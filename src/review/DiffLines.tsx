@@ -128,6 +128,28 @@ interface Props extends LineHandlers {
   onBackgroundMouseDown(): void;
 }
 
+/** The header of the file at the top of the viewport, once its own header has scrolled
+ * away. The next file's header pushes it up as it arrives. */
+function stickyFile(
+  lines: DisplayLine[],
+  v: ReturnType<typeof useVirtualizer<HTMLDivElement, Element>>,
+): { file: number; shift: number } | undefined {
+  const offset = v.scrollOffset ?? 0;
+  const top = v.getVirtualItems().find((item) => item.end > offset);
+  if (!top) return undefined;
+  const file = lines[top.index]?.file;
+  if (file === undefined) return undefined;
+  let headerIdx = top.index;
+  while (headerIdx > 0 && lines[headerIdx].kind !== "file") headerIdx--;
+  const measured = v.measurementsCache;
+  if ((measured[headerIdx]?.start ?? 0) >= offset) return undefined;
+  let next = top.index + 1;
+  while (next < lines.length && lines[next].kind !== "file") next++;
+  const nextStart = measured[next]?.start;
+  const gap = nextStart === undefined ? FILE_HEIGHT : nextStart - offset;
+  return { file, shift: Math.min(0, gap - FILE_HEIGHT) };
+}
+
 export function DiffLines(props: Props) {
   const { files, markers, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
 
@@ -148,21 +170,26 @@ export function DiffLines(props: Props) {
     if (scrollTo) virtualizer.scrollToIndex(scrollTo.line, { align: "start" });
   }, [scrollTo, virtualizer]);
 
+  const sticky = stickyFile(lines, virtualizer);
+
+  const header = (fileIdx: number) => {
+    const file = files[fileIdx];
+    return (
+      <FileHeader
+        dto={file.dto}
+        check={index.checks[fileIdx] ?? "unchecked"}
+        progress={props.progress[fileIdx]}
+        collapsed={props.collapsedFiles.has(file.dto.path)}
+        onClick={() => props.onFileClick(fileIdx)}
+        onToggle={() => props.onToggleFile(fileIdx)}
+        onCheck={(checked) => props.onCheckFile(fileIdx, checked)}
+      />
+    );
+  };
+
   const render = (line: DisplayLine, i: number) => {
     const file = files[line.file];
-    if (line.kind === "file") {
-      return (
-        <FileHeader
-          dto={file.dto}
-          check={index.checks[line.file] ?? "unchecked"}
-          progress={props.progress[line.file]}
-          collapsed={props.collapsedFiles.has(file.dto.path)}
-          onClick={() => props.onFileClick(line.file)}
-          onToggle={() => props.onToggleFile(line.file)}
-          onCheck={(checked) => props.onCheckFile(line.file, checked)}
-        />
-      );
-    }
+    if (line.kind === "file") return header(line.file);
     if (line.kind === "gap") {
       const n = line.rows.length;
       return (
@@ -255,6 +282,16 @@ export function DiffLines(props: Props) {
         if (e.target === e.currentTarget) props.onBackgroundMouseDown();
       }}
     >
+      {sticky && (
+        <div className="sticky-file">
+          <div
+            className="line"
+            style={{ height: FILE_HEIGHT, transform: `translateY(${sticky.shift}px)` }}
+          >
+            {header(sticky.file)}
+          </div>
+        </div>
+      )}
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((v) => {
           const selected = v.index >= selection.start && v.index <= selection.end;

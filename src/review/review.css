@@ -580,3 +580,15 @@
 .log-line.picked {
   background: var(--selection);
 }
+
+.sticky-file {
+  position: sticky;
+  top: 0;
+  height: 0;
+  z-index: 2;
+}
+
+.sticky-file .line {
+  background: var(--bg);
+  box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
+}
