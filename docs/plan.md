@@ -46,12 +46,10 @@ Notes from building M2:
 - Terminal splits, any number of panes.
 - Send a selection or comment to a terminal pane's prompt.
 
-## M4: Comments and GitHub
+## M4: Comments
 
 - Local comments with anchoring.
-- PR checkout (same repo, fork, fallback ref).
-- Pull PR comments, reply locally, publish.
-- Workshop a reply with an agent inside the comment block.
+- Workshop a comment with an agent inside the comment block.
 
 ## M5: Persona reviews
 
@@ -70,3 +68,10 @@ Notes from building M2:
 - File tree and editor tab with syntax highlighting and save.
 
 M7 can move earlier if editing during review is needed sooner. It has no dependency past M1.
+
+## M8: GitHub
+
+Remote features come last, after everything local.
+
+- PR checkout (same repo, fork, fallback ref).
+- Pull PR comments, reply locally (workshopping with an agent as in M4), publish.

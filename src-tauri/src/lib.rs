@@ -119,11 +119,12 @@ fn pty_kill(ptys: State<Ptys>, id: u32) {
     ptys.kill(id);
 }
 
-/// Loads the review for `revset` after snapshotting the working copy.
+/// Loads the review for `revset` after snapshotting the working copy. Starts a review
+/// session, or with `resume` continues the revset's latest one.
 #[tauri::command]
 #[specta::specta]
-async fn open_review(window: WebviewWindow, revset: String) -> CmdResult<ReviewDto> {
-    repo(&window)?.open(&revset).await.map_err(err)
+async fn open_review(window: WebviewWindow, revset: String, resume: bool) -> CmdResult<ReviewDto> {
+    repo(&window)?.open(&revset, resume).await.map_err(err)
 }
 
 #[tauri::command]

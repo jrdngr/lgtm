@@ -130,7 +130,7 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 
 #### File reviewed status
 
-- Each file header has a checkbox. Checking it marks the file reviewed and collapses it. A whole-file selection marked reviewed does the same.
+- Each file header has a checkbox. `x` toggles the checkbox of the file under the cursor. Checking it marks the file reviewed and collapses it. A whole-file selection marked reviewed does the same.
 - File status is separate from line marks. Checking never changes line marks, and unchecking restores them exactly.
 - Skip and flag on a whole-file selection apply to its lines. Files have no skipped or flagged status, and those never collapse a file.
 - When every changed line in a file is reviewed, its checkbox gets an accent ring. It is never checked automatically.

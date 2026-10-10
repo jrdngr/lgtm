@@ -39,6 +39,7 @@ In a review pane:
 | ⌘A | Select the whole review |
 | ⌘Z / ⇧⌘Z | Undo / redo mark changes |
 | ⌘C | Copy selected code text, or the selected rows when no text is selected |
+| `x` | Check or uncheck the file under the cursor |
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `Esc` | Back to the cursor row |
 

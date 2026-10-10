@@ -50,6 +50,7 @@ pub struct FileDto {
     pub new_symbols: Vec<CodeSymbol>,
 }
 
+#[derive(Clone)]
 pub struct FileSide {
     /// `None` for the root commit and for interdiffs, whose old side isn't a commit.
     pub commit: Option<String>,
@@ -58,6 +59,7 @@ pub struct FileSide {
 }
 
 /// A changed row and the anchor a mark made on it would get.
+#[derive(Clone)]
 pub struct Keyed {
     pub row: u32,
     pub side: Side,
@@ -73,6 +75,7 @@ pub struct RowPos {
     pub new_line: Option<u32>,
 }
 
+#[derive(Clone)]
 pub struct ReviewFile {
     pub status: FileStatus,
     pub path: String,
@@ -98,21 +101,8 @@ pub struct Sides {
     pub new: String,
 }
 
-/// Builds per-file state and the UI's view of each file. CPU-bound: parsing and highlighting.
-pub fn build_files(
-    sides: &Sides,
-    diffs: Vec<FileDiff>,
-    contents: Vec<(Option<String>, Option<String>)>,
-    config: &Config,
-) -> (Vec<ReviewFile>, Vec<FileDto>) {
-    diffs
-        .into_iter()
-        .zip(contents)
-        .map(|(d, (old_text, new_text))| build_file(sides, d, old_text, new_text, config))
-        .unzip()
-}
-
-fn build_file(
+/// Builds a file's review state and the UI's view of it. CPU-bound: parsing and highlighting.
+pub fn build_file(
     sides: &Sides,
     d: FileDiff,
     old_text: Option<String>,

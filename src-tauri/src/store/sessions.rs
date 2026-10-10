@@ -18,11 +18,16 @@ pub struct Session {
 impl Store {
     /// The most recent session of `review`.
     pub fn last_session(&self, review: &str) -> rusqlite::Result<Option<Session>> {
+        self.session_before(review, i64::MAX)
+    }
+
+    /// The most recent session of `review` that started before session `id`.
+    pub fn session_before(&self, review: &str, id: i64) -> rusqlite::Result<Option<Session>> {
         self.db
             .query_row(
-                "SELECT id, started_at, commits, seen FROM sessions WHERE review = ?
+                "SELECT id, started_at, commits, seen FROM sessions WHERE review = ? AND id < ?
                  ORDER BY id DESC LIMIT 1",
-                [review],
+                params![review, id],
                 |r| {
                     let commits: String = r.get(2)?;
                     Ok(Session {

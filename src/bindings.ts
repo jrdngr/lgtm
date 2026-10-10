@@ -19,8 +19,11 @@ export const commands = {
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
-	/**  Loads the review for `revset` after snapshotting the working copy. */
-	openReview: (revset: string) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { revset })),
+	/**
+	 *  Loads the review for `revset` after snapshotting the working copy. Starts a review
+	 *  session, or with `resume` continues the revset's latest one.
+	 */
+	openReview: (revset: string, resume: boolean) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { revset, resume })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Reloads a review after the repo changed, or switches it to `view`. */
 	refreshReview: (review: number, view: 

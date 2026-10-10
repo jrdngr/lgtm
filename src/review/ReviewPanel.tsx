@@ -325,6 +325,11 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       case "m":
         openMenuAtCursor();
         break;
+      case "x": {
+        const file = lines[cursor]?.file;
+        if (file !== undefined && !e.repeat) setChecked(file, index.checks[file] !== "checked");
+        break;
+      }
       default:
         return;
     }

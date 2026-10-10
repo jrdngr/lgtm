@@ -18,6 +18,7 @@ export function useReview() {
   const [stale, setStale] = useState<string | null>(null);
   const current = useRef<ReviewDto>(undefined);
   const busy = useRef(false);
+  const opened = useRef<string>(undefined);
   const again = useRef(false);
 
   function show(next: Loaded) {
@@ -26,10 +27,13 @@ export function useReview() {
     setStale(next.review.stale);
   }
 
+  /** Loading the revset this pane already loaded continues its review session. */
   async function open(revset: string): Promise<ReviewDto | undefined> {
+    const resume = opened.current === revset;
+    opened.current = revset;
     setLoading(true);
     setError(undefined);
-    const r = await commands.openReview(revset);
+    const r = await commands.openReview(revset, resume);
     setLoading(false);
     if (r.status === "error") {
       setError(r.error);

@@ -56,6 +56,7 @@ fn is_trivial(line: &str) -> bool {
 }
 
 /// Line hashes for one side of a file, with which lines can serve as context.
+#[derive(Clone)]
 pub struct FileIndex {
     pub hashes: Vec<i64>,
     landmark: Vec<bool>,

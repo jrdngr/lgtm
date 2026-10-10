@@ -1,6 +1,7 @@
 //! A loaded review: its diff, file sides, anchors, and the marks and checks matched onto it.
 
 mod build;
+mod cache;
 mod matching;
 mod rowmap;
 #[cfg(test)]
@@ -41,6 +42,7 @@ pub struct RepoCtx {
     pub watch: Mutex<Option<Watch>>,
     reviews: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
     next_id: AtomicU32,
+    cache: Mutex<cache::FileCache>,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -155,6 +157,7 @@ impl RepoCtx {
             watch: Mutex::default(),
             reviews: Mutex::default(),
             next_id: AtomicU32::new(1),
+            cache: Mutex::default(),
         }
     }
 
@@ -181,15 +184,20 @@ impl RepoCtx {
         Ok(())
     }
 
-    /// Opens `revset` in the Combined view and starts a review session.
-    pub async fn open(&self, revset: &str) -> anyhow::Result<ReviewDto> {
+    /// Opens `revset` in the Combined view. Starts a review session, or with `resume`
+    /// continues the revset's latest one, as when the same revset is loaded again.
+    pub async fn open(&self, revset: &str, resume: bool) -> anyhow::Result<ReviewDto> {
         self.snapshot().await?;
-        let (prev, session) = {
+        let (prev, session, seen) = {
             let store = self.store.lock().unwrap();
-            (
-                store.last_session(revset)?,
-                store.start_session(revset, now_ms())?,
-            )
+            match store.last_session(revset)?.filter(|_| resume) {
+                Some(last) => (store.session_before(revset, last.id)?, last.id, last.seen),
+                None => (
+                    store.last_session(revset)?,
+                    store.start_session(revset, now_ms())?,
+                    vec![],
+                ),
+            }
         };
         let loaded = self.load(revset, &View::Combined, prev.as_ref()).await?;
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
@@ -201,7 +209,11 @@ impl RepoCtx {
             matched: HashMap::new(),
             checks: vec![],
             amber: vec![],
-            baseline: prev.iter().flat_map(|p| p.seen.iter().copied()).collect(),
+            baseline: prev
+                .iter()
+                .flat_map(|p| p.seen.iter().copied())
+                .chain(seen)
+                .collect(),
             session,
             commits: vec![],
             prev,
@@ -248,12 +260,8 @@ impl RepoCtx {
         let spec = views::spec(&self.jj, revset, view, &stack).await?;
         let diffs = spec.diff(&self.jj).await?;
         let sides = spec.sides();
-        let contents = self.load_contents(&sides, &diffs).await?;
         let cfg = config.matching;
-        let (files, dtos) = tokio::task::spawn_blocking(move || {
-            build::build_files(&sides, diffs, contents, &config)
-        })
-        .await?;
+        let (files, dtos) = self.build(sides, diffs, config).await?;
         let (from, to) = spec.endpoints();
         Ok(Loaded {
             files,
@@ -280,11 +288,52 @@ impl RepoCtx {
         })
     }
 
+    /// Builds each file, reusing the last load's build of files whose diff is unchanged.
+    async fn build(
+        &self,
+        sides: Sides,
+        diffs: Vec<FileDiff>,
+        config: Config,
+    ) -> anyhow::Result<(Vec<ReviewFile>, Vec<FileDto>)> {
+        let keys: Vec<cache::Key> = diffs
+            .iter()
+            .map(|d| cache::key(&sides, d, &config))
+            .collect();
+        let mut built: Vec<Option<(ReviewFile, FileDto)>> = {
+            let mut cache = self.cache.lock().unwrap();
+            keys.iter().map(|k| cache.take(k, &sides.new)).collect()
+        };
+        let misses: Vec<(usize, FileDiff)> = diffs
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| built[*i].is_none())
+            .collect();
+        let miss_diffs: Vec<&FileDiff> = misses.iter().map(|(_, d)| d).collect();
+        let contents = self.load_contents(&sides, &miss_diffs).await?;
+        let fresh = tokio::task::spawn_blocking(move || {
+            misses
+                .into_iter()
+                .zip(contents)
+                .map(|((i, d), (old, new))| (i, build::build_file(&sides, d, old, new, &config)))
+                .collect::<Vec<_>>()
+        })
+        .await?;
+        for (i, b) in fresh {
+            built[i] = Some(b);
+        }
+        let built: Vec<(ReviewFile, FileDto)> = built.into_iter().map(Option::unwrap).collect();
+        self.cache
+            .lock()
+            .unwrap()
+            .replace(keys.into_iter().zip(built.iter().cloned()));
+        Ok(built.into_iter().unzip())
+    }
+
     /// Old and new contents per file, `None` where a side is absent, binary, or too large.
     async fn load_contents(
         &self,
         sides: &Sides,
-        diffs: &[FileDiff],
+        diffs: &[&FileDiff],
     ) -> anyhow::Result<Vec<(Option<String>, Option<String>)>> {
         let limit = tokio::sync::Semaphore::new(8);
         let load = |commit: Option<&'_ str>, path: &'_ str, present: bool| {
