@@ -102,6 +102,16 @@ const GO_SYMBOLS: &str = r#"
 (type_declaration (type_spec name: (type_identifier) @name)) @symbol
 "#;
 
+const SWIFT_SYMBOLS: &str = r#"
+(class_declaration name: (_) @name) @symbol
+(protocol_declaration name: (_) @name) @symbol
+(function_declaration name: (_) @name) @symbol
+(protocol_function_declaration name: (_) @name) @symbol
+(init_declaration "init" @name) @symbol
+(deinit_declaration "deinit" @name) @symbol
+(subscript_declaration "subscript" @name) @symbol
+"#;
+
 fn lang(
     language: Language,
     name: &str,
@@ -204,6 +214,17 @@ static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|| {
         ),
     );
     m.insert(
+        "swift",
+        lang(
+            tree_sitter_swift::LANGUAGE.into(),
+            "swift",
+            tree_sitter_swift::HIGHLIGHTS_QUERY,
+            SWIFT_SYMBOLS,
+            &["comment", "multiline_comment"],
+            none,
+        ),
+    );
+    m.insert(
         "json",
         lang(
             tree_sitter_json::LANGUAGE.into(),
@@ -259,6 +280,7 @@ fn lang_key(path: &str) -> Option<&'static str> {
         "tsx" => "tsx",
         "js" | "jsx" | "mjs" | "cjs" => "js",
         "go" => "go",
+        "swift" => "swift",
         "json" => "json",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
@@ -386,7 +408,10 @@ fn kind_of(node_kind: &str) -> SymbolKind {
         k if k.contains("function") || k.contains("method") || k == "lexical_declaration" => {
             SymbolKind::Function
         }
-        "macro_definition" => SymbolKind::Function,
+        "macro_definition"
+        | "init_declaration"
+        | "deinit_declaration"
+        | "subscript_declaration" => SymbolKind::Function,
         _ => SymbolKind::Class,
     }
 }
@@ -406,7 +431,7 @@ mod tests {
 
     #[test]
     fn every_language_builds() {
-        assert_eq!(LazyLock::force(&LANGS).len(), 10);
+        assert_eq!(LazyLock::force(&LANGS).len(), 11);
     }
 
     #[test]
@@ -430,6 +455,23 @@ mod tests {
         assert_eq!(
             symbols("a.ts", src),
             [("A".into(), 1, 4), ("m".into(), 2, 3), ("f".into(), 5, 6)]
+        );
+    }
+
+    #[test]
+    fn swift_symbols_cover_types_members_and_extensions() {
+        let src = "/// Docs.\n@MainActor\nstruct S {\n    init() {}\n    func f() {}\n}\n\nprotocol P {\n    func g()\n}\n\nextension S {\n    deinit {}\n}\n";
+        assert_eq!(
+            symbols("a.swift", src),
+            [
+                ("S".into(), 1, 6),
+                ("init".into(), 4, 4),
+                ("f".into(), 5, 5),
+                ("P".into(), 8, 10),
+                ("g".into(), 9, 9),
+                ("S".into(), 12, 14),
+                ("deinit".into(), 13, 13),
+            ]
         );
     }
 

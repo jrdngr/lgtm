@@ -111,10 +111,12 @@ interface Props extends LineHandlers {
   cursor: number;
   collapsed: ReadonlySet<string>;
   scrollRef: RefObject<HTMLDivElement | null>;
+  /** Scrolls this line to the top whenever a new object is passed. */
+  scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
 }
 
-const STATUS_LABEL = {
+export const STATUS_LABEL = {
   modified: "M",
   added: "A",
   removed: "D",
@@ -123,7 +125,8 @@ const STATUS_LABEL = {
 } as const;
 
 export function DiffLines(props: Props) {
-  const { files, markers, lines, mode, marks, selection, cursor, collapsed, scrollRef } = props;
+  const { files, markers, lines, mode, marks, selection, cursor, collapsed, scrollRef, scrollTo } =
+    props;
 
   const virtualizer = useVirtualizer({
     count: lines.length,
@@ -135,6 +138,11 @@ export function DiffLines(props: Props) {
   useEffect(() => {
     virtualizer.scrollToIndex(cursor, { align: "auto" });
   }, [cursor, virtualizer]);
+
+  // After the cursor effect, so a jump wins over its scroll.
+  useEffect(() => {
+    if (scrollTo) virtualizer.scrollToIndex(scrollTo.line, { align: "start" });
+  }, [scrollTo, virtualizer]);
 
   const render = (line: DisplayLine, i: number) => {
     const file = files[line.file];

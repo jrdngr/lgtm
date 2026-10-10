@@ -64,8 +64,10 @@ fn to_blob(hashes: &[i64]) -> Vec<u8> {
 }
 
 fn from_blob(blob: &[u8]) -> Vec<i64> {
-    blob.chunks_exact(8)
-        .map(|c| i64::from_le_bytes(c.try_into().unwrap()))
+    blob.as_chunks::<8>()
+        .0
+        .iter()
+        .map(|c| i64::from_le_bytes(*c))
         .collect()
 }
 

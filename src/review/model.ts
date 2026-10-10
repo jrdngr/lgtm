@@ -208,3 +208,16 @@ export function symbolMarkers(file: FlatFile): SymbolMarkers {
   });
   return out;
 }
+
+/** Reviewed and total changed rows per file. */
+export function fileProgress(
+  files: FlatFile[],
+  marks: MarkDto[],
+): { reviewed: number; changed: number }[] {
+  const out = files.map((f) => ({
+    reviewed: 0,
+    changed: f.rows.filter((r) => r.kind !== "context").length,
+  }));
+  for (const m of marks) if (m.state === "reviewed" && out[m.file]) out[m.file].reviewed++;
+  return out;
+}

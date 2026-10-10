@@ -327,3 +327,50 @@
 .hl-punctuation {
   color: #d4d4d4;
 }
+
+.file-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  height: 100%;
+  overflow: auto;
+}
+
+.file-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.file-list button:hover {
+  background: var(--selection);
+}
+
+.file-list .status {
+  font:
+    11px Menlo,
+    monospace;
+}
+
+.file-list .path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+}
+
+.file-list .count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.file-list .count.done {
+  color: var(--reviewed);
+}

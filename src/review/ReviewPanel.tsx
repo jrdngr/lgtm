@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarkDto, MarkState, ReviewDto } from "../bindings";
 import { commands } from "../ipc";
 import { isMac } from "../workbench/keys";
+import { type CurrentReview, publishReview, retractReview } from "./current";
 import { DiffLines } from "./DiffLines";
 import { DISABLED, MarkMenu, MENU_KEYS, type MenuAction } from "./MarkMenu";
 import {
@@ -70,12 +71,15 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const [extending, setExtending] = useState(false);
   const [anchor, setAnchor] = useState(0);
   const [menu, setMenu] = useState<{ x: number; y: number }>();
+  const [scrollTo, setScrollTo] = useState<{ line: number }>();
 
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const pendingZ = useRef(false);
   const reviewId = useRef<number>(undefined);
+  const published = useRef<CurrentReview>(undefined);
+  const jumpRef = useRef<(file: number) => void>(() => {});
 
   const files = useMemo(() => (review ? flatten(review) : []), [review]);
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
@@ -121,6 +125,20 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   }, []);
 
   useEffect(() => {
+    const publish = () => {
+      published.current = { files, marks, jump: (f) => jumpRef.current(f) };
+      publishReview(published.current);
+    };
+    if (review && (api.isActive || !published.current)) publish();
+    const sub = api.onDidActiveChange(({ isActive }) => {
+      if (isActive && review) publish();
+    });
+    return () => sub.dispose();
+  }, [api, review, files, marks]);
+
+  useEffect(() => () => retractReview(published.current), []);
+
+  useEffect(() => {
     const up = () => {
       dragging.current = false;
     };
@@ -149,9 +167,27 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     const rows = changedRows(files, lines, sel.start, sel.end);
     if (rows.length === 0) return;
     const r = await commands.markRows(review.id, rows, state);
-    if (r.status === "ok") setMarks(r.data);
-    else setError(r.error);
+    if (r.status !== "ok") {
+      setError(r.error);
+      return;
+    }
+    setMarks(r.data);
+    setExtending(false);
+    setAnchor(cursor);
+    select(lineSelection(cursor));
   }
+
+  jumpRef.current = (file: number) => {
+    const header = lines.findIndex((l) => l.kind === "file" && l.file === file);
+    if (header < 0) return;
+    const next = lines[header + 1];
+    const at = next?.kind === "file" ? header : nextRowLine(lines, header, 1);
+    setAnchor(at);
+    select(lineSelection(at), at);
+    setScrollTo({ line: header });
+    api.setActive();
+    rootRef.current?.focus({ preventScroll: true });
+  };
 
   async function step(undo: boolean) {
     if (!review) return;
@@ -393,6 +429,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
           cursor={cursor}
           collapsed={collapsed}
           scrollRef={scrollRef}
+          scrollTo={scrollTo}
           onBackgroundMouseDown={() => select(lineSelection(cursor))}
           {...handlers}
         />

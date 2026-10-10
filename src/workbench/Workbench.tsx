@@ -3,23 +3,19 @@ import {
   type DockviewApi,
   DockviewReact,
   type DockviewReadyEvent,
-  type IDockviewPanelProps,
   themeDark,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
 import { useEffect, useState } from "react";
 import { commands, type RepoInfo, unwrap } from "../ipc";
+import { FilesPanel } from "../review/FilesPanel";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { chord } from "./keys";
 
-function Placeholder({ api }: IDockviewPanelProps) {
-  return <div className="placeholder">{api.title}</div>;
-}
-
 const components = {
   review: ReviewPanel,
-  files: Placeholder,
+  files: FilesPanel,
   terminal: TerminalPanel,
 };
 

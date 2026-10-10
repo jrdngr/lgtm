@@ -4,13 +4,14 @@ Desktop code review for agentic development, built on jj. See `docs/` for the sp
 
 ## Develop
 
-Needs Rust, Node 22, pnpm, and jj 0.46 or newer (for `jj util snapshot`).
+Needs Rust, Node 22, pnpm, [just](https://github.com/casey/just), and jj 0.46 or newer (for `jj util snapshot`).
 
 ```sh
 pnpm install
-pnpm tauri dev   # shows the repo picker
-pnpm check       # tsc + biome
-pnpm test        # vitest + cargo test (the Rust tests run jj)
+just dev         # hot reload; shows the repo picker
+just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
+just build       # release binary and .app
+just run [repo]  # run the release build
 ```
 
 Debug builds regenerate `src/bindings.ts` from the Rust commands. `cargo test` fails if it's stale; rerun with `UPDATE_BINDINGS=1` to refresh it.
@@ -32,13 +33,15 @@ In a review pane:
 | `j` / `k` | Move the cursor |
 | `J` / `K`, or `v` then `j` / `k` | Extend the selection |
 | `e` / `E` | Expand / shrink: line, function, hunk, file, review |
-| `space` | Mark reviewed |
+| `space` | Mark reviewed (the selection then collapses to the cursor) |
 | `m` or right-click | Mark menu: `r` reviewed, `s` skip, `f` flag, `u` clear |
 | ⌘A | Select the whole review |
 | ⌘Z / ⇧⌘Z | Undo / redo mark changes |
 | ⌘C | Copy the selected rows |
 | `za` | Collapse or expand the hunk |
 | `Esc` | Back to the cursor row |
+
+The Files panel lists the review's files with reviewed/changed row counts. Click one to jump to it.
 
 Mouse: click a row, drag or shift-click for a range, double-click for the function, triple-click for the hunk. Click a file header, hunk header, or ƒ marker to select that unit.
 
