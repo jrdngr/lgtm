@@ -10,7 +10,7 @@ use tauri_specta::Event as _;
 
 use crate::events::{RepoChanged, WorkingCopyStale};
 use crate::jj::Jj;
-use crate::review::RepoCtx;
+use crate::review::{Emit, RepoCtx};
 use crate::store::Store;
 use crate::watch;
 
@@ -81,31 +81,44 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     let store = Store::open(&data_dir.join("repos").join(key(&root)).join("lgtm.db"))
         .map_err(|e| format!("open mark store: {e:#}"))?;
     let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
-    let emit = {
+    let emit: Emit = {
         let (app, label) = (app.clone(), label.clone());
-        move |e: watch::Event| {
+        Arc::new(move |workspace: Option<String>, e: watch::Event| {
             let sent = match e {
                 watch::Event::RepoChanged => RepoChanged {}.emit_to(&app, &label),
-                watch::Event::Stale(message) => WorkingCopyStale { message }.emit_to(&app, &label),
+                watch::Event::Stale(message) => {
+                    WorkingCopyStale { workspace, message }.emit_to(&app, &label)
+                }
             };
             sent.ok();
-        }
+        })
     };
-    match watch::start(&root, ctx.jj.clone(), ctx.stale.clone(), emit) {
-        Ok(w) => *ctx.watch.lock().unwrap() = Some(w),
-        Err(e) => eprintln!("lgtm: watch {}: {e:#}", root.display()),
-    }
+    *ctx.emit.lock().unwrap() = Some(emit);
+    ctx.watch(&ctx.main);
+    let ctx = Arc::new(ctx);
+    // Watch the other workspaces too, without holding up the window.
+    tauri::async_runtime::spawn({
+        let ctx = ctx.clone();
+        async move {
+            ctx.list_workspaces()
+                .await
+                .map(drop)
+                .unwrap_or_else(|e| eprintln!("lgtm: {e:#}"))
+        }
+    });
     app.state::<RepoWindows>()
         .0
         .lock()
         .unwrap()
-        .insert(label.clone(), Arc::new(ctx));
+        .insert(label.clone(), ctx);
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
         eprintln!("lgtm: save recent repos: {e}");
     }
     WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title(name(&root))
         .inner_size(1400.0, 900.0)
+        // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
+        .disable_drag_drop_handler()
         .build()
         .map_err(|e| e.to_string())?;
 

@@ -39,12 +39,24 @@ Notes from building M2:
 - Since last session, after a split, diffs the old commit against the last successor's tree. That includes base changes if the stack was rebased too.
 - An interdiff's old side isn't a commit, so its removed rows can't be marked.
 
-## M3: Tasks and terminals
+## M3: Workspaces and terminals
 
-- Tasks as jj workspaces, `.lgtm/setup`, `lgtm gc`.
-- Task sidebar with review progress.
+- Workspaces via `jj workspace add`, `.lgtm/setup`, `lgtm gc`.
+- Workspace sidebar with review progress. Each workspace has its own layout.
 - Terminal splits, any number of panes.
 - Send a selection or comment to a terminal pane's prompt.
+
+Notes from building M3:
+- New workspaces go in `$XDG_DATA_HOME/lgtm/ws/<repo>/<workspace>`, falling back to `~/.local/share`. Names are limited to letters, digits, `.`, `_` and `-`.
+- `.lgtm/setup` runs in the new workspace's first terminal, so its output is visible, then the shell takes over. Terminals get `LGTM_ROOT` (the main workspace) and `LGTM_WORKSPACE`.
+- Each workspace mounts its own dock and saves its own layout. Docks of unselected workspaces stay mounted but hidden, so their terminals keep running.
+- Deleting a workspace forgets it and deletes its directory only when lgtm created it. Its commits stay.
+- `lgtm gc [repo]` removes workspace directories whose workspace was forgotten or whose repo is gone, and forgets workspaces whose directory is gone.
+- Review sessions record their workspace. Marks made outside the main workspace record `<revset> in <workspace>` as their review.
+- The sidebar's progress is for the workspace's latest reviewed revset, or `@`.
+- Send to agent pastes into the workspace's last focused terminal, and only when its program has bracketed paste on, so a shell never runs the pasted lines. Comments come with M4.
+- Panes move by dragging their tabs. ⌘[ and ⌘] move between panes.
+- Workspaces sit in a left side panel and Files in a right one, outside the pane grid. Each side panel holds views behind a tab strip; repo files will join the right one in M7. ⌘B and ⌥⌘B show and hide them, ⇧⌘K and ⇧⌘E open and focus Workspaces and Files. Their visibility, widths and tabs are saved per repo, shared by its workspaces.
 
 ## M4: Comments
 

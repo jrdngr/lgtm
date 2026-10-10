@@ -136,3 +136,105 @@ button:hover:not(:disabled) {
   box-sizing: border-box;
   background: var(--bg);
 }
+
+.workbench-body {
+  display: flex;
+  min-height: 0;
+}
+
+.docks {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.dock {
+  position: absolute;
+  inset: 0;
+}
+
+.dock[hidden] {
+  display: none;
+}
+
+.side-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  background: var(--bg);
+}
+
+.side-left {
+  border-right: 1px solid var(--border);
+}
+
+.side-right {
+  border-left: 1px solid var(--border);
+}
+
+.side-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.side-tabs button {
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.side-tabs button.selected {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+
+.side-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  outline: none;
+}
+
+.side-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 1;
+}
+
+.side-left .side-resizer {
+  right: -3px;
+}
+
+.side-right .side-resizer {
+  left: -3px;
+}
+
+.side-resizer:hover {
+  background: var(--accent);
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 4px;
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+.icon-button[aria-pressed="true"] {
+  color: var(--fg);
+}

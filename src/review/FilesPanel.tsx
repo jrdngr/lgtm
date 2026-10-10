@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
+import { useWorkspace } from "../workspaces/context";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { STATUS_LABEL } from "./FileHeader";
 import { matchesFilter, type Progress } from "./state";
 import { buildTree, type TreeNode } from "./tree";
 
-function Count({ p }: { p: Progress }) {
+export function Count({ p }: { p: Progress }) {
   const done = p.changed > 0 && p.unreviewed === 0;
   const pct = p.changed ? Math.round(((p.changed - p.unreviewed) / p.changed) * 100) : 100;
   return (
@@ -77,7 +78,7 @@ function Node({ node, depth, review, closed, onToggle }: NodeProps) {
 /** The current review's files as a tree with per-file and per-directory progress. It follows
  * the review pane's line filter. Click a file to jump to it. */
 export function FilesPanel() {
-  const review = useCurrentReview();
+  const review = useCurrentReview(useWorkspace());
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const tree = useMemo(
     () =>

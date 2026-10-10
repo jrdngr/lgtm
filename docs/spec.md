@@ -1,6 +1,6 @@
 # LGTM spec
 
-LGTM is a desktop app for the code review part of agentic development. Most features are about review. Basic agentic workflows (tasks, terminals, sending work to an agent) are also supported.
+LGTM is a desktop app for the code review part of agentic development. Most features are about review. Basic agentic workflows (workspaces, terminals, sending work to an agent) are also supported.
 
 Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 
@@ -8,8 +8,9 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 
 - v1 targets macOS. Keep the code portable to Linux and Windows: no macOS-only APIs outside a platform module.
 - jj only. git is not supported in v1.
-- One app instance per repo. One instance holds many workspaces (tasks).
-- Every major view is a tab that can be docked into custom splits. Layout is remembered per repo.
+- One app instance per repo. One instance holds many jj workspaces.
+- Every major view is a tab that can be docked into custom splits. Each workspace has its own layout, remembered per repo.
+- Workspaces and the file tree are views in side panels left and right of the pane grid. Keys show and hide each side panel and jump to each view.
 - Keybinds cover navigation and marking.
 - A basic file tree and file editor with syntax highlighting.
 - Full terminal support with arbitrary splits. The user runs their agent here.
@@ -41,13 +42,14 @@ Persona-based review, based on the `wee-bots` skill in `jrdngr/agent-stuff`.
 - Every read uses `--ignore-working-copy`. One debounced (about 300 ms) `jj util snapshot` worker runs per workspace. Never run two writing jj commands in one workspace at once.
 - Use jj for revsets, diffs, and undo wherever it already does the job.
 
-### Tasks and workspaces
+### Workspaces
 
-- A task is a jj workspace (`jj workspace add`) under `~/.local/share/lgtm/ws/<repo>/<task>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace counts as a task.
-- "New task" runs `jj workspace add` and `jj new trunk()` there, runs the repo's `.lgtm/setup` script if present, then opens a terminal.
+- New workspaces (`jj workspace add`) go under `~/.local/share/lgtm/ws/<repo>/<workspace>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace is listed too.
+- "New workspace" runs `jj workspace add -r trunk()`, then opens a terminal there that runs the repo's `.lgtm/setup` script if present.
+- The sidebar switches between workspaces. Each has its own panes and layout. Switching hides the other workspaces' panes; their terminals keep running.
 - The default review target is `@`. A commit picker shows `jj log` as the user has it configured; picking one commit or a range sets the revset.
-- Reviewing someone else's PR creates its own task on the PR head, so agent edits never touch other work.
-- Workspaces are removed when their task is deleted, or by `lgtm gc`.
+- Reviewing someone else's PR creates its own workspace on the PR head, so agent edits never touch other work.
+- Deleting a workspace forgets it and removes its directory. `lgtm gc` cleans up any left behind.
 
 ### Diff output
 
@@ -85,7 +87,7 @@ Persona-based review, based on the `wee-bots` skill in `jrdngr/agent-stuff`.
 
 - Same-repo PR: `jj git fetch -b <head-branch>`.
 - Fork PR: add a remote named `gh-<owner>` on demand, then fetch the head branch.
-- Fallback when the branch is gone: in a colocated repo, `git fetch origin pull/N/head:refs/heads/lgtm/pr-N`, then `jj git import`. Clean these bookmarks up when the task closes.
+- Fallback when the branch is gone: in a colocated repo, `git fetch origin pull/N/head:refs/heads/lgtm/pr-N`, then `jj git import`. Clean these bookmarks up when the workspace is deleted.
 
 ## 5. Marking and anchoring
 
@@ -148,7 +150,7 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 
 - Per file and per review: reviewed / skipped / flagged / remaining line counts.
 - A checked file counts as fully reviewed in every progress figure, whatever its line marks say.
-- The file tree shows per-file progress. The review header shows overall progress. The task sidebar shows each task's review progress.
+- The file tree shows per-file progress. The review header shows overall progress. The workspace sidebar shows each workspace's review progress.
 - A line filter sits at the top of the review: All, Unreviewed, Reviewed, Skipped, Flagged (single choice).
   - Only changed rows in that state show. Amber rows count as unreviewed, and rows in a checked file count as reviewed.
   - Hidden runs render as thin gap bars. Files and hunks with no matching rows are hidden. The file tree follows the same filter.

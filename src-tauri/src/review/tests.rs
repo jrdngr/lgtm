@@ -82,7 +82,7 @@ async fn marks_follow_code_through_edits_and_rewrites() {
     );
     jj(d, &["describe", "-m", "add a"]);
 
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let in_b = row_of(&review, 0, "    x();", 1);
     let marks = ctx
         .mark(review.id, &[in_b], Some(MarkState::Flagged), &[])
@@ -99,7 +99,7 @@ async fn marks_follow_code_through_edits_and_rewrites() {
         "a.rs",
         "fn z() {}\n\nfn a() {\n    x();\n}\n\nfn b() {\n      x();\n}\n",
     );
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let b_row = row_of(&review, 0, "      x();", 0);
     assert_eq!(review.state.marks.len(), 1);
     assert_eq!(
@@ -109,7 +109,7 @@ async fn marks_follow_code_through_edits_and_rewrites() {
 
     // A new commit on top doesn't change the reviewed stack's code.
     jj(d, &["new", "-m", "next"]);
-    let review = ctx.open("@-", false).await.unwrap();
+    let review = ctx.open(None, "@-", false).await.unwrap();
     assert_eq!(review.state.marks.len(), 1);
 }
 
@@ -118,7 +118,7 @@ async fn undo_and_redo_step_through_mark_changes() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.py", "def f():\n    return 1\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    return 1", 0);
     ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
         .unwrap();
@@ -146,13 +146,13 @@ async fn marks_survive_a_rename_added_to_the_reviewed_change() {
     write(d, "old.py", "def f():\n    return 1\n");
     jj(d, &["new", "-m", "change"]);
     write(d, "old.py", "def f():\n    log()\n    return 1\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    log()", 0);
     ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
         .unwrap();
 
     std::fs::rename(d.join("old.py"), d.join("new.py")).unwrap();
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(review.files[0].old_path.as_deref(), Some("old.py"));
     assert_eq!(
         marked(&review, &review.state.marks),
@@ -171,7 +171,7 @@ async fn marks_follow_a_heavily_edited_rename_reported_as_delete_and_add() {
         "old.rs",
         "fn a() {}\nfn b() {}\nfn c() {}\nlet marked = 1;\n",
     );
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let file = review
         .files
         .iter()
@@ -187,7 +187,7 @@ async fn marks_follow_a_heavily_edited_rename_reported_as_delete_and_add() {
         "new.rs",
         "fn x() {}\nfn y() {}\nfn z() {}\nfn w() {}\nlet marked = 1;\n",
     );
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     assert!(review.files.iter().all(|f| f.old_path.is_none()));
     assert_eq!(
         marked(&review, &review.state.marks),
@@ -200,7 +200,7 @@ async fn reapplying_same_state_is_a_no_op_and_reset_removes_review_marks() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.go", "package a\n\nfunc F() {}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "func F() {}", 0);
     ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
         .unwrap();
@@ -218,6 +218,6 @@ async fn review_with_two_heads_is_rejected() {
     let d = dir.path();
     jj(d, &["new", "root()", "-m", "a"]);
     jj(d, &["new", "root()", "-m", "b"]);
-    let err = ctx.open("root()+", false).await.err().unwrap();
+    let err = ctx.open(None, "root()+", false).await.err().unwrap();
     assert!(format!("{err:#}").contains("2 heads"), "{err:#}");
 }

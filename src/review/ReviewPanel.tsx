@@ -2,7 +2,10 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarkState, StateDto, View } from "../bindings";
 import { commands } from "../ipc";
+import { sendToTerminal } from "../terminal/registry";
 import { isMac } from "../workbench/keys";
+import { useWorkspace } from "../workspaces/context";
+import { marksChanged } from "../workspaces/useWorkspaces";
 import { type CurrentReview, publishReview, retractReview } from "./current";
 import { DiffLines } from "./DiffLines";
 import { DISABLED, MarkMenu, MENU_KEYS, type MenuAction } from "./MarkMenu";
@@ -25,6 +28,7 @@ import {
   reviewSelection,
   units,
 } from "./selection";
+import { selectionText } from "./sendText";
 import { type Filter, fileProgress, indexState, rowStates, sumProgress } from "./state";
 import { useReview } from "./useReview";
 import { nextRowLine, useSelection } from "./useSelection";
@@ -39,8 +43,9 @@ function clearTextSelection() {
 type Params = { revset?: string };
 
 export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
+  const workspace = useWorkspace();
   const [revset, setRevset] = useState(params.revset ?? DEFAULT_REVSET);
-  const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview();
+  const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
   const [filter, setFilter] = useState<Filter>("all");
   const [collapsedHunks, setCollapsedHunks] = useState<ReadonlySet<string>>(new Set());
@@ -121,16 +126,24 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         filter,
         jump: (f) => jumpRef.current(f),
       };
-      publishReview(published.current);
+      publishReview(workspace, published.current);
     };
     if (review && (api.isActive || !published.current)) publish();
     const sub = api.onDidActiveChange(({ isActive }) => {
       if (isActive && review) publish();
     });
     return () => sub.dispose();
-  }, [api, review, files, progress, index, filter]);
+  }, [api, workspace, review, files, progress, index, filter]);
 
-  useEffect(() => () => retractReview(published.current), []);
+  useEffect(() => () => retractReview(workspace, published.current), [workspace]);
+
+  // Keys go to the review as soon as its tab is picked, as they do for a terminal.
+  useEffect(() => {
+    const focus = () => rootRef.current?.focus({ preventScroll: true });
+    if (api.isActive) focus();
+    const sub = api.onDidActiveChange(({ isActive }) => isActive && focus());
+    return () => sub.dispose();
+  }, [api]);
 
   useEffect(() => {
     const up = () => {
@@ -157,8 +170,14 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     setFileOpen(new Map(fileOpen).set(path, collapsedFiles.has(path)));
   }
 
-  function applied(state: StateDto, files: number[] = []) {
+  /** Shows marks after an edit, and tells the workspace list its progress moved. */
+  function edited(state: StateDto) {
     setState(state);
+    marksChanged();
+  }
+
+  function applied(state: StateDto, files: number[] = []) {
+    edited(state);
     // Checking collapses a file and unchecking expands it, whatever was done by hand.
     if (files.length) {
       const next = new Map(fileOpen);
@@ -205,14 +224,14 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   async function step(undo: boolean) {
     if (!review) return;
     const r = await (undo ? commands.undoMarks(review.id) : commands.redoMarks(review.id));
-    if (r.status === "ok") setState(r.data);
+    if (r.status === "ok") edited(r.data);
     else setError(r.error);
   }
 
   async function resetMarks() {
     if (!review) return;
     const r = await commands.resetReviewMarks(review.id);
-    if (r.status === "ok") setState(r.data);
+    if (r.status === "ok") edited(r.data);
     else setError(r.error);
   }
 
@@ -231,10 +250,33 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     if (text.length) navigator.clipboard.writeText(text.join("\n"));
   }
 
+  /** Pastes the selection into the prompt of the workspace's last focused terminal. */
+  function sendSelection() {
+    const text = selectionText(files, lines, sel.start, sel.end);
+    if (!text) return;
+    const where = workspace ? `workspace ${workspace}` : "the main workspace";
+    const result = sendToTerminal(workspace, text);
+    if (result === "noTerminal") {
+      setError(`No terminal is open in ${where}. Open one with ⌘T and start your agent.`);
+      return;
+    }
+    if (result === "unsafe") {
+      setError(
+        `The last terminal used in ${where} can't take a paste safely: its program would run each line. Start your agent there first.`,
+      );
+      return;
+    }
+    setError(undefined);
+    s.setExtending(false);
+    place(cursor);
+    clearTextSelection();
+  }
+
   function pick(action: MenuAction) {
     setMenu(undefined);
     if (DISABLED.has(action)) return;
     if (action === "copy") copy();
+    else if (action === "agent") sendSelection();
     else applyMark(action === "clear" ? null : (action as MarkState));
   }
 
@@ -416,6 +458,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       }}
     >
       <ReviewBar
+        workspace={workspace}
         review={review}
         loading={loading}
         revset={revset}

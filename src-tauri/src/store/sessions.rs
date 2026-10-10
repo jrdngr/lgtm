@@ -41,12 +41,32 @@ impl Store {
             .optional()
     }
 
-    pub fn start_session(&self, review: &str, started_at: i64) -> rusqlite::Result<i64> {
+    /// Starts a session of `review`, a review of `revset` in `workspace` (empty for main).
+    pub fn start_session(
+        &self,
+        review: &str,
+        workspace: &str,
+        revset: &str,
+        started_at: i64,
+    ) -> rusqlite::Result<i64> {
         self.db.execute(
-            "INSERT INTO sessions (review, started_at, commits, seen) VALUES (?, ?, '', x'')",
-            params![review, started_at],
+            "INSERT INTO sessions (review, workspace, revset, started_at, commits, seen)
+             VALUES (?, ?, ?, ?, '', x'')",
+            params![review, workspace, revset, started_at],
         )?;
         Ok(self.db.last_insert_rowid())
+    }
+
+    /// The revset of the latest review in `workspace`.
+    pub fn last_revset(&self, workspace: &str) -> rusqlite::Result<Option<String>> {
+        self.db
+            .query_row(
+                "SELECT CASE revset WHEN '' THEN review ELSE revset END FROM sessions
+                 WHERE workspace = ? ORDER BY id DESC LIMIT 1",
+                [workspace],
+                |r| r.get(0),
+            )
+            .optional()
     }
 
     pub fn save_session(&self, id: i64, commits: &[String], seen: &[i64]) -> rusqlite::Result<()> {
@@ -66,12 +86,12 @@ mod tests {
     fn last_session_is_the_newest_for_its_review() {
         let store = Store::in_memory();
         assert_eq!(store.last_session("r").unwrap(), None);
-        let a = store.start_session("r", 1).unwrap();
+        let a = store.start_session("r", "", "r", 1).unwrap();
         store
             .save_session(a, &["c1".into(), "c2".into()], &[7])
             .unwrap();
-        let b = store.start_session("r", 2).unwrap();
-        store.start_session("other", 3).unwrap();
+        let b = store.start_session("r", "", "r", 2).unwrap();
+        store.start_session("@ in t", "t", "@", 3).unwrap();
         let last = store.last_session("r").unwrap().unwrap();
         assert_eq!((last.id, last.commits.len()), (b, 0));
         store.save_session(b, &["c3".into()], &[1, 2]).unwrap();
@@ -80,5 +100,8 @@ mod tests {
             (last.commits, last.seen),
             (vec!["c3".to_string()], vec![1, 2])
         );
+        assert_eq!(store.last_revset("").unwrap().as_deref(), Some("r"));
+        assert_eq!(store.last_revset("t").unwrap().as_deref(), Some("@"));
+        assert_eq!(store.last_revset("gone").unwrap(), None);
     }
 }

@@ -12,18 +12,29 @@ export const commands = {
 	openRepo: (path: string) => typedError<null, string>(__TAURI_INVOKE("open_repo", { path })),
 	/**  Recently opened repos, most recent first. */
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
-	loadLayout: () => typedError<string | null, string>(__TAURI_INVOKE("load_layout")),
-	saveLayout: (layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { layout })),
-	/**  Starts a PTY in the window's repo root. `command` defaults to the login shell. */
-	ptySpawn: (cols: number, rows: number, command: string[] | null, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { cols, rows, command, onEvent })),
+	loadLayout: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("load_layout", { workspace })),
+	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
+	/**
+	 *  Starts a login shell in the workspace. With `setup`, the shell first runs its
+	 *  `.lgtm/setup`.
+	 */
+	ptySpawn: (workspace: string | null, cols: number, rows: number, setup: boolean, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, cols, rows, setup, onEvent })),
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
+	/**  Every workspace, the repo's main one first. */
+	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
+	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` to run. */
+	createWorkspace: (name: string) => typedError<boolean, string>(__TAURI_INVOKE("create_workspace", { name })),
+	/**  Ends the workspace's terminals, then forgets it and deletes its directory. */
+	deleteWorkspace: (name: string) => typedError<null, string>(__TAURI_INVOKE("delete_workspace", { name })),
+	/**  Review progress of the workspace's latest review, or of its `@`. */
+	workspaceProgress: (workspace: string | null) => typedError<ProgressDto, string>(__TAURI_INVOKE("workspace_progress", { workspace })),
 	/**
 	 *  Loads the review for `revset` after snapshotting the working copy. Starts a review
 	 *  session, or with `resume` continues the revset's latest one.
 	 */
-	openReview: (revset: string, resume: boolean) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { revset, resume })),
+	openReview: (workspace: string | null, revset: string, resume: boolean) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Reloads a review after the repo changed, or switches it to `view`. */
 	refreshReview: (review: number, view: 
@@ -34,7 +45,7 @@ export const commands = {
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  `jj log` with the user's default revset and template, for picking commits. */
-	logGraph: () => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph")),
+	logGraph: (workspace: string | null) => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph", { workspace })),
 	/**
 	 *  Marks changed rows, or clears their marks when `state` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -122,6 +133,17 @@ export type MarkDto = {
 
 export type MarkState = "reviewed" | "skipped" | "flagged";
 
+/**  Changed-row counts by state, as the review header counts them. */
+export type ProgressDto = {
+	/**  The revset counted: the workspace's latest review, or `@`. */
+	revset: string,
+	reviewed: number,
+	skipped: number,
+	flagged: number,
+	unreviewed: number,
+	changed: number,
+};
+
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
 export type RefreshDto = {
@@ -208,9 +230,23 @@ export type View =
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string };
 
-/**  The working copy became stale (`message` is jj's error) or stopped being stale (`null`). */
+/**
+ *  A workspace's working copy became stale (`message` is jj's error) or stopped being stale
+ *  (`null`). `workspace` is `null` for the main one.
+ */
 export type WorkingCopyStale = {
+	workspace: string | null,
 	message: string | null,
+};
+
+export type WorkspaceDto = {
+	/**  The workspace name, or `null` for the repo's main workspace. */
+	name: string | null,
+	/**  What to show: the workspace name, main included. */
+	title: string,
+	root: string,
+	changeId: string,
+	description: string,
 };
 
 /* Tauri Specta runtime */

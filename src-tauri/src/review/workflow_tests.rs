@@ -25,17 +25,17 @@ async fn checked_file_unchecks_when_new_rows_arrive_and_they_turn_amber() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.py", "def f():\n    return 1\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let state = ctx.set_checked(review.id, &[0], true).unwrap();
     assert_eq!(state.checks, [CheckState::Checked]);
 
     // Same code in a new commit on top of a new parent: still checked.
     jj(d, &["describe", "-m", "a"]);
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(review.state.checks, [CheckState::Checked]);
 
     write(d, "a.py", "def f():\n    log()\n    return 1\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(review.state.checks, [CheckState::ChangedSinceReviewed]);
     assert_eq!(rows_text(&review, &review.state.amber), ["    log()"]);
 
@@ -58,7 +58,7 @@ async fn checked_file_unchecks_when_new_rows_arrive_and_they_turn_amber() {
 async fn whole_file_reviewed_marks_lines_and_checks_in_one_step() {
     let (dir, ctx) = repo();
     write(dir.path(), "a.go", "package a\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "package a", 0);
     let state = ctx
         .mark(review.id, &[row], Some(MarkState::Reviewed), &[0])
@@ -79,13 +79,13 @@ async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {\n    one();\n}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    one();", 0);
     ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
         .unwrap();
 
     write(d, "a.rs", "fn a() {\n    two();\n}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     assert!(review.state.marks.is_empty());
     assert_eq!(rows_text(&review, &review.state.amber), ["    two();"]);
 
@@ -105,7 +105,7 @@ async fn skip_globs_from_config_flag_files() {
     write(d, ".lgtm/config.toml", "skip = [\"*.lock\"]\n");
     write(d, "Cargo.lock", "x\n");
     write(d, "main.rs", "fn main() {}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let skipped: Vec<_> = review
         .files
         .iter()
@@ -123,7 +123,7 @@ async fn per_change_and_since_last_session_views() {
     jj(d, &["describe", "-m", "first"]);
     jj(d, &["new", "-m", "second"]);
     write(d, "b.txt", "two\n");
-    let review = ctx.open("root()..@", false).await.unwrap();
+    let review = ctx.open(None, "root()..@", false).await.unwrap();
     assert_eq!(review.changes.len(), 2);
     assert!(review.changes.iter().all(|c| c.since == Since::Unknown));
     let first = review.changes[0].change_id.clone();
@@ -144,7 +144,7 @@ async fn per_change_and_since_last_session_views() {
 
     // Next session: the second change was edited, the first wasn't.
     write(d, "b.txt", "two\nthree\n");
-    let review = ctx.open("root()..@", false).await.unwrap();
+    let review = ctx.open(None, "root()..@", false).await.unwrap();
     let since: Vec<_> = review.changes.iter().map(|c| c.since).collect();
     assert_eq!(since, [Since::Same, Since::Changed]);
     assert!(review.previous_session.is_some());
@@ -165,13 +165,13 @@ async fn per_change_and_since_last_session_views() {
     assert!(same.files.is_empty());
 
     // Loading the same revset again continues the session: still compared with the first.
-    let again = ctx.open("root()..@", true).await.unwrap();
+    let again = ctx.open(None, "root()..@", true).await.unwrap();
     let since: Vec<_> = again.changes.iter().map(|c| c.since).collect();
     assert_eq!(since, [Since::Same, Since::Changed]);
 
     // Abandoning a change lists it as removed next session.
     jj(d, &["abandon", "@-"]);
-    let review = ctx.open("root()..@", false).await.unwrap();
+    let review = ctx.open(None, "root()..@", false).await.unwrap();
     assert_eq!(review.removed_changes.len(), 1);
     assert_eq!(review.removed_changes[0].description, "first");
 }
@@ -181,7 +181,7 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {}\nfn b() {}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
     let b = row_of(&review, 0, "fn b() {}", 0);
     let state = ctx
         .mark(review.id, &[b], Some(MarkState::Flagged), &[])
@@ -189,7 +189,7 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
     assert_eq!(marked(&review, &state.marks).len(), 1);
 
     write(d, "a.rs", "fn z() {}\nfn a() {}\nfn b() {}\n");
-    ctx.snapshot().await.unwrap();
+    ctx.main.snapshot().await.unwrap();
     let refreshed = ctx.refresh(review.id, None).await.unwrap();
     let new_b = row_of(&refreshed.review, 0, "fn b() {}", 0);
     let moved = refreshed.moves.iter().find(|m| m.from == b).unwrap();
@@ -208,11 +208,11 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
     let d = dir.path();
     write(d, "a.rs", "fn a() {}\n");
     write(d, "b.rs", "fn b() {}\n");
-    let review = ctx.open("@", false).await.unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
 
     // Editing a.rs makes a new commit; b.rs is reused from the cache.
     write(d, "a.rs", "fn a2() {}\n");
-    ctx.snapshot().await.unwrap();
+    ctx.main.snapshot().await.unwrap();
     let review = ctx.refresh(review.id, None).await.unwrap().review;
     assert_eq!(
         rows_text(&review, &[row_of(&review, 0, "fn a2() {}", 0)]),
@@ -222,7 +222,7 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
     ctx.mark(review.id, &[b], Some(MarkState::Reviewed), &[])
         .unwrap();
 
-    let reopened = ctx.open("@", false).await.unwrap();
+    let reopened = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(
         marked(&reopened, &reopened.state.marks),
         [("fn b() {}".to_string(), MarkState::Reviewed)]

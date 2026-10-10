@@ -2,10 +2,16 @@ import { Channel } from "@tauri-apps/api/core";
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
 import { commands, type PtyEvent } from "../ipc";
+import { useWorkspace } from "../workspaces/context";
+import { registerTerminal, touchTerminal } from "./registry";
 import { createTerminal } from "./xterm";
 
-export function TerminalPanel({ api }: IDockviewPanelProps) {
+type Params = { setup?: boolean };
+
+export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
   const ref = useRef<HTMLDivElement>(null);
+  const workspace = useWorkspace();
+  const setup = useRef(params.setup ?? false);
 
   useEffect(() => {
     const container = ref.current as HTMLDivElement;
@@ -19,15 +25,36 @@ export function TerminalPanel({ api }: IDockviewPanelProps) {
       else term.write(`\r\n[process exited with code ${e.code}]\r\n`);
     };
 
-    commands.ptySpawn(term.cols, term.rows, null, channel).then((r) => {
-      if (r.status === "error") {
-        term.write(`failed to start shell: ${r.error}\r\n`);
-      } else if (disposed) {
-        commands.ptyKill(r.data);
-      } else {
-        id = r.data;
+    // Deferred so a mount that's undone at once (React StrictMode) never starts a shell, and
+    // setup never starts twice.
+    const spawn = window.setTimeout(() => {
+      commands.ptySpawn(workspace, term.cols, term.rows, setup.current, channel).then((r) => {
+        if (r.status === "error") {
+          term.write(`failed to start shell: ${r.error}\r\n`);
+        } else if (disposed) {
+          commands.ptyKill(r.data);
+        } else {
+          id = r.data;
+        }
+      });
+      // Setup runs once, not again when the layout is restored.
+      if (setup.current) {
+        setup.current = false;
+        api.updateParameters({ setup: undefined });
       }
     });
+
+    const unregister = registerTerminal(api.id, {
+      workspace,
+      canPaste: () => term.modes.bracketedPasteMode,
+      paste: (text) => term.paste(text),
+      focus: () => {
+        api.setActive();
+        term.focus();
+      },
+    });
+    const onFocus = () => touchTerminal(api.id);
+    term.textarea?.addEventListener("focus", onFocus);
 
     const subs = [
       term.onData((data) => id !== undefined && commands.ptyWrite(id, data)),
@@ -40,12 +67,15 @@ export function TerminalPanel({ api }: IDockviewPanelProps) {
 
     return () => {
       disposed = true;
+      clearTimeout(spawn);
+      unregister();
+      term.textarea?.removeEventListener("focus", onFocus);
       observer.disconnect();
       for (const s of subs) s.dispose();
       if (id !== undefined) commands.ptyKill(id);
       term.dispose();
     };
-  }, [api]);
+  }, [api, workspace]);
 
   return <div ref={ref} className="terminal" />;
 }

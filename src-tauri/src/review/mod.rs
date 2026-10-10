@@ -3,9 +3,10 @@
 mod build;
 mod cache;
 mod matching;
+mod progress;
 mod rowmap;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod views;
 #[cfg(test)]
 mod workflow_tests;
@@ -22,24 +23,33 @@ use specta::Type;
 use crate::anchor::{MatchConfig, Side};
 use crate::config::Config;
 use crate::diff::FileStatus;
-use crate::jj::{self, FileDiff, Jj};
+use crate::jj::{FileDiff, Jj};
 use crate::store::{Edit, FileCheck, Mark, MarkState, Session, Store};
-use crate::watch::Watch;
+use crate::watch;
+use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile, Sides};
 use matching::MatchedCheck;
+pub use progress::ProgressDto;
 pub use rowmap::RowMove;
 pub use views::{ChangeDto, View};
 
 /// Files larger than this load without contents: no highlighting, symbols, or context.
 const MAX_FILE_BYTES: usize = 4 << 20;
 
+/// Reports a workspace's watch events, with the workspace's name.
+pub type Emit = Arc<dyn Fn(Option<String>, watch::Event) + Send + Sync>;
+
 pub struct RepoCtx {
+    /// The main workspace's root.
     pub root: PathBuf,
-    pub jj: Arc<Jj>,
+    pub main: Arc<Workspace>,
+    /// The other workspaces, by name.
+    pub(crate) workspaces: Mutex<HashMap<String, Arc<Workspace>>>,
+    /// Set once the window exists. Workspaces start being watched from then on.
+    pub emit: Mutex<Option<Emit>>,
+    /// Where new workspaces go.
+    pub workspace_base: Option<PathBuf>,
     pub store: Mutex<Store>,
-    /// jj's message while the working copy is stale.
-    pub stale: Arc<Mutex<Option<String>>>,
-    pub watch: Mutex<Option<Watch>>,
     reviews: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
@@ -113,7 +123,10 @@ pub struct StateDto {
 }
 
 pub struct Review {
+    ws: Arc<Workspace>,
     revset: String,
+    /// The source review recorded on marks and checks made here.
+    label: String,
     view: View,
     cfg: MatchConfig,
     files: Vec<ReviewFile>,
@@ -150,11 +163,12 @@ fn now_ms() -> i64 {
 impl RepoCtx {
     pub fn new(root: PathBuf, jj: Jj, store: Store) -> Self {
         Self {
+            main: Arc::new(Workspace::new(None, root.clone(), jj)),
             root,
-            jj: Arc::new(jj),
+            workspaces: Mutex::default(),
+            emit: Mutex::default(),
+            workspace_base: crate::workspaces::ws_base(),
             store: Mutex::new(store),
-            stale: Arc::default(),
-            watch: Mutex::default(),
             reviews: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
@@ -174,52 +188,40 @@ impl RepoCtx {
         self.reviews.lock().unwrap().remove(&id);
     }
 
-    /// Snapshots the working copy, recording rather than failing when it's stale.
-    async fn snapshot(&self) -> anyhow::Result<()> {
-        match self.jj.snapshot().await {
-            Ok(()) => *self.stale.lock().unwrap() = None,
-            Err(e) if jj::is_stale(&e) => *self.stale.lock().unwrap() = Some(format!("{e:#}")),
-            Err(e) => return Err(e),
-        }
-        Ok(())
-    }
-
     /// Opens `revset` in the Combined view. Starts a review session, or with `resume`
     /// continues the revset's latest one, as when the same revset is loaded again.
-    pub async fn open(&self, revset: &str, resume: bool) -> anyhow::Result<ReviewDto> {
-        self.snapshot().await?;
+    pub async fn open(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+        resume: bool,
+    ) -> anyhow::Result<ReviewDto> {
+        let ws = self.workspace(workspace).await?;
+        ws.snapshot().await?;
+        let label = ws.label(revset);
         let (prev, session, seen) = {
             let store = self.store.lock().unwrap();
-            match store.last_session(revset)?.filter(|_| resume) {
-                Some(last) => (store.session_before(revset, last.id)?, last.id, last.seen),
+            match store.last_session(&label)?.filter(|_| resume) {
+                Some(last) => (store.session_before(&label, last.id)?, last.id, last.seen),
                 None => (
-                    store.last_session(revset)?,
-                    store.start_session(revset, now_ms())?,
+                    store.last_session(&label)?,
+                    store.start_session(&label, ws.key(), revset, now_ms())?,
                     vec![],
                 ),
             }
         };
-        let loaded = self.load(revset, &View::Combined, prev.as_ref()).await?;
+        let loaded = self
+            .load(&ws, revset, &View::Combined, prev.as_ref())
+            .await?;
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let mut review = Review {
-            revset: revset.to_string(),
-            view: View::Combined,
-            cfg: loaded.cfg,
-            files: vec![],
-            matched: HashMap::new(),
-            checks: vec![],
-            amber: vec![],
-            baseline: prev
-                .iter()
-                .flat_map(|p| p.seen.iter().copied())
-                .chain(seen)
-                .collect(),
-            session,
-            commits: vec![],
-            prev,
-            undo: vec![],
-            redo: vec![],
-        };
+        let mut review = Review::new(ws, revset, label, loaded.cfg);
+        review.baseline = prev
+            .iter()
+            .flat_map(|p| p.seen.iter().copied())
+            .chain(seen)
+            .collect();
+        review.session = session;
+        review.prev = prev;
         let dto = {
             let store = self.store.lock().unwrap();
             review.swap_in(&store, loaded, id)?.0
@@ -234,13 +236,18 @@ impl RepoCtx {
     /// Reloads a review after the repo changed, or in another view, keeping its marks' undo
     /// history.
     pub async fn refresh(&self, id: u32, view: Option<View>) -> anyhow::Result<RefreshDto> {
-        let (revset, view, prev) = {
+        let (ws, revset, view, prev) = {
             let review = self.review(id)?;
             let review = review.lock().unwrap();
             let view = view.unwrap_or_else(|| review.view.clone());
-            (review.revset.clone(), view, review.prev.clone())
+            (
+                review.ws.clone(),
+                review.revset.clone(),
+                view,
+                review.prev.clone(),
+            )
         };
-        let loaded = self.load(&revset, &view, prev.as_ref()).await?;
+        let loaded = self.load(&ws, &revset, &view, prev.as_ref()).await?;
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         review.view = view;
@@ -251,14 +258,15 @@ impl RepoCtx {
 
     async fn load(
         &self,
+        ws: &Workspace,
         revset: &str,
         view: &View,
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
-        let config = Config::load(&self.root)?;
-        let stack = views::stack(&self.jj, revset, prev).await?;
-        let spec = views::spec(&self.jj, revset, view, &stack).await?;
-        let diffs = spec.diff(&self.jj).await?;
+        let config = Config::load(&ws.root)?;
+        let stack = views::stack(&ws.jj, revset, prev).await?;
+        let spec = views::spec(&ws.jj, revset, view, &stack).await?;
+        let diffs = spec.diff(&ws.jj).await?;
         let sides = spec.sides();
         let cfg = config.matching;
         let (files, dtos) = self.build(sides, diffs, config).await?;
@@ -283,7 +291,7 @@ impl RepoCtx {
                 changes: stack.changes,
                 removed_changes: stack.removed,
                 previous_session: prev.map(|p| p.started_at as f64),
-                stale: self.stale.lock().unwrap().clone(),
+                stale: ws.stale.lock().unwrap().clone(),
             },
         })
     }
@@ -325,7 +333,7 @@ impl RepoCtx {
         self.cache
             .lock()
             .unwrap()
-            .replace(keys.into_iter().zip(built.iter().cloned()));
+            .put(keys.into_iter().zip(built.iter().cloned()));
         Ok(built.into_iter().unzip())
     }
 
@@ -344,7 +352,7 @@ impl RepoCtx {
                     return Ok::<_, anyhow::Error>(None);
                 }
                 let _permit = limit.acquire().await?;
-                let bytes = self.jj.file(commit.as_deref(), &path).await?;
+                let bytes = self.main.jj.file(commit.as_deref(), &path).await?;
                 Ok((bytes.len() <= MAX_FILE_BYTES)
                     .then(|| String::from_utf8(bytes).ok())
                     .flatten())
@@ -387,8 +395,8 @@ impl RepoCtx {
     pub fn reset(&self, id: u32) -> anyhow::Result<StateDto> {
         self.edit(id, |review, store| {
             Ok(Edit {
-                marks_removed: store.marks_for_review(&review.revset)?,
-                checks_removed: store.checks_for_review(&review.revset)?,
+                marks_removed: store.marks_for_review(&review.label)?,
+                checks_removed: store.checks_for_review(&review.label)?,
                 ..Edit::default()
             })
         })
@@ -446,6 +454,26 @@ impl RepoCtx {
 }
 
 impl Review {
+    fn new(ws: Arc<Workspace>, revset: &str, label: String, cfg: MatchConfig) -> Self {
+        Self {
+            ws,
+            revset: revset.to_string(),
+            label,
+            view: View::Combined,
+            cfg,
+            files: vec![],
+            matched: HashMap::new(),
+            checks: vec![],
+            amber: vec![],
+            baseline: HashSet::new(),
+            session: 0,
+            commits: vec![],
+            prev: None,
+            undo: vec![],
+            redo: vec![],
+        }
+    }
+
     /// Replaces the review's files with `loaded`. Returns the DTO and where old rows went.
     fn swap_in(
         &mut self,
@@ -542,7 +570,7 @@ impl Review {
                     commit,
                     line: k.line,
                     state,
-                    review: self.revset.clone(),
+                    review: self.label.clone(),
                     created_at,
                 });
             }
@@ -577,7 +605,7 @@ impl Review {
                     path: file.path.clone(),
                     old_hashes: hashes(Side::Old),
                     new_hashes: hashes(Side::New),
-                    review: self.revset.clone(),
+                    review: self.label.clone(),
                     created_at: now_ms(),
                 });
             }

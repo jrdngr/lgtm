@@ -1,9 +1,21 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Dock layouts are opaque JSON owned by the UI, stored one file per repo.
-pub fn path(data_dir: &Path, repo_key: &str) -> PathBuf {
-    data_dir.join("repos").join(repo_key).join("layout.json")
+/// Dock layouts are opaque JSON owned by the UI, one file per workspace: `layout.json` for
+/// the main one, `layouts/<name>.json` for the others.
+pub fn path(data_dir: &Path, repo_key: &str, workspace: Option<&str>) -> PathBuf {
+    let repo = data_dir.join("repos").join(repo_key);
+    match workspace {
+        None => repo.join("layout.json"),
+        Some(name) => repo.join("layouts").join(format!("{name}.json")),
+    }
+}
+
+pub fn remove(path: &Path) -> std::io::Result<()> {
+    match fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
 }
 
 pub fn load(path: &Path) -> std::io::Result<Option<String>> {

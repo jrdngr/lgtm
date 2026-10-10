@@ -14,3 +14,7 @@ build:
 # Run the release binary from `just build`, optionally on a repo
 run *repo:
     src-tauri/target/release/lgtm {{ repo }}
+
+# Clean up workspaces left behind (see `lgtm gc`)
+gc *repo:
+    src-tauri/target/release/lgtm gc {{ repo }}

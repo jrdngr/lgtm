@@ -16,8 +16,15 @@ pub enum PtyEvent {
     Exit { code: u32 },
 }
 
+/// Which window and workspace a PTY belongs to. `workspace` is `None` for the main workspace.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Owner {
+    pub window: String,
+    pub workspace: Option<String>,
+}
+
 struct Session {
-    window: String,
+    owner: Owner,
     master: Box<dyn MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     killer: Box<dyn ChildKiller + Send + Sync>,
@@ -34,10 +41,11 @@ impl Ptys {
     /// and gets output followed by one `Exit`.
     pub fn spawn(
         &self,
-        window: &str,
+        owner: Owner,
         cwd: &Path,
         size: (u16, u16),
         command: Option<Vec<String>>,
+        env: &[(&str, &str)],
         on_event: impl Fn(PtyEvent) + Send + 'static,
     ) -> anyhow::Result<u32> {
         let (cols, rows) = size;
@@ -65,6 +73,9 @@ impl Ptys {
         cmd.cwd(cwd);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
 
         let mut child = pair.slave.spawn_command(cmd).context("spawn")?;
         drop(pair.slave);
@@ -76,7 +87,7 @@ impl Ptys {
         self.sessions.lock().unwrap().insert(
             id,
             Session {
-                window: window.to_string(),
+                owner,
                 master: pair.master,
                 writer,
                 killer,
@@ -126,15 +137,23 @@ impl Ptys {
     }
 
     pub fn kill_window(&self, window: &str) {
+        self.kill_where(|o| o.window == window);
+    }
+
+    pub fn kill_owner(&self, owner: &Owner) {
+        self.kill_where(|o| o == owner);
+    }
+
+    fn kill_where(&self, pick: impl Fn(&Owner) -> bool) {
         for session in self.sessions.lock().unwrap().values_mut() {
-            if session.window == window {
+            if pick(&session.owner) {
                 session.killer.kill().ok();
             }
         }
     }
 }
 
-fn default_shell() -> String {
+pub fn default_shell() -> String {
     std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())
 }
 
@@ -194,12 +213,24 @@ mod tests {
         assert!(carry.is_empty());
     }
 
+    fn owner(window: &str) -> Owner {
+        Owner {
+            window: window.into(),
+            workspace: None,
+        }
+    }
+
     fn run(ptys: &Ptys, argv: &[&str]) -> (String, u32) {
         let (tx, rx) = mpsc::channel();
         let argv = argv.iter().map(|s| s.to_string()).collect();
-        ptys.spawn("w", Path::new("/"), (80, 24), Some(argv), move |e| {
-            tx.send(e).unwrap()
-        })
+        ptys.spawn(
+            owner("w"),
+            Path::new("/"),
+            (80, 24),
+            Some(argv),
+            &[],
+            move |e| tx.send(e).unwrap(),
+        )
         .unwrap();
         let mut out = String::new();
         loop {
@@ -227,9 +258,14 @@ mod tests {
             .map(String::from)
             .to_vec();
         let id = ptys
-            .spawn("w", Path::new("/"), (80, 24), Some(argv), move |e| {
-                tx.send(e).unwrap()
-            })
+            .spawn(
+                owner("w"),
+                Path::new("/"),
+                (80, 24),
+                Some(argv),
+                &[],
+                move |e| tx.send(e).unwrap(),
+            )
             .unwrap();
         ptys.write(id, b"ping\n").unwrap();
         let mut out = String::new();
@@ -246,11 +282,18 @@ mod tests {
         for window in ["a", "b"] {
             let tx = tx.clone();
             let argv = ["sleep", "30"].map(String::from).to_vec();
-            ptys.spawn(window, Path::new("/"), (80, 24), Some(argv), move |e| {
-                if let PtyEvent::Exit { .. } = e {
-                    tx.send(window).unwrap();
-                }
-            })
+            ptys.spawn(
+                owner(window),
+                Path::new("/"),
+                (80, 24),
+                Some(argv),
+                &[],
+                move |e| {
+                    if let PtyEvent::Exit { .. } = e {
+                        tx.send(window).unwrap();
+                    }
+                },
+            )
             .unwrap();
         }
         ptys.kill_window("a");

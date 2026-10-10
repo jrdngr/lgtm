@@ -1,4 +1,4 @@
-//! Built files from the last load, reused when a file's diff hasn't changed. A refresh after
+//! Built files from recent loads, reused when a file's diff hasn't changed. A refresh after
 //! an edit then only reloads and re-parses the files that changed.
 
 use std::collections::HashMap;
@@ -8,6 +8,10 @@ use crate::config::Config;
 use crate::jj::FileDiff;
 
 pub type Key = [u8; 32];
+
+/// Past this many files the cache starts over, so loads of many reviews (every workspace's
+/// progress) can share it without it growing forever.
+const MAX_FILES: usize = 4096;
 
 #[derive(Default)]
 pub struct FileCache(HashMap<Key, (ReviewFile, FileDto)>);
@@ -43,7 +47,10 @@ impl FileCache {
         Some((file, dto))
     }
 
-    pub fn replace(&mut self, entries: impl IntoIterator<Item = (Key, (ReviewFile, FileDto))>) {
-        self.0 = entries.into_iter().collect();
+    pub fn put(&mut self, entries: impl IntoIterator<Item = (Key, (ReviewFile, FileDto))>) {
+        if self.0.len() > MAX_FILES {
+            self.0.clear();
+        }
+        self.0.extend(entries);
     }
 }

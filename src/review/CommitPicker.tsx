@@ -1,26 +1,28 @@
 import { useEffect, useState } from "react";
 import type { LogLine } from "../bindings";
 import { commands } from "../ipc";
+import type { WorkspaceName } from "../workspaces/context";
 import { parseAnsi } from "./ansi";
 
 interface Props {
+  workspace: WorkspaceName;
   onPick(revset: string): void;
   onClose(): void;
 }
 
 /** `jj log` as the user has it configured. Click a commit, shift-click to extend to a range,
  * then Review (or double-click a commit to review just it). */
-export function CommitPicker({ onPick, onClose }: Props) {
+export function CommitPicker({ workspace, onPick, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
   const [error, setError] = useState<string>();
   const [range, setRange] = useState<[number, number]>();
 
   useEffect(() => {
-    commands.logGraph().then((r) => {
+    commands.logGraph(workspace).then((r) => {
       if (r.status === "ok") setLines(r.data);
       else setError(r.error);
     });
-  }, []);
+  }, [workspace]);
 
   // Each commit's lines run until the next commit starts.
   const owner: number[] = [];

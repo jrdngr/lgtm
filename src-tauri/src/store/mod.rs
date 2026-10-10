@@ -177,6 +177,23 @@ fn row_to_mark(r: &rusqlite::Row) -> rusqlite::Result<Mark> {
 const COLUMNS: &str =
     "id, path, side, line_hash, above, below, commit_id, line, state, review, created_at";
 
+/// Columns added after the first schema. Rows from before default to the main workspace,
+/// with the review label as the revset.
+fn migrate(db: &Connection) -> rusqlite::Result<()> {
+    let has_workspace: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('sessions') WHERE name = 'workspace'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_workspace {
+        db.execute_batch(
+            "ALTER TABLE sessions ADD COLUMN workspace TEXT NOT NULL DEFAULT '';
+             ALTER TABLE sessions ADD COLUMN revset TEXT NOT NULL DEFAULT '';",
+        )?;
+    }
+    Ok(())
+}
+
 impl Store {
     pub fn open(path: &Path) -> anyhow::Result<Self> {
         if let Some(dir) = path.parent() {
@@ -193,6 +210,7 @@ impl Store {
     fn init(db: Connection) -> rusqlite::Result<Self> {
         db.execute_batch("PRAGMA journal_mode = WAL;")?;
         db.execute_batch(SCHEMA)?;
+        migrate(&db)?;
         Ok(Self { db })
     }
 

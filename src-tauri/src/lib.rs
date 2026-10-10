@@ -12,6 +12,8 @@ mod review;
 mod store;
 mod syntax;
 mod watch;
+mod workspace;
+mod workspaces;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,10 +22,11 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, WebviewWindow, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
-use pty::{PtyEvent, Ptys};
+use pty::{Owner, PtyEvent, Ptys};
 use repo::{RepoInfo, RepoWindows};
-use review::{RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
+use review::{ProgressDto, RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
 use store::MarkState;
+use workspaces::WorkspaceDto;
 
 type CmdResult<T> = Result<T, String>;
 
@@ -65,39 +68,104 @@ fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
         .collect())
 }
 
-fn layout_path(window: &WebviewWindow) -> CmdResult<PathBuf> {
+fn layout_path(window: &WebviewWindow, workspace: Option<&str>) -> CmdResult<PathBuf> {
     let data_dir = window.path().app_data_dir().map_err(|e| e.to_string())?;
-    Ok(layout::path(&data_dir, &repo::key(&repo_root(window)?)))
+    let key = repo::key(&repo_root(window)?);
+    Ok(layout::path(&data_dir, &key, workspace))
 }
 
 #[tauri::command]
 #[specta::specta]
-fn load_layout(window: WebviewWindow) -> CmdResult<Option<String>> {
-    layout::load(&layout_path(&window)?).map_err(|e| e.to_string())
+fn load_layout(window: WebviewWindow, workspace: Option<String>) -> CmdResult<Option<String>> {
+    layout::load(&layout_path(&window, workspace.as_deref())?).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
-fn save_layout(window: WebviewWindow, layout: String) -> CmdResult<()> {
-    layout::save(&layout_path(&window)?, &layout).map_err(|e| e.to_string())
+fn save_layout(window: WebviewWindow, workspace: Option<String>, layout: String) -> CmdResult<()> {
+    layout::save(&layout_path(&window, workspace.as_deref())?, &layout).map_err(|e| e.to_string())
 }
 
-/// Starts a PTY in the window's repo root. `command` defaults to the login shell.
+/// Starts a login shell in the workspace. With `setup`, the shell first runs its
+/// `.lgtm/setup`.
 #[tauri::command]
 #[specta::specta]
-fn pty_spawn(
+async fn pty_spawn(
     window: WebviewWindow,
-    ptys: State<Ptys>,
+    ptys: State<'_, Ptys>,
+    workspace: Option<String>,
     cols: u16,
     rows: u16,
-    command: Option<Vec<String>>,
+    setup: bool,
     on_event: Channel<PtyEvent>,
 ) -> CmdResult<u32> {
-    let cwd = repo_root(&window)?;
-    ptys.spawn(window.label(), &cwd, (cols, rows), command, move |e| {
+    let ctx = repo(&window)?;
+    let ws = ctx.workspace(workspace.as_deref()).await.map_err(err)?;
+    let command = setup.then(|| {
+        let shell = pty::default_shell();
+        let quoted = format!("'{}'", shell.replace('\'', r"'\''"));
+        let script = format!(
+            "if [ -x {s} ]; then ./{s}; else sh {s}; fi || echo \"lgtm: {s} exited with $?\"; exec {quoted} -l",
+            s = workspaces::SETUP
+        );
+        vec![shell, "-l".into(), "-c".into(), script]
+    });
+    let root = ctx.root.to_string_lossy();
+    let env = [
+        ("LGTM_ROOT", root.as_ref()),
+        ("LGTM_WORKSPACE", ws.name.as_deref().unwrap_or("")),
+    ];
+    let owner = Owner {
+        window: window.label().to_string(),
+        workspace,
+    };
+    ptys.spawn(owner, &ws.root, (cols, rows), command, &env, move |e| {
         on_event.send(e).ok();
     })
     .map_err(|e| format!("{e:#}"))
+}
+
+/// Every workspace, the repo's main one first.
+#[tauri::command]
+#[specta::specta]
+async fn list_workspaces(window: WebviewWindow) -> CmdResult<Vec<WorkspaceDto>> {
+    repo(&window)?.list_workspaces().await.map_err(err)
+}
+
+/// Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` to run.
+#[tauri::command]
+#[specta::specta]
+async fn create_workspace(window: WebviewWindow, name: String) -> CmdResult<bool> {
+    repo(&window)?.create_workspace(&name).await.map_err(err)
+}
+
+/// Ends the workspace's terminals, then forgets it and deletes its directory.
+#[tauri::command]
+#[specta::specta]
+async fn delete_workspace(
+    window: WebviewWindow,
+    ptys: State<'_, Ptys>,
+    name: String,
+) -> CmdResult<()> {
+    ptys.kill_owner(&Owner {
+        window: window.label().to_string(),
+        workspace: Some(name.clone()),
+    });
+    repo(&window)?.delete_workspace(&name).await.map_err(err)?;
+    layout::remove(&layout_path(&window, Some(&name))?).map_err(|e| e.to_string())
+}
+
+/// Review progress of the workspace's latest review, or of its `@`.
+#[tauri::command]
+#[specta::specta]
+async fn workspace_progress(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<ProgressDto> {
+    repo(&window)?
+        .progress(workspace.as_deref())
+        .await
+        .map_err(err)
 }
 
 #[tauri::command]
@@ -123,8 +191,16 @@ fn pty_kill(ptys: State<Ptys>, id: u32) {
 /// session, or with `resume` continues the revset's latest one.
 #[tauri::command]
 #[specta::specta]
-async fn open_review(window: WebviewWindow, revset: String, resume: bool) -> CmdResult<ReviewDto> {
-    repo(&window)?.open(&revset, resume).await.map_err(err)
+async fn open_review(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    revset: String,
+    resume: bool,
+) -> CmdResult<ReviewDto> {
+    repo(&window)?
+        .open(workspace.as_deref(), &revset, resume)
+        .await
+        .map_err(err)
 }
 
 #[tauri::command]
@@ -137,8 +213,15 @@ fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> {
 /// `jj log` with the user's default revset and template, for picking commits.
 #[tauri::command]
 #[specta::specta]
-async fn log_graph(window: WebviewWindow) -> CmdResult<Vec<jj::LogLine>> {
-    repo(&window)?.jj.log_graph().await.map_err(err)
+async fn log_graph(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Vec<jj::LogLine>> {
+    let ws = repo(&window)?
+        .workspace(workspace.as_deref())
+        .await
+        .map_err(err)?;
+    ws.jj.log_graph().await.map_err(err)
 }
 
 /// Reloads a review after the repo changed, or switches it to `view`.
@@ -213,6 +296,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             pty_write,
             pty_resize,
             pty_kill,
+            list_workspaces,
+            create_workspace,
+            delete_workspace,
+            workspace_progress,
             open_review,
             close_review,
             refresh_review,
@@ -263,6 +350,10 @@ fn adopt_login_shell_path() {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     adopt_login_shell_path();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().is_some_and(|a| a == "gc") {
+        std::process::exit(workspaces::gc::main(&args[1..]));
+    }
     let builder = specta_builder();
     #[cfg(debug_assertions)]
     export_bindings(&builder, BINDINGS_PATH);

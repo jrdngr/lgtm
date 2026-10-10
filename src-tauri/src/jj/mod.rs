@@ -11,6 +11,9 @@ use tokio::sync::Mutex;
 use crate::diff::{self, FileMeta, FileStatus, GitFileDiff, Hunk};
 use crate::gitmeta;
 
+pub mod workspace;
+pub use workspace::WorkspaceInfo;
+
 /// True when `err` came from jj refusing to work on a stale working copy.
 pub fn is_stale(err: &anyhow::Error) -> bool {
     format!("{err:#}").contains("working copy is stale")

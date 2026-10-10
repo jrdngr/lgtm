@@ -17,7 +17,7 @@ const ITEMS: { action: MenuAction; key?: string; label: string; disabled?: boole
   { action: "flagged", key: "f", label: "Flag" },
   { action: "clear", key: "u", label: "Clear mark" },
   { action: "comment", key: "c", label: "Comment", disabled: true },
-  { action: "agent", key: "a", label: "Send to agent", disabled: true },
+  { action: "agent", key: "a", label: "Send to agent" },
   { action: "copy", label: "Copy" },
 ];
 

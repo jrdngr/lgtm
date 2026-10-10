@@ -2,6 +2,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import { commands } from "../ipc";
+import type { WorkspaceName } from "../workspaces/context";
 import { type Moves, movesFrom } from "./follow";
 
 export interface Loaded {
@@ -10,8 +11,9 @@ export interface Loaded {
   moves?: Moves;
 }
 
-/** Loads a review, keeps it live as the repo changes, and tracks a stale working copy. */
-export function useReview() {
+/** Loads a review in a workspace, keeps it live as the repo changes, and tracks a
+ * stale working copy. */
+export function useReview(workspace: WorkspaceName) {
   const [loaded, setLoaded] = useState<Loaded>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>();
@@ -33,7 +35,7 @@ export function useReview() {
     opened.current = revset;
     setLoading(true);
     setError(undefined);
-    const r = await commands.openReview(revset, resume);
+    const r = await commands.openReview(workspace, revset, resume);
     setLoading(false);
     if (r.status === "error") {
       setError(r.error);
@@ -88,13 +90,15 @@ export function useReview() {
     // Scoped to this window: other windows hold other repos.
     const win = getCurrentWebviewWindow();
     const changed = events.repoChanged(win).listen(() => refreshRef.current());
-    const staleSub = events.workingCopyStale(win).listen((e) => setStale(e.payload.message));
+    const staleSub = events.workingCopyStale(win).listen((e) => {
+      if (e.payload.workspace === workspace) setStale(e.payload.message);
+    });
     return () => {
       changed.then((un) => un());
       staleSub.then((un) => un());
       if (current.current) commands.closeReview(current.current.id);
     };
-  }, []);
+  }, [workspace]);
 
   return { loaded, loading, error, setError, stale, open, refresh, setState };
 }

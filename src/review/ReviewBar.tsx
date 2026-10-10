@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChangeDto, ReviewDto, View } from "../bindings";
+import type { WorkspaceName } from "../workspaces/context";
 import { CommitPicker } from "./CommitPicker";
 import type { ViewMode } from "./model";
 import { FILTERS, type Filter, type Progress } from "./state";
@@ -28,6 +29,7 @@ function defaultChange(review: ReviewDto, kind: "change" | "sinceLast"): string 
 }
 
 interface Props {
+  workspace: WorkspaceName;
   review?: ReviewDto;
   loading: boolean;
   revset: string;
@@ -81,6 +83,7 @@ export function ReviewBar(props: Props) {
       </form>
       {picking && (
         <CommitPicker
+          workspace={props.workspace}
           onClose={() => setPicking(false)}
           onPick={(revset) => {
             setPicking(false);
