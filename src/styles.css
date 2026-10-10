@@ -1,0 +1,165 @@
+:root {
+  --bg: #1e1e1e;
+  --panel: #252526;
+  --fg: #d4d4d4;
+  --muted: #8a8a8a;
+  --border: #3c3c3c;
+  --accent: #4f8cc9;
+  --add: rgb(46 160 67 / 15%);
+  --del: rgb(248 81 73 / 15%);
+  --reviewed: #2ea043;
+  --reviewed-tint: rgb(46 160 67 / 12%);
+  --error: #f85149;
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  color: var(--fg);
+  background: var(--bg);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 10px;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.error {
+  color: var(--error);
+}
+
+.start {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+}
+
+.workbench {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.workbench > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar .repo {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+}
+
+.terminal {
+  height: 100%;
+  padding: 4px;
+  box-sizing: border-box;
+  background: var(--bg);
+}
+
+.spike {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.spike > :last-child {
+  flex: 1;
+  min-height: 0;
+}
+
+.spike-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.spike-bar .hint {
+  margin-left: auto;
+}
+
+.diff .cm-editor {
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.diff .cm-scroller {
+  font-family: Menlo, monospace;
+}
+
+.diff .cm-gutters {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.diff .mark-gutter {
+  width: 4px;
+}
+
+.diff .mark-reviewed {
+  background: var(--reviewed);
+}
+
+.diff .cm-cursor {
+  border-left-color: var(--fg);
+}
+
+.row-add {
+  background: var(--add);
+}
+
+.row-del {
+  background: var(--del);
+}
+
+.row-hunk {
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.row-add.row-reviewed,
+.row-del.row-reviewed {
+  background-image: linear-gradient(var(--reviewed-tint), var(--reviewed-tint));
+}
