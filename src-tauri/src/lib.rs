@@ -1,5 +1,6 @@
 mod agent;
 pub mod anchor;
+mod bots;
 mod commands;
 mod config;
 pub mod diff;
@@ -13,6 +14,7 @@ mod repo;
 mod review;
 mod store;
 mod syntax;
+mod tools;
 mod watch;
 mod workspace;
 mod workspaces;
@@ -31,6 +33,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .constant("HIGHLIGHT_NAMES", syntax::HIGHLIGHT_NAMES)
         .commands(collect_commands![
             commands::repo::current_repo,
+            commands::repo::check_tools,
             commands::repo::open_repo,
             commands::repo::recent_repos,
             commands::repo::load_layout,
@@ -58,10 +61,26 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::delete_comment,
             commands::comments::workshop_comment,
             commands::comments::stop_workshop,
+            commands::bots::start_bots,
+            commands::bots::continue_bots,
+            commands::bots::stop_bots,
+            commands::bots::delete_bots,
+            commands::bots::bot_runs,
+            commands::bots::bot_run,
+            commands::bots::fix_findings,
+            commands::bots::stop_fix,
+            commands::bots::list_personas,
+            commands::bots::default_personas,
+            commands::bots::install_personas,
+            commands::bots::new_persona,
+            commands::bots::open_persona,
         ])
         .events(collect_events![
             events::RepoChanged,
-            events::WorkingCopyStale
+            events::WorkingCopyStale,
+            events::BotRunActivity,
+            events::BotRunChanged,
+            events::BotFixText
         ])
 }
 

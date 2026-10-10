@@ -18,7 +18,7 @@ pub struct Ask {
     pub change: bool,
 }
 
-const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
+pub const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
 doesn't include, so its changes wouldn't show here. Review a revset that includes @ first.";
 
 const INSTRUCTIONS: &str = "Keep replies short. When you suggest a version of the comment, \
@@ -92,8 +92,13 @@ impl RepoCtx {
                 prompt: &prompt,
                 resume: workshop.session.as_deref(),
                 edit: ask.change,
+                schema: None,
             },
-            on_text,
+            |p| {
+                if let agent::Progress::Text(t) = p {
+                    on_text(t)
+                }
+            },
         )
         .await;
         let text = match &reply {

@@ -1,6 +1,7 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StateDto, View } from "../bindings";
+import { commands } from "../ipc";
 import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
@@ -182,12 +183,30 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
     else jump(comment.file);
   }
 
+  function jumpToRow(file: number, row: number) {
+    const at = lines.findIndex((l) => l.kind === "rows" && l.file === file && l.rows.includes(row));
+    if (at < 0) return jump(file);
+    jumpTo({ cursor: at, top: Math.max(at - 3, 0) });
+  }
+
+  async function commentOn(file: number, rows: number[], body: string, snippet: string) {
+    if (!review) return false;
+    const refs = rows.map((row) => ({ file, row }));
+    const r = await commands.addComment(review.id, refs, body, snippet);
+    if (r.status === "error") {
+      setError(r.error);
+      return false;
+    }
+    edited(r.data);
+    return true;
+  }
+
   usePublishReview(
     api,
     workspace,
     review,
     { files, progress, checks: index.checks, filter },
-    { jump, jumpToComment, send: sendText },
+    { jump, jumpToComment, jumpToRow, commentOn, send: sendText },
   );
 
   function openMenuAtCursor() {

@@ -46,6 +46,11 @@ export function workspaceTerminals(workspace: WorkspaceName): TerminalChoice[] {
 
 type SendResult = "sent" | "noTerminal" | "unsafe";
 
+/** C0 and C1 control characters other than tab and newline. An escape in pasted text could end
+ * bracketed paste early and have the shell run the rest. */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
+const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+
 /** Pastes `text` into terminal `id`, or else the workspace's most recently focused one, and
  * focuses it. Nothing is sent when that terminal's program doesn't use bracketed paste, since
  * a plain shell would run each pasted line. */
@@ -56,7 +61,7 @@ export function sendToTerminal(workspace: WorkspaceName, text: string, id?: stri
       : terminals.get(id);
   if (!target) return "noTerminal";
   if (!target.canPaste()) return "unsafe";
-  target.paste(text);
+  target.paste(text.replace(CONTROLS, ""));
   target.focus();
   return "sent";
 }

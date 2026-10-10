@@ -1,5 +1,6 @@
 //! Tauri commands, grouped by what they act on.
 
+pub mod bots;
 pub mod comments;
 pub mod pty;
 pub mod repo;

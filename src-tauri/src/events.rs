@@ -15,3 +15,25 @@ pub struct WorkingCopyStale {
     pub workspace: Option<String>,
     pub message: Option<String>,
 }
+
+/// A persona review's part `part` moved on to something else, like reading a file.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct BotRunActivity {
+    pub run: u32,
+    pub part: u32,
+    pub activity: String,
+}
+
+/// A persona review started, stopped, or added or finished a part.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct BotRunChanged {
+    pub run: u32,
+}
+
+/// A persona review's fix `fix` streamed more of its reply.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct BotFixText {
+    pub run: u32,
+    pub fix: u32,
+    pub text: String,
+}

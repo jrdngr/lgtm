@@ -13,7 +13,7 @@ interface Data {
   filter: Filter;
 }
 
-type Actions = Pick<CurrentReview, "jump" | "jumpToComment" | "send">;
+type Actions = Pick<CurrentReview, "jump" | "jumpToComment" | "jumpToRow" | "commentOn" | "send">;
 
 /** Publishes this pane as the workspace's current review while it's active, or when none
  * is yet, and retracts it when the pane goes. */
@@ -32,6 +32,8 @@ export function usePublishReview(
   useEffect(() => {
     const publish = () => {
       published.current = {
+        revset: review?.revset ?? "",
+        to: review?.to ?? "",
         files,
         progress,
         checks,
@@ -39,7 +41,10 @@ export function usePublishReview(
         comments: review?.state.comments ?? [],
         jump: (f) => latest.current.jump(f),
         jumpToComment: (id) => latest.current.jumpToComment(id),
-        send: (text) => latest.current.send(text),
+        jumpToRow: (file, row) => latest.current.jumpToRow(file, row),
+        commentOn: (file, rows, body, snippet) =>
+          latest.current.commentOn(file, rows, body, snippet),
+        send: (text, onSent, report) => latest.current.send(text, onSent, report),
       };
       publishReview(workspace, published.current);
     };

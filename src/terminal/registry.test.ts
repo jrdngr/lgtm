@@ -41,4 +41,12 @@ describe("sendToTerminal", () => {
     expect(shell.got).toEqual([]);
     off();
   });
+
+  it("strips control characters that could end bracketed paste", () => {
+    const t = fake(null);
+    const off = registerTerminal("t", t.target);
+    expect(sendToTerminal(null, "a\x1b[201~rm -rf x\n\tb\r")).toBe("sent");
+    expect(t.got).toEqual(["a[201~rm -rf x\n\tb"]);
+    off();
+  });
 });

@@ -27,13 +27,13 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 
 ## 3. Agent reviews
 
-Persona-based review, based on the `wee-bots` skill in `jrdngr/agent-stuff`.
+Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, but independent of it.
 
-- Initial personas: `simplicity-bot`, `security-bot`, `correctness-bot`, `performance-bot`, `maintainability-bot`, `general-bot`.
+- Personas are user-defined markdown files, global or per repo. The six wee-bots personas (`simplicity-bot`, `security-bot`, `correctness-bot`, `performance-bot`, `maintainability-bot`, `general-bot`) ship as defaults the user installs, and can reinstall to restore them.
 - The user dispatches any subset of personas against a review.
-- Each persona produces a readable report. Findings use the wee-bots severity rubric and finding format.
-- The user can ask for one synthesized report across all findings.
-- Cross-reviewed and minimal reports are supported, as in the skill.
+- The app owns the severity rubric, the prompts, and the finding format. Agents return structured findings, and the report is UI built from them, not text.
+- The user can ask for a synthesis across all findings, a cross-review before it, and a minimal set of findings for the task.
+- Findings link to code, can become comments, and can be sent to an agent in a terminal.
 - Runs on Claude Code in v1 (see Section 8). Other agents come later, so keep the agent behind one interface.
 
 ## 4. VCS layer
@@ -211,6 +211,6 @@ Draft. Tree-sitter supplies everything that needs to know what the code is.
 - A comment sent to the agent goes to a terminal pane and is pasted into the prompt by default. More delivery options later.
 - v1 agent is Claude Code. Two ways to run it:
   - Headless: the app spawns `claude -p` with stream-JSON output for persona reviews, highlighting, and comment workshopping.
-  - Terminal: the app pastes a prompt into a pane already running `claude`. This covers users on a subscription plan and is always available as a choice for any agent action.
+  - Terminal: the app pastes a prompt into a pane already running `claude`. This covers users on a subscription plan and is a choice for any agent action except persona reviews, whose findings need structured output.
 - Other agents (Codex, pi, etc.) are planned. Agent-specific code stays behind one adapter.
 

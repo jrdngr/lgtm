@@ -4,7 +4,7 @@ use serde_json::Value;
 
 /// Arguments for a run that reads its prompt from stdin. It can read files, and edit them
 /// too with `edit`. Nothing else is available, and the user's MCP servers stay off.
-pub fn args(resume: Option<&str>, edit: bool) -> Vec<&str> {
+pub fn args<'a>(resume: Option<&'a str>, edit: bool, schema: Option<&'a str>) -> Vec<&'a str> {
     let mut args = vec![
         "-p",
         "--output-format",
@@ -26,6 +26,9 @@ pub fn args(resume: Option<&str>, edit: bool) -> Vec<&str> {
     if let Some(id) = resume {
         args.extend(["--resume", id]);
     }
+    if let Some(schema) = schema {
+        args.extend(["--json-schema", schema]);
+    }
     args
 }
 
@@ -34,11 +37,15 @@ pub fn args(resume: Option<&str>, edit: bool) -> Vec<&str> {
 pub enum Line {
     /// A piece of the reply as it streams.
     Text(String),
+    /// A tool call, summed up like "Read src/a.rs".
+    Tool(String),
     /// The run finished. `text` is the final reply, or the error.
     Done {
         text: String,
         session: Option<String>,
         error: bool,
+        /// The reply as JSON, when the run was given a schema.
+        structured: Option<Value>,
     },
     Other,
 }
@@ -55,6 +62,11 @@ pub fn parse(line: &str) -> Line {
         {
             Line::Text(str_at("/event/delta/text").unwrap_or_default().to_string())
         }
+        Some("assistant") => v
+            .pointer("/message/content")
+            .and_then(Value::as_array)
+            .and_then(|c| c.iter().rev().find(|b| b["type"] == "tool_use"))
+            .map_or(Line::Other, |b| Line::Tool(tool_summary(b))),
         Some("result") => {
             let error = v.get("is_error").and_then(Value::as_bool).unwrap_or(false)
                 || str_at("/subtype").is_some_and(|s| s != "success");
@@ -73,9 +85,26 @@ pub fn parse(line: &str) -> Line {
                 text,
                 session: str_at("/session_id").map(str::to_string),
                 error,
+                structured: v.get("structured_output").filter(|s| !s.is_null()).cloned(),
             }
         }
         _ => Line::Other,
+    }
+}
+
+/// A tool call as a few words: its name and the file or pattern it's about.
+fn tool_summary(block: &Value) -> String {
+    let name = block["name"].as_str().unwrap_or("Tool");
+    if name == "StructuredOutput" {
+        return "Writing up".to_string();
+    }
+    let input = &block["input"];
+    let target = ["file_path", "pattern", "path"]
+        .iter()
+        .find_map(|k| input[k].as_str());
+    match target {
+        Some(t) => format!("{name} {t}"),
+        None => name.to_string(),
     }
 }
 
@@ -93,9 +122,14 @@ mod tests {
             Line::Done {
                 text: "hi there".into(),
                 session: Some("s1".into()),
-                error: false
+                error: false,
+                structured: None,
             }
         );
+        let structured = r#"{"type":"result","subtype":"success","is_error":false,"result":"{}","structured_output":{"a":1},"session_id":"s1"}"#;
+        assert!(matches!(parse(structured), Line::Done { structured: Some(v), .. } if v["a"] == 1));
+        let tool = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"src/a.rs"}}]}}"#;
+        assert_eq!(parse(tool), Line::Tool("Read src/a.rs".into()));
         let failed = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["boom"],"session_id":"s1"}"#;
         assert!(matches!(parse(failed), Line::Done { error: true, text, .. } if text == "boom"));
         assert_eq!(parse(r#"{"type":"system","subtype":"init"}"#), Line::Other);

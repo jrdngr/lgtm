@@ -94,6 +94,26 @@ Notes from building M4.5:
 - Per-persona reports, synthesized report, cross-review, minimal report.
 - Findings link to code and can become comments.
 
+Notes from building M5:
+- Personas are markdown files: `description` and `off_lens` front matter, and the profile as the body. The file name is the persona's name. Global ones are in `$XDG_CONFIG_HOME/lgtm/personas` (falling back to `~/.config`), a repo's in `.lgtm/personas`, and a repo persona hides a global one of the same name. Files that can't be read are listed with why.
+- Nothing is built in. The Reviewers view offers to install the six defaults (the wee-bots personas) globally or into the repo, all picked, except ones whose file was edited, which say so and start unpicked. Installing again restores the originals. A repo install adds files to `@`.
+- The view rereads persona files each time it's shown. Edit opens a persona's file in the default editor, and New writes a starter file and opens it.
+- A run copies its personas when it starts, so retries and later steps use them as they were.
+- The rubric, the prompts and the steps belong to the app. Every step runs `claude -p --json-schema` with its own schema, and the result is stored as structured data: a persona's findings, challenges, rebuttals, the synthesis, and the minimal pick. A reply that doesn't match fails the part.
+- The app numbers a persona's findings `<persona>#1…` by severity. Later steps refer to findings by id. The synthesis numbers its merged findings and lists the persona findings each absorbs, and the minimal pick lists ids.
+- Each persona is its own run with Read, Grep and Glob, in the review's workspace. The prompt carries the diff (cut at 200 KB), the stat and the commit descriptions. The diff in the prompt is frozen at the commits the revset resolved to when the run started, but agents read files from the working copy, which the prompt says. The report bar warns when the open review's commit isn't the run's.
+- Steps run in order: reviews, then for cross-review a challenge pass (fresh runs, each persona on the others' medium and higher findings, skipped when there are none) and rebuttals (each challenged persona's own session, resumed), then synthesis, then the minimal pick. Cross-review needs two personas, and turns synthesis on, since the synthesis rules on disputes.
+- A step whose parts didn't all finish halts the run. Retry reruns only the parts that didn't finish. A finished run can add synthesis, cross-review or a minimal pick; adding cross-review redoes synthesis and minimal.
+- While a part runs, its chip shows the agent's latest tool call, like "Read src/a.rs".
+- Runs are stored per workspace in the repo's SQLite store, and listed in the Reviewers side view (⇧⌘O). The UI calls the feature Reviewers; the code calls it bots. Runs an older build stored in another shape are skipped.
+- The report pane opens to the right of the review. It shows findings as cards, with Minimal, Synthesis and By persona views. A card opens to show facts, explanation, fix, any contested note, and the challenges, rebuttals and rulings behind it. Fix first, quick wins and questions follow the synthesis, linking to cards.
+- Persona chips, with each persona's state and latest tool call, show only in the By persona view, where clicking one filters to it. The bar shows the run's state in every view.
+- Each card has a checkbox, and Pick all picks every card shown. Picked findings, from any view, can go together to a terminal's agent, or to a headless agent (`claude -p` with Read, Grep, Glob, Edit and Write in `acceptEdits` mode, as comment Change does). That edits the working copy, so it needs the run's revset to include `@`. Its reply streams into a Fixes view, which lists each fix with links to its findings and can stop it. The working copy is snapshotted when it's done.
+- Sending to a terminal says in the report pane where the text went, or why it couldn't go.
+- A card's locations jump to the code in the open review. Comment anchors the finding on the changed rows in its first location's range, or the nearest changed row when the range has none. Send to terminal pastes the finding into a terminal's prompt.
+- Reviews only run headless, since a terminal agent can't hand structured findings back. M6's MCP server is the way for one to do that.
+- At startup the app checks `jj` (0.40.0 or newer, for `WorkspaceRef.root()`) and `claude` (2.1.22 or newer, for `-p --json-schema`). A missing or old tool gets a dialog with the command that fixes it. A `jj` problem blocks the app. A `claude` problem can be skipped, which turns off persona reviews and comment workshopping.
+
 ## M6: Navigation
 
 - Graph views of the change.

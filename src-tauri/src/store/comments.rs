@@ -102,7 +102,7 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 
 const COLUMNS: &str = "id, path, pins, body, snippet, review, created_at, updated_at, workshop";
 
-fn json_err(e: serde_json::Error) -> rusqlite::Error {
+pub(super) fn json_err(e: serde_json::Error) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, e.into())
 }
 

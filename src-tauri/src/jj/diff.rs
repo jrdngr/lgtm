@@ -67,6 +67,36 @@ impl Jj {
         join(diff::parse_meta(&meta)?, diff::parse_git(&git)?)
     }
 
+    fn range_args<'a>(range: &'a Range, extra: &[&'a str]) -> Vec<&'a str> {
+        let from = range.from.as_deref().unwrap_or("root()");
+        [&["diff", "--from", from, "--to", &range.to][..], extra].concat()
+    }
+
+    /// The range's diff as `jj diff --git` prints it.
+    pub async fn git_diff(&self, range: &Range) -> anyhow::Result<String> {
+        self.read(&Self::range_args(range, &["--git"])).await
+    }
+
+    pub async fn diff_stat(&self, range: &Range) -> anyhow::Result<String> {
+        self.read(&Self::range_args(range, &["--stat"])).await
+    }
+
+    /// Each commit in the range, oldest first: its short change id and full description.
+    pub async fn descriptions(&self, range: &Range) -> anyhow::Result<String> {
+        let from = range.from.as_deref().unwrap_or("root()");
+        let revset = format!("{from}..{}", range.to);
+        self.read(&[
+            "log",
+            "--no-graph",
+            "--reversed",
+            "-r",
+            &revset,
+            "-T",
+            r#"change_id.short(8) ++ " " ++ if(description, description, "(no description)\n") ++ "\n""#,
+        ])
+        .await
+    }
+
     /// What `from`'s changes do differently from `to`'s: `from` rebased onto `to`'s parents,
     /// compared with `to`.
     pub async fn interdiff(&self, from: &str, to: &str) -> anyhow::Result<Vec<FileDiff>> {
@@ -143,5 +173,22 @@ mod tests {
         assert_eq!(git_path("a/", "src/main.rs"), "a/src/main.rs");
         assert_eq!(git_path("a/", "with space"), "a/with space");
         assert_eq!(git_path("b/", "é\"x"), r#""b/\303\251\"x""#);
+    }
+
+    #[tokio::test]
+    async fn stat_paths_are_repo_relative() {
+        let dir = tempfile::tempdir().unwrap();
+        let ok = std::process::Command::new("jj")
+            .args(["git", "init"])
+            .arg(dir.path())
+            .output()
+            .unwrap();
+        assert!(ok.status.success());
+        std::fs::create_dir(dir.path().join("src")).unwrap();
+        std::fs::write(dir.path().join("src/a.rs"), "x\n").unwrap();
+        let jj = Jj::new(dir.path());
+        jj.snapshot().await.unwrap();
+        let stat = jj.diff_stat(&jj.resolve("@").await.unwrap()).await.unwrap();
+        assert!(stat.starts_with("src/a.rs"), "{stat}");
     }
 }

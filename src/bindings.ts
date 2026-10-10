@@ -9,6 +9,8 @@ export const commands = {
 	root: string,
 	name: string,
 } | null>("current_repo"),
+	/**  The command-line tools that are missing or too old. */
+	checkTools: () => __TAURI_INVOKE<ToolProblem[]>("check_tools"),
 	openRepo: (path: string) => typedError<null, string>(__TAURI_INVOKE("open_repo", { path })),
 	/**  Recently opened repos, most recent first. */
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
@@ -68,10 +70,38 @@ export const commands = {
 	 */
 	workshopComment: (review: number, comment: number, ask: Ask, onText: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("workshop_comment", { review, comment, ask, onText })),
 	stopWorkshop: (comment: number) => __TAURI_INVOKE<void>("stop_workshop", { comment }),
+	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
+	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options })),
+	/**  Adds `options` to a finished or halted run and runs what it's missing. */
+	continueBots: (run: number, options: BotOptions) => typedError<null, string>(__TAURI_INVOKE("continue_bots", { run, options })),
+	stopBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("stop_bots", { run })),
+	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
+	/**  The workspace's persona reviews, newest first. */
+	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),
+	botRun: (run: number) => typedError<BotRun, string>(__TAURI_INVOKE("bot_run", { run })),
+	/**
+	 *  Starts an agent fixing the picked findings in the run's workspace. `text` is them as
+	 *  markdown. Its reply streams as events.
+	 */
+	fixFindings: (run: number, findings: string[], text: string) => typedError<null, string>(__TAURI_INVOKE("fix_findings", { run, findings, text })),
+	stopFix: (run: number, fix: number) => typedError<null, string>(__TAURI_INVOKE("stop_fix", { run, fix })),
+	/**  The personas a review in the workspace can use, and files that couldn't be read. */
+	listPersonas: (workspace: string | null) => typedError<Personas, string>(__TAURI_INVOKE("list_personas", { workspace })),
+	/**  The default personas, and where each is installed. */
+	defaultPersonas: (workspace: string | null) => typedError<DefaultPersona[], string>(__TAURI_INVOKE("default_personas", { workspace })),
+	/**  Writes the named default personas globally or into the workspace's repo. */
+	installPersonas: (workspace: string | null, names: string[], scope: Scope) => typedError<null, string>(__TAURI_INVOKE("install_personas", { workspace, names, scope })),
+	/**  Writes a starter file for a new persona and opens it in the default editor. */
+	newPersona: (workspace: string | null, name: string, scope: Scope) => typedError<null, string>(__TAURI_INVOKE("new_persona", { workspace, name, scope })),
+	/**  Opens a persona file in the default editor. */
+	openPersona: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("open_persona", { workspace, path })),
 };
 
 /** Events */
 export const events = {
+	botFixText: makeEvent<BotFixText>("bot-fix-text"),
+	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
+	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
 };
@@ -80,6 +110,11 @@ export const events = {
 export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","escape","function","keyword","label","module","number","operator","property","punctuation","string","tag","type","variable.builtin","variable.parameter"] as const;
 
 /* Types */
+export type Action = {
+	action: string,
+	closes: string[],
+};
+
 /**  A message for a comment's agent. */
 export type Ask = {
 	message: string,
@@ -90,6 +125,70 @@ export type Ask = {
 };
 
 export type Author = "user" | "agent";
+
+/**  A persona review's fix `fix` streamed more of its reply. */
+export type BotFixText = {
+	run: number,
+	fix: number,
+	text: string,
+};
+
+/**  What a run does past the personas' own reviews. */
+export type BotOptions = {
+	/**  One set of findings merged across every persona's. */
+	synthesize: boolean,
+	/**  Personas challenge each other's findings before synthesis. */
+	crossReview: boolean,
+	/**  Cross-review argues against every medium and higher finding. */
+	adversarial: boolean,
+	/**  Only the findings that matter to what the change is for. */
+	minimal: boolean,
+};
+
+/**
+ *  A persona review of a revset, frozen at the commits it resolved to and the personas as
+ *  they were when it started.
+ */
+export type BotRun = {
+	id: number,
+	workspace: string | null,
+	revset: string,
+	from: string | null,
+	to: string,
+	personas: Persona[],
+	options: BotOptions,
+	parts: Part[],
+	/**  Steps whose parts all finished. */
+	done: Step[],
+	createdAt: number | null,
+	/**  Agent runs that fixed picked findings, oldest first. */
+	fixes?: Fix[],
+	/**  Whether it's running now. Only memory knows, so the stored value is ignored. */
+	active?: boolean,
+};
+
+/**  A persona review's part `part` moved on to something else, like reading a file. */
+export type BotRunActivity = {
+	run: number,
+	part: number,
+	activity: string,
+};
+
+/**  A persona review started, stopped, or added or finished a part. */
+export type BotRunChanged = {
+	run: number,
+};
+
+/**  A persona file that couldn't be read, by path, with why. */
+export type Broken = {
+	path: string,
+	error: string,
+};
+
+export type Challenge = {
+	finding: string,
+	argument: string,
+};
 
 export type ChangeDto = {
 	changeId: string,
@@ -132,6 +231,13 @@ export type CommentDto = {
 	messages: Message[],
 };
 
+export type DefaultPersona = {
+	name: string,
+	description: string,
+	global: Installed,
+	repo: Installed,
+};
+
 export type FileDto = {
 	path: string,
 	oldPath: string | null,
@@ -149,6 +255,38 @@ export type FileDto = {
 
 export type FileStatus = "modified" | "added" | "removed" | "copied" | "renamed";
 
+export type Finding = {
+	/**
+	 *  `<persona>#<n>` for a persona's finding, which the app assigns, and the synthesis's own
+	 *  number for a merged one.
+	 */
+	id?: string,
+	severity: Severity,
+	title: string,
+	locations: Location[],
+	facts: string[],
+	explanation: string,
+	/**  Absent for off-lens findings. */
+	fix?: string | null,
+	offLens?: boolean,
+	/**  Merged findings only: the persona findings this one combines. */
+	sources?: string[],
+	raisedBy?: Raiser[],
+	/**  How the personas disagreed, and the ruling. */
+	contested?: string | null,
+};
+
+/**  One agent run fixing findings. */
+export type Fix = {
+	/**  Ids of the findings it was asked to fix. */
+	findings: string[],
+	status: Status,
+	/**  The reply, or the reply so far while it runs. */
+	text: string,
+	error: string | null,
+	createdAt: number | null,
+};
+
 export type HunkDto = {
 	oldStart: number,
 	oldLines: number,
@@ -157,6 +295,10 @@ export type HunkDto = {
 	section: string,
 	rows: RowDto[],
 };
+
+export type Installed = "no" | "yes" | 
+/**  Installed, but the file differs from the template. */
+"changed";
 
 /**  A change to the repo, on a revision given by change id. */
 export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: string } | { kind: "newBefore"; rev: string } | 
@@ -167,6 +309,13 @@ export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: 
 { kind: "squash"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
+
+/**  A place in the change: a repository-relative path, with new-side lines when known. */
+export type Location = {
+	path: string,
+	start: number | null,
+	end: number | null,
+};
 
 /**  One line of `jj log` output, with ANSI colors. */
 export type LogLine = {
@@ -193,6 +342,62 @@ export type Message = {
 	change?: boolean,
 };
 
+export type Minimal = {
+	task: string,
+	/**  Synthesis finding ids that matter to the task. */
+	kept: string[],
+	/**  Critical and high findings left out as unrelated to the task. */
+	offTask: string[],
+	recommendations: string,
+};
+
+export type Outcome = "kept" | "dropped" | "downgraded" | "upgraded";
+
+/**  A finished part's result. */
+export type Output = {
+	kind: "review",
+} & Review | ({ kind: "challenges"; challenges: Challenge[] }) & { responses?: never } | ({ kind: "rebuttals"; responses: Response[] }) & { challenges?: never } | {
+	kind: "synthesis",
+} & Synthesis | {
+	kind: "minimal",
+} & Minimal;
+
+/**  One agent run within a review run. */
+export type Part = {
+	step: Step,
+	/**  The persona's name. Absent for synthesis and the minimal report. */
+	persona: string | null,
+	status: Status,
+	/**  Set once it's done. */
+	output: Output | null,
+	/**  Why it failed. */
+	error: string | null,
+	/**  The agent's session, which a rebuttal resumes. */
+	session: string | null,
+	/**  What the agent is doing while it runs. Only memory knows. */
+	activity?: string | null,
+};
+
+/**  What a run needs of a persona, copied into the run when it starts. */
+export type Persona = {
+	name: string,
+	description: string,
+	/**  Whether it also reports serious issues outside its lens. */
+	offLens: boolean,
+	profile: string,
+};
+
+export type PersonaFile = {
+	scope: Scope,
+	path: string,
+} & Persona;
+
+export type Personas = {
+	/**  By name. A repo persona hides a global one of the same name. */
+	personas: PersonaFile[],
+	broken: Broken[],
+};
+
 /**  Changed-row counts by state, as the review header counts them. */
 export type ProgressDto = {
 	/**  The revset counted: the workspace's latest review, or `@`. */
@@ -206,6 +411,23 @@ export type ProgressDto = {
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
+export type Question = {
+	question: string,
+	findings: string[],
+};
+
+export type QuickWin = {
+	finding: string,
+	fix: string,
+};
+
+/**  A persona that raised a merged finding, with its own rating. */
+export type Raiser = {
+	persona: string,
+	severity: Severity,
+	inLens: boolean,
+};
+
 export type RefreshDto = {
 	review: ReviewDto,
 	/**  Where rows of the review as it was went. */
@@ -218,6 +440,17 @@ export type RepoChanged = Record<string, never>;
 export type RepoInfo = {
 	root: string,
 	name: string,
+};
+
+export type Response = {
+	finding: string,
+	stance: Stance,
+	evidence: string,
+};
+
+export type Review = {
+	verdict: string,
+	findings: Finding[],
 };
 
 export type ReviewDto = {
@@ -269,12 +502,27 @@ export type RowSpan = {
 	end: number,
 };
 
+/**  The ruling on a challenged persona finding. */
+export type Ruling = {
+	/**  The persona finding's id. */
+	finding: string,
+	outcome: Outcome,
+	severity: Severity | null,
+	reason: string,
+};
+
+export type Scope = "global" | "repo";
+
+export type Severity = "critical" | "high" | "medium" | "low" | "info";
+
 /**  How a change compares with the previous session. */
 export type Since = 
 /**  There's no previous session. */
 "unknown" | "new" | "changed" | "same" | 
 /**  In the previous session but not in the review now. */
 "removed";
+
+export type Stance = "concede" | "defend" | "partlyConcede";
 
 /**  Everything marking and commenting can change. */
 export type StateDto = {
@@ -290,7 +538,33 @@ export type StateDto = {
 	comments: CommentDto[],
 };
 
+export type Status = "running" | "done" | "failed" | "stopped";
+
+/**  The steps of a run, in order. */
+export type Step = "reports" | "challenges" | "rebuttals" | "synthesis" | "minimal";
+
 export type SymbolKind = "function" | "class" | "module";
+
+export type Synthesis = {
+	verdict: string,
+	findings: Finding[],
+	rulings?: Ruling[],
+	quickWins: QuickWin[],
+	questions: Question[],
+	fixFirst: Action[],
+};
+
+/**  A tool that's missing or too old. */
+export type ToolProblem = {
+	tool: string,
+	/**  The version found, or `None` when it isn't installed. */
+	found: string | null,
+	minimum: string,
+	/**  What to run to fix it. */
+	fix: string,
+	/**  Whether the app can't work without it. Otherwise only some features need it. */
+	required: boolean,
+};
 
 export type View = 
 /**  The whole review as one diff. */

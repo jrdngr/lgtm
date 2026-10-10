@@ -46,3 +46,10 @@ pub(crate) fn save_layout(
 ) -> CmdResult<()> {
     layout::save(&layout_path(&window, workspace.as_deref())?, &layout).map_err(|e| e.to_string())
 }
+
+/// The command-line tools that are missing or too old.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn check_tools() -> Vec<crate::tools::ToolProblem> {
+    crate::tools::check().await
+}

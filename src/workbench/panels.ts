@@ -1,10 +1,11 @@
 import type { AddPanelOptions, DockviewApi } from "dockview-react";
 
-type PanelKind = "review" | "terminal";
+type PanelKind = "review" | "terminal" | "report";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
+  report: "Reviewers",
 };
 
 function addPanel(
@@ -30,6 +31,22 @@ export function addTerminal(api: DockviewApi, direction?: "right" | "below", set
   const active = api.activePanel;
   const position = direction && active ? { referencePanel: active, direction } : undefined;
   return addPanel(api, "terminal", setup ? { setup } : {}, position);
+}
+
+/** Shows a persona review's reports, in the pane it's already open in if there is one. */
+export function openReport(api: DockviewApi, run: number) {
+  const open = api.getPanel(`report-${run}`);
+  if (open) return open.api.setActive();
+  // Beside the review, so jumping to a finding's code keeps the report in view.
+  const review = api.panels.find((p) => p.view.contentComponent === "review");
+  const position = review ? { referencePanel: review, direction: "right" as const } : undefined;
+  api.addPanel({
+    id: `report-${run}`,
+    component: "report",
+    title: "Reviewers",
+    params: { run },
+    position,
+  });
 }
 
 /** A review with a terminal below it. */

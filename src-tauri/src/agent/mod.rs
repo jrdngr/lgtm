@@ -6,7 +6,7 @@ mod claude;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, bail};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -18,20 +18,37 @@ use claude::Line;
 /// How a run ended.
 pub struct Reply {
     pub text: String,
+    /// The reply as JSON, for a task with a schema.
+    pub structured: Option<serde_json::Value>,
     /// The agent's session, for continuing the conversation.
     pub session: Option<String>,
     /// Stopped by the user. `text` is what had streamed so far.
     pub stopped: bool,
 }
 
-/// Running agents by key, so they can be stopped.
-#[derive(Default)]
-pub struct Runs(Mutex<HashMap<String, oneshot::Sender<()>>>);
+/// Running agents by key, so they can be stopped. Clones share the same runs.
+#[derive(Clone, Default)]
+pub struct Runs(Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>);
 
 impl Runs {
     pub fn stop(&self, key: &str) {
         if let Some(tx) = self.0.lock().unwrap().remove(key) {
             tx.send(()).ok();
+        }
+    }
+
+    /// Stops every run whose key starts with `prefix`.
+    pub fn stop_all(&self, prefix: &str) {
+        let mut map = self.0.lock().unwrap();
+        let keys: Vec<String> = map
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .cloned()
+            .collect();
+        for k in keys {
+            if let Some(tx) = map.remove(&k) {
+                tx.send(()).ok();
+            }
         }
     }
 
@@ -64,19 +81,29 @@ pub struct Task<'a> {
     pub resume: Option<&'a str>,
     /// Whether it may edit files in `cwd`.
     pub edit: bool,
+    /// A JSON schema the reply must match.
+    pub schema: Option<&'a str>,
 }
 
-/// Runs the agent on `task`. Streams the reply through `on_text` as it arrives.
+/// What a run reports as it goes.
+pub enum Progress {
+    /// A piece of the reply.
+    Text(String),
+    /// A tool call, summed up like "Read src/a.rs".
+    Tool(String),
+}
+
+/// Runs the agent on `task`, reporting the reply and tool calls through `on` as they arrive.
 pub async fn run(
     runs: &Runs,
     key: &str,
     task: Task<'_>,
-    on_text: impl Fn(String),
+    on: impl Fn(Progress),
 ) -> anyhow::Result<Reply> {
     let (_registered, mut stop) = runs.register(key)?;
 
     let mut child = Command::new("claude")
-        .args(claude::args(task.resume, task.edit))
+        .args(claude::args(task.resume, task.edit, task.schema))
         .current_dir(task.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -96,20 +123,27 @@ pub async fn run(
             line = lines.next_line() => line?,
             _ = &mut stop => {
                 child.kill().await.ok();
-                return Ok(Reply { text: streamed, session: None, stopped: true });
+                return Ok(Reply { text: streamed, structured: None, session: None, stopped: true });
             }
         };
         let Some(line) = line else { break };
         match claude::parse(&line) {
             Line::Text(t) => {
                 streamed.push_str(&t);
-                on_text(t);
+                on(Progress::Text(t));
             }
+            Line::Tool(t) => on(Progress::Tool(t)),
             Line::Done { text, error, .. } if error => bail!("the agent failed: {text}"),
-            Line::Done { text, session, .. } => {
+            Line::Done {
+                text,
+                session,
+                structured,
+                ..
+            } => {
                 child.wait().await.ok();
                 return Ok(Reply {
                     text,
+                    structured,
                     session,
                     stopped: false,
                 });
@@ -137,12 +171,17 @@ mod tests {
         let runs = Runs::default();
         let dir = tempfile::tempdir().unwrap();
         let streamed = Mutex::new(String::new());
-        let on_text = |t: String| streamed.lock().unwrap().push_str(&t);
+        let on_text = |p: Progress| {
+            if let Progress::Text(t) = p {
+                streamed.lock().unwrap().push_str(&t)
+            }
+        };
         let task = |prompt, resume| Task {
             cwd: dir.path(),
             prompt,
             resume,
             edit: true,
+            schema: None,
         };
         let first = run(
             &runs,

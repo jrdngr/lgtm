@@ -1,0 +1,46 @@
+.tool-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.tool-check-dialog {
+  max-width: 480px;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.tool-check-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.tool-check-dialog ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.tool-check-dialog li {
+  margin: 8px 0;
+}
+
+.tool-check-dialog code {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 2px 6px;
+  font:
+    12px Menlo,
+    monospace;
+  background: var(--bg);
+  border-radius: 4px;
+  user-select: all;
+}
+
+.tool-check-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}

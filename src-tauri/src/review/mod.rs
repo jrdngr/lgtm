@@ -38,7 +38,7 @@ use matching::MatchedCheck;
 pub use progress::ProgressDto;
 pub use rowmap::RowMove;
 pub use views::{ChangeDto, View};
-pub use workshop::Ask;
+pub use workshop::{Ask, NOT_AT_WORKING_COPY};
 
 /// Reports a workspace's watch events, with the workspace's name.
 pub type Emit = Arc<dyn Fn(Option<String>, watch::Event) + Send + Sync>;
@@ -57,6 +57,8 @@ pub struct RepoCtx {
     reviews: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
+    /// Persona reviews in progress.
+    pub bots: crate::bots::Live,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -164,7 +166,7 @@ pub struct Review {
     redo: Vec<Edit>,
 }
 
-fn now_ms() -> i64 {
+pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as i64)
@@ -182,6 +184,7 @@ impl RepoCtx {
             reviews: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
+            bots: Default::default(),
         }
     }
 

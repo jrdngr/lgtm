@@ -77,7 +77,9 @@ impl Jj {
         color: &str,
     ) -> anyhow::Result<Vec<u8>> {
         let mut cmd = Command::new("jj");
-        cmd.arg("-R")
+        // jj prints paths relative to its cwd, and they should be relative to the repo.
+        cmd.current_dir(&self.root)
+            .arg("-R")
             .arg(&self.root)
             .arg("--no-pager")
             .arg(format!("--color={color}"));

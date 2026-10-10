@@ -1,12 +1,13 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
+import { BotsPanel } from "../bots/BotsPanel";
 import type { RepoInfo } from "../ipc";
 import { CommentsPanel } from "../review/CommentsPanel";
 import { FilesPanel } from "../review/FilesPanel";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { chord } from "./keys";
-import { addTerminal } from "./panels";
+import { addTerminal, openReport } from "./panels";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
@@ -77,6 +78,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+K": () => showView("left", "workspaces"),
     "Mod+Shift+E": () => showView("right", "files"),
     "Mod+Shift+M": () => showView("right", "comments"),
+    "Mod+Shift+O": () => showView("right", "bots"),
   };
 
   /** The action for a chord, if it has one now. */
@@ -169,6 +171,13 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             views={[
               { id: "files", title: "Files", render: () => <FilesPanel /> },
               { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
+              {
+                id: "bots",
+                title: "Reviewers",
+                render: () => (
+                  <BotsPanel onOpen={(run) => withApi((a) => openReport(a, run.id))()} />
+                ),
+              },
             ]}
           />
         </WorkspaceContext.Provider>

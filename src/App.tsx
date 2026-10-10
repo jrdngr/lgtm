@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { commands, type RepoInfo } from "./ipc";
 import { Start } from "./Start";
+import { ToolCheck } from "./tools/ToolCheck";
 import { Workbench } from "./workbench/Workbench";
 
 export function App() {
@@ -11,5 +12,5 @@ export function App() {
   }, []);
 
   if (repo === undefined) return null;
-  return repo ? <Workbench repo={repo} /> : <Start />;
+  return <ToolCheck>{repo ? <Workbench repo={repo} /> : <Start />}</ToolCheck>;
 }
