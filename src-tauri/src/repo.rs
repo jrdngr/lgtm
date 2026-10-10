@@ -30,6 +30,22 @@ pub struct RepoInfo {
     pub name: String,
 }
 
+impl RepoInfo {
+    pub fn new(root: &Path) -> Self {
+        Self {
+            root: root.display().to_string(),
+            name: name(root),
+        }
+    }
+}
+
+fn name(root: &Path) -> String {
+    root.file_name().map_or_else(
+        || root.display().to_string(),
+        |n| n.to_string_lossy().into(),
+    )
+}
+
 pub const START_LABEL: &str = "start";
 
 /// Nearest ancestor of `path` (inclusive) holding a `.jj` directory.
@@ -66,12 +82,11 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         .lock()
         .unwrap()
         .insert(label.clone(), Arc::new(ctx));
-    let title = root.file_name().map_or_else(
-        || root.display().to_string(),
-        |n| n.to_string_lossy().into(),
-    );
+    if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
+        eprintln!("lgtm: save recent repos: {e}");
+    }
     WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
-        .title(title)
+        .title(name(&root))
         .inner_size(1400.0, 900.0)
         .build()
         .map_err(|e| e.to_string())?;
@@ -88,7 +103,7 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
     }
     WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
         .title("lgtm")
-        .inner_size(480.0, 320.0)
+        .inner_size(480.0, 420.0)
         .build()
         .map(|_| ())
 }

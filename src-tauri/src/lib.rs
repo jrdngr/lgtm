@@ -3,6 +3,7 @@ pub mod diff;
 mod jj;
 mod layout;
 mod pty;
+mod recent;
 mod repo;
 mod review;
 mod store;
@@ -40,18 +41,24 @@ fn err(e: anyhow::Error) -> String {
 #[tauri::command]
 #[specta::specta]
 fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
-    let root = repo_root(&window).ok()?;
-    let name = root.file_name()?.to_string_lossy().into_owned();
-    Some(RepoInfo {
-        root: root.display().to_string(),
-        name,
-    })
+    Some(RepoInfo::new(&repo_root(&window).ok()?))
 }
 
 #[tauri::command]
 #[specta::specta]
 fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
     repo::open(&app, Path::new(&path))
+}
+
+/// Recently opened repos, most recent first.
+#[tauri::command]
+#[specta::specta]
+fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(recent::load(&recent::path(&data_dir))
+        .iter()
+        .map(|root| RepoInfo::new(root))
+        .collect())
 }
 
 fn layout_path(window: &WebviewWindow) -> CmdResult<PathBuf> {
@@ -160,6 +167,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .commands(collect_commands![
             current_repo,
             open_repo,
+            recent_repos,
             load_layout,
             save_layout,
             pty_spawn,

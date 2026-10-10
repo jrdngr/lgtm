@@ -9,6 +9,8 @@ export const commands = {
 	name: string,
 } | null>("current_repo"),
 	openRepo: (path: string) => typedError<null, string>(__TAURI_INVOKE("open_repo", { path })),
+	/**  Recently opened repos, most recent first. */
+	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
 	loadLayout: () => typedError<string | null, string>(__TAURI_INVOKE("load_layout")),
 	saveLayout: (layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { layout })),
 	/**  Starts a PTY in the window's repo root. `command` defaults to the login shell. */
