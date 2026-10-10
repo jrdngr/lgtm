@@ -46,6 +46,7 @@ The Files panel (⌘⇧E or the toolbar's Files button) shows the review's files
 
 In the review toolbar:
 
+- **Revset:** defaults to `@`. **Pick…** opens `jj log` as you have it configured (default revset, template, colors). Click a commit, shift-click another for a range, then Review. Double-click reviews one commit.
 - **View:** Combined, Per change, or Since last session (what each change does differently from the last time this revset was reviewed). The second picker chooses the change.
 - **Line filter:** All, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
 - Progress counts for the whole review.

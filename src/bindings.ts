@@ -30,6 +30,8 @@ export const commands = {
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
+	/**  `jj log` with the user's default revset and template, for picking commits. */
+	logGraph: () => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph")),
 	/**
 	 *  Marks changed rows, or clears their marks when `state` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -97,6 +99,14 @@ export type HunkDto = {
 	newLines: number,
 	section: string,
 	rows: RowDto[],
+};
+
+/**  One line of `jj log` output, with ANSI colors. */
+export type LogLine = {
+	text: string,
+	/**  Set on the first line of each commit. */
+	commitId: string | null,
+	changeId: string | null,
 };
 
 export type MarkDto = {

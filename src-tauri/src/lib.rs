@@ -133,6 +133,13 @@ fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> {
     Ok(())
 }
 
+/// `jj log` with the user's default revset and template, for picking commits.
+#[tauri::command]
+#[specta::specta]
+async fn log_graph(window: WebviewWindow) -> CmdResult<Vec<jj::LogLine>> {
+    repo(&window)?.jj.log_graph().await.map_err(err)
+}
+
 /// Reloads a review after the repo changed, or switches it to `view`.
 #[tauri::command]
 #[specta::specta]
@@ -208,6 +215,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             open_review,
             close_review,
             refresh_review,
+            log_graph,
             mark_rows,
             set_files_checked,
             undo_marks,

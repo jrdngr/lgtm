@@ -45,7 +45,7 @@ Persona-based review, based on the `wee-bots` skill in `jrdngr/agent-stuff`.
 
 - A task is a jj workspace (`jj workspace add`) under `~/.local/share/lgtm/ws/<repo>/<task>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace counts as a task.
 - "New task" runs `jj workspace add` and `jj new trunk()` there, runs the repo's `.lgtm/setup` script if present, then opens a terminal.
-- The default review target is the task's stack, `trunk()..@`.
+- The default review target is `@`. A commit picker shows `jj log` as the user has it configured; picking one commit or a range sets the revset.
 - Reviewing someone else's PR creates its own task on the PR head, so agent edits never touch other work.
 - Workspaces are removed when their task is deleted, or by `lgtm gc`.
 

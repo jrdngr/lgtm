@@ -30,7 +30,7 @@ import { useReview } from "./useReview";
 import { nextRowLine, useSelection } from "./useSelection";
 import "./review.css";
 
-const DEFAULT_REVSET = "trunk()..@";
+const DEFAULT_REVSET = "@";
 
 type Params = { revset?: string };
 
@@ -402,6 +402,10 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         revset={revset}
         onRevset={setRevset}
         onLoad={() => load(revset)}
+        onPick={(picked) => {
+          setRevset(picked);
+          load(picked);
+        }}
         onView={changeView}
         mode={mode}
         onMode={setMode}

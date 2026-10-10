@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { ChangeDto, ReviewDto, View } from "../bindings";
+import { CommitPicker } from "./CommitPicker";
 import type { ViewMode } from "./model";
 import { FILTERS, type Filter, type Progress } from "./state";
 
@@ -31,6 +33,8 @@ interface Props {
   revset: string;
   onRevset(revset: string): void;
   onLoad(): void;
+  /** Sets the revset and loads it. */
+  onPick(revset: string): void;
   onView(view: View): void;
   mode: ViewMode;
   onMode(mode: ViewMode): void;
@@ -42,6 +46,7 @@ interface Props {
 
 export function ReviewBar(props: Props) {
   const { review, progress } = props;
+  const [picking, setPicking] = useState(false);
   const view = review?.view ?? { kind: "combined" };
   const current = view.kind === "combined" ? undefined : view.change;
 
@@ -70,7 +75,19 @@ export function ReviewBar(props: Props) {
         <button type="submit" disabled={props.loading}>
           {props.loading ? "Loading" : "Load"}
         </button>
+        <button type="button" onClick={() => setPicking(true)} title="Pick commits from jj log">
+          Pick…
+        </button>
       </form>
+      {picking && (
+        <CommitPicker
+          onClose={() => setPicking(false)}
+          onPick={(revset) => {
+            setPicking(false);
+            props.onPick(revset);
+          }}
+        />
+      )}
       <select
         value={view.kind}
         disabled={!review}
