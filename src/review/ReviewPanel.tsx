@@ -58,6 +58,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const [fileOpen, setFileOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number }>();
+  const [revisions, setRevisions] = useState(false);
   const [scrollTo, setScrollTo] = useState<{ line: number }>();
   /** Text waiting for the user to pick which terminal it goes to. */
   const [picking, setPicking] = useState<{
@@ -125,13 +126,16 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     [files, lines, sel],
   );
 
-  async function load(target: string) {
+  /** Loads `target` as the review. Returns the error message when it fails. */
+  async function load(target: string): Promise<string | undefined> {
     const r = await open(target);
-    if (!r) return;
+    if (typeof r === "string") return r;
+    setRevset(target);
     setCollapsedHunks(new Set());
     setFileOpen(new Map());
     setRevealed(new Set());
     api.updateParameters({ revset: target });
+    return undefined;
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
@@ -459,6 +463,9 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       case "c":
         if (!e.repeat) startComment();
         break;
+      case "r":
+        setRevisions(true);
+        break;
       case "x": {
         const file = lines[cursor]?.file;
         if (file !== undefined && !e.repeat) setChecked(file, index.checks[file] !== "checked");
@@ -556,11 +563,11 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         review={review}
         loading={loading}
         revset={revset}
-        onRevset={setRevset}
-        onLoad={() => load(revset)}
-        onPick={(picked) => {
-          setRevset(picked);
-          load(picked);
+        onLoad={load}
+        panel={revisions}
+        onPanel={(open) => {
+          setRevisions(open);
+          if (!open) rootRef.current?.focus({ preventScroll: true });
         }}
         onView={changeView}
         mode={mode}

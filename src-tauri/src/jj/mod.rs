@@ -11,7 +11,9 @@ use tokio::sync::Mutex;
 use crate::diff::{self, FileMeta, FileStatus, GitFileDiff, Hunk};
 use crate::gitmeta;
 
+mod edit;
 pub mod workspace;
+pub use edit::JjAction;
 pub use workspace::WorkspaceInfo;
 
 /// True when `err` came from jj refusing to work on a stale working copy.
@@ -56,19 +58,26 @@ fn parse_log(out: &str) -> Vec<LogLine> {
 pub struct Change {
     pub change_id: String,
     pub commit_id: String,
+    /// Length of the shortest prefix of `change_id` that's unique in the repo.
+    pub unique: u32,
+    /// Whether it's the workspace's working-copy commit.
+    pub working_copy: bool,
     pub description: String,
 }
 
-const CHANGE_TEMPLATE: &str =
-    r#"change_id.short(12) ++ "\t" ++ commit_id ++ "\t" ++ description.first_line() ++ "\n""#;
+const CHANGE_TEMPLATE: &str = r#"change_id.short(12) ++ "\t" ++ commit_id ++ "\t"
+  ++ change_id.shortest().prefix().len() ++ "\t" ++ if(current_working_copy, "1", "0") ++ "\t"
+  ++ description.first_line() ++ "\n""#;
 
 fn parse_changes(out: &str) -> Vec<Change> {
     out.lines()
         .filter_map(|l| {
-            let mut parts = l.splitn(3, '\t');
+            let mut parts = l.splitn(5, '\t');
             Some(Change {
                 change_id: parts.next()?.to_string(),
                 commit_id: parts.next()?.to_string(),
+                unique: parts.next()?.parse().ok()?,
+                working_copy: parts.next()? == "1",
                 description: parts.next().unwrap_or_default().to_string(),
             })
         })
@@ -265,7 +274,7 @@ impl Jj {
             .map(|t| t.trim().to_string())
             .unwrap_or_else(|_| "builtin_log_compact".into());
         let template = format!(
-            r#""\x1f" ++ stringify(commit_id) ++ "\x1f" ++ stringify(change_id.short(12)) ++ "\x1f" ++ ({template})"#
+            r#""\x1f" ++ stringify(commit_id) ++ "\x1f" ++ stringify(change_id.shortest(8)) ++ "\x1f" ++ ({template})"#
         );
         let out = self
             .exec_with(&["log", "-T", &template], true, "always")
@@ -361,8 +370,9 @@ mod tests {
 
     #[test]
     fn parses_change_lines_with_tabs_in_descriptions() {
-        let got = parse_changes("abc\tc1\tfix: a\tb\nxyz\tc2\t\n");
+        let got = parse_changes("abc\tc1\t2\t1\tfix: a\tb\nxyz\tc2\t1\t0\t\n");
         assert_eq!(got[0].description, "fix: a\tb");
+        assert_eq!((got[0].unique, got[0].working_copy), (2, true));
         assert_eq!(
             (got[1].change_id.as_str(), got[1].description.as_str()),
             ("xyz", "")

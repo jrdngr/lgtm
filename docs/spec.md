@@ -50,7 +50,7 @@ Persona-based review, based on the `wee-bots` skill in `jrdngr/agent-stuff`.
 - New workspaces (`jj workspace add`) go under `~/.local/share/lgtm/ws/<repo>/<workspace>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace is listed too.
 - "New workspace" runs `jj workspace add -r trunk()`, then opens a terminal there that runs the repo's `.lgtm/setup` script if present.
 - The sidebar switches between workspaces. Each has its own panes and layout. Switching hides the other workspaces' panes; their terminals keep running.
-- The default review target is `@`. A commit picker shows `jj log` as the user has it configured; picking one commit or a range sets the revset.
+- The default review target is `@`. The review bar shows the target as jj colors it. The revisions panel shows `jj log` as the user has it configured. Picking one commit or a range, or typing a revset, sets the review. It also edits a commit, adds a new one before or after it, squashes it into its parent, and undoes or redoes, and the review follows `@`.
 - Reviewing someone else's PR creates its own workspace on the PR head, so agent edits never touch other work.
 - Deleting a workspace forgets it and removes its directory. `lgtm gc` cleans up any left behind.
 

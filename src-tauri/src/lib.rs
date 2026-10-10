@@ -226,6 +226,21 @@ async fn log_graph(
     ws.jj.log_graph().await.map_err(err)
 }
 
+/// Runs a revisions panel action in the workspace. Returns how many jj operations it took.
+#[tauri::command]
+#[specta::specta]
+async fn jj_act(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    action: jj::JjAction,
+) -> CmdResult<u32> {
+    let ws = repo(&window)?
+        .workspace(workspace.as_deref())
+        .await
+        .map_err(err)?;
+    ws.jj.act(&action).await.map_err(err)
+}
+
 /// Reloads a review after the repo changed, or switches it to `view`.
 #[tauri::command]
 #[specta::specta]
@@ -366,6 +381,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             close_review,
             refresh_review,
             log_graph,
+            jj_act,
             mark_rows,
             set_files_checked,
             undo_marks,

@@ -80,6 +80,13 @@ Notes from building M4:
 - The revisions panel: a revset box and the `jj log` graph. j/k move, J/K extend, Enter reviews. `e` edits, `n` and `N` make a new commit after and before, `s` squashes into the parent, `u` and `U` undo and redo. The footer shows the last action.
 - The review follows `@`: edit X reviews `@`, new after X reviews `X::@`, new before X reviews `@::X`.
 
+Notes from building M4.5:
+- Squash keeps the parent's description (`--use-destination-message`), since a headless jj can't open an editor to combine them.
+- Squashing `@` then runs `jj edit` on the parent, so `@` lands on it rather than on a new empty commit. That's two jj operations, so the panel's undo and redo take back both.
+- The panel builds revsets from change ids at jj's shortest unique length, at least 8.
+- The chip colors ids as jj does, with the unique prefix in pink. One commit shows up to 5 characters of its id, fewer when the bar is narrow, but never less than the unique prefix. A range shows only the unique prefixes, like `wk::q`.
+- After squash, undo or redo the review keeps its revset, and falls back to `@` when that no longer resolves.
+
 ## M5: Persona reviews
 
 - Dispatch wee-bots personas against a review, headless via `claude -p` or into a terminal running `claude`.

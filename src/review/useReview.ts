@@ -29,8 +29,9 @@ export function useReview(workspace: WorkspaceName) {
     setStale(next.review.stale);
   }
 
-  /** Loading the revset this pane already loaded continues its review session. */
-  async function open(revset: string): Promise<ReviewDto | undefined> {
+  /** Loading the revset this pane already loaded continues its review session. Returns the
+   * error message when it fails. */
+  async function open(revset: string): Promise<ReviewDto | string> {
     const resume = opened.current === revset;
     opened.current = revset;
     setLoading(true);
@@ -39,7 +40,7 @@ export function useReview(workspace: WorkspaceName) {
     setLoading(false);
     if (r.status === "error") {
       setError(r.error);
-      return undefined;
+      return r.error;
     }
     if (current.current) commands.closeReview(current.current.id);
     show({ review: r.data });

@@ -46,6 +46,8 @@ export const commands = {
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  `jj log` with the user's default revset and template, for picking commits. */
 	logGraph: (workspace: string | null) => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph", { workspace })),
+	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
+	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**
 	 *  Marks changed rows, or clears their marks when `state` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -92,6 +94,10 @@ export type Author = "user" | "agent";
 export type ChangeDto = {
 	changeId: string,
 	commitId: string,
+	/**  Length of the shortest prefix of `change_id` that's unique in the repo. */
+	unique: number,
+	/**  Whether it's the workspace's working-copy commit. */
+	workingCopy: boolean,
 	description: string,
 	since: Since,
 };
@@ -151,6 +157,16 @@ export type HunkDto = {
 	section: string,
 	rows: RowDto[],
 };
+
+/**  A change to the repo, on a revision given by change id. */
+export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: string } | { kind: "newBefore"; rev: string } | 
+/**
+ *  Squash into the parent, keeping the parent's description so no editor opens. Squashing
+ *  `@` leaves `@` on the parent rather than on a new empty commit.
+ */
+{ kind: "squash"; rev: string } | 
+/**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
+{ kind: "undo"; steps: number } | { kind: "redo"; steps: number };
 
 /**  One line of `jj log` output, with ANSI colors. */
 export type LogLine = {

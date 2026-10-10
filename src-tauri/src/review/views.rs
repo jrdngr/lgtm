@@ -40,6 +40,10 @@ pub enum Since {
 pub struct ChangeDto {
     pub change_id: String,
     pub commit_id: String,
+    /// Length of the shortest prefix of `change_id` that's unique in the repo.
+    pub unique: u32,
+    /// Whether it's the workspace's working-copy commit.
+    pub working_copy: bool,
     pub description: String,
     pub since: Since,
 }
@@ -55,6 +59,8 @@ fn dto(c: Change, since: Since) -> ChangeDto {
     ChangeDto {
         change_id: c.change_id,
         commit_id: c.commit_id,
+        unique: c.unique,
+        working_copy: c.working_copy,
         description: c.description,
         since,
     }
@@ -114,6 +120,8 @@ pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Res
                 .map(|c| Change {
                     change_id: String::new(),
                     commit_id: c.to_string(),
+                    unique: 0,
+                    working_copy: false,
                     description: String::new(),
                 })
                 .collect()

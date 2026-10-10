@@ -1,8 +1,8 @@
-import { useState } from "react";
 import type { ChangeDto, ReviewDto, View } from "../bindings";
 import type { WorkspaceName } from "../workspaces/context";
-import { CommitPicker } from "./CommitPicker";
 import type { ViewMode } from "./model";
+import { RevisionsPanel } from "./RevisionsPanel";
+import { RevLabel } from "./RevLabel";
 import { FILTERS, type Filter, type Progress } from "./state";
 
 const SINCE_LABEL = {
@@ -33,10 +33,11 @@ interface Props {
   review?: ReviewDto;
   loading: boolean;
   revset: string;
-  onRevset(revset: string): void;
-  onLoad(): void;
-  /** Sets the revset and loads it. */
-  onPick(revset: string): void;
+  /** Loads a revset as the review. Returns the error message when it fails. */
+  onLoad(revset: string): Promise<string | undefined>;
+  /** Whether the revisions panel is open. */
+  panel: boolean;
+  onPanel(open: boolean): void;
   onView(view: View): void;
   mode: ViewMode;
   onMode(mode: ViewMode): void;
@@ -48,7 +49,6 @@ interface Props {
 
 export function ReviewBar(props: Props) {
   const { review, progress } = props;
-  const [picking, setPicking] = useState(false);
   const view = review?.view ?? { kind: "combined" };
   const current = view.kind === "combined" ? undefined : view.change;
 
@@ -61,34 +61,25 @@ export function ReviewBar(props: Props) {
 
   return (
     <div className="review-bar">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          props.onLoad();
-        }}
+      <button
+        type="button"
+        className="rev-chip"
+        onClick={() => props.onPanel(true)}
+        title="Revisions (r): pick what to review, edit, add and squash commits"
       >
-        <input
-          className="revset"
-          value={props.revset}
-          onChange={(e) => props.onRevset(e.target.value)}
-          spellCheck={false}
-          aria-label="Revset"
-        />
-        <button type="submit" disabled={props.loading}>
-          {props.loading ? "Loading" : "Load"}
-        </button>
-        <button type="button" onClick={() => setPicking(true)} title="Pick commits from jj log">
-          Pick…
-        </button>
-      </form>
-      {picking && (
-        <CommitPicker
+        {props.loading || !review ? (
+          "Loading…"
+        ) : (
+          <RevLabel revset={props.revset} changes={review.changes} />
+        )}
+      </button>
+      {props.panel && (
+        <RevisionsPanel
           workspace={props.workspace}
-          onClose={() => setPicking(false)}
-          onPick={(revset) => {
-            setPicking(false);
-            props.onPick(revset);
-          }}
+          revset={props.revset}
+          head={review?.changes.at(-1)?.commitId}
+          onLoad={props.onLoad}
+          onClose={() => props.onPanel(false)}
         />
       )}
       <select

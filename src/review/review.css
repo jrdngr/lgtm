@@ -596,3 +596,73 @@
   background: var(--bg);
   box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
 }
+
+.picker-footer {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.picker-last {
+  color: var(--fg);
+}
+
+.rev-chip {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 80px;
+  max-width: 420px;
+  overflow: hidden;
+  white-space: nowrap;
+  font:
+    12px Menlo,
+    monospace;
+}
+
+.rev-chip code {
+  color: var(--muted);
+}
+
+.commit-picker {
+  outline: none;
+}
+
+.log-line.cursor {
+  box-shadow: inset 3px 0 var(--accent);
+}
+
+.rev-label {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.rev-at {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.rev-id {
+  color: #8a8a8a;
+}
+
+.rev-unique {
+  color: #c586c0;
+  font-weight: bold;
+}
+
+.rev-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rev-desc.empty {
+  color: #d29922;
+}
