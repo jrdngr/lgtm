@@ -1,6 +1,6 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarkDto, MarkState, ReviewDto } from "../bindings";
+import type { MarkState, StateDto, View } from "../bindings";
 import { commands } from "../ipc";
 import { isMac } from "../workbench/keys";
 import { type CurrentReview, publishReview, retractReview } from "./current";
@@ -9,67 +9,40 @@ import { DISABLED, MarkMenu, MENU_KEYS, type MenuAction } from "./MarkMenu";
 import {
   buildLines,
   changedRows,
-  type DisplayLine,
   flatten,
+  gapKey,
   hunkKey,
-  markMap,
   symbolMarkers,
   symbolRange,
   type ViewMode,
 } from "./model";
+import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import {
   expand,
   fileSelection,
   hunkSelection,
-  lineSelection,
   rangeSelection,
   reviewSelection,
-  type Selection,
   units,
 } from "./selection";
+import { type Filter, fileProgress, indexState, rowStates, sumProgress } from "./state";
+import { useReview } from "./useReview";
+import { nextRowLine, useSelection } from "./useSelection";
 import "./review.css";
 
 const DEFAULT_REVSET = "trunk()..@";
-
-function nextRowLine(lines: DisplayLine[], from: number, dir: 1 | -1): number {
-  for (let i = from + dir; i >= 0 && i < lines.length; i += dir) {
-    if (lines[i].kind === "rows") return i;
-  }
-  return from;
-}
-
-/** Where line `i` of `from` landed in `to`, after a view mode or collapse change. */
-function relocate(from: DisplayLine[], to: DisplayLine[], i: number): number {
-  const line = from[i];
-  if (!line) return 0;
-  const found = to.findIndex((l) => {
-    if (l.file !== line.file) return false;
-    if (line.kind === "rows") return l.kind === "rows" && l.rows.some((r) => line.rows.includes(r));
-    if (line.kind === "hunk") return l.kind === "hunk" && l.hunk === line.hunk;
-    return l.kind === "file";
-  });
-  if (found >= 0) return found;
-  // The row went into a collapsed hunk: land on its header.
-  return line.kind === "rows"
-    ? to.findIndex((l) => l.kind === "hunk" && l.file === line.file && l.hunk === line.hunk)
-    : 0;
-}
 
 type Params = { revset?: string };
 
 export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const [revset, setRevset] = useState(params.revset ?? DEFAULT_REVSET);
-  const [review, setReview] = useState<ReviewDto>();
-  const [marks, setMarks] = useState<MarkDto[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>();
+  const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview();
   const [mode, setMode] = useState<ViewMode>("unified");
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const [cursor, setCursor] = useState(0);
-  const [sel, setSel] = useState<Selection>(lineSelection(0));
-  const [shrinkStack, setShrinkStack] = useState<Selection[]>([]);
-  const [extending, setExtending] = useState(false);
-  const [anchor, setAnchor] = useState(0);
+  const [filter, setFilter] = useState<Filter>("all");
+  const [collapsedHunks, setCollapsedHunks] = useState<ReadonlySet<string>>(new Set());
+  /** Files opened or closed by hand, by path. Others follow their check and skip status. */
+  const [fileOpen, setFileOpen] = useState<ReadonlyMap<string, boolean>>(new Map());
+  const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number }>();
   const [scrollTo, setScrollTo] = useState<{ line: number }>();
 
@@ -77,56 +50,73 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const pendingZ = useRef(false);
-  const reviewId = useRef<number>(undefined);
   const published = useRef<CurrentReview>(undefined);
   const jumpRef = useRef<(file: number) => void>(() => {});
 
-  const files = useMemo(() => (review ? flatten(review) : []), [review]);
+  const review = loaded?.review;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: marking replaces only `state`
+  const files = useMemo(() => (review ? flatten(review) : []), [review?.files]);
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
-  const lines = useMemo(() => buildLines(files, mode, collapsed), [files, mode, collapsed]);
-  const markIndex = useMemo(() => markMap(marks), [marks]);
+  const index = useMemo(
+    () => indexState(review?.state ?? { marks: [], checks: [], amber: [] }),
+    [review?.state],
+  );
+  const rowState = useMemo(() => rowStates(files, index), [files, index]);
+  const progress = useMemo(() => fileProgress(files, rowState), [files, rowState]);
+  const total = useMemo(() => sumProgress(progress), [progress]);
+  const collapsedFiles = useMemo(() => {
+    const out = new Set<string>();
+    files.forEach((f, i) => {
+      const byDefault = index.checks[i] === "checked" || f.dto.skipped;
+      if (!(fileOpen.get(f.dto.path) ?? !byDefault)) out.add(f.dto.path);
+    });
+    return out;
+  }, [files, index, fileOpen]);
+  const lines = useMemo(
+    () => buildLines(files, { mode, collapsedFiles, collapsedHunks, filter, rowState, revealed }),
+    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed],
+  );
+  const s = useSelection(files, lines, loaded?.moves);
+  const { cursor, sel, select, place } = s;
   const changedCount = useMemo(
     () => changedRows(files, lines, sel.start, sel.end).length,
     [files, lines, sel],
   );
 
-  function select(next: Selection, at: number = cursor, keepStack = false) {
-    setSel(next);
-    setCursor(at);
-    if (!keepStack) setShrinkStack([]);
-  }
-
   async function load(target: string) {
-    setLoading(true);
-    setError(undefined);
-    const r = await commands.openReview(target);
-    setLoading(false);
-    if (r.status === "error") {
-      setError(r.error);
-      return;
-    }
-    if (reviewId.current !== undefined) commands.closeReview(reviewId.current);
-    reviewId.current = r.data.id;
-    setReview(r.data);
-    setMarks(r.data.marks);
-    setCollapsed(new Set());
-    const first = buildLines(flatten(r.data), mode, new Set()).findIndex((l) => l.kind === "rows");
-    setAnchor(Math.max(first, 0));
-    select(lineSelection(Math.max(first, 0)), Math.max(first, 0));
+    const r = await open(target);
+    if (!r) return;
+    setCollapsedHunks(new Set());
+    setFileOpen(new Map());
+    setRevealed(new Set());
     api.updateParameters({ revset: target });
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
     load(revset);
-    return () => {
-      if (reviewId.current !== undefined) commands.closeReview(reviewId.current);
-    };
   }, []);
+
+  // A newly opened review starts on its first row.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the review is replaced
+  useEffect(() => {
+    place(
+      Math.max(
+        lines.findIndex((l) => l.kind === "rows"),
+        0,
+      ),
+    );
+  }, [review?.id]);
 
   useEffect(() => {
     const publish = () => {
-      published.current = { files, marks, jump: (f) => jumpRef.current(f) };
+      published.current = {
+        files,
+        progress,
+        checks: index.checks,
+        filter,
+        jump: (f) => jumpRef.current(f),
+      };
       publishReview(published.current);
     };
     if (review && (api.isActive || !published.current)) publish();
@@ -134,7 +124,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       if (isActive && review) publish();
     });
     return () => sub.dispose();
-  }, [api, review, files, marks]);
+  }, [api, review, files, progress, index, filter]);
 
   useEffect(() => () => retractReview(published.current), []);
 
@@ -146,35 +136,54 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     return () => window.removeEventListener("mouseup", up);
   }, []);
 
-  function relayout(nextMode: ViewMode, nextCollapsed: ReadonlySet<string>) {
-    const next = buildLines(files, nextMode, nextCollapsed);
-    const at = relocate(lines, next, cursor);
-    setMode(nextMode);
-    setCollapsed(nextCollapsed);
-    setAnchor(at);
-    select(lineSelection(at), at);
+  function changeFilter(next: Filter) {
+    setFilter(next);
+    setRevealed(new Set());
   }
 
   function toggleHunk(file: number, hunk: number) {
-    const key = hunkKey(file, hunk);
-    const next = new Set(collapsed);
+    const key = hunkKey(files[file].dto.path, hunk);
+    const next = new Set(collapsedHunks);
     if (!next.delete(key)) next.add(key);
-    relayout(mode, next);
+    setCollapsedHunks(next);
+  }
+
+  function toggleFile(file: number) {
+    const path = files[file].dto.path;
+    setFileOpen(new Map(fileOpen).set(path, collapsedFiles.has(path)));
+  }
+
+  function applied(state: StateDto, files: number[] = []) {
+    setState(state);
+    // Checking collapses a file and unchecking expands it, whatever was done by hand.
+    if (files.length) {
+      const next = new Map(fileOpen);
+      for (const f of files) next.delete(review?.files[f]?.path ?? "");
+      setFileOpen(next);
+    }
   }
 
   async function applyMark(state: MarkState | null) {
     if (!review) return;
     const rows = changedRows(files, lines, sel.start, sel.end);
     if (rows.length === 0) return;
-    const r = await commands.markRows(review.id, rows, state);
+    const line = lines[sel.start];
+    const check = sel.level === "file" && state === "reviewed" && line ? [line.file] : [];
+    const r = await commands.markRows(review.id, rows, state, check);
     if (r.status !== "ok") {
       setError(r.error);
       return;
     }
-    setMarks(r.data);
-    setExtending(false);
-    setAnchor(cursor);
-    select(lineSelection(cursor));
+    s.setExtending(false);
+    place(cursor);
+    applied(r.data, check);
+  }
+
+  async function setChecked(file: number, checked: boolean) {
+    if (!review) return;
+    const r = await commands.setFilesChecked(review.id, [file], checked);
+    if (r.status === "ok") applied(r.data, [file]);
+    else setError(r.error);
   }
 
   jumpRef.current = (file: number) => {
@@ -182,8 +191,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     if (header < 0) return;
     const next = lines[header + 1];
     const at = next?.kind === "file" ? header : nextRowLine(lines, header, 1);
-    setAnchor(at);
-    select(lineSelection(at), at);
+    place(at);
     setScrollTo({ line: header });
     api.setActive();
     rootRef.current?.focus({ preventScroll: true });
@@ -192,15 +200,20 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   async function step(undo: boolean) {
     if (!review) return;
     const r = await (undo ? commands.undoMarks(review.id) : commands.redoMarks(review.id));
-    if (r.status === "ok") setMarks(r.data);
+    if (r.status === "ok") setState(r.data);
     else setError(r.error);
   }
 
   async function resetMarks() {
     if (!review) return;
     const r = await commands.resetReviewMarks(review.id);
-    if (r.status === "ok") setMarks(r.data);
+    if (r.status === "ok") setState(r.data);
     else setError(r.error);
+  }
+
+  function changeView(view: View) {
+    setRevealed(new Set());
+    refresh(view);
   }
 
   function copy() {
@@ -230,18 +243,8 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     });
   }
 
-  function move(dir: 1 | -1, extend: boolean) {
-    const next = nextRowLine(lines, cursor, dir);
-    if (extend) {
-      select(rangeSelection(anchor, next), next);
-    } else {
-      setAnchor(next);
-      select(lineSelection(next), next);
-    }
-  }
-
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement) return;
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
     if (menu) {
       e.preventDefault();
       if (e.key === "Escape") setMenu(undefined);
@@ -261,7 +264,8 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     if (pendingZ.current && e.key === "a") {
       pendingZ.current = false;
       const line = lines[cursor];
-      if (line && line.kind !== "file") toggleHunk(line.file, line.hunk);
+      if (line?.kind === "file") toggleFile(line.file);
+      else if (line) toggleHunk(line.file, line.hunk);
       e.preventDefault();
       return;
     }
@@ -269,44 +273,43 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     switch (e.key) {
       case "j":
       case "ArrowDown":
-        move(1, extending);
+        s.move(1, s.extending);
         break;
       case "k":
       case "ArrowUp":
-        move(-1, extending);
+        s.move(-1, s.extending);
         break;
       case "J":
-        if (!extending && sel.level !== "range") setAnchor(cursor);
-        move(1, true);
+        if (!s.extending && sel.level !== "range") s.setAnchor(cursor);
+        s.move(1, true);
         break;
       case "K":
-        if (!extending && sel.level !== "range") setAnchor(cursor);
-        move(-1, true);
+        if (!s.extending && sel.level !== "range") s.setAnchor(cursor);
+        s.move(-1, true);
         break;
       case "v":
-        setExtending((x) => !x);
-        setAnchor(cursor);
+        s.setExtending((x) => !x);
+        s.setAnchor(cursor);
         break;
       case "e": {
         const next = expand(files, lines, cursor, sel);
         if (next) {
-          setShrinkStack([...shrinkStack, sel]);
+          s.setShrinkStack([...s.shrinkStack, sel]);
           select(next, cursor, true);
         }
         break;
       }
       case "E": {
-        const prev = shrinkStack.at(-1);
+        const prev = s.shrinkStack.at(-1);
         if (prev) {
-          setShrinkStack(shrinkStack.slice(0, -1));
+          s.setShrinkStack(s.shrinkStack.slice(0, -1));
           select(prev, cursor, true);
         }
         break;
       }
       case "Escape":
-        setExtending(false);
-        setAnchor(cursor);
-        select(lineSelection(cursor));
+        s.setExtending(false);
+        place(cursor);
         break;
       case " ":
         if (!e.repeat) applyMark("reviewed");
@@ -334,34 +337,35 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         return;
       }
       if (e.shiftKey) {
-        select(rangeSelection(anchor, i), i);
+        select(rangeSelection(s.anchor, i), i);
         return;
       }
-      setAnchor(i);
-      select(lineSelection(i), i);
+      place(i);
       dragging.current = true;
     },
     onRowMouseEnter(i: number) {
-      if (dragging.current) select(rangeSelection(anchor, i), i);
+      if (dragging.current) select(rangeSelection(s.anchor, i), i);
     },
     onRowContextMenu(e: React.MouseEvent, i: number) {
       e.preventDefault();
-      if (i < sel.start || i > sel.end) {
-        setAnchor(i);
-        select(lineSelection(i), i);
-      }
+      if (i < sel.start || i > sel.end) place(i);
       const root = rootRef.current?.getBoundingClientRect();
       if (root) setMenu({ x: e.clientX - root.left, y: e.clientY - root.top });
     },
     onFileClick(file: number) {
-      const s = fileSelection(files, lines, file);
-      select(s, s.start);
+      const f = fileSelection(files, lines, file);
+      select(f, f.start);
     },
     onHunkClick(file: number, hunk: number) {
-      const s = hunkSelection(lines, file, hunk);
-      select(s, s.start);
+      const h = hunkSelection(lines, file, hunk);
+      select(h, h.start);
     },
     onToggleHunk: toggleHunk,
+    onToggleFile: toggleFile,
+    onCheckFile: setChecked,
+    onGapClick(file: number, hunk: number, firstRow: number) {
+      setRevealed(new Set(revealed).add(gapKey(file, hunk, firstRow)));
+    },
     onSymbolClick(i: number, file: number, row: number) {
       const marker = markers[file].get(row);
       if (!marker) return;
@@ -380,43 +384,38 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       tabIndex={-1}
       onKeyDown={onKeyDown}
       onMouseDown={(e) => {
-        if (!(e.target instanceof HTMLInputElement || e.target instanceof HTMLButtonElement)) {
+        const t = e.target;
+        if (
+          !(
+            t instanceof HTMLInputElement ||
+            t instanceof HTMLButtonElement ||
+            t instanceof HTMLSelectElement
+          )
+        ) {
           rootRef.current?.focus({ preventScroll: true });
         }
       }}
     >
-      <div className="review-bar">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            load(revset);
-          }}
-        >
-          <input
-            className="revset"
-            value={revset}
-            onChange={(e) => setRevset(e.target.value)}
-            spellCheck={false}
-            aria-label="Revset"
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? "Loading" : "Load"}
-          </button>
-        </form>
-        <button
-          type="button"
-          onClick={() => relayout(mode === "unified" ? "split" : "unified", collapsed)}
-        >
-          {mode === "unified" ? "Split" : "Unified"}
-        </button>
-        <span className="spacer" />
-        <button type="button" disabled={!review} onClick={resetMarks}>
-          Reset marks for this review
-        </button>
-      </div>
+      <ReviewBar
+        review={review}
+        loading={loading}
+        revset={revset}
+        onRevset={setRevset}
+        onLoad={() => load(revset)}
+        onView={changeView}
+        mode={mode}
+        onMode={setMode}
+        filter={filter}
+        onFilter={changeFilter}
+        progress={total}
+        onReset={resetMarks}
+      />
+      <ReviewNotes review={review} stale={stale} />
       {error && <div className="review-error">{error}</div>}
-      {review && review.files.length === 0 && (
-        <div className="placeholder">No changes in {review.revset}</div>
+      {review && lines.length === 0 && (
+        <div className="placeholder">
+          {review.files.length === 0 ? `No changes in ${review.revset}` : `No ${filter} rows`}
+        </div>
       )}
       {review && (
         <DiffLines
@@ -424,13 +423,15 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
           markers={markers}
           lines={lines}
           mode={mode}
-          marks={markIndex}
+          index={index}
+          progress={progress}
           selection={sel}
           cursor={cursor}
-          collapsed={collapsed}
+          collapsedFiles={collapsedFiles}
+          collapsedHunks={collapsedHunks}
           scrollRef={scrollRef}
           scrollTo={scrollTo}
-          onBackgroundMouseDown={() => select(lineSelection(cursor))}
+          onBackgroundMouseDown={() => place(cursor)}
           {...handlers}
         />
       )}
@@ -439,7 +440,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         <span>
           {changedCount} changed {changedCount === 1 ? "row" : "rows"}
         </span>
-        {extending && <span className="extending">extend</span>}
+        {s.extending && <span className="extending">extend</span>}
       </div>
       {menu && (
         <MarkMenu

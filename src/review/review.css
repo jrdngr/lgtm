@@ -1,9 +1,14 @@
-.review {
-  --row-h: 20px;
-  --selection: rgb(79 140 201 / 28%);
-  --cursor: #4f8cc9;
+.review,
+.file-tree {
+  --amber: #d29922;
   --skipped: #6e7681;
   --flagged: #f85149;
+  --selection: rgb(79 140 201 / 28%);
+}
+
+.review {
+  --row-h: 20px;
+  --cursor: #4f8cc9;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -19,6 +24,11 @@
   gap: 8px;
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
+}
+
+.review-bar {
+  flex-wrap: wrap;
+  white-space: nowrap;
 }
 
 .review-bar form {
@@ -328,15 +338,20 @@
   color: #d4d4d4;
 }
 
-.file-list {
-  list-style: none;
-  margin: 0;
-  padding: 4px 0;
+.file-tree {
   height: 100%;
   overflow: auto;
+  padding: 4px 0;
 }
 
-.file-list button {
+.file-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-tree button,
+.tree-total {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -346,31 +361,168 @@
   border-radius: 0;
   background: none;
   text-align: left;
+  white-space: nowrap;
 }
 
-.file-list button:hover {
+.tree-total {
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.file-tree button:hover {
   background: var(--selection);
 }
 
-.file-list .status {
+.file-tree .status {
   font:
     11px Menlo,
     monospace;
 }
 
-.file-list .path {
+.file-tree .name {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  direction: rtl;
 }
 
-.file-list .count {
+.file-tree .name.amber {
+  color: var(--amber);
+}
+
+.file-tree .chevron {
+  width: 10px;
+  color: var(--muted);
+}
+
+.file-tree .checked {
+  color: var(--reviewed);
+}
+
+.file-tree .flag {
+  font-size: 11px;
+  color: var(--flagged);
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 11px;
   color: var(--muted);
 }
 
-.file-list .count.done {
+.count.done {
   color: var(--reviewed);
+}
+
+.count .bar {
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.count .bar span {
+  display: block;
+  height: 100%;
+  background: var(--reviewed);
+}
+
+.review-bar select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.review-bar .change-picker {
+  max-width: 280px;
+}
+
+.review-bar .progress {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.progress .p-reviewed {
+  color: var(--reviewed);
+}
+
+.progress .p-flagged {
+  color: var(--flagged);
+}
+
+.review-note {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.review-note.warn {
+  color: var(--amber);
+}
+
+.file-header .collapse {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  width: 16px;
+  color: var(--muted);
+}
+
+.file-header input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--reviewed);
+  border-radius: 3px;
+}
+
+.file-header input.ring {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.file-header.changed .path {
+  color: var(--amber);
+}
+
+.file-header .tag.amber {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.file-header .spacer {
+  flex: 1;
+}
+
+.file-header .file-count {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cell.amber .strip {
+  background: var(--amber);
+}
+
+.cell.amber .code {
+  background: rgb(210 153 34 / 14%);
+}
+
+.gap-bar {
+  height: 100%;
+  margin: 0 8px;
+  border-radius: 2px;
+  background: rgb(255 255 255 / 6%);
+  font-size: 0;
+  cursor: pointer;
+}
+
+.gap-bar:hover {
+  background: var(--selection);
 }

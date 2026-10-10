@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { type RefObject, useEffect } from "react";
 import { HIGHLIGHT_NAMES, type MarkDto, type RowDto } from "../bindings";
+import { FileHeader } from "./FileHeader";
 import {
   type DisplayLine,
   type FlatFile,
@@ -10,9 +11,11 @@ import {
   type ViewMode,
 } from "./model";
 import type { Selection } from "./selection";
+import type { MarkIndex, Progress } from "./state";
 
 const ROW_HEIGHT = 20;
 const FILE_HEIGHT = 30;
+const GAP_HEIGHT = 8;
 
 const hlClass = HIGHLIGHT_NAMES.map((n) => `hl-${n.replace(".", "-")}`);
 
@@ -50,20 +53,24 @@ interface CellProps {
   file: FlatFile;
   fileIdx: number;
   row: number | undefined;
-  marks: Map<string, MarkDto>;
+  index: MarkIndex;
   marker?: { name: string; onClick: () => void };
   side?: "left" | "right";
 }
 
-function Cell({ file, fileIdx, row, marks, marker, side }: CellProps) {
+function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
   if (row === undefined) return <div className="cell empty" />;
   const r = file.rows[row];
-  const mark = r.kind === "context" ? undefined : marks.get(markKey(fileIdx, row));
+  const key = markKey(fileIdx, row);
+  const mark = r.kind === "context" ? undefined : index.marks.get(key);
+  const checked = r.kind !== "context" && index.checks[fileIdx] === "checked";
+  const state = mark?.state ?? (checked ? "reviewed" : undefined);
+  const amber = !state && index.amber.has(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
-      className={`cell kind-${r.kind}${mark ? ` mark-${mark.state}` : ""}`}
-      title={markTitle(mark)}
+      className={`cell kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}`}
+      title={amber ? "changed since reviewed" : markTitle(mark)}
     >
       <span className="strip" />
       <span
@@ -98,6 +105,9 @@ export interface LineHandlers {
   onFileClick(file: number): void;
   onHunkClick(file: number, hunk: number): void;
   onToggleHunk(file: number, hunk: number): void;
+  onToggleFile(file: number): void;
+  onCheckFile(file: number, checked: boolean): void;
+  onGapClick(file: number, hunk: number, firstRow: number): void;
   onSymbolClick(line: number, file: number, row: number): void;
 }
 
@@ -106,32 +116,26 @@ interface Props extends LineHandlers {
   markers: SymbolMarkers[];
   lines: DisplayLine[];
   mode: ViewMode;
-  marks: Map<string, MarkDto>;
+  index: MarkIndex;
+  progress: Progress[];
   selection: Selection;
   cursor: number;
-  collapsed: ReadonlySet<string>;
+  collapsedFiles: ReadonlySet<string>;
+  collapsedHunks: ReadonlySet<string>;
   scrollRef: RefObject<HTMLDivElement | null>;
   /** Scrolls this line to the top whenever a new object is passed. */
   scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
 }
 
-export const STATUS_LABEL = {
-  modified: "M",
-  added: "A",
-  removed: "D",
-  copied: "C",
-  renamed: "R",
-} as const;
-
 export function DiffLines(props: Props) {
-  const { files, markers, lines, mode, marks, selection, cursor, collapsed, scrollRef, scrollTo } =
-    props;
+  const { files, markers, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
 
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) => (lines[i].kind === "file" ? FILE_HEIGHT : ROW_HEIGHT),
+    estimateSize: (i) =>
+      lines[i].kind === "file" ? FILE_HEIGHT : lines[i].kind === "gap" ? GAP_HEIGHT : ROW_HEIGHT,
     overscan: 30,
   });
 
@@ -147,20 +151,36 @@ export function DiffLines(props: Props) {
   const render = (line: DisplayLine, i: number) => {
     const file = files[line.file];
     if (line.kind === "file") {
-      const d = file.dto;
       return (
-        <div className="file-header" onMouseDown={() => props.onFileClick(line.file)}>
-          <span className={`status status-${d.status}`}>{STATUS_LABEL[d.status]}</span>
-          <span className="path">{d.oldPath ? `${d.oldPath} → ${d.path}` : d.path}</span>
-          {d.oldExec !== d.newExec && <span className="tag">{d.newExec ? "+x" : "-x"}</span>}
-          {d.binary && <span className="tag">binary</span>}
-          {d.conflict && <span className="tag conflict">conflict</span>}
+        <FileHeader
+          dto={file.dto}
+          check={index.checks[line.file] ?? "unchecked"}
+          progress={props.progress[line.file]}
+          collapsed={props.collapsedFiles.has(file.dto.path)}
+          onClick={() => props.onFileClick(line.file)}
+          onToggle={() => props.onToggleFile(line.file)}
+          onCheck={(checked) => props.onCheckFile(line.file, checked)}
+        />
+      );
+    }
+    if (line.kind === "gap") {
+      const n = line.rows.length;
+      return (
+        <div
+          className="gap-bar"
+          title="Show hidden rows"
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            props.onGapClick(line.file, line.hunk, line.rows[0]);
+          }}
+        >
+          {n} hidden {n === 1 ? "row" : "rows"}
         </div>
       );
     }
     if (line.kind === "hunk") {
       const h = file.dto.hunks[line.hunk];
-      const isCollapsed = collapsed.has(hunkKey(line.file, line.hunk));
+      const isCollapsed = props.collapsedHunks.has(hunkKey(file.dto.path, line.hunk));
       return (
         <div className="hunk-header" onMouseDown={() => props.onHunkClick(line.file, line.hunk)}>
           <button
@@ -192,7 +212,7 @@ export function DiffLines(props: Props) {
           file={file}
           fileIdx={line.file}
           row={line.rows[0]}
-          marks={marks}
+          index={index}
           marker={markerFor(line.rows[0])}
         />
       ) : (
@@ -201,7 +221,7 @@ export function DiffLines(props: Props) {
             file={file}
             fileIdx={line.file}
             row={line.left}
-            marks={marks}
+            index={index}
             side="left"
             marker={markerFor(line.left)}
           />
@@ -209,7 +229,7 @@ export function DiffLines(props: Props) {
             file={file}
             fileIdx={line.file}
             row={line.right}
-            marks={marks}
+            index={index}
             side="right"
             marker={line.right !== line.left ? markerFor(line.right) : undefined}
           />

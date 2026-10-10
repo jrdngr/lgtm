@@ -6,9 +6,13 @@ use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
+use tauri_specta::Event as _;
+
+use crate::events::{RepoChanged, WorkingCopyStale};
 use crate::jj::Jj;
 use crate::review::RepoCtx;
 use crate::store::Store;
+use crate::watch;
 
 /// Repo state by window label. The start window has no entry.
 #[derive(Default)]
@@ -77,6 +81,20 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     let store = Store::open(&data_dir.join("repos").join(key(&root)).join("lgtm.db"))
         .map_err(|e| format!("open mark store: {e:#}"))?;
     let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
+    let emit = {
+        let (app, label) = (app.clone(), label.clone());
+        move |e: watch::Event| {
+            let sent = match e {
+                watch::Event::RepoChanged => RepoChanged {}.emit_to(&app, &label),
+                watch::Event::Stale(message) => WorkingCopyStale { message }.emit_to(&app, &label),
+            };
+            sent.ok();
+        }
+    };
+    match watch::start(&root, ctx.jj.clone(), ctx.stale.clone(), emit) {
+        Ok(w) => *ctx.watch.lock().unwrap() = Some(w),
+        Err(e) => eprintln!("lgtm: watch {}: {e:#}", root.display()),
+    }
     app.state::<RepoWindows>()
         .0
         .lock()

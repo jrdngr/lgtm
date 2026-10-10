@@ -1,4 +1,5 @@
 import type { CodeSymbol, FileDto, ReviewDto, RowDto } from "../bindings";
+import type { Layout } from "./model";
 
 /** Rows from a compact spec: " ctx", "-removed", "+added". Line numbers are assigned. */
 export function rows(spec: string[], oldStart = 1, newStart = 1): RowDto[] {
@@ -30,6 +31,7 @@ export function file(path: string, hunks: RowDto[][], newSymbols: CodeSymbol[] =
     conflict: false,
     oldExec: false,
     newExec: false,
+    skipped: false,
     hunks: hunks.map((r) => ({
       oldStart: 1,
       oldLines: 0,
@@ -44,5 +46,30 @@ export function file(path: string, hunks: RowDto[][], newSymbols: CodeSymbol[] =
 }
 
 export function review(files: FileDto[]): ReviewDto {
-  return { id: 1, revset: "@", from: null, to: "x", files, marks: [] };
+  return {
+    id: 1,
+    revset: "@",
+    view: { kind: "combined" },
+    from: null,
+    to: "x",
+    interdiff: false,
+    files,
+    state: { marks: [], checks: files.map(() => "unchecked"), amber: [] },
+    changes: [],
+    removedChanges: [],
+    previousSession: null,
+    stale: null,
+  };
+}
+
+export function layout(over: Partial<Layout> = {}): Layout {
+  return {
+    mode: "unified",
+    collapsedFiles: new Set(),
+    collapsedHunks: new Set(),
+    filter: "all",
+    rowState: () => "unreviewed",
+    revealed: new Set(),
+    ...over,
+  };
 }

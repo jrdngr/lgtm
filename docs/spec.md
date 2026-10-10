@@ -135,7 +135,7 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 - Skip and flag on a whole-file selection apply to its lines. Files have no skipped or flagged status, and those never collapse a file.
 - When every changed line in a file is reviewed, its checkbox gets an accent ring. It is never checked automatically.
 - Checking stores the anchors of the file's changed rows at that moment. If later changes bring in rows outside that set, the file unchecks itself, expands, and its header shows "changed since reviewed". The new rows are amber. A rebase that doesn't change the code keeps it checked.
-- Files matching `skip` globs in config (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
+- Files matching `skip` globs in `.lgtm/config.toml` (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
 - Any file can be collapsed or expanded with its collapse button regardless of status.
 
 #### Scope

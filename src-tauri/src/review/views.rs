@@ -1,0 +1,212 @@
+//! Review views (Combined, Per change, Since last session) and the stack of changes they pick
+//! from. Old commits map to current ones through evolog predecessors, since split and squash
+//! break change IDs.
+
+use std::collections::HashSet;
+
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+use super::build::Sides;
+use crate::jj::{Change, FileDiff, Jj, Range};
+use crate::store::Session;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum View {
+    /// The whole review as one diff.
+    Combined,
+    /// One change's own diff.
+    Change { change: String },
+    /// What one change does differently from what it did last session.
+    SinceLast { change: String },
+}
+
+/// How a change compares with the previous session.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Since {
+    /// There's no previous session.
+    Unknown,
+    New,
+    Changed,
+    Same,
+    /// In the previous session but not in the review now.
+    Removed,
+}
+
+#[derive(Clone, Debug, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeDto {
+    pub change_id: String,
+    pub commit_id: String,
+    pub description: String,
+    pub since: Since,
+}
+
+pub struct Stack {
+    pub changes: Vec<ChangeDto>,
+    pub removed: Vec<ChangeDto>,
+    /// Previous-session commits each current change evolved from, by index into `changes`.
+    preds: Vec<Vec<String>>,
+}
+
+fn dto(c: Change, since: Since) -> ChangeDto {
+    ChangeDto {
+        change_id: c.change_id,
+        commit_id: c.commit_id,
+        description: c.description,
+        since,
+    }
+}
+
+pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Result<Stack> {
+    let changes = jj.changes(revset).await?;
+    let Some(prev) = prev.filter(|p| !p.commits.is_empty()) else {
+        return Ok(Stack {
+            preds: vec![vec![]; changes.len()],
+            changes: changes
+                .into_iter()
+                .map(|c| dto(c, Since::Unknown))
+                .collect(),
+            removed: vec![],
+        });
+    };
+    let evologs =
+        futures::future::try_join_all(changes.iter().map(|c| jj.evolog(&c.commit_id))).await?;
+    let mut succeeded = HashSet::new();
+    let mut preds = Vec::new();
+    let mut dtos = Vec::new();
+    for (c, evolog) in changes.into_iter().zip(evologs) {
+        let p: Vec<String> = prev
+            .commits
+            .iter()
+            .filter(|old| evolog.contains(old))
+            .cloned()
+            .collect();
+        succeeded.extend(p.iter().cloned());
+        let since = if prev.commits.contains(&c.commit_id) {
+            Since::Same
+        } else if p.is_empty() {
+            Since::New
+        } else {
+            Since::Changed
+        };
+        preds.push(p);
+        dtos.push(dto(c, since));
+    }
+    let gone: Vec<&String> = prev
+        .commits
+        .iter()
+        .filter(|c| !succeeded.contains(*c))
+        .collect();
+    let removed = if gone.is_empty() {
+        vec![]
+    } else {
+        let revset = gone
+            .iter()
+            .map(|c| c.as_str())
+            .collect::<Vec<_>>()
+            .join("|");
+        // Hidden commits stay readable until `jj util gc`; after that only the id is left.
+        jj.changes(&revset).await.unwrap_or_else(|_| {
+            gone.iter()
+                .map(|c| Change {
+                    change_id: String::new(),
+                    commit_id: c.to_string(),
+                    description: String::new(),
+                })
+                .collect()
+        })
+    };
+    Ok(Stack {
+        changes: dtos,
+        removed: removed
+            .into_iter()
+            .map(|c| dto(c, Since::Removed))
+            .collect(),
+        preds,
+    })
+}
+
+/// What a view diffs.
+pub enum Spec {
+    Trees(Range),
+    Interdiff { from: String, to: String },
+}
+
+impl Spec {
+    pub fn sides(&self) -> Sides {
+        match self {
+            Spec::Trees(r) => Sides {
+                old: r.from.clone(),
+                new: r.to.clone(),
+            },
+            Spec::Interdiff { to, .. } => Sides {
+                old: None,
+                new: to.clone(),
+            },
+        }
+    }
+
+    pub fn endpoints(&self) -> (Option<String>, String) {
+        match self {
+            Spec::Trees(r) => (r.from.clone(), r.to.clone()),
+            Spec::Interdiff { from, to } => (Some(from.clone()), to.clone()),
+        }
+    }
+
+    pub async fn diff(&self, jj: &Jj) -> anyhow::Result<Vec<FileDiff>> {
+        match self {
+            Spec::Trees(r) => jj.diff(r).await,
+            Spec::Interdiff { from, to } => jj.interdiff(from, to).await,
+        }
+    }
+}
+
+pub async fn spec(jj: &Jj, revset: &str, view: &View, stack: &Stack) -> anyhow::Result<Spec> {
+    let find = |change: &str| {
+        stack
+            .changes
+            .iter()
+            .position(|c| c.change_id == change)
+            .ok_or_else(|| anyhow::anyhow!("change {change} is no longer in the review"))
+    };
+    match view {
+        View::Combined => Ok(Spec::Trees(jj.resolve(revset).await?)),
+        View::Change { change } => {
+            let c = &stack.changes[find(change)?];
+            Ok(Spec::Trees(jj.resolve(&c.commit_id).await?))
+        }
+        View::SinceLast { change } => {
+            let i = find(change)?;
+            let c = &stack.changes[i];
+            let preds = &stack.preds[i];
+            match c.since {
+                Since::Same => Ok(Spec::Trees(Range {
+                    from: Some(c.commit_id.clone()),
+                    to: c.commit_id.clone(),
+                })),
+                Since::Changed => {
+                    let newest = preds.last().expect("changed change has a predecessor");
+                    // After a split, compare the old commit with all of its successors.
+                    let successors: Vec<usize> = (0..stack.changes.len())
+                        .filter(|&j| stack.preds[j].contains(newest))
+                        .collect();
+                    if successors.len() > 1 {
+                        let last = &stack.changes[*successors.last().unwrap()];
+                        return Ok(Spec::Trees(Range {
+                            from: Some(newest.clone()),
+                            to: last.commit_id.clone(),
+                        }));
+                    }
+                    Ok(Spec::Interdiff {
+                        from: newest.clone(),
+                        to: c.commit_id.clone(),
+                    })
+                }
+                _ => Ok(Spec::Trees(jj.resolve(&c.commit_id).await?)),
+            }
+        }
+    }
+}

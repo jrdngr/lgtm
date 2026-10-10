@@ -1,4 +1,7 @@
-//! Per-repo SQLite store for marks.
+//! Per-repo SQLite store for marks, file checks, and review sessions.
+
+mod checks;
+mod sessions;
 
 use std::path::Path;
 
@@ -7,6 +10,9 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::anchor::{Anchor, Side};
+
+pub use checks::FileCheck;
+pub use sessions::Session;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +41,34 @@ pub struct Store {
     db: Connection,
 }
 
+/// One undoable change to marks and file checks.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Edit {
+    pub marks_removed: Vec<Mark>,
+    pub marks_added: Vec<Mark>,
+    pub checks_removed: Vec<FileCheck>,
+    pub checks_added: Vec<FileCheck>,
+}
+
+impl Edit {
+    pub fn is_empty(&self) -> bool {
+        self.marks_removed.is_empty()
+            && self.marks_added.is_empty()
+            && self.checks_removed.is_empty()
+            && self.checks_added.is_empty()
+    }
+
+    /// The edit that undoes this one.
+    pub fn inverse(&self) -> Edit {
+        Edit {
+            marks_removed: self.marks_added.clone(),
+            marks_added: self.marks_removed.clone(),
+            checks_removed: self.checks_added.clone(),
+            checks_added: self.checks_removed.clone(),
+        }
+    }
+}
+
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS marks (
     id INTEGER PRIMARY KEY,
@@ -51,6 +85,23 @@ CREATE TABLE IF NOT EXISTS marks (
 );
 CREATE INDEX IF NOT EXISTS marks_path ON marks (path);
 CREATE INDEX IF NOT EXISTS marks_review ON marks (review);
+CREATE TABLE IF NOT EXISTS file_checks (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL,
+    old_hashes BLOB NOT NULL,
+    new_hashes BLOB NOT NULL,
+    review TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS file_checks_path ON file_checks (path);
+CREATE TABLE IF NOT EXISTS sessions (
+    id INTEGER PRIMARY KEY,
+    review TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    commits TEXT NOT NULL,
+    seen BLOB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_review ON sessions (review);
 CREATE TABLE IF NOT EXISTS line_hashes (
     commit_id TEXT NOT NULL,
     path TEXT NOT NULL,
@@ -59,11 +110,11 @@ CREATE TABLE IF NOT EXISTS line_hashes (
 );
 ";
 
-fn to_blob(hashes: &[i64]) -> Vec<u8> {
+pub(crate) fn to_blob(hashes: &[i64]) -> Vec<u8> {
     hashes.iter().flat_map(|h| h.to_le_bytes()).collect()
 }
 
-fn from_blob(blob: &[u8]) -> Vec<i64> {
+pub(crate) fn from_blob(blob: &[u8]) -> Vec<i64> {
     blob.as_chunks::<8>()
         .0
         .iter()
@@ -162,15 +213,18 @@ impl Store {
         stmt.query_map([review], row_to_mark)?.collect()
     }
 
-    /// Removes `remove` and inserts `insert` in one transaction. Inserted marks keep their
-    /// ids when they have one (redo) and get fresh ids otherwise. Returns the inserted marks.
-    pub fn replace(&mut self, remove: &[i64], insert: &[Mark]) -> rusqlite::Result<Vec<Mark>> {
+    /// Applies `edit` in one transaction. Added rows keep their ids when they have one (redo)
+    /// and get fresh ids otherwise. Returns the edit with the ids it was stored under.
+    pub fn apply(&mut self, edit: &Edit) -> rusqlite::Result<Edit> {
         let tx = self.db.transaction()?;
-        for id in remove {
-            tx.execute("DELETE FROM marks WHERE id = ?", [id])?;
+        for m in &edit.marks_removed {
+            tx.execute("DELETE FROM marks WHERE id = ?", [m.id])?;
         }
-        let mut inserted = Vec::with_capacity(insert.len());
-        for m in insert {
+        for c in &edit.checks_removed {
+            tx.execute("DELETE FROM file_checks WHERE id = ?", [c.id])?;
+        }
+        let mut marks_added = Vec::with_capacity(edit.marks_added.len());
+        for m in &edit.marks_added {
             tx.execute(
                 "INSERT INTO marks (id, path, side, line_hash, above, below, commit_id, line, state, review, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -188,13 +242,23 @@ impl Store {
                     m.created_at,
                 ],
             )?;
-            inserted.push(Mark {
+            marks_added.push(Mark {
                 id: tx.last_insert_rowid(),
                 ..m.clone()
             });
         }
+        let checks_added = edit
+            .checks_added
+            .iter()
+            .map(|c| checks::insert(&tx, c))
+            .collect::<rusqlite::Result<_>>()?;
         tx.commit()?;
-        Ok(inserted)
+        Ok(Edit {
+            marks_removed: edit.marks_removed.clone(),
+            marks_added,
+            checks_removed: edit.checks_removed.clone(),
+            checks_added,
+        })
     }
 
     pub fn line_hashes(&self, commit: &str, path: &str) -> rusqlite::Result<Option<Vec<i64>>> {
@@ -245,18 +309,25 @@ mod tests {
     }
 
     #[test]
-    fn replace_round_trips_and_redo_keeps_ids() {
+    fn apply_round_trips_and_redo_keeps_ids() {
         let mut store = Store::in_memory();
+        let add = |marks: Vec<Mark>| Edit {
+            marks_added: marks,
+            ..Edit::default()
+        };
         let inserted = store
-            .replace(&[], &[mark("a.rs", "r1"), mark("b.rs", "r1")])
-            .unwrap();
+            .apply(&add(vec![mark("a.rs", "r1"), mark("b.rs", "r1")]))
+            .unwrap()
+            .marks_added;
         let got = store.marks_for_paths(&["a.rs"]).unwrap();
         assert_eq!(got, [inserted[0].clone()]);
 
-        store.replace(&[inserted[0].id], &[]).unwrap();
+        let removed = store
+            .apply(&add(vec![inserted[0].clone()]).inverse())
+            .unwrap();
         assert!(store.marks_for_paths(&["a.rs"]).unwrap().is_empty());
 
-        let redone = store.replace(&[], &[inserted[0].clone()]).unwrap();
+        let redone = store.apply(&removed.inverse()).unwrap().marks_added;
         assert_eq!(redone[0].id, inserted[0].id);
         assert_eq!(store.marks_for_review("r1").unwrap().len(), 2);
     }

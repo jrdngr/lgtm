@@ -1,11 +1,14 @@
 import { useSyncExternalStore } from "react";
-import type { MarkDto } from "../bindings";
+import type { CheckState } from "../bindings";
 import type { FlatFile } from "./model";
+import type { Filter, Progress } from "./state";
 
-/** What the last active review pane shows, for panels that follow it (the file list). */
+/** What the last active review pane shows, for panels that follow it (the file tree). */
 export interface CurrentReview {
   files: FlatFile[];
-  marks: MarkDto[];
+  progress: Progress[];
+  checks: CheckState[];
+  filter: Filter;
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
 }

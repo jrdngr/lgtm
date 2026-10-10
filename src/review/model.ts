@@ -1,4 +1,5 @@
-import type { CodeSymbol, FileDto, MarkDto, ReviewDto, RowDto } from "../bindings";
+import type { CodeSymbol, FileDto, ReviewDto, RowDto } from "../bindings";
+import type { Filter, RowStateFn } from "./state";
 
 export type ViewMode = "unified" | "split";
 
@@ -15,7 +16,9 @@ export type DisplayLine =
       /** Split view: the row on each side. A context row sits on both. */
       left?: number;
       right?: number;
-    };
+    }
+  /** A run of rows the line filter hides. */
+  | { kind: "gap"; file: number; hunk: number; rows: number[] };
 
 export type RowLine = Extract<DisplayLine, { kind: "rows" }>;
 
@@ -40,28 +43,62 @@ export function flatten(review: ReviewDto): FlatFile[] {
   });
 }
 
-export const hunkKey = (file: number, hunk: number) => `${file}:${hunk}`;
+/** Collapse keys use paths so they survive the diff changing under them. */
+export const hunkKey = (path: string, hunk: number) => `${path}#${hunk}`;
+export const gapKey = (file: number, hunk: number, firstRow: number) =>
+  `${file}:${hunk}:${firstRow}`;
 
-export function buildLines(
-  files: FlatFile[],
-  mode: ViewMode,
-  collapsed: ReadonlySet<string>,
-): DisplayLine[] {
+export interface Layout {
+  mode: ViewMode;
+  collapsedFiles: ReadonlySet<string>;
+  collapsedHunks: ReadonlySet<string>;
+  filter: Filter;
+  rowState: RowStateFn;
+  /** Gap bars clicked open, by `gapKey`. */
+  revealed: ReadonlySet<string>;
+}
+
+export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
+  const { mode, filter, rowState } = layout;
   const out: DisplayLine[] = [];
   files.forEach((f, file) => {
+    const shown = (r: number) =>
+      filter === "all" || (f.rows[r].kind !== "context" && rowState(file, r) === filter);
+    if (filter !== "all" && !f.rows.some((_, r) => shown(r))) return;
     out.push({ kind: "file", file });
+    if (layout.collapsedFiles.has(f.dto.path)) return;
     let start = 0;
     f.dto.hunks.forEach((h, hunk) => {
-      out.push({ kind: "hunk", file, hunk });
       const end = start + h.rows.length;
-      if (!collapsed.has(hunkKey(file, hunk))) {
-        if (mode === "unified") {
-          for (let r = start; r < end; r++) out.push({ kind: "rows", file, hunk, rows: [r] });
+      const hunkStart = start;
+      start = end;
+      let any = false;
+      for (let r = hunkStart; r < end && !any; r++) any = shown(r);
+      if (!any && filter !== "all") return;
+      out.push({ kind: "hunk", file, hunk });
+      if (layout.collapsedHunks.has(hunkKey(f.dto.path, hunk))) return;
+      // Alternate runs of shown rows and gaps.
+      let r = hunkStart;
+      while (r < end) {
+        const runStart = r;
+        const visible = shown(r) || layout.revealed.has(gapKey(file, hunk, r));
+        if (visible) {
+          while (r < end && shown(r)) r++;
+          if (r === runStart) {
+            // A revealed gap: show its rows until the next shown row.
+            while (r < end && !shown(r)) r++;
+          }
+          if (mode === "unified") {
+            for (let i = runStart; i < r; i++) out.push({ kind: "rows", file, hunk, rows: [i] });
+          } else {
+            out.push(...splitRows(f.rows, runStart, r, file, hunk));
+          }
         } else {
-          out.push(...splitRows(f.rows, start, end, file, hunk));
+          while (r < end && !shown(r)) r++;
+          const rows = Array.from({ length: r - runStart }, (_, i) => runStart + i);
+          out.push({ kind: "gap", file, hunk, rows });
         }
       }
-      start = end;
     });
   });
   return out;
@@ -122,10 +159,6 @@ export function changedRows(
 
 export const markKey = (file: number, row: number) => `${file}:${row}`;
 
-export function markMap(marks: MarkDto[]): Map<string, MarkDto> {
-  return new Map(marks.map((m) => [markKey(m.file, m.row), m]));
-}
-
 /** The side whose line numbers place `row` within that side's symbols. */
 export function symbolSide(row: RowDto): { line: number; side: "old" | "new" } | undefined {
   if (row.kind === "removed") return row.oldLine ? { line: row.oldLine, side: "old" } : undefined;
@@ -175,7 +208,8 @@ export function hunkRange(lines: DisplayLine[], file: number, hunk: number): [nu
   let end = start;
   while (end + 1 < lines.length) {
     const next = lines[end + 1];
-    if (next.kind !== "rows" || next.file !== file || next.hunk !== hunk) break;
+    if ((next.kind !== "rows" && next.kind !== "gap") || next.file !== file || next.hunk !== hunk)
+      break;
     end++;
   }
   return [start, end];
@@ -206,18 +240,5 @@ export function symbolMarkers(file: FlatFile): SymbolMarkers {
     for (const s of fresh) seen.add(s);
     if (fresh.length > 0 && !out.has(r)) out.set(r, { symbol: fresh[0], side: at.side });
   });
-  return out;
-}
-
-/** Reviewed and total changed rows per file. */
-export function fileProgress(
-  files: FlatFile[],
-  marks: MarkDto[],
-): { reviewed: number; changed: number }[] {
-  const out = files.map((f) => ({
-    reviewed: 0,
-    changed: f.rows.filter((r) => r.kind !== "context").length,
-  }));
-  for (const m of marks) if (m.state === "reviewed" && out[m.file]) out[m.file].reviewed++;
   return out;
 }

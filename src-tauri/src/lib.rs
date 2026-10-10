@@ -1,5 +1,8 @@
 pub mod anchor;
+mod config;
 pub mod diff;
+mod events;
+mod gitmeta;
 mod jj;
 mod layout;
 mod pty;
@@ -8,17 +11,18 @@ mod repo;
 mod review;
 mod store;
 mod syntax;
+mod watch;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, WebviewWindow, WindowEvent};
-use tauri_specta::collect_commands;
+use tauri_specta::{collect_commands, collect_events};
 
 use pty::{PtyEvent, Ptys};
 use repo::{RepoInfo, RepoWindows};
-use review::{MarkDto, RepoCtx, ReviewDto, RowRef};
+use review::{RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
 use store::MarkState;
 
 type CmdResult<T> = Result<T, String>;
@@ -129,8 +133,19 @@ fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> {
     Ok(())
 }
 
-/// Marks changed rows, or clears their marks when `state` is null. Returns every mark in the
-/// review.
+/// Reloads a review after the repo changed, or switches it to `view`.
+#[tauri::command]
+#[specta::specta]
+async fn refresh_review(
+    window: WebviewWindow,
+    review: u32,
+    view: Option<View>,
+) -> CmdResult<RefreshDto> {
+    repo(&window)?.refresh(review, view).await.map_err(err)
+}
+
+/// Marks changed rows, or clears their marks when `state` is null. Files in `check` are
+/// checked in the same undo step.
 #[tauri::command]
 #[specta::specta]
 fn mark_rows(
@@ -138,26 +153,42 @@ fn mark_rows(
     review: u32,
     rows: Vec<RowRef>,
     state: Option<MarkState>,
-) -> CmdResult<Vec<MarkDto>> {
-    repo(&window)?.mark(review, &rows, state).map_err(err)
+    check: Vec<u32>,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .mark(review, &rows, state, &check)
+        .map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-fn undo_marks(window: WebviewWindow, review: u32) -> CmdResult<Vec<MarkDto>> {
+fn set_files_checked(
+    window: WebviewWindow,
+    review: u32,
+    files: Vec<u32>,
+    checked: bool,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .set_checked(review, &files, checked)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn undo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.undo(review).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-fn redo_marks(window: WebviewWindow, review: u32) -> CmdResult<Vec<MarkDto>> {
+fn redo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.redo(review).map_err(err)
 }
 
-/// Removes the marks this review's revset created.
+/// Removes the marks and file checks this review's revset created.
 #[tauri::command]
 #[specta::specta]
-fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<Vec<MarkDto>> {
+fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.reset(review).map_err(err)
 }
 
@@ -176,10 +207,16 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             pty_kill,
             open_review,
             close_review,
+            refresh_review,
             mark_rows,
+            set_files_checked,
             undo_marks,
             redo_marks,
             reset_review_marks,
+        ])
+        .events(collect_events![
+            events::RepoChanged,
+            events::WorkingCopyStale
         ])
 }
 
@@ -230,7 +267,8 @@ pub fn run() {
         .manage(Ptys::default())
         .manage(RepoWindows::default())
         .invoke_handler(builder.invoke_handler())
-        .setup(|app| {
+        .setup(move |app| {
+            builder.mount_events(app);
             let args: Vec<String> = std::env::args().skip(1).collect();
             let cwd = std::env::current_dir()?;
             repo::open_from_args(app.handle(), &args, &cwd);

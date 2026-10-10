@@ -9,7 +9,7 @@ Assumes the Tauri v2 stack in `stack.md`. Each milestone ends with something Jor
 - Dock layout with placeholder tabs, saved per repo.
 - One terminal tab (xterm.js + `portable-pty`).
 - Spikes for the risks in `stack.md`: large-diff rendering, PTY throughput, keybinding capture.
-- macOS build only. CI builds Linux too, so portability breaks show up early.
+- macOS build only.
 
 ## M1: Review core
 
@@ -33,6 +33,11 @@ Added after M1: a flat Files panel with reviewed/changed counts (click to jump),
 - Debounced snapshot worker, driven by the working-copy watcher.
 - Selections follow the code when the diff changes.
 - Config file: `skip` globs, anchoring window and threshold.
+
+Notes from building M2:
+- The config lives at `.lgtm/config.toml`.
+- Since last session, after a split, diffs the old commit against the last successor's tree. That includes base changes if the stack was rebased too.
+- An interdiff's old side isn't a commit, so its removed rows can't be marked.
 
 ## M3: Tasks and terminals
 

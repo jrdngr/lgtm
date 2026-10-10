@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { file, review, rows, sym } from "./fixture.test-utils";
+import { file, layout, review, rows, sym } from "./fixture.test-utils";
 import { buildLines, flatten } from "./model";
 import { expand, lineSelection, units } from "./selection";
 
@@ -14,7 +14,7 @@ const files = flatten(
     file("b.rs", [rows(["+only"])]),
   ]),
 );
-const lines = buildLines(files, "unified", new Set());
+const lines = buildLines(files, layout());
 const at = (text: string) =>
   lines.findIndex((l) => l.kind === "rows" && files[l.file].rows[l.rows[0]].text === text);
 

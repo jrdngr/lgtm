@@ -84,6 +84,8 @@ pub fn parse_meta(output: &str) -> anyhow::Result<Vec<FileMeta>> {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct GitFileDiff {
     pub header: String,
+    /// Lines between the header and the first hunk: modes, renames, `---`/`+++`.
+    pub extended: Vec<String>,
     pub binary: bool,
     pub hunks: Vec<Hunk>,
 }
@@ -150,6 +152,8 @@ pub fn parse_git(output: &str) -> anyhow::Result<Vec<GitFileDiff>> {
                 lines.next();
             }
             file.hunks.push(hunk);
+        } else if file.hunks.is_empty() {
+            file.extended.push(line.to_string());
         }
     }
     Ok(files)
