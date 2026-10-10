@@ -167,6 +167,14 @@ impl Jj {
         Ok(out.lines().map(str::to_string).collect())
     }
 
+    /// Whether `revset` includes the workspace's working-copy commit.
+    pub async fn includes_working_copy(&self, revset: &str) -> anyhow::Result<bool> {
+        Ok(!self
+            .commit_ids(&format!("@ & ({revset})"))
+            .await?
+            .is_empty())
+    }
+
     /// Resolves a review revset R to `heads(::R ~ R)` → `heads(R)`. For a stack this is the
     /// same diff as `jj diff -r R`; for R with gaps (a PR that merged trunk) it matches
     /// GitHub's PR diff. Anything else is rejected with jj's own error.

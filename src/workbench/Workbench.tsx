@@ -1,6 +1,7 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import type { RepoInfo } from "../ipc";
+import { CommentsPanel } from "../review/CommentsPanel";
 import { FilesPanel } from "../review/FilesPanel";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -87,6 +88,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
     "Mod+Shift+E": () => showView("right", "files"),
+    "Mod+Shift+M": () => showView("right", "comments"),
   };
 
   const apiRef = useRef(api);
@@ -182,7 +184,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             state={sides.right}
             onChange={(right) => setSides((s) => ({ ...s, right }))}
             bodyRef={rightBody}
-            views={[{ id: "files", title: "Files", render: () => <FilesPanel /> }]}
+            views={[
+              { id: "files", title: "Files", render: () => <FilesPanel /> },
+              { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
+            ]}
           />
         </WorkspaceContext.Provider>
       </div>

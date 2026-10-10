@@ -56,6 +56,16 @@ export const commands = {
 	redoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("redo_marks", { review })),
 	/**  Removes the marks and file checks this review's revset created. */
 	resetReviewMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_review_marks", { review })),
+	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
+	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
+	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
+	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
+	/**
+	 *  Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
+	 *  the reply's text through `on_text` and returns once it's saved.
+	 */
+	workshopComment: (review: number, comment: number, ask: Ask, onText: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("workshop_comment", { review, comment, ask, onText })),
+	stopWorkshop: (comment: number) => __TAURI_INVOKE<void>("stop_workshop", { comment }),
 };
 
 /** Events */
@@ -68,6 +78,17 @@ export const events = {
 export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","escape","function","keyword","label","module","number","operator","property","punctuation","string","tag","type","variable.builtin","variable.parameter"] as const;
 
 /* Types */
+/**  A message for a comment's agent. */
+export type Ask = {
+	message: string,
+	/**  The comment's text as it is in the editor, which may not be saved. */
+	draft: string,
+	/**  Have the agent edit the working copy. */
+	change: boolean,
+};
+
+export type Author = "user" | "agent";
+
 export type ChangeDto = {
 	changeId: string,
 	commitId: string,
@@ -87,6 +108,22 @@ export type CodeSymbol = {
 	endLine: number,
 	/**  The parse has errors inside the range, so the range can't be trusted. */
 	hasError: boolean,
+};
+
+export type CommentDto = {
+	id: number,
+	path: string,
+	/**  The review file it belongs to. */
+	file: number,
+	/**  Absent when its code can't be found any more. */
+	rows: RowSpan | null,
+	body: string,
+	/**  The code as it was when the comment was made. */
+	snippet: string,
+	review: string,
+	createdAt: number | null,
+	updatedAt: number | null,
+	messages: Message[],
 };
 
 export type FileDto = {
@@ -133,6 +170,13 @@ export type MarkDto = {
 
 export type MarkState = "reviewed" | "skipped" | "flagged";
 
+export type Message = {
+	author: Author,
+	text: string,
+	/**  A user message that asked for a change, which the agent could make by editing files. */
+	change?: boolean,
+};
+
 /**  Changed-row counts by state, as the review header counts them. */
 export type ProgressDto = {
 	/**  The revset counted: the workspace's latest review, or `@`. */
@@ -177,6 +221,8 @@ export type ReviewDto = {
 	/**  When the previous session started (Unix ms), if there was one. */
 	previousSession: number | null,
 	stale: string | null,
+	/**  Whether the revset includes the workspace's `@`, where an agent's changes land. */
+	hasWorkingCopy: boolean,
 };
 
 export type RowDto = {
@@ -201,6 +247,12 @@ export type RowRef = {
 	row: number,
 };
 
+/**  The first and last rows a comment covers, by index among its file's rows. */
+export type RowSpan = {
+	start: number,
+	end: number,
+};
+
 /**  How a change compares with the previous session. */
 export type Since = 
 /**  There's no previous session. */
@@ -208,7 +260,7 @@ export type Since =
 /**  In the previous session but not in the review now. */
 "removed";
 
-/**  Everything marking can change. */
+/**  Everything marking and commenting can change. */
 export type StateDto = {
 	marks: MarkDto[],
 	/**  Per file. */
@@ -218,6 +270,8 @@ export type StateDto = {
 	 *  didn't have when it was checked.
 	 */
 	amber: RowRef[],
+	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
+	comments: CommentDto[],
 };
 
 export type SymbolKind = "function" | "class" | "module";

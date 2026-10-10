@@ -1,5 +1,6 @@
 .review,
-.file-tree {
+.file-tree,
+.comment-list {
   --amber: #d29922;
   --skipped: #6e7681;
   --flagged: #f85149;

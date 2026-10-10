@@ -18,7 +18,13 @@ export type DisplayLine =
       right?: number;
     }
   /** A run of rows the line filter hides. */
-  | { kind: "gap"; file: number; hunk: number; rows: number[] };
+  | { kind: "gap"; file: number; hunk: number; rows: number[] }
+  /** A comment block, after the line holding its last row, or under the file header when its
+   * code is gone (hunk -1). `NEW_COMMENT` is the draft. */
+  | { kind: "comment"; file: number; hunk: number; comment: number };
+
+/** The id of a comment being written that isn't saved yet. */
+export const NEW_COMMENT = 0;
 
 export type RowLine = Extract<DisplayLine, { kind: "rows" }>;
 
@@ -56,6 +62,9 @@ export interface Layout {
   rowState: RowStateFn;
   /** Gap bars clicked open, by `gapKey`. */
   revealed: ReadonlySet<string>;
+  /** Comment ids by the `markKey` of the row their block follows, or `fileSlot` for ones
+   * whose code is gone. */
+  comments?: ReadonlyMap<string, number[]>;
 }
 
 export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
@@ -67,6 +76,8 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
     if (filter !== "all" && !f.rows.some((_, r) => shown(r))) return;
     out.push({ kind: "file", file });
     if (layout.collapsedFiles.has(f.dto.path)) return;
+    for (const comment of layout.comments?.get(fileSlot(file)) ?? [])
+      out.push({ kind: "comment", file, hunk: -1, comment });
     let start = 0;
     f.dto.hunks.forEach((h, hunk) => {
       const end = start + h.rows.length;
@@ -88,10 +99,21 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
             // A revealed gap: show its rows until the next shown row.
             while (r < end && !shown(r)) r++;
           }
-          if (mode === "unified") {
-            for (let i = runStart; i < r; i++) out.push({ kind: "rows", file, hunk, rows: [i] });
-          } else {
-            out.push(...splitRows(f.rows, runStart, r, file, hunk));
+          const rowLines: RowLine[] =
+            mode === "unified"
+              ? Array.from({ length: r - runStart }, (_, i) => ({
+                  kind: "rows",
+                  file,
+                  hunk,
+                  rows: [runStart + i],
+                }))
+              : splitRows(f.rows, runStart, r, file, hunk);
+          for (const line of rowLines) {
+            out.push(line);
+            for (const row of line.rows) {
+              for (const comment of layout.comments?.get(markKey(file, row)) ?? [])
+                out.push({ kind: "comment", file, hunk, comment });
+            }
           }
         } else {
           while (r < end && !shown(r)) r++;
@@ -158,6 +180,8 @@ export function changedRows(
 }
 
 export const markKey = (file: number, row: number) => `${file}:${row}`;
+/** Where comments whose code is gone sit: under their file's header. */
+export const fileSlot = (file: number) => `${file}:file`;
 
 /** The side whose line numbers place `row` within that side's symbols. */
 export function symbolSide(row: RowDto): { line: number; side: "old" | "new" } | undefined {
@@ -208,7 +232,7 @@ export function hunkRange(lines: DisplayLine[], file: number, hunk: number): [nu
   let end = start;
   while (end + 1 < lines.length) {
     const next = lines[end + 1];
-    if ((next.kind !== "rows" && next.kind !== "gap") || next.file !== file || next.hunk !== hunk)
+    if (next.kind === "file" || next.kind === "hunk" || next.file !== file || next.hunk !== hunk)
       break;
     end++;
   }

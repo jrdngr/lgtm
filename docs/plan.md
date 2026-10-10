@@ -63,6 +63,23 @@ Notes from building M3:
 - Local comments with anchoring.
 - Workshop a comment with an agent inside the comment block.
 
+Notes from building M4:
+- `c`, or `m` then `c`, opens a comment block under the selection's last changed row. ⌘↵ saves and Esc cancels. Commenting clears the selection, as marking does.
+- A comment belongs to one file: the last file in the selection with changed rows. It's anchored like a mark on its first and last changed rows, and keeps the code as it was. When the code is gone it stays listed, marked "code changed".
+- Comments aren't part of mark undo.
+- The box under a comment runs `claude -p` headless in the review's workspace, with no MCP servers. **Ask** (↵) gets only Read, Grep and Glob. **Change** (⌘↵) also gets Edit and Write in `acceptEdits` mode, and edits the working copy in place; with the box empty it does what the comment says. Both share one conversation per comment, and follow-ups resume the same Claude session, so they show up in `claude --resume` there. Replies stream into the block. The agent puts a suggested comment in a code block tagged `comment`, shown with a Use this button that puts it in the editor. Asking about an unsaved comment saves it first.
+- `m` then `g` (Change with agent) opens a comment block on the selection with the cursor in the ask box.
+- Change edits `@`, so it's turned off, with a note, when the review's revset doesn't include `@`.
+- A comment whose code is gone shows under its file's header with the code it was made on, so a Change that rewrites its lines doesn't lose the conversation.
+- Send to agent on a comment pastes its code and text into a terminal, as sending a selection does. With two or more terminals in the workspace, a picker asks which, last focused first. Number keys pick directly. Terminals are listed by the title their program sets.
+- A Comments view sits next to Files in the right side panel (⇧⌘M). It lists the review's comments, jumps to them, and can send them all to the agent.
+
+## M4.5: jj in the review bar
+
+- The revset box becomes a chip showing what's reviewed, `@ <change> <description>` in jj's colors. `r` or a click opens the revisions panel.
+- The revisions panel: a revset box and the `jj log` graph. j/k move, J/K extend, Enter reviews. `e` edits, `n` and `N` make a new commit after and before, `s` squashes into the parent, `u` and `U` undo and redo. The footer shows the last action.
+- The review follows `@`: edit X reviews `@`, new after X reviews `X::@`, new before X reviews `@::X`.
+
 ## M5: Persona reviews
 
 - Dispatch wee-bots personas against a review, headless via `claude -p` or into a terminal running `claude`.

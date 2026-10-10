@@ -21,6 +21,9 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 - A comment can be sent to an agent or published to a GitHub PR.
 - Comments can be pulled down from a GitHub PR and replied to locally.
 - Core workflow: pull a GitHub comment, workshop a reply with an agent inside the local comment block, then send the final reply back to GitHub.
+- A comment block shows under the last changed row it covers. A comment covers changed rows in one file and keeps the code it was made on, for when that code is gone.
+- Workshopping runs the agent headless in the review's workspace. Ask is read only. Change can edit files, and edits the working copy in place. Each block keeps its conversation and resumes the agent's session. The agent marks a suggested comment with a `comment` code block, which the user can take into the editor.
+- The Comments view lists a review's comments, including ones whose code is gone.
 
 ## 3. Agent reviews
 
@@ -109,7 +112,8 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 #### Choosing the mark
 
 - `space` marks the selection reviewed.
-- `m` and right-click open the same menu, one letter per item: `r` reviewed, `s` skip, `f` flag, `u` clear mark, `c` comment, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
+- `c` comments on the selection (Section 2).
+- `m` and right-click open the same menu, one letter per item: `r` reviewed, `s` skip, `f` flag, `u` clear mark, `c` comment, `g` change with agent, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
 - Marks never toggle. Applying a mark the code already has changes nothing. Clear mark removes it.
 - Mark keys ignore key repeat.
 - The cursor stays put after marking.

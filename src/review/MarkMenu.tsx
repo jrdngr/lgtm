@@ -1,6 +1,6 @@
 import type { MarkState } from "../bindings";
 
-export type MenuAction = MarkState | "clear" | "comment" | "agent" | "copy";
+export type MenuAction = MarkState | "clear" | "comment" | "change" | "agent" | "copy";
 
 export const MENU_KEYS: Record<string, MenuAction> = {
   r: "reviewed",
@@ -8,20 +8,20 @@ export const MENU_KEYS: Record<string, MenuAction> = {
   f: "flagged",
   u: "clear",
   c: "comment",
+  g: "change",
   a: "agent",
 };
 
-const ITEMS: { action: MenuAction; key?: string; label: string; disabled?: boolean }[] = [
+const ITEMS: { action: MenuAction; key?: string; label: string }[] = [
   { action: "reviewed", key: "r", label: "Reviewed" },
   { action: "skipped", key: "s", label: "Skip" },
   { action: "flagged", key: "f", label: "Flag" },
   { action: "clear", key: "u", label: "Clear mark" },
-  { action: "comment", key: "c", label: "Comment", disabled: true },
+  { action: "comment", key: "c", label: "Comment" },
+  { action: "change", key: "g", label: "Change with agent" },
   { action: "agent", key: "a", label: "Send to agent" },
   { action: "copy", label: "Copy" },
 ];
-
-export const DISABLED = new Set(ITEMS.filter((i) => i.disabled).map((i) => i.action));
 
 interface Props {
   x: number;
@@ -44,13 +44,7 @@ export function MarkMenu({ x, y, changed, onPick, onClose }: Props) {
           {changed} changed {changed === 1 ? "row" : "rows"}
         </div>
         {ITEMS.map((item) => (
-          <button
-            type="button"
-            key={item.action}
-            disabled={item.disabled}
-            title={item.disabled ? "Not available yet" : undefined}
-            onClick={() => onPick(item.action)}
-          >
+          <button type="button" key={item.action} onClick={() => onPick(item.action)}>
             <span className="menu-key">{item.key ?? ""}</span>
             {item.label}
           </button>

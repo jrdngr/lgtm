@@ -1,6 +1,7 @@
-//! Per-repo SQLite store for marks, file checks, and review sessions.
+//! Per-repo SQLite store for marks, file checks, comments, and review sessions.
 
 mod checks;
+mod comments;
 mod sessions;
 
 use std::path::Path;
@@ -12,6 +13,7 @@ use specta::Type;
 use crate::anchor::{Anchor, Side};
 
 pub use checks::FileCheck;
+pub use comments::{Author, Comment, Message, Pin, Workshop};
 pub use sessions::Session;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -210,6 +212,7 @@ impl Store {
     fn init(db: Connection) -> rusqlite::Result<Self> {
         db.execute_batch("PRAGMA journal_mode = WAL;")?;
         db.execute_batch(SCHEMA)?;
+        comments::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

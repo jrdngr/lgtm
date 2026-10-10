@@ -1,3 +1,4 @@
+mod agent;
 pub mod anchor;
 mod config;
 pub mod diff;
@@ -22,9 +23,10 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State, WebviewWindow, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
+use agent::Runs;
 use pty::{Owner, PtyEvent, Ptys};
 use repo::{RepoInfo, RepoWindows};
-use review::{ProgressDto, RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
+use review::{Ask, ProgressDto, RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
 use store::MarkState;
 use workspaces::WorkspaceDto;
 
@@ -283,6 +285,66 @@ fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto>
     repo(&window)?.reset(review).map_err(err)
 }
 
+/// Comments on the changed `rows` of a selection. `snippet` is the code as shown.
+#[tauri::command]
+#[specta::specta]
+fn add_comment(
+    window: WebviewWindow,
+    review: u32,
+    rows: Vec<RowRef>,
+    body: String,
+    snippet: String,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .add_comment(review, &rows, &body, &snippet)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn edit_comment(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+    body: String,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .edit_comment(review, comment, &body)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn delete_comment(window: WebviewWindow, review: u32, comment: u32) -> CmdResult<StateDto> {
+    repo(&window)?.delete_comment(review, comment).map_err(err)
+}
+
+/// Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
+/// the reply's text through `on_text` and returns once it's saved.
+#[tauri::command]
+#[specta::specta]
+async fn workshop_comment(
+    window: WebviewWindow,
+    runs: State<'_, Runs>,
+    review: u32,
+    comment: u32,
+    ask: Ask,
+    on_text: Channel<String>,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .workshop(review, comment, &ask, &runs, |t| {
+            on_text.send(t).ok();
+        })
+        .await
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn stop_workshop(runs: State<Runs>, comment: u32) {
+    runs.stop(&comment.to_string());
+}
+
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
         .constant("HIGHLIGHT_NAMES", syntax::HIGHLIGHT_NAMES)
@@ -309,6 +371,11 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             undo_marks,
             redo_marks,
             reset_review_marks,
+            add_comment,
+            edit_comment,
+            delete_comment,
+            workshop_comment,
+            stop_workshop,
         ])
         .events(collect_events![
             events::RepoChanged,
@@ -365,6 +432,7 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .manage(Ptys::default())
+        .manage(Runs::default())
         .manage(RepoWindows::default())
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {

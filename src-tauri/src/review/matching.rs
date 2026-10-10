@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use similar::DiffOp;
 
-use super::build::{Keyed, ReviewFile};
+use super::build::{FileSide, Keyed, ReviewFile};
 use super::{Review, RowRef};
 use crate::anchor::{self, Candidate, MarkRef, Side};
 use crate::diff::FileStatus;
@@ -19,7 +19,8 @@ pub struct MatchedCheck {
 }
 
 impl Review {
-    /// Rematches marks and checks, recomputes amber rows, and remembers what was matched.
+    /// Rematches marks, checks, and comments, recomputes amber rows, and remembers what was
+    /// matched.
     pub(super) fn rematch(&mut self, store: &Store) -> anyhow::Result<()> {
         let marks = store.marks_for_paths(&self.paths())?;
         self.matched = self.match_marks(store, &marks);
@@ -27,11 +28,11 @@ impl Review {
         self.checks = self.files.iter().map(|f| match_check(f, &checks)).collect();
         self.baseline.extend(self.matched.values().map(|m| m.id));
         self.amber = self.find_amber(store, &marks);
-        Ok(())
+        self.rematch_comments(store)
     }
 
     /// Every path a mark or check in this review could be stored under.
-    fn paths(&self) -> Vec<&str> {
+    pub(super) fn paths(&self) -> Vec<&str> {
         let mut paths = Vec::new();
         for f in &self.files {
             paths.push(f.path.as_str());
@@ -40,72 +41,40 @@ impl Review {
         paths
     }
 
-    fn match_marks(&self, store: &Store, marks: &[Mark]) -> HashMap<RowRef, Mark> {
-        let removed_paths: Vec<&str> = self
-            .files
+    pub(super) fn removed_paths(&self) -> Vec<&str> {
+        self.files
             .iter()
             .filter(|f| f.status == FileStatus::Removed)
             .map(|f| f.path.as_str())
-            .collect();
-        let mut remaps: HashMap<(String, String), Option<HashMap<u32, u32>>> = HashMap::new();
+            .collect()
+    }
+
+    fn match_marks(&self, store: &Store, marks: &[Mark]) -> HashMap<RowRef, Mark> {
+        let removed_paths = self.removed_paths();
+        let mut remaps = Remaps::default();
         let by_id: HashMap<i64, &Mark> = marks.iter().map(|m| (m.id, m)).collect();
         let mut matched = HashMap::new();
 
         for (file_idx, file) in self.files.iter().enumerate() {
             for side in [Side::Old, Side::New] {
-                let keyed: Vec<&Keyed> = file.keyed.iter().filter(|k| k.side == side).collect();
-                if keyed.is_empty() {
+                let Some(rows) = SideRows::new(file_idx, file, side) else {
                     continue;
-                }
-                let current = file.side(side);
-                let candidates: Vec<Candidate> = keyed
-                    .iter()
-                    .map(|k| Candidate {
-                        id: k.row as usize,
-                        line_hash: k.anchor.line_hash,
-                        above: k.anchor.above.clone(),
-                        below: k.anchor.below.clone(),
-                    })
-                    .collect();
-                let row_by_line: HashMap<u32, usize> =
-                    keyed.iter().map(|k| (k.line, k.row as usize)).collect();
-
-                let mut pool_paths = vec![current.path.as_str()];
-                if side == Side::New {
-                    pool_paths.extend(file.old_path.as_deref());
-                }
-                let mut pools = vec![pool_paths];
-                if side == Side::New && file.status == FileStatus::Added {
-                    // Renames past jj's similarity cutoff show up as a delete plus an add.
-                    pools.push(removed_paths.clone());
-                }
-
+                };
                 let mut taken: HashMap<usize, i64> = HashMap::new();
-                for pool in pools {
+                for pool in pools(file, side, &removed_paths) {
                     let refs: Vec<MarkRef> = marks
                         .iter()
                         .filter(|m| m.anchor.side == side && pool.contains(&m.anchor.path.as_str()))
                         .filter(|m| !taken.values().any(|id| *id == m.id))
-                        .map(|m| {
-                            let map = remaps
-                                .entry((m.commit.clone(), m.anchor.path.clone()))
-                                .or_insert_with(|| {
-                                    let old =
-                                        store.line_hashes(&m.commit, &m.anchor.path).ok()??;
-                                    Some(anchor::remap_lines(&old, &current.index.as_ref()?.hashes))
-                                });
-                            let remap = map
-                                .as_ref()
-                                .and_then(|map| row_by_line.get(map.get(&m.line)?).copied());
-                            MarkRef {
-                                id: m.id,
-                                anchor: &m.anchor,
-                                created_at: m.created_at,
-                                remap,
-                            }
+                        .map(|m| MarkRef {
+                            id: m.id,
+                            anchor: &m.anchor,
+                            created_at: m.created_at,
+                            remap: remaps.row(store, &m.commit, &m.anchor.path, m.line, &rows),
                         })
                         .collect();
-                    let open: Vec<Candidate> = candidates
+                    let open: Vec<Candidate> = rows
+                        .candidates
                         .iter()
                         .filter(|c| !taken.contains_key(&c.id))
                         .cloned()
@@ -172,6 +141,92 @@ fn check_covers(check: &FileCheck, k: &Keyed) -> bool {
         Side::New => &check.new_hashes,
     };
     hashes.contains(&k.anchor.line_hash)
+}
+
+/// Changed rows of one side of a file, as candidates for anchors to land on.
+pub(super) struct SideRows<'a> {
+    pub file_idx: usize,
+    pub side: Side,
+    current: &'a FileSide,
+    pub candidates: Vec<Candidate>,
+    row_by_line: HashMap<u32, usize>,
+}
+
+impl<'a> SideRows<'a> {
+    /// `None` when the side has no changed rows.
+    pub fn new(file_idx: usize, file: &'a ReviewFile, side: Side) -> Option<Self> {
+        let keyed: Vec<&Keyed> = file.keyed.iter().filter(|k| k.side == side).collect();
+        if keyed.is_empty() {
+            return None;
+        }
+        Some(Self {
+            file_idx,
+            side,
+            current: file.side(side),
+            candidates: keyed
+                .iter()
+                .map(|k| Candidate {
+                    id: k.row as usize,
+                    line_hash: k.anchor.line_hash,
+                    above: k.anchor.above.clone(),
+                    below: k.anchor.below.clone(),
+                })
+                .collect(),
+            row_by_line: keyed.iter().map(|k| (k.line, k.row as usize)).collect(),
+        })
+    }
+}
+
+/// The stored paths anchors on `side` of `file` can have, as pools tried in order.
+pub(super) fn pools<'a>(
+    file: &'a ReviewFile,
+    side: Side,
+    removed_paths: &[&'a str],
+) -> Vec<Vec<&'a str>> {
+    let mut paths = vec![file.side(side).path.as_str()];
+    if side == Side::New {
+        paths.extend(file.old_path.as_deref());
+    }
+    let mut pools = vec![paths];
+    if side == Side::New && file.status == FileStatus::Added {
+        // Renames past jj's similarity cutoff show up as a delete plus an add.
+        pools.push(removed_paths.to_vec());
+    }
+    pools
+}
+
+/// An anchor's commit and path, and the file index and side it's remapped onto.
+type RemapKey = (String, String, usize, Side);
+
+/// Line-diff remaps from the file an anchor was taken on to a current file side, cached.
+#[derive(Default)]
+pub(super) struct Remaps(HashMap<RemapKey, Option<HashMap<u32, u32>>>);
+
+impl Remaps {
+    /// The row an exact remap of `line` lands on, if it's a changed row of `rows`.
+    pub fn row(
+        &mut self,
+        store: &Store,
+        commit: &str,
+        path: &str,
+        line: u32,
+        rows: &SideRows,
+    ) -> Option<usize> {
+        let key = (
+            commit.to_string(),
+            path.to_string(),
+            rows.file_idx,
+            rows.side,
+        );
+        let map = self.0.entry(key).or_insert_with(|| {
+            let old = store.line_hashes(commit, path).ok()??;
+            Some(anchor::remap_lines(
+                &old,
+                &rows.current.index.as_ref()?.hashes,
+            ))
+        });
+        rows.row_by_line.get(map.as_ref()?.get(&line)?).copied()
+    }
 }
 
 /// The newest check stored for the file's path (or its path before a rename).

@@ -18,22 +18,30 @@ export function selectionText(
     for (const r of line.rows) rows.add(r);
     picked.set(line.file, rows);
   }
+  return [...picked]
+    .map(([file, rows]) =>
+      rowsText(
+        files[file],
+        [...rows].sort((a, b) => a - b),
+      ),
+    )
+    .join("\n\n");
+}
+
+/** File-flat `rows` of one file, in order, as one diff block per hunk. */
+export function rowsText(f: FlatFile, rows: number[]): string {
   const blocks: string[] = [];
-  for (const [file, set] of picked) {
-    const f = files[file];
-    const rows = [...set].sort((a, b) => a - b);
-    // One block per hunk, since rows in different hunks aren't adjacent.
-    let group: number[] = [];
-    const flush = () => {
-      if (group.length) blocks.push(block(f, group));
-      group = [];
-    };
-    for (const r of rows) {
-      if (group.length && f.rowHunk[r] !== f.rowHunk[group[0]]) flush();
-      group.push(r);
-    }
-    flush();
+  // One block per hunk, since rows in different hunks aren't adjacent.
+  let group: number[] = [];
+  const flush = () => {
+    if (group.length) blocks.push(block(f, group));
+    group = [];
+  };
+  for (const r of rows) {
+    if (group.length && f.rowHunk[r] !== f.rowHunk[group[0]]) flush();
+    group.push(r);
   }
+  flush();
   return blocks.join("\n\n");
 }
 

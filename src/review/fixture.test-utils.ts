@@ -54,10 +54,11 @@ export function review(files: FileDto[]): ReviewDto {
     to: "x",
     interdiff: false,
     files,
-    state: { marks: [], checks: files.map(() => "unchecked"), amber: [] },
+    state: { marks: [], checks: files.map(() => "unchecked"), amber: [], comments: [] },
     changes: [],
     removedChanges: [],
     previousSession: null,
+    hasWorkingCopy: true,
     stale: null,
   };
 }

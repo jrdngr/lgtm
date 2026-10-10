@@ -1,0 +1,200 @@
+.comment-block {
+  margin: 4px 12px 8px 76px;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--panel);
+  font:
+    13px -apple-system,
+    system-ui,
+    sans-serif;
+  white-space: normal;
+  user-select: text;
+}
+
+.comment-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.comment-head .spacer,
+.comment-list .spacer {
+  flex: 1;
+}
+
+.comment-title {
+  font-weight: 600;
+}
+
+.comment-meta {
+  color: var(--muted);
+}
+
+.comment-outdated {
+  margin-left: 6px;
+  color: var(--amber);
+  font-size: 11px;
+}
+
+.comment-block button {
+  font-size: 12px;
+  padding: 1px 8px;
+}
+
+.comment-block button.primary {
+  border-color: var(--accent);
+}
+
+.comment-block kbd {
+  margin-left: 4px;
+  color: var(--muted);
+  font: inherit;
+}
+
+.comment-body,
+.msg-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-body em,
+.msg em {
+  color: var(--muted);
+}
+
+.comment-input,
+.ask-input {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.comment-input:focus,
+.ask-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.comment-snippet {
+  margin: 0 0 6px;
+  padding: 4px 6px;
+  overflow-x: auto;
+  color: var(--muted);
+  background: var(--bg);
+  font:
+    12px Menlo,
+    monospace;
+}
+
+.comment-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.workshop {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msg-who {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.msg-agent .msg-who {
+  color: var(--accent);
+}
+
+.suggestion {
+  margin: 2px 0;
+  padding: 4px 8px;
+  border-left: 2px solid var(--reviewed);
+  background: var(--bg);
+}
+
+.suggestion button {
+  margin-top: 4px;
+}
+
+.ask {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 8px;
+}
+
+.ask-input {
+  flex: 1;
+  resize: none;
+}
+
+.cell.commented .fn-marker {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.comment-list {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.comment-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.comment-list li button {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.comment-list li button:hover {
+  background: var(--selection);
+}
+
+.comment-list .tree-total button {
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.comment-where {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.comment-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}

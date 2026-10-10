@@ -1,0 +1,324 @@
+//! Comments on a review: placing them on rows, adding and editing them, and workshopping
+//! them with an agent.
+
+use std::collections::HashSet;
+
+use anyhow::Context;
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
+use super::matching::{Remaps, SideRows, pools};
+use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
+use crate::agent::{self, Runs};
+use crate::anchor::{self, MarkRef};
+use crate::store::{Author, Comment, Message, Pin, Store, Workshop};
+
+/// A message for a comment's agent.
+#[derive(Clone, Deserialize, Type)]
+pub struct Ask {
+    pub message: String,
+    /// The comment's text as it is in the editor, which may not be saved.
+    pub draft: String,
+    /// Have the agent edit the working copy.
+    pub change: bool,
+}
+
+/// The first and last rows a comment covers, by index among its file's rows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+pub struct RowSpan {
+    pub start: u32,
+    pub end: u32,
+}
+
+#[derive(Clone, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CommentDto {
+    pub id: u32,
+    pub path: String,
+    /// The review file it belongs to.
+    pub file: u32,
+    /// Absent when its code can't be found any more.
+    pub rows: Option<RowSpan>,
+    pub body: String,
+    /// The code as it was when the comment was made.
+    pub snippet: String,
+    pub review: String,
+    pub created_at: f64,
+    pub updated_at: f64,
+    pub messages: Vec<Message>,
+}
+
+impl Review {
+    pub(super) fn rematch_comments(&mut self, store: &Store) -> anyhow::Result<()> {
+        let comments = store.comments_for_paths(&self.paths())?;
+        let mut remaps = Remaps::default();
+        self.comments = comments
+            .into_iter()
+            .filter_map(|c| self.place(store, &mut remaps, c))
+            .collect();
+        self.comments.sort_by_key(|c| {
+            let at = c.rows.map_or(u32::MAX, |r| r.end);
+            (c.file, at, c.created_at as i64)
+        });
+        Ok(())
+    }
+
+    /// Where a comment goes, or `None` when none of the review's files is its file.
+    fn place(&self, store: &Store, remaps: &mut Remaps, c: Comment) -> Option<CommentDto> {
+        let found: Vec<RowRef> = c
+            .pins
+            .iter()
+            .filter_map(|p| self.locate(store, remaps, &c.path, p))
+            .collect();
+        let end = found.last().copied();
+        let rows = end.map(|end| {
+            let same: Vec<u32> = found
+                .iter()
+                .filter(|r| r.file == end.file)
+                .map(|r| r.row)
+                .collect();
+            let (lo, hi) = (*same.iter().min().unwrap(), *same.iter().max().unwrap());
+            (end.file, RowSpan { start: lo, end: hi })
+        });
+        let file = match rows {
+            Some((f, _)) => f,
+            None => self
+                .files
+                .iter()
+                .position(|f| f.path == c.path || f.old_path.as_deref() == Some(&c.path))?
+                as u32,
+        };
+        Some(CommentDto {
+            id: c.id as u32,
+            path: c.path,
+            file,
+            rows: rows.map(|(_, span)| span),
+            body: c.body,
+            snippet: c.snippet,
+            review: c.review,
+            created_at: c.created_at as f64,
+            updated_at: c.updated_at as f64,
+            messages: c.workshop.messages,
+        })
+    }
+
+    /// The changed row a pin matches best, trying the files whose path pools hold `path`.
+    fn locate(&self, store: &Store, remaps: &mut Remaps, path: &str, pin: &Pin) -> Option<RowRef> {
+        let removed = self.removed_paths();
+        let anchor = pin.anchor(path);
+        for (file_idx, file) in self.files.iter().enumerate() {
+            let Some(rows) = SideRows::new(file_idx, file, pin.side) else {
+                continue;
+            };
+            if !pools(file, pin.side, &removed)
+                .iter()
+                .any(|p| p.contains(&path))
+            {
+                continue;
+            }
+            let mark = MarkRef {
+                id: 0,
+                anchor: &anchor,
+                created_at: 0,
+                remap: remaps.row(store, &pin.commit, path, pin.line, &rows),
+            };
+            if let Some((&row, _)) = anchor::match_marks(&[mark], &rows.candidates, self.cfg)
+                .iter()
+                .next()
+            {
+                return Some(RowRef {
+                    file: file_idx as u32,
+                    row: row as u32,
+                });
+            }
+        }
+        None
+    }
+
+    /// Pins for the first and last of `rows` that can be anchored, all in the last one's file.
+    fn pins(&self, store: &Store, rows: &[RowRef]) -> anyhow::Result<(String, Vec<Pin>)> {
+        let wanted: HashSet<RowRef> = rows.iter().copied().collect();
+        let file_idx = rows.last().context("nothing to comment on")?.file;
+        let file = self.files.get(file_idx as usize).context("no such file")?;
+        let mut pins = Vec::new();
+        for k in &file.keyed {
+            if !wanted.contains(&RowRef {
+                file: file_idx,
+                row: k.row,
+            }) {
+                continue;
+            }
+            let side = file.side(k.side);
+            // An interdiff's old side isn't a commit, so its rows can't be anchored.
+            let Some(commit) = side.commit.clone() else {
+                continue;
+            };
+            if let Some(index) = &side.index {
+                store.save_line_hashes(&commit, &side.path, &index.hashes)?;
+            }
+            pins.push(Pin::new(&k.anchor, commit, k.line));
+        }
+        if pins.len() > 2 {
+            pins.drain(1..pins.len() - 1);
+        }
+        anyhow::ensure!(!pins.is_empty(), "these rows can't hold a comment");
+        let path = file.side(pins[pins.len() - 1].side).path.clone();
+        Ok((path, pins))
+    }
+}
+
+const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
+doesn't include, so its changes wouldn't show here. Review a revset that includes @ first.";
+
+const INSTRUCTIONS: &str = "Keep replies short. When you suggest a version of the comment, \
+put its full text in a fenced code block tagged `comment`.";
+
+/// One workshop turn. A change asks the agent to edit the code, as the message says or, when
+/// it's empty, as the comment says.
+fn prompt(review: &str, c: &Comment, ask: &Ask) -> String {
+    let (message, change) = (&ask.message, ask.change);
+    let draft = if ask.draft.trim().is_empty() {
+        "(empty)"
+    } else {
+        &ask.draft
+    };
+    let ask = match (change, message.trim().is_empty()) {
+        (false, _) => message.clone(),
+        (true, true) => "Make the change this comment asks for.".to_string(),
+        (true, false) => format!("Make this change: {message}"),
+    };
+    let ask = if change {
+        format!(
+            "{ask}\n\nEdit the files directly and change only what's needed. Then say in a \
+             sentence or two what you changed."
+        )
+    } else {
+        ask
+    };
+    let turn = format!("Current draft of the comment:\n\n{draft}\n\n{ask}");
+    if c.workshop.session.is_some() {
+        return turn;
+    }
+    format!(
+        "You're helping me with a code review comment. I'm reviewing `{review}` in this \
+         repository. The comment is on this code:\n\n{}\n\n{turn}\n\n{INSTRUCTIONS}",
+        c.snippet
+    )
+}
+
+impl RepoCtx {
+    fn comment_edit(
+        &self,
+        id: u32,
+        f: impl FnOnce(&Review, &Store) -> anyhow::Result<()>,
+    ) -> anyhow::Result<StateDto> {
+        let review = self.review(id)?;
+        let mut review = review.lock().unwrap();
+        let store = self.store.lock().unwrap();
+        f(&review, &store)?;
+        review.rematch_comments(&store)?;
+        Ok(review.state())
+    }
+
+    /// Comments on `rows`, the changed rows of a selection. `snippet` is the code as shown.
+    pub fn add_comment(
+        &self,
+        id: u32,
+        rows: &[RowRef],
+        body: &str,
+        snippet: &str,
+    ) -> anyhow::Result<StateDto> {
+        self.comment_edit(id, |review, store| {
+            let (path, pins) = review.pins(store, rows)?;
+            let now = now_ms();
+            store.add_comment(&Comment {
+                id: 0,
+                path,
+                pins,
+                body: body.to_string(),
+                snippet: snippet.to_string(),
+                review: review.label.clone(),
+                created_at: now,
+                updated_at: now,
+                workshop: Workshop::default(),
+            })?;
+            Ok(())
+        })
+    }
+
+    pub fn edit_comment(&self, id: u32, comment: u32, body: &str) -> anyhow::Result<StateDto> {
+        self.comment_edit(id, |_, store| {
+            Ok(store.set_comment_body(comment as i64, body, now_ms())?)
+        })
+    }
+
+    pub fn delete_comment(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
+        self.comment_edit(id, |_, store| Ok(store.delete_comment(comment as i64)?))
+    }
+
+    /// Sends `ask` to the comment's agent in the review's workspace. Streams the reply through
+    /// `on_text` and saves both sides of the exchange. After a change, snapshots the working copy.
+    pub async fn workshop(
+        &self,
+        id: u32,
+        comment: u32,
+        ask: &Ask,
+        runs: &Runs,
+        on_text: impl Fn(String),
+    ) -> anyhow::Result<StateDto> {
+        let cid = comment as i64;
+        let (ws, revset) = {
+            let review = self.review(id)?;
+            let review = review.lock().unwrap();
+            (review.ws.clone(), review.revset.clone())
+        };
+        if ask.change && !ws.jj.includes_working_copy(&revset).await? {
+            anyhow::bail!(NOT_AT_WORKING_COPY);
+        }
+        let (prompt, mut workshop) = {
+            let store = self.store.lock().unwrap();
+            let mut c = store.comment(cid)?.context("the comment is gone")?;
+            let prompt = prompt(&revset, &c, ask);
+            c.workshop.messages.push(Message {
+                author: Author::User,
+                text: ask.message.clone(),
+                change: ask.change,
+            });
+            store.set_workshop(cid, &c.workshop)?;
+            (prompt, c.workshop)
+        };
+        let reply = agent::run(
+            runs,
+            &comment.to_string(),
+            agent::Task {
+                cwd: &ws.root,
+                prompt: &prompt,
+                resume: workshop.session.as_deref(),
+                edit: ask.change,
+            },
+            on_text,
+        )
+        .await;
+        let text = match &reply {
+            Ok(r) if r.stopped => format!("{} (stopped)", r.text.trim_end()),
+            Ok(r) => r.text.clone(),
+            Err(e) => format!("{e:#}"),
+        };
+        if let Ok(agent::Reply {
+            session: Some(s), ..
+        }) = &reply
+        {
+            workshop.session = Some(s.clone());
+        }
+        if ask.change {
+            // Pick up the edits now rather than waiting on the watcher.
+            ws.snapshot().await.ok();
+        }
+        workshop.messages.push(Message {
+            author: Author::Agent,
+            text,
+            change: false,
+        });
+        self.comment_edit(id, |_, store| Ok(store.set_workshop(cid, &workshop)?))
+    }
+}

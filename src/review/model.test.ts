@@ -84,6 +84,7 @@ describe("fileProgress", () => {
       marks: [mark(1, "reviewed"), mark(2, "flagged")],
       checks: ["unchecked"],
       amber: [],
+      comments: [],
     });
     expect(fileProgress(files, rowStates(files, index))).toEqual([
       { reviewed: 1, skipped: 0, flagged: 1, unreviewed: 2, changed: 4 },
@@ -91,10 +92,20 @@ describe("fileProgress", () => {
   });
 
   it("counts a checked file as fully reviewed and a skip-glob file as skipped", () => {
-    const checked = indexState({ marks: [mark(1, "flagged")], checks: ["checked"], amber: [] });
+    const checked = indexState({
+      marks: [mark(1, "flagged")],
+      checks: ["checked"],
+      amber: [],
+      comments: [],
+    });
     expect(fileProgress(files, rowStates(files, checked))[0].reviewed).toBe(4);
     const skipFiles = flatten(review([{ ...files[0].dto, skipped: true }]));
-    const none = indexState({ marks: [mark(1, "flagged")], checks: ["unchecked"], amber: [] });
+    const none = indexState({
+      marks: [mark(1, "flagged")],
+      checks: ["unchecked"],
+      amber: [],
+      comments: [],
+    });
     expect(fileProgress(skipFiles, rowStates(skipFiles, none))[0]).toMatchObject({
       skipped: 3,
       flagged: 1,

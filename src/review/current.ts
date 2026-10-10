@@ -1,17 +1,22 @@
 import { useSyncExternalStore } from "react";
-import type { CheckState } from "../bindings";
+import type { CheckState, CommentDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { FlatFile } from "./model";
 import type { Filter, Progress } from "./state";
 
-/** What the last active review pane shows, for panels that follow it (the file tree). */
+/** What the last active review pane shows, for panels that follow it (files, comments). */
 export interface CurrentReview {
   files: FlatFile[];
   progress: Progress[];
   checks: CheckState[];
   filter: Filter;
+  comments: CommentDto[];
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
+  /** Scrolls the review pane to a comment, or its file when its code is gone. */
+  jumpToComment(id: number): void;
+  /** Pastes text into one of the workspace's terminals, asking which when there are several. */
+  send(text: string): void;
 }
 
 /** One current review per workspace, since each has its own panes. */

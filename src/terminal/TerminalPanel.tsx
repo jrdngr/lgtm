@@ -44,8 +44,10 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
       }
     });
 
+    let title = "";
     const unregister = registerTerminal(api.id, {
       workspace,
+      title: () => title,
       canPaste: () => term.modes.bracketedPasteMode,
       paste: (text) => term.paste(text),
       focus: () => {
@@ -58,6 +60,9 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
 
     const subs = [
       term.onData((data) => id !== undefined && commands.ptyWrite(id, data)),
+      term.onTitleChange((t) => {
+        title = t;
+      }),
       term.onResize(({ cols, rows }) => id !== undefined && commands.ptyResize(id, cols, rows)),
       api.onDidActiveChange(({ isActive }) => isActive && term.focus()),
     ];

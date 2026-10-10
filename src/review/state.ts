@@ -1,4 +1,5 @@
 import type { CheckState, MarkDto, StateDto } from "../bindings";
+import { commentedRows } from "./comments";
 import { type FlatFile, markKey } from "./model";
 
 export type RowState = "reviewed" | "skipped" | "flagged" | "unreviewed";
@@ -11,6 +12,8 @@ export interface MarkIndex {
   marks: Map<string, MarkDto>;
   checks: CheckState[];
   amber: Set<string>;
+  /** Rows inside a comment. */
+  commented: Set<string>;
 }
 
 export function indexState(state: StateDto): MarkIndex {
@@ -18,6 +21,7 @@ export function indexState(state: StateDto): MarkIndex {
     marks: new Map(state.marks.map((m) => [markKey(m.file, m.row), m])),
     checks: state.checks,
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
+    commented: commentedRows(state.comments),
   };
 }
 

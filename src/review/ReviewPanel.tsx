@@ -2,13 +2,15 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarkState, StateDto, View } from "../bindings";
 import { commands } from "../ipc";
-import { sendToTerminal } from "../terminal/registry";
+import { sendToTerminal, type TerminalChoice, workspaceTerminals } from "../terminal/registry";
 import { isMac } from "../workbench/keys";
 import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
+import { CommentBlock, NOT_AT_WORKING_COPY } from "./CommentBlock";
+import { commentSlots, draftFor } from "./comments";
 import { type CurrentReview, publishReview, retractReview } from "./current";
 import { DiffLines } from "./DiffLines";
-import { DISABLED, MarkMenu, MENU_KEYS, type MenuAction } from "./MarkMenu";
+import { MarkMenu, MENU_KEYS, type MenuAction } from "./MarkMenu";
 import {
   buildLines,
   changedRows,
@@ -30,12 +32,15 @@ import {
 } from "./selection";
 import { selectionText } from "./sendText";
 import { type Filter, fileProgress, indexState, rowStates, sumProgress } from "./state";
+import { TerminalPicker } from "./TerminalPicker";
+import { useComments } from "./useComments";
 import { useReview } from "./useReview";
 import { nextRowLine, useSelection } from "./useSelection";
 import "./review.css";
 
 const DEFAULT_REVSET = "@";
 
+/** Drops any browser text selection so it doesn't linger next to a line selection. */
 function clearTextSelection() {
   window.getSelection()?.removeAllRanges();
 }
@@ -54,6 +59,12 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const [revealed, setRevealed] = useState<ReadonlySet<string>>(new Set());
   const [menu, setMenu] = useState<{ x: number; y: number }>();
   const [scrollTo, setScrollTo] = useState<{ line: number }>();
+  /** Text waiting for the user to pick which terminal it goes to. */
+  const [picking, setPicking] = useState<{
+    text: string;
+    terminals: TerminalChoice[];
+    onSent?: () => void;
+  }>();
 
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -61,13 +72,15 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const pendingZ = useRef(false);
   const published = useRef<CurrentReview>(undefined);
   const jumpRef = useRef<(file: number) => void>(() => {});
+  const jumpToCommentRef = useRef<(id: number) => void>(() => {});
+  const sendRef = useRef<(text: string) => void>(() => {});
 
   const review = loaded?.review;
   // biome-ignore lint/correctness/useExhaustiveDependencies: marking replaces only `state`
   const files = useMemo(() => (review ? flatten(review) : []), [review?.files]);
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
   const index = useMemo(
-    () => indexState(review?.state ?? { marks: [], checks: [], amber: [] }),
+    () => indexState(review?.state ?? { marks: [], checks: [], amber: [], comments: [] }),
     [review?.state],
   );
   const rowState = useMemo(() => rowStates(files, index), [files, index]);
@@ -81,9 +94,29 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     });
     return out;
   }, [files, index, fileOpen]);
+  const c = useComments({
+    review,
+    files,
+    moves: loaded?.moves,
+    onState: edited,
+    onError: setError,
+    send: sendText,
+    onDone: () => rootRef.current?.focus({ preventScroll: true }),
+    onChanged: () => refresh(),
+  });
+  const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const lines = useMemo(
-    () => buildLines(files, { mode, collapsedFiles, collapsedHunks, filter, rowState, revealed }),
-    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed],
+    () =>
+      buildLines(files, {
+        mode,
+        collapsedFiles,
+        collapsedHunks,
+        filter,
+        rowState,
+        revealed,
+        comments: slots,
+      }),
+    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed, slots],
   );
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, select, place } = s;
@@ -124,7 +157,10 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         progress,
         checks: index.checks,
         filter,
+        comments: review?.state.comments ?? [],
         jump: (f) => jumpRef.current(f),
+        jumpToComment: (id) => jumpToCommentRef.current(id),
+        send: (text) => sendRef.current(text),
       };
       publishReview(workspace, published.current);
     };
@@ -197,9 +233,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       setError(r.error);
       return;
     }
-    s.setExtending(false);
-    place(cursor);
-    clearTextSelection();
+    finishAction();
     applied(r.data, check);
   }
 
@@ -217,6 +251,22 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     const at = next?.kind === "file" ? header : nextRowLine(lines, header, 1);
     place(at);
     setScrollTo({ line: header });
+    api.setActive();
+    rootRef.current?.focus({ preventScroll: true });
+  };
+
+  jumpToCommentRef.current = (id: number) => {
+    const comment = c.comments.find((x) => x.id === id);
+    if (!comment) return;
+    const at = lines.findIndex((l) => l.kind === "comment" && l.comment === id);
+    if (at < 0) {
+      jumpRef.current(comment.file);
+      return;
+    }
+    // A block under a file header has no row above it in its file.
+    const line = lines[at];
+    place(nextRowLine(lines, at, line.kind === "comment" && line.hunk === -1 ? 1 : -1));
+    setScrollTo({ line: Math.max(at - 3, 0) });
     api.setActive();
     rootRef.current?.focus({ preventScroll: true });
   };
@@ -250,34 +300,67 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     if (text.length) navigator.clipboard.writeText(text.join("\n"));
   }
 
-  /** Pastes the selection into the prompt of the workspace's last focused terminal. */
-  function sendSelection() {
-    const text = selectionText(files, lines, sel.start, sel.end);
-    if (!text) return;
+  /** Pastes text into the prompt of one of the workspace's terminals, asking which one when
+   * there are several. Calls `onSent` once it's sent. */
+  function sendText(text: string, onSent?: () => void) {
+    const terminals = workspaceTerminals(workspace);
+    if (terminals.length > 1) setPicking({ text, terminals, onSent });
+    else sendTo(text, undefined, onSent);
+  }
+
+  function sendTo(text: string, id: string | undefined, onSent?: () => void) {
+    setPicking(undefined);
     const where = workspace ? `workspace ${workspace}` : "the main workspace";
-    const result = sendToTerminal(workspace, text);
+    const result = sendToTerminal(workspace, text, id);
     if (result === "noTerminal") {
       setError(`No terminal is open in ${where}. Open one with ⌘T and start your agent.`);
       return;
     }
     if (result === "unsafe") {
       setError(
-        `The last terminal used in ${where} can't take a paste safely: its program would run each line. Start your agent there first.`,
+        "That terminal can't take a paste safely: its program would run each line. Start your agent there first.",
       );
       return;
     }
     setError(undefined);
+    onSent?.();
+  }
+
+  sendRef.current = sendText;
+
+  /** Clears the selection to the cursor, as every action on a selection does. */
+  function finishAction() {
     s.setExtending(false);
     place(cursor);
     clearTextSelection();
   }
 
+  function sendSelection() {
+    const text = selectionText(files, lines, sel.start, sel.end);
+    if (text) sendText(text, finishAction);
+  }
+
+  /** Opens a comment draft on the selection, in its ask box when it's for a change. */
+  function startComment(field: "body" | "ask" = "body") {
+    const draft = draftFor(files, lines, sel.start, sel.end);
+    if (!draft) {
+      setError("Select changed rows to comment on.");
+      return;
+    }
+    setError(undefined);
+    c.start(draft, field);
+    finishAction();
+  }
+
   function pick(action: MenuAction) {
     setMenu(undefined);
-    if (DISABLED.has(action)) return;
     if (action === "copy") copy();
     else if (action === "agent") sendSelection();
-    else applyMark(action === "clear" ? null : (action as MarkState));
+    else if (action === "comment") startComment();
+    else if (action === "change") {
+      if (review?.hasWorkingCopy) startComment("ask");
+      else setError(NOT_AT_WORKING_COPY);
+    } else applyMark(action === "clear" ? null : (action as MarkState));
   }
 
   function openMenuAtCursor() {
@@ -291,7 +374,13 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+    const t = e.target;
+    if (
+      t instanceof HTMLInputElement ||
+      t instanceof HTMLSelectElement ||
+      t instanceof HTMLTextAreaElement
+    )
+      return;
     if (menu) {
       e.preventDefault();
       if (e.key === "Escape") setMenu(undefined);
@@ -366,6 +455,9 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         break;
       case "m":
         openMenuAtCursor();
+        break;
+      case "c":
+        if (!e.repeat) startComment();
         break;
       case "x": {
         const file = lines[cursor]?.file;
@@ -446,8 +538,10 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       onKeyDown={onKeyDown}
       onMouseDown={(e) => {
         const t = e.target;
+        const inBlock = t instanceof Element && t.closest(".comment-block");
         if (
           !(
+            inBlock ||
             t instanceof HTMLInputElement ||
             t instanceof HTMLButtonElement ||
             t instanceof HTMLSelectElement
@@ -498,6 +592,9 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
           scrollRef={scrollRef}
           scrollTo={scrollTo}
           onBackgroundMouseDown={() => place(cursor)}
+          renderComment={(id) => (
+            <CommentBlock id={id} comment={c.comments.find((x) => x.id === id)} c={c} />
+          )}
           {...handlers}
         />
       )}
@@ -508,6 +605,16 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
         </span>
         {s.extending && <span className="extending">extend</span>}
       </div>
+      {picking && (
+        <TerminalPicker
+          terminals={picking.terminals}
+          onPick={(id) => sendTo(picking.text, id, picking.onSent)}
+          onClose={() => {
+            setPicking(undefined);
+            rootRef.current?.focus({ preventScroll: true });
+          }}
+        />
+      )}
       {menu && (
         <MarkMenu
           x={menu.x}

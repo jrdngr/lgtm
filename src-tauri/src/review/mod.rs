@@ -2,6 +2,9 @@
 
 mod build;
 mod cache;
+#[cfg(test)]
+mod comment_tests;
+mod comments;
 mod matching;
 mod progress;
 mod rowmap;
@@ -28,6 +31,8 @@ use crate::store::{Edit, FileCheck, Mark, MarkState, Session, Store};
 use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile, Sides};
+pub use comments::Ask;
+use comments::CommentDto;
 use matching::MatchedCheck;
 pub use progress::ProgressDto;
 pub use rowmap::RowMove;
@@ -74,6 +79,8 @@ pub struct ReviewDto {
     /// When the previous session started (Unix ms), if there was one.
     pub previous_session: Option<f64>,
     pub stale: Option<String>,
+    /// Whether the revset includes the workspace's `@`, where an agent's changes land.
+    pub has_working_copy: bool,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -110,7 +117,7 @@ pub enum CheckState {
     ChangedSinceReviewed,
 }
 
-/// Everything marking can change.
+/// Everything marking and commenting can change.
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct StateDto {
@@ -120,6 +127,8 @@ pub struct StateDto {
     /// Unreviewed rows that replaced a line whose mark was lost, or that a checked file
     /// didn't have when it was checked.
     pub amber: Vec<RowRef>,
+    /// Comments on the review's files, in file and row order. Ones whose code is gone last.
+    pub comments: Vec<CommentDto>,
 }
 
 pub struct Review {
@@ -135,6 +144,7 @@ pub struct Review {
     /// Matched check per file.
     checks: Vec<Option<MatchedCheck>>,
     amber: Vec<RowRef>,
+    comments: Vec<CommentDto>,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
     baseline: HashSet<i64>,
@@ -271,6 +281,7 @@ impl RepoCtx {
         let cfg = config.matching;
         let (files, dtos) = self.build(sides, diffs, config).await?;
         let (from, to) = spec.endpoints();
+        let has_working_copy = ws.jj.includes_working_copy(revset).await?;
         Ok(Loaded {
             files,
             commits: stack.changes.iter().map(|c| c.commit_id.clone()).collect(),
@@ -287,11 +298,13 @@ impl RepoCtx {
                     marks: vec![],
                     checks: vec![],
                     amber: vec![],
+                    comments: vec![],
                 },
                 changes: stack.changes,
                 removed_changes: stack.removed,
                 previous_session: prev.map(|p| p.started_at as f64),
                 stale: ws.stale.lock().unwrap().clone(),
+                has_working_copy,
             },
         })
     }
@@ -465,6 +478,7 @@ impl Review {
             matched: HashMap::new(),
             checks: vec![],
             amber: vec![],
+            comments: vec![],
             baseline: HashSet::new(),
             session: 0,
             commits: vec![],
@@ -526,6 +540,7 @@ impl Review {
             marks,
             checks,
             amber: self.amber.clone(),
+            comments: self.comments.clone(),
         }
     }
 

@@ -1,0 +1,17 @@
+.terminal-picker {
+  top: 48px;
+  left: 50%;
+  min-width: 260px;
+  transform: translateX(-50%);
+  outline: none;
+}
+
+.terminal-picker button.active {
+  background: var(--selection);
+}
+
+.picker-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}

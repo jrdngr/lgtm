@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type RefObject, useEffect } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect } from "react";
 import { HIGHLIGHT_NAMES, type MarkDto, type RowDto } from "../bindings";
 import { FileHeader } from "./FileHeader";
 import {
@@ -15,7 +15,28 @@ import type { MarkIndex, Progress } from "./state";
 
 const ROW_HEIGHT = 20;
 const FILE_HEIGHT = 30;
-const GAP_HEIGHT = 8;
+const HEIGHTS: Record<DisplayLine["kind"], number> = {
+  file: FILE_HEIGHT,
+  hunk: ROW_HEIGHT,
+  rows: ROW_HEIGHT,
+  gap: 8,
+  comment: 120,
+};
+
+function lineKey(line: DisplayLine): string {
+  switch (line.kind) {
+    case "file":
+      return `f:${line.file}`;
+    case "hunk":
+      return `h:${line.file}:${line.hunk}`;
+    case "rows":
+      return `r:${line.file}:${line.rows.join(",")}`;
+    case "gap":
+      return `g:${line.file}:${line.rows[0]}`;
+    case "comment":
+      return `c:${line.comment}`;
+  }
+}
 
 const hlClass = HIGHLIGHT_NAMES.map((n) => `hl-${n.replace(".", "-")}`);
 
@@ -66,10 +87,11 @@ function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
   const checked = r.kind !== "context" && index.checks[fileIdx] === "checked";
   const state = mark?.state ?? (checked ? "reviewed" : undefined);
   const amber = !state && index.amber.has(key);
+  const commented = index.commented.has(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
-      className={`cell kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}`}
+      className={`cell kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
       title={amber ? "changed since reviewed" : markTitle(mark)}
     >
       <span className="strip" />
@@ -126,6 +148,7 @@ interface Props extends LineHandlers {
   /** Scrolls this line to the top whenever a new object is passed. */
   scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
+  renderComment(id: number): ReactNode;
 }
 
 /** The header of the file at the top of the viewport, once its own header has scrolled
@@ -156,8 +179,10 @@ export function DiffLines(props: Props) {
   const virtualizer = useVirtualizer({
     count: lines.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: (i) =>
-      lines[i].kind === "file" ? FILE_HEIGHT : lines[i].kind === "gap" ? GAP_HEIGHT : ROW_HEIGHT,
+    estimateSize: (i) => HEIGHTS[lines[i].kind],
+    // Keyed by content, so a measured comment's height stays with it as lines shift. A new
+    // function per `lines` also makes the virtualizer re-estimate when lines change.
+    getItemKey: useCallback((i: number) => lineKey(lines[i]), [lines]),
     overscan: 30,
   });
 
@@ -190,6 +215,7 @@ export function DiffLines(props: Props) {
   const render = (line: DisplayLine, i: number) => {
     const file = files[line.file];
     if (line.kind === "file") return header(line.file);
+    if (line.kind === "comment") return props.renderComment(line.comment);
     if (line.kind === "gap") {
       const n = line.rows.length;
       return (
@@ -295,16 +321,20 @@ export function DiffLines(props: Props) {
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((v) => {
           const selected = v.index >= selection.start && v.index <= selection.end;
+          // Comment blocks size to their content; every other line has a fixed height.
+          const sized = lines[v.index].kind === "comment";
           return (
             <div
               key={v.key}
+              ref={sized ? virtualizer.measureElement : undefined}
+              data-index={v.index}
               className={`line${selected ? " selected" : ""}${v.index === cursor ? " cursor" : ""}`}
               style={{
                 position: "absolute",
                 top: 0,
                 left: 0,
                 right: 0,
-                height: v.size,
+                height: sized ? undefined : v.size,
                 transform: `translateY(${v.start}px)`,
               }}
             >
