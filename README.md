@@ -25,6 +25,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘T | New terminal tab |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |
+| ⌘⇧E | Show the Files panel (reopens it if closed) |
 
 In a review pane:
 
@@ -41,7 +42,7 @@ In a review pane:
 | `za` | Collapse or expand the hunk |
 | `Esc` | Back to the cursor row |
 
-The Files panel lists the review's files with reviewed/changed row counts. Click one to jump to it.
+The Files panel (⌘⇧E or the toolbar's Files button) lists the review's files with reviewed/changed row counts. Click one to jump to it.
 
 Mouse: click a row, drag or shift-click for a range, double-click for the function, triple-click for the hunk. Click a file header, hunk header, or ƒ marker to select that unit.
 

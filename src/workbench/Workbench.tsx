@@ -49,10 +49,22 @@ function defaultLayout(api: DockviewApi) {
   addTerminal(api, "below");
 }
 
+/** Focuses the Files panel, or opens one left of the review if it was closed. */
+function showFiles(api: DockviewApi) {
+  const existing = api.panels.find((p) => p.view.contentComponent === "files");
+  if (existing) {
+    existing.api.setActive();
+    return;
+  }
+  const review = api.panels.find((p) => p.view.contentComponent === "review");
+  addPanel(api, "files", "Files", review && { referencePanel: review, direction: "left" });
+}
+
 const shortcuts: Record<string, (api: DockviewApi) => void> = {
   "Mod+T": (api) => addTerminal(api),
   "Mod+D": (api) => addTerminal(api, "right"),
   "Mod+Shift+D": (api) => addTerminal(api, "below"),
+  "Mod+Shift+E": showFiles,
 };
 
 async function restoreLayout(api: DockviewApi) {
@@ -104,6 +116,9 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         </span>
         <button type="button" disabled={!api} onClick={() => api && addTerminal(api)}>
           New terminal
+        </button>
+        <button type="button" disabled={!api} onClick={() => api && showFiles(api)}>
+          Files
         </button>
       </header>
       <DockviewReact components={components} onReady={onReady} theme={themeDark} />
