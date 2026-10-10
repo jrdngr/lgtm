@@ -32,6 +32,10 @@ import "./review.css";
 
 const DEFAULT_REVSET = "@";
 
+function clearTextSelection() {
+  window.getSelection()?.removeAllRanges();
+}
+
 type Params = { revset?: string };
 
 export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
@@ -176,6 +180,7 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
     }
     s.setExtending(false);
     place(cursor);
+    clearTextSelection();
     applied(r.data, check);
   }
 
@@ -256,8 +261,11 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
       const key = e.key.toLowerCase();
       if (key === "a") select(reviewSelection(lines));
       else if (key === "z") step(!e.shiftKey);
-      else if (key === "c") copy();
-      else return;
+      else if (key === "c") {
+        // Selected code text copies natively; otherwise copy the selected rows.
+        if (window.getSelection()?.isCollapsed === false) return;
+        copy();
+      } else return;
       e.preventDefault();
       return;
     }
@@ -326,6 +334,12 @@ export function ReviewPanel({ api, params }: IDockviewPanelProps<Params>) {
   const handlers = {
     onRowMouseDown(e: React.MouseEvent, i: number) {
       if (e.button !== 0) return;
+      // Only code text is selectable. Gutters and double/triple clicks pick rows, not text.
+      const inCode = e.target instanceof Element && e.target.closest(".code");
+      if (!inCode || e.detail >= 2) {
+        e.preventDefault();
+        clearTextSelection();
+      }
       if (e.detail === 2) {
         const fn = units(files, lines, i).find((u) => u.level === "function");
         if (fn) select(fn, i);

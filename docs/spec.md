@@ -112,7 +112,7 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 - Mark keys ignore key repeat.
 - The cursor stays put after marking.
 - ⌘Z / ⇧⌘Z undo and redo mark changes, including file checkboxes.
-- ⌘C copies the selected rows' code. Text selection inside rows isn't supported.
+- Code text can be selected by dragging in the code column. Line numbers and diff signs can't. Dragging in the gutter selects rows only. Marking clears any text selection. ⌘C copies selected text, or the selected rows' code when there's none.
 
 #### Labels and states
 
