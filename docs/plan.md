@@ -28,6 +28,9 @@ Assumes the Tauri v2 stack in `stack.md`. Each milestone ends with something Jor
 - `skip` globs.
 - Per-change and Since-last-session views, with evolog mapping and `jj interdiff`.
 - Live updates from `op_heads`, stale working copy notice.
+- Debounced snapshot worker, driven by the working-copy watcher.
+- Selections follow the code when the diff changes.
+- Config file: `skip` globs, anchoring window and threshold.
 
 ## M3: Tasks and terminals
 

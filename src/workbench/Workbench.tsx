@@ -9,8 +9,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { useEffect, useState } from "react";
 import { commands, type RepoInfo, unwrap } from "../ipc";
-import { LargeDiffSpike } from "../spikes/LargeDiffSpike";
-import { PtyThroughputSpike } from "../spikes/PtyThroughputSpike";
+import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { chord } from "./keys";
 
@@ -19,11 +18,9 @@ function Placeholder({ api }: IDockviewPanelProps) {
 }
 
 const components = {
-  review: Placeholder,
+  review: ReviewPanel,
   files: Placeholder,
   terminal: TerminalPanel,
-  largeDiffSpike: LargeDiffSpike,
-  ptyThroughputSpike: PtyThroughputSpike,
 };
 
 type PanelKind = keyof typeof components;
@@ -111,21 +108,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         </span>
         <button type="button" disabled={!api} onClick={() => api && addTerminal(api)}>
           New terminal
-        </button>
-        <span className="spacer" />
-        <button
-          type="button"
-          disabled={!api}
-          onClick={() => api && addPanel(api, "largeDiffSpike", "Spike: large diff")}
-        >
-          Spike: large diff
-        </button>
-        <button
-          type="button"
-          disabled={!api}
-          onClick={() => api && addPanel(api, "ptyThroughputSpike", "Spike: PTY throughput")}
-        >
-          Spike: PTY throughput
         </button>
       </header>
       <DockviewReact components={components} onReady={onReady} theme={themeDark} />

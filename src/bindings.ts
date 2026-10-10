@@ -16,15 +16,102 @@ export const commands = {
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
+	/**  Loads the review for `revset` after snapshotting the working copy. */
+	openReview: (revset: string) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { revset })),
+	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
+	/**
+	 *  Marks changed rows, or clears their marks when `state` is null. Returns every mark in the
+	 *  review.
+	 */
+	markRows: (review: number, rows: RowRef[], state: "reviewed" | "skipped" | "flagged" | null) => typedError<MarkDto[], string>(__TAURI_INVOKE("mark_rows", { review, rows, state })),
+	undoMarks: (review: number) => typedError<MarkDto[], string>(__TAURI_INVOKE("undo_marks", { review })),
+	redoMarks: (review: number) => typedError<MarkDto[], string>(__TAURI_INVOKE("redo_marks", { review })),
+	/**  Removes the marks this review's revset created. */
+	resetReviewMarks: (review: number) => typedError<MarkDto[], string>(__TAURI_INVOKE("reset_review_marks", { review })),
 };
 
+/* Constants */
+export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","escape","function","keyword","label","module","number","operator","property","punctuation","string","tag","type","variable.builtin","variable.parameter"] as const;
+
 /* Types */
+export type CodeSymbol = {
+	name: string,
+	kind: SymbolKind,
+	/**  1-based, inclusive. Includes leading decorators, attributes, and doc comments. */
+	startLine: number,
+	endLine: number,
+	/**  The parse has errors inside the range, so the range can't be trusted. */
+	hasError: boolean,
+};
+
+export type FileDto = {
+	path: string,
+	oldPath: string | null,
+	status: FileStatus,
+	binary: boolean,
+	conflict: boolean,
+	oldExec: boolean,
+	newExec: boolean,
+	hunks: HunkDto[],
+	oldSymbols: CodeSymbol[],
+	newSymbols: CodeSymbol[],
+};
+
+export type FileStatus = "modified" | "added" | "removed" | "copied" | "renamed";
+
+export type HunkDto = {
+	oldStart: number,
+	oldLines: number,
+	newStart: number,
+	newLines: number,
+	section: string,
+	rows: RowDto[],
+};
+
+export type MarkDto = {
+	file: number,
+	row: number,
+	state: MarkState,
+	review: string,
+	createdAt: number | null,
+};
+
+export type MarkState = "reviewed" | "skipped" | "flagged";
+
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
 export type RepoInfo = {
 	root: string,
 	name: string,
 };
+
+export type ReviewDto = {
+	id: number,
+	revset: string,
+	from: string | null,
+	to: string,
+	files: FileDto[],
+	marks: MarkDto[],
+};
+
+export type RowDto = {
+	kind: RowKind,
+	oldLine: number | null,
+	newLine: number | null,
+	text: string,
+	/**  Highlight segments; absent when the language is unknown or the file has no contents. */
+	hl: ([number | null, number])[] | null,
+};
+
+export type RowKind = "context" | "added" | "removed";
+
+/**  A row by file index and its index among the file's rows, counting across hunks. */
+export type RowRef = {
+	file: number,
+	row: number,
+};
+
+export type SymbolKind = "function" | "class" | "module";
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {

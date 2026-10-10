@@ -1,4 +1,4 @@
-const isMac = navigator.platform.startsWith("Mac");
+export const isMac = navigator.platform.startsWith("Mac");
 
 /**
  * Normalizes an app shortcut to a string like "Mod+Shift+D". Returns undefined for keys that

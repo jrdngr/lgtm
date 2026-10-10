@@ -1,18 +1,26 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use specta::Type;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-/// Repo roots by window label. The start window has no entry.
+use crate::jj::Jj;
+use crate::review::RepoCtx;
+use crate::store::Store;
+
+/// Repo state by window label. The start window has no entry.
 #[derive(Default)]
-pub struct RepoWindows(Mutex<HashMap<String, PathBuf>>);
+pub struct RepoWindows(Mutex<HashMap<String, Arc<RepoCtx>>>);
 
 impl RepoWindows {
-    pub fn root(&self, label: &str) -> Option<PathBuf> {
+    pub fn get(&self, label: &str) -> Option<Arc<RepoCtx>> {
         self.0.lock().unwrap().get(label).cloned()
+    }
+
+    pub fn remove(&self, label: &str) {
+        self.0.lock().unwrap().remove(label);
     }
 }
 
@@ -49,11 +57,15 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         return window.set_focus().map_err(|e| e.to_string());
     }
 
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let store = Store::open(&data_dir.join("repos").join(key(&root)).join("lgtm.db"))
+        .map_err(|e| format!("open mark store: {e:#}"))?;
+    let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
     app.state::<RepoWindows>()
         .0
         .lock()
         .unwrap()
-        .insert(label.clone(), root.clone());
+        .insert(label.clone(), Arc::new(ctx));
     let title = root.file_name().map_or_else(
         || root.display().to_string(),
         |n| n.to_string_lossy().into(),
