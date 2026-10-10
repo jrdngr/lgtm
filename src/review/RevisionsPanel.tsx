@@ -3,6 +3,8 @@ import type { JjAction, LogLine } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
 import { AnsiText } from "./AnsiText";
+import "./MarkMenu.css";
+import "./RevisionsPanel.css";
 
 interface Props {
   workspace: WorkspaceName;
@@ -17,6 +19,29 @@ interface Props {
 
 const HINTS =
   "↵ review · e edit · n new after · N new before · s squash · u undo · U redo · / revset";
+
+/** Cursor moves. Shifted keys extend the range from the anchor. */
+const MOVES: Record<string, number> = { j: 1, ArrowDown: 1, J: 1, k: -1, ArrowUp: -1, K: -1 };
+
+/** Keys that act on the highlighted commit: the action, its label, and the revset to review
+ * after it. */
+const REV_ACTIONS: Record<string, (rev: string) => [JjAction, string, string?]> = {
+  e: (rev) => [{ kind: "edit", rev }, `Editing ${rev}`, "@"],
+  n: (rev) => [{ kind: "newAfter", rev }, `New commit after ${rev}`, `${rev}::@`],
+  N: (rev) => [{ kind: "newBefore", rev }, `New commit before ${rev}`, `@::${rev}`],
+  s: (rev) => [{ kind: "squash", rev }, `Squashed ${rev} into its parent`],
+};
+
+/** Line index of each commit's first line, newest first, and the commit each line belongs to
+ * (-1 before the first). */
+function layout(lines: LogLine[]) {
+  const commits: number[] = [];
+  const owner = lines.map((l, i) => {
+    if (l.commitId) commits.push(i);
+    return commits.length - 1;
+  });
+  return { commits, owner };
+}
 
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
  * commits. Keys act on the highlighted commit. */
@@ -34,8 +59,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /** Line index of each commit's first line, newest first. */
-  const commits = (lines ?? []).flatMap((l, i) => (l.commitId ? [i] : []));
+  const { commits, owner } = layout(lines ?? []);
   const changeAt = (k: number) => lines?.[commits[k]]?.changeId ?? undefined;
 
   async function reload(keep?: string) {
@@ -78,22 +102,20 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   async function act(action: JjAction, label: string, next?: string) {
     if (busy) return;
     setBusy(true);
-    setError(undefined);
-    const r = await commands.jjAct(workspace, action);
-    if (r.status === "error") {
-      setError(r.error);
+    try {
+      setError(undefined);
+      const r = await commands.jjAct(workspace, action);
+      if (r.status === "error") return setError(r.error);
+      setLast(label);
+      if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
+      await reload(changeAt(cursor));
+      // Undo, redo and squash keep the review's revset unless it no longer resolves.
+      const failed = await onLoad(next ?? revset);
+      if (failed && !next) await onLoad("@");
+      else if (failed) setError(failed);
+    } finally {
       setBusy(false);
-      return;
     }
-    setLast(label);
-    if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
-    const keep = changeAt(cursor);
-    await reload(keep);
-    // Undo, redo and squash keep the review's revset unless it no longer resolves.
-    const failed = await onLoad(next ?? revset);
-    if (failed && !next) await onLoad("@");
-    else if (failed) setError(failed);
-    setBusy(false);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -104,65 +126,36 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     }
     const n = commits.length;
     const rev = changeAt(cursor);
-    const move = (d: number) => setCursor((c) => Math.min(Math.max(c + d, 0), n - 1));
-    switch (e.key) {
-      case "j":
-      case "ArrowDown":
-        setAnchor(undefined);
-        move(1);
-        break;
-      case "k":
-      case "ArrowUp":
-        setAnchor(undefined);
-        move(-1);
-        break;
-      case "J":
-        setAnchor((a) => a ?? cursor);
-        move(1);
-        break;
-      case "K":
-        setAnchor((a) => a ?? cursor);
-        move(-1);
-        break;
-      case "Enter":
-        review(picked());
-        break;
-      case "Escape":
-        onClose();
-        break;
-      case "/":
-        inputRef.current?.focus();
-        inputRef.current?.select();
-        break;
-      case "e":
-        if (rev) act({ kind: "edit", rev }, `Editing ${rev}`, "@");
-        break;
-      case "n":
-        if (rev) act({ kind: "newAfter", rev }, `New commit after ${rev}`, `${rev}::@`);
-        break;
-      case "N":
-        if (rev) act({ kind: "newBefore", rev }, `New commit before ${rev}`, `@::${rev}`);
-        break;
-      case "s":
-        if (rev) act({ kind: "squash", rev }, `Squashed ${rev} into its parent`);
-        break;
-      case "u":
-        act({ kind: "undo", steps }, "Undid the last action");
-        break;
-      case "U":
-        act({ kind: "redo", steps }, "Redid the action");
-        break;
-      default:
-        return;
+    const d = MOVES[e.key];
+    const revAction = REV_ACTIONS[e.key];
+    if (d) {
+      setAnchor(e.key === "J" || e.key === "K" ? (a) => a ?? cursor : undefined);
+      setCursor((c) => Math.min(Math.max(c + d, 0), n - 1));
+    } else if (revAction) {
+      if (rev) act(...revAction(rev));
+    } else {
+      switch (e.key) {
+        case "Enter":
+          review(picked());
+          break;
+        case "Escape":
+          onClose();
+          break;
+        case "/":
+          inputRef.current?.focus();
+          inputRef.current?.select();
+          break;
+        case "u":
+          act({ kind: "undo", steps }, "Undid the last action");
+          break;
+        case "U":
+          act({ kind: "redo", steps }, "Redid the action");
+          break;
+        default:
+          return;
+      }
     }
     e.preventDefault();
-  }
-
-  const owner: number[] = [];
-  let k = -1;
-  for (const l of lines ?? []) {
-    if (l.commitId) k++;
-    owner.push(k);
   }
 
   return (

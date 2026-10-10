@@ -1,7 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import type { CommentDto, ReviewDto, StateDto } from "../bindings";
-import { commands } from "../ipc";
+import { type CommandResult, commands } from "../ipc";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
 import { type FlatFile, NEW_COMMENT } from "./model";
@@ -15,20 +15,20 @@ export interface Running {
 
 const NONE: CommentDto[] = [];
 
-type Result = { status: "ok"; data: StateDto } | { status: "error"; error: string };
-
 const without = <V>(m: ReadonlyMap<number, V>, id: number) => {
   const next = new Map(m);
   next.delete(id);
   return next;
 };
 
+const withEntry = <V>(m: ReadonlyMap<number, V>, id: number, v: V) => new Map(m).set(id, v);
+
 const moved = <V>(m: ReadonlyMap<number, V>, from: number, to: number) => {
   const v = m.get(from);
   return v === undefined ? m : without(m, from).set(to, v);
 };
 
-export interface Focus {
+interface Focus {
   id: number;
   field: "body" | "ask";
 }
@@ -86,7 +86,7 @@ export function useComments({
     }
   }, [files, moves]);
 
-  async function apply(result: Promise<Result>): Promise<StateDto | undefined> {
+  async function apply(result: Promise<CommandResult<StateDto>>): Promise<StateDto | undefined> {
     const r = await result;
     if (r.status === "error") {
       onError(r.error);
@@ -99,7 +99,7 @@ export function useComments({
   /** Opens a draft with the cursor in its body, or in its ask box to request a change. */
   function start(next: Draft, field: Focus["field"] = "body") {
     setDraft(next);
-    setEdits((m) => new Map(m).set(NEW_COMMENT, m.get(NEW_COMMENT) ?? ""));
+    setEdits((m) => withEntry(m, NEW_COMMENT, m.get(NEW_COMMENT) ?? ""));
     setFocus({ id: NEW_COMMENT, field });
   }
 
@@ -138,11 +138,6 @@ export function useComments({
     onDone();
   }
 
-  function edit(c: CommentDto) {
-    setEdits((m) => new Map(m).set(c.id, c.body));
-    setFocus({ id: c.id, field: "body" });
-  }
-
   async function remove(id: number) {
     if (review && (await apply(commands.deleteComment(review.id, id)))) {
       setEdits((m) => without(m, id));
@@ -161,12 +156,12 @@ export function useComments({
     // A saved draft's block is a new one, so the ask box needs focus again.
     if (cid !== id) setFocus({ id: cid, field: "ask" });
     setAsks((m) => without(m, cid));
-    setRunning((m) => new Map(m).set(cid, { ask: message, change, reply: "" }));
+    setRunning((m) => withEntry(m, cid, { ask: message, change, reply: "" }));
     const channel = new Channel<string>();
     channel.onmessage = (text) =>
       setRunning((m) => {
         const r = m.get(cid);
-        return r ? new Map(m).set(cid, { ...r, reply: r.reply + text }) : m;
+        return r ? withEntry(m, cid, { ...r, reply: r.reply + text }) : m;
       });
     await apply(
       commands.workshopComment(review.id, cid, { message, draft: body, change }, channel),
@@ -175,13 +170,9 @@ export function useComments({
     if (change) onChanged();
   }
 
-  function stop(id: number) {
-    commands.stopWorkshop(id);
-  }
-
   /** Puts an agent's suggestion in the body for the user to check and save. */
   function use(id: number, text: string) {
-    setEdits((m) => new Map(m).set(id, text));
+    setEdits((m) => withEntry(m, id, text));
     setFocus({ id, field: "body" });
   }
 
@@ -197,15 +188,15 @@ export function useComments({
     focus,
     comments,
     start,
-    setBody: (id: number, text: string) => setEdits((m) => new Map(m).set(id, text)),
-    setAsk: (id: number, text: string) => setAsks((m) => new Map(m).set(id, text)),
+    setBody: (id: number, text: string) => setEdits((m) => withEntry(m, id, text)),
+    setAsk: (id: number, text: string) => setAsks((m) => withEntry(m, id, text)),
     focused: () => setFocus(undefined),
     save,
     cancel,
-    edit,
+    edit: (c: CommentDto) => use(c.id, c.body),
     remove,
     ask,
-    stop,
+    stop: commands.stopWorkshop,
     use,
     send: sendComment,
     /** The agent edits `@`, so a change only shows when the review includes it. */

@@ -4,29 +4,27 @@ use serde_json::Value;
 
 /// Arguments for a run that reads its prompt from stdin. It can read files, and edit them
 /// too with `edit`. Nothing else is available, and the user's MCP servers stay off.
-pub fn args(resume: Option<&str>, edit: bool) -> Vec<String> {
-    let mut args: Vec<String> = [
+pub fn args(resume: Option<&str>, edit: bool) -> Vec<&str> {
+    let mut args = vec![
         "-p",
         "--output-format",
         "stream-json",
         "--verbose",
         "--include-partial-messages",
         "--strict-mcp-config",
-    ]
-    .map(str::to_string)
-    .into();
+    ];
     let tools = if edit {
         "Read,Grep,Glob,Edit,Write"
     } else {
         "Read,Grep,Glob"
     };
-    args.extend(["--tools".to_string(), tools.to_string()]);
+    args.extend(["--tools", tools]);
     if edit {
         // A headless run can't ask, so edits in the workspace are allowed up front.
-        args.extend(["--permission-mode".to_string(), "acceptEdits".to_string()]);
+        args.extend(["--permission-mode", "acceptEdits"]);
     }
     if let Some(id) = resume {
-        args.extend(["--resume".to_string(), id.to_string()]);
+        args.extend(["--resume", id]);
     }
     args
 }

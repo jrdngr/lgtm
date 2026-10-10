@@ -3,11 +3,10 @@ use std::path::{Path, PathBuf};
 
 /// Dock layouts are opaque JSON owned by the UI, one file per workspace: `layout.json` for
 /// the main one, `layouts/<name>.json` for the others.
-pub fn path(data_dir: &Path, repo_key: &str, workspace: Option<&str>) -> PathBuf {
-    let repo = data_dir.join("repos").join(repo_key);
+pub fn path(repo_dir: &Path, workspace: Option<&str>) -> PathBuf {
     match workspace {
-        None => repo.join("layout.json"),
-        Some(name) => repo.join("layouts").join(format!("{name}.json")),
+        None => repo_dir.join("layout.json"),
+        Some(name) => repo_dir.join("layouts").join(format!("{name}.json")),
     }
 }
 

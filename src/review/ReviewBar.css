@@ -1,0 +1,83 @@
+.review-bar select {
+  font: inherit;
+  color: var(--fg);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.review-bar .change-picker {
+  max-width: 280px;
+}
+
+.review-bar .progress {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.progress .p-reviewed {
+  color: var(--reviewed);
+}
+
+.progress .p-flagged {
+  color: var(--flagged);
+}
+
+.review-note {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.review-note.warn {
+  color: var(--amber);
+}
+
+.rev-chip {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 80px;
+  max-width: 420px;
+  overflow: hidden;
+  white-space: nowrap;
+  font:
+    12px Menlo,
+    monospace;
+}
+
+.rev-label {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.rev-at {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.rev-id {
+  color: #8a8a8a;
+}
+
+.rev-unique {
+  color: #c586c0;
+  font-weight: bold;
+}
+
+.rev-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rev-desc.empty {
+  color: #d29922;
+}

@@ -64,3 +64,10 @@ function compress(d: TreeDir): TreeDir {
   if (d.children.length !== 1 || only.kind !== "dir") return d;
   return { ...only, name: `${d.name}/${only.name}` };
 }
+
+/** A copy of `s` with `k` added, or removed when it was there. */
+export function toggled<T>(s: ReadonlySet<T>, k: T): Set<T> {
+  const next = new Set(s);
+  if (!next.delete(k)) next.add(k);
+  return next;
+}

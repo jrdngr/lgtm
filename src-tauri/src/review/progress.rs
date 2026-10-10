@@ -43,10 +43,7 @@ impl RepoCtx {
             let checked = review.checks[i].as_ref().is_some_and(|c| c.current);
             let skipped = loaded.dto.files[i].skipped;
             for k in &file.keyed {
-                let mark = review.matched.get(&RowRef {
-                    file: i as u32,
-                    row: k.row,
-                });
+                let mark = review.matched.get(&RowRef::new(i, k.row));
                 let count = match (checked, mark.map(|m| m.state)) {
                     (true, _) | (_, Some(MarkState::Reviewed)) => &mut p.reviewed,
                     (_, Some(MarkState::Skipped)) => &mut p.skipped,

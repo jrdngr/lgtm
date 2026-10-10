@@ -1,3 +1,4 @@
+import type { WorkspaceName } from "../workspaces/context";
 import type { SideState } from "./SidePanel";
 
 export interface Sides {
@@ -5,7 +6,7 @@ export interface Sides {
   right: SideState;
 }
 
-export const DEFAULT_SIDES: Sides = {
+const DEFAULT_SIDES: Sides = {
   left: { open: true, width: 230, view: "workspaces" },
   right: { open: true, width: 260, view: "files" },
 };
@@ -30,5 +31,24 @@ export function saveSides(root: string, sides: Sides) {
     localStorage.setItem(key(root), JSON.stringify(sides));
   } catch {
     // Remembering panel state is a convenience.
+  }
+}
+
+const selectedKey = (root: string) => `lgtm:workspace:${root}`;
+
+/** The workspace last selected in the repo. */
+export function loadWorkspace(root: string): WorkspaceName {
+  try {
+    return localStorage.getItem(selectedKey(root)) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveWorkspace(root: string, name: WorkspaceName) {
+  try {
+    localStorage.setItem(selectedKey(root), name ?? "");
+  } catch {
+    // Remembering the workspace is a convenience.
   }
 }

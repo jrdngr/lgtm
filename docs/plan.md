@@ -86,6 +86,7 @@ Notes from building M4.5:
 - The panel builds revsets from change ids at jj's shortest unique length, at least 8.
 - The chip colors ids as jj does, with the unique prefix in pink. One commit shows up to 5 characters of its id, fewer when the bar is narrow, but never less than the unique prefix. A range shows only the unique prefixes, like `wk::q`.
 - After squash, undo or redo the review keeps its revset, and falls back to `@` when that no longer resolves.
+- Review panes always open on `@`. The last revset isn't saved with the layout, since it may not exist next time.
 
 ## M5: Persona reviews
 

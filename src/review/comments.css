@@ -21,11 +21,6 @@
   font-size: 12px;
 }
 
-.comment-head .spacer,
-.comment-list .spacer {
-  flex: 1;
-}
-
 .comment-title {
   font-weight: 600;
 }

@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ReviewDto } from "../bindings";
-import { file, rows } from "./fixture.test-utils";
+import { file, review, rows } from "./fixture.test-utils";
 import { type DisplayLine, flatten } from "./model";
 import { selectionText } from "./sendText";
 
-const review = {
-  files: [
+const files = flatten(
+  review([
     file("a.rs", [rows([" fn a() {", "-  old();", "+  new();", " }"]), rows(["-gone"], 9, 9)]),
-  ],
-} as unknown as ReviewDto;
-const files = flatten(review);
+  ]),
+);
 const line = (r: number[], hunk = 0): DisplayLine => ({ kind: "rows", file: 0, hunk, rows: r });
 
 describe("selectionText", () => {

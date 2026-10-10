@@ -1,4 +1,6 @@
 import type { MarkState } from "../bindings";
+import { plural } from "./state";
+import "./MarkMenu.css";
 
 export type MenuAction = MarkState | "clear" | "comment" | "change" | "agent" | "copy";
 
@@ -41,7 +43,7 @@ export function MarkMenu({ x, y, changed, onPick, onClose }: Props) {
       />
       <div className="mark-menu" style={{ left: x, top: y }}>
         <div className="menu-count">
-          {changed} changed {changed === 1 ? "row" : "rows"}
+          {changed} changed {plural(changed)}
         </div>
         {ITEMS.map((item) => (
           <button type="button" key={item.action} onClick={() => onPick(item.action)}>

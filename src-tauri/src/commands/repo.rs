@@ -1,0 +1,48 @@
+use std::path::Path;
+
+use tauri::{AppHandle, WebviewWindow};
+
+use super::{CmdResult, layout_path, repo_root};
+use crate::repo::{self, RepoInfo};
+use crate::{layout, recent};
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
+    Some(RepoInfo::new(&repo_root(&window).ok()?))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
+    repo::open(&app, Path::new(&path))
+}
+
+/// Recently opened repos, most recent first.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
+    Ok(recent::load(&recent::path(&repo::data_dir(&app)?))
+        .iter()
+        .map(|root| RepoInfo::new(root))
+        .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn load_layout(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Option<String>> {
+    layout::load(&layout_path(&window, workspace.as_deref())?).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn save_layout(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    layout: String,
+) -> CmdResult<()> {
+    layout::save(&layout_path(&window, workspace.as_deref())?, &layout).map_err(|e| e.to_string())
+}

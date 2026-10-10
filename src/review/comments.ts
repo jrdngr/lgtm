@@ -1,6 +1,13 @@
 import type { CommentDto } from "../bindings";
 import type { Moves } from "./follow";
-import { changedRows, type DisplayLine, type FlatFile, fileSlot, markKey } from "./model";
+import {
+  changedRows,
+  type DisplayLine,
+  type FlatFile,
+  fileSlot,
+  markKey,
+  NEW_COMMENT,
+} from "./model";
 import { rowsText } from "./sendText";
 
 /** A comment being written on a selection, before it's saved. */
@@ -59,7 +66,7 @@ export function commentSlots(comments: CommentDto[], draft: Draft | undefined) {
   const out = new Map<string, number[]>();
   const add = (key: string, id: number) => out.set(key, [...(out.get(key) ?? []), id]);
   for (const c of comments) add(c.rows ? markKey(c.file, c.rows.end) : fileSlot(c.file), c.id);
-  if (draft) add(markKey(draft.file, draft.rows[draft.rows.length - 1]), 0);
+  if (draft) add(markKey(draft.file, draft.rows[draft.rows.length - 1]), NEW_COMMENT);
   return out;
 }
 

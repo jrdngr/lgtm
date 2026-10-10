@@ -82,11 +82,7 @@ impl Review {
                     taken.extend(anchor::match_marks(&refs, &open, self.cfg));
                 }
                 for (row, mark_id) in taken {
-                    let rref = RowRef {
-                        file: file_idx as u32,
-                        row: row as u32,
-                    };
-                    matched.insert(rref, by_id[&mark_id].clone());
+                    matched.insert(RowRef::new(file_idx, row as u32), by_id[&mark_id].clone());
                 }
             }
         }
@@ -97,10 +93,7 @@ impl Review {
         let matched_ids: HashSet<i64> = self.matched.values().map(|m| m.id).collect();
         let mut amber = HashSet::new();
         for (file_idx, file) in self.files.iter().enumerate() {
-            let at = |k: &Keyed| RowRef {
-                file: file_idx as u32,
-                row: k.row,
-            };
+            let at = |k: &Keyed| RowRef::new(file_idx, k.row);
             if let Some(c) = self.checks[file_idx].as_ref().filter(|c| !c.current) {
                 amber.extend(
                     file.keyed

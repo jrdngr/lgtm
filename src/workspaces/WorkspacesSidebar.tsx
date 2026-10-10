@@ -3,7 +3,6 @@ import { commands } from "../ipc";
 import { Count } from "../review/FilesPanel";
 import { type WorkspaceName, workspaceKey } from "./context";
 import { useWorkspaces } from "./useWorkspaces";
-import "../review/review.css";
 import "./workspaces.css";
 
 interface Props {
@@ -86,7 +85,7 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
         {workspaces?.map((w) => {
           const key = workspaceKey(w.name);
           const p = progress.get(key);
-          if (confirming !== undefined && confirming === w.name) {
+          if (confirming === w.name) {
             return (
               <li key={key} className="workspace confirm">
                 <span>Delete {w.title}? Its commits stay in the repo.</span>

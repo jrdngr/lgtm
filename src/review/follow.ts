@@ -1,4 +1,4 @@
-import type { RowMove } from "../bindings";
+import type { FileDto, RowMove } from "../bindings";
 import { type DisplayLine, markKey } from "./model";
 import { lineSelection, rangeSelection, type Selection } from "./selection";
 
@@ -15,6 +15,17 @@ export function movesFrom(moves: RowMove[], files: [number, number][]): Moves {
     ),
     files: new Map(files),
   };
+}
+
+/** Old file index → new, matching by path, then by the new file's old path. */
+export function fileMoves(before: FileDto[], after: FileDto[]): [number, number][] {
+  const old = new Map(before.map((f, i) => [f.path, i]));
+  const out: [number, number][] = [];
+  after.forEach((f, i) => {
+    const was = old.get(f.path) ?? (f.oldPath === null ? undefined : old.get(f.oldPath));
+    if (was !== undefined) out.push([was, i]);
+  });
+  return out;
 }
 
 /** Keys a line is found by: its rows, or its header. Gap rows are hidden, so they don't count. */

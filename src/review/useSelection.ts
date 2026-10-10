@@ -1,14 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { follow, type Moves } from "./follow";
-import type { DisplayLine, FlatFile } from "./model";
+import { type DisplayLine, type FlatFile, nextRowLine } from "./model";
 import { lineSelection, rangeSelection, type Selection } from "./selection";
-
-export function nextRowLine(lines: DisplayLine[], from: number, dir: 1 | -1): number {
-  for (let i = from + dir; i >= 0 && i < lines.length; i += dir) {
-    if (lines[i].kind === "rows") return i;
-  }
-  return from;
-}
 
 /**
  * Cursor, selection, and extend anchor over `lines`. When the lines change (view mode,
@@ -59,17 +52,51 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
     else place(next);
   }
 
+  /** Widens to `next`, remembering the current selection for `shrink`. */
+  function grow(next: Selection) {
+    setShrinkStack([...shrinkStack, sel]);
+    select(next, cursor, true);
+  }
+
+  /** Goes back to the selection before the last `grow`. */
+  function shrink() {
+    const prev = shrinkStack.at(-1);
+    if (!prev) return;
+    setShrinkStack(shrinkStack.slice(0, -1));
+    select(prev, cursor, true);
+  }
+
+  /** Extends the selection one row, from the cursor unless it's already a range. */
+  function extend(dir: 1 | -1) {
+    if (!extending && sel.level !== "range") setAnchor(cursor);
+    move(dir, true);
+  }
+
+  function toggleExtend() {
+    setExtending((x) => !x);
+    setAnchor(cursor);
+  }
+
+  /** Stops extending and clears the selection to the cursor. */
+  function collapse() {
+    setExtending(false);
+    place(cursor);
+  }
+
   return {
     cursor,
     sel,
     anchor,
-    setAnchor,
-    shrinkStack,
-    setShrinkStack,
     extending,
-    setExtending,
     select,
     place,
     move,
+    grow,
+    shrink,
+    extend,
+    toggleExtend,
+    collapse,
   };
 }
+
+export type SelectionApi = ReturnType<typeof useSelection>;

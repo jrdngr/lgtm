@@ -17,6 +17,17 @@ use crate::workspace::Workspace;
 /// The repo-relative script a new workspace runs in its first terminal.
 pub const SETUP: &str = ".lgtm/setup";
 
+/// The command a new workspace's first terminal runs: its setup script, then a login shell.
+pub fn setup_command() -> Vec<String> {
+    let shell = crate::pty::default_shell();
+    let quoted = format!("'{}'", shell.replace('\'', r"'\''"));
+    let script = format!(
+        "if [ -x {s} ]; then ./{s}; else sh {s}; fi || echo \"lgtm: {s} exited with $?\"; exec {quoted} -l",
+        s = SETUP
+    );
+    vec![shell, "-l".into(), "-c".into(), script]
+}
+
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceDto {
@@ -61,14 +72,16 @@ pub fn validate_name(name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn same_path(a: &Path, b: &Path) -> bool {
-    let canon = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+fn canon(p: &Path) -> PathBuf {
+    p.canonicalize().unwrap_or_else(|_| p.to_path_buf())
+}
+
+pub(super) fn same_path(a: &Path, b: &Path) -> bool {
     canon(a) == canon(b)
 }
 
 /// Whether `path` is inside `base`, comparing canonical paths.
 pub fn under(path: &Path, base: &Path) -> bool {
-    let canon = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
     canon(path).starts_with(canon(base))
 }
 
@@ -119,20 +132,17 @@ impl RepoCtx {
                 map.insert(w.name.clone(), ws);
             }
         }
-        let dto = |w: WorkspaceInfo, name: Option<String>| WorkspaceDto {
+        let dto = |w: WorkspaceInfo, main: bool| WorkspaceDto {
+            name: (!main).then(|| w.name.clone()),
             title: w.name,
-            name,
             root: w.root.display().to_string(),
             change_id: w.change_id,
             description: w.description,
         };
         Ok(main
             .into_iter()
-            .map(|w| dto(w, None))
-            .chain(others.into_iter().map(|w| {
-                let name = Some(w.name.clone());
-                dto(w, name)
-            }))
+            .map(|w| dto(w, true))
+            .chain(others.into_iter().map(|w| dto(w, false)))
             .collect())
     }
 

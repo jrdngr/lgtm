@@ -5,6 +5,8 @@ import { type FlatFile, markKey } from "./model";
 export type RowState = "reviewed" | "skipped" | "flagged" | "unreviewed";
 export type Filter = "all" | RowState;
 
+export const plural = (n: number) => (n === 1 ? "row" : "rows");
+
 export const FILTERS: Filter[] = ["all", "unreviewed", "reviewed", "skipped", "flagged"];
 
 /** The review's marks, checks, and amber rows, indexed by `markKey`. */

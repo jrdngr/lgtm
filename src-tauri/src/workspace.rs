@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::jj::{self, Jj};
+use crate::jj::Jj;
 use crate::watch::Watch;
 
 pub struct Workspace {
@@ -43,11 +43,7 @@ impl Workspace {
 
     /// Snapshots the working copy, recording rather than failing when it's stale.
     pub async fn snapshot(&self) -> anyhow::Result<()> {
-        match self.jj.snapshot().await {
-            Ok(()) => *self.stale.lock().unwrap() = None,
-            Err(e) if jj::is_stale(&e) => *self.stale.lock().unwrap() = Some(format!("{e:#}")),
-            Err(e) => return Err(e),
-        }
+        *self.stale.lock().unwrap() = self.jj.snapshot_or_stale().await?;
         Ok(())
     }
 }

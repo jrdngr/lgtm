@@ -1,0 +1,47 @@
+.hl-keyword,
+.hl-attribute {
+  color: #c586c0;
+}
+
+.hl-function,
+.hl-constructor {
+  color: #dcdcaa;
+}
+
+.hl-type,
+.hl-module,
+.hl-tag {
+  color: #4ec9b0;
+}
+
+.hl-string {
+  color: #ce9178;
+}
+
+.hl-escape {
+  color: #d7ba7d;
+}
+
+.hl-number,
+.hl-constant {
+  color: #b5cea8;
+}
+
+.hl-comment {
+  color: #6a9955;
+}
+
+.hl-property,
+.hl-variable-parameter,
+.hl-label {
+  color: #9cdcfe;
+}
+
+.hl-variable-builtin {
+  color: #569cd6;
+}
+
+.hl-operator,
+.hl-punctuation {
+  color: #d4d4d4;
+}

@@ -4,6 +4,7 @@ import type { ViewMode } from "./model";
 import { RevisionsPanel } from "./RevisionsPanel";
 import { RevLabel } from "./RevLabel";
 import { FILTERS, type Filter, type Progress } from "./state";
+import "./ReviewBar.css";
 
 const SINCE_LABEL = {
   unknown: "",
@@ -13,9 +14,11 @@ const SINCE_LABEL = {
   removed: "removed",
 } as const;
 
+const shortId = (c: ChangeDto) => c.changeId || c.commitId.slice(0, 12);
+
 function changeLabel(c: ChangeDto) {
   const since = SINCE_LABEL[c.since];
-  return `${c.changeId || c.commitId.slice(0, 12)} ${c.description || "(no description)"}${since ? ` · ${since}` : ""}`;
+  return `${shortId(c)} ${c.description || "(no description)"}${since ? ` · ${since}` : ""}`;
 }
 
 /** The change a per-change view starts on: the first one that changed since last session. */
@@ -155,9 +158,7 @@ export function ReviewNotes({ review, stale }: { review?: ReviewDto; stale: stri
       {removed.length > 0 && (
         <div className="review-note">
           Removed since last session:{" "}
-          {removed
-            .map((c) => `${c.changeId || c.commitId.slice(0, 12)} ${c.description}`)
-            .join(", ")}
+          {removed.map((c) => `${shortId(c)} ${c.description}`).join(", ")}
         </div>
       )}
     </>

@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use super::under;
+use super::{same_path, under};
 use crate::jj::workspace::{forget_blocking, workspaces_blocking};
 
 /// The main workspace root of the repo a workspace directory belongs to, from the path in its
@@ -14,10 +14,6 @@ fn main_root(dir: &Path) -> Option<PathBuf> {
     let link = std::fs::read_to_string(dir.join(".jj/repo")).ok()?;
     let store = dir.join(".jj").join(link.trim()).canonicalize().ok()?;
     Some(store.parent()?.parent()?.to_path_buf())
-}
-
-fn same(a: &Path, b: &Path) -> bool {
-    a.canonicalize().ok() == b.canonicalize().ok()
 }
 
 fn remove(dir: &Path, why: &str, log: &mut Vec<String>) {
@@ -50,7 +46,7 @@ pub fn run(base: &Path, repos: &[PathBuf]) -> Vec<String> {
                 continue;
             };
             match workspaces_blocking(&root) {
-                Ok(listed) if !listed.iter().any(|w| same(&w.root, &dir)) => {
+                Ok(listed) if !listed.iter().any(|w| same_path(&w.root, &dir)) => {
                     remove(&dir, "its workspace was forgotten", &mut log);
                 }
                 Ok(_) => {}

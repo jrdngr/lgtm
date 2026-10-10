@@ -1,13 +1,13 @@
 import type { AddPanelOptions, DockviewApi } from "dockview-react";
 
-export type PanelKind = "review" | "terminal";
+type PanelKind = "review" | "terminal";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
 };
 
-export function addPanel(
+function addPanel(
   api: DockviewApi,
   component: PanelKind,
   params: Record<string, unknown> = {},

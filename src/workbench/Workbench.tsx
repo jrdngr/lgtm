@@ -7,13 +7,13 @@ import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspace
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { chord } from "./keys";
 import { addTerminal } from "./panels";
-import { SidePanel } from "./SidePanel";
+import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
-import { loadSides, type Sides, saveSides } from "./sides";
+import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
 import { WorkspaceDock } from "./WorkspaceDock";
 
 /** Shortcuts acting on the selected workspace's panes. */
-const shortcuts: Record<string, (api: DockviewApi) => void> = {
+const shortcuts: Partial<Record<string, (api: DockviewApi) => void>> = {
   "Mod+T": (api) => addTerminal(api),
   "Mod+D": (api) => addTerminal(api, "right"),
   "Mod+Shift+D": (api) => addTerminal(api, "below"),
@@ -21,16 +21,6 @@ const shortcuts: Record<string, (api: DockviewApi) => void> = {
   "Mod+]": (api) => api.moveToNext({ includePanel: true }),
   "Mod+[": (api) => api.moveToPrevious({ includePanel: true }),
 };
-
-const storageKey = (repo: RepoInfo) => `lgtm:workspace:${repo.root}`;
-
-function savedWorkspace(repo: RepoInfo): WorkspaceName {
-  try {
-    return localStorage.getItem(storageKey(repo)) || null;
-  } catch {
-    return null;
-  }
-}
 
 interface Mounted {
   name: WorkspaceName;
@@ -40,7 +30,7 @@ interface Mounted {
 /** Side panels around the selected workspace's dock. Each workspace has its own dock
  * and layout. Docks of other workspaces stay mounted but hidden, so their terminals run on. */
 export function Workbench({ repo }: { repo: RepoInfo }) {
-  const [selected, setSelected] = useState<WorkspaceName>(() => savedWorkspace(repo));
+  const [selected, setSelected] = useState<WorkspaceName>(() => loadWorkspace(repo.root));
   const [mounted, setMounted] = useState<Mounted[]>([{ name: selected, setup: false }]);
   const [sides, setSidesState] = useState<Sides>(() => loadSides(repo.root));
   const leftBody = useRef<HTMLDivElement>(null);
@@ -51,11 +41,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
     setMounted((m) => (m.some((d) => d.name === name) ? m : [...m, { name, setup }]));
-    try {
-      localStorage.setItem(storageKey(repo), name ?? "");
-    } catch {
-      // Remembering the workspace is a convenience.
-    }
+    saveWorkspace(repo.root, name);
   }
 
   /** Unmounts a deleted workspace's dock, which ends its terminals. */
@@ -73,17 +59,19 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     });
   }
 
-  const toggle = (side: keyof Sides) =>
-    setSides((s) => ({ ...s, [side]: { ...s[side], open: !s[side].open } }));
+  const updateSide = (side: keyof Sides, f: (s: SideState) => SideState) =>
+    setSides((s) => ({ ...s, [side]: f(s[side]) }));
+
+  const toggle = (side: keyof Sides) => updateSide(side, (s) => ({ ...s, open: !s.open }));
 
   /** Opens the side panel on `view` and focuses it. */
   function showView(side: keyof Sides, view: string) {
-    setSides((s) => ({ ...s, [side]: { ...s[side], open: true, view } }));
+    updateSide(side, (s) => ({ ...s, open: true, view }));
     const body = side === "left" ? leftBody : rightBody;
     requestAnimationFrame(() => body.current?.focus());
   }
 
-  const panelKeys: Record<string, () => void> = {
+  const panelKeys: Partial<Record<string, () => void>> = {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
@@ -91,28 +79,22 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+M": () => showView("right", "comments"),
   };
 
-  const apiRef = useRef(api);
-  apiRef.current = api;
-  const panelKeysRef = useRef(panelKeys);
-  panelKeysRef.current = panelKeys;
+  /** The action for a chord, if it has one now. */
+  const keyRef = useRef<(key: string) => (() => void) | undefined>(undefined);
+  keyRef.current = (key) => {
+    const action = shortcuts[key];
+    const target = api();
+    return panelKeys[key] ?? (action && target ? () => action(target) : undefined);
+  };
 
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
-      const key = chord(e) ?? "";
-      const panelKey = panelKeysRef.current[key];
-      if (panelKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        panelKey();
-        return;
-      }
-      const action = shortcuts[key];
-      const target = apiRef.current();
-      if (!action || !target) return;
+      const run = keyRef.current?.(chord(e) ?? "");
+      if (!run) return;
       e.preventDefault();
       e.stopPropagation();
-      action(target);
+      run();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -150,7 +132,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         <SidePanel
           side="left"
           state={sides.left}
-          onChange={(left) => setSides((s) => ({ ...s, left }))}
+          onChange={(left) => updateSide("left", () => left)}
           bodyRef={leftBody}
           views={[
             {
@@ -182,7 +164,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           <SidePanel
             side="right"
             state={sides.right}
-            onChange={(right) => setSides((s) => ({ ...s, right }))}
+            onChange={(right) => updateSide("right", () => right)}
             bodyRef={rightBody}
             views={[
               { id: "files", title: "Files", render: () => <FilesPanel /> },

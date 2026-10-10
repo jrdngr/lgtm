@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
-import { type Moves, movesFrom } from "./follow";
+import { fileMoves, type Moves, movesFrom } from "./follow";
 
 export interface Loaded {
   review: ReviewDto;
@@ -61,12 +61,7 @@ export function useReview(workspace: WorkspaceName) {
     if (r.status === "error") setError(r.error);
     else {
       setError(undefined);
-      const old = new Map(before.files.map((f, i) => [f.path, i]));
-      const files: [number, number][] = [];
-      r.data.review.files.forEach((f, i) => {
-        const was = old.get(f.path) ?? (f.oldPath === null ? undefined : old.get(f.oldPath));
-        if (was !== undefined) files.push([was, i]);
-      });
+      const files = fileMoves(before.files, r.data.review.files);
       show({ review: r.data.review, moves: movesFrom(r.data.moves, files) });
     }
     if (again.current) {

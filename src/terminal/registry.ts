@@ -1,7 +1,7 @@
 import type { WorkspaceName } from "../workspaces/context";
 
 /** A live terminal pane that text can be pasted into. */
-export interface TerminalTarget {
+interface TerminalTarget {
   workspace: WorkspaceName;
   /** The title its program set, if any. */
   title(): string;
@@ -44,7 +44,7 @@ export function workspaceTerminals(workspace: WorkspaceName): TerminalChoice[] {
     .map(([id, t]) => ({ id, title: t.title(), canPaste: t.canPaste() }));
 }
 
-export type SendResult = "sent" | "noTerminal" | "unsafe";
+type SendResult = "sent" | "noTerminal" | "unsafe";
 
 /** Pastes `text` into terminal `id`, or else the workspace's most recently focused one, and
  * focuses it. Nothing is sent when that terminal's program doesn't use bracketed paste, since

@@ -34,6 +34,17 @@ impl Runs {
             tx.send(()).ok();
         }
     }
+
+    /// Records a run under `key`. The receiver fires when it's stopped.
+    fn register(&self, key: &str) -> anyhow::Result<(Registered<'_>, oneshot::Receiver<()>)> {
+        let (tx, rx) = oneshot::channel();
+        let mut map = self.0.lock().unwrap();
+        if map.contains_key(key) {
+            bail!("the agent is already working on this");
+        }
+        map.insert(key.to_string(), tx);
+        Ok((Registered(self, key.to_string()), rx))
+    }
 }
 
 /// Removes a run's entry however the run ends.
@@ -62,15 +73,7 @@ pub async fn run(
     task: Task<'_>,
     on_text: impl Fn(String),
 ) -> anyhow::Result<Reply> {
-    let (tx, mut stop) = oneshot::channel();
-    {
-        let mut map = runs.0.lock().unwrap();
-        if map.contains_key(key) {
-            bail!("the agent is already working on this");
-        }
-        map.insert(key.to_string(), tx);
-    }
-    let _registered = Registered(runs, key.to_string());
+    let (_registered, mut stop) = runs.register(key)?;
 
     let mut child = Command::new("claude")
         .args(claude::args(task.resume, task.edit))

@@ -1,5 +1,6 @@
 import type { CheckState, FileDto } from "../bindings";
 import type { Progress } from "./state";
+import "./FileHeader.css";
 
 export const STATUS_LABEL = {
   modified: "M",

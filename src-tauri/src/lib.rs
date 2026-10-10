@@ -1,5 +1,6 @@
 mod agent;
 pub mod anchor;
+mod commands;
 mod config;
 pub mod diff;
 mod events;
@@ -16,382 +17,47 @@ mod watch;
 mod workspace;
 mod workspaces;
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::path::Path;
 
-use tauri::ipc::Channel;
-use tauri::{AppHandle, Manager, State, WebviewWindow, WindowEvent};
+use tauri::{Manager, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
 use agent::Runs;
-use pty::{Owner, PtyEvent, Ptys};
-use repo::{RepoInfo, RepoWindows};
-use review::{Ask, ProgressDto, RefreshDto, RepoCtx, ReviewDto, RowRef, StateDto, View};
-use store::MarkState;
-use workspaces::WorkspaceDto;
-
-type CmdResult<T> = Result<T, String>;
-
-fn repo(window: &WebviewWindow) -> CmdResult<Arc<RepoCtx>> {
-    window
-        .state::<RepoWindows>()
-        .get(window.label())
-        .ok_or_else(|| "window has no repo".into())
-}
-
-fn repo_root(window: &WebviewWindow) -> CmdResult<PathBuf> {
-    Ok(repo(window)?.root.clone())
-}
-
-fn err(e: anyhow::Error) -> String {
-    format!("{e:#}")
-}
-
-#[tauri::command]
-#[specta::specta]
-fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
-    Some(RepoInfo::new(&repo_root(&window).ok()?))
-}
-
-#[tauri::command]
-#[specta::specta]
-fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
-    repo::open(&app, Path::new(&path))
-}
-
-/// Recently opened repos, most recent first.
-#[tauri::command]
-#[specta::specta]
-fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    Ok(recent::load(&recent::path(&data_dir))
-        .iter()
-        .map(|root| RepoInfo::new(root))
-        .collect())
-}
-
-fn layout_path(window: &WebviewWindow, workspace: Option<&str>) -> CmdResult<PathBuf> {
-    let data_dir = window.path().app_data_dir().map_err(|e| e.to_string())?;
-    let key = repo::key(&repo_root(window)?);
-    Ok(layout::path(&data_dir, &key, workspace))
-}
-
-#[tauri::command]
-#[specta::specta]
-fn load_layout(window: WebviewWindow, workspace: Option<String>) -> CmdResult<Option<String>> {
-    layout::load(&layout_path(&window, workspace.as_deref())?).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-#[specta::specta]
-fn save_layout(window: WebviewWindow, workspace: Option<String>, layout: String) -> CmdResult<()> {
-    layout::save(&layout_path(&window, workspace.as_deref())?, &layout).map_err(|e| e.to_string())
-}
-
-/// Starts a login shell in the workspace. With `setup`, the shell first runs its
-/// `.lgtm/setup`.
-#[tauri::command]
-#[specta::specta]
-async fn pty_spawn(
-    window: WebviewWindow,
-    ptys: State<'_, Ptys>,
-    workspace: Option<String>,
-    cols: u16,
-    rows: u16,
-    setup: bool,
-    on_event: Channel<PtyEvent>,
-) -> CmdResult<u32> {
-    let ctx = repo(&window)?;
-    let ws = ctx.workspace(workspace.as_deref()).await.map_err(err)?;
-    let command = setup.then(|| {
-        let shell = pty::default_shell();
-        let quoted = format!("'{}'", shell.replace('\'', r"'\''"));
-        let script = format!(
-            "if [ -x {s} ]; then ./{s}; else sh {s}; fi || echo \"lgtm: {s} exited with $?\"; exec {quoted} -l",
-            s = workspaces::SETUP
-        );
-        vec![shell, "-l".into(), "-c".into(), script]
-    });
-    let root = ctx.root.to_string_lossy();
-    let env = [
-        ("LGTM_ROOT", root.as_ref()),
-        ("LGTM_WORKSPACE", ws.name.as_deref().unwrap_or("")),
-    ];
-    let owner = Owner {
-        window: window.label().to_string(),
-        workspace,
-    };
-    ptys.spawn(owner, &ws.root, (cols, rows), command, &env, move |e| {
-        on_event.send(e).ok();
-    })
-    .map_err(|e| format!("{e:#}"))
-}
-
-/// Every workspace, the repo's main one first.
-#[tauri::command]
-#[specta::specta]
-async fn list_workspaces(window: WebviewWindow) -> CmdResult<Vec<WorkspaceDto>> {
-    repo(&window)?.list_workspaces().await.map_err(err)
-}
-
-/// Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` to run.
-#[tauri::command]
-#[specta::specta]
-async fn create_workspace(window: WebviewWindow, name: String) -> CmdResult<bool> {
-    repo(&window)?.create_workspace(&name).await.map_err(err)
-}
-
-/// Ends the workspace's terminals, then forgets it and deletes its directory.
-#[tauri::command]
-#[specta::specta]
-async fn delete_workspace(
-    window: WebviewWindow,
-    ptys: State<'_, Ptys>,
-    name: String,
-) -> CmdResult<()> {
-    ptys.kill_owner(&Owner {
-        window: window.label().to_string(),
-        workspace: Some(name.clone()),
-    });
-    repo(&window)?.delete_workspace(&name).await.map_err(err)?;
-    layout::remove(&layout_path(&window, Some(&name))?).map_err(|e| e.to_string())
-}
-
-/// Review progress of the workspace's latest review, or of its `@`.
-#[tauri::command]
-#[specta::specta]
-async fn workspace_progress(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<ProgressDto> {
-    repo(&window)?
-        .progress(workspace.as_deref())
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn pty_write(ptys: State<Ptys>, id: u32, data: String) -> CmdResult<()> {
-    ptys.write(id, data.as_bytes())
-        .map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-#[specta::specta]
-fn pty_resize(ptys: State<Ptys>, id: u32, cols: u16, rows: u16) -> CmdResult<()> {
-    ptys.resize(id, cols, rows).map_err(|e| format!("{e:#}"))
-}
-
-#[tauri::command]
-#[specta::specta]
-fn pty_kill(ptys: State<Ptys>, id: u32) {
-    ptys.kill(id);
-}
-
-/// Loads the review for `revset` after snapshotting the working copy. Starts a review
-/// session, or with `resume` continues the revset's latest one.
-#[tauri::command]
-#[specta::specta]
-async fn open_review(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    revset: String,
-    resume: bool,
-) -> CmdResult<ReviewDto> {
-    repo(&window)?
-        .open(workspace.as_deref(), &revset, resume)
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> {
-    repo(&window)?.close(review);
-    Ok(())
-}
-
-/// `jj log` with the user's default revset and template, for picking commits.
-#[tauri::command]
-#[specta::specta]
-async fn log_graph(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Vec<jj::LogLine>> {
-    let ws = repo(&window)?
-        .workspace(workspace.as_deref())
-        .await
-        .map_err(err)?;
-    ws.jj.log_graph().await.map_err(err)
-}
-
-/// Runs a revisions panel action in the workspace. Returns how many jj operations it took.
-#[tauri::command]
-#[specta::specta]
-async fn jj_act(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    action: jj::JjAction,
-) -> CmdResult<u32> {
-    let ws = repo(&window)?
-        .workspace(workspace.as_deref())
-        .await
-        .map_err(err)?;
-    ws.jj.act(&action).await.map_err(err)
-}
-
-/// Reloads a review after the repo changed, or switches it to `view`.
-#[tauri::command]
-#[specta::specta]
-async fn refresh_review(
-    window: WebviewWindow,
-    review: u32,
-    view: Option<View>,
-) -> CmdResult<RefreshDto> {
-    repo(&window)?.refresh(review, view).await.map_err(err)
-}
-
-/// Marks changed rows, or clears their marks when `state` is null. Files in `check` are
-/// checked in the same undo step.
-#[tauri::command]
-#[specta::specta]
-fn mark_rows(
-    window: WebviewWindow,
-    review: u32,
-    rows: Vec<RowRef>,
-    state: Option<MarkState>,
-    check: Vec<u32>,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .mark(review, &rows, state, &check)
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn set_files_checked(
-    window: WebviewWindow,
-    review: u32,
-    files: Vec<u32>,
-    checked: bool,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .set_checked(review, &files, checked)
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn undo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
-    repo(&window)?.undo(review).map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn redo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
-    repo(&window)?.redo(review).map_err(err)
-}
-
-/// Removes the marks and file checks this review's revset created.
-#[tauri::command]
-#[specta::specta]
-fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
-    repo(&window)?.reset(review).map_err(err)
-}
-
-/// Comments on the changed `rows` of a selection. `snippet` is the code as shown.
-#[tauri::command]
-#[specta::specta]
-fn add_comment(
-    window: WebviewWindow,
-    review: u32,
-    rows: Vec<RowRef>,
-    body: String,
-    snippet: String,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .add_comment(review, &rows, &body, &snippet)
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn edit_comment(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-    body: String,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .edit_comment(review, comment, &body)
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn delete_comment(window: WebviewWindow, review: u32, comment: u32) -> CmdResult<StateDto> {
-    repo(&window)?.delete_comment(review, comment).map_err(err)
-}
-
-/// Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
-/// the reply's text through `on_text` and returns once it's saved.
-#[tauri::command]
-#[specta::specta]
-async fn workshop_comment(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    review: u32,
-    comment: u32,
-    ask: Ask,
-    on_text: Channel<String>,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .workshop(review, comment, &ask, &runs, |t| {
-            on_text.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-fn stop_workshop(runs: State<Runs>, comment: u32) {
-    runs.stop(&comment.to_string());
-}
+use pty::Ptys;
+use repo::RepoWindows;
 
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
         .constant("HIGHLIGHT_NAMES", syntax::HIGHLIGHT_NAMES)
         .commands(collect_commands![
-            current_repo,
-            open_repo,
-            recent_repos,
-            load_layout,
-            save_layout,
-            pty_spawn,
-            pty_write,
-            pty_resize,
-            pty_kill,
-            list_workspaces,
-            create_workspace,
-            delete_workspace,
-            workspace_progress,
-            open_review,
-            close_review,
-            refresh_review,
-            log_graph,
-            jj_act,
-            mark_rows,
-            set_files_checked,
-            undo_marks,
-            redo_marks,
-            reset_review_marks,
-            add_comment,
-            edit_comment,
-            delete_comment,
-            workshop_comment,
-            stop_workshop,
+            commands::repo::current_repo,
+            commands::repo::open_repo,
+            commands::repo::recent_repos,
+            commands::repo::load_layout,
+            commands::repo::save_layout,
+            commands::pty::pty_spawn,
+            commands::pty::pty_write,
+            commands::pty::pty_resize,
+            commands::pty::pty_kill,
+            commands::workspaces::list_workspaces,
+            commands::workspaces::create_workspace,
+            commands::workspaces::delete_workspace,
+            commands::workspaces::workspace_progress,
+            commands::review::open_review,
+            commands::review::close_review,
+            commands::review::refresh_review,
+            commands::review::log_graph,
+            commands::review::jj_act,
+            commands::review::mark_rows,
+            commands::review::set_files_checked,
+            commands::review::undo_marks,
+            commands::review::redo_marks,
+            commands::review::reset_review_marks,
+            commands::comments::add_comment,
+            commands::comments::edit_comment,
+            commands::comments::delete_comment,
+            commands::comments::workshop_comment,
+            commands::comments::stop_workshop,
         ])
         .events(collect_events![
             events::RepoChanged,
@@ -412,8 +78,7 @@ fn export_bindings(builder: &tauri_specta::Builder<tauri::Wry>, path: &str) {
 /// Apps opened from Finder get a bare PATH without Homebrew or ~/.cargo/bin, so jj and the
 /// user's tools wouldn't resolve. Adopt the PATH their login shell sets up.
 fn adopt_login_shell_path() {
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
-    let Ok(out) = std::process::Command::new(shell)
+    let Ok(out) = std::process::Command::new(pty::default_shell())
         .args(["-l", "-i", "-c", "printf '\\n__LGTM_PATH__%s' \"$PATH\""])
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -453,7 +118,6 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
-            let args: Vec<String> = std::env::args().skip(1).collect();
             let cwd = std::env::current_dir()?;
             repo::open_from_args(app.handle(), &args, &cwd);
             Ok(())

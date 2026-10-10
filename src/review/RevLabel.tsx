@@ -19,7 +19,7 @@ function Revset({ revset, changes }: { revset: string; changes: ChangeDto[] }) {
   return (
     <span className="rev-set">
       {parts.map((p, i) => {
-        const c = p && changes.find((c) => c.changeId.startsWith(p) && p.length >= c.unique);
+        const c = p && changes.find((ch) => ch.changeId.startsWith(p) && p.length >= ch.unique);
         return c ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
           <Id key={i} id={c.changeId} unique={c.unique} length={c.unique} />

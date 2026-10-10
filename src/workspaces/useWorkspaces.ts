@@ -31,9 +31,9 @@ export function useWorkspaces() {
       setWorkspaces(list);
       setError(undefined);
       const entries = await Promise.all(
-        list.map(async (t) => {
-          const r = await commands.workspaceProgress(t.name);
-          return r.status === "ok" ? ([workspaceKey(t.name), r.data] as const) : undefined;
+        list.map(async (w) => {
+          const r = await commands.workspaceProgress(w.name);
+          return r.status === "ok" ? ([workspaceKey(w.name), r.data] as const) : undefined;
         }),
       );
       setProgress(new Map(entries.filter((e) => e !== undefined)));

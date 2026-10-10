@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use specta::Type;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 
 use tauri_specta::Event as _;
 
@@ -25,6 +25,10 @@ impl RepoWindows {
 
     pub fn remove(&self, label: &str) {
         self.0.lock().unwrap().remove(label);
+    }
+
+    fn insert(&self, label: String, ctx: Arc<RepoCtx>) {
+        self.0.lock().unwrap().insert(label, ctx);
     }
 }
 
@@ -64,6 +68,29 @@ pub fn key(root: &Path) -> String {
     blake3::hash(root.as_os_str().as_encoded_bytes()).to_hex()[..16].to_string()
 }
 
+pub fn data_dir(app: &impl Manager<Wry>) -> Result<PathBuf, String> {
+    app.path().app_data_dir().map_err(|e| e.to_string())
+}
+
+/// Where the repo's mark store and layouts live.
+pub fn repo_dir(data_dir: &Path, root: &Path) -> PathBuf {
+    data_dir.join("repos").join(key(root))
+}
+
+/// Sends a workspace's watch events to the repo's window.
+fn emitter(app: &AppHandle, label: &str) -> Emit {
+    let (app, label) = (app.clone(), label.to_string());
+    Arc::new(move |workspace: Option<String>, e: watch::Event| {
+        let sent = match e {
+            watch::Event::RepoChanged => RepoChanged {}.emit_to(&app, &label),
+            watch::Event::Stale(message) => {
+                WorkingCopyStale { workspace, message }.emit_to(&app, &label)
+            }
+        };
+        sent.ok();
+    })
+}
+
 /// Focuses the window for the repo containing `path`, creating it if needed.
 pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     let path = path
@@ -77,23 +104,11 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         return window.set_focus().map_err(|e| e.to_string());
     }
 
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let store = Store::open(&data_dir.join("repos").join(key(&root)).join("lgtm.db"))
+    let data_dir = data_dir(app)?;
+    let store = Store::open(&repo_dir(&data_dir, &root).join("lgtm.db"))
         .map_err(|e| format!("open mark store: {e:#}"))?;
     let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
-    let emit: Emit = {
-        let (app, label) = (app.clone(), label.clone());
-        Arc::new(move |workspace: Option<String>, e: watch::Event| {
-            let sent = match e {
-                watch::Event::RepoChanged => RepoChanged {}.emit_to(&app, &label),
-                watch::Event::Stale(message) => {
-                    WorkingCopyStale { workspace, message }.emit_to(&app, &label)
-                }
-            };
-            sent.ok();
-        })
-    };
-    *ctx.emit.lock().unwrap() = Some(emit);
+    *ctx.emit.lock().unwrap() = Some(emitter(app, &label));
     ctx.watch(&ctx.main);
     let ctx = Arc::new(ctx);
     // Watch the other workspaces too, without holding up the window.
@@ -106,11 +121,7 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
                 .unwrap_or_else(|e| eprintln!("lgtm: {e:#}"))
         }
     });
-    app.state::<RepoWindows>()
-        .0
-        .lock()
-        .unwrap()
-        .insert(label.clone(), ctx);
+    app.state::<RepoWindows>().insert(label.clone(), ctx);
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
         eprintln!("lgtm: save recent repos: {e}");
     }

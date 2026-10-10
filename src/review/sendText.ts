@@ -1,6 +1,4 @@
-import type { DisplayLine, FlatFile } from "./model";
-
-const SIGN = { context: " ", added: "+", removed: "-" } as const;
+import { type DisplayLine, type FlatFile, SIGN } from "./model";
 
 /** The selected rows as text for an agent's prompt: per file and hunk, the path with the
  * new side's line range (the old side's for pure removals), then the rows as a diff. */
@@ -26,6 +24,22 @@ export function selectionText(
       ),
     )
     .join("\n\n");
+}
+
+/** The text of the rows on display lines `start..=end`, one per line, or undefined when
+ * there are none. */
+export function selectedRowText(
+  files: FlatFile[],
+  lines: DisplayLine[],
+  start: number,
+  end: number,
+): string | undefined {
+  const text: string[] = [];
+  for (let i = start; i <= end; i++) {
+    const line = lines[i];
+    if (line?.kind === "rows") for (const r of line.rows) text.push(files[line.file].rows[r].text);
+  }
+  return text.length ? text.join("\n") : undefined;
 }
 
 /** File-flat `rows` of one file, in order, as one diff block per hunk. */

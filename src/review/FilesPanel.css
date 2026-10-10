@@ -1,0 +1,91 @@
+.file-tree {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.file-tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.file-tree button,
+.tree-total {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tree-total {
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
+}
+
+.file-tree button:hover {
+  background: var(--selection);
+}
+
+.file-tree .status {
+  font:
+    11px Menlo,
+    monospace;
+}
+
+.file-tree .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-tree .name.amber {
+  color: var(--amber);
+}
+
+.file-tree .chevron {
+  width: 10px;
+  color: var(--muted);
+}
+
+.file-tree .checked {
+  color: var(--reviewed);
+}
+
+.file-tree .flag {
+  font-size: 11px;
+  color: var(--flagged);
+}
+
+.count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.count.done {
+  color: var(--reviewed);
+}
+
+.count .bar {
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.count .bar span {
+  display: block;
+  height: 100%;
+  background: var(--reviewed);
+}

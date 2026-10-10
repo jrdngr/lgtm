@@ -34,21 +34,12 @@ struct RawAnchor {
     threshold: Option<f64>,
 }
 
+#[derive(Default)]
 pub struct Config {
     pub skip: GlobSet,
     pub matching: MatchConfig,
     /// The file's text, so cached results built under other settings can be told apart.
     pub source: String,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            skip: GlobSet::empty(),
-            matching: MatchConfig::default(),
-            source: String::new(),
-        }
-    }
 }
 
 impl Config {

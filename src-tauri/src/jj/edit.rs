@@ -84,18 +84,13 @@ mod tests {
 
     #[tokio::test]
     async fn actions_move_the_working_copy_and_squash() {
-        let dir = tempfile::tempdir().unwrap();
+        let (dir, ctx) = crate::review::tests::repo();
         let d = dir.path();
-        std::process::Command::new("jj")
-            .args(["git", "init"])
-            .arg(d)
-            .output()
-            .unwrap();
-        let j = Jj::new(d);
+        let j = &ctx.main.jj;
         write(d, "a.txt", "a\n");
         jj(d, &["describe", "-m", "base"]);
         let base = j.commit_ids("@").await.unwrap();
-        let base_change = change_id(&j, "@").await;
+        let base_change = change_id(j, "@").await;
 
         j.act(&JjAction::NewAfter {
             rev: base_change.clone(),
@@ -104,18 +99,18 @@ mod tests {
         .unwrap();
         write(d, "b.txt", "b\n");
         j.snapshot().await.unwrap();
-        let top = change_id(&j, "@").await;
+        let top = change_id(j, "@").await;
         assert_eq!(j.act(&JjAction::Squash { rev: top }).await.unwrap(), 2);
-        assert_eq!(change_id(&j, "@").await, base_change);
+        assert_eq!(change_id(j, "@").await, base_change);
         let base_now = j.changes(&base_change).await.unwrap();
         assert_eq!(base_now[0].description, "base");
         assert_ne!(j.commit_ids(&base_change).await.unwrap(), base);
 
         j.act(&JjAction::Undo { steps: 2 }).await.unwrap();
         assert_eq!(j.changes(&base_change).await.unwrap()[0].commit_id, base[0]);
-        assert_ne!(change_id(&j, "@").await, base_change);
+        assert_ne!(change_id(j, "@").await, base_change);
         j.act(&JjAction::Redo { steps: 2 }).await.unwrap();
-        assert_eq!(change_id(&j, "@").await, base_change);
+        assert_eq!(change_id(j, "@").await, base_change);
         let edit = |rev: &str| JjAction::Edit {
             rev: rev.to_string(),
         };
@@ -125,6 +120,6 @@ mod tests {
         .await
         .unwrap();
         j.act(&edit(&base_change)).await.unwrap();
-        assert_eq!(change_id(&j, "@").await, base_change);
+        assert_eq!(change_id(j, "@").await, base_change);
     }
 }

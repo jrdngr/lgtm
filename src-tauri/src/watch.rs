@@ -11,7 +11,7 @@ use notify::{RecursiveMode, Watcher as _};
 use tokio::sync::mpsc;
 use tokio::time::{Instant, sleep_until};
 
-use crate::jj::{self, Jj};
+use crate::jj::Jj;
 
 const SNAPSHOT_DEBOUNCE: Duration = Duration::from_millis(300);
 const CHANGE_DEBOUNCE: Duration = Duration::from_millis(50);
@@ -139,14 +139,12 @@ async fn run(
                 }
                 if snapshot_at.is_some_and(|t| t <= now) {
                     snapshot_at = None;
-                    let result = jj.snapshot().await;
-                    let now_stale = match &result {
-                        Err(e) if jj::is_stale(e) => Some(format!("{e:#}")),
+                    let now_stale = match jj.snapshot_or_stale().await {
+                        Ok(now_stale) => now_stale,
                         Err(e) => {
                             eprintln!("lgtm: snapshot: {e:#}");
                             continue;
                         }
-                        Ok(()) => None,
                     };
                     let mut current = stale.lock().unwrap();
                     if current.is_some() != now_stale.is_some() {

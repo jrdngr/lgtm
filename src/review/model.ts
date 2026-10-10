@@ -156,6 +156,40 @@ function splitRows(rows: RowDto[], start: number, end: number, file: number, hun
   return out;
 }
 
+export const SIGN = { context: " ", added: "+", removed: "-" } as const;
+
+/** The first rows line from `from` in direction `dir`, or `from` when there is none. */
+export function nextRowLine(lines: DisplayLine[], from: number, dir: 1 | -1): number {
+  for (let i = from + dir; i >= 0 && i < lines.length; i += dir) {
+    if (lines[i].kind === "rows") return i;
+  }
+  return from;
+}
+
+export interface JumpTarget {
+  cursor: number;
+  /** The line to scroll to the top. */
+  top: number;
+}
+
+/** Jumping to a file scrolls its header to the top and puts the cursor on its first row. */
+export function fileJumpTarget(lines: DisplayLine[], file: number): JumpTarget | undefined {
+  const header = lines.findIndex((l) => l.kind === "file" && l.file === file);
+  if (header < 0) return undefined;
+  const cursor = lines[header + 1]?.kind === "file" ? header : nextRowLine(lines, header, 1);
+  return { cursor, top: header };
+}
+
+/** Jumping to a comment block puts the cursor on the row it follows. */
+export function commentJumpTarget(lines: DisplayLine[], id: number): JumpTarget | undefined {
+  const at = lines.findIndex((l) => l.kind === "comment" && l.comment === id);
+  if (at < 0) return undefined;
+  // A block under a file header has no row above it in its file.
+  const line = lines[at];
+  const cursor = nextRowLine(lines, at, line.kind === "comment" && line.hunk === -1 ? 1 : -1);
+  return { cursor, top: Math.max(at - 3, 0) };
+}
+
 export interface Addr {
   file: number;
   row: number;
@@ -189,17 +223,18 @@ export function symbolSide(row: RowDto): { line: number; side: "old" | "new" } |
   return row.newLine ? { line: row.newLine, side: "new" } : undefined;
 }
 
-export function symbolsOf(file: FileDto, side: "old" | "new"): CodeSymbol[] {
-  return side === "old" ? file.oldSymbols : file.newSymbols;
+/** Symbols on `side` containing `line`, innermost first. */
+function symbolsAt(dto: FileDto, side: "old" | "new", line: number): CodeSymbol[] {
+  return (side === "old" ? dto.oldSymbols : dto.newSymbols)
+    .filter((s) => s.startLine <= line && line <= s.endLine)
+    .sort((a, b) => a.endLine - a.startLine - (b.endLine - b.startLine));
 }
 
 /** Symbols around `row` with a clean parse, innermost first. */
 export function enclosingSymbols(file: FlatFile, row: number): CodeSymbol[] {
   const at = symbolSide(file.rows[row]);
   if (!at) return [];
-  return symbolsOf(file.dto, at.side)
-    .filter((s) => !s.hasError && s.startLine <= at.line && at.line <= s.endLine)
-    .sort((a, b) => a.endLine - a.startLine - (b.endLine - b.startLine));
+  return symbolsAt(file.dto, at.side, at.line).filter((s) => !s.hasError);
 }
 
 /** Display range of the rows inside `symbol` on `side`, or undefined if none are shown. */
@@ -257,10 +292,7 @@ export function symbolMarkers(file: FlatFile): SymbolMarkers {
     if (row.kind === "context") return;
     const at = symbolSide(row);
     if (!at) return;
-    const syms = symbolsOf(file.dto, at.side)
-      .filter((s) => s.startLine <= at.line && at.line <= s.endLine)
-      .sort((a, b) => a.endLine - a.startLine - (b.endLine - b.startLine));
-    const fresh = syms.filter((s) => !seen.has(s));
+    const fresh = symbolsAt(file.dto, at.side, at.line).filter((s) => !seen.has(s));
     for (const s of fresh) seen.add(s);
     if (fresh.length > 0 && !out.has(r)) out.set(r, { symbol: fresh[0], side: at.side });
   });

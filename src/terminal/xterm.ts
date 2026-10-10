@@ -3,8 +3,6 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 
-export type Renderer = "webgl" | "dom";
-
 /** Opens an xterm in `container`, on WebGL when the webview supports it. */
 export function createTerminal(container: HTMLElement) {
   const term = new Terminal({
@@ -18,12 +16,10 @@ export function createTerminal(container: HTMLElement) {
   term.loadAddon(fit);
   term.open(container);
 
-  let renderer: Renderer = "dom";
   try {
     const webgl = new WebglAddon();
     webgl.onContextLoss(() => webgl.dispose());
     term.loadAddon(webgl);
-    renderer = "webgl";
   } catch {
     // The DOM renderer is the fallback.
   }
@@ -33,5 +29,5 @@ export function createTerminal(container: HTMLElement) {
     if (container.offsetWidth > 0 && container.offsetHeight > 0) fit.fit();
   };
   refit();
-  return { term, refit, renderer };
+  return { term, refit };
 }

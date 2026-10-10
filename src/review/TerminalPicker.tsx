@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TerminalChoice } from "../terminal/registry";
+import "./MarkMenu.css";
 import "./TerminalPicker.css";
 
 interface Props {

@@ -1,7 +1,7 @@
 //! Local review comments. A comment is anchored like a mark, on the first and last changed
 //! rows of the selection it was made on, and keeps its workshop conversation with an agent.
 
-use rusqlite::{OptionalExtension, params, params_from_iter};
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -122,14 +122,7 @@ fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
 
 impl Store {
     pub fn comments_for_paths(&self, paths: &[&str]) -> rusqlite::Result<Vec<Comment>> {
-        if paths.is_empty() {
-            return Ok(Vec::new());
-        }
-        let placeholders = vec!["?"; paths.len()].join(",");
-        let sql = format!("SELECT {COLUMNS} FROM comments WHERE path IN ({placeholders})");
-        let mut stmt = self.db.prepare(&sql)?;
-        stmt.query_map(params_from_iter(paths), row_to_comment)?
-            .collect()
+        self.select_by_paths("comments", COLUMNS, paths, row_to_comment)
     }
 
     pub fn comment(&self, id: i64) -> rusqlite::Result<Option<Comment>> {

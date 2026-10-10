@@ -61,38 +61,37 @@ impl Jj {
     }
 }
 
-/// `jj workspace list` for the repo at `root`, outside the async runtime (for `lgtm gc`).
-pub fn workspaces_blocking(root: &Path) -> anyhow::Result<Vec<WorkspaceInfo>> {
+/// Runs jj on the repo at `root` outside the async runtime (for `lgtm gc`).
+fn exec_blocking(root: &Path, args: &[&str], what: &str) -> anyhow::Result<String> {
     let out = std::process::Command::new("jj")
         .arg("-R")
         .arg(root)
         .args(["--no-pager", "--color=never", "--ignore-working-copy"])
-        .args(["workspace", "list", "-T", LIST_TEMPLATE])
+        .args(args)
         .stdin(std::process::Stdio::null())
         .output()?;
     anyhow::ensure!(
         out.status.success(),
-        "jj workspace list: {}",
+        "jj {what}: {}",
         String::from_utf8_lossy(&out.stderr).trim()
     );
-    Ok(parse_workspaces(&String::from_utf8_lossy(&out.stdout)))
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// `jj workspace forget`, outside the async runtime (for `lgtm gc`).
+/// `jj workspace list`, outside the async runtime.
+pub fn workspaces_blocking(root: &Path) -> anyhow::Result<Vec<WorkspaceInfo>> {
+    let out = exec_blocking(
+        root,
+        &["workspace", "list", "-T", LIST_TEMPLATE],
+        "workspace list",
+    )?;
+    Ok(parse_workspaces(&out))
+}
+
+/// `jj workspace forget`, outside the async runtime.
 pub fn forget_blocking(root: &Path, name: &str) -> anyhow::Result<()> {
-    let out = std::process::Command::new("jj")
-        .arg("-R")
-        .arg(root)
-        .args(["--no-pager", "--color=never", "--ignore-working-copy"])
-        .args(["workspace", "forget", name])
-        .stdin(std::process::Stdio::null())
-        .output()?;
-    anyhow::ensure!(
-        out.status.success(),
-        "jj workspace forget {name}: {}",
-        String::from_utf8_lossy(&out.stderr).trim()
-    );
-    Ok(())
+    let what = format!("workspace forget {name}");
+    exec_blocking(root, &["workspace", "forget", name], &what).map(drop)
 }
 
 #[cfg(test)]

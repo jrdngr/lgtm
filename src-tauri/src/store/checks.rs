@@ -1,6 +1,6 @@
 //! File checkboxes. A check remembers the changed rows the file had when it was checked.
 
-use rusqlite::{Transaction, params, params_from_iter};
+use rusqlite::{Transaction, params};
 
 use super::{Store, from_blob, to_blob};
 
@@ -49,20 +49,11 @@ pub(super) fn insert(tx: &Transaction, c: &FileCheck) -> rusqlite::Result<FileCh
 
 impl Store {
     pub fn checks_for_paths(&self, paths: &[&str]) -> rusqlite::Result<Vec<FileCheck>> {
-        if paths.is_empty() {
-            return Ok(Vec::new());
-        }
-        let placeholders = vec!["?"; paths.len()].join(",");
-        let sql = format!("SELECT {COLUMNS} FROM file_checks WHERE path IN ({placeholders})");
-        let mut stmt = self.db.prepare(&sql)?;
-        stmt.query_map(params_from_iter(paths), row_to_check)?
-            .collect()
+        self.select_by_paths("file_checks", COLUMNS, paths, row_to_check)
     }
 
     pub fn checks_for_review(&self, review: &str) -> rusqlite::Result<Vec<FileCheck>> {
-        let sql = format!("SELECT {COLUMNS} FROM file_checks WHERE review = ?");
-        let mut stmt = self.db.prepare(&sql)?;
-        stmt.query_map([review], row_to_check)?.collect()
+        self.select_by_review("file_checks", COLUMNS, review, row_to_check)
     }
 }
 

@@ -53,14 +53,8 @@ pub fn map_rows(before: &[ReviewFile], after: &[ReviewFile]) -> Vec<RowMove> {
             };
             if let Some(&to) = to {
                 out.push(RowMove {
-                    from: RowRef {
-                        file: bi as u32,
-                        row: row as u32,
-                    },
-                    to: RowRef {
-                        file: ai as u32,
-                        row: to as u32,
-                    },
+                    from: RowRef::new(bi, row as u32),
+                    to: RowRef::new(ai, to as u32),
                 });
             }
         }

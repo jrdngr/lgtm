@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
+import type { CheckState } from "../bindings";
 import { file, layout, review, rows, sym } from "./fixture.test-utils";
-import { buildLines, changedRows, flatten, hunkKey, symbolMarkers } from "./model";
+import {
+  buildLines,
+  changedRows,
+  commentJumpTarget,
+  type DisplayLine,
+  fileJumpTarget,
+  flatten,
+  hunkKey,
+  symbolMarkers,
+} from "./model";
 import { fileProgress, indexState, rowStates } from "./state";
 
 const r = review([file("a.rs", [rows([" a", "-b", "-c", "+B", " d", "+e"])])]);
@@ -54,6 +64,30 @@ describe("changedRows", () => {
   });
 });
 
+describe("jump targets", () => {
+  const lines: DisplayLine[] = [
+    { kind: "file", file: 0 },
+    { kind: "comment", file: 0, hunk: -1, comment: 7 },
+    { kind: "hunk", file: 0, hunk: 0 },
+    { kind: "rows", file: 0, hunk: 0, rows: [0] },
+    { kind: "comment", file: 0, hunk: 0, comment: 8 },
+    { kind: "file", file: 1 },
+    { kind: "file", file: 2 },
+  ];
+
+  it("puts the cursor on a file's first row, or its header when it's collapsed", () => {
+    expect(fileJumpTarget(lines, 0)).toEqual({ cursor: 3, top: 0 });
+    expect(fileJumpTarget(lines, 1)).toEqual({ cursor: 5, top: 5 });
+    expect(fileJumpTarget(lines, 3)).toBeUndefined();
+  });
+
+  it("puts the cursor on the row a comment follows, or the first row under a file block", () => {
+    expect(commentJumpTarget(lines, 8)).toEqual({ cursor: 3, top: 1 });
+    expect(commentJumpTarget(lines, 7)).toEqual({ cursor: 3, top: 0 });
+    expect(commentJumpTarget(lines, 9)).toBeUndefined();
+  });
+});
+
 describe("symbolMarkers", () => {
   it("puts one marker on the first changed row of each changed symbol, innermost first", () => {
     const f = flatten(
@@ -78,34 +112,21 @@ describe("fileProgress", () => {
     review: "r",
     createdAt: 0,
   });
+  const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
+    indexState({ marks, checks: [check], amber: [], comments: [] });
 
   it("counts changed rows by mark state", () => {
-    const index = indexState({
-      marks: [mark(1, "reviewed"), mark(2, "flagged")],
-      checks: ["unchecked"],
-      amber: [],
-      comments: [],
-    });
+    const index = indexed([mark(1, "reviewed"), mark(2, "flagged")]);
     expect(fileProgress(files, rowStates(files, index))).toEqual([
       { reviewed: 1, skipped: 0, flagged: 1, unreviewed: 2, changed: 4 },
     ]);
   });
 
   it("counts a checked file as fully reviewed and a skip-glob file as skipped", () => {
-    const checked = indexState({
-      marks: [mark(1, "flagged")],
-      checks: ["checked"],
-      amber: [],
-      comments: [],
-    });
+    const checked = indexed([mark(1, "flagged")], "checked");
     expect(fileProgress(files, rowStates(files, checked))[0].reviewed).toBe(4);
     const skipFiles = flatten(review([{ ...files[0].dto, skipped: true }]));
-    const none = indexState({
-      marks: [mark(1, "flagged")],
-      checks: ["unchecked"],
-      amber: [],
-      comments: [],
-    });
+    const none = indexed([mark(1, "flagged")]);
     expect(fileProgress(skipFiles, rowStates(skipFiles, none))[0]).toMatchObject({
       skipped: 3,
       flagged: 1,

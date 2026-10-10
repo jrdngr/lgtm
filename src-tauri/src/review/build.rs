@@ -9,6 +9,7 @@ use crate::anchor::{self, Anchor, FileIndex, MatchConfig, Side};
 use crate::config::Config;
 use crate::diff::{FileStatus, Hunk, RowKind};
 use crate::jj::FileDiff;
+use crate::store::Store;
 use crate::syntax::{self, CodeSymbol, Segment};
 
 #[derive(Clone, Serialize, Type)]
@@ -56,6 +57,20 @@ pub struct FileSide {
     pub commit: Option<String>,
     pub path: String,
     pub index: Option<FileIndex>,
+}
+
+impl FileSide {
+    /// The commit a mark or pin on this side anchors to, after saving its line hashes so it
+    /// can be remapped later. `None` for an interdiff's old side, which isn't a commit.
+    pub fn anchor_commit(&self, store: &Store) -> anyhow::Result<Option<String>> {
+        let Some(commit) = self.commit.clone() else {
+            return Ok(None);
+        };
+        if let Some(index) = &self.index {
+            store.save_line_hashes(&commit, &self.path, &index.hashes)?;
+        }
+        Ok(Some(commit))
+    }
 }
 
 /// A changed row and the anchor a mark made on it would get.
