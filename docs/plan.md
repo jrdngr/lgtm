@@ -21,10 +21,12 @@ Assumes the Tauri v2 stack in `stack.md`. Each milestone ends with something Jor
 - Undo/redo for marks.
 - Validate the window size and threshold against a real repo's history.
 
+Added after M1: a flat Files panel with reviewed/changed counts (click to jump), Open Recent on the start window, and a Justfile.
+
 ## M2: Review workflow
 
 - File checkboxes, "changed since reviewed", amber rows.
-- Progress counts, line filter, gap bars, file tree with progress.
+- Progress counts, line filter, gap bars, file tree with progress (grow the Files panel into it).
 - `skip` globs.
 - Per-change and Since-last-session views, with evolog mapping and `jj interdiff`.
 - Live updates from `op_heads`, stale working copy notice.
