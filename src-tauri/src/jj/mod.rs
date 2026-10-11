@@ -11,6 +11,7 @@ use tokio::sync::Mutex;
 mod diff;
 mod edit;
 pub mod git;
+pub mod init;
 mod log;
 mod rewrite;
 pub mod workspace;

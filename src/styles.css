@@ -55,6 +55,21 @@ button:hover:not(:disabled) {
   height: 100%;
 }
 
+.start .init {
+  max-width: 400px;
+  text-align: center;
+}
+
+.start .init p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.start .hint {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .recent {
   width: 100%;
   max-width: 400px;

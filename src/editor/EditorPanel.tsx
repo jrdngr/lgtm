@@ -11,6 +11,7 @@ import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { emitSaved } from "./saved";
 import { editorExtensions } from "./setup";
+import { setUnsaved } from "./unsaved";
 import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
@@ -30,7 +31,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   const [error, setError] = useState<string>();
   /** The text shown rendered, for markdown, or undefined while editing. */
   const [rendered, setRendered] = useState<string>();
-  const saveRef = useRef(() => {});
+  const saveRef = useRef(async () => false);
 
   useEffect(() => {
     let live = true;
@@ -77,7 +78,10 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
 
   useEffect(() => {
     api.setTitle(dirty ? `● ${baseName(path)}` : baseName(path));
+    setUnsaved(api.id, dirty ? () => saveRef.current() : undefined);
   }, [api, path, dirty]);
+
+  useEffect(() => () => setUnsaved(api.id, undefined), [api]);
 
   useEffect(() => {
     const sub = api.onDidActiveChange((e) => e.isActive && view?.focus());
@@ -93,8 +97,8 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
     setOnDisk(undefined);
   }
 
-  async function save() {
-    if (!view) return;
+  async function save(): Promise<boolean> {
+    if (!view) return false;
     const doc = view.state.doc;
     try {
       await unwrap(commands.saveFile(workspace, path, view.state.sliceDoc()));
@@ -103,8 +107,10 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
       setOnDisk(undefined);
       setError(undefined);
       emitSaved(path);
+      return true;
     } catch (e) {
       setError(errorText(e));
+      return false;
     }
   }
   saveRef.current = save;

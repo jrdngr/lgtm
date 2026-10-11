@@ -3,6 +3,7 @@ use std::path::Path;
 use tauri::{AppHandle, WebviewWindow};
 
 use super::{CmdResult, err, layout_path, repo_root};
+use crate::jj::init;
 use crate::repo::{self, RepoInfo};
 use crate::{layout, recent};
 
@@ -16,6 +17,30 @@ pub(crate) fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
 #[specta::specta]
 pub(crate) fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
     repo::open(&app, Path::new(&path))
+}
+
+/// The git repo containing `path` when it isn't a jj repo, so the start window can offer to init.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn git_root(path: String) -> Option<String> {
+    let path = Path::new(&path);
+    if repo::find_root(path).is_some() {
+        return None;
+    }
+    Some(init::git_root(path)?.display().to_string())
+}
+
+/// Colocates jj with the git repo at `root`, then opens it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn init_jj(app: AppHandle, root: String) -> CmdResult<()> {
+    let path = std::path::PathBuf::from(&root);
+    let dir = path.clone();
+    tauri::async_runtime::spawn_blocking(move || init::init_colocated(&dir))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(err)?;
+    repo::open(&app, &path)
 }
 
 /// Recently opened repos, most recent first.

@@ -16,6 +16,7 @@ import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { registerDock } from "./docks";
 import { defaultLayout, dropStalePanels } from "./panels";
+import { Tab } from "./Tab";
 
 const components = {
   review: ReviewPanel,
@@ -81,7 +82,12 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
   return (
     <WorkspaceContext.Provider value={workspace}>
       <div className="dock" hidden={hidden}>
-        <DockviewReact components={components} onReady={ready} theme={themeDark} />
+        <DockviewReact
+          components={components}
+          defaultTabComponent={Tab}
+          onReady={ready}
+          theme={themeDark}
+        />
       </div>
     </WorkspaceContext.Provider>
   );
