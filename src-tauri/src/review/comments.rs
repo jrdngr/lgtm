@@ -9,7 +9,7 @@ use specta::Type;
 use super::matching::{Remaps, SideRows, pools};
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::anchor::{self, MarkRef};
-use crate::store::{Comment, Message, Pin, Store, Workshop};
+use crate::store::{Comment, GhLink, Message, Pin, Store, Workshop};
 
 /// The first and last rows a comment covers, by index among its file's rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
@@ -34,6 +34,8 @@ pub struct CommentDto {
     pub created_at: f64,
     pub updated_at: f64,
     pub messages: Vec<Message>,
+    /// The GitHub thread it's on, whose replies show above it.
+    pub github: Option<GhLink>,
 }
 
 impl Review {
@@ -65,6 +67,7 @@ impl Review {
             created_at: c.created_at as f64,
             updated_at: c.updated_at as f64,
             messages: c.workshop.messages,
+            github: c.github,
         })
     }
 
@@ -167,7 +170,7 @@ impl Review {
 }
 
 impl RepoCtx {
-    pub(super) fn comment_edit(
+    pub(crate) fn comment_edit(
         &self,
         id: u32,
         f: impl FnOnce(&Review, &Store) -> anyhow::Result<()>,
@@ -201,6 +204,7 @@ impl RepoCtx {
                 created_at: now,
                 updated_at: now,
                 workshop: Workshop::default(),
+                github: None,
             })?;
             Ok(())
         })

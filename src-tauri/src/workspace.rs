@@ -15,6 +15,9 @@ pub struct Workspace {
     /// jj's message while the working copy is stale.
     pub stale: Arc<Mutex<Option<String>>>,
     pub watch: Mutex<Option<Watch>>,
+    /// Held while something moves `@` or has an agent editing the working copy, which must
+    /// not overlap: a conflict resolution, a refetch, a fix.
+    busy: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Workspace {
@@ -25,6 +28,7 @@ impl Workspace {
             jj: Arc::new(jj),
             stale: Arc::default(),
             watch: Mutex::default(),
+            busy: Arc::default(),
         }
     }
 
@@ -39,6 +43,16 @@ impl Workspace {
             None => revset.to_string(),
             Some(name) => format!("{revset} in {name}"),
         }
+    }
+
+    /// Claims the workspace for work that moves `@` or edits the working copy, failing when
+    /// other such work is running.
+    pub fn claim(&self) -> anyhow::Result<tokio::sync::OwnedMutexGuard<()>> {
+        self.busy.clone().try_lock_owned().map_err(|_| {
+            anyhow::anyhow!(
+                "an agent or a refetch is already changing this workspace; wait for it to finish"
+            )
+        })
     }
 
     /// Snapshots the working copy, recording rather than failing when it's stale.

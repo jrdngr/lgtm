@@ -56,6 +56,7 @@ impl RepoCtx {
             ws.jj.includes_working_copy(&run.revset).await?,
             NOT_AT_WORKING_COPY
         );
+        let busy = ws.claim()?;
         let idx = self.edit_run(id, |run| {
             run.fixes.push(Fix {
                 findings,
@@ -71,6 +72,7 @@ impl RepoCtx {
         notify(super::Event::Changed { run: id });
         let prompt = prompt(&run.revset, &text);
         tauri::async_runtime::spawn(async move {
+            let _busy = busy;
             let task = agent::Task {
                 cwd: &ws.root,
                 prompt: &prompt,

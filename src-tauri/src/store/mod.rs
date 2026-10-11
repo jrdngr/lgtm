@@ -6,6 +6,7 @@ mod checks;
 mod comments;
 mod hotspots;
 mod marks;
+mod prs;
 mod sessions;
 
 use std::path::Path;
@@ -13,7 +14,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
-pub use comments::{Author, Comment, Message, Pin, Workshop};
+pub use comments::{Author, Comment, GhLink, GhPost, Message, Pin, Workshop};
 pub use hotspots::{Hotspot, Level, Source};
 pub use marks::{Mark, MarkState};
 pub use sessions::Session;
@@ -181,6 +182,7 @@ impl Store {
         comments::create_table(&db)?;
         bots::create_table(&db)?;
         hotspots::create_table(&db)?;
+        prs::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

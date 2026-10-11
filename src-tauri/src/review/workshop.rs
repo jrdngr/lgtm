@@ -6,7 +6,7 @@ use specta::Type;
 
 use super::{RepoCtx, StateDto};
 use crate::agent::{self, Runs};
-use crate::store::{Author, Comment, Message};
+use crate::store::{Author, Comment, GhLink, Message};
 
 /// A message for a comment's agent.
 #[derive(Clone, Deserialize, Type)]
@@ -45,11 +45,27 @@ fn prompt(review: &str, c: &Comment, ask: &Ask) -> String {
     if c.workshop.session.is_some() {
         return turn;
     }
+    let thread = match &c.github {
+        Some(g) => format!(
+            "\n\nIt's my reply to this GitHub review thread:\n\n{}",
+            thread_text(g)
+        ),
+        None => String::new(),
+    };
     format!(
         "You're helping me with a code review comment. I'm reviewing `{review}` in this \
-         repository. The comment is on this code:\n\n{}\n\n{turn}\n\n{INSTRUCTIONS}",
+         repository. The comment is on this code:\n\n{}{thread}\n\n{turn}\n\n{INSTRUCTIONS}",
         c.snippet
     )
+}
+
+/// A GitHub thread's posts, quoted.
+fn thread_text(g: &GhLink) -> String {
+    g.posts
+        .iter()
+        .map(|p| format!("{} wrote:\n> {}", p.author, p.body.replace('\n', "\n> ")))
+        .collect::<Vec<_>>()
+        .join("\n\n")
 }
 
 impl RepoCtx {
@@ -72,6 +88,8 @@ impl RepoCtx {
         if ask.change && !ws.jj.includes_working_copy(&revset).await? {
             anyhow::bail!(NOT_AT_WORKING_COPY);
         }
+        // A change edits the working copy, which mustn't move under it.
+        let _busy = ask.change.then(|| ws.claim()).transpose()?;
         let (prompt, resume) = {
             let store = self.store.lock().unwrap();
             let mut c = store.comment(cid)?.context("the comment is gone")?;

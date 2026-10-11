@@ -47,6 +47,8 @@ interface Deps {
   onDone(): void;
   /** Called after the agent was asked to change the code, to show its edits. */
   onChanged(): void;
+  /** The review is a PR's, so comments can be published to it. */
+  canPublish: boolean;
 }
 
 /** The comment being drafted, bodies being edited, and workshop conversations. */
@@ -59,6 +61,7 @@ export function useComments({
   send,
   onDone,
   onChanged,
+  canPublish,
 }: Deps) {
   const [draft, setDraft] = useState<Draft>();
   /** Bodies being edited, by comment id. Present means the block is in edit mode. */
@@ -66,6 +69,7 @@ export function useComments({
   /** Unsent workshop messages, by comment id. */
   const [asks, setAsks] = useState<ReadonlyMap<number, string>>(new Map());
   const [running, setRunning] = useState<ReadonlyMap<number, Running>>(new Map());
+  const [publishing, setPublishing] = useState<ReadonlySet<number>>(new Set());
   /** The text box that should take focus when its block next renders. */
   const [focus, setFocus] = useState<Focus>();
   const comments = review?.state.comments ?? NONE;
@@ -176,6 +180,33 @@ export function useComments({
     setFocus({ id, field: "body" });
   }
 
+  /** Saves the block's text when it's being edited. Resolves to the comment's id. */
+  async function saveEdit(id: number): Promise<number | undefined> {
+    const editing = edits.get(id);
+    if (!review || editing === undefined) return id;
+    const cid =
+      id === NEW_COMMENT
+        ? await create(editing)
+        : (await apply(commands.editComment(review.id, id, editing))) && id;
+    if (cid === undefined) return undefined;
+    setEdits((m) => without(m, cid));
+    return cid;
+  }
+
+  /** Adds the block's text to the PR's pending review, saving it first. */
+  async function publish(id: number) {
+    if (!review || publishing.has(id)) return;
+    const cid = await saveEdit(id);
+    if (cid === undefined) return;
+    setPublishing((s) => new Set(s).add(cid));
+    await apply(commands.publishComment(review.id, cid));
+    setPublishing((s) => {
+      const next = new Set(s);
+      next.delete(cid);
+      return next;
+    });
+  }
+
   function sendComment(c: CommentDto) {
     send(commentText(files, c), onDone);
   }
@@ -199,6 +230,9 @@ export function useComments({
     stop: commands.stopWorkshop,
     use,
     send: sendComment,
+    publish,
+    publishing,
+    canPublish,
     /** The agent edits `@`, so a change only shows when the review includes it. */
     canChange: review?.hasWorkingCopy ?? false,
     done: onDone,

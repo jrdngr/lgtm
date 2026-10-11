@@ -25,7 +25,7 @@ struct Tool {
     required: bool,
 }
 
-const TOOLS: [Tool; 2] = [
+const TOOLS: [Tool; 3] = [
     // `WorkspaceRef.root()` in workspace list templates came in 0.40.
     Tool {
         name: "jj",
@@ -40,6 +40,14 @@ const TOOLS: [Tool; 2] = [
         minimum: (2, 1, 22),
         install: "curl -fsSL https://claude.ai/install.sh | bash",
         update: "claude update",
+        required: false,
+    },
+    // `gh api graphql --input -` and the PR review thread mutations.
+    Tool {
+        name: "gh",
+        minimum: (2, 40, 0),
+        install: "brew install gh && gh auth login",
+        update: "brew upgrade gh",
         required: false,
     },
 ];
@@ -103,7 +111,7 @@ mod tests {
     fn versions_are_checked_against_the_minimum() {
         assert_eq!(parse_version("jj 0.46.0-abc\n"), Some((0, 46, 0)));
         assert_eq!(parse_version("2.1.296 (Claude Code)"), Some((2, 1, 296)));
-        let [jj, claude] = &TOOLS;
+        let [jj, claude, gh] = &TOOLS;
         assert_eq!(problem(jj, Some("jj 0.46.0")), None);
         let old = problem(jj, Some("jj 0.39.1")).unwrap();
         assert_eq!(
@@ -113,5 +121,6 @@ mod tests {
         let missing = problem(claude, None).unwrap();
         assert!(missing.found.is_none() && !missing.required);
         assert_eq!(problem(claude, Some("2.1.22 (Claude Code)")), None);
+        assert_eq!(problem(gh, Some("gh version 2.102.0 (2026-09-30)\n")), None);
     }
 }

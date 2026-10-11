@@ -71,6 +71,32 @@ pub struct Workshop {
     pub messages: Vec<Message>,
 }
 
+/// A post in a GitHub review thread.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GhPost {
+    pub author: String,
+    pub body: String,
+    pub created_at: String,
+    /// In the viewer's review, which isn't submitted yet.
+    pub pending: bool,
+}
+
+/// The GitHub review thread a comment is on. The comment's body is then a reply not yet
+/// published.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GhLink {
+    /// `owner/name` of the PR's repo.
+    pub repo: String,
+    pub pr: u32,
+    pub thread: String,
+    pub url: String,
+    pub resolved: bool,
+    pub outdated: bool,
+    pub posts: Vec<GhPost>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Comment {
     pub id: i64,
@@ -84,6 +110,7 @@ pub struct Comment {
     pub created_at: i64,
     pub updated_at: i64,
     pub workshop: Workshop,
+    pub github: Option<GhLink>,
 }
 
 const SCHEMA: &str = "
@@ -96,16 +123,41 @@ CREATE TABLE IF NOT EXISTS comments (
     review TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    workshop TEXT NOT NULL
+    workshop TEXT NOT NULL,
+    github TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS comments_path ON comments (path);
 ";
 
 pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
-    db.execute_batch(SCHEMA)
+    db.execute_batch(SCHEMA)?;
+    let has_github: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('comments') WHERE name = 'github'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_github {
+        db.execute_batch("ALTER TABLE comments ADD COLUMN github TEXT NOT NULL DEFAULT '';")?;
+    }
+    Ok(())
 }
 
-const COLUMNS: &str = "id, path, pins, body, snippet, review, created_at, updated_at, workshop";
+const COLUMNS: &str =
+    "id, path, pins, body, snippet, review, created_at, updated_at, workshop, github";
+
+fn github_to_sql(g: &Option<GhLink>) -> rusqlite::Result<String> {
+    match g {
+        Some(g) => serde_json::to_string(g).map_err(json_err),
+        None => Ok(String::new()),
+    }
+}
+
+fn github_from_sql(s: String) -> rusqlite::Result<Option<GhLink>> {
+    if s.is_empty() {
+        return Ok(None);
+    }
+    serde_json::from_str(&s).map(Some).map_err(json_err)
+}
 
 fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
     Ok(Comment {
@@ -118,6 +170,7 @@ fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
         created_at: r.get(6)?,
         updated_at: r.get(7)?,
         workshop: serde_json::from_str(&r.get::<_, String>(8)?).map_err(json_err)?,
+        github: github_from_sql(r.get(9)?)?,
     })
 }
 
@@ -134,8 +187,8 @@ impl Store {
     /// Inserts a comment and returns its id.
     pub fn add_comment(&self, c: &Comment) -> rusqlite::Result<i64> {
         self.db.execute(
-            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop, github)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 c.path,
                 serde_json::to_string(&c.pins).map_err(json_err)?,
@@ -145,6 +198,7 @@ impl Store {
                 c.created_at,
                 c.updated_at,
                 serde_json::to_string(&c.workshop).map_err(json_err)?,
+                github_to_sql(&c.github)?,
             ],
         )?;
         Ok(self.db.last_insert_rowid())
@@ -164,6 +218,58 @@ impl Store {
             params![serde_json::to_string(workshop).map_err(json_err)?, id],
         )?;
         Ok(())
+    }
+
+    pub fn set_comment_pins(
+        &self,
+        id: i64,
+        path: &str,
+        pins: &[Pin],
+        snippet: &str,
+    ) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE comments SET path = ?, pins = ?, snippet = ? WHERE id = ?",
+            params![
+                path,
+                serde_json::to_string(pins).map_err(json_err)?,
+                snippet,
+                id
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Empties the comment's body if it's still `body`, so text saved since isn't lost.
+    pub fn clear_body_if(&self, id: i64, body: &str, at: i64) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE comments SET body = '', updated_at = ? WHERE id = ? AND body = ?",
+            params![at, id, body],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_github(&self, id: i64, github: &Option<GhLink>) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE comments SET github = ? WHERE id = ?",
+            params![github_to_sql(github)?, id],
+        )?;
+        Ok(())
+    }
+
+    /// Comments on GitHub threads of `repo`'s PR `pr`.
+    pub fn pr_comments(&self, repo: &str, pr: u32) -> rusqlite::Result<Vec<Comment>> {
+        let sql = format!("SELECT {COLUMNS} FROM comments WHERE github != ''");
+        let mut stmt = self.db.prepare(&sql)?;
+        let rows = stmt.query_map([], row_to_comment)?;
+        let all: rusqlite::Result<Vec<Comment>> = rows.collect();
+        Ok(all?
+            .into_iter()
+            .filter(|c| {
+                c.github
+                    .as_ref()
+                    .is_some_and(|g| g.repo == repo && g.pr == pr)
+            })
+            .collect())
     }
 
     pub fn delete_comment(&self, id: i64) -> rusqlite::Result<()> {
@@ -198,6 +304,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
             workshop: Workshop::default(),
+            github: None,
         };
         c.id = store.add_comment(&c).unwrap();
         assert_eq!(store.comments_for_paths(&["a.rs"]).unwrap(), [c.clone()]);
@@ -215,6 +322,19 @@ mod tests {
         let got = store.comment(c.id).unwrap().unwrap();
         assert_eq!((got.body.as_str(), got.updated_at), ("because", 2));
         assert_eq!(got.workshop, workshop);
+
+        let link = Some(GhLink {
+            repo: "o/n".into(),
+            pr: 3,
+            thread: "T".into(),
+            url: String::new(),
+            resolved: false,
+            outdated: false,
+            posts: vec![],
+        });
+        store.set_github(c.id, &link).unwrap();
+        assert_eq!(store.pr_comments("o/n", 3).unwrap()[0].github, link);
+        assert!(store.pr_comments("o/n", 4).unwrap().is_empty());
 
         store.delete_comment(c.id).unwrap();
         assert_eq!(store.comment(c.id).unwrap(), None);

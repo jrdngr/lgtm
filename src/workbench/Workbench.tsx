@@ -2,6 +2,7 @@ import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { BotsPanel } from "../bots/BotsPanel";
 import { RepoTree } from "../editor/RepoTree";
+import { PrPanel } from "../github/PrPanel";
 import { SymbolsPanel } from "../graph/SymbolsPanel";
 import type { RepoInfo } from "../ipc";
 import { CommentsPanel } from "../review/CommentsPanel";
@@ -86,6 +87,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+O": () => showView("right", "bots"),
     "Mod+Shift+Y": () => showView("right", "symbols"),
     "Mod+Shift+H": () => showView("right", "hotspots"),
+    "Mod+Shift+P": () => showView("right", "pr"),
   };
 
   /** The action for a chord, if it has one now. */
@@ -186,6 +188,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
                 render: () => <RepoTree key={workspaceKey(selected)} />,
               },
               { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
+              { id: "pr", title: "PR", render: () => <PrPanel /> },
               { id: "symbols", title: "Symbols", render: () => <SymbolsPanel /> },
               { id: "hotspots", title: "Hotspots", render: () => <HotspotsPanel /> },
               {

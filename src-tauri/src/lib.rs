@@ -6,13 +6,16 @@ mod config;
 pub mod diff;
 mod events;
 mod files;
+mod github;
 mod gitmeta;
 mod jj;
 mod layout;
 mod mcp;
+mod pr;
 mod pty;
 mod recent;
 mod repo;
+mod resolve;
 mod review;
 mod store;
 mod syntax;
@@ -85,6 +88,17 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::read_file,
             commands::files::save_file,
             commands::files::highlight_text,
+            commands::github::open_pr,
+            commands::github::pr_info,
+            commands::github::pr_head,
+            commands::github::refetch_pr,
+            commands::github::pull_pr_comments,
+            commands::github::publish_comment,
+            commands::github::submit_review,
+            commands::github::pr_discussion,
+            commands::github::reply_pr,
+            commands::github::resolve_conflict,
+            commands::github::stop_resolve,
         ])
         .events(collect_events![
             events::RepoChanged,

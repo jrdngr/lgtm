@@ -203,3 +203,22 @@
 .hotspot-list .comment-preview {
   white-space: normal;
 }
+
+.gh-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.gh-post {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gh-pending {
+  margin-left: 6px;
+  color: var(--amber);
+  font-weight: normal;
+}

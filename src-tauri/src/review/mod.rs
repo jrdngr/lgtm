@@ -9,6 +9,9 @@ mod cache;
 mod comment_tests;
 mod comments;
 mod edits;
+mod github;
+#[cfg(test)]
+mod github_tests;
 mod graph;
 #[cfg(test)]
 mod hotspot_tests;
@@ -41,6 +44,7 @@ use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
+pub use github::PulledThread;
 pub use graph::GraphDto;
 pub use hotspots::{HotspotDto, HotspotInput};
 use load::Loaded;
@@ -291,6 +295,31 @@ impl RepoCtx {
             .unwrap()
             .insert(id, Arc::new(Mutex::new(review)));
         Ok(dto)
+    }
+
+    /// Ends the review's session and starts another, so the next load compares against what
+    /// it showed until now. For when commits are about to be replaced, as a PR refetch does.
+    pub fn seal_session(&self, id: u32) -> anyhow::Result<()> {
+        let review = self.review(id)?;
+        let mut review = review.lock().unwrap();
+        let store = self.store.lock().unwrap();
+        review.save_session(&store)?;
+        review.prev = store.last_session(&review.label)?;
+        review.session =
+            store.start_session(&review.label, review.ws.key(), &review.revset, now_ms())?;
+        Ok(())
+    }
+
+    /// Whether the review shows `revset` whole, in the Combined view.
+    pub fn shows_whole(&self, id: u32, revset: &str) -> anyhow::Result<bool> {
+        let review = self.review(id)?;
+        let review = review.lock().unwrap();
+        Ok(review.revset == revset && review.view == View::Combined)
+    }
+
+    /// The workspace a review is in.
+    pub fn review_workspace(&self, id: u32) -> anyhow::Result<Arc<Workspace>> {
+        Ok(self.review(id)?.lock().unwrap().ws.clone())
     }
 
     /// Reloads a review after the repo changed, or in another view, keeping its marks' undo

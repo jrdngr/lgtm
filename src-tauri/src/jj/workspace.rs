@@ -40,12 +40,12 @@ impl Jj {
         ))
     }
 
-    /// Adds workspace `name` at `path` with a new working-copy commit on `trunk()`.
-    pub async fn workspace_add(&self, name: &str, path: &Path) -> anyhow::Result<()> {
+    /// Adds workspace `name` at `path` with a new working-copy commit on `rev`.
+    pub async fn workspace_add(&self, name: &str, path: &Path, rev: &str) -> anyhow::Result<()> {
         let _guard = self.writer.lock().await;
         let path = path.to_string_lossy();
         self.exec(
-            &["workspace", "add", "--name", name, "-r", "trunk()", &path],
+            &["workspace", "add", "--name", name, "-r", rev, &path],
             false,
         )
         .await
@@ -92,6 +92,24 @@ pub fn workspaces_blocking(root: &Path) -> anyhow::Result<Vec<WorkspaceInfo>> {
 pub fn forget_blocking(root: &Path, name: &str) -> anyhow::Result<()> {
     let what = format!("workspace forget {name}");
     exec_blocking(root, &["workspace", "forget", name], &what).map(drop)
+}
+
+/// Local bookmarks matching `glob`, outside the async runtime.
+pub fn bookmarks_blocking(root: &Path, glob: &str) -> anyhow::Result<Vec<String>> {
+    let pattern = format!("glob:{glob}");
+    let args = ["bookmark", "list", "-T", r#"name ++ "\n""#, &pattern];
+    let mut names: Vec<String> = exec_blocking(root, &args, "bookmark list")?
+        .lines()
+        .map(str::to_string)
+        .collect();
+    names.dedup();
+    Ok(names)
+}
+
+pub fn bookmark_delete_blocking(root: &Path, name: &str) -> anyhow::Result<()> {
+    let pattern = format!("exact:{name}");
+    let what = format!("bookmark delete {name}");
+    exec_blocking(root, &["bookmark", "delete", &pattern], &what).map(drop)
 }
 
 #[cfg(test)]

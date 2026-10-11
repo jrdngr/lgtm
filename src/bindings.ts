@@ -118,6 +118,49 @@ export const commands = {
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
 	/**  Highlight segments per line, empty when `path` has no grammar. */
 	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
+	/**
+	 *  Checks out the PR `input` names (a number or a URL) into its own workspace, or finds the
+	 *  one that has it.
+	 */
+	openPr: (input: string) => typedError<OpenedPr, string>(__TAURI_INVOKE("open_pr", { input })),
+	/**  The PR the workspace was checked out for, if any. */
+	prInfo: (workspace: string | null) => typedError<{
+	number: number,
+	/**  `owner/name`. */
+	repo: string,
+	title: string,
+	url: string,
+	author: string,
+	baseRef: string,
+	headRef: string,
+	/**  The head commit as last fetched. */
+	head: string,
+	/**  The revset the workspace reviews. */
+	revset: string,
+} | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
+	/**  How the PR's head on GitHub compares with the fetched one. */
+	prHead: (workspace: string | null) => typedError<HeadDto, string>(__TAURI_INVOKE("pr_head", { workspace })),
+	/**
+	 *  Fetches the PR again and moves the workspace onto its new head. `review`'s session ends
+	 *  first, so it can show what changed.
+	 */
+	refetchPr: (workspace: string | null, review: number | null) => typedError<null, string>(__TAURI_INVOKE("refetch_pr", { workspace, review })),
+	/**  Pulls the PR's review threads into the review as comments. */
+	pullPrComments: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("pull_pr_comments", { review })),
+	/**
+	 *  Adds a comment's text to the pending review on GitHub: a reply on its thread, or a new
+	 *  thread on its code.
+	 */
+	publishComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("publish_comment", { review, comment })),
+	/**  Submits the pending review. */
+	submitReview: (workspace: string | null, verdict: Verdict, body: string) => typedError<null, string>(__TAURI_INVOKE("submit_review", { workspace, verdict, body })),
+	/**  The PR's conversation: comments and review summaries. */
+	prDiscussion: (workspace: string | null) => typedError<DiscussionDto, string>(__TAURI_INVOKE("pr_discussion", { workspace })),
+	/**  Posts to the PR's conversation right away. */
+	replyPr: (workspace: string | null, body: string) => typedError<null, string>(__TAURI_INVOKE("reply_pr", { workspace, body })),
+	/**  Has an agent resolve a conflicted change, streaming its reply through `on_text`. */
+	resolveConflict: (workspace: string | null, change: string, onText: Channel<string>) => typedError<ResolveDto, string>(__TAURI_INVOKE("resolve_conflict", { workspace, change, onText })),
+	stopResolve: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("stop_resolve", { workspace })),
 };
 
 /** Events */
@@ -239,6 +282,8 @@ export type ChangeDto = {
 	unique: number,
 	/**  Whether it's the workspace's working-copy commit. */
 	workingCopy: boolean,
+	/**  Whether it has unresolved conflicts. */
+	conflict: boolean,
 	description: string,
 	since: Since,
 };
@@ -271,6 +316,8 @@ export type CommentDto = {
 	createdAt: number | null,
 	updatedAt: number | null,
 	messages: Message[],
+	/**  The GitHub thread it's on, whose replies show above it. */
+	github: GhLink | null,
 };
 
 export type DefaultPersona = {
@@ -278,6 +325,14 @@ export type DefaultPersona = {
 	description: string,
 	global: Installed,
 	repo: Installed,
+};
+
+export type DiscussionDto = {
+	pr: PrDto,
+	/**  Oldest first. */
+	posts: PostDto[],
+	/**  Whether the viewer has a review that isn't submitted yet. */
+	pendingReview: boolean,
 };
 
 export type FileDto = {
@@ -336,6 +391,30 @@ export type Fix = {
 	createdAt: number | null,
 };
 
+/**
+ *  The GitHub review thread a comment is on. The comment's body is then a reply not yet
+ *  published.
+ */
+export type GhLink = {
+	/**  `owner/name` of the PR's repo. */
+	repo: string,
+	pr: number,
+	thread: string,
+	url: string,
+	resolved: boolean,
+	outdated: boolean,
+	posts: GhPost[],
+};
+
+/**  A post in a GitHub review thread. */
+export type GhPost = {
+	author: string,
+	body: string,
+	createdAt: string,
+	/**  In the viewer's review, which isn't submitted yet. */
+	pending: boolean,
+};
+
 export type GraphDto = {
 	nodes: GraphNode[],
 	edges: GraphEdge[],
@@ -364,6 +443,17 @@ export type GraphNode = {
 	rows: number[],
 	/**  The enclosing symbol's name, like the type of an `impl` for a method. */
 	parent: string | null,
+};
+
+export type HeadDto = {
+	/**  The head on GitHub isn't the fetched one. */
+	moved: boolean,
+	/**  Commits the new head has that the fetched one doesn't. */
+	ahead: number,
+	/**  The fetched head isn't under the new one: a force-push. */
+	rewritten: boolean,
+	/**  OPEN, CLOSED or MERGED. */
+	state: string,
 };
 
 export type HotspotDto = {
@@ -467,6 +557,12 @@ export type NodeStatus = "added" | "modified" | "removed" |
 /**  Unchanged, but uses a changed symbol. */
 "caller";
 
+export type OpenedPr = {
+	workspace: string,
+	/**  It's new and has a `.lgtm/setup` to run. */
+	setup: boolean,
+};
+
 export type Outcome = "kept" | "dropped" | "downgraded" | "upgraded";
 
 /**  A finished part's result. */
@@ -514,6 +610,30 @@ export type Personas = {
 	broken: Broken[],
 };
 
+export type PostDto = {
+	author: string,
+	body: string,
+	/**  For a review: APPROVED, CHANGES_REQUESTED, COMMENTED or DISMISSED. */
+	verdict: string | null,
+	createdAt: string,
+	url: string,
+};
+
+export type PrDto = {
+	number: number,
+	/**  `owner/name`. */
+	repo: string,
+	title: string,
+	url: string,
+	author: string,
+	baseRef: string,
+	headRef: string,
+	/**  The head commit as last fetched. */
+	head: string,
+	/**  The revset the workspace reviews. */
+	revset: string,
+};
+
 /**  Changed-row counts by state, as the review header counts them. */
 export type ProgressDto = {
 	/**  The revset counted: the workspace's latest review, or `@`. */
@@ -556,6 +676,14 @@ export type RepoChanged = Record<string, never>;
 export type RepoInfo = {
 	root: string,
 	name: string,
+};
+
+export type ResolveDto = {
+	/**  The agent's reply. */
+	text: string,
+	stopped: boolean,
+	/**  The commit still has conflicts. */
+	conflicted: boolean,
 };
 
 export type Response = {
@@ -696,6 +824,8 @@ export type ToolProblem = {
 	/**  Whether the app can't work without it. Otherwise only some features need it. */
 	required: boolean,
 };
+
+export type Verdict = "comment" | "approve" | "requestChanges";
 
 export type View = 
 /**  The whole review as one diff. */

@@ -1,20 +1,15 @@
-import { useSyncExternalStore } from "react";
+import { flag } from "./flag";
 
 /** Whether `claude` is missing or too old and the user chose to go on without it. Agent
  * features (persona reviews, comment workshopping) are off then. */
-let off = false;
-const listeners = new Set<() => void>();
+const agents = flag();
 
-export function setAgentsOff(value: boolean) {
-  off = value;
-  for (const l of listeners) l();
-}
+export const setAgentsOff = agents.set;
+export const agentsOff = agents.get;
+export const useAgentsOff = agents.use;
 
-function subscribe(l: () => void) {
-  listeners.add(l);
-  return () => listeners.delete(l);
-}
+/** Whether `gh` is missing or too old. GitHub features (PR workspaces, publishing) are off. */
+const github = flag();
 
-export const agentsOff = () => off;
-
-export const useAgentsOff = () => useSyncExternalStore(subscribe, () => off);
+export const setGithubOff = github.set;
+export const useGithubOff = github.use;

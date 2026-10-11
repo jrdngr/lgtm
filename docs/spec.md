@@ -24,6 +24,7 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 - A comment block shows under the last changed row it covers. A comment covers changed rows in one file and keeps the code it was made on, for when that code is gone.
 - Workshopping runs the agent headless in the review's workspace. Ask is read only. Change can edit files, and edits the working copy in place. Each block keeps its conversation and resumes the agent's session. The agent marks a suggested comment with a `comment` code block, which the user can take into the editor.
 - The Comments view lists a review's comments, including ones whose code is gone.
+- Publishing adds a comment to the user's pending review on the PR, as a reply on its thread or a new thread on its code. The Comments view submits the review with a verdict and summary. The PR's conversation (comments not on code, and review summaries) shows in a PR view, with a box that posts to it right away.
 
 ## 3. Agent reviews
 
@@ -90,7 +91,9 @@ Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, b
 
 - Same-repo PR: `jj git fetch -b <head-branch>`.
 - Fork PR: add a remote named `gh-<owner>` on demand, then fetch the head branch.
-- Fallback when the branch is gone: in a colocated repo, `git fetch origin pull/N/head:refs/heads/lgtm/pr-N`, then `jj git import`. Clean these bookmarks up when the workspace is deleted.
+- Fallback when the branch is gone: `git fetch origin pull/N/head:refs/heads/lgtm/pr-N` into jj's git store, then `jj git import`. Clean these bookmarks up when the workspace is deleted.
+- GitHub calls go through the `gh` CLI, which holds the user's auth.
+- A conflicted change can go to an agent to resolve, headless or pasted into a terminal.
 
 ## 5. Marking and anchoring
 

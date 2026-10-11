@@ -23,7 +23,14 @@ interface Data {
 
 type Actions = Pick<
   CurrentReview,
-  "jump" | "jumpToComment" | "jumpToRow" | "commentOn" | "send" | "findRisks"
+  | "jump"
+  | "jumpToComment"
+  | "jumpToRow"
+  | "commentOn"
+  | "send"
+  | "findRisks"
+  | "refetchPr"
+  | "pullPr"
 >;
 
 /** Publishes this pane as the workspace's current review while it's active, when none is
@@ -54,6 +61,8 @@ export function usePublishReview(
         comments: review?.state.comments ?? [],
         hotspots: review?.state.hotspots ?? [],
         findRisks: () => latest.current.findRisks(),
+        refetchPr: () => latest.current.refetchPr(),
+        pullPr: (quiet) => latest.current.pullPr(quiet),
         jump: (f) => latest.current.jump(f),
         jumpToComment: (id) => latest.current.jumpToComment(id),
         jumpToRow: (file, row) => latest.current.jumpToRow(file, row),

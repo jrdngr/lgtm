@@ -3,7 +3,7 @@
 use super::tests::{repo, row_of, write};
 use super::*;
 
-fn row_text(review: &ReviewDto, file: u32, row: u32) -> String {
+pub(super) fn row_text(review: &ReviewDto, file: u32, row: u32) -> String {
     let rows = review.files[file as usize]
         .hunks
         .iter()

@@ -6,7 +6,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use super::{same_path, under};
-use crate::jj::workspace::{forget_blocking, workspaces_blocking};
+use crate::jj::workspace::{
+    bookmark_delete_blocking, bookmarks_blocking, forget_blocking, workspaces_blocking,
+};
 
 /// The main workspace root of the repo a workspace directory belongs to, from the path in its
 /// `.jj/repo` file. `None` when it isn't a workspace or its repo is gone.
@@ -32,6 +34,24 @@ fn subdirs(dir: &Path) -> Vec<PathBuf> {
         .map(|e| e.path())
         .filter(|p| p.is_dir())
         .collect()
+}
+
+/// Deletes `lgtm/pr-N` bookmarks without a `pr-N` workspace, which deleted PR workspaces left.
+fn clean_prs(root: &Path, log: &mut Vec<String>) {
+    let Ok(listed) = workspaces_blocking(root) else {
+        return;
+    };
+    let has = |name: &str| listed.iter().any(|w| w.name == name);
+    for b in bookmarks_blocking(root, "lgtm/pr-*").unwrap_or_default() {
+        let ws = b.trim_start_matches("lgtm/");
+        if has(ws) {
+            continue;
+        }
+        match bookmark_delete_blocking(root, &b) {
+            Ok(()) => log.push(format!("deleted bookmark {b} ({ws} is gone)")),
+            Err(e) => log.push(format!("{e:#}")),
+        }
+    }
 }
 
 /// Cleans up `base` (laid out `<repo>/<workspace>`). `repos` are main workspace roots to check
@@ -68,6 +88,7 @@ pub fn run(base: &Path, repos: &[PathBuf]) -> Vec<String> {
                 Err(e) => log.push(format!("{e:#}")),
             }
         }
+        clean_prs(root, &mut log);
         if root.join(".git").exists() {
             Command::new("git")
                 .arg("-C")

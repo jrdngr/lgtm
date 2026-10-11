@@ -1,19 +1,25 @@
 import { type ReactNode, useEffect, useState } from "react";
 import type { ToolProblem } from "../bindings";
 import { commands } from "../ipc";
-import { setAgentsOff } from "./agents";
+import { setAgentsOff, setGithubOff } from "./agents";
 import "./tools.css";
+
+const NEEDED_BY: Record<string, string> = {
+  claude: "Reviewers and comment agents",
+  gh: "GitHub PRs",
+};
 
 function describe(p: ToolProblem) {
   const what = p.found
     ? `${p.tool} ${p.found} is older than ${p.minimum}`
     : `${p.tool} isn't installed`;
-  const needs = p.required ? "LGTM needs it." : "Reviewers and comment agents need it.";
+  const needs = p.required ? "LGTM needs it." : `${NEEDED_BY[p.tool] ?? "Some features"} need it.`;
   return `${what}. ${needs}`;
 }
 
-/** Checks for jj and claude before showing the app. Without jj nothing works, so that can't
- * be dismissed. Without claude the app runs with its agent features off. */
+/** Checks for jj, claude and gh before showing the app. Without jj nothing works, so that
+ * can't be dismissed. Without claude the app runs with its agent features off, and without gh
+ * with its GitHub features off. */
 export function ToolCheck({ children }: { children: ReactNode }) {
   const [problems, setProblems] = useState<ToolProblem[]>();
   const [checking, setChecking] = useState(false);
@@ -25,6 +31,7 @@ export function ToolCheck({ children }: { children: ReactNode }) {
     setChecking(false);
     setProblems(found);
     setAgentsOff(found.some((p) => p.tool === "claude"));
+    setGithubOff(found.some((p) => p.tool === "gh"));
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: check once at startup
@@ -55,7 +62,7 @@ export function ToolCheck({ children }: { children: ReactNode }) {
           </button>
           {!blocking && (
             <button type="button" onClick={() => setDismissed(true)}>
-              Continue without agents
+              Continue without {problems.map((p) => p.tool).join(" and ")}
             </button>
           )}
         </div>

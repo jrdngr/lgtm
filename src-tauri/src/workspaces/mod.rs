@@ -163,13 +163,18 @@ impl RepoCtx {
 
     /// Adds a workspace on `trunk()`. Returns whether it has a setup script.
     pub async fn create_workspace(&self, name: &str) -> anyhow::Result<bool> {
+        self.add_workspace(name, "trunk()").await
+    }
+
+    /// Adds a workspace with a new commit on `rev`. Returns whether it has a setup script.
+    pub(crate) async fn add_workspace(&self, name: &str, rev: &str) -> anyhow::Result<bool> {
         validate_name(name)?;
         let path = self.workspace_dir()?.join(name);
         if path.exists() {
             bail!("{} already exists", path.display());
         }
         std::fs::create_dir_all(path.parent().unwrap())?;
-        self.main.jj.workspace_add(name, &path).await?;
+        self.main.jj.workspace_add(name, &path, rev).await?;
         self.list_workspaces().await?;
         Ok(path.join(SETUP).is_file())
     }
@@ -184,6 +189,10 @@ impl RepoCtx {
             .workspace_base
             .as_ref()
             .is_some_and(|b| under(&ws.root, b));
+        // The workspace is forgotten already, so its PR goes even if its directory stays.
+        for problem in self.forget_pr(name).await {
+            eprintln!("lgtm: cleaning up after {name}: {problem}");
+        }
         if ours && ws.root.is_dir() {
             std::fs::remove_dir_all(&ws.root)
                 .with_context(|| format!("remove {}", ws.root.display()))?;

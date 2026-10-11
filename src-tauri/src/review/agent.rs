@@ -216,7 +216,7 @@ impl Review {
     }
 
     /// The code of `rows` and the context between them, as a diff.
-    fn snippet(&self, rows: &[RowRef]) -> String {
+    pub(super) fn snippet(&self, rows: &[RowRef]) -> String {
         let (Some(first), Some(last)) = (rows.first(), rows.last()) else {
             return String::new();
         };
@@ -292,6 +292,7 @@ impl RepoCtx {
                 created_at: now,
                 updated_at: now,
                 workshop: Workshop::default(),
+                github: None,
             })?;
             Ok(())
         })?;

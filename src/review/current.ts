@@ -29,6 +29,10 @@ export interface CurrentReview {
   jumpToRow(file: number, row: number): void;
   /** Comments on changed `rows` of `file`. Resolves to whether it worked. */
   commentOn(file: number, rows: number[], body: string, snippet: string): Promise<boolean>;
+  /** In a PR workspace: fetches the PR again, and pulls its threads into the review. */
+  refetchPr(): void;
+  /** `quiet` skips the error when the review isn't the whole PR. */
+  pullPr(quiet?: boolean): void;
   /** Pastes text into one of the workspace's terminals, asking which when there are several. */
   send(text: string, onSent?: () => void, report?: (outcome: SendOutcome) => void): void;
 }

@@ -36,7 +36,7 @@ Use **Tauri v2**: a Rust backend and a TypeScript UI in the system webview.
 ### Tauri v2 (recommended)
 
 - UI: the same libraries as Electron (xterm.js, CodeMirror 6, dockview).
-- Backend crates: `portable-pty` (from wezterm), `notify`, `tree-sitter` (native, faster than WASM), `rusqlite`, `octocrab` for GitHub, `rmcp` for MCP, `serde` instead of Zod.
+- Backend crates: `portable-pty` (from wezterm), `notify`, `tree-sitter` (native, faster than WASM), `rusqlite`, the `gh` CLI for GitHub, `rmcp` for MCP, `serde` instead of Zod.
 - IPC: Tauri channels stream PTY output and events to the webview. Commands are typed end to end with `tauri-specta` or `ts-rs`.
 - Agents: spawn `claude -p --output-format stream-json` as a child process, or paste into a terminal pane running `claude` (subscription users). Other agent CLIs plug in behind the same adapter. No in-process Agent SDK.
 - Small binaries, low idle memory.

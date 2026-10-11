@@ -3,12 +3,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeDto, StateDto, View } from "../bindings";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
+import { PrNote } from "../github/PrNote";
+import { prOf } from "../github/pr";
+import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
 import { openGraph } from "../workbench/panels";
 import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
+import { Conflicts } from "./Conflicts";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { MarkMenu } from "./MarkMenu";
@@ -31,8 +35,8 @@ import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
 import "./review.css";
 
-/** A review pane always opens on the working copy, so a revset saved last time that no longer
- * resolves can't break startup. */
+/** A review pane opens on the working copy, or a PR workspace's PR, so a revset saved last
+ * time that no longer resolves can't break startup. */
 const START_REVSET = "@";
 const NO_CHANGES: ChangeDto[] = [];
 const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], hotspots: [] };
@@ -70,6 +74,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
   const { sendText, picker } = useSendText(workspace, setError, focusRoot);
+  const pr = usePrReview(workspace, review, { onState: edited, onError: setError, load });
   const c = useComments({
     review,
     files,
@@ -79,6 +84,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     send: sendText,
     onDone: focusRoot,
     onChanged: () => refresh(),
+    canPublish: pr.whole,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
@@ -127,7 +133,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
-    load(revset);
+    prOf(workspace).then((p) => load(p?.revset ?? revset));
   }, []);
 
   // A newly opened review starts on its first row.
@@ -205,7 +211,16 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     workspace,
     review,
     { files, progress, rowState, checks: index.checks, filter },
-    { jump, jumpToComment, jumpToRow, commentOn, send: sendText, findRisks: findRisksNow },
+    {
+      jump,
+      jumpToComment,
+      jumpToRow,
+      commentOn,
+      send: sendText,
+      findRisks: findRisksNow,
+      refetchPr: pr.refetch,
+      pullPr: pr.pull,
+    },
   );
 
   useAgentRequests(workspace, { isCurrent, show: showLine, load });
@@ -285,6 +300,15 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         onRisks={findRisksNow}
       />
       <ReviewNotes review={review} stale={stale} />
+      <PrNote p={pr} />
+      {review && (
+        <Conflicts
+          workspace={workspace}
+          changes={review.changes}
+          send={(text) => sendText(text, focusRoot)}
+          onDone={() => refresh()}
+        />
+      )}
       {error && <div className="review-error">{error}</div>}
       {review && lines.length === 0 && (
         <div className="placeholder">

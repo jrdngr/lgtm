@@ -44,6 +44,8 @@ pub struct ChangeDto {
     pub unique: u32,
     /// Whether it's the workspace's working-copy commit.
     pub working_copy: bool,
+    /// Whether it has unresolved conflicts.
+    pub conflict: bool,
     pub description: String,
     pub since: Since,
 }
@@ -61,6 +63,7 @@ fn dto(c: Change, since: Since) -> ChangeDto {
         commit_id: c.commit_id,
         unique: c.unique,
         working_copy: c.working_copy,
+        conflict: c.conflict,
         description: c.description,
         since,
     }
@@ -80,53 +83,64 @@ pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Res
     };
     let evologs =
         futures::future::try_join_all(changes.iter().map(|c| jj.evolog(&c.commit_id))).await?;
-    let mut succeeded = HashSet::new();
-    let mut preds = Vec::new();
-    let mut dtos = Vec::new();
-    for (c, evolog) in changes.into_iter().zip(evologs) {
-        let p: Vec<String> = prev
-            .commits
-            .iter()
-            .filter(|old| evolog.contains(old))
-            .cloned()
-            .collect();
-        succeeded.extend(p.iter().cloned());
-        let since = if prev.commits.contains(&c.commit_id) {
-            Since::Same
-        } else if p.is_empty() {
-            Since::New
-        } else {
-            Since::Changed
-        };
-        preds.push(p);
-        dtos.push(dto(c, since));
-    }
-    let gone: Vec<&String> = prev
-        .commits
+    let mut preds: Vec<Vec<String>> = evologs
         .iter()
-        .filter(|c| !succeeded.contains(*c))
+        .map(|evolog| {
+            let found = prev.commits.iter().filter(|old| evolog.contains(old));
+            found.cloned().collect()
+        })
         .collect();
-    let removed = if gone.is_empty() {
+    let succeeded =
+        |preds: &[Vec<String>]| -> HashSet<String> { preds.iter().flatten().cloned().collect() };
+    let gone_from = |succeeded: &HashSet<String>| -> Vec<String> {
+        let gone = prev.commits.iter().filter(|c| !succeeded.contains(*c));
+        gone.cloned().collect()
+    };
+    let gone = gone_from(&succeeded(&preds));
+    let mut old = if gone.is_empty() {
         vec![]
     } else {
-        let revset = gone
-            .iter()
-            .map(|c| c.as_str())
-            .collect::<Vec<_>>()
-            .join("|");
         // Hidden commits stay readable until `jj util gc`; after that only the id is left.
-        jj.changes(&revset).await.unwrap_or_else(|_| {
+        jj.changes(&gone.join("|")).await.unwrap_or_else(|_| {
             gone.iter()
                 .map(|c| Change {
                     change_id: String::new(),
                     commit_id: c.to_string(),
                     unique: 0,
                     working_copy: false,
+                    conflict: false,
                     description: String::new(),
                 })
                 .collect()
         })
     };
+    // A fetched commit has no evolog link to the one it replaced (a PR's force-push), but jj
+    // keeps the change id when the author uses jj.
+    for (c, p) in changes.iter().zip(preds.iter_mut()) {
+        if p.is_empty() && !prev.commits.contains(&c.commit_id) {
+            let same = old
+                .iter()
+                .filter(|o| !o.change_id.is_empty() && o.change_id == c.change_id);
+            p.extend(same.map(|o| o.commit_id.clone()));
+        }
+    }
+    let matched = succeeded(&preds);
+    old.retain(|o| !matched.contains(&o.commit_id));
+    let removed = old;
+    let dtos: Vec<ChangeDto> = changes
+        .into_iter()
+        .zip(&preds)
+        .map(|(c, p)| {
+            let since = if prev.commits.contains(&c.commit_id) {
+                Since::Same
+            } else if p.is_empty() {
+                Since::New
+            } else {
+                Since::Changed
+            };
+            dto(c, since)
+        })
+        .collect();
     Ok(Stack {
         changes: dtos,
         removed: removed

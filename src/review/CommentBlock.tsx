@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { CommentDto } from "../bindings";
+import { GhThread, threadState } from "../github/GhThread";
 import { useAgentsOff } from "../tools/agents";
 import { isMac } from "../workbench/keys";
 import { NEW_COMMENT } from "./model";
@@ -58,10 +59,24 @@ export function CommentBlock({ id, comment, c }: Props) {
   const asked = !!c.asks.get(id)?.trim();
   const body = editing ?? comment?.body ?? "";
   const use = (text: string) => c.use(id, text);
+  const gh = comment?.github;
+  const publishing = c.publishing.has(id);
+  const publish = c.canPublish && (
+    <button
+      type="button"
+      onClick={() => c.publish(id)}
+      disabled={publishing || !body.trim()}
+      title="Add to your pending review on GitHub. Submit it from the Comments view."
+    >
+      {publishing ? "Publishing…" : gh ? "Publish reply" : "Publish"}
+    </button>
+  );
   return (
     <div className="comment-block">
       <div className="comment-head">
-        <span className="comment-title">{isNew ? "New comment" : "Comment"}</span>
+        <span className="comment-title">
+          {isNew ? "New comment" : gh ? "GitHub thread" : "Comment"}
+        </span>
         {comment && (
           <span
             className="comment-meta"
@@ -73,11 +88,13 @@ export function CommentBlock({ id, comment, c }: Props) {
           </span>
         )}
         {outdated && <span className="comment-outdated">code changed</span>}
+        {gh && threadState(gh) && <span className="comment-meta">{threadState(gh)}</span>}
         <span className="spacer" />
         {comment && editing === undefined && (
           <>
+            {publish}
             <button type="button" onClick={() => c.edit(comment)}>
-              Edit
+              {gh && !comment.body ? "Reply" : "Edit"}
             </button>
             <button
               type="button"
@@ -93,8 +110,11 @@ export function CommentBlock({ id, comment, c }: Props) {
         )}
       </div>
       {outdated && <pre className="comment-snippet">{comment.snippet}</pre>}
+      {gh && <GhThread link={gh} />}
       {editing === undefined ? (
-        <div className="comment-body">{comment?.body || <em>No text yet</em>}</div>
+        (!gh || comment?.body) && (
+          <div className="comment-body">{comment?.body || <em>No text yet</em>}</div>
+        )
       ) : (
         <>
           <textarea
@@ -102,7 +122,7 @@ export function CommentBlock({ id, comment, c }: Props) {
             className="comment-input"
             value={editing}
             rows={Math.min(12, Math.max(3, editing.split("\n").length))}
-            placeholder="Write a comment"
+            placeholder={gh ? "Write a reply" : "Write a comment"}
             onChange={(e) => c.setBody(id, e.target.value)}
             onKeyDown={onBodyKey}
           />
@@ -113,6 +133,7 @@ export function CommentBlock({ id, comment, c }: Props) {
             <button type="button" onClick={() => c.cancel(id)}>
               Cancel <kbd>Esc</kbd>
             </button>
+            {publish}
           </div>
         </>
       )}

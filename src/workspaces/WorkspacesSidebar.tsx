@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { OpenPr } from "../github/OpenPr";
+import { reloadPr, usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { Count } from "../review/FilesPanel";
+import { useGithubOff } from "../tools/agents";
 import { type WorkspaceName, workspaceKey } from "./context";
 import { useWorkspaces } from "./useWorkspaces";
 import "./workspaces.css";
@@ -14,10 +17,18 @@ interface Props {
   onMissing(): void;
 }
 
+/** A PR workspace's PR, in place of its working copy's description. */
+function PrTitle({ name, fallback }: { name: string; fallback: string }) {
+  const pr = usePr(name);
+  return <>{pr ? `#${pr.number} ${pr.title}` : fallback}</>;
+}
+
 /** The repo's jj workspaces with review progress. Click one to switch to it. */
 export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: Props) {
   const { workspaces, progress, error, setError, reload } = useWorkspaces();
   const [naming, setNaming] = useState(false);
+  const [openingPr, setOpeningPr] = useState(false);
+  const githubOff = useGithubOff();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string>();
@@ -59,10 +70,32 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
     <div className="workspaces">
       <div className="workspaces-bar">
         <span className="spacer" />
+        <button
+          type="button"
+          onClick={() => setOpeningPr(true)}
+          disabled={openingPr || githubOff}
+          title={
+            githubOff ? "Needs the GitHub CLI (gh)" : "Review a GitHub PR in its own workspace"
+          }
+        >
+          PR
+        </button>
         <button type="button" onClick={() => setNaming(true)} disabled={naming}>
           New
         </button>
       </div>
+      {openingPr && (
+        <OpenPr
+          onClose={() => setOpeningPr(false)}
+          onError={setError}
+          onOpened={async (ws, setup) => {
+            setOpeningPr(false);
+            setError(undefined);
+            await Promise.all([reload(), reloadPr(ws)]);
+            onSelect(ws, setup);
+          }}
+        />
+      )}
       {naming && (
         <form className="workspace-form" onSubmit={create}>
           <input
@@ -111,7 +144,11 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
                   {w.name === null && <span className="workspace-main">main</span>}
                 </span>
                 <span className="workspace-desc">
-                  {w.changeId} {w.description || "(no description)"}
+                  {w.name?.startsWith("pr-") ? (
+                    <PrTitle name={w.name} fallback={`${w.changeId} ${w.description}`} />
+                  ) : (
+                    `${w.changeId} ${w.description || "(no description)"}`
+                  )}
                 </span>
                 {p && (
                   <span className="workspace-progress" title={`Progress of ${p.revset}`}>
