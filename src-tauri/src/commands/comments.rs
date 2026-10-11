@@ -65,6 +65,11 @@ pub(crate) async fn workshop_comment(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn stop_workshop(runs: State<Runs>, comment: u32) {
-    runs.stop(&comment.to_string());
+pub(crate) fn stop_workshop(
+    window: WebviewWindow,
+    runs: State<Runs>,
+    comment: u32,
+) -> CmdResult<()> {
+    repo(&window)?.stop_workshop(comment, &runs);
+    Ok(())
 }

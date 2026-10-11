@@ -65,3 +65,26 @@ async fn reviews_know_whether_they_include_the_working_copy() {
     );
     assert!(!ctx.open(None, "@-", false).await.unwrap().has_working_copy);
 }
+
+#[tokio::test]
+async fn a_comment_on_a_renamed_file_keeps_its_removed_rows() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "old.py", "def f():\n    a = 1\n    return 1\n");
+    super::tests::jj(d, &["new", "-m", "change"]);
+    std::fs::rename(d.join("old.py"), d.join("new.py")).unwrap();
+    write(d, "new.py", "def f():\n    a = 1\n    return 2\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    assert_eq!(review.files[0].old_path.as_deref(), Some("old.py"));
+    let rows = [
+        row_of(&review, 0, "    return 1", 0),
+        row_of(&review, 0, "    return 2", 0),
+    ];
+    ctx.add_comment(review.id, &rows, "why?", "-1\n+2").unwrap();
+
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let c = &review.state.comments[0];
+    let span = c.rows.unwrap();
+    assert_eq!(row_text(&review, c.file, span.start), "    return 1");
+    assert_eq!(row_text(&review, c.file, span.end), "    return 2");
+}

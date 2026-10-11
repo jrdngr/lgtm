@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GraphDto } from "../bindings";
-import { commands, unwrap } from "../ipc";
+import { commands, errorText, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
 
 /** Loads by the review's files, so the panels showing one review share a load, and a refresh
@@ -33,7 +33,7 @@ export function useGraph(review: CurrentReview | undefined) {
     let live = true;
     load(id, files).then(
       (graph) => live && setState({ files, graph }),
-      (e) => live && setState({ files, error: e instanceof Error ? e.message : String(e) }),
+      (e) => live && setState({ files, error: errorText(e) }),
     );
     return () => {
       live = false;

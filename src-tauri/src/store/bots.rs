@@ -20,12 +20,11 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 }
 
 fn to_json(run: &BotRun) -> rusqlite::Result<String> {
-    serde_json::to_string(run).map_err(super::comments::json_err)
+    serde_json::to_string(run).map_err(super::json_err)
 }
 
 fn row_to_run(r: &rusqlite::Row) -> rusqlite::Result<BotRun> {
-    let mut run: BotRun =
-        serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::comments::json_err)?;
+    let mut run: BotRun = serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::json_err)?;
     run.id = r.get(0)?;
     Ok(run)
 }

@@ -1,6 +1,7 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { BotsPanel } from "../bots/BotsPanel";
+import { RepoTree } from "../editor/RepoTree";
 import { SymbolsPanel } from "../graph/SymbolsPanel";
 import type { RepoInfo } from "../ipc";
 import { CommentsPanel } from "../review/CommentsPanel";
@@ -9,6 +10,7 @@ import { HotspotsPanel } from "../review/HotspotsPanel";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
+import { dockOf } from "./docks";
 import { chord } from "./keys";
 import { addReview, addTerminal, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
@@ -40,8 +42,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const [sides, setSidesState] = useState<Sides>(() => loadSides(repo.root));
   const leftBody = useRef<HTMLDivElement>(null);
   const rightBody = useRef<HTMLDivElement>(null);
-  const apis = useRef(new Map<string, DockviewApi>());
-  const api = () => apis.current.get(workspaceKey(selected));
+  const api = () => dockOf(selected);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
@@ -52,7 +53,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   /** Unmounts a deleted workspace's dock, which ends its terminals. */
   function forget(name: string) {
     if (selected === name) select(null);
-    apis.current.delete(name);
     setMounted((m) => m.filter((d) => d.name !== name));
   }
 
@@ -81,6 +81,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
     "Mod+Shift+E": () => showView("right", "files"),
+    "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+O": () => showView("right", "bots"),
     "Mod+Shift+Y": () => showView("right", "symbols"),
@@ -168,7 +169,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
               workspace={d.name}
               hidden={d.name !== selected}
               setup={d.setup}
-              onReady={(a) => apis.current.set(workspaceKey(d.name), a)}
             />
           ))}
         </div>
@@ -180,6 +180,11 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             bodyRef={rightBody}
             views={[
               { id: "files", title: "Files", render: () => <FilesPanel /> },
+              {
+                id: "repo",
+                title: "Repo",
+                render: () => <RepoTree key={workspaceKey(selected)} />,
+              },
               { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
               { id: "symbols", title: "Symbols", render: () => <SymbolsPanel /> },
               { id: "hotspots", title: "Hotspots", render: () => <HotspotsPanel /> },

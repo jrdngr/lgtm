@@ -38,8 +38,14 @@ pub fn listen(app: AppHandle, path: PathBuf) {
             Err(e) => return eprintln!("lgtm: MCP socket {}: {e}", path.display()),
         };
         loop {
-            let Ok((stream, _)) = listener.accept().await else {
-                continue;
+            let (stream, _) = match listener.accept().await {
+                Ok(s) => s,
+                Err(e) => {
+                    // Errors like running out of file descriptors persist, so don't spin.
+                    eprintln!("lgtm: MCP accept: {e}");
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    continue;
+                }
             };
             let app = app.clone();
             tauri::async_runtime::spawn(async move {

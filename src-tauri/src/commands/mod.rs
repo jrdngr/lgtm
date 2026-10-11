@@ -2,6 +2,7 @@
 
 pub mod bots;
 pub mod comments;
+pub mod files;
 pub mod hotspots;
 pub mod pty;
 pub mod repo;

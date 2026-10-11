@@ -89,3 +89,12 @@
   height: 100%;
   background: var(--reviewed);
 }
+
+.file-tree .tree-note {
+  padding: 2px 8px;
+  color: var(--muted);
+}
+
+.file-tree .tree-note.error {
+  color: var(--error);
+}

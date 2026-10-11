@@ -55,6 +55,8 @@ impl Review {
         let mut remaps = Remaps::default();
         let by_id: HashMap<i64, &Mark> = marks.iter().map(|m| (m.id, m)).collect();
         let mut matched = HashMap::new();
+        // A mark on a removed file is in the pool of every added file, so it may match only once.
+        let mut used: HashSet<i64> = HashSet::new();
 
         for (file_idx, file) in self.files.iter().enumerate() {
             for side in [Side::Old, Side::New] {
@@ -66,7 +68,7 @@ impl Review {
                     let refs: Vec<MarkRef> = marks
                         .iter()
                         .filter(|m| m.anchor.side == side && pool.contains(&m.anchor.path.as_str()))
-                        .filter(|m| !taken.values().any(|id| *id == m.id))
+                        .filter(|m| !used.contains(&m.id))
                         .map(|m| MarkRef {
                             id: m.id,
                             anchor: &m.anchor,
@@ -80,7 +82,9 @@ impl Review {
                         .filter(|c| !taken.contains_key(&c.id))
                         .cloned()
                         .collect();
-                    taken.extend(anchor::match_marks(&refs, &open, self.cfg));
+                    let found = anchor::match_marks(&refs, &open, self.cfg);
+                    used.extend(found.values().copied());
+                    taken.extend(found);
                 }
                 for (row, mark_id) in taken {
                     matched.insert(RowRef::new(file_idx, row as u32), by_id[&mark_id].clone());

@@ -87,7 +87,7 @@ export const commands = {
 	 *  the reply's text through `on_text` and returns once it's saved.
 	 */
 	workshopComment: (review: number, comment: number, ask: Ask, onText: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("workshop_comment", { review, comment, ask, onText })),
-	stopWorkshop: (comment: number) => __TAURI_INVOKE<void>("stop_workshop", { comment }),
+	stopWorkshop: (comment: number) => typedError<null, string>(__TAURI_INVOKE("stop_workshop", { comment })),
 	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
 	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options })),
 	/**  Adds `options` to a finished or halted run and runs what it's missing. */
@@ -109,10 +109,15 @@ export const commands = {
 	defaultPersonas: (workspace: string | null) => typedError<DefaultPersona[], string>(__TAURI_INVOKE("default_personas", { workspace })),
 	/**  Writes the named default personas globally or into the workspace's repo. */
 	installPersonas: (workspace: string | null, names: string[], scope: Scope) => typedError<null, string>(__TAURI_INVOKE("install_personas", { workspace, names, scope })),
-	/**  Writes a starter file for a new persona and opens it in the default editor. */
-	newPersona: (workspace: string | null, name: string, scope: Scope) => typedError<null, string>(__TAURI_INVOKE("new_persona", { workspace, name, scope })),
-	/**  Opens a persona file in the default editor. */
-	openPersona: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("open_persona", { workspace, path })),
+	/**  Writes a starter file for a new persona. Returns its path, to open in the editor. */
+	newPersona: (workspace: string | null, name: string, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("new_persona", { workspace, name, scope })),
+	/**  A directory of the workspace's working copy, `""` for its root. */
+	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
+	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
+	/**  Saves a file, then snapshots the working copy so reviews of `@` pick it up. */
+	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
+	/**  Highlight segments per line, empty when `path` has no grammar. */
+	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
 };
 
 /** Events */
@@ -142,7 +147,10 @@ export type AgentRevset = {
 	revset: string,
 };
 
-/**  An agent asked the workspace's review pane to show `path`, at `line` on the new side. */
+/**
+ *  An agent asked to see `path` at `line`: in the review pane, or an editor when the review
+ *  doesn't change it.
+ */
 export type AgentShow = {
 	workspace: string | null,
 	path: string,
@@ -160,7 +168,7 @@ export type Ask = {
 
 export type Author = "user" | "agent";
 
-/**  A persona review's fix `fix` streamed more of its reply. */
+/**  A persona review's fix `fix` streamed more of its reply. `text` is the whole reply so far. */
 export type BotFixText = {
 	run: number,
 	fix: number,
@@ -285,6 +293,13 @@ export type FileDto = {
 	hunks: HunkDto[],
 	oldSymbols: CodeSymbol[],
 	newSymbols: CodeSymbol[],
+};
+
+export type FileEntry = {
+	name: string,
+	/**  Relative to the workspace root, `/`-separated. */
+	path: string,
+	dir: boolean,
 };
 
 export type FileStatus = "modified" | "added" | "removed" | "copied" | "renamed";

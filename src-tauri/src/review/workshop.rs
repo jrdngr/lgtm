@@ -72,7 +72,7 @@ impl RepoCtx {
         if ask.change && !ws.jj.includes_working_copy(&revset).await? {
             anyhow::bail!(NOT_AT_WORKING_COPY);
         }
-        let (prompt, mut workshop) = {
+        let (prompt, resume) = {
             let store = self.store.lock().unwrap();
             let mut c = store.comment(cid)?.context("the comment is gone")?;
             let prompt = prompt(&revset, &c, ask);
@@ -82,15 +82,15 @@ impl RepoCtx {
                 change: ask.change,
             });
             store.set_workshop(cid, &c.workshop)?;
-            (prompt, c.workshop)
+            (prompt, c.workshop.session)
         };
         let reply = agent::run(
             runs,
-            &comment.to_string(),
+            &self.workshop_key(comment),
             agent::Task {
                 cwd: &ws.root,
                 prompt: &prompt,
-                resume: workshop.session.as_deref(),
+                resume: resume.as_deref(),
                 edit: ask.change,
                 schema: None,
             },
@@ -106,21 +106,31 @@ impl RepoCtx {
             Ok(r) => r.text.clone(),
             Err(e) => format!("{e:#}"),
         };
-        if let Ok(agent::Reply {
-            session: Some(s), ..
-        }) = &reply
-        {
-            workshop.session = Some(s.clone());
-        }
+        let session = reply.ok().and_then(|r| r.session);
         if ask.change {
             // Pick up the edits now rather than waiting on the watcher.
             ws.snapshot().await.ok();
         }
-        workshop.messages.push(Message {
-            author: Author::Agent,
-            text,
-            change: false,
-        });
-        self.comment_edit(id, |_, store| Ok(store.set_workshop(cid, &workshop)?))
+        // Re-read the comment, since an agent may have replied on it during the run.
+        self.comment_edit(id, |_, store| {
+            let mut c = store.comment(cid)?.context("the comment is gone")?;
+            if let Some(s) = session {
+                c.workshop.session = Some(s);
+            }
+            c.workshop.messages.push(Message {
+                author: Author::Agent,
+                text,
+                change: false,
+            });
+            Ok(store.set_workshop(cid, &c.workshop)?)
+        })
+    }
+
+    pub fn stop_workshop(&self, comment: u32, runs: &Runs) {
+        runs.stop(&self.workshop_key(comment));
+    }
+
+    fn workshop_key(&self, comment: u32) -> String {
+        self.agent_key(&format!("workshop-{comment}"))
     }
 }

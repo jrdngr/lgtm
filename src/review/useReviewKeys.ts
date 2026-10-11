@@ -20,6 +20,7 @@ interface Ctx {
   startComment(): void;
   openRevisions(): void;
   openGraph(): void;
+  openInEditor(): void;
   findRisks(): void;
   stepHotspot(dir: 1 | -1): void;
   toggleFile(file: number): void;
@@ -110,6 +111,9 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "g":
         ctx.openGraph();
+        break;
+      case "o":
+        ctx.openInEditor();
         break;
       case "h":
         if (!e.repeat) ctx.findRisks();

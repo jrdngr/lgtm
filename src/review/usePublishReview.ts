@@ -3,7 +3,13 @@ import { useEffect, useRef } from "react";
 import type { CheckState, ReviewDto } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
-import { type CurrentReview, isCurrent, publishReview, retractReview } from "./current";
+import {
+  type CurrentReview,
+  currentReview,
+  isCurrent,
+  publishReview,
+  retractReview,
+} from "./current";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 
@@ -20,8 +26,8 @@ type Actions = Pick<
   "jump" | "jumpToComment" | "jumpToRow" | "commentOn" | "send" | "findRisks"
 >;
 
-/** Publishes this pane as the workspace's current review while it's active, or when none
- * is yet, and retracts it when the pane goes. */
+/** Publishes this pane as the workspace's current review while it's active, when none is
+ * yet, or when it already is and its data changed. Retracts it when the pane goes. */
 export function usePublishReview(
   api: DockviewPanelApi,
   workspace: WorkspaceName,
@@ -59,7 +65,9 @@ export function usePublishReview(
       // Agents in the workspace's terminals act on this review.
       if (review) commands.focusReview(workspace, review.id);
     };
-    if (review && (api.isActive || !published.current)) publish();
+    // Active, unclaimed, or already ours and changed.
+    const ours = isCurrent(workspace, published.current);
+    if (review && (api.isActive || !currentReview(workspace) || ours)) publish();
     const sub = api.onDidActiveChange(({ isActive }) => {
       if (isActive && review) publish();
     });

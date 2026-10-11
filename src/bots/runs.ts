@@ -7,6 +7,8 @@ import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 /** Persona review runs the window has seen, kept current by the backend's events. */
 const runs = new Map<number, BotRun>();
 const listeners = new Set<() => void>();
+/** The latest fetch per run, so an older snapshot that resolves late is dropped. */
+const latest = new Map<number, number>();
 let version = 0;
 
 function changed() {
@@ -20,9 +22,23 @@ function put(run: BotRun) {
 }
 
 export async function refreshRun(id: number) {
+  const seq = (latest.get(id) ?? 0) + 1;
+  latest.set(id, seq);
   const r = await commands.botRun(id);
+  if (latest.get(id) !== seq) return;
   if (r.status === "ok") put(r.data);
   else if (runs.delete(id)) changed();
+}
+
+/** Runs a command on `run`, reports its error or that there's none, and refreshes the run. */
+export async function runAction(
+  run: BotRun,
+  f: () => Promise<{ status: string; error?: string }>,
+  onError: (message: string | undefined) => void,
+) {
+  const r = await f();
+  onError(r.status === "error" ? r.error : undefined);
+  await refreshRun(run.id);
 }
 
 export async function loadRuns(workspace: WorkspaceName) {
@@ -40,11 +56,11 @@ function setActivity(id: number, part: number, activity: string) {
   put({ ...run, parts });
 }
 
-/** Adds streamed text to a running fix. */
-function appendFix(id: number, fix: number, text: string) {
+/** Shows a running fix's reply so far. */
+function setFixText(id: number, fix: number, text: string) {
   const run = runs.get(id);
   if (run?.fixes?.[fix]?.status !== "running") return;
-  const fixes = (run.fixes ?? []).map((f, i) => (i === fix ? { ...f, text: f.text + text } : f));
+  const fixes = (run.fixes ?? []).map((f, i) => (i === fix ? { ...f, text } : f));
   put({ ...run, fixes });
 }
 
@@ -62,7 +78,7 @@ function listen() {
   events
     .botRunActivity(win)
     .listen((e) => setActivity(e.payload.run, e.payload.part, e.payload.activity));
-  events.botFixText(win).listen((e) => appendFix(e.payload.run, e.payload.fix, e.payload.text));
+  events.botFixText(win).listen((e) => setFixText(e.payload.run, e.payload.fix, e.payload.text));
 }
 
 function subscribe(l: () => void) {

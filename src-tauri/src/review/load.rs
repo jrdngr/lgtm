@@ -34,8 +34,9 @@ impl RepoCtx {
         let spec = views::spec(&ws.jj, revset, view, &stack).await?;
         let diffs = spec.diff(&ws.jj).await?;
         let sides = spec.sides();
+        let interdiff = matches!(spec, views::Spec::Interdiff { .. });
         let cfg = config.matching;
-        let (files, dtos) = self.build(sides, diffs, config).await?;
+        let (files, dtos) = self.build(sides, interdiff, diffs, config).await?;
         let (from, to) = spec.endpoints();
         let has_working_copy = ws.jj.includes_working_copy(revset).await?;
         Ok(Loaded {
@@ -48,7 +49,7 @@ impl RepoCtx {
                 view: view.clone(),
                 from,
                 to,
-                interdiff: matches!(spec, views::Spec::Interdiff { .. }),
+                interdiff,
                 files: dtos,
                 state: StateDto::default(),
                 changes: stack.changes,
@@ -64,12 +65,13 @@ impl RepoCtx {
     async fn build(
         &self,
         sides: Sides,
+        interdiff: bool,
         diffs: Vec<FileDiff>,
         config: Config,
     ) -> anyhow::Result<(Vec<ReviewFile>, Vec<FileDto>)> {
         let keys: Vec<cache::Key> = diffs
             .iter()
-            .map(|d| cache::key(&sides, d, &config))
+            .map(|d| cache::key(&sides, interdiff, d, &config))
             .collect();
         let mut built: Vec<Option<(ReviewFile, FileDto)>> = {
             let mut cache = self.cache.lock().unwrap();

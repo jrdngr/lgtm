@@ -172,6 +172,9 @@ export interface JumpTarget {
   top: number;
 }
 
+/** Jumping to a row puts the cursor on it with a few lines of context above. */
+export const rowJumpTarget = (at: number): JumpTarget => ({ cursor: at, top: Math.max(at - 3, 0) });
+
 /** Jumping to a file scrolls its header to the top and puts the cursor on its first row. */
 export function fileJumpTarget(lines: DisplayLine[], file: number): JumpTarget | undefined {
   const header = lines.findIndex((l) => l.kind === "file" && l.file === file);
@@ -294,7 +297,7 @@ export function symbolMarkers(file: FlatFile): SymbolMarkers {
     if (!at) return;
     const fresh = symbolsAt(file.dto, at.side, at.line).filter((s) => !seen.has(s));
     for (const s of fresh) seen.add(s);
-    if (fresh.length > 0 && !out.has(r)) out.set(r, { symbol: fresh[0], side: at.side });
+    if (fresh.length > 0) out.set(r, { symbol: fresh[0], side: at.side });
   });
   return out;
 }

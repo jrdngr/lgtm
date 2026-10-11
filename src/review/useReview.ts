@@ -22,6 +22,9 @@ export function useReview(workspace: WorkspaceName) {
   const busy = useRef(false);
   const opened = useRef<string>(undefined);
   const again = useRef(false);
+  /** Counts opens and refreshes, so a response that a later call overtook is dropped. */
+  const opens = useRef(0);
+  const refreshes = useRef(0);
 
   function show(next: Loaded) {
     current.current = next.review;
@@ -33,15 +36,20 @@ export function useReview(workspace: WorkspaceName) {
    * error message when it fails. */
   async function open(revset: string): Promise<ReviewDto | string> {
     const resume = opened.current === revset;
-    opened.current = revset;
+    const mine = ++opens.current;
     setLoading(true);
     setError(undefined);
     const r = await commands.openReview(workspace, revset, resume);
+    if (opens.current !== mine) {
+      if (r.status === "ok") commands.closeReview(r.data.id);
+      return "superseded by a later open";
+    }
     setLoading(false);
     if (r.status === "error") {
       setError(r.error);
       return r.error;
     }
+    opened.current = revset;
     if (current.current) commands.closeReview(current.current.id);
     show({ review: r.data });
     return r.data;
@@ -56,10 +64,13 @@ export function useReview(workspace: WorkspaceName) {
       return;
     }
     busy.current = true;
+    const mine = ++refreshes.current;
     const r = await commands.refreshReview(before.id, view ?? null);
     busy.current = false;
-    if (r.status === "error") setError(r.error);
-    else {
+    // A later refresh, or an open that replaced the review, answers for this one.
+    const overtaken = refreshes.current !== mine || current.current?.id !== before.id;
+    if (!overtaken && r.status === "error") setError(r.error);
+    else if (!overtaken && r.status === "ok") {
       setError(undefined);
       const files = fileMoves(before.files, r.data.review.files);
       show({ review: r.data.review, moves: movesFrom(r.data.moves, files) });

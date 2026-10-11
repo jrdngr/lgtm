@@ -243,6 +243,28 @@ fn live_activity_fills_running_parts() {
     assert_eq!(ended.parts[0].status, Status::Stopped);
 }
 
+#[test]
+fn live_fixes_fill_text_and_show_stopped_once_gone() {
+    let live = Live::default();
+    let mut r = run(&["sec"], BotOptions::default());
+    r.id = 7;
+    r.fixes.push(Fix {
+        findings: vec!["#sec#1".into()],
+        status: Status::Running,
+        text: String::new(),
+        error: None,
+        created_at: 0.0,
+    });
+    live.begin_fix(7, 0);
+    live.append_fix(7, 0, "a");
+    assert_eq!(live.append_fix(7, 0, "b"), "ab");
+    assert!(live.has_fix(7) && !live.has_fix(8));
+    assert_eq!(live.fill(r.clone()).fixes[0].text, "ab");
+    live.end_fix(7, 0);
+    assert!(!live.has_fix(7));
+    assert_eq!(live.fill(r).fixes[0].status, Status::Stopped);
+}
+
 /// Runs the real `claude` for every step, so it's skipped unless asked for with `--ignored`.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]

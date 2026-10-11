@@ -216,7 +216,10 @@ impl Lgtm {
         Ok(format!("Submitted {} findings.", p.findings.len()))
     }
 
-    #[tool(description = "Show a file of the review in lgtm's review pane, at a line.")]
+    #[tool(
+        description = "Show a file at a line in lgtm: in the review pane when the review \
+        changes it, otherwise in an editor tab."
+    )]
     async fn show(&self, Parameters(p): Parameters<inputs::Show>) -> Out {
         let (label, _) = self.repo().map_err(failed)?;
         AgentShow {

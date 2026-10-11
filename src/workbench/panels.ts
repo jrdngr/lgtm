@@ -14,9 +14,10 @@ function addPanel(
   component: PanelKind,
   params: Record<string, unknown> = {},
   position?: AddPanelOptions["position"],
+  id = `${component}-${crypto.randomUUID()}`,
 ) {
   return api.addPanel({
-    id: `${component}-${crypto.randomUUID()}`,
+    id,
     component,
     title: TITLES[component],
     params,
@@ -34,29 +35,24 @@ export function addTerminal(api: DockviewApi, direction?: "right" | "below", set
   return addPanel(api, "terminal", setup ? { setup } : {}, position);
 }
 
+/** Beside the review, so jumping to code from the new pane keeps it in view. */
+function besideReview(api: DockviewApi): AddPanelOptions["position"] {
+  const review = api.panels.find((p) => p.view.contentComponent === "review");
+  return review ? { referencePanel: review, direction: "right" } : undefined;
+}
+
 /** Shows a persona review's reports, in the pane it's already open in if there is one. */
 export function openReport(api: DockviewApi, run: number) {
   const open = api.getPanel(`report-${run}`);
   if (open) return open.api.setActive();
-  // Beside the review, so jumping to a finding's code keeps the report in view.
-  const review = api.panels.find((p) => p.view.contentComponent === "review");
-  const position = review ? { referencePanel: review, direction: "right" as const } : undefined;
-  api.addPanel({
-    id: `report-${run}`,
-    component: "report",
-    title: "Reviewers",
-    params: { run },
-    position,
-  });
+  addPanel(api, "report", { run }, besideReview(api), `report-${run}`);
 }
 
 /** Shows the symbol graph beside the review, in its pane if it's already open. */
 export function openGraph(api: DockviewApi) {
   const open = api.getPanel("graph");
   if (open) return open.api.setActive();
-  const review = api.panels.find((p) => p.view.contentComponent === "review");
-  const position = review ? { referencePanel: review, direction: "right" as const } : undefined;
-  api.addPanel({ id: "graph", component: "graph", title: "Graph", position });
+  addPanel(api, "graph", {}, besideReview(api), "graph");
 }
 
 /** Opens a review pane on `@`, beside the active pane. */

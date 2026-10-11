@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { McpStatus } from "../bindings";
-import { commands, unwrap } from "../ipc";
+import { commands, errorText, unwrap } from "../ipc";
 import { useAgentsOff } from "./agents";
 import "./tools.css";
 
@@ -38,7 +38,7 @@ export function McpOffer() {
       setState("done");
     } catch (e) {
       setState("idle");
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }
 

@@ -136,7 +136,6 @@
   border-left-color: var(--skipped);
   border-style: dashed;
   color: var(--muted);
-  cursor: default;
 }
 
 .gnode-bar {

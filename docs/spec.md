@@ -185,7 +185,7 @@ Marks and comments are content-addressed diff lines, independent of commit IDs, 
 
 Draft. Tree-sitter supplies everything that needs to know what the code is.
 
-- Grammars are bundled per language and loaded on demand. v1 set: Rust, TypeScript/JavaScript, Python, Go, Swift, JSON, YAML, TOML, Markdown, shell. Markdown isn't wired up yet.
+- Grammars are bundled per language and loaded on demand. v1 set: Rust, TypeScript/JavaScript, Python, Go, Swift, JSON, YAML, TOML, Markdown, shell.
 - Each file is parsed on both sides of the diff (old and new), from full file contents, not hunks.
 - Parsing runs in the backend. Results are cached by (commit, path) and reused across views.
 - Highlighting uses tree-sitter highlight queries. Files with no grammar render as plain text and lose only the function selection level.

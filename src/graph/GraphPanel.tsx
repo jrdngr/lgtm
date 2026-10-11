@@ -58,6 +58,7 @@ function toNodes(review: CurrentReview, graph: GraphDto, placed: Placed) {
 function Flow({ review, graph }: { review: CurrentReview; graph: GraphDto }) {
   const placed = usePlaced(graph);
   const flow = useReactFlow();
+  const workspace = useWorkspace();
   const [focus, setFocus] = useState<number>();
   const nodes = useMemo(
     () => (placed ? toNodes(review, graph, placed) : []),
@@ -79,7 +80,7 @@ function Flow({ review, graph }: { review: CurrentReview; graph: GraphDto }) {
       minZoom={0.1}
       onNodeClick={(_, n) => {
         const s = symbol(n);
-        if (s) showNode(review, s);
+        if (s) showNode(review, s, workspace);
       }}
       onNodeMouseEnter={(_, n) => setFocus(symbol(n)?.id)}
       onNodeMouseLeave={() => setFocus(undefined)}

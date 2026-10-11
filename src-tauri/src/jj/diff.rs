@@ -15,6 +15,13 @@ pub struct Range {
     pub to: String,
 }
 
+impl Range {
+    /// `from`, or the root commit.
+    fn base(&self) -> &str {
+        self.from.as_deref().unwrap_or("root()")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileDiff {
     pub path: String,
@@ -59,17 +66,18 @@ impl Jj {
     }
 
     pub async fn diff(&self, range: &Range) -> anyhow::Result<Vec<FileDiff>> {
-        let from = range.from.as_deref().unwrap_or("root()");
-        let base = ["diff", "--from", from, "--to", &range.to];
-        let meta_args = [&base[..], &["-T", diff::META_TEMPLATE]].concat();
-        let git_args = [&base[..], &["--git"]].concat();
+        let meta_args = Self::range_args(range, &["-T", diff::META_TEMPLATE]);
+        let git_args = Self::range_args(range, &["--git"]);
         let (meta, git) = tokio::try_join!(self.read(&meta_args), self.read(&git_args))?;
         join(diff::parse_meta(&meta)?, diff::parse_git(&git)?)
     }
 
     fn range_args<'a>(range: &'a Range, extra: &[&'a str]) -> Vec<&'a str> {
-        let from = range.from.as_deref().unwrap_or("root()");
-        [&["diff", "--from", from, "--to", &range.to][..], extra].concat()
+        [
+            &["diff", "--from", range.base(), "--to", &range.to][..],
+            extra,
+        ]
+        .concat()
     }
 
     /// The range's diff as `jj diff --git` prints it.
@@ -83,8 +91,7 @@ impl Jj {
 
     /// Each commit in the range, oldest first: its short change id and full description.
     pub async fn descriptions(&self, range: &Range) -> anyhow::Result<String> {
-        let from = range.from.as_deref().unwrap_or("root()");
-        let revset = format!("{from}..{}", range.to);
+        let revset = format!("{}..{}", range.base(), range.to);
         self.read(&[
             "log",
             "--no-graph",

@@ -10,4 +10,12 @@ describe("parseAnsi", () => {
       { text: "c", color: undefined },
     ]);
   });
+
+  it("reads 24-bit colors and skips background arguments", () => {
+    expect(parseAnsi("\x1b[38;2;34;139;34ma\x1b[48;2;1;2;3;1mb\x1b[48;5;34mc")).toEqual([
+      { text: "a", color: "rgb(34 139 34)" },
+      { text: "b", color: "rgb(34 139 34)", bold: true },
+      { text: "c", color: "rgb(34 139 34)", bold: true },
+    ]);
+  });
 });

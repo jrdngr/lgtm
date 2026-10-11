@@ -74,15 +74,28 @@ async fn graph_of_a_real_repo() {
         return;
     };
     let root = std::path::PathBuf::from(root);
-    let ctx = RepoCtx::new(root.clone(), crate::jj::Jj::new(&root), crate::store::Store::in_memory());
+    let ctx = RepoCtx::new(
+        root.clone(),
+        crate::jj::Jj::new(&root),
+        crate::store::Store::in_memory(),
+    );
     let review = ctx.open(None, "@", false).await.unwrap();
     if let Some(out) = std::env::var_os("LGTM_REVIEW_OUT") {
         std::fs::write(out, serde_json::to_string(&review).unwrap()).unwrap();
     }
     let t = std::time::Instant::now();
     let g = ctx.graph(review.id).await.unwrap();
-    let callers = g.nodes.iter().filter(|n| n.status == NodeStatus::Caller).count();
-    eprintln!("{:?}: {} nodes ({callers} callers), {} edges", t.elapsed(), g.nodes.len(), g.edges.len());
+    let callers = g
+        .nodes
+        .iter()
+        .filter(|n| n.status == NodeStatus::Caller)
+        .count();
+    eprintln!(
+        "{:?}: {} nodes ({callers} callers), {} edges",
+        t.elapsed(),
+        g.nodes.len(),
+        g.edges.len()
+    );
     if let Some(out) = std::env::var_os("LGTM_GRAPH_OUT") {
         std::fs::write(out, serde_json::to_string(&g).unwrap()).unwrap();
     }

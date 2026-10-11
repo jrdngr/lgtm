@@ -134,7 +134,16 @@ Notes from building M6:
 
 - File tree and editor tab with syntax highlighting and save.
 
-M7 can move earlier if editing during review is needed sooner. It has no dependency past M1.
+Notes from building M7:
+- The Repo view (⇧⌘R) sits next to Files in the right side panel. It lists the workspace's working copy a directory at a time, without what `.gitignore` files ignore, and colors files the current review changes with VS Code's dark git colors: green for added (and copied), lighter green for renamed, yellow for modified, red for conflicts, with the status letter. A folder takes its most urgent file's color with a dot: conflict, then added, renamed, modified. VS Code has no fixed order here (a folder takes whichever child it finds first). Removed files don't color folders, as in VS Code. It lists open directories again when the repo changes.
+- Files open in editor tabs, all in one pane, opened right of the active pane the first time. Opening a file that's open focuses its tab and moves the cursor.
+- The editor is CodeMirror 6, colored by the backend's tree-sitter highlighting, the same `hl-*` classes as the diff view. Edits keep the old colors in place until the next pass lands, about 120 ms after typing stops. Files over 4 MB or not UTF-8 don't open. CRLF files keep their line endings.
+- Markdown highlights with `tree-sitter-md`, in the editor and the diff view. Inline text is injected into the block grammar (it needs `include-children`, or the inline grammar highlights nothing), and fenced code is highlighted by its info string's language.
+- Markdown files have a Rendered/Editor toggle in the editor's path bar (⇧⌘V). The rendered view is read-only, shows unsaved edits, and follows reloads from disk. It renders GitHub's extensions (tables, task lists), colors fenced code with the same tree-sitter highlighting, shows links as text (following one would navigate the window away), and doesn't render raw HTML. Opening the file at a line switches back to the editor.
+- ⌘S saves, then snapshots the workspace's working copy, so reviews of `@` update right away. Only files that exist can be saved.
+- When the file changes on disk, an editor with no unsaved edits loads it in place, keeping the cursor. With unsaved edits a bar offers Load theirs or Keep mine. A dirty tab's title starts with ●. Closing a tab drops unsaved edits.
+- Edit and New in the Reviewers view open persona files in the editor, global ones too: the editor opens absolute paths only for persona files. Saving one rereads the personas.
+- Opening at a line: `o` in a review opens the cursor's file at its new-side line. Graph and Symbols callers outside the review, and finding locations not in the open review, open in the editor. The MCP `show` tool opens files the review doesn't change in the editor, and so does any `show` while the workspace has no review pane.
 
 ## M8: GitHub
 
@@ -142,3 +151,4 @@ Remote features come last, after everything local.
 
 - PR checkout (same repo, fork, fallback ref).
 - Pull PR comments, reply locally (workshopping with an agent as in M4), publish.
+- jj conflict resolution: one click hands a conflicted commit to an agent to resolve.

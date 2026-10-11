@@ -54,10 +54,15 @@ export function parseAnsi(input: string): Span[] {
       else if (c === 39) style = { ...style, color: undefined };
       else if (c >= 30 && c <= 37) style = { ...style, color: BASE[c - 30] };
       else if (c >= 90 && c <= 97) style = { ...style, color: BASE[c - 90 + 8] };
-      else if (c === 38 && codes[i + 1] === 5) {
+      else if (c === 38 && codes[i + 1] === 5 && codes.length > i + 2) {
         style = { ...style, color: color256(codes[i + 2]) };
         i += 2;
+      } else if (c === 38 && codes[i + 1] === 2 && codes.length > i + 4) {
+        style = { ...style, color: `rgb(${codes[i + 2]} ${codes[i + 3]} ${codes[i + 4]})` };
+        i += 4;
       }
+      // Backgrounds aren't shown, but their arguments aren't codes.
+      else if (c === 48) i += codes[i + 1] === 2 ? 4 : codes[i + 1] === 5 ? 2 : 0;
     }
   }
   if (last < input.length) out.push({ text: input.slice(last), ...style });

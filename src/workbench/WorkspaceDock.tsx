@@ -7,11 +7,14 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { useEffect, useRef } from "react";
 import { ReportPanel } from "../bots/ReportPanel";
+import { EditorPanel } from "../editor/EditorPanel";
+import { useAgentShow } from "../editor/useAgentShow";
 import { GraphPanel } from "../graph/GraphPanel";
 import { commands, unwrap } from "../ipc";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
+import { registerDock } from "./docks";
 import { defaultLayout, dropStalePanels } from "./panels";
 
 const components = {
@@ -19,6 +22,7 @@ const components = {
   terminal: TerminalPanel,
   report: ReportPanel,
   graph: GraphPanel,
+  editor: EditorPanel,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,
@@ -44,22 +48,23 @@ interface Props {
   hidden: boolean;
   /** A new workspace: its first terminal runs `.lgtm/setup`. */
   setup: boolean;
-  onReady(api: DockviewApi): void;
 }
 
 /** One workspace's panes, with its own saved layout. Hidden docks stay mounted so their
  * terminals keep running. */
-export function WorkspaceDock({ workspace, hidden, setup, onReady }: Props) {
+export function WorkspaceDock({ workspace, hidden, setup }: Props) {
   const timer = useRef<number>(undefined);
   const gone = useRef(false);
+  useAgentShow(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
     gone.current = false;
     return () => {
       gone.current = true;
       clearTimeout(timer.current);
+      registerDock(workspace, undefined);
     };
-  }, []);
+  }, [workspace]);
 
   async function ready({ api }: DockviewReadyEvent) {
     await restoreLayout(api, workspace, setup);
@@ -70,7 +75,7 @@ export function WorkspaceDock({ workspace, hidden, setup, onReady }: Props) {
         500,
       );
     });
-    onReady(api);
+    registerDock(workspace, api);
   }
 
   return (

@@ -182,7 +182,12 @@ pub struct Review {
     prev: Option<Session>,
     undo: Vec<Edit>,
     redo: Vec<Edit>,
+    /// Counts refreshes, so one that a later refresh overtook doesn't swap in.
+    load_gen: u64,
 }
+
+/// A refresh's error when a later one overtook it. The UI drops it.
+pub const SUPERSEDED: &str = "superseded by a later refresh";
 
 pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()
@@ -205,6 +210,11 @@ impl RepoCtx {
             cache: Mutex::default(),
             bots: Default::default(),
         }
+    }
+
+    /// Scopes an agent run key to this repo, since ids from different repos' stores collide.
+    pub(crate) fn agent_key(&self, key: &str) -> String {
+        format!("{}:{key}", crate::repo::key(&self.root))
     }
 
     fn review(&self, id: u32) -> anyhow::Result<Arc<Mutex<Review>>> {
@@ -284,23 +294,28 @@ impl RepoCtx {
     }
 
     /// Reloads a review after the repo changed, or in another view, keeping its marks' undo
-    /// history.
+    /// history. Fails with [`SUPERSEDED`] when a later refresh started before it finished.
     pub async fn refresh(&self, id: u32, view: Option<View>) -> anyhow::Result<RefreshDto> {
-        let (ws, revset, view, prev) = {
+        let (ws, revset, view, prev, load_gen) = {
             let review = self.review(id)?;
-            let review = review.lock().unwrap();
-            let view = view.unwrap_or_else(|| review.view.clone());
+            let mut review = review.lock().unwrap();
+            // Set now, so a refresh that starts before this one ends loads this view too.
+            if let Some(view) = view {
+                review.view = view;
+            }
+            review.load_gen += 1;
             (
                 review.ws.clone(),
                 review.revset.clone(),
-                view,
+                review.view.clone(),
                 review.prev.clone(),
+                review.load_gen,
             )
         };
         let loaded = self.load(&ws, &revset, &view, prev.as_ref()).await?;
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
-        review.view = view;
+        anyhow::ensure!(review.load_gen == load_gen, SUPERSEDED);
         let store = self.store.lock().unwrap();
         let (review, moves) = review.swap_in(&store, loaded, id)?;
         Ok(RefreshDto { review, moves })
@@ -329,6 +344,7 @@ impl Review {
             prev: None,
             undo: vec![],
             redo: vec![],
+            load_gen: 0,
         }
     }
 

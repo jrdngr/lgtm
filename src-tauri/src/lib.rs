@@ -5,6 +5,7 @@ mod commands;
 mod config;
 pub mod diff;
 mod events;
+mod files;
 mod gitmeta;
 mod jj;
 mod layout;
@@ -80,7 +81,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::default_personas,
             commands::bots::install_personas,
             commands::bots::new_persona,
-            commands::bots::open_persona,
+            commands::files::list_files,
+            commands::files::read_file,
+            commands::files::save_file,
+            commands::files::highlight_text,
         ])
         .events(collect_events![
             events::RepoChanged,

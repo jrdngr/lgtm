@@ -71,17 +71,20 @@ impl RepoCtx {
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         let mut store = self.store.lock().unwrap();
-        let popped = if undo {
-            review.undo.pop()
+        let last = if undo {
+            review.undo.last()
         } else {
-            review.redo.pop()
+            review.redo.last()
         };
-        if let Some(edit) = popped {
+        if let Some(edit) = last.cloned() {
+            // Popped only once applied, so a failed step stays on its stack.
             if undo {
                 store.apply(&edit.inverse())?;
+                review.undo.pop();
                 review.redo.push(edit);
             } else {
                 store.apply(&edit)?;
+                review.redo.pop();
                 review.undo.push(edit);
             }
             review.rematch(&store)?;

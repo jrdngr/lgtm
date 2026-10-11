@@ -1,16 +1,10 @@
-import type { HotspotDto } from "../bindings";
 import { useWorkspace } from "../workspaces/context";
-import { type CurrentReview, useCurrentReview } from "./current";
+import { rowLabel } from "./comments";
+import { useCurrentReview } from "./current";
 import { stopRisks, useRiskRun } from "./riskRun";
 import "./comments.css";
 
 const SOURCE = { headless: "Highlight risks", terminal: "a terminal agent" } as const;
-
-function where(review: CurrentReview, h: HotspotDto) {
-  const row = h.rows && review.files[h.file]?.rows[h.rows.start];
-  const line = row ? (row.newLine ?? row.oldLine) : undefined;
-  return `${h.path.split("/").pop()}${line !== undefined ? `:${line}` : ""}`;
-}
 
 /** The current review's hotspots, worst first. Click one to jump to it. */
 export function HotspotsPanel() {
@@ -58,7 +52,7 @@ export function HotspotsPanel() {
             >
               <span className="comment-where">
                 <span className={`risk-dot risk-${h.level}`} />
-                {where(review, h)}
+                {rowLabel(review.files, h.file, h.path, h.rows?.start)}
                 {!h.rows && <span className="comment-outdated">code changed</span>}
               </span>
               <span className="comment-preview">{h.reason}</span>

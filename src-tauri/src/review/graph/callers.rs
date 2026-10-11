@@ -1,14 +1,14 @@
 //! Unchanged symbols that use the review's changed symbols.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
-use super::{GraphEdge, GraphNode, NodeStatus, innermost, name_index, parent, targets};
+use super::{GraphEdge, GraphNode, NameIndex, NodeStatus, innermost, parent, targets};
 use crate::syntax::{CodeSymbol, Ref};
 
 /// Callers shown per changed symbol, so a common name doesn't flood the graph.
 const MAX_PER_NODE: usize = 8;
 /// Shorter names match too much to count as uses.
-const MIN_NAME: usize = 3;
+pub(super) const MIN_NAME: usize = 3;
 
 #[derive(Default)]
 pub(super) struct Found {
@@ -19,16 +19,8 @@ pub(super) struct Found {
 }
 
 impl Found {
-    /// Names worth looking for outside the review.
-    pub fn wanted_names(&self, nodes: &[GraphNode]) -> HashSet<String> {
-        nodes
-            .iter()
-            .filter(|n| n.name.len() >= MIN_NAME)
-            .map(|n| n.name.clone())
-            .collect()
-    }
-
-    /// Adds the symbols in one file that use a changed symbol's name.
+    /// Adds the symbols in one file that use a changed symbol's name. `index` holds the
+    /// changed symbols whose names are long enough to count.
     pub fn scan(
         &mut self,
         path: &str,
@@ -36,13 +28,8 @@ impl Found {
         symbols: &[CodeSymbol],
         refs: &[Ref],
         nodes: &[GraphNode],
+        index: &NameIndex,
     ) {
-        let long: Vec<GraphNode> = nodes
-            .iter()
-            .filter(|n| n.name.len() >= MIN_NAME)
-            .cloned()
-            .collect();
-        let index = name_index(&long);
         let mut used: BTreeMap<usize, HashMap<&str, bool>> = BTreeMap::new();
         for r in refs.iter().filter(|r| index.contains_key(r.name.as_str())) {
             if let Some(si) = innermost(symbols, r.line) {
@@ -61,7 +48,7 @@ impl Found {
             names.sort();
             let mut me = None;
             for (name, call) in names {
-                for to in targets(&index, name, call, path) {
+                for to in targets(index, name, call, path) {
                     let count = self.per_node.entry(to).or_default();
                     if *count >= MAX_PER_NODE {
                         continue;

@@ -30,7 +30,7 @@ pub struct BotRunChanged {
     pub run: u32,
 }
 
-/// A persona review's fix `fix` streamed more of its reply.
+/// A persona review's fix `fix` streamed more of its reply. `text` is the whole reply so far.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct BotFixText {
     pub run: u32,
@@ -38,7 +38,8 @@ pub struct BotFixText {
     pub text: String,
 }
 
-/// An agent asked the workspace's review pane to show `path`, at `line` on the new side.
+/// An agent asked to see `path` at `line`: in the review pane, or an editor when the review
+/// doesn't change it.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct AgentShow {
     pub workspace: Option<String>,

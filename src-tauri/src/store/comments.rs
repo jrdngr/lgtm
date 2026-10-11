@@ -5,7 +5,7 @@ use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::Store;
+use super::{Store, json_err};
 use crate::anchor::{Anchor, Side};
 
 /// An anchor with the file side it was taken on, as for a mark.
@@ -17,10 +17,14 @@ pub struct Pin {
     pub below: Vec<i64>,
     pub commit: String,
     pub line: u32,
+    /// The path on the pin's side, which differs from its comment's across a rename. Pins saved
+    /// before this have none and use their comment's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 impl Pin {
-    pub fn new(anchor: &Anchor, commit: String, line: u32) -> Self {
+    pub fn new(anchor: &Anchor, commit: String, line: u32, path: Option<String>) -> Self {
         Self {
             side: anchor.side,
             line_hash: anchor.line_hash,
@@ -28,6 +32,7 @@ impl Pin {
             below: anchor.below.clone(),
             commit,
             line,
+            path,
         }
     }
 
@@ -101,10 +106,6 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 }
 
 const COLUMNS: &str = "id, path, pins, body, snippet, review, created_at, updated_at, workshop";
-
-pub(super) fn json_err(e: serde_json::Error) -> rusqlite::Error {
-    rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, e.into())
-}
 
 fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
     Ok(Comment {
@@ -185,6 +186,7 @@ mod tests {
             below: vec![],
             commit: "c".into(),
             line: 4,
+            path: None,
         };
         let mut c = Comment {
             id: 0,

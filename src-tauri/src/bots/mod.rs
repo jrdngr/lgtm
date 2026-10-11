@@ -132,13 +132,13 @@ pub struct Live {
     /// Active runs the user stopped.
     stopping: Mutex<HashSet<u32>>,
     activity: Mutex<HashMap<(u32, usize), String>>,
-    /// Fixes' replies so far, by run and fix.
+    /// Running fixes' replies so far, by run and fix.
     fix_text: Mutex<HashMap<(u32, usize), String>>,
 }
 
 impl Live {
     /// Fills in what only memory knows: whether it's running and what its parts are doing.
-    /// Parts left running by an app exit or a failed run show as stopped.
+    /// Parts and fixes left running by an app exit or a failed run show as stopped.
     pub fn fill(&self, mut run: BotRun) -> BotRun {
         run.active = self.is_active(run.id);
         let activity = self.activity.lock().unwrap();
@@ -151,8 +151,11 @@ impl Live {
         }
         let text = self.fix_text.lock().unwrap();
         for (i, f) in run.fixes.iter_mut().enumerate() {
-            if let (Status::Running, Some(t)) = (f.status, text.get(&(run.id, i))) {
-                f.text = t.clone();
+            if f.status == Status::Running {
+                match text.get(&(run.id, i)) {
+                    Some(t) => f.text = t.clone(),
+                    None => f.status = Status::Stopped,
+                }
             }
         }
         run
@@ -183,9 +186,24 @@ impl Live {
         self.activity.lock().unwrap().retain(|(r, _), _| *r != run);
     }
 
-    fn append_fix(&self, run: u32, fix: usize, text: &str) {
+    /// Whether any of the run's fixes is running.
+    pub fn has_fix(&self, run: u32) -> bool {
+        self.fix_text.lock().unwrap().keys().any(|(r, _)| *r == run)
+    }
+
+    fn begin_fix(&self, run: u32, fix: usize) {
+        self.fix_text
+            .lock()
+            .unwrap()
+            .insert((run, fix), String::new());
+    }
+
+    /// Adds to a fix's reply and returns the whole reply so far.
+    fn append_fix(&self, run: u32, fix: usize, text: &str) -> String {
         let mut all = self.fix_text.lock().unwrap();
-        all.entry((run, fix)).or_default().push_str(text);
+        let all = all.entry((run, fix)).or_default();
+        all.push_str(text);
+        all.clone()
     }
 
     fn end_fix(&self, run: u32, fix: usize) {

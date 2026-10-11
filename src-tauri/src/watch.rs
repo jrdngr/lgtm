@@ -82,6 +82,14 @@ fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping> {
     (!ignores.ignored(path)).then_some(Ping::Edit)
 }
 
+/// A secondary workspace's `.jj/repo` is a file pointing at the main repo, whose operations
+/// land outside the workspace. Returns that repo's op heads directory, to watch as well.
+fn shared_op_heads(root: &Path) -> Option<PathBuf> {
+    let link = std::fs::read_to_string(root.join(".jj/repo")).ok()?;
+    let repo = root.join(".jj").join(link.trim()).canonicalize().ok()?;
+    Some(repo.join("op_heads/heads"))
+}
+
 /// Starts watching `root` (canonical). `emit` runs on the async runtime.
 pub fn start(
     root: &Path,
@@ -95,18 +103,25 @@ pub fn start(
         by_dir: HashMap::new(),
     };
     let watch_root = root.to_path_buf();
+    let op_heads = shared_op_heads(root);
+    let shared = op_heads.clone();
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         let Ok(event) = res else { return };
         if event.kind.is_access() {
             return;
         }
         for path in &event.paths {
-            if let Some(ping) = classify(&watch_root, &mut ignores, path) {
+            if shared.as_ref().is_some_and(|d| path.starts_with(d)) {
+                tx.send(Ping::Op).ok();
+            } else if let Some(ping) = classify(&watch_root, &mut ignores, path) {
                 tx.send(ping).ok();
             }
         }
     })?;
     watcher.watch(root, RecursiveMode::Recursive)?;
+    if let Some(dir) = &op_heads {
+        watcher.watch(dir, RecursiveMode::NonRecursive)?;
+    }
     tauri::async_runtime::spawn(run(rx, jj, stale, emit));
     Ok(Watch { _watcher: watcher })
 }
@@ -184,6 +199,21 @@ mod tests {
         assert_eq!(c("web/dist/app.js"), None);
         assert_eq!(c("web/src/app.ts"), Some(Ping::Edit));
         assert_eq!(c(".gitignore"), Some(Ping::Edit));
+    }
+
+    #[test]
+    fn a_secondary_workspace_also_watches_the_main_repos_op_heads() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let (main, ws) = (root.join("main"), root.join("ws"));
+        std::fs::create_dir_all(main.join(".jj/repo/op_heads/heads")).unwrap();
+        std::fs::create_dir_all(ws.join(".jj")).unwrap();
+        std::fs::write(ws.join(".jj/repo"), "../../main/.jj/repo").unwrap();
+        assert_eq!(
+            shared_op_heads(&ws),
+            Some(main.join(".jj/repo/op_heads/heads"))
+        );
+        assert_eq!(shared_op_heads(&main), None);
     }
 
     #[tokio::test]

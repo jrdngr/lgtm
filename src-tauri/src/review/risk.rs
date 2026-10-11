@@ -82,7 +82,7 @@ impl RepoCtx {
             edit: false,
             schema: Some(SCHEMA),
         };
-        let reply = agent::run(runs, &run_key(id), task, |p| {
+        let reply = agent::run(runs, &self.agent_key(&run_key(id)), task, |p| {
             if let Progress::Tool(t) = p {
                 on_tool(t)
             }
@@ -102,6 +102,6 @@ impl RepoCtx {
     }
 
     pub fn stop_hotspots(&self, id: u32, runs: &Runs) {
-        runs.stop(&run_key(id));
+        runs.stop(&self.agent_key(&run_key(id)));
     }
 }

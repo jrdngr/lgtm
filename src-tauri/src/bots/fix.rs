@@ -64,7 +64,9 @@ impl RepoCtx {
                 error: None,
                 created_at: now_ms() as f64,
             });
-            run.fixes.len() - 1
+            let idx = run.fixes.len() - 1;
+            self.bots.begin_fix(id, idx);
+            idx
         })?;
         notify(super::Event::Changed { run: id });
         let prompt = prompt(&run.revset, &text);
@@ -76,13 +78,12 @@ impl RepoCtx {
                 edit: true,
                 schema: None,
             };
-            let reply = agent::run(&runs, &fix_key(id, idx), task, |p| {
+            let reply = agent::run(&runs, &self.agent_key(&fix_key(id, idx)), task, |p| {
                 if let Progress::Text(text) = p {
-                    self.bots.append_fix(id, idx, &text);
                     notify(super::Event::FixText {
                         run: id,
                         fix: idx as u32,
-                        text,
+                        text: self.bots.append_fix(id, idx, &text),
                     });
                 }
             })
@@ -90,7 +91,9 @@ impl RepoCtx {
             // Show the edits now rather than waiting on the watcher.
             ws.snapshot().await.ok();
             self.edit_run(id, |run| {
-                let fix = &mut run.fixes[idx];
+                let Some(fix) = run.fixes.get_mut(idx) else {
+                    return;
+                };
                 match reply {
                     Ok(r) if r.stopped => {
                         fix.status = Status::Stopped;
@@ -114,6 +117,6 @@ impl RepoCtx {
     }
 
     pub fn stop_fix(&self, id: u32, fix: u32, runs: &Runs) {
-        runs.stop(&fix_key(id, fix as usize));
+        runs.stop(&self.agent_key(&fix_key(id, fix as usize)));
     }
 }

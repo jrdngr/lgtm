@@ -1,0 +1,179 @@
+import { EditorState, type Text, Transaction } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
+import type { IDockviewPanelProps } from "dockview-react";
+import { useEffect, useRef, useState } from "react";
+import { commands, errorText, unwrap } from "../ipc";
+import { isMac } from "../workbench/keys";
+import { useWorkspace } from "../workspaces/context";
+import { useRepoChanged } from "../workspaces/useRepoChanged";
+import { minimalChange } from "./change";
+import { MarkdownView } from "./MarkdownView";
+import { baseName, type EditorParams } from "./open";
+import { emitSaved } from "./saved";
+import { editorExtensions } from "./setup";
+import "./editor.css";
+
+const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
+
+/** A working-copy file in CodeMirror. Saving snapshots the working copy, so reviews of `@`
+ * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
+export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
+  const workspace = useWorkspace();
+  const { path, line, nonce } = params;
+  const host = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<EditorView>();
+  /** The text as last read or saved. */
+  const saved = useRef<Text>(undefined);
+  const [dirty, setDirty] = useState(false);
+  /** Newer text on disk, held back because of unsaved edits. */
+  const [onDisk, setOnDisk] = useState<string>();
+  const [error, setError] = useState<string>();
+  /** The text shown rendered, for markdown, or undefined while editing. */
+  const [rendered, setRendered] = useState<string>();
+  const saveRef = useRef(() => {});
+
+  useEffect(() => {
+    let live = true;
+    let made: EditorView | undefined;
+    unwrap(commands.readFile(workspace, path)).then(
+      (text) => {
+        if (!live || !host.current) return;
+        const extensions = editorExtensions(path, text, {
+          save: () => saveRef.current(),
+          changed: (u) => {
+            if (!u.docChanged) return;
+            if (saved.current) setDirty(!u.state.doc.eq(saved.current));
+            // A reload from disk shows in the rendered view too.
+            setRendered((r) => (r === undefined ? r : u.state.sliceDoc()));
+          },
+        });
+        made = new EditorView({
+          parent: host.current,
+          state: EditorState.create({ doc: text, extensions }),
+        });
+        saved.current = made.state.doc;
+        setView(made);
+      },
+      (e) => live && setError(errorText(e)),
+    );
+    return () => {
+      live = false;
+      made?.destroy();
+    };
+  }, [workspace, path]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` reopens at the same line
+  useEffect(() => {
+    if (!view || !line) return;
+    const doc = view.state.doc;
+    const at = doc.line(Math.min(Math.max(line, 1), doc.lines)).from;
+    setRendered(undefined);
+    view.dispatch({
+      selection: { anchor: at },
+      effects: EditorView.scrollIntoView(at, { y: "center" }),
+    });
+    view.focus();
+  }, [view, line, nonce]);
+
+  useEffect(() => {
+    api.setTitle(dirty ? `● ${baseName(path)}` : baseName(path));
+  }, [api, path, dirty]);
+
+  useEffect(() => {
+    const sub = api.onDidActiveChange((e) => e.isActive && view?.focus());
+    return () => sub.dispose();
+  }, [api, view]);
+
+  /** Puts `text` in the editor as the saved text, keeping the cursor where it can. */
+  function load(v: EditorView, text: string) {
+    const change = minimalChange(v.state.sliceDoc(), text);
+    v.dispatch({ changes: change, annotations: Transaction.addToHistory.of(false) });
+    saved.current = v.state.doc;
+    setDirty(false);
+    setOnDisk(undefined);
+  }
+
+  async function save() {
+    if (!view) return;
+    const doc = view.state.doc;
+    try {
+      await unwrap(commands.saveFile(workspace, path, view.state.sliceDoc()));
+      saved.current = doc;
+      setDirty(!view.state.doc.eq(doc));
+      setOnDisk(undefined);
+      setError(undefined);
+      emitSaved(path);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
+  saveRef.current = save;
+
+  async function sync() {
+    if (!view || !saved.current) return;
+    // A file that went away keeps its editor, to save elsewhere by copying.
+    const text = await unwrap(commands.readFile(workspace, path)).catch(() => undefined);
+    if (text === undefined || view.state.toText(text).eq(saved.current)) return;
+    if (view.state.doc.eq(saved.current)) load(view, text);
+    else setOnDisk(text);
+  }
+  useRepoChanged(sync);
+
+  function toggleRendered() {
+    if (!view) return;
+    if (rendered === undefined) setRendered(view.state.sliceDoc());
+    else {
+      setRendered(undefined);
+      requestAnimationFrame(() => view.focus());
+    }
+  }
+
+  function onKeyDown(e: React.KeyboardEvent) {
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (mod && e.shiftKey && e.key.toLowerCase() === "v" && isMarkdown(path)) {
+      e.preventDefault();
+      toggleRendered();
+    }
+  }
+
+  function keepMine() {
+    if (!view || onDisk === undefined) return;
+    saved.current = view.state.toText(onDisk);
+    setDirty(!view.state.doc.eq(saved.current));
+    setOnDisk(undefined);
+  }
+
+  return (
+    <div className="editor-panel" onKeyDown={onKeyDown}>
+      <div className="editor-path">
+        <span className="path" title={path}>
+          {path}
+        </span>
+        {isMarkdown(path) && (
+          <button type="button" disabled={!view} onClick={toggleRendered} title="⇧⌘V">
+            {rendered === undefined ? "Rendered" : "Editor"}
+          </button>
+        )}
+      </div>
+      {error && <div className="editor-bar error">{error}</div>}
+      {onDisk !== undefined && (
+        <div className="editor-bar">
+          <span>Changed on disk while you have unsaved edits.</span>
+          <button type="button" onClick={() => view && load(view, onDisk)}>
+            Load theirs
+          </button>
+          <button type="button" onClick={keepMine}>
+            Keep mine
+          </button>
+        </div>
+      )}
+      {rendered !== undefined && (
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
+        <div className="editor-rendered" tabIndex={0}>
+          <MarkdownView text={rendered} />
+        </div>
+      )}
+      <div className="editor-host" ref={host} hidden={rendered !== undefined} />
+    </div>
+  );
+}

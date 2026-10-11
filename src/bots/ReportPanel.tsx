@@ -4,14 +4,16 @@ import type { BotOptions, Finding } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
-import { Closing, Refs, Tally } from "./Closing";
+import { Closing, Tally } from "./Closing";
 import { FindingCard } from "./FindingCard";
 import { Fixes } from "./Fixes";
-import { findingsById, findingText, history, report, SEVERITIES } from "./findings";
+import { findingsText, history, type Picked, report } from "./findings";
 import { Markdown } from "./Markdown";
 import { Progress } from "./Progress";
 import { runState } from "./personas";
-import { refreshRun, useRun } from "./runs";
+import { MinimalView, PersonaView, SelectAll } from "./ReportViews";
+import { type Act, RunControls } from "./RunControls";
+import { refreshRun, runAction, useRun } from "./runs";
 import "./bots.css";
 
 type View = "minimal" | "synthesis" | "personas" | "fixes";
@@ -36,17 +38,9 @@ const NO_OPTIONS: BotOptions = {
   minimal: false,
 };
 
-function SelectAll({ onClick }: { onClick(): void }) {
-  return (
-    <button type="button" onClick={onClick} title="Pick every finding shown">
-      Pick all
-    </button>
-  );
-}
-
 /** A request to an agent to fix the picked findings. */
-function fixPrompt(revset: string, picked: { f: Finding; source: string }[]): string {
-  const findings = picked.map(({ f, source }) => findingText(f, source)).join("\n\n---\n\n");
+function fixPrompt(revset: string, picked: Picked[]): string {
+  const findings = findingsText(picked);
   const n = picked.length;
   return `Fix ${n === 1 ? "this finding" : `these ${n} findings`} from a review of \`${revset}\`. Change only what each one needs.\n\n${findings}`;
 }
@@ -59,7 +53,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const [persona, setPersona] = useState<string>();
   const [open, setOpen] = useState<Set<string>>(new Set());
   /** Findings picked to send to the agent, by id. */
-  const [checked, setChecked] = useState<Map<string, { f: Finding; source: string }>>(new Map());
+  const [checked, setChecked] = useState<Map<string, Picked>>(new Map());
   const review = useCurrentReview(useWorkspace());
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<{ error: boolean; text: string }>();
@@ -80,11 +74,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   );
   const sourceOf = (f: Finding) => (f.id?.includes("#") ? f.id.split("#")[0] : "synthesis");
 
-  async function act(f: () => Promise<{ status: string; error?: string }>) {
-    const res = await f();
-    setError(res.status === "error" ? res.error : undefined);
-    if (run) await refreshRun(run.id);
-  }
+  const act: Act = (f) => runAction(run, f, setError);
 
   const toggle = (id: string) => {
     const next = new Set(open);
@@ -109,7 +99,14 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
     setChecked(next);
   };
 
-  const checkAll = (shown: { f: Finding; source: string }[]) => {
+  /** Switches to view `v` and scrolls to finding `id`, showing every persona's findings. */
+  const goTo = (v: View, id: string) => {
+    if (v === "personas") setPersona(undefined);
+    setPicked(v);
+    go(id);
+  };
+
+  const checkAll = (shown: Picked[]) => {
     const next = new Map(checked);
     for (const x of shown) next.set(x.f.id ?? "", x);
     setChecked(next);
@@ -132,8 +129,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   /** Has a headless agent fix the picked findings, and shows its reply in Fixes. */
   async function fixChecked() {
     if (!run) return;
-    const picks = [...checked.values()];
-    const text = picks.map(({ f, source }) => findingText(f, source)).join("\n\n---\n\n");
+    const text = findingsText([...checked.values()]);
     const res = await commands.fixFindings(run.id, [...checked.keys()], text);
     if (res.status === "error") return setNotice({ error: true, text: res.error });
     setNotice(undefined);
@@ -165,48 +161,19 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
     );
   };
 
-  const byId = findingsById(r);
   let body: React.ReactNode;
   if (view === "minimal" && r.minimal) {
-    const m = r.minimal;
-    const kept = m.kept.flatMap((id) => byId.get(id) ?? []);
-    const offTask = m.offTask.flatMap((id) => byId.get(id) ?? []);
     body = (
-      <>
-        <div className="bots-verdict">
-          For “{m.task}” · {kept.length} of {r.synthesis?.findings.length ?? byId.size} findings{" "}
-          <Tally findings={kept} />
-          <SelectAll onClick={() => checkAll(kept.map((f) => ({ f, source: sourceOf(f) })))} />
-        </div>
-        {kept.map((f) => card(f, sourceOf(f)))}
-        {offTask.length > 0 && (
-          <section>
-            <h3>Off-task critical and high</h3>
-            <Refs
-              ids={m.offTask}
-              onGo={(id) => {
-                setPicked(r.synthesis ? "synthesis" : "personas");
-                go(id);
-              }}
-            />
-          </section>
-        )}
-        <section>
-          <h3>Recommendations</h3>
-          <Markdown>{m.recommendations}</Markdown>
-        </section>
-      </>
-    );
-  } else if (view === "fixes") {
-    body = (
-      <Fixes
-        run={run}
-        onGo={(id) => {
-          setPicked(id.includes("#") ? "personas" : "synthesis");
-          go(id);
-        }}
+      <MinimalView
+        r={r}
+        card={card}
+        checkAll={checkAll}
+        sourceOf={sourceOf}
+        onGo={(id) => goTo(r.synthesis ? "synthesis" : "personas", id)}
       />
     );
+  } else if (view === "fixes") {
+    body = <Fixes run={run} onGo={(id) => goTo(id.includes("#") ? "personas" : "synthesis", id)} />;
   } else if (view === "synthesis" && r.synthesis) {
     const s = r.synthesis;
     body = (
@@ -223,23 +190,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
       </>
     );
   } else {
-    const who = [...r.byPersona.keys()].filter((p) => !persona || p === persona);
-    const findings = who.flatMap((p) => (r.byPersona.get(p) ?? []).map((f) => ({ p, f })));
-    findings.sort((a, b) => SEVERITIES.indexOf(a.f.severity) - SEVERITIES.indexOf(b.f.severity));
-    body = (
-      <>
-        {persona && r.verdicts.get(persona) && (
-          <div className="bots-verdict">
-            <Markdown>{r.verdicts.get(persona) ?? ""}</Markdown>
-          </div>
-        )}
-        <div className="bots-verdict">
-          <Tally findings={findings.map((x) => x.f)} />
-          <SelectAll onClick={() => checkAll(findings.map(({ p, f }) => ({ f, source: p })))} />
-        </div>
-        {findings.map(({ p, f }) => card(f, p))}
-      </>
-    );
+    body = <PersonaView r={r} persona={persona} card={card} checkAll={checkAll} />;
   }
 
   return (
@@ -270,34 +221,20 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
           </span>
         )}
         <span className="spacer" />
-        {run.active ? (
-          <button type="button" onClick={() => act(() => commands.stopBots(run.id))}>
-            Stop
-          </button>
-        ) : (
-          <>
-            {state === "halted" && (
-              <button
-                type="button"
-                onClick={() => act(() => commands.continueBots(run.id, run.options))}
-              >
-                Retry
-              </button>
-            )}
-            {ADD.filter(([key]) => !run.options[key]).map(([key, text]) => (
-              <button
-                type="button"
-                key={key}
-                disabled={key === "crossReview" && run.personas.length < 2}
-                onClick={() =>
-                  act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true }))
-                }
-              >
-                + {text}
-              </button>
-            ))}
-          </>
-        )}
+        <RunControls run={run} act={act}>
+          {ADD.filter(([key]) => !run.options[key]).map(([key, text]) => (
+            <button
+              type="button"
+              key={key}
+              disabled={key === "crossReview" && run.personas.length < 2}
+              onClick={() =>
+                act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true }))
+              }
+            >
+              + {text}
+            </button>
+          ))}
+        </RunControls>
       </div>
       {view === "personas" && <Progress run={run} persona={persona} onPersona={setPersona} />}
       {checked.size > 0 && (

@@ -5,9 +5,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, JsonSchema)]
 pub struct Show {
-    /// Repository-relative path of a file in the review.
+    /// Workspace-relative path of a file.
     pub path: String,
-    /// A line on the new side of the diff.
+    /// A line in the working copy, or on the new side of the diff.
     pub line: Option<u32>,
 }
 

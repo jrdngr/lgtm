@@ -1,8 +1,8 @@
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef, useState } from "react";
-import { events, type ProgressDto, type WorkspaceDto } from "../bindings";
-import { commands, unwrap } from "../ipc";
+import type { ProgressDto, WorkspaceDto } from "../bindings";
+import { commands, errorText, unwrap } from "../ipc";
 import { workspaceKey } from "./context";
+import { useRepoChanged } from "./useRepoChanged";
 
 const listeners = new Set<() => void>();
 
@@ -38,7 +38,7 @@ export function useWorkspaces() {
       );
       setProgress(new Map(entries.filter((e) => e !== undefined)));
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
     } finally {
       busy.current = false;
     }
@@ -56,12 +56,11 @@ export function useWorkspaces() {
     reloadRef.current();
     const onChange = () => reloadRef.current();
     listeners.add(onChange);
-    const sub = events.repoChanged(getCurrentWebviewWindow()).listen(onChange);
     return () => {
       listeners.delete(onChange);
-      sub.then((un) => un());
     };
   }, []);
+  useRepoChanged(() => reloadRef.current());
 
   return { workspaces, progress, error, setError, reload };
 }

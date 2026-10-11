@@ -62,10 +62,13 @@ pub fn map_rows(before: &[ReviewFile], after: &[ReviewFile]) -> Vec<RowMove> {
     out
 }
 
-/// Maps a line of `before` to the same line in `after`, by line diff of the two sides.
+/// Maps a line of `before` to the same line in `after`, by line diff of the two sides. An
+/// interdiff's old side has no commit or contents, so its lines can't be told apart from
+/// another interdiff's and map to nothing.
 fn line_map(before: &FileSide, after: &FileSide) -> impl Fn(Option<u32>) -> Option<u32> {
+    let same = before.commit.is_some() && before.commit == after.commit;
     let map = match (&before.index, &after.index) {
-        (Some(_), Some(_)) if before.commit == after.commit && before.path == after.path => None,
+        (Some(_), Some(_)) if same && before.path == after.path => None,
         (Some(b), Some(a)) => Some(anchor::remap_lines(&b.hashes, &a.hashes)),
         _ => Some(HashMap::new()),
     };

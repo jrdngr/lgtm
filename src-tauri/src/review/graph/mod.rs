@@ -98,6 +98,12 @@ pub fn graph(files: &[ReviewFile], root: Option<&Path>) -> GraphDto {
         }
     }
     let mut dtos = dtos;
+    let long: Vec<GraphNode> = dtos
+        .iter()
+        .filter(|n| n.name.len() >= callers::MIN_NAME)
+        .cloned()
+        .collect();
+    let long_index = name_index(&long);
     let mut found = callers::Found::default();
     for (i, f) in files.iter().enumerate() {
         if f.status != FileStatus::Removed {
@@ -107,14 +113,16 @@ pub fn graph(files: &[ReviewFile], root: Option<&Path>) -> GraphDto {
                 &f.new.symbols,
                 &f.new.refs,
                 &dtos,
+                &long_index,
             );
         }
     }
     if let Some(root) = root {
         let skip: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
-        let names = found.wanted_names(&dtos);
+        // Names worth looking for outside the review.
+        let names: HashSet<String> = long_index.keys().map(|s| s.to_string()).collect();
         for s in scan::mentioning(root, &skip, &names) {
-            found.scan(&s.path, None, &s.symbols, &s.refs, &dtos);
+            found.scan(&s.path, None, &s.symbols, &s.refs, &dtos, &long_index);
         }
     }
     found.finish(&mut dtos, &mut edges);

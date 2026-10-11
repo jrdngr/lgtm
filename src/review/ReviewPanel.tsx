@@ -1,6 +1,8 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeDto, StateDto, View } from "../bindings";
+import { editorAt } from "../editor/at";
+import { openFileIn } from "../editor/open";
 import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
 import { openGraph } from "../workbench/panels";
@@ -9,18 +11,8 @@ import { marksChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
-import { stepHotspot } from "./hotspots";
 import { MarkMenu } from "./MarkMenu";
-import {
-  buildLines,
-  changedRows,
-  commentJumpTarget,
-  fileJumpTarget,
-  flatten,
-  type JumpTarget,
-  symbolMarkers,
-  type ViewMode,
-} from "./model";
+import { buildLines, changedRows, flatten, symbolMarkers, type ViewMode } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { findRisks, useRiskRun } from "./riskRun";
 import { type Filter, fileProgress, indexState, plural, rowStates, sumProgress } from "./state";
@@ -33,6 +25,7 @@ import { usePublishTarget } from "./usePublishTarget";
 import { useReview } from "./useReview";
 import { useReviewActions } from "./useReviewActions";
 import { useReviewKeys } from "./useReviewKeys";
+import { useReviewNav } from "./useReviewNav";
 import { useRowMouse } from "./useRowMouse";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
@@ -171,31 +164,18 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     refresh(view);
   }
 
-  function jumpTo(target: JumpTarget) {
-    place(target.cursor);
-    setScrollTo({ line: target.top });
-    api.setActive();
-    focusRoot();
-  }
-
-  function jump(file: number) {
-    const target = fileJumpTarget(lines, file);
-    if (target) jumpTo(target);
-  }
-
-  function jumpToComment(id: number) {
-    const comment = c.comments.find((x) => x.id === id);
-    if (!comment) return;
-    const target = commentJumpTarget(lines, id);
-    if (target) jumpTo(target);
-    else jump(comment.file);
-  }
-
-  function jumpToRow(file: number, row: number) {
-    const at = lines.findIndex((l) => l.kind === "rows" && l.file === file && l.rows.includes(row));
-    if (at < 0) return jump(file);
-    jumpTo({ cursor: at, top: Math.max(at - 3, 0) });
-  }
+  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, showLine } = useReviewNav({
+    lines,
+    files,
+    comments: c.comments,
+    hotspots: review?.state.hotspots ?? [],
+    cursor,
+    place,
+    setScrollTo,
+    api,
+    containerApi,
+    focusRoot,
+  });
 
   async function commentOn(file: number, rows: number[], body: string, snippet: string) {
     if (!review) return false;
@@ -215,25 +195,9 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     findRisks(review.id, edited);
   }
 
-  function stepHotspotFrom(dir: 1 | -1) {
-    const at = stepHotspot(lines, review?.state.hotspots ?? [], cursor, dir);
-    if (at !== undefined) jumpTo({ cursor: at, top: Math.max(at - 3, 0) });
-  }
-
-  /** Shows `line` of `path`: the row on that new-side line, or the nearest one. */
-  function showLine(path: string, line: number | null) {
-    const file = files.findIndex((f) => f.dto.path === path || f.dto.oldPath === path);
-    if (file < 0) return setError(`An agent asked to show ${path}, which isn't in this review`);
-    if (line === null) return jump(file);
-    const rows = files[file].rows;
-    let best = -1;
-    rows.forEach((r, i) => {
-      if (r.newLine === null) return;
-      if (best < 0 || Math.abs(r.newLine - line) < Math.abs((rows[best].newLine ?? 0) - line))
-        best = i;
-    });
-    if (best < 0) jump(file);
-    else jumpToRow(file, best);
+  function openInEditor() {
+    const at = editorAt(files, lines[cursor]);
+    if (at) openFileIn(containerApi, at.path, at.line);
   }
 
   const isCurrent = usePublishReview(
@@ -276,6 +240,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     startComment: a.startComment,
     openRevisions: () => openRevisions(workspace),
     openGraph: () => openGraph(containerApi),
+    openInEditor,
     findRisks: findRisksNow,
     stepHotspot: stepHotspotFrom,
     toggleFile: fold.toggleFile,

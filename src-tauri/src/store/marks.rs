@@ -4,8 +4,8 @@ use rusqlite::{Transaction, params};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{Store, from_blob, to_blob};
-use crate::anchor::{Anchor, Side};
+use super::{Store, enum_from, enum_to, from_blob, to_blob};
+use crate::anchor::Anchor;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -33,53 +33,19 @@ pub struct Mark {
 const COLUMNS: &str =
     "id, path, side, line_hash, above, below, commit_id, line, state, review, created_at";
 
-fn side_str(side: Side) -> &'static str {
-    match side {
-        Side::Old => "old",
-        Side::New => "new",
-    }
-}
-
-fn state_str(state: MarkState) -> &'static str {
-    match state {
-        MarkState::Reviewed => "reviewed",
-        MarkState::Skipped => "skipped",
-        MarkState::Flagged => "flagged",
-    }
-}
-
-fn parse_err(what: &str, value: String) -> rusqlite::Error {
-    rusqlite::Error::FromSqlConversionFailure(
-        0,
-        rusqlite::types::Type::Text,
-        format!("bad {what}: {value}").into(),
-    )
-}
-
 fn row_to_mark(r: &rusqlite::Row) -> rusqlite::Result<Mark> {
-    let side = match r.get::<_, String>(2)?.as_str() {
-        "old" => Side::Old,
-        "new" => Side::New,
-        other => return Err(parse_err("side", other.into())),
-    };
-    let state = match r.get::<_, String>(8)?.as_str() {
-        "reviewed" => MarkState::Reviewed,
-        "skipped" => MarkState::Skipped,
-        "flagged" => MarkState::Flagged,
-        other => return Err(parse_err("state", other.into())),
-    };
     Ok(Mark {
         id: r.get(0)?,
         anchor: Anchor {
             path: r.get(1)?,
-            side,
+            side: enum_from(r.get(2)?)?,
             line_hash: r.get(3)?,
             above: from_blob(&r.get::<_, Vec<u8>>(4)?),
             below: from_blob(&r.get::<_, Vec<u8>>(5)?),
         },
         commit: r.get(6)?,
         line: r.get(7)?,
-        state,
+        state: enum_from(r.get(8)?)?,
         review: r.get(9)?,
         created_at: r.get(10)?,
     })
@@ -92,13 +58,13 @@ pub(super) fn insert(tx: &Transaction, m: &Mark) -> rusqlite::Result<Mark> {
         params![
             (m.id != 0).then_some(m.id),
             m.anchor.path,
-            side_str(m.anchor.side),
+            enum_to(&m.anchor.side),
             m.anchor.line_hash,
             to_blob(&m.anchor.above),
             to_blob(&m.anchor.below),
             m.commit,
             m.line,
-            state_str(m.state),
+            enum_to(&m.state),
             m.review,
             m.created_at,
         ],
@@ -123,6 +89,7 @@ impl Store {
 mod tests {
     use super::super::Edit;
     use super::*;
+    use crate::anchor::Side;
 
     fn mark(path: &str, review: &str) -> Mark {
         Mark {

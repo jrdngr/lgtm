@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
@@ -26,7 +27,8 @@ pub struct Owner {
 struct Session {
     owner: Owner,
     master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    /// Feeds a writer thread, so a PTY that isn't reading input never blocks a caller.
+    input: Sender<Vec<u8>>,
     killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
@@ -80,7 +82,7 @@ impl Ptys {
         let mut child = pair.slave.spawn_command(cmd).context("spawn")?;
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader()?;
-        let writer = pair.master.take_writer()?;
+        let input = spawn_writer(pair.master.take_writer()?);
         let killer = child.clone_killer();
 
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
@@ -89,7 +91,7 @@ impl Ptys {
             Session {
                 owner,
                 master: pair.master,
-                writer,
+                input,
                 killer,
             },
         );
@@ -112,10 +114,9 @@ impl Ptys {
     }
 
     pub fn write(&self, id: u32, data: &[u8]) -> anyhow::Result<()> {
-        let mut sessions = self.sessions.lock().unwrap();
-        let session = sessions.get_mut(&id).context("no such pty")?;
-        session.writer.write_all(data)?;
-        Ok(())
+        let sessions = self.sessions.lock().unwrap();
+        let session = sessions.get(&id).context("no such pty")?;
+        session.input.send(data.to_vec()).ok().context("pty closed")
     }
 
     pub fn resize(&self, id: u32, cols: u16, rows: u16) -> anyhow::Result<()> {
@@ -151,6 +152,19 @@ impl Ptys {
             }
         }
     }
+}
+
+/// Writes queued input in order. The thread ends when the session is dropped or a write fails.
+fn spawn_writer(mut writer: Box<dyn Write + Send>) -> Sender<Vec<u8>> {
+    let (tx, rx) = channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        while let Ok(data) = rx.recv() {
+            if writer.write_all(&data).is_err() {
+                break;
+            }
+        }
+    });
+    tx
 }
 
 pub fn default_shell() -> String {
@@ -273,6 +287,31 @@ mod tests {
             out.push_str(&data);
         }
         assert!(out.ends_with("got:ping"), "{out:?}");
+    }
+
+    #[test]
+    fn write_to_a_pty_not_reading_never_blocks() {
+        let ptys = Ptys::default();
+        let (tx, rx) = mpsc::channel();
+        let argv = ["sleep", "30"].map(String::from).to_vec();
+        let id = ptys
+            .spawn(
+                owner("w"),
+                Path::new("/"),
+                (80, 24),
+                Some(argv),
+                &[],
+                move |e| {
+                    if let PtyEvent::Exit { .. } = e {
+                        tx.send(()).unwrap();
+                    }
+                },
+            )
+            .unwrap();
+        ptys.write(id, &vec![b'x'; 1 << 20]).unwrap();
+        ptys.write(id, b"more").unwrap();
+        ptys.kill_window("w");
+        rx.recv_timeout(Duration::from_secs(10)).unwrap();
     }
 
     #[test]

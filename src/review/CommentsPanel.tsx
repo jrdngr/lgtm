@@ -1,5 +1,5 @@
 import { useWorkspace } from "../workspaces/context";
-import { commentText } from "./comments";
+import { commentText, rowLabel } from "./comments";
 import { useCurrentReview } from "./current";
 import "./comments.css";
 
@@ -25,15 +25,11 @@ export function CommentsPanel() {
       </div>
       <ul>
         {comments.map((c) => {
-          const f = files[c.file];
-          const row = c.rows && f?.rows[c.rows.end];
-          const line = row ? (row.newLine ?? row.oldLine) : undefined;
           return (
             <li key={c.id}>
               <button type="button" onClick={() => review.jumpToComment(c.id)} title={c.path}>
                 <span className="comment-where">
-                  {c.path.split("/").pop()}
-                  {line !== undefined ? `:${line}` : ""}
+                  {rowLabel(files, c.file, c.path, c.rows?.end)}
                   {!c.rows && <span className="comment-outdated">code changed</span>}
                 </span>
                 <span className="comment-preview">{c.body || "No text yet"}</span>

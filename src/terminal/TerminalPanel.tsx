@@ -28,13 +28,17 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
     // Deferred so a mount that's undone at once (React StrictMode) never starts a shell, and
     // setup never starts twice.
     const spawn = window.setTimeout(() => {
-      commands.ptySpawn(workspace, term.cols, term.rows, setup.current, channel).then((r) => {
+      const { cols, rows } = term;
+      commands.ptySpawn(workspace, cols, rows, setup.current, channel).then((r) => {
         if (r.status === "error") {
           term.write(`failed to start shell: ${r.error}\r\n`);
         } else if (disposed) {
           commands.ptyKill(r.data);
         } else {
           id = r.data;
+          // Resizes while it started weren't sent.
+          if (term.cols !== cols || term.rows !== rows)
+            commands.ptyResize(id, term.cols, term.rows);
         }
       });
       // Setup runs once, not again when the layout is restored.

@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::sync::Arc;
 
 use tauri::{Manager, State, WebviewWindow};
@@ -162,7 +161,7 @@ pub(crate) async fn install_personas(
     personas::install(&ws.root, &names, scope).map_err(err)
 }
 
-/// Writes a starter file for a new persona and opens it in the default editor.
+/// Writes a starter file for a new persona. Returns its path, to open in the editor.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn new_persona(
@@ -170,28 +169,8 @@ pub(crate) async fn new_persona(
     workspace: Option<String>,
     name: String,
     scope: Scope,
-) -> CmdResult<()> {
+) -> CmdResult<String> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let path = personas::create(&ws.root, &name, scope).map_err(err)?;
-    open(&path)
-}
-
-/// Opens a persona file in the default editor.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn open_persona(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    path: String,
-) -> CmdResult<()> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let path = Path::new(&path);
-    if !personas::is_persona_file(&ws.root, path) {
-        return Err("that isn't a persona file".into());
-    }
-    open(path)
-}
-
-fn open(path: &Path) -> CmdResult<()> {
-    open::that_detached(path).map_err(|e| format!("couldn't open {}: {e}", path.display()))
+    Ok(path.to_string_lossy().into_owned())
 }

@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::Store;
-use super::comments::{Pin, json_err};
+use super::comments::Pin;
+use super::{enum_from, enum_to, json_err};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -58,17 +59,6 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 }
 
 const COLUMNS: &str = "id, path, pins, level, reason, review, source, created_at";
-
-fn enum_from<T: serde::de::DeserializeOwned>(s: String) -> rusqlite::Result<T> {
-    serde_json::from_value(serde_json::Value::String(s)).map_err(json_err)
-}
-
-fn enum_to(v: &impl Serialize) -> String {
-    serde_json::to_value(v)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_string))
-        .unwrap_or_default()
-}
 
 fn row_to_hotspot(r: &rusqlite::Row) -> rusqlite::Result<Hotspot> {
     Ok(Hotspot {
@@ -126,6 +116,7 @@ mod tests {
             below: vec![2],
             commit: "c".into(),
             line: 3,
+            path: None,
         };
         let h = |reason: &str, review: &str| Hotspot {
             id: 0,

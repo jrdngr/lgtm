@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Finding } from "../bindings";
+import { openFile } from "../editor/open";
 import { useCurrentReview } from "../review/current";
 import { rowsText } from "../review/sendText";
 import { useWorkspace } from "../workspaces/context";
@@ -48,7 +49,8 @@ export function FindingCard(props: Props) {
     onCheck,
     onSend,
   } = props;
-  const review = useCurrentReview(useWorkspace());
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
   const [commented, setCommented] = useState(false);
   const placed = f.locations.map((loc) => (review ? place(review.files, loc) : undefined));
   const first = placed.find((p) => p);
@@ -103,11 +105,11 @@ export function FindingCard(props: Props) {
             type="button"
             // biome-ignore lint/suspicious/noArrayIndexKey: a finding's locations never reorder
             key={i}
-            disabled={!placed[i]}
-            title={placed[i] ? "Show in the review" : notHere}
+            title={placed[i] ? "Show in the review" : "Open in the editor"}
             onClick={() => {
               const at = placed[i];
-              if (at) review?.jumpToRow(at.file, at.row);
+              if (at && review) review.jumpToRow(at.file, at.row);
+              else openFile(workspace, loc.path, loc.start ?? undefined);
             }}
           >
             {locationText(loc)}

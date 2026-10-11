@@ -17,14 +17,21 @@ const MAX_FILES: usize = 4096;
 pub struct FileCache(HashMap<Key, (ReviewFile, FileDto)>);
 
 /// Same base, same patch, same settings: the same file contents, so the same build. The new
-/// side's commit can differ, since an edit elsewhere makes a new working-copy commit.
-pub fn key(sides: &Sides, d: &FileDiff, config: &Config) -> Key {
+/// side's commit can differ, since an edit elsewhere makes a new working-copy commit. An
+/// interdiff's old side isn't a commit, so its base is the new commit and its builds are only
+/// reused while that stays the same.
+pub fn key(sides: &Sides, interdiff: bool, d: &FileDiff, config: &Config) -> Key {
     let mut h = blake3::Hasher::new();
     let mut field = |bytes: &[u8]| {
         h.update(&(bytes.len() as u64).to_le_bytes());
         h.update(bytes);
     };
-    field(sides.old.as_deref().unwrap_or("").as_bytes());
+    let base = match (&sides.old, interdiff) {
+        (_, true) => &sides.new,
+        (Some(old), false) => old,
+        (None, false) => "",
+    };
+    field(base.as_bytes());
     field(d.path.as_bytes());
     field(d.old_path.as_deref().unwrap_or("").as_bytes());
     field(config.source.as_bytes());

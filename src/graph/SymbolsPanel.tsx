@@ -18,7 +18,8 @@ function callersOf(graph: GraphDto) {
 
 /** The current review's changed symbols by file. Click one to show it. */
 export function SymbolsPanel() {
-  const review = useCurrentReview(useWorkspace());
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
   const { graph, error, loading } = useGraph(review);
   if (!review) return <div className="placeholder">No review open</div>;
   if (error) return <div className="placeholder error">{error}</div>;
@@ -48,7 +49,7 @@ export function SymbolsPanel() {
                   <button
                     type="button"
                     className={`gnode-${n.status}`}
-                    onClick={() => showNode(review, n)}
+                    onClick={() => showNode(review, n, workspace)}
                     title={users.length ? `Used by ${users.map(nodeLabel).join(", ")}` : n.path}
                   >
                     <span className="gnode-sign">{STATUS_SIGN[n.status]}</span>

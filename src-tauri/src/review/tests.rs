@@ -196,6 +196,28 @@ async fn marks_follow_a_heavily_edited_rename_reported_as_delete_and_add() {
 }
 
 #[tokio::test]
+async fn a_mark_on_a_split_file_matches_in_only_one_of_its_parts() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "old.rs", "fn a() {}\n");
+    jj(d, &["new", "-m", "change"]);
+    write(d, "old.rs", "fn a() {}\nuse x;\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let row = row_of(&review, 0, "use x;", 0);
+    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+        .unwrap();
+
+    std::fs::remove_file(d.join("old.rs")).unwrap();
+    write(d, "b.rs", "use x;\nfn b() {}\n");
+    write(d, "c.rs", "use x;\nfn c() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    assert_eq!(
+        marked(&review, &review.state.marks),
+        [("use x;".into(), MarkState::Reviewed)]
+    );
+}
+
+#[tokio::test]
 async fn reapplying_same_state_is_a_no_op_and_reset_removes_review_marks() {
     let (dir, ctx) = repo();
     let d = dir.path();

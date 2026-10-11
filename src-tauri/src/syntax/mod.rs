@@ -12,7 +12,7 @@ use specta::Type;
 use tree_sitter::{Node, Parser, QueryCursor, StreamingIterator, Tree};
 use tree_sitter_highlight::{HighlightEvent, Highlighter};
 
-use langs::{LANGS, Lang, lang_key};
+use langs::{LANGS, Lang, injected, lang_key};
 
 /// Capture names the UI styles, as `hl-<index>` classes. Order is part of the UI contract.
 pub const HIGHLIGHT_NAMES: &[&str] = &[
@@ -137,46 +137,64 @@ impl Parsed {
     /// Highlight segments for the given 1-based lines.
     pub fn highlight(&self, source: &str, lines: &[u32]) -> HashMap<u32, Vec<Segment>> {
         let wanted: std::collections::HashSet<u32> = lines.iter().copied().collect();
-        let mut out: HashMap<u32, Vec<Segment>> = HashMap::new();
-        let mut highlighter = Highlighter::new();
-        let Ok(events) =
-            highlighter.highlight(&self.lang.highlight, source.as_bytes(), None, None, |_| {
-                None
-            })
-        else {
-            return out;
-        };
-        let mut stack: Vec<u8> = Vec::new();
-        let mut line = 1u32;
-        for event in events {
-            match event {
-                Ok(HighlightEvent::HighlightStart(h)) => stack.push(h.0 as u8),
-                Ok(HighlightEvent::HighlightEnd) => {
-                    stack.pop();
-                }
-                Ok(HighlightEvent::Source { start, end }) => {
-                    for (i, piece) in source[start..end].split('\n').enumerate() {
-                        if i > 0 {
-                            line += 1;
-                        }
-                        let piece = piece.strip_suffix('\r').unwrap_or(piece);
-                        if piece.is_empty() || !wanted.contains(&line) {
-                            continue;
-                        }
-                        let len = piece.encode_utf16().count() as u32;
-                        let segs = out.entry(line).or_default();
-                        let class = stack.last().copied();
-                        match segs.last_mut() {
-                            Some((c, l)) if *c == class => *l += len,
-                            _ => segs.push((class, len)),
-                        }
+        highlight_lines(self.lang, source, |l| wanted.contains(&l))
+    }
+}
+
+/// Highlight segments for every line of `source`, empty when `path` has no grammar.
+pub fn highlight_file(path: &str, source: &str) -> Vec<Vec<Segment>> {
+    let Some(lang) = lang_key(path).and_then(|k| LANGS.get(k)) else {
+        return vec![];
+    };
+    let mut by_line = highlight_lines(lang, source, |_| true);
+    let count = source.split('\n').count() as u32;
+    (1..=count)
+        .map(|l| by_line.remove(&l).unwrap_or_default())
+        .collect()
+}
+
+fn highlight_lines(
+    lang: &Lang,
+    source: &str,
+    wanted: impl Fn(u32) -> bool,
+) -> HashMap<u32, Vec<Segment>> {
+    let mut out: HashMap<u32, Vec<Segment>> = HashMap::new();
+    let mut highlighter = Highlighter::new();
+    let Ok(events) = highlighter.highlight(&lang.highlight, source.as_bytes(), None, None, |n| {
+        injected(n)
+    }) else {
+        return out;
+    };
+    let mut stack: Vec<u8> = Vec::new();
+    let mut line = 1u32;
+    for event in events {
+        match event {
+            Ok(HighlightEvent::HighlightStart(h)) => stack.push(h.0 as u8),
+            Ok(HighlightEvent::HighlightEnd) => {
+                stack.pop();
+            }
+            Ok(HighlightEvent::Source { start, end }) => {
+                for (i, piece) in source[start..end].split('\n').enumerate() {
+                    if i > 0 {
+                        line += 1;
+                    }
+                    let piece = piece.strip_suffix('\r').unwrap_or(piece);
+                    if piece.is_empty() || !wanted(line) {
+                        continue;
+                    }
+                    let len = piece.encode_utf16().count() as u32;
+                    let segs = out.entry(line).or_default();
+                    let class = stack.last().copied();
+                    match segs.last_mut() {
+                        Some((c, l)) if *c == class => *l += len,
+                        _ => segs.push((class, len)),
                     }
                 }
-                Err(_) => break,
             }
+            Err(_) => break,
         }
-        out
     }
+    out
 }
 
 fn kind_of(node_kind: &str) -> SymbolKind {
@@ -210,7 +228,7 @@ mod tests {
 
     #[test]
     fn every_language_builds() {
-        assert_eq!(LazyLock::force(&LANGS).len(), 11);
+        assert_eq!(LazyLock::force(&LANGS).len(), 12);
     }
 
     #[test]
@@ -277,6 +295,25 @@ mod tests {
             .position(|n| *n == "keyword")
             .unwrap() as u8;
         assert!(segs.iter().any(|s| s.0 == Some(keyword)));
+    }
+
+    #[test]
+    fn highlight_file_has_a_segment_list_per_line() {
+        let lines = highlight_file("a.rs", "fn f() {}\n\nlet x = 1;\n");
+        assert_eq!(lines.len(), 4);
+        assert!(lines[1].is_empty() && lines[3].is_empty());
+        assert!(highlight_file("notes.txt", "hi").is_empty());
+    }
+
+    #[test]
+    fn markdown_highlights_inline_text_and_fenced_code_by_language() {
+        let src = "# Title\n\nSome `code` and **bold**.\n\n```rust\nfn f() {}\n```\n";
+        let lines = highlight_file("a.md", src);
+        let class = |n: &str| Some(HIGHLIGHT_NAMES.iter().position(|h| *h == n).unwrap() as u8);
+        let has = |line: usize, n: &str| lines[line].iter().any(|s| s.0 == class(n));
+        assert!(has(0, "tag"), "{:?}", lines[0]);
+        assert!(has(2, "string") && has(2, "keyword"), "{:?}", lines[2]);
+        assert!(has(5, "keyword"), "{:?}", lines[5]);
     }
 
     #[test]

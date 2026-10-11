@@ -52,7 +52,7 @@ impl Edit {
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS marks (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL,
     side TEXT NOT NULL,
     line_hash INTEGER NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS marks (
 CREATE INDEX IF NOT EXISTS marks_path ON marks (path);
 CREATE INDEX IF NOT EXISTS marks_review ON marks (review);
 CREATE TABLE IF NOT EXISTS file_checks (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL,
     old_hashes BLOB NOT NULL,
     new_hashes BLOB NOT NULL,
@@ -90,6 +90,22 @@ CREATE TABLE IF NOT EXISTS line_hashes (
     PRIMARY KEY (commit_id, path)
 );
 ";
+
+pub(super) fn json_err(e: serde_json::Error) -> rusqlite::Error {
+    rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, e.into())
+}
+
+/// A unit enum stored as its serde name.
+pub(super) fn enum_from<T: serde::de::DeserializeOwned>(s: String) -> rusqlite::Result<T> {
+    serde_json::from_value(serde_json::Value::String(s)).map_err(json_err)
+}
+
+pub(super) fn enum_to(v: &impl serde::Serialize) -> String {
+    serde_json::to_value(v)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default()
+}
 
 pub(crate) fn to_blob(hashes: &[i64]) -> Vec<u8> {
     hashes.iter().flat_map(|h| h.to_le_bytes()).collect()
@@ -117,7 +133,33 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
              ALTER TABLE sessions ADD COLUMN revset TEXT NOT NULL DEFAULT '';",
         )?;
     }
-    Ok(())
+    migrate_autoincrement(db)
+}
+
+/// Marks and checks once reused a deleted row's id, which undo history still refers to.
+/// SQLite can't add AUTOINCREMENT in place, so the tables are rebuilt.
+fn migrate_autoincrement(db: &Connection) -> rusqlite::Result<()> {
+    for table in ["marks", "file_checks"] {
+        let sql: String = db.query_row(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+            [table],
+            |r| r.get(0),
+        )?;
+        if sql.contains("AUTOINCREMENT") {
+            continue;
+        }
+        let create = sql.replacen("PRIMARY KEY", "PRIMARY KEY AUTOINCREMENT", 1);
+        db.execute_batch(&format!(
+            "BEGIN;
+             ALTER TABLE {table} RENAME TO {table}_old;
+             {create};
+             INSERT INTO {table} SELECT * FROM {table}_old;
+             DROP TABLE {table}_old;
+             COMMIT;"
+        ))?;
+    }
+    // Brings back the indexes dropped with the old tables.
+    db.execute_batch(SCHEMA)
 }
 
 impl Store {
@@ -227,6 +269,57 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_tables_gain_autoincrement_and_keep_their_rows() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch(&SCHEMA.replace("AUTOINCREMENT", ""))
+            .unwrap();
+        db.execute_batch(
+            "INSERT INTO marks VALUES (1, 'a.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0),
+                                      (2, 'b.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0);",
+        )
+        .unwrap();
+        let store = Store::init(db).unwrap();
+        let sql: String = store
+            .db
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name = 'marks'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(sql.contains("AUTOINCREMENT"));
+        store
+            .db
+            .execute("DELETE FROM marks WHERE id = 2", [])
+            .unwrap();
+        store
+            .db
+            .execute_batch(
+                "INSERT INTO marks (path, side, line_hash, above, below, commit_id, line, state, \
+                 review, created_at) VALUES ('c.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0)",
+            )
+            .unwrap();
+        let ids: Vec<i64> = store
+            .db
+            .prepare("SELECT id FROM marks ORDER BY id")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(ids, [1, 3]);
+        let indexes: i64 = store
+            .db
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND tbl_name = 'marks'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(indexes, 2);
+    }
 
     #[test]
     fn line_hashes_round_trip() {

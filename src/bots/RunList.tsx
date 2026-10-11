@@ -2,7 +2,8 @@ import type { BotRun } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
 import { runState } from "./personas";
-import { forgetRun, refreshRun, useRuns } from "./runs";
+import { RunControls } from "./RunControls";
+import { forgetRun, runAction, useRuns } from "./runs";
 
 function when(ms: number) {
   return new Date(ms).toLocaleString(undefined, {
@@ -22,12 +23,6 @@ interface Props {
 /** The workspace's persona reviews, newest first, with Stop, Retry and Delete. */
 export function RunList({ workspace, onOpen, onError }: Props) {
   const runs = useRuns(workspace);
-
-  async function act(run: BotRun, f: () => Promise<{ status: string; error?: string }>) {
-    const r = await f();
-    onError(r.status === "error" ? r.error : undefined);
-    await refreshRun(run.id);
-  }
 
   async function remove(run: BotRun) {
     const r = await commands.deleteBots(run.id);
@@ -55,25 +50,11 @@ export function RunList({ workspace, onOpen, onError }: Props) {
                 </span>
               </button>
               <span className="bots-run-buttons">
-                {run.active ? (
-                  <button type="button" onClick={() => act(run, () => commands.stopBots(run.id))}>
-                    Stop
+                <RunControls run={run} act={(f) => runAction(run, f, onError)}>
+                  <button type="button" onClick={() => remove(run)} title="Delete this run">
+                    ✕
                   </button>
-                ) : (
-                  <>
-                    {state === "halted" && (
-                      <button
-                        type="button"
-                        onClick={() => act(run, () => commands.continueBots(run.id, run.options))}
-                      >
-                        Retry
-                      </button>
-                    )}
-                    <button type="button" onClick={() => remove(run)} title="Delete this run">
-                      ✕
-                    </button>
-                  </>
-                )}
+                </RunControls>
               </span>
             </li>
           );

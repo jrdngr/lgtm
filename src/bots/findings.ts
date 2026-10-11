@@ -120,6 +120,16 @@ export function findingText(f: Finding, source: string): string {
   return parts.filter((p) => p.trim()).join("\n\n");
 }
 
+/** A finding picked to fix or send, with whose finding it is. */
+export interface Picked {
+  f: Finding;
+  source: string;
+}
+
+/** Picked findings as markdown, one after another. */
+export const findingsText = (picks: Picked[]) =>
+  picks.map(({ f, source }) => findingText(f, source)).join("\n\n---\n\n");
+
 /** Where a location lands in a review: its file, the row to jump to, and the changed rows a
  * comment on it covers. */
 export interface Placed {

@@ -1,5 +1,7 @@
 import type { GraphNode } from "../bindings";
+import { openFile } from "../editor/open";
 import type { CurrentReview } from "../review/current";
+import type { WorkspaceName } from "../workspaces/context";
 
 /** A node's label: `Parent::name` for a member. */
 export const nodeLabel = (n: GraphNode) => (n.parent ? `${n.parent}::${n.name}` : n.name);
@@ -13,9 +15,9 @@ export function nodeDone(review: CurrentReview, n: GraphNode): number | undefine
 }
 
 /** Shows a node's code in the review: its first changed row, or the file for a caller in
- * one of the review's files. Callers elsewhere have nothing to show yet. */
-export function showNode(review: CurrentReview, n: GraphNode) {
-  if (n.file === null) return;
+ * one of the review's files. Callers elsewhere open in the editor. */
+export function showNode(review: CurrentReview, n: GraphNode, workspace: WorkspaceName) {
+  if (n.file === null) return openFile(workspace, n.path, n.line);
   if (n.rows.length > 0) review.jumpToRow(n.file, n.rows[0]);
   else review.jump(n.file);
 }

@@ -57,7 +57,13 @@ mod tests {
         let names: Vec<(&str, bool)> = refs.iter().map(|r| (r.name.as_str(), r.call)).collect();
         assert_eq!(
             names,
-            [("a", true), ("b", true), ("S", false), ("x", false), ("y", false)]
+            [
+                ("a", true),
+                ("b", true),
+                ("S", false),
+                ("x", false),
+                ("y", false)
+            ]
         );
         assert_eq!(refs[1].line, 2);
     }

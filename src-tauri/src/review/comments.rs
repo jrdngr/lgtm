@@ -102,8 +102,10 @@ impl Review {
         Some((file, rows.map(|(_, span)| span)))
     }
 
-    /// The changed row a pin matches best, trying the files whose path pools hold `path`.
+    /// The changed row a pin matches best, trying the files whose path pools hold its path:
+    /// its own, or else `path`, its comment's.
     fn locate(&self, store: &Store, remaps: &mut Remaps, path: &str, pin: &Pin) -> Option<RowRef> {
+        let path = pin.path.as_deref().unwrap_or(path);
         let removed = self.removed_paths();
         let anchor = pin.anchor(path);
         for (file_idx, file) in self.files.iter().enumerate() {
@@ -152,13 +154,14 @@ impl Review {
             let Some(commit) = file.side(k.side).anchor_commit(store)? else {
                 continue;
             };
-            pins.push(Pin::new(&k.anchor, commit, k.line));
+            let path = file.side(k.side).path.clone();
+            pins.push(Pin::new(&k.anchor, commit, k.line, Some(path)));
         }
         if pins.len() > 2 {
             pins.drain(1..pins.len() - 1);
         }
-        anyhow::ensure!(!pins.is_empty(), "these rows can't hold a comment");
-        let path = file.side(pins[pins.len() - 1].side).path.clone();
+        let last = pins.last().context("these rows can't hold a comment")?;
+        let path = last.path.clone().unwrap_or_default();
         Ok((path, pins))
     }
 }

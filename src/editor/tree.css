@@ -1,0 +1,24 @@
+/* VS Code's dark git decoration colors. */
+.file-tree .decor-added {
+  color: #81b88b;
+}
+
+.file-tree .decor-renamed {
+  color: #73c991;
+}
+
+.file-tree .decor-modified {
+  color: #e2c08d;
+}
+
+.file-tree .decor-conflict {
+  color: #e4676b;
+}
+
+.file-tree .decor {
+  margin-left: auto;
+  padding-right: 4px;
+  font:
+    11px Menlo,
+    monospace;
+}

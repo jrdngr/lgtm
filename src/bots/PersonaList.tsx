@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Personas, Scope } from "../bindings";
+import { openFile } from "../editor/open";
 import { commands } from "../ipc";
 import { useWorkspace } from "../workspaces/context";
 
@@ -17,10 +18,7 @@ export function PersonaList({ personas, picked, onToggle, onChanged }: Props) {
   const [adding, setAdding] = useState<{ name: string; scope: Scope }>();
   const [error, setError] = useState<string>();
 
-  async function edit(path: string) {
-    const r = await commands.openPersona(workspace, path);
-    setError(r.status === "error" ? r.error : undefined);
-  }
+  const edit = (path: string) => openFile(workspace, path);
 
   async function add() {
     if (!adding) return;
@@ -29,6 +27,7 @@ export function PersonaList({ personas, picked, onToggle, onChanged }: Props) {
     setError(undefined);
     setAdding(undefined);
     onChanged();
+    openFile(workspace, r.data);
   }
 
   return (

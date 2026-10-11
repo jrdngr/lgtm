@@ -20,7 +20,7 @@ pub enum Event {
         part: u32,
         activity: String,
     },
-    /// A fix's reply grew by `text`.
+    /// A fix's reply grew. `text` is the whole reply so far.
     FixText { run: u32, fix: u32, text: String },
     /// Anything else: parts or fixes added or finished, or the run started or stopped.
     Changed { run: u32 },
@@ -174,11 +174,14 @@ impl RepoCtx {
     /// Stops the run's agents, and keeps it from starting its next step.
     pub fn stop_bots(&self, id: u32, runs: &Runs) {
         self.bots.stop(id);
-        runs.stop_all(&run_prefix(id));
+        runs.stop_all(&self.agent_key(&run_prefix(id)));
     }
 
     pub fn delete_bots(&self, id: u32) -> anyhow::Result<()> {
-        ensure!(!self.bots.is_active(id), "stop the run first");
+        ensure!(
+            !self.bots.is_active(id) && !self.bots.has_fix(id),
+            "stop the run first"
+        );
         Ok(self.store.lock().unwrap().delete_bot_run(id)?)
     }
 
@@ -275,7 +278,7 @@ impl RepoCtx {
                         edit: false,
                         schema: Some(schema),
                     };
-                    let reply = agent::run(runs, &run_key(id, idx), task, |p| {
+                    let reply = agent::run(runs, &self.agent_key(&run_key(id, idx)), task, |p| {
                         if let Progress::Tool(activity) = p {
                             self.bots.set_activity(id, idx, activity.clone());
                             notify(Event::Activity {

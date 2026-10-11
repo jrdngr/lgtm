@@ -94,6 +94,13 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
   return `${code}\n\n${c.body.trim()}`;
 }
 
+/** Where a row is, as `file.ts:12`, or just the file name without a row. */
+export function rowLabel(files: FlatFile[], file: number, path: string, row?: number): string {
+  const r = row !== undefined ? files[file]?.rows[row] : undefined;
+  const line = r ? (r.newLine ?? r.oldLine) : undefined;
+  return `${path.split("/").pop()}${line != null ? `:${line}` : ""}`;
+}
+
 /** Parts of an agent reply: plain text, and suggested comments from ```comment blocks. */
 export type ReplyPart = { kind: "text" | "suggestion"; text: string };
 
