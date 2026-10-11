@@ -53,7 +53,7 @@ export function RevLabel({ revset, changes }: Props) {
     const reset = () => setLength(full);
     reset();
     const observer = new ResizeObserver(reset);
-    observer.observe(el.closest(".review-bar") ?? el);
+    observer.observe(el.closest(".toolbar") ?? el);
     return () => observer.disconnect();
   }, [full]);
 

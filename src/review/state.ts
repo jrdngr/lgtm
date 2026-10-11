@@ -1,5 +1,6 @@
-import type { CheckState, MarkDto, StateDto } from "../bindings";
+import type { CheckState, HotspotDto, MarkDto, StateDto } from "../bindings";
 import { commentedRows } from "./comments";
+import { hotRows } from "./hotspots";
 import { type FlatFile, markKey } from "./model";
 
 export type RowState = "reviewed" | "skipped" | "flagged" | "unreviewed";
@@ -16,6 +17,8 @@ export interface MarkIndex {
   amber: Set<string>;
   /** Rows inside a comment. */
   commented: Set<string>;
+  /** The worst hotspot on each row. */
+  hot: Map<string, HotspotDto>;
 }
 
 export function indexState(state: StateDto): MarkIndex {
@@ -24,6 +27,7 @@ export function indexState(state: StateDto): MarkIndex {
     checks: state.checks,
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
     commented: commentedRows(state.comments),
+    hot: hotRows(state.hotspots),
   };
 }
 

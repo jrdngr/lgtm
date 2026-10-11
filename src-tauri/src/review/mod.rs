@@ -1,14 +1,22 @@
 //! A loaded review: its diff, file sides, anchors, and the marks and checks matched onto it.
 
+mod agent;
+#[cfg(test)]
+mod agent_tests;
 mod build;
 mod cache;
 #[cfg(test)]
 mod comment_tests;
 mod comments;
 mod edits;
+mod graph;
+#[cfg(test)]
+mod hotspot_tests;
+mod hotspots;
 mod load;
 mod matching;
 mod progress;
+mod risk;
 mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;
@@ -33,6 +41,8 @@ use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
+pub use graph::GraphDto;
+pub use hotspots::{HotspotDto, HotspotInput};
 use load::Loaded;
 use matching::MatchedCheck;
 pub use progress::ProgressDto;
@@ -55,6 +65,8 @@ pub struct RepoCtx {
     pub workspace_base: Option<PathBuf>,
     pub store: Mutex<Store>,
     reviews: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
+    /// The review each workspace's last active review pane shows, by workspace key.
+    current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
     /// Persona reviews in progress.
@@ -139,6 +151,8 @@ pub struct StateDto {
     pub amber: Vec<RowRef>,
     /// Comments on the review's files, in file and row order. Ones whose code is gone last.
     pub comments: Vec<CommentDto>,
+    /// The review's hotspots, worst first. Ones whose code is gone have no rows.
+    pub hotspots: Vec<HotspotDto>,
 }
 
 pub struct Review {
@@ -155,10 +169,14 @@ pub struct Review {
     checks: Vec<Option<MatchedCheck>>,
     amber: Vec<RowRef>,
     comments: Vec<CommentDto>,
+    hotspots: Vec<HotspotDto>,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
     baseline: HashSet<i64>,
     session: i64,
+    /// The diff's endpoints as last loaded.
+    from: Option<String>,
+    to: String,
     /// The commits of the review's changes as last loaded, oldest first.
     commits: Vec<String>,
     prev: Option<Session>,
@@ -182,6 +200,7 @@ impl RepoCtx {
             workspace_base: crate::workspaces::ws_base(),
             store: Mutex::new(store),
             reviews: Mutex::default(),
+            current: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
             bots: Default::default(),
@@ -199,6 +218,22 @@ impl RepoCtx {
 
     pub fn close(&self, id: u32) {
         self.reviews.lock().unwrap().remove(&id);
+        self.current.lock().unwrap().retain(|_, r| *r != id);
+    }
+
+    /// Records the review a workspace's active review pane shows, for agents to act on.
+    pub fn focus(&self, workspace: Option<&str>, id: u32) {
+        let key = workspace.unwrap_or("").to_string();
+        self.current.lock().unwrap().insert(key, id);
+    }
+
+    pub fn current_review(&self, workspace: Option<&str>) -> anyhow::Result<u32> {
+        self.current
+            .lock()
+            .unwrap()
+            .get(workspace.unwrap_or(""))
+            .copied()
+            .context("no review is open in lgtm for this workspace")
     }
 
     /// Opens `revset` in the Combined view. Starts a review session, or with `resume`
@@ -285,8 +320,11 @@ impl Review {
             checks: vec![],
             amber: vec![],
             comments: vec![],
+            hotspots: vec![],
             baseline: HashSet::new(),
             session: 0,
+            from: None,
+            to: String::new(),
             commits: vec![],
             prev: None,
             undo: vec![],
@@ -305,6 +343,8 @@ impl Review {
         self.files = loaded.files;
         self.cfg = loaded.cfg;
         self.commits = loaded.commits;
+        self.from = loaded.dto.from.clone();
+        self.to = loaded.dto.to.clone();
         self.rematch(store)?;
         self.save_session(store)?;
         let mut dto = loaded.dto;
@@ -347,6 +387,7 @@ impl Review {
             checks,
             amber: self.amber.clone(),
             comments: self.comments.clone(),
+            hotspots: self.hotspots.clone(),
         }
     }
 }

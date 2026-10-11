@@ -1,11 +1,12 @@
 import type { AddPanelOptions, DockviewApi } from "dockview-react";
 
-type PanelKind = "review" | "terminal" | "report";
+type PanelKind = "review" | "terminal" | "report" | "graph";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
   report: "Reviewers",
+  graph: "Graph",
 };
 
 function addPanel(
@@ -47,6 +48,26 @@ export function openReport(api: DockviewApi, run: number) {
     params: { run },
     position,
   });
+}
+
+/** Shows the symbol graph beside the review, in its pane if it's already open. */
+export function openGraph(api: DockviewApi) {
+  const open = api.getPanel("graph");
+  if (open) return open.api.setActive();
+  const review = api.panels.find((p) => p.view.contentComponent === "review");
+  const position = review ? { referencePanel: review, direction: "right" as const } : undefined;
+  api.addPanel({ id: "graph", component: "graph", title: "Graph", position });
+}
+
+/** Opens a review pane on `@`, beside the active pane. */
+export function addReview(api: DockviewApi) {
+  const active = api.activePanel;
+  return addPanel(
+    api,
+    "review",
+    {},
+    active ? { referencePanel: active, direction: "left" } : undefined,
+  );
 }
 
 /** A review with a terminal below it. */

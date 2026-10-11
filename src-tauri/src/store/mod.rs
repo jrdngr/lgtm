@@ -4,6 +4,7 @@
 mod bots;
 mod checks;
 mod comments;
+mod hotspots;
 mod marks;
 mod sessions;
 
@@ -13,6 +14,7 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, Message, Pin, Workshop};
+pub use hotspots::{Hotspot, Level, Source};
 pub use marks::{Mark, MarkState};
 pub use sessions::Session;
 
@@ -136,6 +138,7 @@ impl Store {
         db.execute_batch(SCHEMA)?;
         comments::create_table(&db)?;
         bots::create_table(&db)?;
+        hotspots::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

@@ -60,6 +60,24 @@ export const commands = {
 	redoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("redo_marks", { review })),
 	/**  Removes the marks and file checks this review's revset created. */
 	resetReviewMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_review_marks", { review })),
+	/**  The review's symbol graph: changed symbols, their links, and unchanged callers. */
+	reviewGraph: (review: number) => typedError<GraphDto, string>(__TAURI_INVOKE("review_graph", { review })),
+	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
+	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
+	/**  Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code. */
+	mcpStatus: () => typedError<McpStatus, string>(__TAURI_INVOKE("mcp_status")),
+	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
+	registerMcp: () => typedError<null, string>(__TAURI_INVOKE("register_mcp")),
+	/**
+	 *  Runs an agent over the review to find its hotspots, replacing the last ones. Sends each
+	 *  tool call it makes through `activity`. `null` when it was stopped.
+	 */
+	findHotspots: (review: number, activity: Channel<string>) => typedError<{
+	state: StateDto,
+	/**  Hotspots the agent put outside the review's files. */
+	skipped: number,
+} | null, string>(__TAURI_INVOKE("find_hotspots", { review, activity })),
+	stopHotspots: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_hotspots", { review })),
 	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
 	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
@@ -99,10 +117,13 @@ export const commands = {
 
 /** Events */
 export const events = {
+	agentRevset: makeEvent<AgentRevset>("agent-revset"),
+	agentShow: makeEvent<AgentShow>("agent-show"),
 	botFixText: makeEvent<BotFixText>("bot-fix-text"),
 	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
+	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
 };
 
@@ -113,6 +134,19 @@ export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","
 export type Action = {
 	action: string,
 	closes: string[],
+};
+
+/**  An agent asked the workspace's review pane to review `revset`. */
+export type AgentRevset = {
+	workspace: string | null,
+	revset: string,
+};
+
+/**  An agent asked the workspace's review pane to show `path`, at `line` on the new side. */
+export type AgentShow = {
+	workspace: string | null,
+	path: string,
+	line: number | null,
 };
 
 /**  A message for a comment's agent. */
@@ -287,6 +321,53 @@ export type Fix = {
 	createdAt: number | null,
 };
 
+export type GraphDto = {
+	nodes: GraphNode[],
+	edges: GraphEdge[],
+};
+
+export type GraphEdge = {
+	/**  The node whose code uses `to`'s name. */
+	from: number,
+	to: number,
+};
+
+export type GraphNode = {
+	id: number,
+	name: string,
+	kind: SymbolKind,
+	status: NodeStatus,
+	path: string,
+	/**  The review file, absent for a caller in a file the review doesn't change. */
+	file: number | null,
+	/**  1-based, on the new side, or the old side for a removed symbol. */
+	line: number,
+	/**
+	 *  Changed rows directly in the symbol, by index among the file's rows, in order. Empty
+	 *  for callers.
+	 */
+	rows: number[],
+	/**  The enclosing symbol's name, like the type of an `impl` for a method. */
+	parent: string | null,
+};
+
+export type HotspotDto = {
+	id: number,
+	path: string,
+	file: number,
+	/**  Absent when its code can't be found any more. */
+	rows: RowSpan | null,
+	level: Level,
+	reason: string,
+	source: Source,
+};
+
+export type HotspotsFound = {
+	state: StateDto,
+	/**  Hotspots the agent put outside the review's files. */
+	skipped: number,
+};
+
 export type HunkDto = {
 	oldStart: number,
 	oldLines: number,
@@ -309,6 +390,8 @@ export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: 
 { kind: "squash"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
+
+export type Level = "high" | "medium" | "low";
 
 /**  A place in the change: a repository-relative path, with new-side lines when known. */
 export type Location = {
@@ -335,6 +418,20 @@ export type MarkDto = {
 
 export type MarkState = "reviewed" | "skipped" | "flagged";
 
+export type McpSetup = 
+/**  Registered to run this app. */
+"registered" | 
+/**  Registered to run another lgtm binary that exists, like a dev build. */
+"elsewhere" | 
+/**  Not registered, or registered to a binary that's gone. */
+"missing";
+
+export type McpStatus = {
+	setup: McpSetup,
+	/**  The command that registers this app. */
+	command: string,
+};
+
 export type Message = {
 	author: Author,
 	text: string,
@@ -350,6 +447,10 @@ export type Minimal = {
 	offTask: string[],
 	recommendations: string,
 };
+
+export type NodeStatus = "added" | "modified" | "removed" | 
+/**  Unchanged, but uses a changed symbol. */
+"caller";
 
 export type Outcome = "kept" | "dropped" | "downgraded" | "upgraded";
 
@@ -474,6 +575,12 @@ export type ReviewDto = {
 	hasWorkingCopy: boolean,
 };
 
+/**  An agent changed review `review`'s comments or hotspots. */
+export type ReviewStateChanged = {
+	review: number,
+	state: StateDto,
+};
+
 export type RowDto = {
 	kind: RowKind,
 	oldLine: number | null,
@@ -522,6 +629,13 @@ export type Since =
 /**  In the previous session but not in the review now. */
 "removed";
 
+/**  Which agent found a hotspot. */
+export type Source = 
+/**  The app's own headless run. */
+"headless" | 
+/**  An agent in a terminal, through the MCP server. */
+"terminal";
+
 export type Stance = "concede" | "defend" | "partlyConcede";
 
 /**  Everything marking and commenting can change. */
@@ -536,6 +650,8 @@ export type StateDto = {
 	amber: RowRef[],
 	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
 	comments: CommentDto[],
+	/**  The review's hotspots, worst first. Ones whose code is gone have no rows. */
+	hotspots: HotspotDto[],
 };
 
 export type Status = "running" | "done" | "failed" | "stopped";

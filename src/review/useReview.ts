@@ -81,6 +81,8 @@ export function useReview(workspace: WorkspaceName) {
 
   const refreshRef = useRef(refresh);
   refreshRef.current = refresh;
+  const setStateRef = useRef(setState);
+  setStateRef.current = setState;
 
   useEffect(() => {
     // Scoped to this window: other windows hold other repos.
@@ -89,9 +91,14 @@ export function useReview(workspace: WorkspaceName) {
     const staleSub = events.workingCopyStale(win).listen((e) => {
       if (e.payload.workspace === workspace) setStale(e.payload.message);
     });
+    // An agent added a comment or hotspots.
+    const stateSub = events.reviewStateChanged(win).listen((e) => {
+      if (e.payload.review === current.current?.id) setStateRef.current(e.payload.state);
+    });
     return () => {
       changed.then((un) => un());
       staleSub.then((un) => un());
+      stateSub.then((un) => un());
       if (current.current) commands.closeReview(current.current.id);
     };
   }, [workspace]);

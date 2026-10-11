@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tauri::{AppHandle, WebviewWindow};
 
-use super::{CmdResult, layout_path, repo_root};
+use super::{CmdResult, err, layout_path, repo_root};
 use crate::repo::{self, RepoInfo};
 use crate::{layout, recent};
 
@@ -52,4 +52,18 @@ pub(crate) fn save_layout(
 #[specta::specta]
 pub(crate) async fn check_tools() -> Vec<crate::tools::ToolProblem> {
     crate::tools::check().await
+}
+
+/// Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn mcp_status() -> CmdResult<crate::mcp::register::McpStatus> {
+    crate::mcp::register::status().map_err(err)
+}
+
+/// Registers this app's `lgtm mcp` with Claude Code at user scope.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn register_mcp() -> CmdResult<()> {
+    crate::mcp::register::register().await.map_err(err)
 }

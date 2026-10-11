@@ -8,6 +8,7 @@ pub mod personas;
 mod pipeline;
 mod prompts;
 mod schema;
+mod submitted;
 #[cfg(test)]
 mod tests;
 
@@ -21,6 +22,7 @@ pub use fix::Fix;
 pub use output::Output;
 pub use personas::Persona;
 pub use pipeline::{Event, Notify};
+pub use prompts::describe;
 
 /// What a run does past the personas' own reviews.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]

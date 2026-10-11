@@ -1,12 +1,15 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { StateDto, View } from "../bindings";
+import type { ChangeDto, StateDto, View } from "../bindings";
 import { commands } from "../ipc";
+import { agentsOff } from "../tools/agents";
+import { openGraph } from "../workbench/panels";
 import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
+import { stepHotspot } from "./hotspots";
 import { MarkMenu } from "./MarkMenu";
 import {
   buildLines,
@@ -19,10 +22,14 @@ import {
   type ViewMode,
 } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
+import { findRisks, useRiskRun } from "./riskRun";
 import { type Filter, fileProgress, indexState, plural, rowStates, sumProgress } from "./state";
+import { openRevisions } from "./target";
+import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
 import { usePublishReview } from "./usePublishReview";
+import { usePublishTarget } from "./usePublishTarget";
 import { useReview } from "./useReview";
 import { useReviewActions } from "./useReviewActions";
 import { useReviewKeys } from "./useReviewKeys";
@@ -34,7 +41,8 @@ import "./review.css";
 /** A review pane always opens on the working copy, so a revset saved last time that no longer
  * resolves can't break startup. */
 const START_REVSET = "@";
-const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [] };
+const NO_CHANGES: ChangeDto[] = [];
+const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], hotspots: [] };
 
 /** Clicks on these keep their own focus instead of giving it to the review. */
 function keepsFocus(t: EventTarget) {
@@ -46,14 +54,13 @@ function keepsFocus(t: EventTarget) {
   );
 }
 
-export function ReviewPanel({ api }: IDockviewPanelProps) {
+export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const workspace = useWorkspace();
   const [revset, setRevset] = useState(START_REVSET);
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
   const [filter, setFilter] = useState<Filter>("all");
   const [menu, setMenu] = useState<{ x: number; y: number }>();
-  const [revisions, setRevisions] = useState(false);
   const [scrollTo, setScrollTo] = useState<{ line: number }>();
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -102,6 +109,7 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
     [files, lines, sel],
   );
   const closeMenu = () => setMenu(undefined);
+  const risk = useRiskRun(review?.id);
   const a = useReviewActions({
     review,
     files,
@@ -201,12 +209,47 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
     return true;
   }
 
-  usePublishReview(
+  function findRisksNow() {
+    if (!review) return;
+    if (agentsOff()) return setError("Highlight risks needs Claude Code, which is turned off.");
+    findRisks(review.id, edited);
+  }
+
+  function stepHotspotFrom(dir: 1 | -1) {
+    const at = stepHotspot(lines, review?.state.hotspots ?? [], cursor, dir);
+    if (at !== undefined) jumpTo({ cursor: at, top: Math.max(at - 3, 0) });
+  }
+
+  /** Shows `line` of `path`: the row on that new-side line, or the nearest one. */
+  function showLine(path: string, line: number | null) {
+    const file = files.findIndex((f) => f.dto.path === path || f.dto.oldPath === path);
+    if (file < 0) return setError(`An agent asked to show ${path}, which isn't in this review`);
+    if (line === null) return jump(file);
+    const rows = files[file].rows;
+    let best = -1;
+    rows.forEach((r, i) => {
+      if (r.newLine === null) return;
+      if (best < 0 || Math.abs(r.newLine - line) < Math.abs((rows[best].newLine ?? 0) - line))
+        best = i;
+    });
+    if (best < 0) jump(file);
+    else jumpToRow(file, best);
+  }
+
+  const isCurrent = usePublishReview(
     api,
     workspace,
     review,
-    { files, progress, checks: index.checks, filter },
-    { jump, jumpToComment, jumpToRow, commentOn, send: sendText },
+    { files, progress, rowState, checks: index.checks, filter },
+    { jump, jumpToComment, jumpToRow, commentOn, send: sendText, findRisks: findRisksNow },
+  );
+
+  useAgentRequests(workspace, { isCurrent, show: showLine, load });
+  usePublishTarget(
+    api,
+    workspace,
+    { revset, changes: review?.changes ?? NO_CHANGES, loading },
+    { load, focus: focusRoot },
   );
 
   function openMenuAtCursor() {
@@ -231,7 +274,10 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
     applyMark: a.applyMark,
     openMenuAtCursor,
     startComment: a.startComment,
-    openRevisions: () => setRevisions(true),
+    openRevisions: () => openRevisions(workspace),
+    openGraph: () => openGraph(containerApi),
+    findRisks: findRisksNow,
+    stepHotspot: stepHotspotFrom,
     toggleFile: fold.toggleFile,
     toggleHunk: fold.toggleHunk,
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),
@@ -261,16 +307,7 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
       }}
     >
       <ReviewBar
-        workspace={workspace}
         review={review}
-        loading={loading}
-        revset={revset}
-        onLoad={load}
-        panel={revisions}
-        onPanel={(open) => {
-          setRevisions(open);
-          if (!open) focusRoot();
-        }}
         onView={changeView}
         mode={mode}
         onMode={setMode}
@@ -278,6 +315,9 @@ export function ReviewPanel({ api }: IDockviewPanelProps) {
         onFilter={changeFilter}
         progress={total}
         onReset={a.resetMarks}
+        onGraph={() => openGraph(containerApi)}
+        risk={risk}
+        onRisks={findRisksNow}
       />
       <ReviewNotes review={review} stale={stale} />
       {error && <div className="review-error">{error}</div>}

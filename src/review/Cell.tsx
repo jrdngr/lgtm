@@ -52,12 +52,17 @@ export function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
   const state = mark?.state ?? (checked ? "reviewed" : undefined);
   const amber = !state && index.amber.has(key);
   const commented = index.commented.has(key);
+  const hot = index.hot.get(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
       className={`cell kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
       title={amber ? "changed since reviewed" : markTitle(mark)}
     >
+      <span
+        className={`risk${hot ? ` risk-${hot.level}` : ""}`}
+        title={hot ? `${hot.level} risk: ${hot.reason}` : undefined}
+      />
       <span className="strip" />
       <span
         className={`fn-marker${marker ? " on" : ""}`}

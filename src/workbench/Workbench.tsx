@@ -1,13 +1,17 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { BotsPanel } from "../bots/BotsPanel";
+import { SymbolsPanel } from "../graph/SymbolsPanel";
 import type { RepoInfo } from "../ipc";
 import { CommentsPanel } from "../review/CommentsPanel";
 import { FilesPanel } from "../review/FilesPanel";
+import { HotspotsPanel } from "../review/HotspotsPanel";
+import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { chord } from "./keys";
-import { addTerminal, openReport } from "./panels";
+import { addReview, addTerminal, openReport } from "./panels";
+import { RevPicker } from "./RevPicker";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
@@ -79,6 +83,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+E": () => showView("right", "files"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+O": () => showView("right", "bots"),
+    "Mod+Shift+Y": () => showView("right", "symbols"),
+    "Mod+Shift+H": () => showView("right", "hotspots"),
   };
 
   /** The action for a chord, if it has one now. */
@@ -123,6 +129,9 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           New terminal
         </button>
         <span className="spacer" />
+        <div className="toolbar-center">
+          <RevPicker workspace={selected} onNoReview={withApi(addReview)} />
+        </div>
         <SideToggle
           side="right"
           open={sides.right.open}
@@ -130,6 +139,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           onClick={() => toggle("right")}
         />
       </header>
+      <McpOffer />
       <div className="workbench-body">
         <SidePanel
           side="left"
@@ -171,6 +181,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             views={[
               { id: "files", title: "Files", render: () => <FilesPanel /> },
               { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
+              { id: "symbols", title: "Symbols", render: () => <SymbolsPanel /> },
+              { id: "hotspots", title: "Hotspots", render: () => <HotspotsPanel /> },
               {
                 id: "bots",
                 title: "Reviewers",

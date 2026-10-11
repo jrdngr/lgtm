@@ -15,4 +15,6 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
+export const agentsOff = () => off;
+
 export const useAgentsOff = () => useSyncExternalStore(subscribe, () => off);

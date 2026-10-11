@@ -40,24 +40,31 @@ pub struct Target {
 
 impl Target {
     pub async fn load(ws: &Workspace, run: &BotRun) -> anyhow::Result<Self> {
-        let range = Range {
-            from: run.from.clone(),
-            to: run.to.clone(),
-        };
-        let (commits, stat, diff) = tokio::try_join!(
-            ws.jj.descriptions(&range),
-            ws.jj.diff_stat(&range),
-            ws.jj.git_diff(&range),
-        )?;
-        let short = |c: &str| c.chars().take(8).collect::<String>();
-        let span = match &run.from {
-            Some(from) => format!("from commit {} to {}", short(from), short(&run.to)),
-            None => format!("up to commit {}", short(&run.to)),
-        };
         Ok(Self {
-            context: context(&run.revset, &span, &commits, &stat, &diff),
+            context: describe(ws, &run.revset, run.from.clone(), run.to.clone()).await?,
         })
     }
+}
+
+/// Describes the change from `from` to `to` for an agent: its commits, stat and diff.
+pub async fn describe(
+    ws: &Workspace,
+    revset: &str,
+    from: Option<String>,
+    to: String,
+) -> anyhow::Result<String> {
+    let short = |c: &str| c.chars().take(8).collect::<String>();
+    let span = match &from {
+        Some(from) => format!("from commit {} to {}", short(from), short(&to)),
+        None => format!("up to commit {}", short(&to)),
+    };
+    let range = Range { from, to };
+    let (commits, stat, diff) = tokio::try_join!(
+        ws.jj.descriptions(&range),
+        ws.jj.diff_stat(&range),
+        ws.jj.git_diff(&range),
+    )?;
+    Ok(context(revset, &span, &commits, &stat, &diff))
 }
 
 fn context(revset: &str, span: &str, commits: &str, stat: &str, diff: &str) -> String {

@@ -1,20 +1,27 @@
 import { useSyncExternalStore } from "react";
-import type { CheckState, CommentDto } from "../bindings";
+import type { CheckState, CommentDto, HotspotDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { FlatFile } from "./model";
-import type { Filter, Progress } from "./state";
+import type { Filter, Progress, RowStateFn } from "./state";
 import type { SendOutcome } from "./useSendText";
 
 /** What the last active review pane shows, for panels that follow it (files, comments). */
 export interface CurrentReview {
+  /** The backend's review id. */
+  id: number;
   revset: string;
   /** The commit on the new side of the diff. */
   to: string;
   files: FlatFile[];
   progress: Progress[];
+  rowState: RowStateFn;
   checks: CheckState[];
   filter: Filter;
   comments: CommentDto[];
+  /** Worst first. */
+  hotspots: HotspotDto[];
+  /** Starts an agent finding the review's hotspots. */
+  findRisks(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */
@@ -40,6 +47,10 @@ export function publishReview(workspace: WorkspaceName, next: CurrentReview | un
 /** Clears the workspace's current review only if `owner` is still it. */
 export function retractReview(workspace: WorkspaceName, owner: CurrentReview | undefined) {
   if (owner && current.get(workspaceKey(workspace)) === owner) publishReview(workspace, undefined);
+}
+
+export function isCurrent(workspace: WorkspaceName, owner: CurrentReview | undefined) {
+  return !!owner && current.get(workspaceKey(workspace)) === owner;
 }
 
 function subscribe(l: () => void) {

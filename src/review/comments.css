@@ -193,3 +193,13 @@
   white-space: nowrap;
   width: 100%;
 }
+
+.hotspot-list .comment-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hotspot-list .comment-preview {
+  white-space: normal;
+}

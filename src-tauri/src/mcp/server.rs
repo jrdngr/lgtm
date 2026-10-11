@@ -1,0 +1,254 @@
+//! The tools an agent in a terminal gets. Each acts on the review open in the terminal's
+//! workspace. Agents read everything and add comments, hotspots and findings, but can't mark
+//! code reviewed: that's the human's record.
+
+use std::path::Path;
+use std::sync::Arc;
+
+use anyhow::Context;
+use rmcp::handler::server::router::tool::ToolRouter;
+use rmcp::handler::server::wrapper::Parameters;
+use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
+use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use serde::Serialize;
+use tauri::{AppHandle, Manager};
+use tauri_specta::Event as _;
+
+use super::{Hello, inputs};
+use crate::bots::output::Output;
+use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
+use crate::repo::RepoWindows;
+use crate::review::{HotspotInput, RepoCtx, StateDto};
+use crate::store::Source;
+
+const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
+reviews a change there and marks what they've reviewed. These tools act on the review open in \
+this terminal's workspace: read its state, comments, hotspots, symbol graph and Reviewer \
+findings; add comments and hotspots; submit your own review findings; and point the review at \
+code or a revset. You can't mark code reviewed. Lines are on the new side of the diff.";
+
+type Out = Result<String, String>;
+
+#[derive(Clone)]
+pub struct Lgtm {
+    app: AppHandle,
+    hello: Hello,
+    tool_router: ToolRouter<Self>,
+}
+
+fn json(value: &impl Serialize) -> Out {
+    serde_json::to_string_pretty(value).map_err(|e| e.to_string())
+}
+
+fn failed(e: anyhow::Error) -> String {
+    format!("{e:#}")
+}
+
+impl Lgtm {
+    pub(super) fn new(app: AppHandle, hello: Hello) -> Self {
+        Self {
+            app,
+            hello,
+            tool_router: Self::tool_router(),
+        }
+    }
+
+    fn workspace(&self) -> Option<&str> {
+        self.hello.workspace.as_deref()
+    }
+
+    /// The repo's state and its window's label.
+    fn repo(&self) -> anyhow::Result<(String, Arc<RepoCtx>)> {
+        self.app
+            .state::<RepoWindows>()
+            .find(Path::new(&self.hello.root))
+            .context("lgtm doesn't have this repo open")
+    }
+
+    fn changed(&self, label: &str, review: u32, state: StateDto) {
+        ReviewStateChanged { review, state }
+            .emit_to(&self.app, label)
+            .ok();
+    }
+}
+
+#[tool_router]
+impl Lgtm {
+    #[tool(
+        description = "The open review: its revset and commits, and per file the changed \
+        rows the human has reviewed, skipped or flagged, and the line ranges still unreviewed."
+    )]
+    async fn get_review(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        json(&ctx.summary(self.workspace()).map_err(failed)?)
+    }
+
+    #[tool(
+        description = "The review's comments, with their lines, author and any \
+        conversation. Comments whose code is gone have no lines."
+    )]
+    async fn list_comments(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        json(&ctx.agent_comments(self.workspace()).map_err(failed)?)
+    }
+
+    #[tool(
+        description = "Comment on lines of a file in the review. The comment shows in \
+        the review marked as from a terminal agent."
+    )]
+    async fn add_comment(&self, Parameters(p): Parameters<inputs::AddComment>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let (review, state) = ctx
+            .agent_comment(self.workspace(), &p.path, p.start_line, p.end_line, &p.body)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Added the comment.".into())
+    }
+
+    #[tool(description = "Reply to a comment. The reply joins the comment's conversation.")]
+    async fn reply_to_comment(&self, Parameters(p): Parameters<inputs::Reply>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let (review, state) = ctx
+            .agent_reply(self.workspace(), p.comment_id, &p.text)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Replied.".into())
+    }
+
+    #[tool(
+        description = "The review's hotspots: the parts most in need of a careful look, \
+        worst first."
+    )]
+    async fn list_hotspots(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        json(&ctx.agent_hotspots(self.workspace()).map_err(failed)?)
+    }
+
+    #[tool(
+        description = "Replace the review's hotspots with yours: the parts of the change \
+        that most need careful human review (subtle logic, edge cases, concurrency, error \
+        handling, security boundaries, data changes, untested behavior; not style). high: \
+        likely wrong or a mistake would do serious damage. medium: worth a close look. low: \
+        routine but worth knowing about. Ranges outside the review's files are left out."
+    )]
+    async fn set_hotspots(&self, Parameters(p): Parameters<inputs::Hotspots>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let inputs: Vec<HotspotInput> =
+            serde_json::from_value(serde_json::to_value(&p.hotspots).map_err(|e| e.to_string())?)
+                .map_err(|e| e.to_string())?;
+        let review = ctx.current_review(self.workspace()).map_err(failed)?;
+        let (state, skipped) = ctx
+            .save_hotspots(review, &inputs, Source::Terminal)
+            .map_err(failed)?;
+        let n = state.hotspots.len();
+        self.changed(&label, review, state);
+        Ok(format!(
+            "Set {n} hotspots; left out {skipped} outside the review's files."
+        ))
+    }
+
+    #[tool(
+        description = "The review's changed symbols (functions, types) and unchanged \
+        callers of them. `uses` holds [user, used] id pairs. Symbols link by name, so a link \
+        can be wrong for common names."
+    )]
+    async fn get_symbol_graph(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let review = ctx.current_review(self.workspace()).map_err(failed)?;
+        let graph = ctx.graph(review).await.map_err(failed)?;
+        let nodes: Vec<_> = graph
+            .nodes
+            .iter()
+            .map(|n| {
+                serde_json::json!({
+                    "id": n.id, "name": n.name, "parent": n.parent, "status": n.status,
+                    "path": n.path, "line": n.line,
+                })
+            })
+            .collect();
+        let uses: Vec<_> = graph.edges.iter().map(|e| [e.from, e.to]).collect();
+        json(&serde_json::json!({ "symbols": nodes, "uses": uses }))
+    }
+
+    #[tool(
+        description = "Findings from the latest Reviewers run in this workspace: the \
+        synthesis when there is one, otherwise each reviewer's own."
+    )]
+    async fn list_findings(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let runs = ctx.bot_runs(self.workspace()).map_err(failed)?;
+        let Some(run) = runs.first() else {
+            return Ok("No Reviewers runs in this workspace.".into());
+        };
+        let outputs = run.parts.iter().filter_map(|p| p.output.as_ref());
+        let synthesis = outputs.clone().find_map(|o| match o {
+            Output::Synthesis(s) => Some(s.findings.clone()),
+            _ => None,
+        });
+        let findings = synthesis.unwrap_or_else(|| {
+            outputs
+                .filter_map(|o| match o {
+                    Output::Review(r) => Some(r.findings.clone()),
+                    _ => None,
+                })
+                .flatten()
+                .collect()
+        });
+        json(&serde_json::json!({ "revset": run.revset, "findings": findings }))
+    }
+
+    #[tool(
+        description = "Submit your own review of the open change as a Reviewers run, so \
+        the human sees your findings as cards they can comment on, send to an agent, or fix. \
+        Rate severity by real impact: critical (exploitable or loses data in normal use), high \
+        (a core flow is broken), medium (a real bug off the main path), low (hygiene), info."
+    )]
+    async fn submit_findings(&self, Parameters(p): Parameters<inputs::Findings>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let reviewer = p.reviewer.as_deref().unwrap_or("terminal-agent");
+        let review = serde_json::json!({ "verdict": p.verdict, "findings": p.findings });
+        let run = ctx
+            .submit_findings(self.workspace(), reviewer, review)
+            .map_err(failed)?;
+        BotRunChanged { run: run.id }
+            .emit_to(&self.app, &label)
+            .ok();
+        Ok(format!("Submitted {} findings.", p.findings.len()))
+    }
+
+    #[tool(description = "Show a file of the review in lgtm's review pane, at a line.")]
+    async fn show(&self, Parameters(p): Parameters<inputs::Show>) -> Out {
+        let (label, _) = self.repo().map_err(failed)?;
+        AgentShow {
+            workspace: self.hello.workspace.clone(),
+            path: p.path,
+            line: p.line,
+        }
+        .emit_to(&self.app, &label)
+        .map_err(|e| e.to_string())?;
+        Ok("Shown.".into())
+    }
+
+    #[tool(description = "Change what the review pane reviews to a jj revset.")]
+    async fn set_revset(&self, Parameters(p): Parameters<inputs::Revset>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        ws.jj.resolve(&p.revset).await.map_err(failed)?;
+        AgentRevset {
+            workspace: self.hello.workspace.clone(),
+            revset: p.revset,
+        }
+        .emit_to(&self.app, &label)
+        .map_err(|e| e.to_string())?;
+        Ok("The review pane is loading it.".into())
+    }
+}
+
+#[tool_handler(router = self.tool_router)]
+impl ServerHandler for Lgtm {
+    fn get_info(&self) -> ServerConfig {
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
+            .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
+            .with_instructions(INSTRUCTIONS)
+    }
+}

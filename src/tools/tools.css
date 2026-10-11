@@ -44,3 +44,16 @@
   gap: 8px;
   margin-top: 12px;
 }
+
+.mcp-offer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.mcp-offer .spacer {
+  flex: 1;
+}

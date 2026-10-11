@@ -53,10 +53,33 @@ impl Review {
 
     /// Where a comment goes, or `None` when none of the review's files is its file.
     fn place(&self, store: &Store, remaps: &mut Remaps, c: Comment) -> Option<CommentDto> {
-        let found: Vec<RowRef> = c
-            .pins
+        let (file, rows) = self.placement(store, remaps, &c.path, &c.pins)?;
+        Some(CommentDto {
+            id: c.id as u32,
+            path: c.path,
+            file,
+            rows,
+            body: c.body,
+            snippet: c.snippet,
+            review: c.review,
+            created_at: c.created_at as f64,
+            updated_at: c.updated_at as f64,
+            messages: c.workshop.messages,
+        })
+    }
+
+    /// The file and rows that pins on `path` match, or `None` when none of the review's files
+    /// is that file. The rows are absent when the code can't be found any more.
+    pub(super) fn placement(
+        &self,
+        store: &Store,
+        remaps: &mut Remaps,
+        path: &str,
+        pins: &[Pin],
+    ) -> Option<(u32, Option<RowSpan>)> {
+        let found: Vec<RowRef> = pins
             .iter()
-            .filter_map(|p| self.locate(store, remaps, &c.path, p))
+            .filter_map(|p| self.locate(store, remaps, path, p))
             .collect();
         let end = found.last().copied();
         let rows = end.map(|end| {
@@ -73,21 +96,10 @@ impl Review {
             None => self
                 .files
                 .iter()
-                .position(|f| f.path == c.path || f.old_path.as_deref() == Some(&c.path))?
+                .position(|f| f.path == path || f.old_path.as_deref() == Some(path))?
                 as u32,
         };
-        Some(CommentDto {
-            id: c.id as u32,
-            path: c.path,
-            file,
-            rows: rows.map(|(_, span)| span),
-            body: c.body,
-            snippet: c.snippet,
-            review: c.review,
-            created_at: c.created_at as f64,
-            updated_at: c.updated_at as f64,
-            messages: c.workshop.messages,
-        })
+        Some((file, rows.map(|(_, span)| span)))
     }
 
     /// The changed row a pin matches best, trying the files whose path pools hold `path`.
@@ -121,7 +133,11 @@ impl Review {
     }
 
     /// Pins for the first and last of `rows` that can be anchored, all in the last one's file.
-    fn pins(&self, store: &Store, rows: &[RowRef]) -> anyhow::Result<(String, Vec<Pin>)> {
+    pub(super) fn pins(
+        &self,
+        store: &Store,
+        rows: &[RowRef],
+    ) -> anyhow::Result<(String, Vec<Pin>)> {
         let wanted: HashSet<RowRef> = rows.iter().copied().collect();
         let file_idx = rows.last().context("nothing to comment on")?.file;
         let file = self.files.get(file_idx as usize).context("no such file")?;

@@ -7,6 +7,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import { useEffect, useRef } from "react";
 import { ReportPanel } from "../bots/ReportPanel";
+import { GraphPanel } from "../graph/GraphPanel";
 import { commands, unwrap } from "../ipc";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
@@ -17,6 +18,7 @@ const components = {
   review: ReviewPanel,
   terminal: TerminalPanel,
   report: ReportPanel,
+  graph: GraphPanel,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

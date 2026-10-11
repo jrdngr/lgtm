@@ -1,0 +1,229 @@
+.graph-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+
+.graph-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.graph-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.graph-bar label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.graph-panel .react-flow {
+  --xy-background-color: var(--bg);
+}
+
+.glinks {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.glink {
+  fill: none;
+  stroke: #6b7280;
+  stroke-width: 1.5;
+}
+
+.glink.caller {
+  stroke-dasharray: 4 3;
+}
+
+.garrow {
+  fill: #6b7280;
+}
+
+.glinks.dimmed .glink:not(.lit),
+.glinks.dimmed .garrow:not(.lit) {
+  opacity: 0.25;
+}
+
+.glink.lit {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.garrow.lit {
+  fill: var(--accent);
+}
+
+.gfile {
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 3%);
+  box-sizing: border-box;
+}
+
+.gfile span {
+  display: block;
+  padding: 6px 10px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gfile.outside {
+  border-style: dashed;
+}
+
+.gnode {
+  height: 40px;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--panel);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.gnode:hover {
+  border-color: var(--accent);
+}
+
+.gnode-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gnode-sign {
+  display: inline-block;
+  width: 12px;
+  color: var(--muted);
+}
+
+.gnode-added {
+  border-left-color: var(--reviewed);
+}
+
+.gnode-removed {
+  border-left-color: var(--flagged);
+}
+
+.gnode-removed .gnode-name {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.gnode-caller {
+  border-left-color: var(--skipped);
+  border-style: dashed;
+  color: var(--muted);
+  cursor: default;
+}
+
+.gnode-bar {
+  height: 3px;
+  margin-top: 6px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gnode-bar span {
+  display: block;
+  height: 100%;
+  background: var(--reviewed);
+}
+
+.gnode.risk-high {
+  box-shadow: 0 0 0 2px var(--flagged);
+}
+
+.gnode.risk-medium {
+  box-shadow: 0 0 0 2px var(--amber);
+}
+
+.gnode.risk-low {
+  box-shadow: 0 0 0 1px var(--muted);
+}
+
+.symbol-list {
+  overflow: auto;
+  height: 100%;
+}
+
+.symbol-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.symbol-file {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.symbol-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 2px 8px 2px 14px;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.symbol-list button:hover {
+  background: var(--panel);
+}
+
+.symbol-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-list .gnode-removed .symbol-name {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.symbol-users,
+.symbol-done {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.symbol-done.all {
+  color: var(--reviewed);
+}

@@ -19,6 +19,9 @@ interface Ctx {
   openMenuAtCursor(): void;
   startComment(): void;
   openRevisions(): void;
+  openGraph(): void;
+  findRisks(): void;
+  stepHotspot(dir: 1 | -1): void;
   toggleFile(file: number): void;
   toggleHunk(file: number, hunk: number): void;
   toggleChecked(file: number): void;
@@ -104,6 +107,16 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "r":
         ctx.openRevisions();
+        break;
+      case "g":
+        ctx.openGraph();
+        break;
+      case "h":
+        if (!e.repeat) ctx.findRisks();
+        break;
+      case "]":
+      case "[":
+        ctx.stepHotspot(e.key === "]" ? 1 : -1);
         break;
       case "x": {
         const file = lines[cursor]?.file;

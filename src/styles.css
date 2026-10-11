@@ -110,11 +110,62 @@ button:hover:not(:disabled) {
 }
 
 .toolbar {
+  position: relative;
+  /* Above the panes, so the revision picker opens over them. */
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--border);
+}
+
+.toolbar-center {
+  position: absolute;
+  left: 25%;
+  right: 25%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toolbar-center > * {
+  pointer-events: auto;
+}
+
+.toolbar .commit-picker {
+  top: calc(100% + 4px);
+  left: 50%;
+  right: auto;
+  width: min(900px, 90vw);
+  translate: -50% 0;
+  max-height: 70vh;
+}
+
+/* The revision selector: a field showing what's reviewed, not a button. */
+.toolbar .rev-select {
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px solid rgb(210 153 34 / 60%);
+  border-radius: 4px;
+  background: rgb(210 153 34 / 14%);
+  cursor: pointer;
+}
+
+.toolbar .rev-select:hover:not(:disabled),
+.toolbar .rev-select.open {
+  border-color: var(--amber);
+  background: rgb(210 153 34 / 22%);
+}
+
+.rev-select-empty {
+  color: var(--muted);
+}
+
+.rev-select-caret {
+  flex: none;
+  color: var(--muted);
+  font-size: 10px;
 }
 
 .toolbar .repo {
@@ -184,6 +235,7 @@ button:hover:not(:disabled) {
 
 .side-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 4px 6px 0;
   border-bottom: 1px solid var(--border);
@@ -245,4 +297,24 @@ button:hover:not(:disabled) {
 
 .icon-button[aria-pressed="true"] {
   color: var(--fg);
+}
+
+/* Hotspot levels, in the Hotspots and Symbols views. */
+.risk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.risk-dot.risk-high {
+  background: var(--flagged);
+}
+
+.risk-dot.risk-medium {
+  background: var(--amber);
+}
+
+.risk-dot.risk-low {
+  background: var(--muted);
 }

@@ -208,3 +208,20 @@
   background: var(--bg);
   box-shadow: 0 2px 4px rgb(0 0 0 / 30%);
 }
+
+.cell .risk {
+  flex: none;
+  width: 3px;
+}
+
+.cell .risk-high {
+  background: var(--flagged);
+}
+
+.cell .risk-medium {
+  background: var(--amber);
+}
+
+.cell .risk-low {
+  background: var(--muted);
+}

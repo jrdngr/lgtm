@@ -1,6 +1,9 @@
 //! Tree-sitter: languages, highlighting, and symbol ranges.
 
 mod langs;
+mod refs;
+
+pub use refs::Ref;
 
 use std::collections::HashMap;
 
@@ -60,6 +63,13 @@ pub type Segment = (Option<u8>, u32);
 pub struct Parsed {
     lang: &'static Lang,
     tree: Tree,
+}
+
+/// Whether `path` is in a language with symbols.
+pub fn has_symbols(path: &str) -> bool {
+    lang_key(path)
+        .and_then(|k| LANGS.get(k))
+        .is_some_and(|l| l.symbols.pattern_count() > 0)
 }
 
 pub fn parse(path: &str, source: &str) -> Option<Parsed> {

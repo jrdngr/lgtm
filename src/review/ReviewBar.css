@@ -81,3 +81,18 @@
 .rev-desc.empty {
   color: #d29922;
 }
+
+.risk-run {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.risk-note {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}

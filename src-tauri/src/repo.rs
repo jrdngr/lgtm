@@ -27,6 +27,14 @@ impl RepoWindows {
         self.0.lock().unwrap().remove(label);
     }
 
+    /// The window and state of the repo whose main workspace is at `root`.
+    pub fn find(&self, root: &Path) -> Option<(String, Arc<RepoCtx>)> {
+        let map = self.0.lock().unwrap();
+        map.iter()
+            .find(|(_, ctx)| ctx.root == root)
+            .map(|(label, ctx)| (label.clone(), ctx.clone()))
+    }
+
     fn insert(&self, label: String, ctx: Arc<RepoCtx>) {
         self.0.lock().unwrap().insert(label, ctx);
     }

@@ -1,5 +1,5 @@
 use tauri::ipc::Channel;
-use tauri::{State, WebviewWindow};
+use tauri::{Manager, State, WebviewWindow};
 
 use super::{CmdResult, err, repo};
 use crate::pty::{Owner, PtyEvent, Ptys};
@@ -22,9 +22,13 @@ pub(crate) async fn pty_spawn(
     let ws = ctx.workspace(workspace.as_deref()).await.map_err(err)?;
     let command = setup.then(workspaces::setup_command);
     let root = ctx.root.to_string_lossy();
+    let socket = crate::repo::data_dir(window.app_handle())
+        .map(|d| crate::mcp::socket_path(&d).to_string_lossy().into_owned())
+        .unwrap_or_default();
     let env = [
         ("LGTM_ROOT", root.as_ref()),
         ("LGTM_WORKSPACE", ws.name.as_deref().unwrap_or("")),
+        ("LGTM_SOCKET", socket.as_str()),
     ];
     let owner = Owner {
         window: window.label().to_string(),

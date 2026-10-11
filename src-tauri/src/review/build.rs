@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::diff::{FileStatus, Hunk, RowKind};
 use crate::jj::FileDiff;
 use crate::store::Store;
-use crate::syntax::{self, CodeSymbol, Segment};
+use crate::syntax::{self, CodeSymbol, Ref, Segment};
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -57,6 +57,9 @@ pub struct FileSide {
     pub commit: Option<String>,
     pub path: String,
     pub index: Option<FileIndex>,
+    pub symbols: Vec<CodeSymbol>,
+    /// Identifiers the side mentions, for the symbol graph.
+    pub refs: Vec<Ref>,
 }
 
 impl FileSide {
@@ -98,7 +101,11 @@ pub struct ReviewFile {
     pub old: FileSide,
     pub new: FileSide,
     pub rows: Vec<RowPos>,
+    /// Each row's code, for text sent to agents.
+    pub texts: Vec<String>,
     pub keyed: Vec<Keyed>,
+    /// Matches a `skip` glob from the repo config.
+    pub skipped: bool,
 }
 
 impl ReviewFile {
@@ -146,15 +153,25 @@ pub fn build_file(
         .as_ref()
         .map(|p| p.highlight(new_text.as_deref().unwrap(), &new_lines));
 
+    let side_syms = |p: Option<&syntax::Parsed>, t: Option<&str>| match (p, t) {
+        (Some(p), Some(t)) => (p.symbols(t), p.refs(t)),
+        _ => (vec![], vec![]),
+    };
+    let (old_symbols, old_refs) = side_syms(old_parsed.as_ref(), old_text.as_deref());
+    let (new_symbols, new_refs) = side_syms(new_parsed.as_ref(), new_text.as_deref());
     let old = FileSide {
         commit: sides.old.clone(),
         path: old_path.clone(),
         index: old_text.as_deref().map(|t| FileIndex::new(t, old_norm)),
+        symbols: old_symbols,
+        refs: old_refs,
     };
     let new = FileSide {
         commit: Some(sides.new.clone()),
         path: d.path.clone(),
         index: new_text.as_deref().map(|t| FileIndex::new(t, new_norm)),
+        symbols: new_symbols,
+        refs: new_refs,
     };
 
     let keyed = rows
@@ -190,14 +207,12 @@ pub fn build_file(
         new_exec: d.new_exec,
         skipped: config.skips(&d.path),
         hunks,
-        old_symbols: old_parsed
-            .map(|p| p.symbols(old_text.as_deref().unwrap()))
-            .unwrap_or_default(),
-        new_symbols: new_parsed
-            .map(|p| p.symbols(new_text.as_deref().unwrap()))
-            .unwrap_or_default(),
+        old_symbols: old.symbols.clone(),
+        new_symbols: new.symbols.clone(),
     };
     let file = ReviewFile {
+        skipped: dto.skipped,
+        texts: rows.clone().map(|r| r.text.clone()).collect(),
         status: d.status,
         path: d.path,
         old_path: d.old_path,

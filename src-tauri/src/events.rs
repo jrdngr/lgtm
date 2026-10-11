@@ -37,3 +37,25 @@ pub struct BotFixText {
     pub fix: u32,
     pub text: String,
 }
+
+/// An agent asked the workspace's review pane to show `path`, at `line` on the new side.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct AgentShow {
+    pub workspace: Option<String>,
+    pub path: String,
+    pub line: Option<u32>,
+}
+
+/// An agent asked the workspace's review pane to review `revset`.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct AgentRevset {
+    pub workspace: Option<String>,
+    pub revset: String,
+}
+
+/// An agent changed review `review`'s comments or hotspots.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct ReviewStateChanged {
+    pub review: u32,
+    pub state: crate::review::StateDto,
+}

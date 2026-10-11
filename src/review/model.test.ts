@@ -113,7 +113,7 @@ describe("fileProgress", () => {
     createdAt: 0,
   });
   const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
-    indexState({ marks, checks: [check], amber: [], comments: [] });
+    indexState({ marks, checks: [check], amber: [], comments: [], hotspots: [] });
 
   it("counts changed rows by mark state", () => {
     const index = indexed([mark(1, "reviewed"), mark(2, "flagged")]);

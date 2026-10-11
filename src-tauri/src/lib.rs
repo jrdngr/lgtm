@@ -8,6 +8,7 @@ mod events;
 mod gitmeta;
 mod jj;
 mod layout;
+mod mcp;
 mod pty;
 mod recent;
 mod repo;
@@ -56,6 +57,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::undo_marks,
             commands::review::redo_marks,
             commands::review::reset_review_marks,
+            commands::review::review_graph,
+            commands::review::focus_review,
+            commands::repo::mcp_status,
+            commands::repo::register_mcp,
+            commands::hotspots::find_hotspots,
+            commands::hotspots::stop_hotspots,
             commands::comments::add_comment,
             commands::comments::edit_comment,
             commands::comments::delete_comment,
@@ -80,7 +87,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::WorkingCopyStale,
             events::BotRunActivity,
             events::BotRunChanged,
-            events::BotFixText
+            events::BotFixText,
+            events::AgentShow,
+            events::AgentRevset,
+            events::ReviewStateChanged
         ])
 }
 
@@ -116,8 +126,12 @@ fn adopt_login_shell_path() {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    adopt_login_shell_path();
     let args: Vec<String> = std::env::args().skip(1).collect();
+    // Claude Code starts this, inside a terminal that already has the user's PATH.
+    if args.first().is_some_and(|a| a == "mcp") {
+        std::process::exit(mcp::bridge_main());
+    }
+    adopt_login_shell_path();
     if args.first().is_some_and(|a| a == "gc") {
         std::process::exit(workspaces::gc::main(&args[1..]));
     }
@@ -137,6 +151,10 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            match repo::data_dir(app) {
+                Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
+                Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
+            }
             let cwd = std::env::current_dir()?;
             repo::open_from_args(app.handle(), &args, &cwd);
             Ok(())

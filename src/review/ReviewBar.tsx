@@ -1,8 +1,6 @@
 import type { ChangeDto, ReviewDto, View } from "../bindings";
-import type { WorkspaceName } from "../workspaces/context";
 import type { ViewMode } from "./model";
-import { RevisionsPanel } from "./RevisionsPanel";
-import { RevLabel } from "./RevLabel";
+import { type RiskRun, stopRisks } from "./riskRun";
 import { FILTERS, type Filter, type Progress } from "./state";
 import "./ReviewBar.css";
 
@@ -32,15 +30,7 @@ function defaultChange(review: ReviewDto, kind: "change" | "sinceLast"): string 
 }
 
 interface Props {
-  workspace: WorkspaceName;
   review?: ReviewDto;
-  loading: boolean;
-  revset: string;
-  /** Loads a revset as the review. Returns the error message when it fails. */
-  onLoad(revset: string): Promise<string | undefined>;
-  /** Whether the revisions panel is open. */
-  panel: boolean;
-  onPanel(open: boolean): void;
   onView(view: View): void;
   mode: ViewMode;
   onMode(mode: ViewMode): void;
@@ -48,6 +38,9 @@ interface Props {
   onFilter(filter: Filter): void;
   progress: Progress;
   onReset(): void;
+  onGraph(): void;
+  risk?: RiskRun;
+  onRisks(): void;
 }
 
 export function ReviewBar(props: Props) {
@@ -64,27 +57,6 @@ export function ReviewBar(props: Props) {
 
   return (
     <div className="review-bar">
-      <button
-        type="button"
-        className="rev-chip"
-        onClick={() => props.onPanel(true)}
-        title="Revisions (r): pick what to review, edit, add and squash commits"
-      >
-        {props.loading || !review ? (
-          "Loading…"
-        ) : (
-          <RevLabel revset={props.revset} changes={review.changes} />
-        )}
-      </button>
-      {props.panel && (
-        <RevisionsPanel
-          workspace={props.workspace}
-          revset={props.revset}
-          head={review?.changes.at(-1)?.commitId}
-          onLoad={props.onLoad}
-          onClose={() => props.onPanel(false)}
-        />
-      )}
       <select
         value={view.kind}
         disabled={!review}
@@ -128,6 +100,31 @@ export function ReviewBar(props: Props) {
       >
         {props.mode === "unified" ? "Split" : "Unified"}
       </button>
+      <button type="button" disabled={!review} onClick={props.onGraph} title="Symbol graph (g)">
+        Graph
+      </button>
+      {review && props.risk?.running ? (
+        <span className="risk-run" title="Finding the parts that most need a careful look">
+          <span className="risk-note">Highlighting · {props.risk.note}</span>
+          <button type="button" onClick={() => stopRisks(review.id)}>
+            Stop
+          </button>
+        </span>
+      ) : (
+        <button
+          type="button"
+          disabled={!review}
+          onClick={props.onRisks}
+          title={
+            props.risk?.error ??
+            props.risk?.note ??
+            "Have an agent find the riskiest parts (h). ] and [ jump between them."
+          }
+          className={props.risk?.error ? "error" : undefined}
+        >
+          Highlight risks
+        </button>
+      )}
       <span className="spacer" />
       {review && (
         <span className="progress" title="Changed rows by state">
