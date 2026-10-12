@@ -153,7 +153,7 @@ export const commands = {
 	revset: string,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
-	nearbyPrs: (workspace: string | null) => typedError<NearbyPrDto[], string>(__TAURI_INVOKE("nearby_prs", { workspace })),
+	nearbyPrs: (workspace: string | null) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace })),
 	/**
 	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
 	 *  conversation and its diff with review threads.
@@ -594,6 +594,16 @@ export type NearbyPrDto = {
 	/**  The pushed bookmark that is the PR's head. */
 	bookmark: string,
 	draft: boolean,
+};
+
+/**
+ *  What the search found: the PRs, and the bookmarks looked up to find them, which tell
+ *  "nothing pushed near `@`" apart from "pushed, but no open PRs".
+ */
+export type NearbyPrsDto = {
+	prs: NearbyPrDto[],
+	/**  Names of the pushed bookmarks on the stack, nearest first. */
+	bookmarks: string[],
 };
 
 export type NodeStatus = "added" | "modified" | "removed" | 

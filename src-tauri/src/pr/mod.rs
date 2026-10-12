@@ -18,7 +18,7 @@ use crate::jj::git::remote_bookmark;
 use crate::review::RepoCtx;
 
 pub use discussion::DiscussionDto;
-pub use nearby::NearbyPrDto;
+pub use nearby::NearbyPrsDto;
 pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
 

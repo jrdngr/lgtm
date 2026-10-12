@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import type { NearbyPrDto } from "../bindings";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { NearbyPrDto, NearbyPrsDto } from "../bindings";
 import { closePrPreview, openPrPreview } from "../github/preview";
-import { commands } from "../ipc";
+import { type CommandResult, commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { dockOf } from "../workbench/docks";
 import type { WorkspaceName } from "./context";
@@ -21,6 +21,14 @@ function quiet(error: string): string {
   return error;
 }
 
+/** Why the list is empty, if it is. */
+function emptyNote({ prs, bookmarks }: NearbyPrsDto): string | undefined {
+  if (prs.length) return undefined;
+  if (!bookmarks.length) return "No bookmarks pushed to GitHub on this workspace's stack";
+  const names = bookmarks.slice(0, 3).join(", ") + (bookmarks.length > 3 ? ", …" : "");
+  return `No open PRs for ${names}`;
+}
+
 /** Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. Click one
  * to preview it in the workspace's dock; double-click or Enter reviews it in its own
  * workspace. Loads when the workspace changes and on Refresh. */
@@ -32,17 +40,24 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
   const [opening, setOpening] = useState<number>();
   const [selected, setSelected] = useState<number>();
 
+  // The workspace the latest load is for: a reply for an earlier one is dropped.
+  const latest = useRef(workspace);
+  latest.current = workspace;
+
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await commands.nearbyPrs(workspace);
+    const r = await commands
+      .nearbyPrs(workspace)
+      .catch((e): CommandResult<NearbyPrsDto> => ({ status: "error", error: errorText(e) }));
+    if (latest.current !== workspace) return;
     setLoading(false);
     if (r.status === "error") {
       setPrs(undefined);
       setNote(quiet(r.error));
       return;
     }
-    setPrs(r.data);
-    setNote(r.data.length ? undefined : "No open PRs for bookmarks pushed from this stack");
+    setPrs(r.data.prs);
+    setNote(emptyNote(r.data));
   }, [workspace]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the selection is per workspace

@@ -80,8 +80,9 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
         <span className="spacer" />
         <button
           type="button"
-          onClick={() => setOpeningPr(true)}
-          disabled={openingPr || githubOff}
+          onClick={() => setOpeningPr((o) => !o)}
+          disabled={githubOff}
+          aria-pressed={openingPr}
           title={
             githubOff ? "Needs the GitHub CLI (gh)" : "Review a GitHub PR in its own workspace"
           }

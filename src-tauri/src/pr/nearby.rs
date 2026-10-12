@@ -23,6 +23,15 @@ pub struct NearbyPrDto {
     pub draft: bool,
 }
 
+/// What the search found: the PRs, and the bookmarks looked up to find them, which tell
+/// "nothing pushed near `@`" apart from "pushed, but no open PRs".
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct NearbyPrsDto {
+    pub prs: Vec<NearbyPrDto>,
+    /// Names of the pushed bookmarks on the stack, nearest first.
+    pub bookmarks: Vec<String>,
+}
+
 /// Bookmarks on GitHub remotes, with the repo each was pushed to.
 fn on_github(near: Vec<NearBookmark>, remotes: &[(String, String)]) -> Vec<(NearBookmark, GhRepo)> {
     near.into_iter()
@@ -66,19 +75,29 @@ fn match_prs(bookmarks: &[(NearBookmark, GhRepo)], prs: &[HeadPr]) -> Vec<Nearby
 impl RepoCtx {
     /// Open PRs of the bookmarks pushed from `workspace`'s stack, nearest `@` first. PRs are
     /// looked up in the repo PR numbers refer to, and may come from forks pushed to.
-    pub async fn nearby_prs(&self, workspace: Option<&str>) -> anyhow::Result<Vec<NearbyPrDto>> {
+    pub async fn nearby_prs(&self, workspace: Option<&str>) -> anyhow::Result<NearbyPrsDto> {
         let near = self.workspace(workspace).await?.jj.bookmarks_near().await?;
         let remotes = self.main.jj.remotes().await?;
         let bookmarks = on_github(near, &remotes);
-        if bookmarks.is_empty() {
-            return Ok(Vec::new());
+        let mut names: Vec<String> = Vec::new();
+        for (b, _) in &bookmarks {
+            if !names.contains(&b.name) {
+                names.push(b.name.clone());
+            }
+        }
+        if names.is_empty() {
+            return Ok(NearbyPrsDto {
+                prs: Vec::new(),
+                bookmarks: names,
+            });
         }
         let (_, _, base) = remote::pick(&remotes, None)?;
-        let mut names: Vec<&str> = bookmarks.iter().map(|(b, _)| b.name.as_str()).collect();
-        names.sort_unstable();
-        names.dedup();
-        let prs = heads::open_prs(&base, &names).await?;
-        Ok(match_prs(&bookmarks, &prs))
+        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let prs = heads::open_prs(&base, &refs).await?;
+        Ok(NearbyPrsDto {
+            prs: match_prs(&bookmarks, &prs),
+            bookmarks: names,
+        })
     }
 }
 

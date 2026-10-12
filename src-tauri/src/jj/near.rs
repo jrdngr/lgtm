@@ -11,9 +11,10 @@ pub struct NearBookmark {
     pub distance: u32,
 }
 
-/// `@`'s stack: its ancestors down to trunk, and its descendants unless `@` is in trunk,
-/// where they'd be every branch.
-const STACK: &str = "(trunk()..@) | ((@ ~ ::trunk())::)";
+/// `@`'s stack: its ancestors down to trunk and their descendants, so a new change on top
+/// of a stack commit (`jj new`, or a PR workspace's `@`) still sees the commits above it.
+/// Empty when `@` is in trunk, where the descendants would be every branch.
+const STACK: &str = "(trunk()..@)::";
 
 /// `a` for `@` and its ancestors, `d` for descendants, then the commit's remote bookmarks.
 const TEMPLATE: &str = r#"if(self.contained_in("::@"), "a", "d") ++ "\t"
@@ -126,6 +127,14 @@ mod tests {
             [("three", 0), ("four", 1), ("one", 2), ("five", 2)]
         );
         assert!(got.iter().all(|b| b.remote == "origin"));
+
+        // A new change on `three` still sees the stack above it.
+        jj(d, &["new", "three"]);
+        let got = ctx.main.jj.bookmarks_near().await.unwrap();
+        assert_eq!(
+            names(&got),
+            [("three", 1), ("four", 1), ("five", 2), ("one", 3)]
+        );
 
         // At trunk, other branches aren't near.
         jj(d, &["new", "main"]);

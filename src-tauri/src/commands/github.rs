@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
 use crate::github::Verdict;
-use crate::pr::{DiscussionDto, HeadDto, NearbyPrDto, PrDto, PrPreviewDto};
+use crate::pr::{DiscussionDto, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto};
 use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
@@ -33,7 +33,7 @@ pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<O
 pub(crate) async fn nearby_prs(
     window: WebviewWindow,
     workspace: Option<String>,
-) -> CmdResult<Vec<NearbyPrDto>> {
+) -> CmdResult<NearbyPrsDto> {
     repo(&window)?
         .nearby_prs(workspace.as_deref())
         .await
