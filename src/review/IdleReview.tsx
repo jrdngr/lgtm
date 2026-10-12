@@ -112,6 +112,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
         return true;
       },
     });
+    console.debug("[lgtm] idle publishes", { review: review.id });
     publishReview(workspace, published.current);
     // Agents in the workspace's terminals act on this review.
     commands.focusReview(workspace, review.id);

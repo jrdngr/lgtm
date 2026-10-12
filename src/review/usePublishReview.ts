@@ -74,6 +74,7 @@ export function usePublishReview(
           latest.current.commentOn(file, rows, body, snippet),
         send: (text, onSent, report) => latest.current.send(text, onSent, report),
       };
+      console.debug("[lgtm] pane publishes", { pane: api.id, review: review?.id });
       publishReview(workspace, published.current);
       // Agents in the workspace's terminals act on this review.
       if (review) commands.focusReview(workspace, review.id);
@@ -95,7 +96,13 @@ export function usePublishReview(
     };
   }, [api, workspace, review, files, progress, rowState, checks, filter]);
 
-  useEffect(() => () => retractReview(workspace, published.current), [workspace]);
+  useEffect(
+    () => () => {
+      console.debug("[lgtm] pane retracts");
+      retractReview(workspace, published.current);
+    },
+    [workspace],
+  );
 
   /** Whether this pane is the one its workspace's agents and side views act on. */
   return () => isCurrent(workspace, published.current);
