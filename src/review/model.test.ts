@@ -129,9 +129,9 @@ describe("hunk stepping", () => {
 
   it("lands on a hunk's first shown row, or its header when it's collapsed", () => {
     expect(targets).toEqual([
-      { cursor: 2, top: 1 },
-      { cursor: 4, top: 4 },
-      { cursor: 8, top: 6 },
+      { cursor: 2, top: 0 },
+      { cursor: 4, top: 2 },
+      { cursor: 8, top: 4 },
     ]);
   });
 

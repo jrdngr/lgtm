@@ -198,15 +198,16 @@ function fileTargetAt(lines: DisplayLine[], header: number): JumpTarget {
 export const fileTargets = (lines: DisplayLine[]): JumpTarget[] =>
   lines.flatMap((l, i) => (l.kind === "file" ? [fileTargetAt(lines, i)] : []));
 
-/** Jumping to a hunk scrolls its header to the top and puts the cursor on its first row, or on
- * the header when no row of it is shown. */
+/** Jumping to a hunk puts the cursor on its first row, or on the header when no row of it is
+ * shown. Two lines above the header stay in view, so the sticky file header can't cover it. */
 export function hunkJumpTarget(lines: DisplayLine[], header: number): JumpTarget {
+  const top = Math.max(header - 2, 0);
   for (let i = header + 1; i < lines.length; i++) {
     const kind = lines[i].kind;
-    if (kind === "rows") return { cursor: i, top: header };
+    if (kind === "rows") return { cursor: i, top };
     if (kind === "file" || kind === "hunk") break;
   }
-  return { cursor: header, top: header };
+  return { cursor: header, top };
 }
 
 /** Every shown hunk's jump target, in display order. */
