@@ -1,15 +1,16 @@
 import { ViewportPortal } from "@xyflow/react";
 import { useMemo } from "react";
-import { NODE_HEIGHT, type Placed } from "./layout";
+import { NODE_HEIGHT, type Placed, type Point } from "./layout";
 import type { Routed } from "./ports";
 
 interface Paths {
   links: string;
   callers: string;
   arrows: string;
+  joins: string;
 }
 
-const empty = (): Paths => ({ links: "", callers: "", arrows: "" });
+const empty = (): Paths => ({ links: "", callers: "", arrows: "", joins: "" });
 
 type Segment = { from: string; to: string; caller: boolean };
 
@@ -23,20 +24,40 @@ function end(placed: Placed, id: string, leaving: boolean) {
   return { x: leaving ? b.x + b.width : b.x, y: b.y + Math.min(b.height, NODE_HEIGHT) / 2 };
 }
 
+/** An arrowhead at `b`, pointing the way the line from `a` goes. */
+function arrow(a: Point, b: Point) {
+  if (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y)) {
+    return b.x >= a.x ? `M${b.x},${b.y}l-7,-4v8z` : `M${b.x},${b.y}l7,-4v8z`;
+  }
+  return b.y >= a.y ? `M${b.x},${b.y}l-4,-7h8z` : `M${b.x},${b.y}l-4,7h8z`;
+}
+
+/** The laid-out right-angled path of a segment, or a curve between its ends. */
+function line(placed: Placed, s: Segment): Point[] | undefined {
+  const routed = placed.routes.get(`${s.from}>${s.to}`);
+  if (routed) return routed.points;
+  const a = end(placed, s.from, true);
+  const b = end(placed, s.to, false);
+  return a && b ? [a, b] : undefined;
+}
+
 /** Segments as one path per style. An SVG element per link costs WebKit time that grows
  * faster than the number of links: 250 links blocked the window for 2 s. */
 function paths(segments: Iterable<Segment>, placed: Placed, routed: Routed): Paths {
   const out = empty();
   for (const s of segments) {
-    const a = end(placed, s.from, true);
-    const b = end(placed, s.to, false);
-    if (!a || !b) continue;
-    const dx = Math.max(20, Math.abs(b.x - a.x) / 2);
-    const d = `M${a.x},${a.y}C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
+    const points = line(placed, s);
+    if (!points) continue;
+    const d = `M${points.map((p) => `${p.x},${p.y}`).join("L")}`;
     if (s.caller) out.callers += d;
     else out.links += d;
     // Arrowheads where a link reaches a box or goes into one, not where it leaves one.
-    if (routed.ports.get(s.to)?.side !== "out") out.arrows += `M${b.x},${b.y}l-7,-4v8z`;
+    if (routed.ports.get(s.to)?.side !== "out") {
+      out.arrows += arrow(points[points.length - 2], points[points.length - 1]);
+    }
+    for (const j of placed.routes.get(`${s.from}>${s.to}`)?.joins ?? []) {
+      out.joins += `M${j.x - 2.5},${j.y}a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0`;
+    }
   }
   return out;
 }
@@ -84,10 +105,10 @@ export function EdgesLayer({
       <svg className={`glinks${focus === undefined ? "" : " dimmed"}`} aria-hidden="true">
         <path className="glink" d={all.links} />
         <path className="glink caller" d={all.callers} />
-        <path className="garrow" d={all.arrows} />
+        <path className="garrow" d={all.arrows + all.joins} />
         <path className="gport" d={ports} />
         <path className="glink lit" d={lit.links + lit.callers} />
-        <path className="garrow lit" d={lit.arrows} />
+        <path className="garrow lit" d={lit.arrows + lit.joins} />
       </svg>
     </ViewportPortal>
   );

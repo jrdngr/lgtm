@@ -213,3 +213,29 @@ test("lays out symbols inside their open file's box, users left of what they use
   expect(helper.at.x + helper.at.width).toBeLessThanOrEqual(a.at.width);
   expect(helper.abs.x).toBe(a.abs.x + helper.at.x);
 });
+
+test("routes every link segment with right angles", async () => {
+  const graph = graphOf(
+    [
+      ["a.rs", "one"],
+      ["a.rs", "two"],
+      ["b.rs", "three"],
+      ["c.rs", "four"],
+    ],
+    [
+      [0, 2],
+      [1, 2],
+      [3, 2],
+    ],
+  );
+  const s = scene(graph, { expanded: new Set(["f:a.rs"]), callersOpen: new Set() });
+  const routed = route(s.tree, s.links);
+  const placed = await layout({ ...s, open: new Set(["f:a.rs"]), routed });
+  expect([...placed.routes.keys()].sort()).toEqual([...routed.segments.keys()].sort());
+  for (const { points } of placed.routes.values()) {
+    for (let i = 1; i < points.length; i++) {
+      const [p, q] = [points[i - 1], points[i]];
+      expect(p.x === q.x || p.y === q.y).toBe(true);
+    }
+  }
+});

@@ -36,7 +36,14 @@ export interface Placed {
   /** Boxes by id: `at` is in the parent box's coordinates, `abs` in the graph's. */
   boxes: Map<string, { at: Rect; abs: Rect; open: boolean }>;
   /** Port centers by id, in the graph's coordinates. */
-  ports: Map<string, { x: number; y: number }>;
+  ports: Map<string, Point>;
+  /** Each segment's right-angled path, by `from>to`, and where it joins others. */
+  routes: Map<string, { points: Point[]; joins: Point[] }>;
+}
+
+export interface Point {
+  x: number;
+  y: number;
 }
 
 const PORT = 8;
@@ -66,10 +73,14 @@ export async function layout(scene: Scene): Promise<Placed> {
       "elk.layered.spacing.nodeNodeBetweenLayers": "48",
       "elk.layered.thoroughness": "2",
       "elk.padding": "[top=12,left=12,bottom=12,right=12]",
+      // Right-angled links that share their way into the same box, like a bus.
+      "elk.edgeRouting": "ORTHOGONAL",
+      "elk.layered.mergeEdges": "true",
+      "elk.json.edgeCoords": "ROOT",
     },
     children: [],
-    edges: [...scene.routed.segments.values()].map((l, i) => ({
-      id: `e${i}`,
+    edges: [...scene.routed.segments.entries()].map(([key, l]) => ({
+      id: key,
       sources: [l.from],
       targets: [l.to],
     })),
@@ -117,5 +128,12 @@ export async function layout(scene: Scene): Promise<Placed> {
     }
   };
   walk(out, 0, 0);
-  return { boxes, ports };
+  const routes: Placed["routes"] = new Map();
+  for (const e of out.edges ?? []) {
+    const s = e.sections?.[0];
+    if (!s) continue;
+    const points = [s.startPoint, ...(s.bendPoints ?? []), s.endPoint];
+    routes.set(e.id, { points, joins: e.junctionPoints ?? [] });
+  }
+  return { boxes, ports, routes };
 }
