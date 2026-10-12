@@ -8,7 +8,16 @@ export interface Sides {
 
 const DEFAULT_SIDES: Sides = {
   left: { open: true, width: 230, view: "workspaces" },
-  right: { open: true, width: 260, view: "files" },
+  right: { open: true, width: 260, view: "diff" },
+};
+
+/** Right panel tabs from older builds, by the tab that holds them now. */
+const MOVED: Record<string, string> = {
+  files: "diff",
+  symbols: "diff",
+  pr: "comments",
+  walkthrough: "reports",
+  bots: "reports",
 };
 
 const key = (root: string) => `lgtm:sides:${root}`;
@@ -17,9 +26,10 @@ const key = (root: string) => `lgtm:sides:${root}`;
 export function loadSides(root: string): Sides {
   try {
     const saved = JSON.parse(localStorage.getItem(key(root)) ?? "null");
+    const right = { ...DEFAULT_SIDES.right, ...saved?.right };
     return {
       left: { ...DEFAULT_SIDES.left, ...saved?.left },
-      right: { ...DEFAULT_SIDES.right, ...saved?.right },
+      right: { ...right, view: MOVED[right.view] ?? right.view },
     };
   } catch {
     return DEFAULT_SIDES;

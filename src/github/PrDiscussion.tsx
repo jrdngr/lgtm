@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import type { DiscussionDto } from "../bindings";
+import type { DiscussionDto, PrDto } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
-import { usePr } from "./pr";
 import "../review/comments.css";
 import "./github.css";
 
@@ -16,10 +15,9 @@ const VERDICTS: Record<string, string> = {
 
 const when = (iso: string) => (iso ? new Date(iso).toLocaleString() : "");
 
-/** A PR workspace's PR: its conversation and review summaries, with a box that posts to it. */
-export function PrPanel() {
+/** A PR's conversation and review summaries, with a box that posts to it. */
+export function PrDiscussion({ pr }: { pr: PrDto }) {
   const workspace = useWorkspace();
-  const pr = usePr(workspace);
   const review = useCurrentReview(workspace);
   const [d, setD] = useState<DiscussionDto>();
   const [error, setError] = useState<string>();
@@ -48,15 +46,10 @@ export function PrPanel() {
     load();
   }
 
-  if (pr === undefined) return null;
-  if (!pr)
-    return <div className="placeholder">Not a PR workspace. Open one with PR in Workspaces.</div>;
   return (
     <div className="pr-panel">
       <div className="pr-head">
-        <div className="pr-title">
-          #{pr.number} {pr.title}
-        </div>
+        <div className="pr-title">{pr.title}</div>
         <div className="pr-meta">
           {pr.author} · {pr.headRef} → {pr.baseRef}
         </div>

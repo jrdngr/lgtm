@@ -25,10 +25,13 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘T | New terminal tab |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |
-| ⌘⇧E | Show the Files panel (reopens it if closed) |
-| ⌘⇧O | Show the Reviewers panel |
-| ⌘⇧Y | Show the Symbols panel |
-| ⌘⇧H | Show the Walkthrough panel |
+| ⌘⇧E | Show the Diff tab's file tree (reopens the right panel if closed) |
+| ⌘⇧Y | Show the Diff tab's symbols |
+| ⌘⇧R | Show the Files tab |
+| ⌘⇧M | Show the Comments tab |
+| ⌘⇧P | Show the Comments tab with the PR open |
+| ⌘⇧H | Show the walkthrough in the Reports tab |
+| ⌘⇧O | Show the Reviewers in the Reports tab |
 
 In a review pane:
 
@@ -51,7 +54,12 @@ In a review pane:
 | `n` / `N` | Next / previous note in the walkthrough's tour |
 | `Esc` | Back to the cursor row |
 
-The Files panel (⌘⇧E or the toolbar's Files button) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it.
+The right panel has four tabs:
+
+- **Diff** lists the review. Its **Files** view (⌘⇧E) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it. Its **Symbols** view (⌘⇧Y) lists the changed symbols.
+- **Files** (⌘⇧R) shows the whole repo.
+- **Comments** (⌘⇧M) lists the review's comments. In a PR workspace the PR sits on top: its conversation folds away under the **PR #N** header, with Pull and the review submit box below it.
+- **Reports** switches between the **Walkthrough** (⌘⇧H) and **Reviewers** (⌘⇧O).
 
 In the header and review toolbar:
 
@@ -64,9 +72,9 @@ Each file header has a checkbox. Checking marks the file reviewed and collapses 
 
 Reviews update live: edits in the working copy are snapshotted after 300 ms of quiet, and any new jj operation reloads open reviews. Selections stay on the same code.
 
-Reviewers: the Reviewers panel (⌘⇧O) runs review personas on the open review, each as its own headless `claude -p` that can only read files. Personas are markdown files in `~/.config/lgtm/personas` or the repo's `.lgtm/personas`. The panel can install the defaults, open a persona to edit, or start a new one. Pick personas and reports (synthesis, cross-review, minimal), then Run. Findings open as cards in a pane beside the review. A card's locations jump to its code, Comment adds it as a comment there, and Send to terminal pastes it into a terminal's prompt.
+Reviewers: Reviewers in the Reports tab (⌘⇧O) runs review personas on the open review, each as its own headless `claude -p` that can only read files. Personas are markdown files in `~/.config/lgtm/personas` or the repo's `.lgtm/personas`. The panel can install the defaults, open a persona to edit, or start a new one. Pick personas and reports (synthesis, cross-review, minimal), then Run. Findings open as cards in a pane beside the review. A card's locations jump to its code, Comment adds it as a comment there, and Send to terminal pastes it into a terminal's prompt.
 
-Navigation: **Graph** (`g`) opens a pane with the review's changed symbols nested in folders, files, and their enclosing classes or functions, with links between those that use each other. It opens on files for a small review and on folders for a big one, and remembers what you opened per review. Click a folder, file, or class to open or close it, click a symbol to jump to its code, and ⌘-click anything to jump to it. A closed box shows one link per box it connects to, and a progress bar for everything in it. Links leave an open box through a port on its right edge and come in through one on its left, one port per box at the other end, so two boxes are joined by a single link however much inside them connects. Links run at right angles and merge where they head into the same box, like a bus, with a dot where they join. A symbol's **+N callers** badge brings in the unchanged code that uses it (dashed), and each caller's badge goes one hop further; the toolbar checkbox shows every changed symbol's callers. Hover a box to highlight its links. The Symbols panel (⌘⇧Y) lists the same symbols.
+Navigation: **Graph** (`g`) opens a pane with the review's changed symbols nested in folders, files, and their enclosing classes or functions, with links between those that use each other. It opens on files for a small review and on folders for a big one, and remembers what you opened per review. Click a folder, file, or class to open or close it, click a symbol to jump to its code, and ⌘-click anything to jump to it. A closed box shows one link per box it connects to, and a progress bar for everything in it. Links leave an open box through a port on its right edge and come in through one on its left, one port per box at the other end, so two boxes are joined by a single link however much inside them connects. Links run at right angles and merge where they head into the same box, like a bus, with a dot where they join. A symbol's **+N callers** badge brings in the unchanged code that uses it (dashed), and each caller's badge goes one hop further; the toolbar checkbox shows every changed symbol's callers. Hover a box to highlight its links. The Diff tab's Symbols view (⌘⇧Y) lists the same symbols.
 
 **Walkthrough** (`h`, or Walkthrough in the review bar) runs a headless `claude -p` that reads the change and writes notes pinned to the code, in the order to read them. Each note has a category:
 
@@ -75,9 +83,9 @@ Navigation: **Graph** (`g`) opens a pane with the review's changed symbols neste
 - 💡 **Context**: intent or background the diff doesn't show.
 - ❓ **Question**: something for you or the author to settle.
 
-Notes show as blocks under their code, and the Walkthrough panel (⌘⇧H) lists them. Pick a tour there: **Reading order** covers every note, and each flow is its own tour. `n` and `N` step through the active tour, moving the cursor to each note, and each tour remembers where you are. The panel's emoji buttons hide or show a category, and **In review** turns the blocks under the code off. A note's **Comment** button adds it as your own comment. Notes are never published; each new walkthrough replaces the last.
+Notes show as blocks under their code, and the walkthrough in the Reports tab (⌘⇧H) lists them. Pick a tour there: **Reading order** covers every note, and each flow is its own tour. `n` and `N` step through the active tour, moving the cursor to each note, and each tour remembers where you are. The panel's emoji buttons hide or show a category, and **In review** turns the blocks under the code off. A note's **Comment** button adds it as your own comment. Notes are never published; each new walkthrough replaces the last.
 
-The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. **Edit global** and **Edit repo** in the Walkthrough panel open that file, copying the built-in prompt there first. Delete the file to go back to the built-in prompt. The note format the agent returns is fixed.
+The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. **Edit global** and **Edit repo** in the walkthrough open that file, copying the built-in prompt there first. Delete the file to go back to the built-in prompt. The note format the agent returns is fixed.
 
 Pull requests: the Workspaces sidebar's **PR** button takes a PR number or URL and checks the PR out into its own `pr-<N>` workspace. Below the workspaces, **Pull requests** lists the open PRs of bookmarks pushed from the selected workspace's stack (`@`'s ancestors down to `trunk()`, and its descendants), nearest `@` first. A PR counts when its head branch has a pushed bookmark's name in the GitHub repo that bookmark was pushed to, so PRs from your fork show up too. Click one to review it like the PR button does. The list loads when you switch workspaces and on **Refresh**; it needs `gh` signed in.
 

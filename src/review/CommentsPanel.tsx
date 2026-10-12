@@ -1,7 +1,5 @@
 import type { CommentDto } from "../bindings";
-import { usePr } from "../github/pr";
-import { SubmitReview } from "../github/SubmitReview";
-import { useGithubOff } from "../tools/agents";
+import { PrSection } from "../github/PrSection";
 import { useWorkspace } from "../workspaces/context";
 import { commentText, rowLabel } from "./comments";
 import { type CurrentReview, useCurrentReview } from "./current";
@@ -14,51 +12,26 @@ function preview(c: CommentDto) {
   return last ? `${last.author}: ${last.body}` : "GitHub thread";
 }
 
-/** Submitting the review and pulling threads, in a PR workspace. */
-function PrBar({ review }: { review: CurrentReview }) {
-  const workspace = useWorkspace();
-  const pr = usePr(workspace);
-  const off = useGithubOff();
-  if (!pr || off) return null;
+/** The current review's comments in file order, under the PR in a PR workspace. Click one to
+ * jump to it. */
+export function CommentsPanel() {
+  const review = useCurrentReview(useWorkspace());
   return (
-    <>
-      <div className="tree-total">
-        <span>PR #{pr.number}</span>
-        <span className="spacer" />
-        <button
-          type="button"
-          onClick={() => review.pullPr()}
-          title="Pull the PR's threads from GitHub"
-        >
-          Pull
-        </button>
-      </div>
-      <SubmitReview
-        workspace={workspace}
-        comments={review.comments}
-        onSubmitted={() => review.pullPr(true)}
-      />
-    </>
+    <div className="comment-list">
+      <PrSection review={review} />
+      {review ? <Comments review={review} /> : <div className="placeholder">No review open</div>}
+    </div>
   );
 }
 
-/** The current review's comments in file order. Click one to jump to it. */
-export function CommentsPanel() {
-  const review = useCurrentReview(useWorkspace());
-  if (!review) return <div className="placeholder">No review open</div>;
+function Comments({ review }: { review: CurrentReview }) {
   const { comments, files } = review;
   if (comments.length === 0) {
-    return (
-      <>
-        <PrBar review={review} />
-        <div className="placeholder">No comments. Select code and press c.</div>
-      </>
-    );
+    return <div className="placeholder">No comments. Select code and press c.</div>;
   }
   const sendAll = () => review.send(comments.map((c) => commentText(files, c)).join("\n\n---\n\n"));
   return (
-    <div className="comment-list">
-      <PrBar review={review} />
+    <>
       <div className="tree-total">
         <span>
           {comments.length} {comments.length === 1 ? "comment" : "comments"}
@@ -69,20 +42,18 @@ export function CommentsPanel() {
         </button>
       </div>
       <ul>
-        {comments.map((c) => {
-          return (
-            <li key={c.id}>
-              <button type="button" onClick={() => review.jumpToComment(c.id)} title={c.path}>
-                <span className="comment-where">
-                  {rowLabel(files, c.file, c.path, c.rows?.end)}
-                  {!c.rows && <span className="comment-outdated">code changed</span>}
-                </span>
-                <span className="comment-preview">{preview(c)}</span>
-              </button>
-            </li>
-          );
-        })}
+        {comments.map((c) => (
+          <li key={c.id}>
+            <button type="button" onClick={() => review.jumpToComment(c.id)} title={c.path}>
+              <span className="comment-where">
+                {rowLabel(files, c.file, c.path, c.rows?.end)}
+                {!c.rows && <span className="comment-outdated">code changed</span>}
+              </span>
+              <span className="comment-preview">{preview(c)}</span>
+            </button>
+          </li>
+        ))}
       </ul>
-    </div>
+    </>
   );
 }

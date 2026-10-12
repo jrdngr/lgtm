@@ -1,13 +1,6 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
-import { BotsPanel } from "../bots/BotsPanel";
-import { RepoTree } from "../editor/RepoTree";
-import { PrPanel } from "../github/PrPanel";
-import { SymbolsPanel } from "../graph/SymbolsPanel";
 import type { RepoInfo } from "../ipc";
-import { CommentsPanel } from "../review/CommentsPanel";
-import { FilesPanel } from "../review/FilesPanel";
-import { WalkthroughPanel } from "../review/WalkthroughPanel";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -15,9 +8,11 @@ import { dockOf } from "./docks";
 import { chord } from "./keys";
 import { addReview, addTerminal, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
+import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
+import { diffView, prOpen, reportView } from "./subviews";
 import { WorkspaceDock } from "./WorkspaceDock";
 
 /** Shortcuts acting on the selected workspace's panes. */
@@ -81,13 +76,28 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
-    "Mod+Shift+E": () => showView("right", "files"),
+    "Mod+Shift+E": () => {
+      diffView.set("files");
+      showView("right", "diff");
+    },
+    "Mod+Shift+Y": () => {
+      diffView.set("symbols");
+      showView("right", "diff");
+    },
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
-    "Mod+Shift+O": () => showView("right", "bots"),
-    "Mod+Shift+Y": () => showView("right", "symbols"),
-    "Mod+Shift+H": () => showView("right", "walkthrough"),
-    "Mod+Shift+P": () => showView("right", "pr"),
+    "Mod+Shift+P": () => {
+      prOpen.set(true);
+      showView("right", "comments");
+    },
+    "Mod+Shift+H": () => {
+      reportView.set("walkthrough");
+      showView("right", "reports");
+    },
+    "Mod+Shift+O": () => {
+      reportView.set("reviewers");
+      showView("right", "reports");
+    },
   };
 
   /** The action for a chord, if it has one now. */
@@ -175,30 +185,11 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           ))}
         </div>
         <WorkspaceContext.Provider value={selected}>
-          <SidePanel
-            side="right"
+          <RightPanel
             state={sides.right}
             onChange={(right) => updateSide("right", () => right)}
             bodyRef={rightBody}
-            views={[
-              { id: "files", title: "Files", render: () => <FilesPanel /> },
-              {
-                id: "repo",
-                title: "Repo",
-                render: () => <RepoTree key={workspaceKey(selected)} />,
-              },
-              { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
-              { id: "pr", title: "PR", render: () => <PrPanel /> },
-              { id: "symbols", title: "Symbols", render: () => <SymbolsPanel /> },
-              { id: "walkthrough", title: "Walkthrough", render: () => <WalkthroughPanel /> },
-              {
-                id: "bots",
-                title: "Reviewers",
-                render: () => (
-                  <BotsPanel onOpen={(run) => withApi((a) => openReport(a, run.id))()} />
-                ),
-              },
-            ]}
+            onOpenReport={(run) => withApi((a) => openReport(a, run.id))()}
           />
         </WorkspaceContext.Provider>
       </div>

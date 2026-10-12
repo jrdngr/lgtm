@@ -52,3 +52,13 @@
 .submit-note {
   color: var(--muted);
 }
+
+.comment-list .tree-total .pr-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+}
