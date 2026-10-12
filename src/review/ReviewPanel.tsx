@@ -170,7 +170,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     refresh(view);
   }
 
-  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, showLine } = useReviewNav({
+  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, showLine } = useReviewNav({
     lines,
     files,
     comments: c.comments,
@@ -258,6 +258,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     openInEditor,
     findRisks: findRisksNow,
     stepHotspot: stepHotspotFrom,
+    stepHunk,
     toggleFile: fold.toggleFile,
     toggleHunk: fold.toggleHunk,
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),

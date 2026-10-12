@@ -25,7 +25,7 @@ test("a row shows its worst hotspot", () => {
   expect(rows.has("0:0")).toBe(false);
 });
 
-test("] and [ step between hotspot starts and wrap around", () => {
+test("stepping moves between hotspot starts and wrap around", () => {
   const spots = [hot(1, 1, 1, "high"), hot(2, 3, 4, "low")];
   expect(stepHotspot(lines, spots, 0, 1)).toBe(2);
   expect(stepHotspot(lines, spots, 2, 1)).toBe(4);

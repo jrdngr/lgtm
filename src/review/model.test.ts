@@ -9,6 +9,8 @@ import {
   fileJumpTarget,
   flatten,
   hunkKey,
+  hunkTargets,
+  stepTarget,
   symbolMarkers,
 } from "./model";
 import { fileProgress, indexState, rowStates } from "./state";
@@ -85,6 +87,39 @@ describe("jump targets", () => {
     expect(commentJumpTarget(lines, 8)).toEqual({ cursor: 3, top: 1 });
     expect(commentJumpTarget(lines, 7)).toEqual({ cursor: 3, top: 0 });
     expect(commentJumpTarget(lines, 9)).toBeUndefined();
+  });
+});
+
+describe("hunk stepping", () => {
+  const lines: DisplayLine[] = [
+    { kind: "file", file: 0 },
+    { kind: "hunk", file: 0, hunk: 0 },
+    { kind: "rows", file: 0, hunk: 0, rows: [0] },
+    { kind: "rows", file: 0, hunk: 0, rows: [1] },
+    { kind: "hunk", file: 0, hunk: 1 },
+    { kind: "file", file: 1 },
+    { kind: "hunk", file: 1, hunk: 0 },
+    { kind: "gap", file: 1, hunk: 0, rows: [0] },
+    { kind: "rows", file: 1, hunk: 0, rows: [1] },
+  ];
+  const targets = hunkTargets(lines);
+  const step = (cursor: number, dir: 1 | -1) => stepTarget(targets, cursor, dir)?.cursor;
+
+  it("lands on a hunk's first shown row, or its header when it's collapsed", () => {
+    expect(targets).toEqual([
+      { cursor: 2, top: 1 },
+      { cursor: 4, top: 4 },
+      { cursor: 8, top: 6 },
+    ]);
+  });
+
+  it("goes back to the previous hunk from inside one and stops at the ends", () => {
+    expect(step(3, 1)).toBe(4);
+    expect(step(4, 1)).toBe(8);
+    expect(step(8, 1)).toBeUndefined();
+    expect(step(3, -1)).toBe(2);
+    expect(step(8, -1)).toBe(4);
+    expect(step(2, -1)).toBeUndefined();
   });
 });
 

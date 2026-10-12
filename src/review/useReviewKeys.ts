@@ -23,6 +23,7 @@ interface Ctx {
   openInEditor(): void;
   findRisks(): void;
   stepHotspot(dir: 1 | -1): void;
+  stepHunk(dir: 1 | -1): void;
   toggleFile(file: number): void;
   toggleHunk(file: number, hunk: number): void;
   toggleChecked(file: number): void;
@@ -120,7 +121,11 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "]":
       case "[":
-        ctx.stepHotspot(e.key === "]" ? 1 : -1);
+        ctx.stepHunk(e.key === "]" ? 1 : -1);
+        break;
+      case "n":
+      case "N":
+        ctx.stepHotspot(e.key === "n" ? 1 : -1);
         break;
       case "x": {
         const file = lines[cursor]?.file;

@@ -46,7 +46,8 @@ In a review pane:
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |
 | `h` | Highlight risks: an agent finds the parts that most need a careful look |
-| `]` / `[` | Next / previous hotspot |
+| `]` / `[` | Next / previous hunk |
+| `n` / `N` | Next / previous hotspot |
 | `Esc` | Back to the cursor row |
 
 The Files panel (⌘⇧E or the toolbar's Files button) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it.

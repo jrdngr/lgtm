@@ -183,6 +183,31 @@ export function fileJumpTarget(lines: DisplayLine[], file: number): JumpTarget |
   return { cursor, top: header };
 }
 
+/** Jumping to a hunk scrolls its header to the top and puts the cursor on its first row, or on
+ * the header when no row of it is shown. */
+export function hunkJumpTarget(lines: DisplayLine[], header: number): JumpTarget {
+  for (let i = header + 1; i < lines.length; i++) {
+    const kind = lines[i].kind;
+    if (kind === "rows") return { cursor: i, top: header };
+    if (kind === "file" || kind === "hunk") break;
+  }
+  return { cursor: header, top: header };
+}
+
+/** Every shown hunk's jump target, in display order. */
+export const hunkTargets = (lines: DisplayLine[]): JumpTarget[] =>
+  lines.flatMap((l, i) => (l.kind === "hunk" ? [hunkJumpTarget(lines, i)] : []));
+
+/** The first target after `cursor` (`dir` 1) or the last one before it (-1). Doesn't wrap. */
+export function stepTarget(
+  targets: JumpTarget[],
+  cursor: number,
+  dir: 1 | -1,
+): JumpTarget | undefined {
+  if (dir === 1) return targets.find((t) => t.cursor > cursor);
+  return [...targets].reverse().find((t) => t.cursor < cursor);
+}
+
 /** Jumping to a comment block puts the cursor on the row it follows. */
 export function commentJumpTarget(lines: DisplayLine[], id: number): JumpTarget | undefined {
   const at = lines.findIndex((l) => l.kind === "comment" && l.comment === id);
