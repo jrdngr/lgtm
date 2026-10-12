@@ -7,6 +7,7 @@ import {
   type DisplayLine,
   type FlatFile,
   fileJumpTarget,
+  fileTargets,
   hunkTargets,
   type JumpTarget,
   rowJumpTarget,
@@ -66,6 +67,11 @@ export function useReviewNav(n: Nav) {
     if (target) jumpTo(target);
   }
 
+  function stepFile(dir: 1 | -1) {
+    const target = stepTarget(fileTargets(lines), n.cursor, dir);
+    if (target) jumpTo(target);
+  }
+
   /** Shows `line` of `path`: the row on that new-side line, or the nearest one. A file the
    * review doesn't change opens in the editor. */
   function showLine(path: string, line: number | null) {
@@ -83,5 +89,5 @@ export function useReviewNav(n: Nav) {
     else jumpToRow(file, best);
   }
 
-  return { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, showLine };
+  return { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, stepFile, showLine };
 }

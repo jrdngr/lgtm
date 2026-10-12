@@ -7,6 +7,7 @@ import {
   commentJumpTarget,
   type DisplayLine,
   fileJumpTarget,
+  fileTargets,
   flatten,
   hunkKey,
   hunkTargets,
@@ -120,6 +121,13 @@ describe("hunk stepping", () => {
     expect(step(3, -1)).toBe(2);
     expect(step(8, -1)).toBe(4);
     expect(step(2, -1)).toBeUndefined();
+  });
+
+  it("steps files the same way, going back to the current file's start first", () => {
+    const files = fileTargets(lines);
+    expect(files.map((t) => t.cursor)).toEqual([2, 8]);
+    expect(stepTarget(files, 4, 1)?.cursor).toBe(8);
+    expect(stepTarget(files, 4, -1)?.cursor).toBe(2);
   });
 });
 

@@ -178,10 +178,17 @@ export const rowJumpTarget = (at: number): JumpTarget => ({ cursor: at, top: Mat
 /** Jumping to a file scrolls its header to the top and puts the cursor on its first row. */
 export function fileJumpTarget(lines: DisplayLine[], file: number): JumpTarget | undefined {
   const header = lines.findIndex((l) => l.kind === "file" && l.file === file);
-  if (header < 0) return undefined;
+  return header < 0 ? undefined : fileTargetAt(lines, header);
+}
+
+function fileTargetAt(lines: DisplayLine[], header: number): JumpTarget {
   const cursor = lines[header + 1]?.kind === "file" ? header : nextRowLine(lines, header, 1);
   return { cursor, top: header };
 }
+
+/** Every shown file's jump target, in display order. */
+export const fileTargets = (lines: DisplayLine[]): JumpTarget[] =>
+  lines.flatMap((l, i) => (l.kind === "file" ? [fileTargetAt(lines, i)] : []));
 
 /** Jumping to a hunk scrolls its header to the top and puts the cursor on its first row, or on
  * the header when no row of it is shown. */

@@ -47,6 +47,7 @@ In a review pane:
 | `g` | Open the symbol graph |
 | `h` | Highlight risks: an agent finds the parts that most need a careful look |
 | `]` / `[` | Next / previous hunk |
+| `}` / `{` | Next / previous file |
 | `n` / `N` | Next / previous hotspot |
 | `Esc` | Back to the cursor row |
 

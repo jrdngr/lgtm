@@ -170,18 +170,19 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     refresh(view);
   }
 
-  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, showLine } = useReviewNav({
-    lines,
-    files,
-    comments: c.comments,
-    hotspots: review?.state.hotspots ?? [],
-    cursor,
-    place,
-    setScrollTo,
-    api,
-    containerApi,
-    focusRoot,
-  });
+  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, stepFile, showLine } =
+    useReviewNav({
+      lines,
+      files,
+      comments: c.comments,
+      hotspots: review?.state.hotspots ?? [],
+      cursor,
+      place,
+      setScrollTo,
+      api,
+      containerApi,
+      focusRoot,
+    });
 
   async function commentOn(file: number, rows: number[], body: string, snippet: string) {
     if (!review) return false;
@@ -259,6 +260,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     findRisks: findRisksNow,
     stepHotspot: stepHotspotFrom,
     stepHunk,
+    stepFile,
     toggleFile: fold.toggleFile,
     toggleHunk: fold.toggleHunk,
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),

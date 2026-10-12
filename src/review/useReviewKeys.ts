@@ -24,6 +24,7 @@ interface Ctx {
   findRisks(): void;
   stepHotspot(dir: 1 | -1): void;
   stepHunk(dir: 1 | -1): void;
+  stepFile(dir: 1 | -1): void;
   toggleFile(file: number): void;
   toggleHunk(file: number, hunk: number): void;
   toggleChecked(file: number): void;
@@ -122,6 +123,10 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "]":
       case "[":
         ctx.stepHunk(e.key === "]" ? 1 : -1);
+        break;
+      case "}":
+      case "{":
+        ctx.stepFile(e.key === "}" ? 1 : -1);
         break;
       case "n":
       case "N":
