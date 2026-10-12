@@ -5,12 +5,15 @@ import { type CurrentReview, publishReview } from "./current";
 import { inReviewPane, markIdle } from "./idle";
 
 function fakeDock(workspace: string) {
-  const panels: { view: { contentComponent: string } }[] = [];
+  const panels: { view: { contentComponent: string }; shown: number; api: object }[] = [];
   const api = {
     panels,
     groups: [],
-    addPanel: (o: { component: string }) =>
-      panels.push({ view: { contentComponent: o.component } }),
+    addPanel(o: { component: string }) {
+      const p = { view: { contentComponent: o.component }, shown: 0, api: {} };
+      p.api = { setActive: () => p.shown++ };
+      panels.push(p);
+    },
   };
   registerDock(workspace, api as unknown as DockviewApi);
   return panels;
@@ -32,12 +35,13 @@ describe("inReviewPane", () => {
     expect(got).toEqual([3]);
   });
 
-  it("reuses a loading pane, and only the latest action runs", () => {
+  it("shows a loading pane instead of opening another, and only the latest action runs", () => {
     const panels = fakeDock("c");
     const got: string[] = [];
     inReviewPane("c", () => got.push("first"));
     inReviewPane("c", () => got.push("second"));
     expect(panels).toHaveLength(1);
+    expect(panels[0].shown).toBe(1);
     publishReview("c", review(5));
     expect(got).toEqual(["second"]);
   });

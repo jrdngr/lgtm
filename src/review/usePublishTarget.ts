@@ -2,7 +2,14 @@ import type { DockviewPanelApi } from "dockview-react";
 import { useEffect, useRef } from "react";
 import type { WorkspaceName } from "../workspaces/context";
 import { isIdle } from "./idle";
-import { isTarget, publishTarget, type ReviewTarget, retractTarget, targetOf } from "./target";
+import {
+  isTarget,
+  onTargetChange,
+  publishTarget,
+  type ReviewTarget,
+  retractTarget,
+  targetOf,
+} from "./target";
 
 /** Publishes this pane's target while it's active, or when no pane has, and retracts it when
  * the pane goes. */
@@ -32,7 +39,14 @@ export function usePublishTarget(
     const free = !targetOf(workspace) || isIdle(targetOf(workspace));
     if (api.isActive || free || isTarget(workspace, published.current)) publish();
     const sub = api.onDidActiveChange(({ isActive }) => isActive && publish());
-    return () => sub.dispose();
+    // Takes over when the pane that was the target closes.
+    const off = onTargetChange(() => {
+      if (!targetOf(workspace)) publish();
+    });
+    return () => {
+      sub.dispose();
+      off();
+    };
   }, [api, workspace, revset, changes, loading]);
 
   useEffect(() => () => retractTarget(workspace, published.current), [workspace]);

@@ -24,6 +24,7 @@ export const retractTarget = store.retract;
 export const targetOf = store.get;
 export const isTarget = store.isOwner;
 export const useReviewTarget = store.use;
+export const onTargetChange = store.subscribe;
 
 /** Asks the header to open the revision picker, as `r` in a review does. */
 export function openRevisions(workspace: WorkspaceName) {

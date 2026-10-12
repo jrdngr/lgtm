@@ -17,8 +17,8 @@ export const isIdle = (o: object | undefined) => !!o && idle.has(o);
 const WAIT_MS = 60_000;
 const waiting = new Map<string, () => void>();
 
-/** Calls `f` with the workspace's review pane once one has loaded, opening one first when
- * the dock has none. A later call replaces a waiting one. */
+/** Calls `f` with the workspace's review pane once one has loaded, showing the dock's review
+ * pane first, or opening one when it has none. A later call replaces a waiting one. */
 export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview) => void) {
   const api = dockOf(workspace);
   if (!api) return;
@@ -37,5 +37,7 @@ export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview
   });
   const timer = setTimeout(done, WAIT_MS);
   waiting.set(key, done);
-  if (!api.panels.some(isReviewPanel)) openReviewTab(api);
+  const pane = api.panels.find(isReviewPanel);
+  if (pane) pane.api.setActive();
+  else openReviewTab(api);
 }

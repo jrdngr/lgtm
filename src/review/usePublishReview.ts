@@ -7,6 +7,7 @@ import {
   type CurrentReview,
   currentReview,
   isCurrent,
+  onReviewChange,
   publishReview,
   retractReview,
 } from "./current";
@@ -84,7 +85,14 @@ export function usePublishReview(
     const sub = api.onDidActiveChange(({ isActive }) => {
       if (isActive && review) publish();
     });
-    return () => sub.dispose();
+    // Takes over when the pane that was current closes.
+    const off = onReviewChange(() => {
+      if (review && !currentReview(workspace)) publish();
+    });
+    return () => {
+      sub.dispose();
+      off();
+    };
   }, [api, workspace, review, files, progress, rowState, checks, filter]);
 
   useEffect(() => () => retractReview(workspace, published.current), [workspace]);
