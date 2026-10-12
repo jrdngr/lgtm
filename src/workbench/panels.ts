@@ -1,13 +1,19 @@
-import type { AddPanelOptions, DockviewApi } from "dockview-react";
+import type { AddPanelOptions, DockviewApi, DockviewGroupPanel } from "dockview-react";
 
-type PanelKind = "review" | "terminal" | "report" | "graph";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "editor";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
   report: "Reviewers",
   graph: "Graph",
+  editor: "Editor",
 };
+
+/** What the new tab menu offers, in order. */
+export const KINDS: PanelKind[] = ["review", "terminal", "graph", "report", "editor"];
+
+export const kindTitle = (kind: PanelKind) => TITLES[kind];
 
 function addPanel(
   api: DockviewApi,
@@ -22,8 +28,9 @@ function addPanel(
     title: TITLES[component],
     params,
     position,
-    // Terminals keep their DOM while their tab is hidden so scrollback and state survive.
-    renderer: component === "terminal" ? "always" : "onlyWhenVisible",
+    // Terminals and editors keep their DOM while their tab is hidden, so scrollback and
+    // unsaved edits survive.
+    renderer: component === "terminal" || component === "editor" ? "always" : "onlyWhenVisible",
   });
 }
 
@@ -41,11 +48,16 @@ function besideReview(api: DockviewApi): AddPanelOptions["position"] {
   return review ? { referencePanel: review, direction: "right" } : undefined;
 }
 
-/** Shows a persona review's reports, in the pane it's already open in if there is one. */
-export function openReport(api: DockviewApi, run: number) {
+/** Shows a persona review's reports, in the pane it's already open in if there is one,
+ * else at `position`. */
+export function openReport(
+  api: DockviewApi,
+  run: number,
+  position: AddPanelOptions["position"] = besideReview(api),
+) {
   const open = api.getPanel(`report-${run}`);
   if (open) return open.api.setActive();
-  addPanel(api, "report", { run }, besideReview(api), `report-${run}`);
+  addPanel(api, "report", { run }, position, `report-${run}`);
 }
 
 /** Shows the symbol graph beside the review, in its pane if it's already open. */
@@ -53,6 +65,26 @@ export function openGraph(api: DockviewApi) {
   const open = api.getPanel("graph");
   if (open) return open.api.setActive();
   addPanel(api, "graph", {}, besideReview(api), "graph");
+}
+
+/** Opens a `kind` tab in `group`. A report or editor opens empty and offers a run or file.
+ * The graph is one per dock, so an open one moves here. */
+export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
+  const graph = kind === "graph" ? api.getPanel("graph") : undefined;
+  if (graph) {
+    graph.api.moveTo({ group });
+    return graph.api.setActive();
+  }
+  addPanel(api, kind, {}, { referenceGroup: group }, kind === "graph" ? "graph" : undefined);
+}
+
+/** Splits `group` with an empty pane, which offers the kinds of tab to open in it. */
+export function splitGroup(
+  api: DockviewApi,
+  group: DockviewGroupPanel,
+  direction: "right" | "below",
+) {
+  api.addGroup({ referenceGroup: group, direction });
 }
 
 /** Opens a review pane on `@`, beside the active pane. */

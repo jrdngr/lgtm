@@ -301,9 +301,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         onFilter={changeFilter}
         progress={total}
         onReset={a.resetMarks}
-        onGraph={() => openGraph(containerApi)}
         walkthrough={walkthrough}
-        onWalkthrough={runWalkthroughNow}
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />

@@ -138,9 +138,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         <span className="repo" title={repo.root}>
           {repo.name}
         </span>
-        <button type="button" onClick={withApi((a) => addTerminal(a))}>
-          New terminal
-        </button>
         <span className="spacer" />
         <div className="toolbar-center">
           <RevPicker workspace={selected} onNoReview={withApi(addReview)} />

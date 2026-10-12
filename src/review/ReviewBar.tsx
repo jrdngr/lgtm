@@ -38,9 +38,7 @@ interface Props {
   onFilter(filter: Filter): void;
   progress: Progress;
   onReset(): void;
-  onGraph(): void;
   walkthrough?: WalkthroughRun;
-  onWalkthrough(): void;
 }
 
 export function ReviewBar(props: Props) {
@@ -100,30 +98,13 @@ export function ReviewBar(props: Props) {
       >
         {props.mode === "unified" ? "Split" : "Unified"}
       </button>
-      <button type="button" disabled={!review} onClick={props.onGraph} title="Symbol graph (g)">
-        Graph
-      </button>
-      {review && props.walkthrough?.running ? (
+      {review && props.walkthrough?.running && (
         <span className="risk-run" title="An agent is writing a walkthrough of the change">
           <span className="risk-note">Walking through · {props.walkthrough.note}</span>
           <button type="button" onClick={() => stopWalkthrough(review.id)}>
             Stop
           </button>
         </span>
-      ) : (
-        <button
-          type="button"
-          disabled={!review}
-          onClick={props.onWalkthrough}
-          title={
-            props.walkthrough?.error ??
-            props.walkthrough?.note ??
-            "Have an agent guide you through the change (h). n and N step through it."
-          }
-          className={props.walkthrough?.error ? "error" : undefined}
-        >
-          Walkthrough
-        </button>
       )}
       <span className="spacer" />
       {review && (
@@ -134,8 +115,13 @@ export function ReviewBar(props: Props) {
           <span>{progress.unreviewed} left</span>
         </span>
       )}
-      <button type="button" disabled={!review} onClick={props.onReset}>
-        Reset marks for this review
+      <button
+        type="button"
+        disabled={!review}
+        onClick={props.onReset}
+        title="Clear every mark in this review"
+      >
+        Reset
       </button>
     </div>
   );

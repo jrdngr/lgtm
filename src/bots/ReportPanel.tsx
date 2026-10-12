@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import type { BotOptions, Finding } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
+import { openReport } from "../workbench/panels";
 import { useWorkspace } from "../workspaces/context";
 import { Closing, Tally } from "./Closing";
 import { FindingCard } from "./FindingCard";
@@ -13,6 +14,7 @@ import { Progress } from "./Progress";
 import { runState } from "./personas";
 import { MinimalView, PersonaView, SelectAll } from "./ReportViews";
 import { type Act, RunControls } from "./RunControls";
+import { RunList } from "./RunList";
 import { refreshRun, runAction, useRun } from "./runs";
 import "./bots.css";
 
@@ -45,10 +47,30 @@ function fixPrompt(revset: string, picked: Picked[]): string {
   return `Fix ${n === 1 ? "this finding" : `these ${n} findings`} from a review of \`${revset}\`. Change only what each one needs.\n\n${findings}`;
 }
 
+/** A persona review's report, or the workspace's runs to pick one from. */
+export function ReportPanel({ params, api, containerApi }: IDockviewPanelProps<{ run?: number }>) {
+  const workspace = useWorkspace();
+  const [error, setError] = useState<string>();
+  if (params.run !== undefined) return <Report run={params.run} />;
+  return (
+    <div className="bots-report bots-pick">
+      <RunList
+        workspace={workspace}
+        onError={setError}
+        onOpen={(run) => {
+          openReport(containerApi, run.id, { referencePanel: api.id, direction: "within" });
+          api.close();
+        }}
+      />
+      {error && <div className="bots-error">{error}</div>}
+    </div>
+  );
+}
+
 /** One persona review: its findings as cards, as the minimal set, the synthesis, or each
  * persona's own. */
-export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
-  const run = useRun(params.run);
+function Report({ run: id }: { run: number }) {
+  const run = useRun(id);
   const [picked, setPicked] = useState<View>();
   const [persona, setPersona] = useState<string>();
   const [open, setOpen] = useState<Set<string>>(new Set());

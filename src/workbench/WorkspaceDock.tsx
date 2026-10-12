@@ -15,6 +15,8 @@ import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { registerDock } from "./docks";
+import { EmptyGroup } from "./EmptyGroup";
+import { NewTab, SplitButtons } from "./GroupActions";
 import { defaultLayout, dropStalePanels } from "./panels";
 import { Tab } from "./Tab";
 
@@ -85,6 +87,9 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
         <DockviewReact
           components={components}
           defaultTabComponent={Tab}
+          leftHeaderActionsComponent={NewTab}
+          rightHeaderActionsComponent={SplitButtons}
+          watermarkComponent={EmptyGroup}
           onReady={ready}
           theme={themeDark}
         />

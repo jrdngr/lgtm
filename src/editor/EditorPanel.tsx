@@ -16,9 +16,18 @@ import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 
+/** An editor tab, empty until a file is opened in it. */
+export function EditorPanel(props: IDockviewPanelProps<Partial<EditorParams>>) {
+  const { params } = props;
+  if (!params.path) {
+    return <div className="placeholder">No file open. Open one from the Files tab.</div>;
+  }
+  return <FileEditor {...props} params={{ ...params, path: params.path }} />;
+}
+
 /** A working-copy file in CodeMirror. Saving snapshots the working copy, so reviews of `@`
  * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
-export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
+function FileEditor({ params, api }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
   const { path, line, nonce } = params;
   const host = useRef<HTMLDivElement>(null);
