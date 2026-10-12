@@ -23,7 +23,7 @@ mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;
 mod views;
-mod walkthrough;
+pub(crate) mod walkthrough;
 #[cfg(test)]
 mod workflow_tests;
 mod workshop;

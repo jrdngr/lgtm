@@ -69,6 +69,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::register_mcp,
             commands::notes::run_walkthrough,
             commands::notes::stop_walkthrough,
+            commands::notes::walkthrough_prompt,
+            commands::notes::edit_walkthrough_prompt,
             commands::comments::add_comment,
             commands::comments::edit_comment,
             commands::comments::delete_comment,

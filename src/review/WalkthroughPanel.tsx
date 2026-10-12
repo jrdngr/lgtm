@@ -4,6 +4,7 @@ import { rowLabel } from "./comments";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { CATEGORIES, CATEGORY_ORDER, READING_ORDER, tours } from "./notes";
 import { activeTour, goToStep, setTourState, useTourState } from "./tour";
+import { WalkthroughPrompt } from "./WalkthroughPrompt";
 import { stopWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./comments.css";
 import "./notes.css";
@@ -52,6 +53,7 @@ export function WalkthroughPanel() {
           </>
         )}
       </div>
+      <WalkthroughPrompt />
       {notes.length > 0 && (
         <div className="note-tools">
           <select

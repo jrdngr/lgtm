@@ -77,6 +77,8 @@ Navigation: **Graph** (`g`) opens a pane with the review's changed symbols neste
 
 Notes show as blocks under their code, and the Walkthrough panel (⌘⇧H) lists them. Pick a tour there: **Reading order** covers every note, and each flow is its own tour. `n` and `N` step through the active tour, moving the cursor to each note, and each tour remembers where you are. The panel's emoji buttons hide or show a category, and **In review** turns the blocks under the code off. A note's **Comment** button adds it as your own comment. Notes are never published; each new walkthrough replaces the last.
 
+The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. **Edit global** and **Edit repo** in the Walkthrough panel open that file, copying the built-in prompt there first. Delete the file to go back to the built-in prompt. The note format the agent returns is fixed.
+
 Agents in terminals: lgtm offers to register itself with Claude Code (`claude mcp add -s user lgtm -- <app> mcp`). Then `claude` in an lgtm terminal gets tools to read the open review (progress, unreviewed ranges, comments, walkthrough, symbol graph, Reviewer findings), add comments and replies, write a walkthrough, submit its own findings as a Reviewers run, and show code or change the revset in the review pane. It can't mark code reviewed. Outside an lgtm terminal the server has no tools.
 
 At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to install or update whichever is missing.

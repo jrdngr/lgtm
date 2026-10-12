@@ -82,6 +82,16 @@ export const commands = {
 	skipped: number,
 } | null, string>(__TAURI_INVOKE("run_walkthrough", { review, activity })),
 	stopWalkthrough: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_walkthrough", { review })),
+	/**  The walkthrough prompt file the workspace's reviews use, `null` for the built-in prompt. */
+	walkthroughPrompt: (workspace: string | null) => typedError<{
+	scope: Scope,
+	path: string,
+} | null, string>(__TAURI_INVOKE("walkthrough_prompt", { workspace })),
+	/**
+	 *  The path of `scope`'s walkthrough prompt, to open in the editor. Writes the built-in prompt
+	 *  there first when there's no file yet.
+	 */
+	editWalkthroughPrompt: (workspace: string | null, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("edit_walkthrough_prompt", { workspace, scope })),
 	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
 	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
@@ -667,6 +677,12 @@ export type ProgressDto = {
 	flagged: number,
 	unreviewed: number,
 	changed: number,
+};
+
+/**  The prompt file a walkthrough uses. */
+export type PromptFile = {
+	scope: Scope,
+	path: string,
 };
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };

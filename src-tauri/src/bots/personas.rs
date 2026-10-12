@@ -81,13 +81,18 @@ off_lens: true
 - What it flags, and what it leaves alone.
 ";
 
-/// Global personas: `$XDG_CONFIG_HOME/lgtm/personas`, falling back to `~/.config`.
-pub fn global_dir() -> Option<PathBuf> {
+/// lgtm's config: `$XDG_CONFIG_HOME/lgtm`, falling back to `~/.config`.
+pub fn config_dir() -> Option<PathBuf> {
     let config = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
         .or_else(|| std::env::home_dir().map(|h| h.join(".config")))?;
-    Some(config.join("lgtm").join("personas"))
+    Some(config.join("lgtm"))
+}
+
+/// Global personas: `personas` in the config dir.
+pub fn global_dir() -> Option<PathBuf> {
+    Some(config_dir()?.join("personas"))
 }
 
 pub fn repo_dir(root: &Path) -> PathBuf {
@@ -261,12 +266,17 @@ pub fn create(root: &Path, name: &str, scope: Scope) -> anyhow::Result<PathBuf> 
     Ok(path)
 }
 
+/// A file that isn't a symlink.
+pub fn is_plain_file(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+}
+
 /// Whether `path` is a persona file, the only files the app opens for editing. Symlinks aren't,
 /// so a repo can't have Edit open some other file by its own type.
 pub fn is_persona_file(root: &Path, path: &Path) -> bool {
     let in_dir = |d: &Path| path.parent() == Some(d);
     path.extension().is_some_and(|e| e == "md")
-        && std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
+        && is_plain_file(path)
         && (in_dir(&repo_dir(root)) || global_dir().is_some_and(|d| in_dir(&d)))
 }
 
