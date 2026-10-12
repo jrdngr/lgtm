@@ -53,6 +53,12 @@
   fill: #6b7280;
 }
 
+.gport {
+  fill: var(--bg);
+  stroke: #6b7280;
+  stroke-width: 1.5;
+}
+
 .glinks.dimmed .glink:not(.lit),
 .glinks.dimmed .garrow:not(.lit) {
   opacity: 0.25;

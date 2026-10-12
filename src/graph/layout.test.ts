@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { GraphDto, GraphNode } from "../bindings";
 import { layout } from "./layout";
+import { route } from "./ports";
 import { buildTree } from "./tree";
 import {
   firstView,
@@ -117,6 +118,35 @@ describe("collapsed boxes", () => {
     ]);
   });
 
+  test("route an open file's links to one closed file through one port", () => {
+    const view = { expanded: new Set(["f:a.rs"]), callersOpen: new Set<number>() };
+    const s = scene(graph, view);
+    const { ports, segments } = route(s.tree, s.links);
+    expect([...ports.keys()]).toEqual(["out:f:a.rs>f:b.rs"]);
+    expect([...segments.keys()].sort()).toEqual([
+      "out:f:a.rs>f:b.rs>f:b.rs",
+      "s:0>out:f:a.rs>f:b.rs",
+      "s:1>out:f:a.rs>f:b.rs",
+      "s:1>s:0",
+    ]);
+  });
+
+  test("route links between two open files from out port to in port", () => {
+    const view = { expanded: new Set(["f:a.rs", "f:b.rs"]), callersOpen: new Set<number>() };
+    const s = scene(graph, view);
+    const { routes, segments } = route(s.tree, s.links);
+    expect(routes.find((r) => r.link.from === "s:0")?.stops).toEqual([
+      "s:0",
+      "out:f:a.rs>f:b.rs",
+      "in:f:b.rs>f:a.rs",
+      "s:2",
+    ]);
+    // The two links between the files share the step between the ports.
+    expect([...segments.keys()].filter((k) => k.startsWith("out:"))).toEqual([
+      "out:f:a.rs>f:b.rs>in:f:b.rs>f:a.rs",
+    ]);
+  });
+
   test("the first view opens folders until the graph would pass 20 boxes", () => {
     const many = graphOf(
       Array.from({ length: 30 }, (_, i): [string, string] => [`d${i % 2}/f${i}.rs`, `fn${i}`]),
@@ -172,7 +202,7 @@ test("lays out symbols inside their open file's box, users left of what they use
   );
   const view: View = { expanded: new Set(["f:a.rs"]), callersOpen: new Set() };
   const s = scene(graph, view);
-  const placed = await layout({ ...s, open: new Set(["f:a.rs"]) });
+  const placed = await layout({ ...s, open: new Set(["f:a.rs"]), routed: route(s.tree, s.links) });
   const a = placed.boxes.get("f:a.rs");
   const b = placed.boxes.get("f:b.rs");
   const helper = placed.boxes.get("s:0");

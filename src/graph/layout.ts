@@ -1,6 +1,6 @@
 import type { ELK as Elk, ElkNode } from "elkjs/lib/elk-api.js";
+import type { Routed } from "./ports";
 import type { Tree } from "./tree";
-import type { Link } from "./view";
 
 let elk: Promise<Elk> | undefined;
 
@@ -35,15 +35,19 @@ export interface Rect {
 export interface Placed {
   /** Boxes by id: `at` is in the parent box's coordinates, `abs` in the graph's. */
   boxes: Map<string, { at: Rect; abs: Rect; open: boolean }>;
+  /** Port centers by id, in the graph's coordinates. */
+  ports: Map<string, { x: number; y: number }>;
 }
 
+const PORT = 8;
+
 /** What to lay out: the boxes on screen, parents first, which of them are open, and the
- * links between them. */
+ * links between them, routed through the open boxes' ports. */
 export interface Scene {
   tree: Tree;
   visible: string[];
   open: ReadonlySet<string>;
-  links: Link[];
+  routed: Routed;
   /** Boxes with a callers badge. */
   badges: ReadonlySet<string>;
 }
@@ -64,8 +68,19 @@ export async function layout(scene: Scene): Promise<Placed> {
       "elk.padding": "[top=12,left=12,bottom=12,right=12]",
     },
     children: [],
-    edges: scene.links.map((l, i) => ({ id: `e${i}`, sources: [l.from], targets: [l.to] })),
+    edges: [...scene.routed.segments.values()].map((l, i) => ({
+      id: `e${i}`,
+      sources: [l.from],
+      targets: [l.to],
+    })),
   };
+  const portsOf = new Map<string, ElkNode["ports"]>();
+  for (const p of scene.routed.ports.values()) {
+    const side = p.side === "out" ? "EAST" : "WEST";
+    const list = portsOf.get(p.box) ?? [];
+    list.push({ id: p.id, width: PORT, height: PORT, layoutOptions: { "elk.port.side": side } });
+    portsOf.set(p.box, list);
+  }
   for (const id of visible) {
     const box = tree.boxes.get(id);
     if (!box) continue;
@@ -77,8 +92,10 @@ export async function layout(scene: Scene): Promise<Placed> {
             "elk.padding": `[top=${HEADER},left=10,bottom=10,right=10]`,
             "elk.nodeSize.constraints": "MINIMUM_SIZE",
             "elk.nodeSize.minimum": `(${width}, ${HEADER})`,
+            "elk.portConstraints": "FIXED_SIDE",
           },
           children: [],
+          ports: portsOf.get(id) ?? [],
         }
       : { id, width, height: NODE_HEIGHT };
     elkNodes.set(id, node);
@@ -87,14 +104,18 @@ export async function layout(scene: Scene): Promise<Placed> {
   }
   const out = await (await getElk()).layout(root);
   const boxes: Placed["boxes"] = new Map();
+  const ports: Placed["ports"] = new Map();
   const walk = (n: ElkNode, ox: number, oy: number) => {
     for (const c of n.children ?? []) {
       const at = { x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? 0, height: c.height ?? 0 };
       const abs = { ...at, x: ox + at.x, y: oy + at.y };
       boxes.set(c.id, { at, abs, open: open.has(c.id) });
+      for (const p of c.ports ?? []) {
+        ports.set(p.id, { x: abs.x + (p.x ?? 0) + PORT / 2, y: abs.y + (p.y ?? 0) + PORT / 2 });
+      }
       walk(c, abs.x, abs.y);
     }
   };
   walk(out, 0, 0);
-  return { boxes };
+  return { boxes, ports };
 }

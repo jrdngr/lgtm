@@ -8,6 +8,7 @@ import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 import { EdgesLayer } from "./EdgesLayer";
 import { layout, type Placed, type Scene } from "./layout";
 import { showNode } from "./nodes";
+import { route } from "./ports";
 import { type BoxData, BoxNode, OpenBoxNode } from "./SymbolNode";
 import { boxStats, jumpToBox } from "./stats";
 import { buildTree, type Tree } from "./tree";
@@ -57,7 +58,7 @@ function useScene(graph: GraphDto, tree: Tree, view: View) {
       visible,
       open,
       badges,
-      links: links(graph, tree, present, view.expanded),
+      routed: route(tree, links(graph, tree, present, view.expanded)),
     };
     return { scene, present, shown, next };
   }, [graph, tree, view]);
@@ -146,7 +147,7 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
       onNodeMouseEnter={(_, n) => setFocus(n.id)}
       onNodeMouseLeave={() => setFocus(undefined)}
     >
-      <EdgesLayer links={scene.links} placed={placed} focus={focus} />
+      <EdgesLayer routed={scene.routed} placed={placed} focus={focus} />
       <Background gap={24} />
     </ReactFlow>
   );

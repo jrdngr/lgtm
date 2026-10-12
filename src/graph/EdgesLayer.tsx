@@ -1,7 +1,7 @@
 import { ViewportPortal } from "@xyflow/react";
 import { useMemo } from "react";
 import { NODE_HEIGHT, type Placed } from "./layout";
-import type { Link } from "./view";
+import type { Routed } from "./ports";
 
 interface Paths {
   links: string;
@@ -11,41 +11,73 @@ interface Paths {
 
 const empty = (): Paths => ({ links: "", callers: "", arrows: "" });
 
-/** Every link as one path per style. An SVG element per link costs WebKit time that grows
+type Segment = { from: string; to: string; caller: boolean };
+
+/** Where a segment leaves `id` or comes into it: a port's center, or a box's right or left
+ * side level with its name. */
+function end(placed: Placed, id: string, leaving: boolean) {
+  const port = placed.ports.get(id);
+  if (port) return port;
+  const b = placed.boxes.get(id)?.abs;
+  if (!b) return undefined;
+  return { x: leaving ? b.x + b.width : b.x, y: b.y + Math.min(b.height, NODE_HEIGHT) / 2 };
+}
+
+/** Segments as one path per style. An SVG element per link costs WebKit time that grows
  * faster than the number of links: 250 links blocked the window for 2 s. */
-function paths(links: Link[], placed: Placed, only?: string): Paths {
+function paths(segments: Iterable<Segment>, placed: Placed, routed: Routed): Paths {
   const out = empty();
-  for (const l of links) {
-    if (only !== undefined && l.from !== only && l.to !== only) continue;
-    const a = placed.boxes.get(l.from)?.abs;
-    const b = placed.boxes.get(l.to)?.abs;
+  for (const s of segments) {
+    const a = end(placed, s.from, true);
+    const b = end(placed, s.to, false);
     if (!a || !b) continue;
-    const [sx, sy] = [a.x + a.width, a.y + Math.min(a.height, NODE_HEIGHT) / 2];
-    const [tx, ty] = [b.x, b.y + Math.min(b.height, NODE_HEIGHT) / 2];
-    const dx = Math.max(40, Math.abs(tx - sx) / 2);
-    const d = `M${sx},${sy}C${sx + dx},${sy} ${tx - dx},${ty} ${tx},${ty}`;
-    if (l.caller) out.callers += d;
+    const dx = Math.max(20, Math.abs(b.x - a.x) / 2);
+    const d = `M${a.x},${a.y}C${a.x + dx},${a.y} ${b.x - dx},${b.y} ${b.x},${b.y}`;
+    if (s.caller) out.callers += d;
     else out.links += d;
-    out.arrows += `M${tx},${ty}l-7,-4v8z`;
+    // Arrowheads where a link reaches a box or goes into one, not where it leaves one.
+    if (routed.ports.get(s.to)?.side !== "out") out.arrows += `M${b.x},${b.y}l-7,-4v8z`;
   }
   return out;
 }
 
-/** The graph's links, drawn under the boxes. Links of `focus` are drawn again on top, so
- * hovering a box shows what it uses and what uses it. */
+/** The segments of every link that starts or ends at `box`, or passes through its ports. */
+function litSegments(routed: Routed, box: string): Segment[] {
+  const out = new Map<string, Segment>();
+  for (const r of routed.routes) {
+    const touches =
+      r.link.from === box ||
+      r.link.to === box ||
+      r.stops.some((s) => routed.ports.get(s)?.box === box);
+    if (!touches) continue;
+    for (let i = 1; i < r.stops.length; i++) {
+      const key = `${r.stops[i - 1]}>${r.stops[i]}`;
+      const s = routed.segments.get(key);
+      if (s) out.set(key, s);
+    }
+  }
+  return [...out.values()];
+}
+
+/** The graph's links and ports, drawn under the boxes. Links of `focus` are drawn again on
+ * top, so hovering a box shows what it uses and what uses it. */
 export function EdgesLayer({
-  links,
+  routed,
   placed,
   focus,
 }: {
-  links: Link[];
+  routed: Routed;
   placed: Placed;
   focus?: string;
 }) {
-  const all = useMemo(() => paths(links, placed), [links, placed]);
+  const all = useMemo(() => paths(routed.segments.values(), placed, routed), [routed, placed]);
+  const ports = useMemo(
+    () => [...placed.ports.values()].map((p) => `M${p.x - 3},${p.y - 3}h6v6h-6z`).join(""),
+    [placed],
+  );
   const lit = useMemo(
-    () => (focus === undefined ? empty() : paths(links, placed, focus)),
-    [links, placed, focus],
+    () => (focus === undefined ? empty() : paths(litSegments(routed, focus), placed, routed)),
+    [routed, placed, focus],
   );
   return (
     <ViewportPortal>
@@ -53,6 +85,7 @@ export function EdgesLayer({
         <path className="glink" d={all.links} />
         <path className="glink caller" d={all.callers} />
         <path className="garrow" d={all.arrows} />
+        <path className="gport" d={ports} />
         <path className="glink lit" d={lit.links + lit.callers} />
         <path className="garrow lit" d={lit.arrows} />
       </svg>
