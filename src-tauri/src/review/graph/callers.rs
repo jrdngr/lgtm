@@ -9,9 +9,11 @@ use crate::syntax::{CodeSymbol, Ref};
 const MAX_PER_NODE: usize = 8;
 /// Shorter names match too much to count as uses.
 pub(super) const MIN_NAME: usize = 3;
+/// How far out callers of callers are followed.
+pub(super) const MAX_HOPS: u32 = 3;
 
-#[derive(Default)]
 pub(super) struct Found {
+    hop: u32,
     callers: Vec<GraphNode>,
     /// (caller index, changed node)
     edges: Vec<(usize, u32)>,
@@ -19,8 +21,18 @@ pub(super) struct Found {
 }
 
 impl Found {
-    /// Adds the symbols in one file that use a changed symbol's name. `index` holds the
-    /// changed symbols whose names are long enough to count.
+    /// Finds the callers `hop` uses away from a changed symbol.
+    pub fn new(hop: u32) -> Self {
+        Found {
+            hop,
+            callers: Vec::new(),
+            edges: Vec::new(),
+            per_node: HashMap::new(),
+        }
+    }
+
+    /// Adds the symbols in one file that use a name in `index`: the last hop's symbols whose
+    /// names are long enough to count. Symbols already in `nodes` are skipped.
     pub fn scan(
         &mut self,
         path: &str,
@@ -65,6 +77,7 @@ impl Found {
                             line: s.start_line,
                             rows: vec![],
                             parent: parent(symbols, si).map(|p| symbols[p].name.clone()),
+                            hop: self.hop,
                         });
                         self.callers.len() - 1
                     });

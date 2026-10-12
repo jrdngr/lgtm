@@ -3,73 +3,127 @@ import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
 import type { GraphDto } from "../bindings";
 import { type CurrentReview, useCurrentReview } from "../review/current";
-import { useWorkspace } from "../workspaces/context";
+import { isMac } from "../workbench/keys";
+import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 import { EdgesLayer } from "./EdgesLayer";
-import { layout, type Placed } from "./layout";
-import { nodeDone, nodeRisk, showNode } from "./nodes";
-import { FileNode, type SymbolData, SymbolNode } from "./SymbolNode";
+import { layout, type Placed, type Scene } from "./layout";
+import { showNode } from "./nodes";
+import { type BoxData, BoxNode, OpenBoxNode } from "./SymbolNode";
+import { boxStats, jumpToBox } from "./stats";
+import { buildTree, type Tree } from "./tree";
 import { useGraph } from "./useGraph";
+import { useView } from "./useView";
+import {
+  canExpand,
+  links,
+  nextCallers,
+  presentBoxes,
+  presentNodes,
+  toggleAllCallers,
+  toggleCallers,
+  type View,
+  visibleBoxes,
+} from "./view";
 import "./graph.css";
 
-const nodeTypes = { symbol: SymbolNode, file: FileNode };
+const nodeTypes = { box: BoxNode, open: OpenBoxNode };
 
-function usePlaced(graph: GraphDto | undefined) {
-  const [placed, setPlaced] = useState<{ graph: GraphDto; placed: Placed }>();
+function usePlaced(scene: Scene) {
+  const [placed, setPlaced] = useState<{ scene: Scene; placed: Placed }>();
   useEffect(() => {
-    if (!graph) return;
     let live = true;
-    layout(graph).then((p) => live && setPlaced({ graph, placed: p }));
+    layout(scene).then((p) => live && setPlaced({ scene, placed: p }));
     return () => {
       live = false;
     };
-  }, [graph]);
-  return placed?.graph === graph ? placed?.placed : undefined;
+  }, [scene]);
+  return placed?.scene === scene ? placed.placed : undefined;
 }
 
-function toNodes(review: CurrentReview, graph: GraphDto, placed: Placed) {
-  const nodes: Node[] = [];
-  for (const [path, box] of placed.groups) {
-    const outside = graph.nodes.every((n) => n.path !== path || n.file === null);
-    nodes.push({
-      id: `file:${path}`,
-      type: "file",
-      position: { x: box.x, y: box.y },
-      style: { width: box.width, height: box.height },
-      data: { path, outside },
-      selectable: false,
-    });
-  }
-  for (const n of graph.nodes) {
-    const box = placed.nodes.get(n.id);
-    if (!box) continue;
-    const data: SymbolData = { node: n, done: nodeDone(review, n), risk: nodeRisk(review, n) };
-    nodes.push({
-      id: String(n.id),
-      type: "symbol",
-      parentId: `file:${n.path}`,
-      position: { x: box.x, y: box.y },
-      style: { width: box.width },
-      data,
-    });
-  }
-  return nodes;
+function useScene(graph: GraphDto, tree: Tree, view: View) {
+  return useMemo(() => {
+    const present = presentNodes(graph, view.callersOpen);
+    const shown = presentBoxes(tree, present);
+    const visible = visibleBoxes(tree, shown, view.expanded);
+    const open = new Set(
+      visible.filter((id) => view.expanded.has(id) && canExpand(tree, shown, id)),
+    );
+    const next = nextCallers(graph);
+    const badges = new Set(
+      visible.filter((id) => tree.boxes.get(id)?.own.some((n) => present[n] && next.has(n))),
+    );
+    const scene: Scene = {
+      tree,
+      visible,
+      open,
+      badges,
+      links: links(graph, tree, present, view.expanded),
+    };
+    return { scene, present, shown, next };
+  }, [graph, tree, view]);
 }
 
-function Flow({ review, graph }: { review: CurrentReview; graph: GraphDto }) {
-  const placed = usePlaced(graph);
+interface FlowProps {
+  review: CurrentReview;
+  graph: GraphDto;
+  tree: Tree;
+  view: View;
+  setView(view: View): void;
+  workspace: WorkspaceName;
+}
+
+function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
+  const { scene, present, shown, next } = useScene(graph, tree, view);
+  const placed = usePlaced(scene);
   const flow = useReactFlow();
-  const workspace = useWorkspace();
-  const [focus, setFocus] = useState<number>();
-  const nodes = useMemo(
-    () => (placed ? toNodes(review, graph, placed) : []),
-    [review, graph, placed],
-  );
-  // Fit once per layout, not on every progress update.
+  const [focus, setFocus] = useState<string>();
+  const nodes = useMemo(() => {
+    if (!placed) return [];
+    const stats = boxStats(review, graph, tree, present);
+    const out: Node[] = [];
+    for (const id of scene.visible) {
+      const box = tree.boxes.get(id);
+      const at = placed.boxes.get(id);
+      if (!box || !at) continue;
+      const s = stats.get(id);
+      const own = box.own.filter((n) => present[n]);
+      const ownNode = own.length > 0 ? graph.nodes[own[0]] : undefined;
+      const callers = own.reduce((sum, n) => sum + (next.get(n)?.length ?? 0), 0);
+      const data: BoxData = {
+        box,
+        expandable: canExpand(tree, shown, id),
+        status: ownNode?.status,
+        outside: s?.outside ?? false,
+        count: s?.count ?? 0,
+        done: s && s.all > 0 ? s.done / s.all : undefined,
+        risk: s?.risk,
+        callers,
+        callersOpen: own.some((n) => view.callersOpen.has(n)),
+        onCallers: () => {
+          let v = view;
+          for (const n of own) if (next.has(n)) v = toggleCallers(graph, tree, v, n);
+          setView(v);
+        },
+        title: ownNode
+          ? `${ownNode.path}:${ownNode.line}, ${ownNode.status}`
+          : (box.path ?? box.label),
+      };
+      out.push({
+        id,
+        type: at.open ? "open" : "box",
+        parentId: box.parent && placed.boxes.has(box.parent) ? box.parent : undefined,
+        position: { x: at.at.x, y: at.at.y },
+        style: { width: at.at.width, height: at.open ? at.at.height : undefined },
+        data,
+      });
+    }
+    return out;
+  }, [review, graph, tree, view, setView, scene, placed, present, shown, next]);
+  // Fit when the boxes change, not on every progress update.
   useEffect(() => {
     if (placed) requestAnimationFrame(() => flow.fitView({ padding: 0.1 }));
   }, [placed, flow]);
   if (!placed) return <div className="placeholder">Laying out…</div>;
-  const symbol = (n: Node) => (n.type === "symbol" ? (n.data as SymbolData).node : undefined);
   return (
     <ReactFlow
       nodes={nodes}
@@ -78,61 +132,83 @@ function Flow({ review, graph }: { review: CurrentReview; graph: GraphDto }) {
       nodesDraggable={false}
       nodesConnectable={false}
       minZoom={0.1}
-      onNodeClick={(_, n) => {
-        const s = symbol(n);
-        if (s) showNode(review, s, workspace);
+      onNodeClick={(e, n) => {
+        const { box, expandable } = n.data as BoxData;
+        if (isMac ? e.metaKey : e.ctrlKey) return jumpToBox(review, graph, tree, box, workspace);
+        if (expandable) {
+          const expanded = new Set(view.expanded);
+          if (!expanded.delete(box.id)) expanded.add(box.id);
+          return setView({ ...view, expanded });
+        }
+        const own = box.own[0];
+        if (own !== undefined) showNode(review, graph.nodes[own], workspace);
       }}
-      onNodeMouseEnter={(_, n) => setFocus(symbol(n)?.id)}
+      onNodeMouseEnter={(_, n) => setFocus(n.id)}
       onNodeMouseLeave={() => setFocus(undefined)}
     >
-      <EdgesLayer graph={graph} placed={placed} focus={focus} />
+      <EdgesLayer links={scene.links} placed={placed} focus={focus} />
       <Background gap={24} />
     </ReactFlow>
   );
 }
 
-/** Past this many callers they start hidden, since they crowd out the changed symbols. */
-const MAX_SHOWN_CALLERS = 60;
-
-/** `graph` without its callers, keeping node ids as indexes. */
-function withoutCallers(graph: GraphDto): GraphDto {
-  const keep = graph.nodes.filter((n) => n.status !== "caller");
-  const ids = new Set(keep.map((n) => n.id));
-  return { nodes: keep, edges: graph.edges.filter((e) => ids.has(e.from) && ids.has(e.to)) };
-}
-
-/** The current review's changed symbols, how they use each other, and their callers. Click
- * a symbol to show it in the review. */
+/** The current review's changed symbols and how they use each other, nested in their
+ * folders, files and enclosing symbols. Click a box to open it, a symbol to show it in the
+ * review, and a symbol's callers badge to bring in the unchanged code that uses it. */
 export function GraphPanel() {
-  const review = useCurrentReview(useWorkspace());
-  const { graph: full, error, loading } = useGraph(review);
-  const callers = full?.nodes.filter((n) => n.status === "caller").length ?? 0;
-  const [showCallers, setShowCallers] = useState<boolean>();
-  const shown = showCallers ?? callers <= MAX_SHOWN_CALLERS;
-  const graph = useMemo(() => full && (shown ? full : withoutCallers(full)), [full, shown]);
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
+  const { graph, error, loading } = useGraph(review);
   if (!review) return <div className="placeholder">No review open</div>;
   if (error) return <div className="placeholder error">{error}</div>;
   if (loading || !graph) return <div className="placeholder">Finding symbols…</div>;
-  if (graph.nodes.length === 0) {
+  if (!graph.nodes.some((n) => n.hop === 0)) {
     return <div className="placeholder">No changed symbols in {review.revset}</div>;
   }
+  return <Loaded review={review} graph={graph} workspace={workspace} />;
+}
+
+function Loaded({
+  review,
+  graph,
+  workspace,
+}: {
+  review: CurrentReview;
+  graph: GraphDto;
+  workspace: WorkspaceName;
+}) {
+  const tree = useMemo(() => buildTree(graph), [graph]);
+  const [view, setView] = useView(`${workspace}\n${review.revset}`, graph, tree);
+  const changed = graph.nodes.filter((n) => n.hop === 0).length;
+  const firstHop = graph.nodes.filter((n) => n.hop === 1).length;
+  const next = nextCallers(graph);
+  const allOpen = graph.nodes.every(
+    (n) => n.hop !== 0 || !next.has(n.id) || view.callersOpen.has(n.id),
+  );
   return (
     <div className="graph-panel">
       <div className="graph-bar">
-        <span>{graph.nodes.length - (shown ? callers : 0)} changed symbols</span>
+        <span>{changed} changed symbols</span>
         <label>
           <input
             type="checkbox"
-            checked={shown}
-            disabled={callers === 0}
-            onChange={(e) => setShowCallers(e.target.checked)}
+            checked={firstHop > 0 && allOpen}
+            disabled={firstHop === 0}
+            onChange={(e) => setView(toggleAllCallers(graph, tree, view, e.target.checked))}
           />
-          {callers} unchanged callers
+          {firstHop} unchanged callers
         </label>
       </div>
       <div className="graph-canvas">
         <ReactFlowProvider>
-          <Flow review={review} graph={graph} />
+          <Flow
+            review={review}
+            graph={graph}
+            tree={tree}
+            view={view}
+            setView={setView}
+            workspace={workspace}
+          />
         </ReactFlowProvider>
       </div>
     </div>

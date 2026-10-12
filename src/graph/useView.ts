@@ -1,0 +1,28 @@
+import { useState } from "react";
+import type { GraphDto } from "../bindings";
+import type { Tree } from "./tree";
+import { firstView, type View } from "./view";
+
+/** Each review's last view, so reopening the graph or reloading the review keeps what was
+ * open. Callers shown are by node id, so they're kept only for the same graph. */
+const saved = new Map<string, { graph: GraphDto; view: View }>();
+
+/** The graph's view for review `key`: the saved one, or the first view. */
+export function useView(key: string, graph: GraphDto, tree: Tree) {
+  const [state, setState] = useState<{ key: string; graph: GraphDto; view: View }>();
+  let view = state?.key === key && state.graph === graph ? state.view : undefined;
+  if (!view) {
+    const last = saved.get(key);
+    view = last
+      ? {
+          expanded: last.view.expanded,
+          callersOpen: last.graph === graph ? last.view.callersOpen : new Set(),
+        }
+      : firstView(graph, tree);
+  }
+  const setView = (next: View) => {
+    saved.set(key, { graph, view: next });
+    setState({ key, graph, view: next });
+  };
+  return [view, setView] as const;
+}

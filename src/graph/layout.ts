@@ -1,6 +1,6 @@
 import type { ELK as Elk, ElkNode } from "elkjs/lib/elk-api.js";
-import type { GraphDto, GraphNode } from "../bindings";
-import { nodeLabel } from "./nodes";
+import type { Tree } from "./tree";
+import type { Link } from "./view";
 
 let elk: Promise<Elk> | undefined;
 
@@ -18,9 +18,14 @@ function getElk(): Promise<Elk> {
 }
 
 export const NODE_HEIGHT = 40;
-const nodeWidth = (n: GraphNode) => Math.max(90, nodeLabel(n).length * 7 + 36);
+/** Room for an open box's header above what's in it. */
+const HEADER = 30;
+/** Room for a callers badge. */
+const BADGE = 80;
+const labelWidth = (label: string, badge: boolean) =>
+  Math.max(90, label.length * 7 + 56 + (badge ? BADGE : 0));
 
-export interface Box {
+export interface Rect {
   x: number;
   y: number;
   width: number;
@@ -28,16 +33,25 @@ export interface Box {
 }
 
 export interface Placed {
-  /** File groups by path, positioned in the graph. */
-  groups: Map<string, Box>;
-  /** Symbol nodes by id, positioned inside their file's group. */
-  nodes: Map<number, Box>;
+  /** Boxes by id: `at` is in the parent box's coordinates, `abs` in the graph's. */
+  boxes: Map<string, { at: Rect; abs: Rect; open: boolean }>;
 }
 
-/** Lays out nodes in boxes per file, callers to the left of what they call. */
-export async function layout(graph: GraphDto): Promise<Placed> {
-  const byPath = new Map<string, GraphNode[]>();
-  for (const n of graph.nodes) byPath.set(n.path, [...(byPath.get(n.path) ?? []), n]);
+/** What to lay out: the boxes on screen, parents first, which of them are open, and the
+ * links between them. */
+export interface Scene {
+  tree: Tree;
+  visible: string[];
+  open: ReadonlySet<string>;
+  links: Link[];
+  /** Boxes with a callers badge. */
+  badges: ReadonlySet<string>;
+}
+
+/** Lays out the boxes, nested, with users to the left of what they use. */
+export async function layout(scene: Scene): Promise<Placed> {
+  const { tree, visible, open } = scene;
+  const elkNodes = new Map<string, ElkNode>();
   const root: ElkNode = {
     id: "root",
     layoutOptions: {
@@ -49,29 +63,38 @@ export async function layout(graph: GraphDto): Promise<Placed> {
       "elk.layered.thoroughness": "2",
       "elk.padding": "[top=12,left=12,bottom=12,right=12]",
     },
-    children: [...byPath].map(([path, nodes]) => ({
-      id: `file:${path}`,
-      layoutOptions: { "elk.padding": "[top=30,left=10,bottom=10,right=10]" },
-      children: nodes.map((n) => ({ id: String(n.id), width: nodeWidth(n), height: NODE_HEIGHT })),
-    })),
-    edges: graph.edges.map((e, i) => ({
-      id: `e${i}`,
-      sources: [String(e.from)],
-      targets: [String(e.to)],
-    })),
+    children: [],
+    edges: scene.links.map((l, i) => ({ id: `e${i}`, sources: [l.from], targets: [l.to] })),
   };
-  const out = await (await getElk()).layout(root);
-  const groups = new Map<string, Box>();
-  const nodes = new Map<number, Box>();
-  const box = (n: ElkNode): Box => ({
-    x: n.x ?? 0,
-    y: n.y ?? 0,
-    width: n.width ?? 0,
-    height: n.height ?? 0,
-  });
-  for (const g of out.children ?? []) {
-    groups.set(g.id.slice("file:".length), box(g));
-    for (const c of g.children ?? []) nodes.set(Number(c.id), box(c));
+  for (const id of visible) {
+    const box = tree.boxes.get(id);
+    if (!box) continue;
+    const width = labelWidth(box.label, scene.badges.has(id));
+    const node: ElkNode = open.has(id)
+      ? {
+          id,
+          layoutOptions: {
+            "elk.padding": `[top=${HEADER},left=10,bottom=10,right=10]`,
+            "elk.nodeSize.constraints": "MINIMUM_SIZE",
+            "elk.nodeSize.minimum": `(${width}, ${HEADER})`,
+          },
+          children: [],
+        }
+      : { id, width, height: NODE_HEIGHT };
+    elkNodes.set(id, node);
+    const parent = (box.parent && elkNodes.get(box.parent)) || root;
+    parent.children?.push(node);
   }
-  return { groups, nodes };
+  const out = await (await getElk()).layout(root);
+  const boxes: Placed["boxes"] = new Map();
+  const walk = (n: ElkNode, ox: number, oy: number) => {
+    for (const c of n.children ?? []) {
+      const at = { x: c.x ?? 0, y: c.y ?? 0, width: c.width ?? 0, height: c.height ?? 0 };
+      const abs = { ...at, x: ox + at.x, y: oy + at.y };
+      boxes.set(c.id, { at, abs, open: open.has(c.id) });
+      walk(c, abs.x, abs.y);
+    }
+  };
+  walk(out, 0, 0);
+  return { boxes };
 }

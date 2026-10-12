@@ -76,8 +76,10 @@
   box-sizing: border-box;
 }
 
-.gfile span {
-  display: block;
+.gfile-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 6px 10px;
   color: var(--muted);
   font-size: 11px;
@@ -88,6 +90,56 @@
 
 .gfile.outside {
   border-style: dashed;
+}
+
+.gfile-folder {
+  background: rgb(255 255 255 / 1.5%);
+}
+
+.gfile-group {
+  background: var(--panel);
+  border-left: 3px solid var(--accent);
+}
+
+.gfile.risk-high {
+  border-color: var(--flagged);
+}
+
+.gfile.risk-medium {
+  border-color: var(--amber);
+}
+
+.gchevron {
+  display: inline-block;
+  width: 12px;
+  color: var(--muted);
+}
+
+.gcount {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.gnode-box {
+  border-left-color: var(--border);
+}
+
+.gcallers {
+  margin-left: 8px;
+  padding: 0 5px;
+  border: 1px dashed var(--skipped);
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.gcallers.open {
+  border-style: solid;
+  color: var(--fg);
 }
 
 .gnode {

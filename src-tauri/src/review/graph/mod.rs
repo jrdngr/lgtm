@@ -45,6 +45,8 @@ pub struct GraphNode {
     pub rows: Vec<u32>,
     /// The enclosing symbol's name, like the type of an `impl` for a method.
     pub parent: Option<String>,
+    /// 0 for a changed symbol. For a caller, how many uses away from a changed symbol it is.
+    pub hop: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
@@ -98,34 +100,43 @@ pub fn graph(files: &[ReviewFile], root: Option<&Path>) -> GraphDto {
         }
     }
     let mut dtos = dtos;
-    let long: Vec<GraphNode> = dtos
-        .iter()
-        .filter(|n| n.name.len() >= callers::MIN_NAME)
-        .cloned()
-        .collect();
-    let long_index = name_index(&long);
-    let mut found = callers::Found::default();
-    for (i, f) in files.iter().enumerate() {
-        if f.status != FileStatus::Removed {
-            found.scan(
-                &f.new.path,
-                Some(i as u32),
-                &f.new.symbols,
-                &f.new.refs,
-                &dtos,
-                &long_index,
-            );
+    let mut frontier = 0..dtos.len();
+    for hop in 1..=callers::MAX_HOPS {
+        // Callers of the last hop's symbols, by names long enough to count.
+        let wanted: Vec<GraphNode> = dtos[frontier.clone()]
+            .iter()
+            .filter(|n| n.name.len() >= callers::MIN_NAME)
+            .cloned()
+            .collect();
+        if wanted.is_empty() {
+            break;
         }
-    }
-    if let Some(root) = root {
-        let skip: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
-        // Names worth looking for outside the review.
-        let names: HashSet<String> = long_index.keys().map(|s| s.to_string()).collect();
-        for s in scan::mentioning(root, &skip, &names) {
-            found.scan(&s.path, None, &s.symbols, &s.refs, &dtos, &long_index);
+        let index = name_index(&wanted);
+        let mut found = callers::Found::new(hop);
+        for (i, f) in files.iter().enumerate() {
+            if f.status != FileStatus::Removed {
+                found.scan(
+                    &f.new.path,
+                    Some(i as u32),
+                    &f.new.symbols,
+                    &f.new.refs,
+                    &dtos,
+                    &index,
+                );
+            }
         }
+        if let Some(root) = root {
+            let skip: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
+            // Names worth looking for outside the review.
+            let names: HashSet<String> = index.keys().map(|s| s.to_string()).collect();
+            for s in scan::mentioning(root, &skip, &names) {
+                found.scan(&s.path, None, &s.symbols, &s.refs, &dtos, &index);
+            }
+        }
+        let start = dtos.len();
+        found.finish(&mut dtos, &mut edges);
+        frontier = start..dtos.len();
     }
-    found.finish(&mut dtos, &mut edges);
     edges.sort_by_key(|e| (e.from, e.to));
     edges.dedup();
     GraphDto { nodes: dtos, edges }
@@ -253,6 +264,7 @@ fn changed(files: &[ReviewFile]) -> Vec<Node> {
                     line: s.start_line,
                     rows,
                     parent: parent(&fs.symbols, si).map(|p| fs.symbols[p].name.clone()),
+                    hop: 0,
                 },
                 side,
                 sym: si,

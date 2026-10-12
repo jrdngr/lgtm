@@ -447,6 +447,8 @@ export type GraphNode = {
 	rows: number[],
 	/**  The enclosing symbol's name, like the type of an `impl` for a method. */
 	parent: string | null,
+	/**  0 for a changed symbol. For a caller, how many uses away from a changed symbol it is. */
+	hop: number,
 };
 
 export type HeadDto = {

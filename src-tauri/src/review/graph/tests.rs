@@ -100,3 +100,27 @@ async fn graph_of_a_real_repo() {
         std::fs::write(out, serde_json::to_string(&g).unwrap()).unwrap();
     }
 }
+
+#[tokio::test]
+async fn follows_callers_of_callers_and_counts_hops() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn helper() -> u32 {\n    1\n}\n");
+    write(d, "b.rs", "fn uses_helper() -> u32 {\n    helper()\n}\n");
+    write(
+        d,
+        "c.rs",
+        "fn outer_caller() -> u32 {\n    uses_helper()\n}\n",
+    );
+    jj(d, &["commit", "-m", "base"]);
+    write(d, "a.rs", "fn helper() -> u32 {\n    2\n}\n");
+
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let g = ctx.graph(review.id).await.unwrap();
+
+    assert_eq!(node(&g, "helper").hop, 0);
+    assert_eq!(node(&g, "uses_helper").hop, 1);
+    assert_eq!(node(&g, "outer_caller").hop, 2);
+    assert!(linked(&g, "outer_caller", "uses_helper"));
+    assert!(!linked(&g, "outer_caller", "helper"));
+}
