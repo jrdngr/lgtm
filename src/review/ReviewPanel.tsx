@@ -4,7 +4,6 @@ import type { ChangeDto, StateDto, View } from "../bindings";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
 import { PrNote } from "../github/PrNote";
-import { prOf } from "../github/pr";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
@@ -16,9 +15,10 @@ import { Conflicts } from "./Conflicts";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { MarkMenu } from "./MarkMenu";
-import { buildLines, changedRows, flatten, symbolMarkers, type ViewMode } from "./model";
+import { buildLines, changedRows, symbolMarkers, type ViewMode } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
-import { type Filter, fileProgress, indexState, plural, rowStates, sumProgress } from "./state";
+import { startRevset, workspaceRevset } from "./revset";
+import { type Filter, plural, sumProgress } from "./state";
 import { openRevisions } from "./target";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
@@ -29,6 +29,7 @@ import { useReview } from "./useReview";
 import { useReviewActions } from "./useReviewActions";
 import { useReviewKeys } from "./useReviewKeys";
 import { useReviewNav } from "./useReviewNav";
+import { useReviewState } from "./useReviewState";
 import { useRowMouse } from "./useRowMouse";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
@@ -36,11 +37,7 @@ import { useWalkthrough } from "./useWalkthrough";
 import { runWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./review.css";
 
-/** A review pane opens on the working copy, or a PR workspace's PR, so a revset saved last
- * time that no longer resolves can't break startup. */
-const START_REVSET = "@";
 const NO_CHANGES: ChangeDto[] = [];
-const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], notes: [] };
 
 /** Clicks on these keep their own focus instead of giving it to the review. */
 function keepsFocus(t: EventTarget) {
@@ -54,7 +51,7 @@ function keepsFocus(t: EventTarget) {
 
 export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const workspace = useWorkspace();
-  const [revset, setRevset] = useState(START_REVSET);
+  const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
   const [filter, setFilter] = useState<Filter>("all");
@@ -66,12 +63,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const focusRoot = useCallback(() => rootRef.current?.focus({ preventScroll: true }), []);
 
   const review = loaded?.review;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: marking replaces only `state`
-  const files = useMemo(() => (review ? flatten(review) : []), [review?.files]);
+  const { files, index, rowState, progress } = useReviewState(review);
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
-  const index = useMemo(() => indexState(review?.state ?? NO_STATE), [review?.state]);
-  const rowState = useMemo(() => rowStates(files, index), [files, index]);
-  const progress = useMemo(() => fileProgress(files, rowState), [files, rowState]);
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
   const { sendText, picker } = useSendText(workspace, setError, focusRoot);
@@ -136,7 +129,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
-    prOf(workspace).then((p) => load(p?.revset ?? revset));
+    startRevset(workspace).then(load);
   }, []);
 
   // A newly opened review starts on its first row.
@@ -219,6 +212,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       jump,
       jumpToComment,
       jumpToRow,
+      show: showLine,
       commentOn,
       send: sendText,
       runWalkthrough: runWalkthroughNow,

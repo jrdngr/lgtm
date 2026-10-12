@@ -10,6 +10,7 @@ import {
   publishReview,
   retractReview,
 } from "./current";
+import { isIdle } from "./idle";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 
@@ -26,6 +27,7 @@ type Actions = Pick<
   | "jump"
   | "jumpToComment"
   | "jumpToRow"
+  | "show"
   | "commentOn"
   | "send"
   | "runWalkthrough"
@@ -66,6 +68,7 @@ export function usePublishReview(
         jump: (f) => latest.current.jump(f),
         jumpToComment: (id) => latest.current.jumpToComment(id),
         jumpToRow: (file, row) => latest.current.jumpToRow(file, row),
+        show: (path, line) => latest.current.show(path, line),
         commentOn: (file, rows, body, snippet) =>
           latest.current.commentOn(file, rows, body, snippet),
         send: (text, onSent, report) => latest.current.send(text, onSent, report),
@@ -74,9 +77,10 @@ export function usePublishReview(
       // Agents in the workspace's terminals act on this review.
       if (review) commands.focusReview(workspace, review.id);
     };
-    // Active, unclaimed, or already ours and changed.
+    // Active, unclaimed or held by the idle review, or already ours and changed.
     const ours = isCurrent(workspace, published.current);
-    if (review && (api.isActive || !currentReview(workspace) || ours)) publish();
+    const free = !currentReview(workspace) || isIdle(currentReview(workspace));
+    if (review && (api.isActive || free || ours)) publish();
     const sub = api.onDidActiveChange(({ isActive }) => {
       if (isActive && review) publish();
     });

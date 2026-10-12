@@ -1,4 +1,9 @@
-import type { AddPanelOptions, DockviewApi, DockviewGroupPanel } from "dockview-react";
+import type {
+  AddPanelOptions,
+  DockviewApi,
+  DockviewGroupPanel,
+  IDockviewPanel,
+} from "dockview-react";
 
 export type PanelKind = "review" | "terminal" | "report" | "graph";
 
@@ -10,7 +15,9 @@ const TITLES: Record<PanelKind, string> = {
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["terminal", "graph"];
+export const KINDS: PanelKind[] = ["review", "terminal", "graph"];
+
+export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
 export const kindTitle = (kind: PanelKind) => TITLES[kind];
 
@@ -42,7 +49,7 @@ export function addTerminal(api: DockviewApi, direction?: "right" | "below", set
 
 /** Beside the review, so jumping to code from the new pane keeps it in view. */
 function besideReview(api: DockviewApi): AddPanelOptions["position"] {
-  const review = api.panels.find((p) => p.view.contentComponent === "review");
+  const review = api.panels.find(isReviewPanel);
   return review ? { referencePanel: review, direction: "right" } : undefined;
 }
 
@@ -79,15 +86,14 @@ export function splitGroup(
   api.addGroup({ referenceGroup: group, direction });
 }
 
-/** Opens a review pane on `@`, beside the active pane. */
-export function addReview(api: DockviewApi) {
-  const active = api.activePanel;
-  return addPanel(
-    api,
-    "review",
-    {},
-    active ? { referencePanel: active, direction: "left" } : undefined,
+/** Opens a review pane on the workspace's revset, as a tab in the largest pane. */
+export function openReviewTab(api: DockviewApi) {
+  const area = (g: DockviewGroupPanel) => g.width * g.height;
+  const largest = api.groups.reduce<DockviewGroupPanel | undefined>(
+    (best, g) => (!best || area(g) > area(best) ? g : best),
+    undefined,
   );
+  return addPanel(api, "review", {}, largest ? { referenceGroup: largest } : undefined);
 }
 
 /** A review with a terminal below it. */

@@ -56,14 +56,14 @@ In a review pane:
 
 The right panel has four tabs:
 
-- **Diff** lists the review. Its **Files** view (⌘⇧E) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it. Its **Symbols** view (⌘⇧Y) lists the changed symbols.
+- **Diff** lists the review. Its **Files** view (⌘⇧E) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it. Its **Symbols** view (⌘⇧Y) lists the changed symbols. With no Review tab open, clicking a file or symbol opens one on the current revset.
 - **Files** (⌘⇧R) shows the whole repo.
 - **Comments** (⌘⇧M) lists the review's comments. In a PR workspace the PR sits on top: its conversation folds away under the **PR #N** header, with Pull and the review submit box below it.
 - **Reports** switches between the **Walkthrough** (⌘⇧H) and **Reviewers** (⌘⇧O).
 
 In the header and review toolbar:
 
-- **Revset:** the selector in the center of the header shows what's reviewed (`@` by default). Click it or press `r` to open `jj log` as you have it configured, then pick a commit or range, or type a revset.
+- **Revset:** the selector in the center of the header shows what's reviewed (`@` by default), with or without a Review tab open. New Review tabs open on it. Click it or press `r` to open `jj log` as you have it configured, then pick a commit or range, or type a revset.
 - **View:** Combined, Per change, or Since last session (what each change does differently from the last time this revset was reviewed). The second picker chooses the change.
 - **Line filter:** All, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
 - Progress counts for the whole review. **Reset** clears every mark in it.

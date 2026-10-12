@@ -5,20 +5,21 @@ import {
   themeDark,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
 import { GraphPanel } from "../graph/GraphPanel";
 import { commands, unwrap } from "../ipc";
+import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
 import { NewTab, SplitButtons } from "./GroupActions";
-import { defaultLayout, dropStalePanels } from "./panels";
+import { defaultLayout, dropStalePanels, isReviewPanel } from "./panels";
 import { Tab } from "./Tab";
 
 const components = {
@@ -60,6 +61,8 @@ interface Props {
 export function WorkspaceDock({ workspace, hidden, setup }: Props) {
   const timer = useRef<number>(undefined);
   const gone = useRef(false);
+  /** Unknown until the layout is restored. */
+  const [hasPane, setHasPane] = useState<boolean>();
   useAgentShow(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
@@ -73,6 +76,10 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
 
   async function ready({ api }: DockviewReadyEvent) {
     await restoreLayout(api, workspace, setup);
+    const panes = () => setHasPane(api.panels.some(isReviewPanel));
+    panes();
+    api.onDidAddPanel(panes);
+    api.onDidRemovePanel(panes);
     api.onDidLayoutChange(() => {
       clearTimeout(timer.current);
       timer.current = window.setTimeout(
@@ -96,6 +103,7 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
           theme={themeDark}
         />
       </div>
+      {hasPane !== undefined && <WorkspaceReview workspace={workspace} hasPane={hasPane} />}
     </WorkspaceContext.Provider>
   );
 }

@@ -6,7 +6,7 @@ import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspace
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { dockOf } from "./docks";
 import { chord } from "./keys";
-import { addReview, addTerminal, openReport } from "./panels";
+import { addTerminal, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
@@ -140,7 +140,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         </span>
         <span className="spacer" />
         <div className="toolbar-center">
-          <RevPicker workspace={selected} onNoReview={withApi(addReview)} />
+          <RevPicker workspace={selected} />
         </div>
         <SideToggle
           side="right"

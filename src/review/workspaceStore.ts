@@ -27,6 +27,7 @@ export function workspaceStore<T>() {
     },
     isOwner: (workspace: WorkspaceName, owner: T | undefined) =>
       owner !== undefined && get(workspace) === owner,
+    subscribe,
     use: (workspace: WorkspaceName) => useSyncExternalStore(subscribe, () => get(workspace)),
   };
 }

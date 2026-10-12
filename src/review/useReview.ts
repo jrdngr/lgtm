@@ -4,6 +4,7 @@ import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
 import { fileMoves, type Moves, movesFrom } from "./follow";
+import { setWorkspaceRevset, workspaceRevset } from "./revset";
 
 export interface Loaded {
   review: ReviewDto;
@@ -32,10 +33,10 @@ export function useReview(workspace: WorkspaceName) {
     setStale(next.review.stale);
   }
 
-  /** Loading the revset this pane already loaded continues its review session. Returns the
-   * error message when it fails. */
+  /** Loading the revset this pane or its workspace already loaded continues its review
+   * session. Returns the error message when it fails. */
   async function open(revset: string): Promise<ReviewDto | string> {
-    const resume = opened.current === revset;
+    const resume = opened.current === revset || workspaceRevset(workspace) === revset;
     const mine = ++opens.current;
     setLoading(true);
     setError(undefined);
@@ -50,6 +51,7 @@ export function useReview(workspace: WorkspaceName) {
       return r.error;
     }
     opened.current = revset;
+    setWorkspaceRevset(workspace, revset);
     if (current.current) commands.closeReview(current.current.id);
     show({ review: r.data });
     return r.data;

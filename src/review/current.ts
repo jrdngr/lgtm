@@ -25,6 +25,9 @@ export interface CurrentReview {
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */
   jumpToComment(id: number): void;
+  /** Shows `line` of `path` in the review pane, or in the editor when the review doesn't
+   * change it. */
+  show(path: string, line: number | null): void;
   /** Scrolls the review pane to a row, or its file when the row is hidden. */
   jumpToRow(file: number, row: number): void;
   /** Comments on changed `rows` of `file`. Resolves to whether it worked. */
@@ -47,3 +50,4 @@ export const retractReview = store.retract;
 export const currentReview = store.get;
 export const isCurrent = store.isOwner;
 export const useCurrentReview = store.use;
+export const onReviewChange = store.subscribe;
