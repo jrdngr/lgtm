@@ -4,6 +4,7 @@
 mod checkout;
 mod cleanup;
 mod discussion;
+mod nearby;
 mod publish;
 mod pull;
 mod refetch;
@@ -16,6 +17,7 @@ use crate::jj::git::remote_bookmark;
 use crate::review::RepoCtx;
 
 pub use discussion::DiscussionDto;
+pub use nearby::NearbyPrDto;
 pub use refetch::HeadDto;
 
 /// A PR workspace's PR, as stored.

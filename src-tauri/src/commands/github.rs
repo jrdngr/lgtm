@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
 use crate::github::Verdict;
-use crate::pr::{DiscussionDto, HeadDto, PrDto};
+use crate::pr::{DiscussionDto, HeadDto, NearbyPrDto, PrDto};
 use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
@@ -25,6 +25,19 @@ pub struct OpenedPr {
 pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<OpenedPr> {
     let (workspace, setup) = repo(&window)?.open_pr(&input).await.map_err(err)?;
     Ok(OpenedPr { workspace, setup })
+}
+
+/// Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn nearby_prs(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Vec<NearbyPrDto>> {
+    repo(&window)?
+        .nearby_prs(workspace.as_deref())
+        .await
+        .map_err(err)
 }
 
 /// The PR the workspace was checked out for, if any.

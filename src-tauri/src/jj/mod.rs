@@ -13,11 +13,13 @@ mod edit;
 pub mod git;
 pub mod init;
 mod log;
+mod near;
 mod rewrite;
 pub mod workspace;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogLine;
+pub use near::NearBookmark;
 pub use workspace::WorkspaceInfo;
 
 /// True when `err` came from jj refusing to work on a stale working copy.

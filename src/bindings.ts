@@ -152,6 +152,8 @@ export const commands = {
 	/**  The revset the workspace reviews. */
 	revset: string,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
+	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
+	nearbyPrs: (workspace: string | null) => typedError<NearbyPrDto[], string>(__TAURI_INVOKE("nearby_prs", { workspace })),
 	/**  How the PR's head on GitHub compares with the fetched one. */
 	prHead: (workspace: string | null) => typedError<HeadDto, string>(__TAURI_INVOKE("pr_head", { workspace })),
 	/**
@@ -567,6 +569,16 @@ export type Minimal = {
 	/**  Critical and high findings left out as unrelated to the task. */
 	offTask: string[],
 	recommendations: string,
+};
+
+export type NearbyPrDto = {
+	number: number,
+	title: string,
+	url: string,
+	author: string,
+	/**  The pushed bookmark that is the PR's head. */
+	bookmark: string,
+	draft: boolean,
 };
 
 export type NodeStatus = "added" | "modified" | "removed" | 

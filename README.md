@@ -79,6 +79,8 @@ Notes show as blocks under their code, and the Walkthrough panel (⌘⇧H) lists
 
 The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. **Edit global** and **Edit repo** in the Walkthrough panel open that file, copying the built-in prompt there first. Delete the file to go back to the built-in prompt. The note format the agent returns is fixed.
 
+Pull requests: the Workspaces sidebar's **PR** button takes a PR number or URL and checks the PR out into its own `pr-<N>` workspace. Below the workspaces, **Pull requests** lists the open PRs of bookmarks pushed from the selected workspace's stack (`@`'s ancestors down to `trunk()`, and its descendants), nearest `@` first. A PR counts when its head branch has a pushed bookmark's name in the GitHub repo that bookmark was pushed to, so PRs from your fork show up too. Click one to review it like the PR button does. The list loads when you switch workspaces and on **Refresh**; it needs `gh` signed in.
+
 Agents in terminals: lgtm offers to register itself with Claude Code (`claude mcp add -s user lgtm -- <app> mcp`). Then `claude` in an lgtm terminal gets tools to read the open review (progress, unreviewed ranges, comments, walkthrough, symbol graph, Reviewer findings), add comments and replies, write a walkthrough, submit its own findings as a Reviewers run, and show code or change the revset in the review pane. It can't mark code reviewed. Outside an lgtm terminal the server has no tools.
 
 At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to install or update whichever is missing.

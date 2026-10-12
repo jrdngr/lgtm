@@ -5,6 +5,7 @@ import { commands } from "../ipc";
 import { Count } from "../review/FilesPanel";
 import { useGithubOff } from "../tools/agents";
 import { type WorkspaceName, workspaceKey } from "./context";
+import { NearbyPrs } from "./NearbyPrs";
 import { useWorkspaces } from "./useWorkspaces";
 import "./workspaces.css";
 
@@ -58,6 +59,13 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
     onSelect(ws, r.data);
   }
 
+  async function prOpened(ws: string, setup: boolean) {
+    setOpeningPr(false);
+    setError(undefined);
+    await Promise.all([reload(), reloadPr(ws)]);
+    onSelect(ws, setup);
+  }
+
   async function remove(ws: string) {
     setConfirming(undefined);
     onDeleted(ws);
@@ -85,16 +93,7 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
         </button>
       </div>
       {openingPr && (
-        <OpenPr
-          onClose={() => setOpeningPr(false)}
-          onError={setError}
-          onOpened={async (ws, setup) => {
-            setOpeningPr(false);
-            setError(undefined);
-            await Promise.all([reload(), reloadPr(ws)]);
-            onSelect(ws, setup);
-          }}
-        />
+        <OpenPr onClose={() => setOpeningPr(false)} onError={setError} onOpened={prOpened} />
       )}
       {naming && (
         <form className="workspace-form" onSubmit={create}>
@@ -170,6 +169,7 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
           );
         })}
       </ul>
+      <NearbyPrs workspace={selected} onOpened={prOpened} onError={setError} />
     </div>
   );
 }
