@@ -68,7 +68,7 @@ In the header and review toolbar:
 - **Line filter:** All, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
 - Progress counts for the whole review. **Reset** clears every mark in it.
 
-Panes: the **+** tab after each pane's tabs opens a new Review, Terminal, Graph, Reviewers, or Editor tab in that pane. A report tab opened this way lists the runs to pick from, and an editor tab waits for a file from the Files tab (⌘⇧R). The split icons at the right of each pane's tab strip split it right or down into an empty pane, which offers the same kinds of tab.
+Panes: the **+** tab after each pane's tabs opens a new Terminal or Graph tab in that pane. The split icons at the right of each pane's tab strip split it right or down into an empty pane, which offers the same kinds of tab.
 
 Each file header has a checkbox. Checking marks the file reviewed and collapses it, without touching its line marks. If new rows show up later, the file unchecks itself and the new rows turn amber. Marking a whole-file selection reviewed (`e` up to file, then `space`) checks it too.
 

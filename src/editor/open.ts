@@ -24,10 +24,6 @@ export function openFileIn(api: DockviewApi, path: string, line?: number) {
   }
   // Editors share a pane, opened right of the active one so what it came from stays in view.
   const editor = api.panels.find((p) => p.view.contentComponent === "editor");
-  // An empty editor tab gives way to the file.
-  const empty = api.panels.find(
-    (p) => p.view.contentComponent === "editor" && !(p.params as Partial<EditorParams>)?.path,
-  );
   const active = api.activePanel;
   const position = editor
     ? { referencePanel: editor, direction: "within" as const }
@@ -41,7 +37,6 @@ export function openFileIn(api: DockviewApi, path: string, line?: number) {
     // Hidden tabs keep their editor, so unsaved edits and undo history survive a tab switch.
     renderer: "always",
   });
-  empty?.api.close();
 }
 
 /** Opens `path` in the workspace's dock. */

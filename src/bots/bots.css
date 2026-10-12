@@ -495,7 +495,3 @@
 .bots-fix-stopped .bots-fix-status {
   color: var(--error);
 }
-
-.bots-pick {
-  overflow: auto;
-}
