@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
+import { PrPreview } from "../github/PrPreview";
 import { GraphPanel } from "../graph/GraphPanel";
 import { commands, unwrap } from "../ipc";
 import { ReviewPanel } from "../review/ReviewPanel";
@@ -26,6 +27,7 @@ const components = {
   report: ReportPanel,
   graph: GraphPanel,
   editor: EditorPanel,
+  prPreview: PrPreview,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

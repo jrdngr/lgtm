@@ -5,6 +5,7 @@ mod checkout;
 mod cleanup;
 mod discussion;
 mod nearby;
+mod preview;
 mod publish;
 mod pull;
 mod refetch;
@@ -18,6 +19,7 @@ use crate::review::RepoCtx;
 
 pub use discussion::DiscussionDto;
 pub use nearby::NearbyPrDto;
+pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
 
 /// A PR workspace's PR, as stored.

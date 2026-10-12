@@ -7,6 +7,8 @@ use serde_json::{Value, json};
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
+use super::GhRepo;
+
 async fn run(args: &[&str], input: Option<&[u8]>) -> anyhow::Result<Vec<u8>> {
     let mut child = Command::new("gh")
         .args(args)
@@ -58,6 +60,17 @@ pub async fn graphql(query: &str, variables: Value) -> anyhow::Result<Value> {
 pub async fn rest(path: &str) -> anyhow::Result<Value> {
     let out = run(&["api", path], None).await?;
     serde_json::from_slice(&out).context("gh returned bad JSON")
+}
+
+/// A PR's diff against its base, as GitHub shows it.
+pub async fn pr_diff(repo: &GhRepo, number: u32) -> anyhow::Result<String> {
+    let (repo, number) = (repo.to_string(), number.to_string());
+    let out = run(
+        &["pr", "diff", &number, "--repo", &repo, "--color", "never"],
+        None,
+    )
+    .await?;
+    Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
 /// Takes `T` out of `v` at `pointer`, failing with what was missing.

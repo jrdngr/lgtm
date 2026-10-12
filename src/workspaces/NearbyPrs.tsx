@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { NearbyPrDto } from "../bindings";
+import { closePrPreview, openPrPreview } from "../github/preview";
 import { commands } from "../ipc";
 import { useGithubOff } from "../tools/agents";
+import { dockOf } from "../workbench/docks";
 import type { WorkspaceName } from "./context";
 
 interface Props {
@@ -20,13 +22,15 @@ function quiet(error: string): string {
 }
 
 /** Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. Click one
- * to review it in its own workspace. Loads when the workspace changes and on Refresh. */
+ * to preview it in the workspace's dock; double-click or Enter reviews it in its own
+ * workspace. Loads when the workspace changes and on Refresh. */
 export function NearbyPrs({ workspace, onOpened, onError }: Props) {
   const githubOff = useGithubOff();
   const [prs, setPrs] = useState<NearbyPrDto[]>();
   const [note, setNote] = useState<string>();
   const [loading, setLoading] = useState(false);
   const [opening, setOpening] = useState<number>();
+  const [selected, setSelected] = useState<number>();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,15 +45,27 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
     setNote(r.data.length ? undefined : "No open PRs for bookmarks pushed from this stack");
   }, [workspace]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the selection is per workspace
+  useEffect(() => setSelected(undefined), [workspace]);
+
   useEffect(() => {
     if (!githubOff) load();
   }, [githubOff, load]);
 
+  function preview(pr: NearbyPrDto) {
+    setSelected(pr.number);
+    const api = dockOf(workspace);
+    if (api) openPrPreview(api, pr);
+  }
+
   async function open(pr: NearbyPrDto) {
+    setSelected(pr.number);
     setOpening(pr.number);
     const r = await commands.openPr(pr.url);
     setOpening(undefined);
     if (r.status === "error") return onError(r.error);
+    const api = dockOf(workspace);
+    if (api) closePrPreview(api, pr.url);
     onOpened(r.data.workspace, r.data.setup);
   }
 
@@ -74,13 +90,19 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
       )}
       <ul>
         {prs?.map((pr) => (
-          <li key={pr.number} className="workspace">
+          <li key={pr.number} className={`workspace${selected === pr.number ? " selected" : ""}`}>
             <button
               type="button"
               className="workspace-open"
-              onClick={() => open(pr)}
+              onClick={() => preview(pr)}
+              onDoubleClick={() => open(pr)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                open(pr);
+              }}
               disabled={opening !== undefined}
-              title={pr.url}
+              title={`${pr.url}\nDouble-click to review it in its own workspace`}
             >
               <span className="workspace-title">
                 #{pr.number} {pr.title}

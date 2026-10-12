@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
 use crate::github::Verdict;
-use crate::pr::{DiscussionDto, HeadDto, NearbyPrDto, PrDto};
+use crate::pr::{DiscussionDto, HeadDto, NearbyPrDto, PrDto, PrPreviewDto};
 use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
@@ -38,6 +38,14 @@ pub(crate) async fn nearby_prs(
         .nearby_prs(workspace.as_deref())
         .await
         .map_err(err)
+}
+
+/// The PR `input` names (a number or a URL), read from GitHub without fetching it: its
+/// conversation and its diff with review threads.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn pr_preview(window: WebviewWindow, input: String) -> CmdResult<PrPreviewDto> {
+    repo(&window)?.pr_preview(&input).await.map_err(err)
 }
 
 /// The PR the workspace was checked out for, if any.

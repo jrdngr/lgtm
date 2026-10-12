@@ -7,7 +7,7 @@ use crate::github::{self, threads::Thread};
 use crate::review::{PulledThread, RepoCtx, StateDto};
 use crate::store::{GhLink, GhPost};
 
-fn pulled(t: Thread, repo: &str, pr: u32) -> PulledThread {
+pub(super) fn pulled(t: Thread, repo: &str, pr: u32) -> PulledThread {
     let url = t
         .comments
         .nodes

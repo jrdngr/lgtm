@@ -6,6 +6,7 @@ use specta::Type;
 
 use super::PrDto;
 use crate::github;
+use crate::github::threads::{Comment, Review};
 use crate::review::RepoCtx;
 
 #[derive(Clone, Serialize, Type)]
@@ -29,6 +30,32 @@ pub struct DiscussionDto {
     pub pending_review: bool,
 }
 
+/// Conversation comments and submitted reviews that say something, oldest first.
+pub(super) fn posts(comments: Vec<Comment>, reviews: Vec<Review>) -> Vec<PostDto> {
+    let comments = comments.into_iter().map(|c| PostDto {
+        author: github::login(&c.author),
+        body: c.body,
+        verdict: None,
+        created_at: c.created_at,
+        url: c.url,
+    });
+    // A COMMENTED review with no text only holds code comments, which show on the code.
+    let reviews = reviews
+        .into_iter()
+        .filter(|r| r.state != "PENDING" && (r.state != "COMMENTED" || !r.body.trim().is_empty()))
+        .map(|r| PostDto {
+            author: github::login(&r.author),
+            body: r.body,
+            verdict: Some(r.state),
+            created_at: r.submitted_at.unwrap_or_default(),
+            url: r.url,
+        });
+    let mut posts: Vec<PostDto> = comments.chain(reviews).collect();
+    // RFC 3339 times in UTC sort as text.
+    posts.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    posts
+}
+
 impl RepoCtx {
     pub async fn pr_discussion(&self, workspace: Option<&str>) -> anyhow::Result<DiscussionDto> {
         let pr = self.need_pr(workspace)?;
@@ -37,30 +64,7 @@ impl RepoCtx {
             .reviews
             .iter()
             .any(|r| r.state == "PENDING" && r.viewer_did_author);
-        let comments = d.comments.into_iter().map(|c| PostDto {
-            author: github::login(&c.author),
-            body: c.body,
-            verdict: None,
-            created_at: c.created_at,
-            url: c.url,
-        });
-        // A COMMENTED review with no text only holds code comments, which show on the code.
-        let reviews = d
-            .reviews
-            .into_iter()
-            .filter(|r| {
-                r.state != "PENDING" && (r.state != "COMMENTED" || !r.body.trim().is_empty())
-            })
-            .map(|r| PostDto {
-                author: github::login(&r.author),
-                body: r.body,
-                verdict: Some(r.state),
-                created_at: r.submitted_at.unwrap_or_default(),
-                url: r.url,
-            });
-        let mut posts: Vec<PostDto> = comments.chain(reviews).collect();
-        // RFC 3339 times in UTC sort as text.
-        posts.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+        let posts = posts(d.comments, d.reviews);
         Ok(DiscussionDto {
             pr: PrDto::from(&pr),
             posts,

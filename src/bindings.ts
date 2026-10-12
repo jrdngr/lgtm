@@ -154,6 +154,11 @@ export const commands = {
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
 	nearbyPrs: (workspace: string | null) => typedError<NearbyPrDto[], string>(__TAURI_INVOKE("nearby_prs", { workspace })),
+	/**
+	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
+	 *  conversation and its diff with review threads.
+	 */
+	prPreview: (input: string) => typedError<PrPreviewDto, string>(__TAURI_INVOKE("pr_preview", { input })),
 	/**  How the PR's head on GitHub compares with the fetched one. */
 	prHead: (workspace: string | null) => typedError<HeadDto, string>(__TAURI_INVOKE("pr_head", { workspace })),
 	/**
@@ -491,6 +496,16 @@ export type HeadDto = {
 	state: string,
 };
 
+export type Hunk = {
+	oldStart: number,
+	oldLines: number,
+	newStart: number,
+	newLines: number,
+	/**  Text after the second `@@`, usually the enclosing function. */
+	section: string,
+	rows: Row[],
+};
+
 export type HunkDto = {
 	oldStart: number,
 	oldLines: number,
@@ -656,6 +671,13 @@ export type Personas = {
 	broken: Broken[],
 };
 
+/**  A thread after row `row` of hunk `hunk`. */
+export type PlacedThreadDto = {
+	hunk: number,
+	row: number,
+	thread: PreviewThreadDto,
+};
+
 export type PostDto = {
 	author: string,
 	body: string,
@@ -678,6 +700,41 @@ export type PrDto = {
 	head: string,
 	/**  The revset the workspace reviews. */
 	revset: string,
+};
+
+export type PrPreviewDto = {
+	number: number,
+	/**  `owner/name`. */
+	repo: string,
+	title: string,
+	url: string,
+	author: string,
+	/**  OPEN, CLOSED or MERGED. */
+	state: string,
+	baseRef: string,
+	headRef: string,
+	/**  Conversation comments and review summaries, oldest first. */
+	posts: PostDto[],
+	files: PreviewFileDto[],
+	/**  Threads whose line isn't on the diff, like outdated ones. */
+	elsewhere: PreviewThreadDto[],
+};
+
+export type PreviewFileDto = {
+	path: string,
+	/**  Source path for renames. */
+	oldPath: string | null,
+	binary: boolean,
+	hunks: Hunk[],
+	/**  In diff order. */
+	threads: PlacedThreadDto[],
+};
+
+export type PreviewThreadDto = {
+	link: GhLink,
+	path: string,
+	/**  GitHub's diff hunk ending at the thread's line, for threads not on the diff. */
+	hunk: string,
 };
 
 /**  Changed-row counts by state, as the review header counts them. */
@@ -774,6 +831,15 @@ export type ReviewDto = {
 export type ReviewStateChanged = {
 	review: number,
 	state: StateDto,
+};
+
+export type Row = {
+	kind: RowKind,
+	/**  1-based line in the old file. Set for context and removed rows. */
+	oldLine: number | null,
+	/**  1-based line in the new file. Set for context and added rows. */
+	newLine: number | null,
+	text: string,
 };
 
 export type RowDto = {

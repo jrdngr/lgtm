@@ -3,17 +3,7 @@ import type { DiscussionDto, PrDto } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
-import "../review/comments.css";
-import "./github.css";
-
-const VERDICTS: Record<string, string> = {
-  APPROVED: "approved",
-  CHANGES_REQUESTED: "requested changes",
-  COMMENTED: "reviewed",
-  DISMISSED: "review dismissed",
-};
-
-const when = (iso: string) => (iso ? new Date(iso).toLocaleString() : "");
+import { PrPosts } from "./PrPosts";
 
 /** A PR's conversation and review summaries, with a box that posts to it. */
 export function PrDiscussion({ pr }: { pr: PrDto }) {
@@ -72,16 +62,7 @@ export function PrDiscussion({ pr }: { pr: PrDto }) {
       </div>
       {error && <div className="review-error">{error}</div>}
       {!d && !error && <div className="placeholder">Loading</div>}
-      {d && d.posts.length === 0 && <div className="placeholder">No conversation yet</div>}
-      {d?.posts.map((p) => (
-        <div key={p.url} className="pr-post">
-          <div className="msg-who" title={when(p.createdAt)}>
-            {p.author}
-            {p.verdict && ` ${VERDICTS[p.verdict] ?? p.verdict.toLowerCase()}`}
-          </div>
-          {p.body && <div className="msg-text">{p.body}</div>}
-        </div>
-      ))}
+      {d && <PrPosts posts={d.posts} />}
       {d && (
         <div className="pr-reply">
           <textarea
