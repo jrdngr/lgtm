@@ -28,7 +28,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘⇧E | Show the Files panel (reopens it if closed) |
 | ⌘⇧O | Show the Reviewers panel |
 | ⌘⇧Y | Show the Symbols panel |
-| ⌘⇧H | Show the Hotspots panel |
+| ⌘⇧H | Show the Walkthrough panel |
 
 In a review pane:
 
@@ -45,10 +45,10 @@ In a review pane:
 | `x` | Check or uncheck the file under the cursor |
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |
-| `h` | Highlight risks: an agent finds the parts that most need a careful look |
+| `h` | Walkthrough: an agent guides you through the change |
 | `]` / `[` | Next / previous hunk |
 | `}` / `{` | Next / previous file |
-| `n` / `N` | Next / previous hotspot |
+| `n` / `N` | Next / previous note in the walkthrough's tour |
 | `Esc` | Back to the cursor row |
 
 The Files panel (⌘⇧E or the toolbar's Files button) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it.
@@ -66,9 +66,18 @@ Reviews update live: edits in the working copy are snapshotted after 300 ms of q
 
 Reviewers: the Reviewers panel (⌘⇧O) runs review personas on the open review, each as its own headless `claude -p` that can only read files. Personas are markdown files in `~/.config/lgtm/personas` or the repo's `.lgtm/personas`. The panel can install the defaults, open a persona to edit, or start a new one. Pick personas and reports (synthesis, cross-review, minimal), then Run. Findings open as cards in a pane beside the review. A card's locations jump to its code, Comment adds it as a comment there, and Send to terminal pastes it into a terminal's prompt.
 
-Navigation: **Graph** (`g`) opens a pane with the review's changed symbols nested in folders, files, and their enclosing classes or functions, with links between those that use each other. It opens on files for a small review and on folders for a big one, and remembers what you opened per review. Click a folder, file, or class to open or close it, click a symbol to jump to its code, and ⌘-click anything to jump to it. A closed box shows one link per box it connects to, and a progress bar for everything in it. Links leave an open box through a port on its right edge and come in through one on its left, one port per box at the other end, so two boxes are joined by a single link however much inside them connects. Links run at right angles and merge where they head into the same box, like a bus, with a dot where they join. A symbol's **+N callers** badge brings in the unchanged code that uses it (dashed), and each caller's badge goes one hop further; the toolbar checkbox shows every changed symbol's callers. Hover a box to highlight its links. The Symbols panel (⌘⇧Y) lists the same symbols. **Highlight risks** (`h`) runs a headless `claude -p` that marks the parts most in need of a careful look: a colored strip in the gutter (hover for why), the Hotspots panel (⌘⇧H), and outlines on graph nodes.
+Navigation: **Graph** (`g`) opens a pane with the review's changed symbols nested in folders, files, and their enclosing classes or functions, with links between those that use each other. It opens on files for a small review and on folders for a big one, and remembers what you opened per review. Click a folder, file, or class to open or close it, click a symbol to jump to its code, and ⌘-click anything to jump to it. A closed box shows one link per box it connects to, and a progress bar for everything in it. Links leave an open box through a port on its right edge and come in through one on its left, one port per box at the other end, so two boxes are joined by a single link however much inside them connects. Links run at right angles and merge where they head into the same box, like a bus, with a dot where they join. A symbol's **+N callers** badge brings in the unchanged code that uses it (dashed), and each caller's badge goes one hop further; the toolbar checkbox shows every changed symbol's callers. Hover a box to highlight its links. The Symbols panel (⌘⇧Y) lists the same symbols.
 
-Agents in terminals: lgtm offers to register itself with Claude Code (`claude mcp add -s user lgtm -- <app> mcp`). Then `claude` in an lgtm terminal gets tools to read the open review (progress, unreviewed ranges, comments, hotspots, symbol graph, Reviewer findings), add comments and replies, set hotspots, submit its own findings as a Reviewers run, and show code or change the revset in the review pane. It can't mark code reviewed. Outside an lgtm terminal the server has no tools.
+**Walkthrough** (`h`, or Walkthrough in the review bar) runs a headless `claude -p` that reads the change and writes notes pinned to the code, in the order to read them. Each note has a category:
+
+- ⚠️ **Important**: needs a careful look, at a high, medium, or low level. These also show as a colored strip in the gutter (hover for why) and outline graph boxes.
+- 🧭 **Flow step**: one numbered step of a named flow through several places.
+- 💡 **Context**: intent or background the diff doesn't show.
+- ❓ **Question**: something for you or the author to settle.
+
+Notes show as blocks under their code, and the Walkthrough panel (⌘⇧H) lists them. Pick a tour there: **Reading order** covers every note, and each flow is its own tour. `n` and `N` step through the active tour, moving the cursor to each note, and each tour remembers where you are. The panel's emoji buttons hide or show a category, and **In review** turns the blocks under the code off. A note's **Comment** button adds it as your own comment. Notes are never published; each new walkthrough replaces the last.
+
+Agents in terminals: lgtm offers to register itself with Claude Code (`claude mcp add -s user lgtm -- <app> mcp`). Then `claude` in an lgtm terminal gets tools to read the open review (progress, unreviewed ranges, comments, walkthrough, symbol graph, Reviewer findings), add comments and replies, write a walkthrough, submit its own findings as a Reviewers run, and show code or change the revset in the review pane. It can't mark code reviewed. Outside an lgtm terminal the server has no tools.
 
 At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to install or update whichever is missing.
 

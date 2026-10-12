@@ -314,7 +314,7 @@ button:hover:not(:disabled) {
   color: var(--fg);
 }
 
-/* Hotspot levels, in the Hotspots and Symbols views. */
+/* Important note levels, in the Symbols view. */
 .risk-dot {
   width: 8px;
   height: 8px;

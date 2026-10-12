@@ -1,7 +1,7 @@
 import type { ChangeDto, ReviewDto, View } from "../bindings";
 import type { ViewMode } from "./model";
-import { type RiskRun, stopRisks } from "./riskRun";
 import { FILTERS, type Filter, type Progress } from "./state";
+import { stopWalkthrough, type WalkthroughRun } from "./walkthroughRun";
 import "./ReviewBar.css";
 
 const SINCE_LABEL = {
@@ -39,8 +39,8 @@ interface Props {
   progress: Progress;
   onReset(): void;
   onGraph(): void;
-  risk?: RiskRun;
-  onRisks(): void;
+  walkthrough?: WalkthroughRun;
+  onWalkthrough(): void;
 }
 
 export function ReviewBar(props: Props) {
@@ -103,10 +103,10 @@ export function ReviewBar(props: Props) {
       <button type="button" disabled={!review} onClick={props.onGraph} title="Symbol graph (g)">
         Graph
       </button>
-      {review && props.risk?.running ? (
-        <span className="risk-run" title="Finding the parts that most need a careful look">
-          <span className="risk-note">Highlighting · {props.risk.note}</span>
-          <button type="button" onClick={() => stopRisks(review.id)}>
+      {review && props.walkthrough?.running ? (
+        <span className="risk-run" title="An agent is writing a walkthrough of the change">
+          <span className="risk-note">Walking through · {props.walkthrough.note}</span>
+          <button type="button" onClick={() => stopWalkthrough(review.id)}>
             Stop
           </button>
         </span>
@@ -114,15 +114,15 @@ export function ReviewBar(props: Props) {
         <button
           type="button"
           disabled={!review}
-          onClick={props.onRisks}
+          onClick={props.onWalkthrough}
           title={
-            props.risk?.error ??
-            props.risk?.note ??
-            "Have an agent find the riskiest parts (h). ] and [ jump between them."
+            props.walkthrough?.error ??
+            props.walkthrough?.note ??
+            "Have an agent guide you through the change (h). n and N step through it."
           }
-          className={props.risk?.error ? "error" : undefined}
+          className={props.walkthrough?.error ? "error" : undefined}
         >
-          Highlight risks
+          Walkthrough
         </button>
       )}
       <span className="spacer" />

@@ -1,0 +1,88 @@
+.note-block {
+  margin: 4px 12px 8px 76px;
+  padding: 5px 10px 6px;
+  border: 1px dashed var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 2%);
+  font:
+    13px -apple-system,
+    system-ui,
+    sans-serif;
+  white-space: normal;
+  user-select: text;
+}
+
+.note-block.current {
+  border-style: solid;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.note-important.level-high {
+  border-left-color: var(--flagged);
+}
+
+.note-important.level-medium {
+  border-left-color: var(--amber);
+}
+
+.note-flow {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.note-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.note-title {
+  font-weight: 600;
+}
+
+.note-block button {
+  font-size: 12px;
+  padding: 1px 8px;
+}
+
+.note-body {
+  margin-top: 2px;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.note-body p {
+  margin: 2px 0;
+}
+
+.note-list li.current button {
+  background: var(--panel);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.note-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-tools select {
+  min-width: 0;
+  flex: 1;
+}
+
+.note-filter {
+  padding: 0 6px;
+  font-size: 12px;
+  opacity: 0.45;
+}
+
+.note-filter.on {
+  opacity: 1;
+}

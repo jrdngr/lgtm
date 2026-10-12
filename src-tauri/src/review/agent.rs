@@ -1,5 +1,5 @@
 //! What an agent in a terminal sees of a review and can do to it, through the MCP server.
-//! Agents can read everything and add comments and hotspots, but never mark rows.
+//! Agents can read everything and add comments and walkthrough notes, but never mark rows.
 
 use anyhow::Context;
 use serde::Serialize;
@@ -9,7 +9,7 @@ use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::diff::{FileStatus, RowKind};
 use crate::store::{Author, Comment, MarkState, Message, Workshop};
 
-/// What comments and hotspots from a terminal agent record as their source review.
+/// What comments and notes from a terminal agent record as their source review.
 const BY_AGENT: &str = "terminal agent";
 
 #[derive(Clone, Copy, Default, Serialize)]
@@ -65,11 +65,16 @@ pub struct AgentComment {
 }
 
 #[derive(Serialize)]
-pub struct AgentHotspot {
+pub struct AgentNote {
     pub path: String,
     pub lines: Option<String>,
-    pub level: crate::store::Level,
-    pub reason: String,
+    pub category: crate::store::Category,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub level: Option<crate::store::Level>,
+    pub title: String,
+    pub body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flow: Option<crate::store::FlowStep>,
 }
 
 impl Review {
@@ -203,14 +208,17 @@ impl Review {
             .collect()
     }
 
-    pub(super) fn agent_hotspots(&self) -> Vec<AgentHotspot> {
-        self.hotspots
+    pub(super) fn agent_notes(&self) -> Vec<AgentNote> {
+        self.notes
             .iter()
-            .map(|h| AgentHotspot {
-                path: h.path.clone(),
-                lines: self.span_lines(h.file, h.rows),
-                level: h.level,
-                reason: h.reason.clone(),
+            .map(|n| AgentNote {
+                path: n.path.clone(),
+                lines: self.span_lines(n.file, n.rows),
+                category: n.category,
+                level: n.level,
+                title: n.title.clone(),
+                body: n.body.clone(),
+                flow: n.flow.clone(),
             })
             .collect()
     }
@@ -261,8 +269,8 @@ impl RepoCtx {
         Ok(self.with_current(workspace, Review::agent_comments)?.1)
     }
 
-    pub fn agent_hotspots(&self, workspace: Option<&str>) -> anyhow::Result<Vec<AgentHotspot>> {
-        Ok(self.with_current(workspace, Review::agent_hotspots)?.1)
+    pub fn agent_notes(&self, workspace: Option<&str>) -> anyhow::Result<Vec<AgentNote>> {
+        Ok(self.with_current(workspace, Review::agent_notes)?.1)
     }
 
     /// Comments as a terminal agent on lines `start..=end` of `path` (new side). Returns the

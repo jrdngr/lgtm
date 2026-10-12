@@ -1,7 +1,6 @@
 import type { DockviewApi, DockviewPanelApi } from "dockview-react";
-import type { CommentDto, HotspotDto } from "../bindings";
+import type { CommentDto, NoteDto } from "../bindings";
 import { openFileIn } from "../editor/open";
-import { stepHotspot } from "./hotspots";
 import {
   commentJumpTarget,
   type DisplayLine,
@@ -13,12 +12,14 @@ import {
   rowJumpTarget,
   stepTarget,
 } from "./model";
+import { stepTour } from "./tour";
 
 interface Nav {
+  review: number | undefined;
   lines: DisplayLine[];
   files: FlatFile[];
   comments: CommentDto[];
-  hotspots: HotspotDto[];
+  notes: NoteDto[];
   cursor: number;
   place(line: number): void;
   setScrollTo(to: { line: number }): void;
@@ -27,7 +28,7 @@ interface Nav {
   focusRoot(): void;
 }
 
-/** Moving the review's cursor to files, rows, comments and hotspots, and scrolling there. */
+/** Moving the review's cursor to files, rows, comments and notes, and scrolling there. */
 export function useReviewNav(n: Nav) {
   const { lines, files } = n;
 
@@ -57,9 +58,13 @@ export function useReviewNav(n: Nav) {
     jumpTo(rowJumpTarget(at));
   }
 
-  function stepHotspotFrom(dir: 1 | -1) {
-    const at = stepHotspot(lines, n.hotspots, n.cursor, dir);
-    if (at !== undefined) jumpTo(rowJumpTarget(at));
+  /** Goes to the next or previous note of the walkthrough's active tour. */
+  function stepNote(dir: 1 | -1) {
+    if (n.review === undefined) return;
+    const note = stepTour(n.review, n.notes, dir);
+    if (!note) return;
+    if (note.rows) jumpToRow(note.file, note.rows.start);
+    else jump(note.file);
   }
 
   function stepHunk(dir: 1 | -1) {
@@ -89,5 +94,5 @@ export function useReviewNav(n: Nav) {
     else jumpToRow(file, best);
   }
 
-  return { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, stepFile, showLine };
+  return { jump, jumpToComment, jumpToRow, stepNote, stepHunk, stepFile, showLine };
 }

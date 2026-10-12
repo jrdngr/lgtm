@@ -194,13 +194,13 @@
   width: 100%;
 }
 
-.hotspot-list .comment-where {
+.note-list .comment-where {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.hotspot-list .comment-preview {
+.note-list .comment-preview {
   white-space: normal;
 }
 

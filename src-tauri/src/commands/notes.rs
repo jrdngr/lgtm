@@ -9,29 +9,29 @@ use crate::review::StateDto;
 
 #[derive(Serialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct HotspotsFound {
+pub struct WalkthroughDone {
     pub state: StateDto,
-    /// Hotspots the agent put outside the review's files.
+    /// Notes the agent put outside the review's files.
     pub skipped: u32,
 }
 
-/// Runs an agent over the review to find its hotspots, replacing the last ones. Sends each
+/// Runs an agent over the review to write its walkthrough, replacing the last one. Sends each
 /// tool call it makes through `activity`. `null` when it was stopped.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn find_hotspots(
+pub(crate) async fn run_walkthrough(
     window: WebviewWindow,
     runs: State<'_, Runs>,
     review: u32,
     activity: Channel<String>,
-) -> CmdResult<Option<HotspotsFound>> {
-    let found = repo(&window)?
-        .find_hotspots(review, &runs, |t| {
+) -> CmdResult<Option<WalkthroughDone>> {
+    let done = repo(&window)?
+        .run_walkthrough(review, &runs, |t| {
             activity.send(t).ok();
         })
         .await
         .map_err(err)?;
-    Ok(found.map(|(state, skipped)| HotspotsFound {
+    Ok(done.map(|(state, skipped)| WalkthroughDone {
         state,
         skipped: skipped as u32,
     }))
@@ -39,11 +39,11 @@ pub(crate) async fn find_hotspots(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn stop_hotspots(
+pub(crate) fn stop_walkthrough(
     window: WebviewWindow,
     runs: State<Runs>,
     review: u32,
 ) -> CmdResult<()> {
-    repo(&window)?.stop_hotspots(review, &runs);
+    repo(&window)?.stop_walkthrough(review, &runs);
     Ok(())
 }

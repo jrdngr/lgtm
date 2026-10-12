@@ -21,8 +21,8 @@ interface Ctx {
   openRevisions(): void;
   openGraph(): void;
   openInEditor(): void;
-  findRisks(): void;
-  stepHotspot(dir: 1 | -1): void;
+  runWalkthrough(): void;
+  stepNote(dir: 1 | -1): void;
   stepHunk(dir: 1 | -1): void;
   stepFile(dir: 1 | -1): void;
   toggleFile(file: number): void;
@@ -118,7 +118,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         ctx.openInEditor();
         break;
       case "h":
-        if (!e.repeat) ctx.findRisks();
+        if (!e.repeat) ctx.runWalkthrough();
         break;
       case "]":
       case "[":
@@ -130,7 +130,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "n":
       case "N":
-        ctx.stepHotspot(e.key === "n" ? 1 : -1);
+        ctx.stepNote(e.key === "n" ? 1 : -1);
         break;
       case "x": {
         const file = lines[cursor]?.file;

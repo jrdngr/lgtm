@@ -28,7 +28,7 @@ type Actions = Pick<
   | "jumpToRow"
   | "commentOn"
   | "send"
-  | "findRisks"
+  | "runWalkthrough"
   | "refetchPr"
   | "pullPr"
 >;
@@ -59,8 +59,8 @@ export function usePublishReview(
         checks,
         filter,
         comments: review?.state.comments ?? [],
-        hotspots: review?.state.hotspots ?? [],
-        findRisks: () => latest.current.findRisks(),
+        notes: review?.state.notes ?? [],
+        runWalkthrough: () => latest.current.runWalkthrough(),
         refetchPr: () => latest.current.refetchPr(),
         pullPr: (quiet) => latest.current.pullPr(quiet),
         jump: (f) => latest.current.jump(f),

@@ -21,7 +21,9 @@ export type DisplayLine =
   | { kind: "gap"; file: number; hunk: number; rows: number[] }
   /** A comment block, after the line holding its last row, or under the file header when its
    * code is gone (hunk -1). `NEW_COMMENT` is the draft. */
-  | { kind: "comment"; file: number; hunk: number; comment: number };
+  | { kind: "comment"; file: number; hunk: number; comment: number }
+  /** A walkthrough note's block, placed like a comment's. */
+  | { kind: "note"; file: number; hunk: number; note: number };
 
 /** The id of a comment being written that isn't saved yet. */
 export const NEW_COMMENT = 0;
@@ -65,6 +67,8 @@ export interface Layout {
   /** Comment ids by the `markKey` of the row their block follows, or `fileSlot` for ones
    * whose code is gone. */
   comments?: ReadonlyMap<string, number[]>;
+  /** Walkthrough note ids, keyed the same way. */
+  notes?: ReadonlyMap<string, number[]>;
 }
 
 export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
@@ -78,6 +82,8 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
     if (layout.collapsedFiles.has(f.dto.path)) return;
     for (const comment of layout.comments?.get(fileSlot(file)) ?? [])
       out.push({ kind: "comment", file, hunk: -1, comment });
+    for (const note of layout.notes?.get(fileSlot(file)) ?? [])
+      out.push({ kind: "note", file, hunk: -1, note });
     let start = 0;
     f.dto.hunks.forEach((h, hunk) => {
       const end = start + h.rows.length;
@@ -113,6 +119,8 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
             for (const row of line.rows) {
               for (const comment of layout.comments?.get(markKey(file, row)) ?? [])
                 out.push({ kind: "comment", file, hunk, comment });
+              for (const note of layout.notes?.get(markKey(file, row)) ?? [])
+                out.push({ kind: "note", file, hunk, note });
             }
           }
         } else {

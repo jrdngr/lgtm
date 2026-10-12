@@ -20,6 +20,7 @@ const HEIGHTS: Record<DisplayLine["kind"], number> = {
   rows: ROW_HEIGHT,
   gap: 8,
   comment: 120,
+  note: 80,
 };
 
 function lineKey(line: DisplayLine): string {
@@ -34,6 +35,8 @@ function lineKey(line: DisplayLine): string {
       return `g:${line.file}:${line.rows[0]}`;
     case "comment":
       return `c:${line.comment}`;
+    case "note":
+      return `n:${line.note}`;
   }
 }
 
@@ -66,6 +69,7 @@ interface Props extends LineHandlers {
   scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
   renderComment(id: number): ReactNode;
+  renderNote(id: number): ReactNode;
 }
 
 /** The header of the file at the top of the viewport, once its own header has scrolled
@@ -133,6 +137,7 @@ export function DiffLines(props: Props) {
     const file = files[line.file];
     if (line.kind === "file") return header(line.file);
     if (line.kind === "comment") return props.renderComment(line.comment);
+    if (line.kind === "note") return props.renderNote(line.note);
     if (line.kind === "gap") {
       const n = line.rows.length;
       return (
@@ -238,8 +243,9 @@ export function DiffLines(props: Props) {
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((v) => {
           const selected = v.index >= selection.start && v.index <= selection.end;
-          // Comment blocks size to their content; every other line has a fixed height.
-          const sized = lines[v.index].kind === "comment";
+          // Comment and note blocks size to their content; every other line has a fixed height.
+          const kind = lines[v.index].kind;
+          const sized = kind === "comment" || kind === "note";
           return (
             <div
               key={v.key}

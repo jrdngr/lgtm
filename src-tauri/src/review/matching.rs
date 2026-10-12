@@ -29,7 +29,7 @@ impl Review {
         self.baseline.extend(self.matched.values().map(|m| m.id));
         self.amber = self.find_amber(store, &marks);
         self.rematch_comments(store)?;
-        self.rematch_hotspots(store)
+        self.rematch_notes(store)
     }
 
     /// Every path a mark or check in this review could be stored under.

@@ -13,17 +13,17 @@ mod github;
 #[cfg(test)]
 mod github_tests;
 mod graph;
-#[cfg(test)]
-mod hotspot_tests;
-mod hotspots;
 mod load;
 mod matching;
+#[cfg(test)]
+mod note_tests;
+mod notes;
 mod progress;
-mod risk;
 mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;
 mod views;
+mod walkthrough;
 #[cfg(test)]
 mod workflow_tests;
 mod workshop;
@@ -46,9 +46,9 @@ use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use github::PulledThread;
 pub use graph::GraphDto;
-pub use hotspots::{HotspotDto, HotspotInput};
 use load::Loaded;
 use matching::MatchedCheck;
+pub use notes::{NoteDto, NoteInput};
 pub use progress::ProgressDto;
 pub use rowmap::RowMove;
 pub use views::{ChangeDto, View};
@@ -155,8 +155,8 @@ pub struct StateDto {
     pub amber: Vec<RowRef>,
     /// Comments on the review's files, in file and row order. Ones whose code is gone last.
     pub comments: Vec<CommentDto>,
-    /// The review's hotspots, worst first. Ones whose code is gone have no rows.
-    pub hotspots: Vec<HotspotDto>,
+    /// The review's walkthrough notes, in reading order. Ones whose code is gone have no rows.
+    pub notes: Vec<NoteDto>,
 }
 
 pub struct Review {
@@ -173,7 +173,7 @@ pub struct Review {
     checks: Vec<Option<MatchedCheck>>,
     amber: Vec<RowRef>,
     comments: Vec<CommentDto>,
-    hotspots: Vec<HotspotDto>,
+    notes: Vec<NoteDto>,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
     baseline: HashSet<i64>,
@@ -364,7 +364,7 @@ impl Review {
             checks: vec![],
             amber: vec![],
             comments: vec![],
-            hotspots: vec![],
+            notes: vec![],
             baseline: HashSet::new(),
             session: 0,
             from: None,
@@ -432,7 +432,7 @@ impl Review {
             checks,
             amber: self.amber.clone(),
             comments: self.comments.clone(),
-            hotspots: self.hotspots.clone(),
+            notes: self.notes.clone(),
         }
     }
 }

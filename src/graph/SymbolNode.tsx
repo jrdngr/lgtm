@@ -15,7 +15,7 @@ export interface BoxData extends Record<string, unknown> {
   count: number;
   /** Share of its changed rows that are reviewed or skipped. */
   done?: number;
-  /** The worst hotspot level on its rows. */
+  /** The worst level of the important notes on its rows. */
   risk?: string;
   /** Callers one hop out from its own symbols, and whether they're shown. */
   callers: number;

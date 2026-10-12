@@ -1,4 +1,4 @@
-import type { CheckState, CommentDto, HotspotDto } from "../bindings";
+import type { CheckState, CommentDto, NoteDto } from "../bindings";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 import type { SendOutcome } from "./useSendText";
@@ -17,10 +17,10 @@ export interface CurrentReview {
   checks: CheckState[];
   filter: Filter;
   comments: CommentDto[];
-  /** Worst first. */
-  hotspots: HotspotDto[];
-  /** Starts an agent finding the review's hotspots. */
-  findRisks(): void;
+  /** The walkthrough, in reading order. */
+  notes: NoteDto[];
+  /** Starts an agent writing the review's walkthrough. */
+  runWalkthrough(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */

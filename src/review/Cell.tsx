@@ -60,8 +60,8 @@ export function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
       title={amber ? "changed since reviewed" : markTitle(mark)}
     >
       <span
-        className={`risk${hot ? ` risk-${hot.level}` : ""}`}
-        title={hot ? `${hot.level} risk: ${hot.reason}` : undefined}
+        className={`risk${hot?.level ? ` risk-${hot.level}` : ""}`}
+        title={hot ? `${hot.level}: ${hot.title}` : undefined}
       />
       <span className="strip" />
       <span

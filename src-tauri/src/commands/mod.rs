@@ -4,7 +4,7 @@ pub mod bots;
 pub mod comments;
 pub mod files;
 pub mod github;
-pub mod hotspots;
+pub mod notes;
 pub mod pty;
 pub mod repo;
 pub mod review;

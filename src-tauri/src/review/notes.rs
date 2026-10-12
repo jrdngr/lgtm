@@ -1,4 +1,5 @@
-//! Hotspots on a review: placing them on rows, and saving a new pass from line ranges.
+//! Walkthrough notes on a review: placing them on rows, and saving a new walkthrough from
+//! line ranges.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -7,53 +8,69 @@ use super::comments::RowSpan;
 use super::matching::Remaps;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::diff::RowKind;
-use crate::store::{Hotspot, Level, Source, Store};
+use crate::store::{Category, FlowStep, Level, Note, Source, Store};
 
 #[derive(Clone, Debug, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct HotspotDto {
+pub struct NoteDto {
     pub id: u32,
     pub path: String,
     pub file: u32,
     /// Absent when its code can't be found any more.
     pub rows: Option<RowSpan>,
-    pub level: Level,
-    pub reason: String,
+    pub category: Category,
+    /// Only for important notes.
+    pub level: Option<Level>,
+    pub title: String,
+    /// Markdown.
+    pub body: String,
+    pub flow: Option<FlowStep>,
+    /// Its place in the reading order, from 0.
+    pub position: u32,
     pub source: Source,
 }
 
-/// A hotspot as an agent reports it: a path and the first and last lines on the new side, or
-/// the old side for a removed file.
+/// A note as an agent reports it, in reading order: a path and the first and last lines on
+/// the new side, or the old side for a removed file.
 #[derive(Clone, Debug, Deserialize, Serialize, Type)]
-pub struct HotspotInput {
+pub struct NoteInput {
     pub path: String,
     pub start: u32,
     pub end: u32,
-    pub level: Level,
-    pub reason: String,
+    pub category: Category,
+    #[serde(default)]
+    pub level: Option<Level>,
+    pub title: String,
+    pub body: String,
+    #[serde(default)]
+    pub flow: Option<FlowStep>,
 }
 
 impl Review {
-    pub(super) fn rematch_hotspots(&mut self, store: &Store) -> anyhow::Result<()> {
+    pub(super) fn rematch_notes(&mut self, store: &Store) -> anyhow::Result<()> {
         let mut remaps = Remaps::default();
-        let mut placed: Vec<HotspotDto> = store
-            .hotspots(&self.label)?
+        let mut placed: Vec<NoteDto> = store
+            .notes(&self.label)?
             .into_iter()
-            .filter_map(|h| {
-                let (file, rows) = self.placement(store, &mut remaps, &h.path, &h.pins)?;
-                Some(HotspotDto {
-                    id: h.id as u32,
-                    path: h.path,
+            .filter_map(|n| {
+                let (file, rows) = self.placement(store, &mut remaps, &n.path, &n.pins)?;
+                Some(NoteDto {
+                    id: n.id as u32,
+                    path: n.path,
                     file,
                     rows,
-                    level: h.level,
-                    reason: h.reason,
-                    source: h.source,
+                    category: n.category,
+                    level: n.level,
+                    title: n.title,
+                    body: n.body,
+                    flow: n.flow,
+                    position: n.position,
+                    source: n.source,
                 })
             })
             .collect();
-        placed.sort_by_key(|h| (h.level, h.file, h.rows.map_or(u32::MAX, |r| r.start)));
-        self.hotspots = placed;
+        placed.sort_by_key(|n| n.position);
+        self.notes = placed;
         Ok(())
     }
 
@@ -88,26 +105,36 @@ impl Review {
         })
     }
 
-    /// Anchors reported hotspots. Ones outside the review's files are left out.
-    fn anchor_hotspots(
+    /// Anchors reported notes, keeping their order. Ones outside the review's files are left
+    /// out. An important note without a level counts as medium, and a level on any other
+    /// note is dropped.
+    fn anchor_notes(
         &self,
         store: &Store,
-        inputs: &[HotspotInput],
+        inputs: &[NoteInput],
         source: Source,
-    ) -> anyhow::Result<Vec<Hotspot>> {
+    ) -> anyhow::Result<Vec<Note>> {
         let now = now_ms();
         let mut out = Vec::new();
-        for h in inputs {
-            let Some(rows) = self.rows_for(&h.path, h.start.min(h.end), h.start.max(h.end)) else {
+        for n in inputs {
+            let Some(rows) = self.rows_for(&n.path, n.start.min(n.end), n.start.max(n.end)) else {
                 continue;
             };
             let (path, pins) = self.pins(store, &rows)?;
-            out.push(Hotspot {
+            let level = match n.category {
+                Category::Important => Some(n.level.unwrap_or(Level::Medium)),
+                _ => None,
+            };
+            out.push(Note {
                 id: 0,
                 path,
                 pins,
-                level: h.level,
-                reason: h.reason.clone(),
+                category: n.category,
+                level,
+                title: n.title.clone(),
+                body: n.body.clone(),
+                flow: n.flow.clone(),
+                position: out.len() as u32,
                 review: self.label.clone(),
                 source,
                 created_at: now,
@@ -118,20 +145,20 @@ impl Review {
 }
 
 impl RepoCtx {
-    /// Replaces the review's hotspots with `inputs`. Returns the new state and how many
-    /// hotspots were left out for being outside the review's files.
-    pub fn save_hotspots(
+    /// Replaces the review's notes with `inputs`. Returns the new state and how many notes
+    /// were left out for being outside the review's files.
+    pub fn save_notes(
         &self,
         id: u32,
-        inputs: &[HotspotInput],
+        inputs: &[NoteInput],
         source: Source,
     ) -> anyhow::Result<(StateDto, usize)> {
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         let mut store = self.store.lock().unwrap();
-        let hotspots = review.anchor_hotspots(&store, inputs, source)?;
-        store.replace_hotspots(&review.label, &hotspots)?;
-        review.rematch_hotspots(&store)?;
-        Ok((review.state(), inputs.len() - hotspots.len()))
+        let notes = review.anchor_notes(&store, inputs, source)?;
+        store.replace_notes(&review.label, &notes)?;
+        review.rematch_notes(&store)?;
+        Ok((review.state(), inputs.len() - notes.len()))
     }
 }

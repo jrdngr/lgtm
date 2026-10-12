@@ -102,7 +102,7 @@ export function useReview(workspace: WorkspaceName) {
     const staleSub = events.workingCopyStale(win).listen((e) => {
       if (e.payload.workspace === workspace) setStale(e.payload.message);
     });
-    // An agent added a comment or hotspots.
+    // An agent added a comment or a walkthrough.
     const stateSub = events.reviewStateChanged(win).listen((e) => {
       if (e.payload.review === current.current?.id) setStateRef.current(e.payload.state);
     });

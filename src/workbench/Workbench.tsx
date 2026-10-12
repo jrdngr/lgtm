@@ -7,7 +7,7 @@ import { SymbolsPanel } from "../graph/SymbolsPanel";
 import type { RepoInfo } from "../ipc";
 import { CommentsPanel } from "../review/CommentsPanel";
 import { FilesPanel } from "../review/FilesPanel";
-import { HotspotsPanel } from "../review/HotspotsPanel";
+import { WalkthroughPanel } from "../review/WalkthroughPanel";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -86,7 +86,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+O": () => showView("right", "bots"),
     "Mod+Shift+Y": () => showView("right", "symbols"),
-    "Mod+Shift+H": () => showView("right", "hotspots"),
+    "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+P": () => showView("right", "pr"),
   };
 
@@ -190,7 +190,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
               { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
               { id: "pr", title: "PR", render: () => <PrPanel /> },
               { id: "symbols", title: "Symbols", render: () => <SymbolsPanel /> },
-              { id: "hotspots", title: "Hotspots", render: () => <HotspotsPanel /> },
+              { id: "walkthrough", title: "Walkthrough", render: () => <WalkthroughPanel /> },
               {
                 id: "bots",
                 title: "Reviewers",

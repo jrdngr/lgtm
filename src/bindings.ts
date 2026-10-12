@@ -73,15 +73,15 @@ export const commands = {
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
 	registerMcp: () => typedError<null, string>(__TAURI_INVOKE("register_mcp")),
 	/**
-	 *  Runs an agent over the review to find its hotspots, replacing the last ones. Sends each
+	 *  Runs an agent over the review to write its walkthrough, replacing the last one. Sends each
 	 *  tool call it makes through `activity`. `null` when it was stopped.
 	 */
-	findHotspots: (review: number, activity: Channel<string>) => typedError<{
+	runWalkthrough: (review: number, activity: Channel<string>) => typedError<{
 	state: StateDto,
-	/**  Hotspots the agent put outside the review's files. */
+	/**  Notes the agent put outside the review's files. */
 	skipped: number,
-} | null, string>(__TAURI_INVOKE("find_hotspots", { review, activity })),
-	stopHotspots: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_hotspots", { review })),
+} | null, string>(__TAURI_INVOKE("run_walkthrough", { review, activity })),
+	stopWalkthrough: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_walkthrough", { review })),
 	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
 	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
@@ -274,6 +274,16 @@ export type Broken = {
 	error: string,
 };
 
+export type Category = 
+/**  Needs a careful look. Has a level. */
+"important" | 
+/**  A step in a flow through several places. */
+"flow" | 
+/**  Intent or background the diff doesn't show. */
+"context" | 
+/**  Something for the reviewer or author to settle. */
+"question";
+
 export type Challenge = {
 	finding: string,
 	argument: string,
@@ -395,6 +405,13 @@ export type Fix = {
 	createdAt: number | null,
 };
 
+/**  Where a note sits in a flow. */
+export type FlowStep = {
+	flow: string,
+	/**  1-based. */
+	step: number,
+};
+
 /**
  *  The GitHub review thread a comment is on. The comment's body is then a reply not yet
  *  published.
@@ -460,23 +477,6 @@ export type HeadDto = {
 	rewritten: boolean,
 	/**  OPEN, CLOSED or MERGED. */
 	state: string,
-};
-
-export type HotspotDto = {
-	id: number,
-	path: string,
-	file: number,
-	/**  Absent when its code can't be found any more. */
-	rows: RowSpan | null,
-	level: Level,
-	reason: string,
-	source: Source,
-};
-
-export type HotspotsFound = {
-	state: StateDto,
-	/**  Hotspots the agent put outside the review's files. */
-	skipped: number,
 };
 
 export type HunkDto = {
@@ -562,6 +562,24 @@ export type Minimal = {
 export type NodeStatus = "added" | "modified" | "removed" | 
 /**  Unchanged, but uses a changed symbol. */
 "caller";
+
+export type NoteDto = {
+	id: number,
+	path: string,
+	file: number,
+	/**  Absent when its code can't be found any more. */
+	rows: RowSpan | null,
+	category: Category,
+	/**  Only for important notes. */
+	level: Level | null,
+	title: string,
+	/**  Markdown. */
+	body: string,
+	flow: FlowStep | null,
+	/**  Its place in the reading order, from 0. */
+	position: number,
+	source: Source,
+};
 
 export type OpenedPr = {
 	workspace: string,
@@ -724,7 +742,7 @@ export type ReviewDto = {
 	hasWorkingCopy: boolean,
 };
 
-/**  An agent changed review `review`'s comments or hotspots. */
+/**  An agent changed review `review`'s comments or walkthrough notes. */
 export type ReviewStateChanged = {
 	review: number,
 	state: StateDto,
@@ -778,7 +796,7 @@ export type Since =
 /**  In the previous session but not in the review now. */
 "removed";
 
-/**  Which agent found a hotspot. */
+/**  Which agent wrote a note. */
 export type Source = 
 /**  The app's own headless run. */
 "headless" | 
@@ -799,8 +817,8 @@ export type StateDto = {
 	amber: RowRef[],
 	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
 	comments: CommentDto[],
-	/**  The review's hotspots, worst first. Ones whose code is gone have no rows. */
-	hotspots: HotspotDto[],
+	/**  The review's walkthrough notes, in reading order. Ones whose code is gone have no rows. */
+	notes: NoteDto[],
 };
 
 export type Status = "running" | "done" | "failed" | "stopped";
@@ -840,6 +858,12 @@ export type View =
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string };
+
+export type WalkthroughDone = {
+	state: StateDto,
+	/**  Notes the agent put outside the review's files. */
+	skipped: number,
+};
 
 /**
  *  A workspace's working copy became stale (`message` is jj's error) or stopped being stale

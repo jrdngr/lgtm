@@ -54,6 +54,27 @@ describe("buildLines", () => {
     expect(buildLines(files, layout({ filter: "skipped" }))).toEqual([]);
   });
 
+  it("puts note blocks after their row's comments, and gone ones under the file header", () => {
+    const lines = buildLines(
+      files,
+      layout({
+        comments: new Map([["0:1", [5]]]),
+        notes: new Map([
+          ["0:1", [8]],
+          ["0:file", [9]],
+        ]),
+      }),
+    );
+    const blocks = lines.flatMap((l, i) =>
+      l.kind === "comment" ? [[i, `c${l.comment}`]] : l.kind === "note" ? [[i, `n${l.note}`]] : [],
+    );
+    expect(blocks).toEqual([
+      [1, "n9"],
+      [5, "c5"],
+      [6, "n8"],
+    ]);
+  });
+
   it("shows only the header of a collapsed file", () => {
     const lines = buildLines(files, layout({ collapsedFiles: new Set(["a.rs"]) }));
     expect(lines.map((l) => l.kind)).toEqual(["file"]);
@@ -156,7 +177,7 @@ describe("fileProgress", () => {
     createdAt: 0,
   });
   const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
-    indexState({ marks, checks: [check], amber: [], comments: [], hotspots: [] });
+    indexState({ marks, checks: [check], amber: [], comments: [], notes: [] });
 
   it("counts changed rows by mark state", () => {
     const index = indexed([mark(1, "reviewed"), mark(2, "flagged")]);

@@ -18,7 +18,6 @@ import { DiffLines } from "./DiffLines";
 import { MarkMenu } from "./MarkMenu";
 import { buildLines, changedRows, flatten, symbolMarkers, type ViewMode } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
-import { findRisks, useRiskRun } from "./riskRun";
 import { type Filter, fileProgress, indexState, plural, rowStates, sumProgress } from "./state";
 import { openRevisions } from "./target";
 import { useAgentRequests } from "./useAgentRequests";
@@ -33,18 +32,20 @@ import { useReviewNav } from "./useReviewNav";
 import { useRowMouse } from "./useRowMouse";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
+import { useWalkthrough } from "./useWalkthrough";
+import { runWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./review.css";
 
 /** A review pane opens on the working copy, or a PR workspace's PR, so a revset saved last
  * time that no longer resolves can't break startup. */
 const START_REVSET = "@";
 const NO_CHANGES: ChangeDto[] = [];
-const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], hotspots: [] };
+const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], notes: [] };
 
 /** Clicks on these keep their own focus instead of giving it to the review. */
 function keepsFocus(t: EventTarget) {
   return (
-    (t instanceof Element && !!t.closest(".comment-block")) ||
+    (t instanceof Element && !!t.closest(".comment-block, .note-block")) ||
     t instanceof HTMLInputElement ||
     t instanceof HTMLButtonElement ||
     t instanceof HTMLSelectElement
@@ -87,6 +88,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     canPublish: pr.whole,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
+  const w = useWalkthrough(review, files, commentOn);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
   const lines = useMemo(
     () =>
@@ -98,8 +100,9 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         rowState,
         revealed,
         comments: slots,
+        notes: w.slots,
       }),
-    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed, slots],
+    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed, slots, w.slots],
   );
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, place } = s;
@@ -108,7 +111,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     [files, lines, sel],
   );
   const closeMenu = () => setMenu(undefined);
-  const risk = useRiskRun(review?.id);
+  const walkthrough = useWalkthroughRun(review?.id);
   const a = useReviewActions({
     review,
     files,
@@ -170,19 +173,19 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     refresh(view);
   }
 
-  const { jump, jumpToComment, jumpToRow, stepHotspotFrom, stepHunk, stepFile, showLine } =
-    useReviewNav({
-      lines,
-      files,
-      comments: c.comments,
-      hotspots: review?.state.hotspots ?? [],
-      cursor,
-      place,
-      setScrollTo,
-      api,
-      containerApi,
-      focusRoot,
-    });
+  const { jump, jumpToComment, jumpToRow, stepNote, stepHunk, stepFile, showLine } = useReviewNav({
+    review: review?.id,
+    lines,
+    files,
+    comments: c.comments,
+    notes: w.notes,
+    cursor,
+    place,
+    setScrollTo,
+    api,
+    containerApi,
+    focusRoot,
+  });
 
   async function commentOn(file: number, rows: number[], body: string, snippet: string) {
     if (!review) return false;
@@ -196,10 +199,10 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     return true;
   }
 
-  function findRisksNow() {
+  function runWalkthroughNow() {
     if (!review) return;
-    if (agentsOff()) return setError("Highlight risks needs Claude Code, which is turned off.");
-    findRisks(review.id, edited);
+    if (agentsOff()) return setError("Walkthrough needs Claude Code, which is turned off.");
+    runWalkthrough(review.id, edited);
   }
 
   function openInEditor() {
@@ -218,7 +221,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       jumpToRow,
       commentOn,
       send: sendText,
-      findRisks: findRisksNow,
+      runWalkthrough: runWalkthroughNow,
       refetchPr: pr.refetch,
       pullPr: pr.pull,
     },
@@ -257,8 +260,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     openRevisions: () => openRevisions(workspace),
     openGraph: () => openGraph(containerApi),
     openInEditor,
-    findRisks: findRisksNow,
-    stepHotspot: stepHotspotFrom,
+    runWalkthrough: runWalkthroughNow,
+    stepNote,
     stepHunk,
     stepFile,
     toggleFile: fold.toggleFile,
@@ -299,8 +302,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         progress={total}
         onReset={a.resetMarks}
         onGraph={() => openGraph(containerApi)}
-        risk={risk}
-        onRisks={findRisksNow}
+        walkthrough={walkthrough}
+        onWalkthrough={runWalkthroughNow}
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />
@@ -336,6 +339,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           renderComment={(id) => (
             <CommentBlock id={id} comment={c.comments.find((x) => x.id === id)} c={c} />
           )}
+          renderNote={w.renderNote}
           {...handlers}
         />
       )}
