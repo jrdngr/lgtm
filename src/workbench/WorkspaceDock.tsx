@@ -34,8 +34,7 @@ const components = {
   files: () => null,
 };
 
-async function restoreLayout(api: DockviewApi, workspace: WorkspaceName, setup: boolean) {
-  const saved = await unwrap(commands.loadLayout(workspace)).catch(() => null);
+function restoreLayout(api: DockviewApi, saved: string | null, setup: boolean) {
   if (saved) {
     try {
       api.fromJSON(JSON.parse(saved));
@@ -61,6 +60,9 @@ interface Props {
 export function WorkspaceDock({ workspace, hidden, setup }: Props) {
   const timer = useRef<number>(undefined);
   const gone = useRef(false);
+  /** The dock's latest api. React can mount the dock twice, and panes added to the first,
+   * already disposed api would stay mounted outside the dock. */
+  const latest = useRef<DockviewApi>(undefined);
   /** Unknown until the layout is restored. */
   const [hasPane, setHasPane] = useState<boolean>();
   useAgentShow(workspace);
@@ -75,7 +77,10 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
   }, [workspace]);
 
   async function ready({ api }: DockviewReadyEvent) {
-    await restoreLayout(api, workspace, setup);
+    latest.current = api;
+    const saved = await unwrap(commands.loadLayout(workspace)).catch(() => null);
+    if (latest.current !== api) return;
+    restoreLayout(api, saved, setup);
     const panes = () => setHasPane(api.panels.some(isReviewPanel));
     panes();
     api.onDidAddPanel(panes);

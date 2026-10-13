@@ -10,3 +10,9 @@ export function registerDock(workspace: WorkspaceName, api: DockviewApi | undefi
 }
 
 export const dockOf = (workspace: WorkspaceName) => docks.get(workspaceKey(workspace));
+
+/** Whether the panel `id` is in the workspace's dock, or the dock isn't up yet. */
+export function inDock(workspace: WorkspaceName, id: string) {
+  const api = dockOf(workspace);
+  return !api || !!api.getPanel(id);
+}

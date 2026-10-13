@@ -21,12 +21,6 @@ const waiting = new Map<string, () => void>();
  * pane first, or opening one when it has none. A later call replaces a waiting one. */
 export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview) => void) {
   const api = dockOf(workspace);
-  console.debug("[lgtm] inReviewPane", {
-    workspace,
-    dock: !!api,
-    panels: api?.panels.map((p) => p.view.contentComponent),
-    groups: api?.groups.length,
-  });
   if (!api) return;
   const key = workspaceKey(workspace);
   waiting.get(key)?.();
@@ -37,7 +31,6 @@ export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview
   };
   const off = onReviewChange(() => {
     const review = currentReview(workspace);
-    console.debug("[lgtm] review changed", { has: !!review, idle: isIdle(review) });
     if (!review || isIdle(review)) return;
     done();
     f(review);
@@ -47,5 +40,4 @@ export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview
   const pane = api.panels.find(isReviewPanel);
   if (pane) pane.api.setActive();
   else openReviewTab(api);
-  console.debug("[lgtm] after open", { panels: api.panels.map((p) => p.view.contentComponent) });
 }

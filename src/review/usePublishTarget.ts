@@ -1,5 +1,6 @@
 import type { DockviewPanelApi } from "dockview-react";
 import { useEffect, useRef } from "react";
+import { inDock } from "../workbench/docks";
 import type { WorkspaceName } from "../workspaces/context";
 import { isIdle } from "./idle";
 import {
@@ -26,6 +27,8 @@ export function usePublishTarget(
 
   useEffect(() => {
     const publish = () => {
+      // A pane left outside the dock can't show anything.
+      if (!inDock(workspace, api.id)) return;
       published.current = {
         revset,
         changes,

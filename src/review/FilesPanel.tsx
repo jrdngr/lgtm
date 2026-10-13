@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useWorkspace } from "../workspaces/context";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { STATUS_LABEL } from "./FileHeader";
-import { isIdle } from "./idle";
 import { matchesFilter, type Progress } from "./state";
 import { buildTree, type TreeNode, toggled } from "./tree";
 import "./FilesPanel.css";
@@ -48,15 +47,7 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
     const check = review.checks[node.file];
     return (
       <li>
-        <button
-          type="button"
-          style={pad}
-          onClick={() => {
-            console.debug("[lgtm] file click", { idle: isIdle(review), id: review.id });
-            review.jump(node.file);
-          }}
-          title={dto.path}
-        >
+        <button type="button" style={pad} onClick={() => review.jump(node.file)} title={dto.path}>
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${check === "changedSinceReviewed" ? " amber" : ""}`}>
             {node.name}
