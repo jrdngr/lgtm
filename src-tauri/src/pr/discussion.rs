@@ -72,6 +72,12 @@ impl RepoCtx {
         })
     }
 
+    /// Opens the PR's page on GitHub in the browser.
+    pub async fn open_pr_page(&self, workspace: Option<&str>) -> anyhow::Result<()> {
+        let pr = self.need_pr(workspace)?;
+        github::gh::browse_pr(&pr.repo, pr.number).await
+    }
+
     /// Posts to the PR's conversation.
     pub async fn reply_pr(&self, workspace: Option<&str>, body: &str) -> anyhow::Result<()> {
         let pr = self.need_pr(workspace)?;

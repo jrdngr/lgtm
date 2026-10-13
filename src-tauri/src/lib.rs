@@ -94,6 +94,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::highlight_text,
             commands::github::open_pr,
             commands::github::pr_info,
+            commands::github::open_pr_page,
             commands::github::nearby_prs,
             commands::github::pr_preview,
             commands::github::pr_head,

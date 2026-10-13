@@ -73,6 +73,13 @@ pub async fn pr_diff(repo: &GhRepo, number: u32) -> anyhow::Result<String> {
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
+/// Opens a PR's page in the default browser.
+pub async fn browse_pr(repo: &GhRepo, number: u32) -> anyhow::Result<()> {
+    let (repo, number) = (repo.to_string(), number.to_string());
+    run(&["pr", "view", &number, "--repo", &repo, "--web"], None).await?;
+    Ok(())
+}
+
 /// Takes `T` out of `v` at `pointer`, failing with what was missing.
 pub fn at<T: serde::de::DeserializeOwned>(v: &mut Value, pointer: &str) -> anyhow::Result<T> {
     let found = v

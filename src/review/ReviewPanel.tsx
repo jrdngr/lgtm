@@ -12,7 +12,7 @@ import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
-import { commentSlots } from "./comments";
+import { commentNear, commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { MarkMenu } from "./MarkMenu";
 import { buildLines, changedRows, symbolMarkers, type ViewMode } from "./model";
@@ -239,6 +239,11 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     });
   }
 
+  function askAgent() {
+    const id = commentNear(lines, cursor);
+    if (id !== undefined && !agentsOff()) c.openAsk(id);
+  }
+
   const onKeyDown = useReviewKeys({
     files,
     lines,
@@ -251,6 +256,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     applyMark: a.applyMark,
     openMenuAtCursor,
     startComment: a.startComment,
+    askAgent,
     openRevisions: () => openRevisions(workspace),
     openGraph: () => openGraph(containerApi),
     openInEditor,

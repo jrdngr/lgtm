@@ -45,6 +45,8 @@ In a review pane:
 | ⌘A | Select the whole review |
 | ⌘Z / ⇧⌘Z | Undo / redo mark changes |
 | ⌘C | Copy selected code text, or the selected rows when no text is selected |
+| `c` | Comment on the selection |
+| `a` | Ask the agent about the comment at the cursor |
 | `x` | Check or uncheck the file under the cursor |
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |
@@ -58,8 +60,10 @@ The right panel has four tabs:
 
 - **Diff** lists the review. Its **Files** view (⌘⇧E) shows the review's files as a tree with reviewed/changed counts per file and folder. It follows the review's line filter. Click a file to jump to it. Its **Symbols** view (⌘⇧Y) lists the changed symbols. With no Review tab open, clicking a file or symbol opens one on the current revset.
 - **Files** (⌘⇧R) shows the whole repo.
-- **Comments** (⌘⇧M) lists the review's comments. In a PR workspace the PR sits on top: its conversation folds away under the **PR #N** header, with Pull and the review submit box below it.
+- **Comments** (⌘⇧M) lists the review's comments by file, with Open, Pending, Resolved and All filters once some are GitHub threads; its ⋯ menu sends them all to a terminal. In a PR workspace the PR sits on top: its state, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. The review submit box (Comment, Approve, Request changes) stays at the bottom.
 - **Reports** switches between the **Walkthrough** (⌘⇧H) and **Reviewers** (⌘⇧O).
+
+Comments show under their code as cards: purple for a GitHub thread, blue for your own. Their actions show on hover: ✎ edit, ✦ ask the agent (or `a`), ↗ send to a terminal, and Publish and Delete in ⋯. The agent box stays open while the comment has a conversation with the agent. Resolved threads fold to one line; click to open one.
 
 In the header and review toolbar:
 

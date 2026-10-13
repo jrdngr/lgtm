@@ -1,21 +1,23 @@
 import { Fragment, useState } from "react";
 import type { Hunk, PreviewFileDto, PreviewThreadDto, Row } from "../bindings";
 import { SIGN } from "../review/model";
-import { GhThread, threadState } from "./GhThread";
+import { GhThread } from "./GhThread";
+import "../review/comments.css";
 import "../review/FileHeader.css";
 import "../review/review.css";
 
 /** A review thread, read-only. `where` names its code when it isn't shown beside it. */
 export function PreviewThread({ thread, where }: { thread: PreviewThreadDto; where?: string }) {
-  const state = threadState(thread.link);
+  const { link } = thread;
   return (
-    <div className="comment-block preview-thread">
-      <div className="comment-head">
-        <span className="comment-title">{where ?? "Thread"}</span>
-        {state && <span className="comment-meta">{state}</span>}
+    <div className={`comment-block gh preview-thread${link.resolved ? " resolved" : ""}`}>
+      <div className="card-bar">
+        <span className="card-source">{where ?? "GitHub"}</span>
+        {link.resolved && <span className="pill green">✓ Resolved</span>}
+        {link.outdated && <span className="pill">Outdated</span>}
       </div>
       {where && thread.hunk && <pre className="preview-hunk">{thread.hunk}</pre>}
-      <GhThread link={thread.link} />
+      <GhThread link={link} />
     </div>
   );
 }

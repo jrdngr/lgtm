@@ -152,6 +152,8 @@ export const commands = {
 	/**  The revset the workspace reviews. */
 	revset: string,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
+	/**  Opens the workspace's PR on GitHub in the browser. */
+	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
 	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
 	nearbyPrs: (workspace: string | null) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace })),
 	/**

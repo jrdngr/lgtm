@@ -1,81 +1,64 @@
-import { useEffect, useState } from "react";
-import type { DiscussionDto, PrDto } from "../bindings";
-import { commands } from "../ipc";
-import { useCurrentReview } from "../review/current";
-import { useWorkspace } from "../workspaces/context";
+import { useState } from "react";
+import { prOpen } from "../workbench/subviews";
 import { PrPosts } from "./PrPosts";
+import { verdicts } from "./people";
+import type { Discussion } from "./useDiscussion";
 
-/** A PR's conversation and review summaries, with a box that posts to it. */
-export function PrDiscussion({ pr }: { pr: PrDto }) {
-  const workspace = useWorkspace();
-  const review = useCurrentReview(workspace);
-  const [d, setD] = useState<DiscussionDto>();
-  const [error, setError] = useState<string>();
+const TONES = { approved: "green", changes: "red", commented: "" };
+const SAYS = { approved: "approved", changes: "requested changes", commented: "commented" };
+
+/** A PR's conversation, folded to one line of each reviewer's verdict. Open, its posts and a
+ * box that posts to it. */
+export function PrDiscussion({ discussion, viewer }: { discussion: Discussion; viewer?: string }) {
+  const { d, error, post } = discussion;
+  const open = prOpen.use();
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function load() {
-    const r = await commands.prDiscussion(workspace);
-    if (r.status === "error") return setError(r.error);
-    setError(undefined);
-    setD(r.data);
-  }
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reload when the workspace's PR does
-  useEffect(() => {
-    setD(undefined);
-    if (pr) load();
-  }, [pr]);
-
-  async function post() {
+  async function send() {
     setBusy(true);
-    const r = await commands.replyPr(workspace, reply);
+    if (await post(reply)) setReply("");
     setBusy(false);
-    if (r.status === "error") return setError(r.error);
-    setReply("");
-    load();
   }
 
   return (
-    <div className="pr-panel">
-      <div className="pr-head">
-        <div className="pr-title">{pr.title}</div>
-        <div className="pr-meta">
-          {pr.author} · {pr.headRef} → {pr.baseRef}
-        </div>
-        <div className="pr-meta" title="The PR's page">
-          {pr.url}
-        </div>
-        <div className="pr-actions">
-          <button type="button" onClick={load}>
-            Reload
-          </button>
-          <button
-            type="button"
-            disabled={!review}
-            onClick={() => review?.refetchPr()}
-            title="Fetch the PR's head again and pull its comments"
-          >
-            Refetch
-          </button>
-        </div>
-      </div>
+    <div className="pr-convo">
+      <button
+        type="button"
+        className="pr-convo-bar"
+        aria-expanded={open}
+        onClick={() => prOpen.set(!open)}
+        title={open ? "Fold the conversation" : "Show the conversation"}
+      >
+        <span className="chevron">{open ? "▾" : "▸"}</span>
+        <b>Conversation</b>
+        {d && <span className="faint">{d.posts.length}</span>}
+        {d &&
+          verdicts(d.posts).map(([who, v]) => (
+            <span key={who} className={`pill ${TONES[v]}`} title={`${who} ${SAYS[v]}`}>
+              {v === "approved" && "✓ "}
+              {who}
+            </span>
+          ))}
+      </button>
       {error && <div className="review-error">{error}</div>}
-      {!d && !error && <div className="placeholder">Loading</div>}
-      {d && <PrPosts posts={d.posts} />}
-      {d && (
-        <div className="pr-reply">
-          <textarea
-            className="comment-input"
-            rows={3}
-            value={reply}
-            placeholder="Reply on the PR (posts right away)"
-            onChange={(e) => setReply(e.target.value)}
-          />
-          <button type="button" onClick={post} disabled={busy || !reply.trim()}>
-            {busy ? "Posting…" : "Post"}
-          </button>
-        </div>
+      {open && !d && !error && <div className="pr-empty">Loading</div>}
+      {open && d && (
+        <>
+          <PrPosts posts={d.posts} viewer={viewer} />
+          <div className="pr-reply">
+            <textarea
+              className="comment-input"
+              rows={2}
+              value={reply}
+              placeholder="Reply on the PR (posts right away)"
+              onChange={(e) => setReply(e.target.value)}
+            />
+            <button type="button" onClick={send} disabled={busy || !reply.trim()}>
+              {busy ? "Posting…" : "Post"}
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

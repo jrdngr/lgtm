@@ -1,0 +1,48 @@
+import { useEffect, useState } from "react";
+import type { DiscussionDto, HeadDto, PrDto } from "../bindings";
+import { commands } from "../ipc";
+import type { WorkspaceName } from "../workspaces/context";
+
+/** A PR's conversation and state on GitHub, read when the PR changes and on each sync. */
+export function useDiscussion(workspace: WorkspaceName, pr: PrDto) {
+  const [d, setD] = useState<DiscussionDto>();
+  const [head, setHead] = useState<HeadDto>();
+  const [error, setError] = useState<string>();
+  const [loading, setLoading] = useState(false);
+  const [syncedAt, setSyncedAt] = useState<number>();
+
+  async function load() {
+    setLoading(true);
+    const [r, h] = await Promise.all([
+      commands.prDiscussion(workspace),
+      commands.prHead(workspace),
+    ]);
+    setLoading(false);
+    if (h.status === "ok") setHead(h.data);
+    if (r.status === "error") return setError(r.error);
+    setError(undefined);
+    setD(r.data);
+    setSyncedAt(Date.now());
+  }
+
+  /** Posts to the conversation right away. Resolves to whether it worked. */
+  async function post(body: string) {
+    const r = await commands.replyPr(workspace, body);
+    if (r.status === "error") {
+      setError(r.error);
+      return false;
+    }
+    load();
+    return true;
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reload when the workspace's PR does
+  useEffect(() => {
+    setD(undefined);
+    load();
+  }, [pr]);
+
+  return { d, head, error, loading, syncedAt, load, post };
+}
+
+export type Discussion = ReturnType<typeof useDiscussion>;

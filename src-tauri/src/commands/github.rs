@@ -61,6 +61,19 @@ pub(crate) fn pr_info(
     Ok(pr.as_ref().map(PrDto::from))
 }
 
+/// Opens the workspace's PR on GitHub in the browser.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn open_pr_page(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<()> {
+    repo(&window)?
+        .open_pr_page(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
 /// How the PR's head on GitHub compares with the fetched one.
 #[tauri::command]
 #[specta::specta]

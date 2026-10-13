@@ -31,6 +31,7 @@ export function NoteBlock({ note, current, flowLabel, onComment }: Props) {
         <span className="spacer" />
         <button
           type="button"
+          className="quiet"
           disabled={commented || !note.rows}
           onClick={async () => setCommented(await onComment(note))}
           title="Add it as your comment"

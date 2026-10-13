@@ -1,17 +1,21 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CommentDto } from "../bindings";
-import { GhThread, threadState } from "../github/GhThread";
+import { Markdown } from "../bots/Markdown";
+import { GhThread, lastPost } from "../github/GhThread";
+import { Avatar, Post } from "../github/Post";
+import { viewerLogin } from "../github/people";
 import { useAgentsOff } from "../tools/agents";
+import { IconButton } from "../ui/icons";
+import { Menu } from "../ui/Menu";
+import { ago, fullDate } from "../ui/time";
 import { isMac } from "../workbench/keys";
+import { AskBox, SAVE_KEY } from "./AskBox";
 import { NEW_COMMENT } from "./model";
 import type { Comments } from "./useComments";
 import { Workshop } from "./Workshop";
 import "./comments.css";
 
-export const NOT_AT_WORKING_COPY =
-  "The agent edits the working copy (@), which this review doesn't include. Review a revset that includes @ to make changes.";
-
-const SAVE_KEY = isMac ? "⌘↵" : "Ctrl+↵";
+export { NOT_AT_WORKING_COPY } from "./AskBox";
 
 interface Props {
   id: number;
@@ -19,15 +23,18 @@ interface Props {
   c: Comments;
 }
 
-/** A comment under its code: the body, or an editor for it, and a conversation with an agent
- * about it. */
+/** A comment under its code: a GitHub thread or your own comment, an editor for its text, and
+ * a conversation with an agent about it. */
 export function CommentBlock({ id, comment, c }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
   const agentsOff = useAgentsOff();
+  const [expanded, setExpanded] = useState(false);
+  const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
-  const running = c.running.get(id);
-  const isNew = id === NEW_COMMENT;
+  const gh = comment?.github;
+  const viewer = viewerLogin(c.comments);
+  const asking = c.asking(id);
 
   useEffect(() => {
     if (c.focus?.id !== id) return;
@@ -38,6 +45,26 @@ export function CommentBlock({ id, comment, c }: Props) {
     c.focused();
   });
 
+  if (gh?.resolved && !expanded && editing === undefined && !asking) {
+    return (
+      <div className="comment-block gh resolved">
+        <button
+          type="button"
+          className="card-bar collapsed"
+          aria-expanded={false}
+          onClick={() => setExpanded(true)}
+          title="Show the thread"
+        >
+          <span className="chevron">▸</span>
+          <span className="pill green">✓ Resolved</span>
+          <span className="card-summary">{lastPost(gh, viewer)}</span>
+          <span className="spacer" />
+          <span className="card-count">{gh.posts.length}</span>
+        </button>
+      </div>
+    );
+  }
+
   function onBodyKey(e: React.KeyboardEvent) {
     if (e.key === "Enter" && (isMac ? e.metaKey : e.ctrlKey)) c.save(id);
     else if (e.key === "Escape") c.cancel(id);
@@ -45,78 +72,130 @@ export function CommentBlock({ id, comment, c }: Props) {
     e.preventDefault();
   }
 
-  function onAskKey(e: React.KeyboardEvent) {
-    const mod = isMac ? e.metaKey : e.ctrlKey;
-    if (e.key === "Enter" && mod) {
-      if (c.canChange) c.ask(id, true);
-    } else if (e.key === "Enter" && !e.shiftKey) c.ask(id, false);
-    else if (e.key === "Escape") c.done();
-    else return;
-    e.preventDefault();
-  }
-
-  const outdated = comment && !comment.rows;
-  const asked = !!c.asks.get(id)?.trim();
+  const isNew = id === NEW_COMMENT;
   const body = editing ?? comment?.body ?? "";
-  const use = (text: string) => c.use(id, text);
-  const gh = comment?.github;
+  const changed = comment && !comment.rows;
   const publishing = c.publishing.has(id);
-  const publish = c.canPublish && (
+  const canPublish = c.canPublish && !!body.trim() && !publishing;
+  const publishTitle = "Add to your pending review on GitHub. Submit it from the Comments view.";
+  const when = comment && (comment.updatedAt ?? comment.createdAt);
+  const kind = gh ? "gh" : "mine";
+
+  const publishButton = c.canPublish && (
     <button
       type="button"
+      className="primary"
       onClick={() => c.publish(id)}
-      disabled={publishing || !body.trim()}
-      title="Add to your pending review on GitHub. Submit it from the Comments view."
+      disabled={!canPublish}
+      title={publishTitle}
     >
-      {publishing ? "Publishing…" : gh ? "Publish reply" : "Publish"}
+      {publishing ? "Publishing…" : "Publish"}
     </button>
   );
+
   return (
-    <div className="comment-block">
-      <div className="comment-head">
-        <span className="comment-title">
-          {isNew ? "New comment" : gh ? "GitHub thread" : "Comment"}
-        </span>
-        {comment && (
-          <span
-            className="comment-meta"
-            title={
-              comment.updatedAt === null ? undefined : new Date(comment.updatedAt).toLocaleString()
-            }
+    <div className={`comment-block ${kind}${gh?.resolved ? " resolved" : ""}`}>
+      <div className="card-bar">
+        {gh?.resolved && (
+          <button
+            type="button"
+            className="chevron quiet"
+            aria-expanded={true}
+            onClick={() => setExpanded(false)}
+            title="Fold the thread"
           >
-            {comment.review}
-          </span>
+            ▾
+          </button>
         )}
-        {outdated && <span className="comment-outdated">code changed</span>}
-        {gh && threadState(gh) && <span className="comment-meta">{threadState(gh)}</span>}
-        <span className="spacer" />
-        {comment && editing === undefined && (
+        <span className="card-source" title={comment ? `Review: ${comment.review}` : undefined}>
+          {isNew ? "New comment" : gh ? "GitHub" : "Your comment"}
+        </span>
+        {gh && (
           <>
-            {publish}
-            <button type="button" onClick={() => c.edit(comment)}>
-              {gh && !comment.body ? "Reply" : "Edit"}
-            </button>
-            <button
-              type="button"
-              onClick={() => c.send(comment)}
-              title="Paste into the agent's prompt"
-            >
-              Send to agent
-            </button>
-            <button type="button" onClick={() => c.remove(comment.id)}>
-              Delete
-            </button>
+            <span className="faint">·</span>
+            <span>
+              {gh.posts.length} {gh.posts.length === 1 ? "post" : "posts"}
+            </span>
           </>
         )}
+        {!gh && when ? (
+          <>
+            <span className="faint">·</span>
+            <span className="faint" title={fullDate(when)}>
+              {ago(when)}
+            </span>
+          </>
+        ) : null}
+        {gh?.resolved && <span className="pill green">✓ Resolved</span>}
+        {gh?.outdated && <span className="pill">Outdated</span>}
+        {changed && (
+          <button
+            type="button"
+            className="pill amber"
+            aria-expanded={snippet}
+            onClick={() => setSnippet(!snippet)}
+            title={snippet ? "Hide the code as it was" : "Show the code as it was"}
+          >
+            Code changed {snippet ? "▾" : "▸"}
+          </button>
+        )}
+        <span className="spacer" />
+        <span className={`card-actions${editing === undefined ? " reveal" : ""}`}>
+          {comment && editing === undefined && (!gh || comment.body) && (
+            <IconButton
+              icon="edit"
+              label={gh ? "Edit reply" : "Edit"}
+              onClick={() => c.edit(comment)}
+            />
+          )}
+          {!agentsOff && (
+            <IconButton
+              icon="sparkle"
+              label="Ask agent (a)"
+              aria-pressed={asking}
+              onClick={() => (asking ? c.closeAsk(id) : c.openAsk(id))}
+            />
+          )}
+          {comment && (
+            <IconButton icon="send" label="Send to terminal" onClick={() => c.send(comment)} />
+          )}
+          {comment && (
+            <Menu
+              items={[
+                editing === undefined &&
+                  !gh &&
+                  c.canPublish && {
+                    label: "Publish",
+                    onSelect: () => c.publish(id),
+                    disabled: !canPublish,
+                    title: publishTitle,
+                  },
+                { label: "Delete", onSelect: () => c.remove(comment.id), danger: true },
+              ]}
+            />
+          )}
+        </span>
       </div>
-      {outdated && <pre className="comment-snippet">{comment.snippet}</pre>}
-      {gh && <GhThread link={gh} />}
-      {editing === undefined ? (
-        (!gh || comment?.body) && (
-          <div className="comment-body">{comment?.body || <em>No text yet</em>}</div>
-        )
-      ) : (
-        <>
+      {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
+      {gh && <GhThread link={gh} viewer={viewer} />}
+      {editing === undefined && gh && comment?.body && (
+        <Post
+          author={viewer ?? "You"}
+          name="You"
+          pills={<span className="pill blue">Not published</span>}
+          body={comment.body}
+        />
+      )}
+      {editing === undefined && !gh && (
+        <div className="post">
+          <Avatar name={viewer ?? "You"} />
+          <div className="post-body">
+            {comment?.body ? <Markdown>{comment.body}</Markdown> : <em>No text yet</em>}
+          </div>
+        </div>
+      )}
+      {editing !== undefined ? (
+        <div className="card-foot editing">
           <textarea
             ref={bodyRef}
             className="comment-input"
@@ -126,52 +205,36 @@ export function CommentBlock({ id, comment, c }: Props) {
             onChange={(e) => c.setBody(id, e.target.value)}
             onKeyDown={onBodyKey}
           />
-          <div className="comment-actions">
-            <button type="button" className="primary" onClick={() => c.save(id)}>
-              Save <kbd>{SAVE_KEY}</kbd>
-            </button>
-            <button type="button" onClick={() => c.cancel(id)}>
+          <div className="card-buttons">
+            <span className="spacer" />
+            <button type="button" className="quiet" onClick={() => c.cancel(id)}>
               Cancel <kbd>Esc</kbd>
             </button>
-            {publish}
-          </div>
-        </>
-      )}
-      <Workshop comment={comment} running={running} onUse={use} />
-      {!agentsOff && (
-        <div className="ask">
-          <textarea
-            ref={askRef}
-            className="ask-input"
-            rows={1}
-            value={c.asks.get(id) ?? ""}
-            placeholder={`Ask the agent (↵), or tell it what to change (${SAVE_KEY})`}
-            onChange={(e) => c.setAsk(id, e.target.value)}
-            onKeyDown={onAskKey}
-          />
-          {running ? (
-            <button type="button" onClick={() => c.stop(id)}>
-              Stop
+            <button
+              type="button"
+              className={c.canPublish ? undefined : "primary"}
+              onClick={() => c.save(id)}
+            >
+              Save <kbd>{SAVE_KEY}</kbd>
             </button>
-          ) : (
-            <>
-              <button type="button" onClick={() => c.ask(id, false)} disabled={!asked}>
-                Ask
-              </button>
-              <button
-                type="button"
-                onClick={() => c.ask(id, true)}
-                disabled={!c.canChange || (!asked && !body.trim())}
-                title={
-                  c.canChange
-                    ? "Have the agent edit the code. With nothing typed, it does what the comment says."
-                    : NOT_AT_WORKING_COPY
-                }
-              >
-                Change
-              </button>
-            </>
-          )}
+            {publishButton}
+          </div>
+        </div>
+      ) : (
+        gh &&
+        comment && (
+          <div className="card-foot">
+            <button type="button" className="reply-field" onClick={() => c.edit(comment)}>
+              {comment.body ? "Edit reply…" : "Reply…"}
+            </button>
+            {comment.body && publishButton}
+          </div>
+        )
+      )}
+      {asking && (
+        <div className="card-agent">
+          <Workshop comment={comment} running={c.running.get(id)} onUse={(t) => c.use(id, t)} />
+          {!agentsOff && <AskBox id={id} body={body} c={c} inputRef={askRef} />}
         </div>
       )}
     </div>

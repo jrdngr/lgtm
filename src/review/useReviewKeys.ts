@@ -18,6 +18,8 @@ interface Ctx {
   applyMark(state: MarkState | null): void;
   openMenuAtCursor(): void;
   startComment(): void;
+  /** Opens the agent box of the comment at the cursor. */
+  askAgent(): void;
   openRevisions(): void;
   openGraph(): void;
   openInEditor(): void;
@@ -107,6 +109,9 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "c":
         if (!e.repeat) ctx.startComment();
+        break;
+      case "a":
+        if (!e.repeat) ctx.askAgent();
         break;
       case "r":
         ctx.openRevisions();

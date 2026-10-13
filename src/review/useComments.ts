@@ -23,6 +23,12 @@ const without = <V>(m: ReadonlyMap<number, V>, id: number) => {
 
 const withEntry = <V>(m: ReadonlyMap<number, V>, id: number, v: V) => new Map(m).set(id, v);
 
+const withoutId = (s: ReadonlySet<number>, id: number) => {
+  const next = new Set(s);
+  next.delete(id);
+  return next;
+};
+
 const moved = <V>(m: ReadonlyMap<number, V>, from: number, to: number) => {
   const v = m.get(from);
   return v === undefined ? m : without(m, from).set(to, v);
@@ -70,6 +76,8 @@ export function useComments({
   const [asks, setAsks] = useState<ReadonlyMap<number, string>>(new Map());
   const [running, setRunning] = useState<ReadonlyMap<number, Running>>(new Map());
   const [publishing, setPublishing] = useState<ReadonlySet<number>>(new Set());
+  /** Blocks whose ask box was opened. It also shows while a block has a conversation. */
+  const [askOpen, setAskOpen] = useState<ReadonlySet<number>>(new Set());
   /** The text box that should take focus when its block next renders. */
   const [focus, setFocus] = useState<Focus>();
   const comments = review?.state.comments ?? NONE;
@@ -87,6 +95,7 @@ export function useComments({
     if (!next) {
       setEdits((m) => without(m, NEW_COMMENT));
       setAsks((m) => without(m, NEW_COMMENT));
+      setAskOpen((s) => withoutId(s, NEW_COMMENT));
     }
   }, [files, moves]);
 
@@ -104,6 +113,7 @@ export function useComments({
   function start(next: Draft, field: Focus["field"] = "body") {
     setDraft(next);
     setEdits((m) => withEntry(m, NEW_COMMENT, m.get(NEW_COMMENT) ?? ""));
+    if (field === "ask") setAskOpen((s) => new Set(s).add(NEW_COMMENT));
     setFocus({ id: NEW_COMMENT, field });
   }
 
@@ -118,6 +128,7 @@ export function useComments({
     setDraft(undefined);
     setEdits((m) => moved(m, NEW_COMMENT, id));
     setAsks((m) => moved(m, NEW_COMMENT, id));
+    setAskOpen((s) => (s.has(NEW_COMMENT) ? withoutId(s, NEW_COMMENT).add(id) : s));
     return id;
   }
 
@@ -138,6 +149,7 @@ export function useComments({
     if (id === NEW_COMMENT) {
       setDraft(undefined);
       setAsks((m) => without(m, id));
+      setAskOpen((s) => withoutId(s, id));
     }
     onDone();
   }
@@ -200,11 +212,19 @@ export function useComments({
     if (cid === undefined) return;
     setPublishing((s) => new Set(s).add(cid));
     await apply(commands.publishComment(review.id, cid));
-    setPublishing((s) => {
-      const next = new Set(s);
-      next.delete(cid);
-      return next;
-    });
+    setPublishing((s) => withoutId(s, cid));
+  }
+
+  /** Shows the block's ask box with the cursor in it. */
+  function openAsk(id: number) {
+    setAskOpen((s) => new Set(s).add(id));
+    setFocus({ id, field: "ask" });
+  }
+
+  /** Hides the block's ask box, unless it holds a conversation, and gives keys back. */
+  function closeAsk(id: number) {
+    setAskOpen((s) => withoutId(s, id));
+    onDone();
   }
 
   function sendComment(c: CommentDto) {
@@ -232,6 +252,10 @@ export function useComments({
     send: sendComment,
     publish,
     publishing,
+    /** Whether the block's ask box shows: opened, or holding a conversation. */
+    asking: (id: number) => askOpen.has(id) || running.has(id) || !!byId(id)?.messages.length,
+    openAsk,
+    closeAsk,
     canPublish,
     /** The agent edits `@`, so a change only shows when the review includes it. */
     canChange: review?.hasWorkingCopy ?? false,

@@ -1,59 +1,53 @@
-import type { CommentDto } from "../bindings";
 import { PrSection } from "../github/PrSection";
+import { viewerLogin } from "../github/people";
+import { usePr } from "../github/pr";
+import { SubmitReview } from "../github/SubmitReview";
+import { useGithubOff } from "../tools/agents";
+import { Menu } from "../ui/Menu";
+import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
-import { commentText, rowLabel } from "./comments";
-import { type CurrentReview, useCurrentReview } from "./current";
+import { CommentList } from "./CommentList";
+import { commentText } from "./comments";
+import { useCurrentReview } from "./current";
 import "./comments.css";
 
-/** A comment's text, or for a GitHub thread its last post, with who wrote it. */
-function preview(c: CommentDto) {
-  if (c.body || !c.github) return c.body || "No text yet";
-  const last = c.github.posts[c.github.posts.length - 1];
-  return last ? `${last.author}: ${last.body}` : "GitHub thread";
-}
-
-/** The current review's comments in file order, under the PR in a PR workspace. Click one to
- * jump to it. */
+/** The current review's comments by file. In a PR workspace the PR sits on top and the review
+ * submit box at the bottom. */
 export function CommentsPanel() {
-  const review = useCurrentReview(useWorkspace());
-  return (
-    <div className="comment-list">
-      <PrSection review={review} />
-      {review ? <Comments review={review} /> : <div className="placeholder">No review open</div>}
-    </div>
-  );
-}
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
+  const pr = usePr(workspace);
+  const off = useGithubOff();
+  const comments = review?.comments ?? [];
+  const viewer = viewerLogin(comments);
+  const sendAll = () =>
+    review?.send(comments.map((c) => commentText(review.files, c)).join("\n\n---\n\n"));
 
-function Comments({ review }: { review: CurrentReview }) {
-  const { comments, files } = review;
-  if (comments.length === 0) {
-    return <div className="placeholder">No comments. Select code and press c.</div>;
-  }
-  const sendAll = () => review.send(comments.map((c) => commentText(files, c)).join("\n\n---\n\n"));
   return (
-    <>
-      <div className="tree-total">
-        <span>
-          {comments.length} {comments.length === 1 ? "comment" : "comments"}
-        </span>
-        <span className="spacer" />
-        <button type="button" onClick={sendAll} title="Paste every comment into the agent's prompt">
-          Send all to agent
-        </button>
+    <div className="comments-view">
+      <SectionHeader title="Comments" meta={review ? comments.length : undefined}>
+        <Menu
+          items={[
+            {
+              label: "Send all to agent",
+              title: "Paste every comment into a terminal's prompt",
+              onSelect: sendAll,
+              disabled: comments.length === 0,
+            },
+          ]}
+        />
+      </SectionHeader>
+      <div className="comments-scroll">
+        {pr && <PrSection pr={pr} review={review} />}
+        {review ? <CommentList review={review} viewer={viewer} /> : <Empty>No review open</Empty>}
       </div>
-      <ul>
-        {comments.map((c) => (
-          <li key={c.id}>
-            <button type="button" onClick={() => review.jumpToComment(c.id)} title={c.path}>
-              <span className="comment-where">
-                {rowLabel(files, c.file, c.path, c.rows?.end)}
-                {!c.rows && <span className="comment-outdated">code changed</span>}
-              </span>
-              <span className="comment-preview">{preview(c)}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
+      {pr && review && !off && (
+        <SubmitReview
+          workspace={workspace}
+          comments={comments}
+          onSubmitted={() => review.pullPr(true)}
+        />
+      )}
+    </div>
   );
 }

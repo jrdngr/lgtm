@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommentDto } from "../bindings";
-import { commentSlots, draftFor, followDraft, replyParts } from "./comments";
+import { commentNear, commentSlots, draftFor, followDraft, replyParts } from "./comments";
 import { file, layout, review, rows } from "./fixture.test-utils";
 import { buildLines, flatten, hunkRange, NEW_COMMENT } from "./model";
 
@@ -60,5 +60,22 @@ describe("comments whose code is gone", () => {
     const gone = { id: 7, file: 0, rows: null } as unknown as CommentDto;
     const lines = buildLines(files, layout({ comments: commentSlots([gone], undefined) }));
     expect(lines.slice(0, 3).map((l) => l.kind)).toEqual(["file", "comment", "hunk"]);
+  });
+});
+
+describe("commentNear", () => {
+  const two = flatten(review([file("a.rs", [rows([" a", "-b", "+B", " c"]), rows(["+x", " y"])])]));
+  const c = { id: 3, file: 0, rows: { start: 1, end: 2 } } as unknown as CommentDto;
+  const lines = buildLines(two, layout({ comments: commentSlots([c], undefined) }));
+
+  it("finds the block below the cursor, else above it, within the hunk", () => {
+    expect(lines[5]).toMatchObject({ kind: "comment", comment: 3 });
+    expect(commentNear(lines, 2)).toBe(3);
+    expect(commentNear(lines, 6)).toBe(3);
+  });
+
+  it("doesn't reach into another hunk", () => {
+    expect(lines[7].kind).toBe("hunk");
+    expect(commentNear(lines, 8)).toBeUndefined();
   });
 });

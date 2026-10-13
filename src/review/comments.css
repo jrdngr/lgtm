@@ -1,64 +1,213 @@
+/* A comment under its code: a bar naming its source, its posts, then a reply or editor. */
 .comment-block {
   margin: 4px 12px 8px 76px;
-  padding: 6px 10px 8px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
   background: var(--panel);
   font:
-    13px -apple-system,
+    var(--fs) -apple-system,
     system-ui,
     sans-serif;
   white-space: normal;
   user-select: text;
 }
 
-.comment-head {
+.comment-block.resolved {
+  border-style: dashed;
+}
+
+.card-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-
-.comment-title {
-  font-weight: 600;
-}
-
-.comment-meta {
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 4px 2px 10px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
-.comment-outdated {
-  margin-left: 6px;
-  color: var(--amber);
-  font-size: 11px;
+/* Purple for a GitHub thread, blue for your own comment. */
+.card-bar::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
-.comment-block button {
-  font-size: 12px;
+.gh > .card-bar::before {
+  background: var(--github);
+}
+
+.card-bar.collapsed {
+  width: 100%;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.card-bar.collapsed:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.card-bar.collapsed::before,
+.resolved > .card-bar::before {
+  display: none;
+}
+
+.card-bar .chevron {
+  width: 14px;
+  padding: 0;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.card-bar button.pill {
+  border: none;
+  cursor: pointer;
+}
+
+.card-source {
+  color: var(--fg);
+}
+
+.card-summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-count,
+.comment-block .faint {
+  color: var(--faint);
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+}
+
+.post {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 2px 8px;
+  padding: 8px 10px 0;
+}
+
+.comment-block > .post:last-child {
+  padding-bottom: 8px;
+}
+
+.post-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+
+.post-meta b {
+  font-weight: 600;
+}
+
+.post-time {
+  color: var(--faint);
+}
+
+.post-body {
+  grid-column: 2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.post-body p {
+  margin: 0 0 4px;
+}
+
+.post-body p:last-child {
+  margin-bottom: 0;
+}
+
+.post-body code {
+  font: 11.5px var(--mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--hover);
+}
+
+.post-body pre {
+  margin: 4px 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.post-body pre code {
+  padding: 0;
+  background: none;
+}
+
+.post-body em,
+.msg em {
+  color: var(--muted);
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.card-foot.editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.card-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.card-foot button,
+.ask button {
+  font-size: var(--fs-sm);
   padding: 1px 8px;
-}
-
-.comment-block button.primary {
-  border-color: var(--accent);
 }
 
 .comment-block kbd {
   margin-left: 4px;
-  color: var(--muted);
-  font: inherit;
 }
 
-.comment-body,
+.comment-block button.primary kbd {
+  color: inherit;
+  border-color: rgb(255 255 255 / 35%);
+}
+
+/* Looks like an empty text box; starts the reply. */
+.card-foot .reply-field {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 7px;
+  text-align: left;
+  color: var(--faint);
+  background: var(--bg);
+}
+
 .msg-text {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-
-.comment-body em,
-.msg em {
-  color: var(--muted);
 }
 
 .comment-input,
@@ -81,29 +230,25 @@
 }
 
 .comment-snippet {
-  margin: 0 0 6px;
-  padding: 4px 6px;
+  margin: 0;
+  padding: 6px 10px;
   overflow-x: auto;
   color: var(--muted);
   background: var(--bg);
-  font:
-    12px Menlo,
-    monospace;
+  border-bottom: 1px solid var(--hair);
+  font: var(--fs-sm) var(--mono);
 }
 
-.comment-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 4px;
+.card-agent {
+  padding: 0 10px 8px;
+  border-top: 1px solid var(--hair);
 }
 
 .workshop {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 8px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 
 .msg {
@@ -204,21 +349,99 @@
   white-space: normal;
 }
 
-.gh-thread {
+/* The Comments view: header, the scrolling list, and the submit box pinned under it. */
+.comments-view {
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.comments-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.comments-scroll .placeholder {
+  height: auto;
+  padding-block: 24px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: none;
+}
+
+.chip.on {
+  color: var(--fg);
+  background: var(--selection);
+  border-color: transparent;
+}
+
+.list-empty {
+  padding: 12px 10px;
+  color: var(--muted);
+}
+
+.group-head {
+  display: flex;
   gap: 6px;
-  margin-bottom: 6px;
+  padding: 8px 10px 2px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
-.gh-post {
+.group-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 10px 3px 14px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.comment-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+}
+
+.comment-item .item-text code {
+  font: var(--fs-xs) var(--mono);
+}
+
+.item-where {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.gh-pending {
-  margin-left: 6px;
-  color: var(--amber);
-  font-weight: normal;
+  align-items: center;
+  gap: 4px;
+  font: var(--fs-xs) var(--mono);
+  color: var(--faint);
 }

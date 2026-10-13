@@ -17,13 +17,15 @@ interface Props {
   onSubmitted(): void;
 }
 
-/** Submits the pending review on GitHub with a verdict and summary. */
+/** Submits the pending review on GitHub with a verdict and summary. Sits at the bottom of the
+ * Comments view. */
 export function SubmitReview({ workspace, comments, onSubmitted }: Props) {
   const [verdict, setVerdict] = useState<Verdict>("comment");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string>();
   const pending = comments.flatMap((c) => c.github?.posts ?? []).filter((p) => p.pending).length;
+  const label = VERDICTS.find(([v]) => v === verdict)?.[1];
 
   async function submit() {
     setBusy(true);
@@ -37,23 +39,19 @@ export function SubmitReview({ workspace, comments, onSubmitted }: Props) {
 
   return (
     <div className="submit-review">
-      <div className="submit-row">
-        <span>
-          {pending} pending {pending === 1 ? "comment" : "comments"}
-        </span>
-        <span className="spacer" />
-        <select
-          value={verdict}
-          onChange={(e) => setVerdict(e.target.value as Verdict)}
-          aria-label="Verdict"
-        >
-          {VERDICTS.map(([v, label]) => (
-            <option key={v} value={v}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </div>
+      <fieldset className="verdicts" aria-label="Verdict">
+        {VERDICTS.map(([v, text]) => (
+          <button
+            key={v}
+            type="button"
+            aria-pressed={verdict === v}
+            className={`verdict-${v}`}
+            onClick={() => setVerdict(v)}
+          >
+            {text}
+          </button>
+        ))}
+      </fieldset>
       <textarea
         className="comment-input"
         rows={2}
@@ -61,11 +59,18 @@ export function SubmitReview({ workspace, comments, onSubmitted }: Props) {
         placeholder="Summary (optional)"
         onChange={(e) => setBody(e.target.value)}
       />
+      {note && <div className="submit-note">{note}</div>}
       <div className="submit-row">
-        {note && <span className="submit-note">{note}</span>}
+        <span className="submit-count">{pending} pending</span>
         <span className="spacer" />
-        <button type="button" className="primary" onClick={submit} disabled={busy}>
-          {busy ? "Submitting…" : "Submit review"}
+        <button
+          type="button"
+          className="primary"
+          onClick={submit}
+          disabled={busy}
+          title="Submit your review on GitHub"
+        >
+          {busy ? "Submitting…" : label}
         </button>
       </div>
     </div>

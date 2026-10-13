@@ -80,6 +80,21 @@ export function commentedRows(comments: CommentDto[]): Set<string> {
   return out;
 }
 
+/** The comment block nearest the cursor: the first below it in its hunk, else the last above.
+ * Undefined when its hunk has none. */
+export function commentNear(lines: DisplayLine[], cursor: number): number | undefined {
+  const edge = (i: number) => lines[i].kind === "file" || lines[i].kind === "hunk";
+  for (let i = cursor; i < lines.length && (i === cursor || !edge(i)); i++) {
+    const l = lines[i];
+    if (l.kind === "comment") return l.comment;
+  }
+  for (let i = cursor - 1; i >= 0 && !edge(i); i--) {
+    const l = lines[i];
+    if (l.kind === "comment") return l.comment;
+  }
+  return undefined;
+}
+
 /** The comment's code, as it is now or as it was if it's gone, then the comment. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
   const f = files[c.file];
