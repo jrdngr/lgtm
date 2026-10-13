@@ -45,6 +45,29 @@ pub struct Hunk {
     pub rows: Vec<Row>,
 }
 
+impl Hunk {
+    /// Per row, whether it's a removed row in a change that also adds rows. Only the added
+    /// rows of such a change need review.
+    pub fn replaced(&self) -> Vec<bool> {
+        let mut out = vec![false; self.rows.len()];
+        let mut start = 0;
+        while start < self.rows.len() {
+            let end = self.rows[start..]
+                .iter()
+                .position(|r| r.kind == RowKind::Context)
+                .map_or(self.rows.len(), |n| start + n);
+            let change = &self.rows[start..end];
+            if change.iter().any(|r| r.kind == RowKind::Added) {
+                for (i, r) in change.iter().enumerate() {
+                    out[start + i] = r.kind == RowKind::Removed;
+                }
+            }
+            start = end + 1;
+        }
+        out
+    }
+}
+
 /// One entry of the `-T` template output.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -229,6 +252,35 @@ index 1b7c1e7d73..7527576062
             ]
         );
         assert_eq!(hunk.rows[1].text, "    println!(\"hi\");");
+    }
+
+    #[test]
+    fn only_removed_rows_of_changes_that_also_add_are_replaced() {
+        let out = "\
+diff --git a/a b/a
+index 1b7c1e7d73..7527576062 100644
+--- a/a
++++ b/a
+@@ -1,6 +1,5 @@
+-one
++uno
++eins
+ two
+-three
+ four
+-five
+-six
++seis
+";
+        let hunk = &parse_git(out).unwrap()[0].hunks[0];
+        let replaced: Vec<_> = hunk
+            .rows
+            .iter()
+            .zip(hunk.replaced())
+            .filter(|(_, r)| *r)
+            .map(|(row, _)| row.text.as_str())
+            .collect();
+        assert_eq!(replaced, ["one", "five", "six"]);
     }
 
     #[test]

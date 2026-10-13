@@ -37,20 +37,36 @@ describe("buildLines", () => {
   });
 
   it("shows only rows in the filter's state, with gap bars for the rest", () => {
-    const flagged = (_: number, row: number) => (row === 2 ? "flagged" : "unreviewed");
+    const flagged = (_: number, row: number) => (row === 5 ? "flagged" : "unreviewed");
     const lines = buildLines(files, layout({ filter: "flagged", rowState: flagged }));
     expect(
       lines.map((l) => (l.kind === "rows" || l.kind === "gap" ? [l.kind, l.rows] : l.kind)),
-    ).toEqual(["file", "hunk", ["gap", [0, 1]], ["rows", [2]], ["gap", [3, 4, 5]]]);
+    ).toEqual(["file", "hunk", ["gap", [0, 1, 2, 3, 4]], ["rows", [5]]]);
+  });
+
+  it("shows a change's removed rows with its added rows, which alone take the state", () => {
+    const flagged = (_: number, row: number) => (row === 3 ? "unreviewed" : "flagged");
+    const lines = buildLines(files, layout({ filter: "unreviewed", rowState: flagged }));
+    expect(
+      lines.map((l) => (l.kind === "rows" || l.kind === "gap" ? [l.kind, l.rows] : l.kind)),
+    ).toEqual([
+      "file",
+      "hunk",
+      ["gap", [0]],
+      ["rows", [1]],
+      ["rows", [2]],
+      ["rows", [3]],
+      ["gap", [4, 5]],
+    ]);
   });
 
   it("shows a revealed gap's rows and hides files with nothing to show", () => {
-    const flagged = (_: number, row: number) => (row === 2 ? "flagged" : "unreviewed");
+    const flagged = (_: number, row: number) => (row === 3 ? "flagged" : "unreviewed");
     const lines = buildLines(
       files,
       layout({ filter: "flagged", rowState: flagged, revealed: new Set(["0:0:0"]) }),
     );
-    expect(lines.filter((l) => l.kind === "rows").map((l) => l.rows)).toEqual([[0], [1], [2]]);
+    expect(lines.filter((l) => l.kind === "rows").map((l) => l.rows)).toEqual([[0], [1], [2], [3]]);
     expect(buildLines(files, layout({ filter: "skipped" }))).toEqual([]);
   });
 
@@ -176,20 +192,22 @@ describe("fileProgress", () => {
   const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
     indexState({ marks, checks: [check], amber: [], comments: [], notes: [] });
 
-  it("counts changed rows by mark state", () => {
-    const index = indexed([mark(1, "reviewed"), mark(2, "flagged")]);
+  it("counts rows that need review by mark state, leaving out a change's removed rows", () => {
+    const index = indexed([mark(1, "reviewed"), mark(3, "flagged")]);
     expect(fileProgress(files, rowStates(files, index))).toEqual([
-      { reviewed: 1, skipped: 0, flagged: 1, unreviewed: 2, changed: 4 },
+      { reviewed: 0, skipped: 0, flagged: 1, unreviewed: 1, changed: 2 },
     ]);
+    const deletion = flatten(review([file("b.rs", [rows([" a", "-b", " c"])])]));
+    expect(fileProgress(deletion, rowStates(deletion, indexed([])))[0].unreviewed).toBe(1);
   });
 
   it("counts a checked file as fully reviewed and a skip-glob file as skipped", () => {
-    const checked = indexed([mark(1, "flagged")], "checked");
-    expect(fileProgress(files, rowStates(files, checked))[0].reviewed).toBe(4);
+    const checked = indexed([mark(3, "flagged")], "checked");
+    expect(fileProgress(files, rowStates(files, checked))[0].reviewed).toBe(2);
     const skipFiles = flatten(review([{ ...files[0].dto, skipped: true }]));
-    const none = indexed([mark(1, "flagged")]);
+    const none = indexed([mark(3, "flagged")]);
     expect(fileProgress(skipFiles, rowStates(skipFiles, none))[0]).toMatchObject({
-      skipped: 3,
+      skipped: 1,
       flagged: 1,
     });
   });

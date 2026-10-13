@@ -866,6 +866,8 @@ export type RowDto = {
 	kind: RowKind,
 	oldLine: number | null,
 	newLine: number | null,
+	/**  A removed row in a change that also adds rows. It doesn't need review. */
+	replaced: boolean,
 	text: string,
 	/**  Highlight segments; absent when the language is unknown or the file has no contents. */
 	hl: ([number | null, number])[] | null,

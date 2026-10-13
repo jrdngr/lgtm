@@ -18,6 +18,8 @@ pub struct RowDto {
     pub kind: RowKind,
     pub old_line: Option<u32>,
     pub new_line: Option<u32>,
+    /// A removed row in a change that also adds rows. It doesn't need review.
+    pub replaced: bool,
     pub text: String,
     /// Highlight segments; absent when the language is unknown or the file has no contents.
     pub hl: Option<Vec<Segment>>,
@@ -91,6 +93,8 @@ pub struct RowPos {
     pub kind: RowKind,
     pub old_line: Option<u32>,
     pub new_line: Option<u32>,
+    /// See `RowDto::replaced`.
+    pub replaced: bool,
 }
 
 #[derive(Clone)]
@@ -219,10 +223,12 @@ pub fn build_file(
         old,
         new,
         rows: rows
-            .map(|r| RowPos {
+            .zip(d.hunks.iter().flat_map(|h| h.replaced()))
+            .map(|(r, replaced)| RowPos {
                 kind: r.kind,
                 old_line: r.old_line,
                 new_line: r.new_line,
+                replaced,
             })
             .collect(),
         keyed,
@@ -260,7 +266,8 @@ fn hunk_dto(
     let rows = h
         .rows
         .iter()
-        .map(|r| {
+        .zip(h.replaced())
+        .map(|(r, replaced)| {
             let hl = match r.kind {
                 RowKind::Removed => old_hl.zip(r.old_line).and_then(|(m, l)| m.get(&l)),
                 _ => new_hl.zip(r.new_line).and_then(|(m, l)| m.get(&l)),
@@ -269,6 +276,7 @@ fn hunk_dto(
                 kind: r.kind,
                 old_line: r.old_line,
                 new_line: r.new_line,
+                replaced,
                 text: r.text.clone(),
                 hl: hl.cloned(),
             }

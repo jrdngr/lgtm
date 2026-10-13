@@ -10,9 +10,10 @@ import {
   type SymbolMarkers,
   type ViewMode,
 } from "./model";
+import { SplitScroll } from "./SplitScroll";
 import type { Selection } from "./selection";
 import { type MarkIndex, type Progress, plural } from "./state";
-import { contentWidth } from "./width";
+import { unifiedWidth } from "./width";
 
 const ROW_HEIGHT = 20;
 const FILE_HEIGHT = 30;
@@ -99,7 +100,12 @@ function stickyFile(
 export function DiffLines(props: Props) {
   const { files, markers, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
   const wrap = wordWrap.use();
-  const width = useMemo(() => (wrap ? undefined : contentWidth(files, mode)), [files, mode, wrap]);
+  // Split sides scroll sideways on their own, under `SplitScroll`.
+  const splitScroll = mode === "split" && !wrap;
+  const width = useMemo(
+    () => (wrap || mode === "split" ? undefined : unifiedWidth(files)),
+    [files, mode, wrap],
+  );
 
   const virtualizer = useVirtualizer({
     count: lines.length,
@@ -243,54 +249,57 @@ export function DiffLines(props: Props) {
   };
 
   return (
-    <div
-      ref={scrollRef}
-      className={`diff-scroll${wrap ? " wrap" : ""}`}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) props.onBackgroundMouseDown();
-      }}
-    >
-      {sticky && (
-        <div className="sticky-file">
-          <div
-            className="line"
-            style={{ height: FILE_HEIGHT, transform: `translateY(${sticky.shift}px)` }}
-          >
-            {header(sticky.file)}
-          </div>
-        </div>
-      )}
-      <div style={{ height: virtualizer.getTotalSize(), width, position: "relative" }}>
-        {virtualizer.getVirtualItems().map((v) => {
-          const selected = v.index >= selection.start && v.index <= selection.end;
-          // Comment and note blocks size to their content, as do rows when they wrap. Every
-          // other line has a fixed height.
-          const kind = lines[v.index].kind;
-          const sized = kind === "comment" || kind === "note" || (wrap && kind === "rows");
-          return (
+    <>
+      <div
+        ref={scrollRef}
+        className={`diff-scroll${wrap ? " wrap" : ""}${splitScroll ? " split" : ""}`}
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) props.onBackgroundMouseDown();
+        }}
+      >
+        {sticky && (
+          <div className="sticky-file">
             <div
-              key={v.key}
-              ref={sized ? virtualizer.measureElement : undefined}
-              data-index={v.index}
-              className={`line${selected ? " selected" : ""}${v.index === cursor ? " cursor" : ""}`}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                height: sized ? undefined : v.size,
-                transform: `translateY(${v.start}px)`,
-              }}
+              className="line"
+              style={{ height: FILE_HEIGHT, transform: `translateY(${sticky.shift}px)` }}
             >
-              {kind === "rows" ? (
-                render(lines[v.index], v.index)
-              ) : (
-                <div className="pin">{render(lines[v.index], v.index)}</div>
-              )}
+              {header(sticky.file)}
             </div>
-          );
-        })}
+          </div>
+        )}
+        <div style={{ height: virtualizer.getTotalSize(), width, position: "relative" }}>
+          {virtualizer.getVirtualItems().map((v) => {
+            const selected = v.index >= selection.start && v.index <= selection.end;
+            // Comment and note blocks size to their content, as do rows when they wrap. Every
+            // other line has a fixed height.
+            const kind = lines[v.index].kind;
+            const sized = kind === "comment" || kind === "note" || (wrap && kind === "rows");
+            return (
+              <div
+                key={v.key}
+                ref={sized ? virtualizer.measureElement : undefined}
+                data-index={v.index}
+                className={`line${selected ? " selected" : ""}${v.index === cursor ? " cursor" : ""}`}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: sized ? undefined : v.size,
+                  transform: `translateY(${v.start}px)`,
+                }}
+              >
+                {kind === "rows" ? (
+                  render(lines[v.index], v.index)
+                ) : (
+                  <div className="pin">{render(lines[v.index], v.index)}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+      {splitScroll && <SplitScroll files={files} scrollRef={scrollRef} />}
+    </>
   );
 }

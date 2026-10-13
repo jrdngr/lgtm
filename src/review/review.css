@@ -125,6 +125,25 @@
   border-left: 1px solid var(--border);
 }
 
+.split-scroll {
+  display: flex;
+  font:
+    12px / 20px Menlo,
+    monospace;
+}
+
+.split-bar {
+  flex: 1;
+  min-width: 0;
+  height: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.split-bar + .split-bar {
+  border-left: 1px solid var(--border);
+}
+
 .cell.empty {
   background: repeating-linear-gradient(135deg, transparent 0 4px, rgb(255 255 255 / 3%) 4px 8px);
 }
@@ -240,4 +259,13 @@
 
 .cell .risk-low {
   background: var(--muted);
+}
+
+/* Each side's code shifts by its own bar in .split-scroll. */
+.diff-scroll.split .cell.left .code {
+  text-indent: calc(-1 * var(--left-x, 0px));
+}
+
+.diff-scroll.split .cell.right .code {
+  text-indent: calc(-1 * var(--right-x, 0px));
 }

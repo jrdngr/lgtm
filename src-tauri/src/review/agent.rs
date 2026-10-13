@@ -78,10 +78,11 @@ pub struct AgentNote {
 }
 
 impl Review {
-    /// A changed row's state; `None` for context rows.
+    /// A row's state; `None` for rows that don't need review: context and replaced rows.
     fn row_state(&self, fi: usize, row: usize) -> Option<Option<MarkState>> {
         let file = &self.files[fi];
-        if file.rows[row].kind == RowKind::Context {
+        let pos = &file.rows[row];
+        if pos.kind == RowKind::Context || pos.replaced {
             return None;
         }
         if self.checks[fi].as_ref().is_some_and(|c| c.current) {

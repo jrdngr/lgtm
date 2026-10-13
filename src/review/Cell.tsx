@@ -56,7 +56,7 @@ export function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
-      className={`cell kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
+      className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
       title={amber ? "changed since reviewed" : markTitle(mark)}
     >
       <span

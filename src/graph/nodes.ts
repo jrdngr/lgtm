@@ -1,6 +1,7 @@
 import type { GraphNode } from "../bindings";
 import { openFile } from "../editor/open";
 import type { CurrentReview } from "../review/current";
+import { needsReview } from "../review/model";
 import type { WorkspaceName } from "../workspaces/context";
 
 /** A node's label: `Parent::name` for a member. */
@@ -16,8 +17,9 @@ export function nodeDone(review: CurrentReview, n: GraphNode): number | undefine
 export function rowsDone(review: CurrentReview, n: GraphNode): [number, number] {
   const file = n.file;
   if (file === null) return [0, 0];
-  const done = n.rows.filter((r) => review.rowState(file, r) !== "unreviewed").length;
-  return [done, n.rows.length];
+  const rows = n.rows.filter((r) => needsReview(review.files[file].rows[r]));
+  const done = rows.filter((r) => review.rowState(file, r) !== "unreviewed").length;
+  return [done, rows.length];
 }
 
 /** Shows a node's code in the review: its first changed row, or the file for a caller in

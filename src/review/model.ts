@@ -75,8 +75,9 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
   const { mode, filter, rowState } = layout;
   const out: DisplayLine[] = [];
   files.forEach((f, file) => {
-    const shown = (r: number) =>
-      filter === "all" || (f.rows[r].kind !== "context" && rowState(file, r) === filter);
+    const matches = (r: number) => needsReview(f.rows[r]) && rowState(file, r) === filter;
+    // A change's removed rows show with its added rows.
+    const shown = (r: number) => filter === "all" || matches(r) || addedMatch(f.rows, r, matches);
     if (filter !== "all" && !f.rows.some((_, r) => shown(r))) return;
     out.push({ kind: "file", file });
     if (layout.collapsedFiles.has(f.dto.path)) return;
@@ -132,6 +133,19 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
     });
   });
   return out;
+}
+
+/** Added rows, and removed rows of changes that add nothing. A change's removed rows
+ * don't need review when it also adds rows. */
+export const needsReview = (row: RowDto) => row.kind !== "context" && !row.replaced;
+
+/** For a replaced row, whether an added row of its change matches. */
+function addedMatch(rows: RowDto[], r: number, matches: (r: number) => boolean) {
+  if (!rows[r].replaced) return false;
+  let i = r;
+  while (rows[i]?.kind === "removed") i++;
+  for (; rows[i]?.kind === "added"; i++) if (matches(i)) return true;
+  return false;
 }
 
 /** Pairs each run of removed rows with the added rows that follow it, side by side. */

@@ -77,8 +77,8 @@ In the header and review toolbar:
 - **Revset:** the selector in the center of the header shows what's reviewed (`@` by default), with or without a Review tab open. New Review tabs open on it. Click it or press `r` to open `jj log` as you have it configured, then pick a commit or range, or type a revset.
 - **View:** Combined, Per change, or Since last session (what each change does differently from the last time this revset was reviewed). The second picker chooses the change.
 - **Line filter:** All lines, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
-- **Layout:** the two icons pick Unified or Split; the lit one is current.
-- Progress for the whole review: a bar of reviewed (green), skipped (grey), and flagged (red) rows with the reviewed percentage. Hover it for the counts. **Reset review…** in the ⋯ menu at the end clears every mark in it after you confirm.
+- **Layout:** the two icons pick Unified or Split; the lit one is current. In Split, each side scrolls sideways on its own, with a scroll bar under each. Scrolling sideways over the diff moves both, and the one with room left keeps going after the other hits its end.
+- Progress for the whole review: a bar of reviewed (green), skipped (grey), and flagged (red) rows with the reviewed percentage. Only added rows count when a change both removes and adds lines; a change that only removes lines counts its removed rows. Hover it for the counts. **Reset review…** in the ⋯ menu at the end clears every mark in it after you confirm.
 
 Bottom panel: a second pane grid docked under the panes, between the side panels, which pushes the panes up. Its tabs and splits work like the main grid's, and each workspace has its own. Drag tabs between it and the main grid; terminals keep running when they move, but an editor with unsaved changes stays put. It opens with a terminal when it would open empty. Hiding it with ⌃\` keeps its terminals running, and closing its last tab hides it too, while dragging its last tab out leaves it open. Drag its top edge to resize; the height and whether it's open are remembered.
 

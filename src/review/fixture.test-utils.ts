@@ -1,15 +1,27 @@
 import type { CodeSymbol, FileDto, ReviewDto, RowDto } from "../bindings";
 import type { Layout } from "./model";
 
-/** Rows from a compact spec: " ctx", "-removed", "+added". Line numbers are assigned. */
+/** Rows from a compact spec: " ctx", "-removed", "+added". Line numbers are assigned, and
+ * removed rows are replaced when their change also adds rows. */
 export function rows(spec: string[], oldStart = 1, newStart = 1): RowDto[] {
   let o = oldStart;
   let n = newStart;
-  return spec.map((s) => {
+  return spec.map((s, i) => {
     const text = s.slice(1);
-    if (s[0] === "-") return { kind: "removed", oldLine: o++, newLine: null, text, hl: null };
-    if (s[0] === "+") return { kind: "added", oldLine: null, newLine: n++, text, hl: null };
-    return { kind: "context", oldLine: o++, newLine: n++, text, hl: null };
+    const row = { text, hl: null, replaced: false };
+    if (s[0] === "-") {
+      let j = i;
+      while (spec[j]?.[0] === "-") j++;
+      return {
+        ...row,
+        kind: "removed",
+        oldLine: o++,
+        newLine: null,
+        replaced: spec[j]?.[0] === "+",
+      };
+    }
+    if (s[0] === "+") return { ...row, kind: "added", oldLine: null, newLine: n++ };
+    return { ...row, kind: "context", oldLine: o++, newLine: n++ };
   });
 }
 

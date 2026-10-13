@@ -1,6 +1,6 @@
 import type { CheckState, MarkDto, NoteDto, StateDto } from "../bindings";
 import { commentedRows } from "./comments";
-import { type FlatFile, markKey } from "./model";
+import { type FlatFile, markKey, needsReview } from "./model";
 import { hotRows } from "./notes";
 
 export type RowState = "reviewed" | "skipped" | "flagged" | "unreviewed";
@@ -60,12 +60,12 @@ export const emptyProgress = (): Progress => ({
   changed: 0,
 });
 
-/** Changed-row counts by state, per file. */
+/** Counts by state of the rows that need review, per file. */
 export function fileProgress(files: FlatFile[], state: RowStateFn): Progress[] {
   return files.map((f, file) => {
     const p = emptyProgress();
     f.rows.forEach((r, row) => {
-      if (r.kind === "context") return;
+      if (!needsReview(r)) return;
       p[state(file, row)]++;
       p.changed++;
     });
