@@ -21,6 +21,8 @@ function thread(id: number, stage: Stage, body = "", gh = true, path = "a.rs"): 
           line: 1,
         }
       : null,
+    snippet: "",
+    messages: [],
     placed: true,
     createdAt: 0,
   };

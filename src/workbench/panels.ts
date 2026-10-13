@@ -5,13 +5,14 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
   report: "Reviewers",
   graph: "Graph",
+  threads: "Threads",
 };
 
 /** What the new tab menu offers, in order. */
@@ -74,6 +75,13 @@ export function openGraph(api: DockviewApi) {
   const open = api.getPanel("graph");
   if (open) return open.api.setActive();
   addPanel(api, "graph", {}, besideReview(api), "graph");
+}
+
+/** Shows the Threads tab beside the review, in its pane if it's already open. */
+export function openThreads(api: DockviewApi) {
+  const open = api.getPanel("threads");
+  if (open) return open.api.setActive();
+  addPanel(api, "threads", {}, besideReview(api), "threads");
 }
 
 /** Opens a `kind` tab in `group`. The graph is one per dock, so an open one moves here. */

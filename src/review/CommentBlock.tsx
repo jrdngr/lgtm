@@ -4,6 +4,7 @@ import { Markdown } from "../bots/Markdown";
 import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar, Post } from "../github/Post";
 import { viewerLogin } from "../github/people";
+import { showThread } from "../threads/focus";
 import { STAGES } from "../threads/stages";
 import { ReplyHead, StagePill, TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
@@ -11,6 +12,7 @@ import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
 import { isMac } from "../workbench/keys";
+import { useWorkspace } from "../workspaces/context";
 import { AskBox, SAVE_KEY } from "./AskBox";
 import { NEW_COMMENT } from "./model";
 import type { Comments } from "./useComments";
@@ -31,6 +33,7 @@ export function CommentBlock({ id, comment, c }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
   const agentsOff = useAgentsOff();
+  const workspace = useWorkspace();
   const [expanded, setExpanded] = useState(false);
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
@@ -176,6 +179,13 @@ export function CommentBlock({ id, comment, c }: Props) {
               onClick={() => c.setDone(comment.id, !comment.done)}
             />
           )}
+          {comment && thread && (
+            <IconButton
+              icon="comments"
+              label="Open in the Threads tab"
+              onClick={() => showThread(workspace, comment.id)}
+            />
+          )}
           {!agentsOff && (
             <IconButton
               icon="sparkle"
@@ -260,7 +270,11 @@ export function CommentBlock({ id, comment, c }: Props) {
       )}
       {asking && (
         <div className="card-agent">
-          <Workshop comment={comment} running={c.running.get(id)} onUse={(t) => c.use(id, t)} />
+          <Workshop
+            messages={comment?.messages ?? []}
+            running={c.running.get(id)}
+            onUse={(t) => c.use(id, t)}
+          />
           {!agentsOff && <AskBox id={id} body={body} c={c} inputRef={askRef} />}
         </div>
       )}

@@ -1077,6 +1077,10 @@ export type ThreadDto = {
 	body: string,
 	state: ThreadState,
 	github: GhLink | null,
+	/**  The code it's on as it was, or GitHub's diff hunk. */
+	snippet: string,
+	/**  The agent conversation about it. */
+	messages: Message[],
 	/**  Whether the review shows its code. */
 	placed: boolean,
 	createdAt: number | null,

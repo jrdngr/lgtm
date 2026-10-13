@@ -18,6 +18,7 @@ import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
+import { ThreadsPanel } from "../threads/ThreadsPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
 import { isMoving, takeTabsFrom } from "./crossDock";
@@ -36,6 +37,7 @@ const components = {
   editor: EditorPanel,
   prPreview: PrPreview,
   settings: SettingsPanel,
+  threads: ThreadsPanel,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

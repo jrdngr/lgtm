@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Fixed, ThreadDto, Verdict } from "../bindings";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
@@ -40,11 +40,13 @@ interface Props {
   /** On the viewer's own PR there's no verdict to give. */
   own: boolean;
   onSent(): void;
+  /** Changes to open the list of what goes out, as ⌘↵ in the Threads tab does. */
+  confirm?: number;
 }
 
 /** Sends every ready thread to GitHub in one go, after a short list of what goes out. On
  * someone else's PR it carries a verdict and summary. */
-export function SendBox({ review, threads, repo, own, onSent }: Props) {
+export function SendBox({ review, threads, repo, own, onSent, confirm }: Props) {
   const fixedStore = fixedFor(repo);
   const fixed = fixedStore.use();
   const [verdict, setVerdict] = useState<Verdict>("comment");
@@ -56,6 +58,9 @@ export function SendBox({ review, threads, repo, own, onSent }: Props) {
   const ready = threads.filter((t) => t.state.stage === "ready").length;
   const says = !own && (verdict !== "comment" || !!summary.trim());
   const any = canSend(plan) || says;
+  useEffect(() => {
+    if (confirm) setConfirming(true);
+  }, [confirm]);
   const label = own ? "Send to GitHub" : (VERDICTS.find(([v]) => v === verdict)?.[1] ?? "");
 
   async function send() {

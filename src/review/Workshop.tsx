@@ -1,4 +1,4 @@
-import type { CommentDto, Message } from "../bindings";
+import type { Message } from "../bindings";
 import { replyParts } from "./comments";
 import type { Running } from "./useComments";
 
@@ -47,17 +47,17 @@ function Msg({ m, onUse }: { m: Message; onUse(text: string): void }) {
 }
 
 interface Props {
-  comment?: CommentDto;
+  messages: Message[];
   running?: Running;
   onUse(text: string): void;
 }
 
 /** A comment's conversation with the agent, including the exchange in flight. */
-export function Workshop({ comment, running, onUse }: Props) {
-  if (!comment?.messages.length && !running) return null;
+export function Workshop({ messages, running, onUse }: Props) {
+  if (!messages.length && !running) return null;
   return (
     <div className="workshop">
-      {comment?.messages.map((m, i) => (
+      {messages.map((m, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: messages are append-only
         <Msg key={i} m={m} onUse={onUse} />
       ))}

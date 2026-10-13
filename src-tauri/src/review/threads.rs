@@ -6,7 +6,7 @@ use serde::Serialize;
 use specta::Type;
 
 use super::{RepoCtx, Review, StateDto, now_ms};
-use crate::store::{Comment, GhLink, Stage, Store, ThreadState, Workshop};
+use crate::store::{Comment, GhLink, Message, Stage, Store, ThreadState, Workshop};
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +21,10 @@ pub struct ThreadDto {
     pub body: String,
     pub state: ThreadState,
     pub github: Option<GhLink>,
+    /// The code it's on as it was, or GitHub's diff hunk.
+    pub snippet: String,
+    /// The agent conversation about it.
+    pub messages: Vec<Message>,
     /// Whether the review shows its code.
     pub placed: bool,
     pub created_at: f64,
@@ -94,6 +98,8 @@ impl Review {
                 },
                 path: c.path,
                 body: c.body,
+                snippet: c.snippet,
+                messages: c.workshop.messages,
                 state: c.thread.expect("pr threads have a state"),
                 github: c.github,
                 created_at: c.created_at as f64,

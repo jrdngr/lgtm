@@ -162,3 +162,177 @@
   align-items: center;
   gap: 6px;
 }
+
+/* The Threads tab. */
+.threads {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+  background: var(--bg);
+}
+
+.threads-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs-sm);
+}
+
+.threads-title {
+  font-weight: 600;
+}
+
+.threads-pr-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.threads-head .faint {
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.threads-bar {
+  padding: 0 12px 6px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.threads-list {
+  flex: 1;
+  overflow: auto;
+  padding-bottom: 12px;
+}
+
+.threads-section-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px 0 12px;
+  background: var(--bg);
+  font-size: var(--fs-sm);
+}
+
+.threads-section-head .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.threads-section-head .faint {
+  color: var(--faint);
+}
+
+.threads-section-head button {
+  padding: 1px 8px;
+  font-size: var(--fs-xs);
+}
+
+.threads-row {
+  display: grid;
+  grid-template-columns: 14px minmax(120px, 2fr) auto minmax(0, 3fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 26px;
+  padding: 0 12px 0 24px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+
+.threads-row:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.threads-row[aria-current="true"] {
+  background: var(--selection);
+}
+
+.threads-summary,
+.threads-latest {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.threads-latest {
+  color: var(--muted);
+}
+
+.threads-where {
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+
+/* The focused thread: what's unanswered and the code beside the take, reply and chat. */
+.focused-thread {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+  margin: 2px 12px 10px 24px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--hair);
+  border-left: 2px solid var(--github);
+  border-radius: 4px;
+  background: var(--panel);
+  user-select: text;
+}
+
+.focused-left > .post {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.focused-left .earlier {
+  padding: 0;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.focused-code {
+  margin-top: 8px;
+}
+
+.focused-code pre {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  overflow: auto;
+  max-height: 240px;
+  border-radius: 4px;
+  background: var(--bg);
+  font: var(--fs-xs) var(--mono);
+}
+
+.focused-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.focused-right .reply-head {
+  padding: 0;
+}
+
+.focused-right .comment-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.focused-take {
+  font-size: var(--fs-sm);
+}

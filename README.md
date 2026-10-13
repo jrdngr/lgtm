@@ -37,6 +37,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘⇧R | Show the Files tab |
 | ⌘⇧M | Show the Notes tab |
 | ⌘⇧P | Show the PR tab (PR workspaces) |
+| ⌘⇧T | Open or focus the Threads tab (PR workspaces) |
 | ⌘⇧H | Show the Walkthrough tab |
 | ⌘⇧O | Show the Reviewers tab |
 
@@ -78,7 +79,20 @@ Notes and threads show under their code as cards: blue for a note, purple for a 
 
 Threads move through stages: **New** (synced, not triaged), **Decide** (needs your call), **To fix**, **Reply** (a reply is being written), **Ready** (the reply is final, or the fix needs none), and **Done**. Writing a reply moves a thread to Reply; **Final** moves it to Ready, and editing a final reply moves it back. A draft (`C`) is Ready once it has text. Sync keeps each thread's stage, brings one back to New when someone posts to it, and marks it Done when it's resolved. Comments on the PR from others come in as threads too, Done when you posted to the PR after them.
 
-**Send to GitHub** in the PR tab sends everything Ready at once: replies on code and new drafts go into one review, so reviewers get one notification, and replies to comments on the PR post as PR comments that open with a quote of what they answer. On someone else's PR the button carries your verdict (Comment, Approve, Request changes) and summary. Ready threads with no reply (fixed as asked) follow the **Fixed threads** choice, remembered per repo: leave as is, reply "Done", resolve, or both. A short list of what goes out shows before it sends; sent threads move to Done and the PR syncs. New drafts need the whole PR open in the Combined view, where GitHub's lines match.
+The **Threads** tab (⌘⇧T, or the PR tab's header icon, or a thread card's icon) is where you work a PR's threads down. Each thread is one row (who spoke last, summary, location, the latest comment, the take) in stage sections, with Done folded at the end. The thread at the cursor opens in place: on the left what's unanswered since your last post (earlier posts fold) and the code; on the right the take, the reply, and an agent chat (↵ to ask, ⌘↵ to change the code). The To fix section's **Send to terminal** pastes its threads into a terminal's prompt. Clicking a thread in the PR tab focuses it here while this tab is open. Keys:
+
+| Key | Action |
+| --- | --- |
+| `j` / `k` | Next / previous thread |
+| `f` | To fix |
+| `r` | Reply, with the cursor in the agent chat |
+| `e` | Edit the reply (Esc or ⌘↵ leaves the box) |
+| `y` | Mark the reply final (Ready) |
+| `d` | Done, without sending |
+| `o` | Show the thread's code in the review |
+| ⌘↵ | Send to GitHub (opens the list of what goes out) |
+
+**Send to GitHub** in the PR and Threads tabs sends everything Ready at once: replies on code and new drafts go into one review, so reviewers get one notification, and replies to comments on the PR post as PR comments that open with a quote of what they answer. On someone else's PR the button carries your verdict (Comment, Approve, Request changes) and summary. Ready threads with no reply (fixed as asked) follow the **Fixed threads** choice, remembered per repo: leave as is, reply "Done", resolve, or both. A short list of what goes out shows before it sends; sent threads move to Done and the PR syncs. New drafts need the whole PR open in the Combined view, where GitHub's lines match.
 
 In the header and review toolbar:
 

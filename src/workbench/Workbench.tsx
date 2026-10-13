@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { RepoInfo } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
+import { showThread } from "../threads/focus";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -110,6 +111,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+P": () => showView("right", "pr"),
+    "Mod+Shift+T": () => showThread(selected),
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     toggle: () => toggleBottom(),

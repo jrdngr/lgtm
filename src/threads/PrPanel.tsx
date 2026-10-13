@@ -7,8 +7,10 @@ import { useDiscussion } from "../github/useDiscussion";
 import type { CurrentReview } from "../review/current";
 import { useCurrentReview } from "../review/current";
 import { useGithubOff } from "../tools/agents";
+import { IconButton } from "../ui/icons";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
+import { showThread, threadsOpen } from "./focus";
 import { SendBox } from "./SendBox";
 import { byStage, STAGES, threadLabel, threadWhere } from "./stages";
 import { TakePill } from "./ThreadBits";
@@ -24,6 +26,7 @@ interface ListProps {
 
 /** Threads grouped by stage in work order, Done folded. Click a thread to open it in place. */
 function ThreadGroups({ review, threads, viewer }: ListProps) {
+  const workspace = useWorkspace();
   const [folded, setFolded] = useState<ReadonlySet<Stage>>(new Set(["done"]));
   const [open, setOpen] = useState<number>();
   if (threads.length === 0) {
@@ -67,9 +70,10 @@ function ThreadGroups({ review, threads, viewer }: ListProps) {
                     aria-expanded={open === t.id}
                     onClick={(e) => {
                       if (e.metaKey && t.placed) review.jumpToComment(t.id);
+                      else if (threadsOpen(workspace)) showThread(workspace, t.id);
                       else setOpen(open === t.id ? undefined : t.id);
                     }}
-                    title="Open it here. ⌘-click shows its code in the review."
+                    title="Open it in the Threads tab when that's open, else here. ⌘-click shows its code in the review."
                   >
                     <span className="item-text">
                       {!t.github && <span className="pill purple">Draft</span>} {threadLabel(t)}
@@ -126,7 +130,15 @@ export function PrPanel() {
   const pr = usePr(workspace);
   return (
     <div className="comments-view">
-      <SectionHeader title="PR" />
+      <SectionHeader title="PR">
+        {pr && (
+          <IconButton
+            icon="comments"
+            label="Open the Threads tab (⌘⇧T)"
+            onClick={() => showThread(workspace)}
+          />
+        )}
+      </SectionHeader>
       {pr ? <PrBody pr={pr} review={review} /> : <Empty>This workspace isn't a PR's</Empty>}
     </div>
   );
