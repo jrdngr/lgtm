@@ -24,6 +24,9 @@ export function setUnsaved(
   else unsaved.delete(key);
 }
 
+export const isUnsaved = (workspace: WorkspaceName, id: string) =>
+  unsaved.has(keyOf(workspace, id));
+
 /** Whether panel `id` may close: true when it has no unsaved edits, or the user saved or
  * discarded them. */
 export function confirmClose(workspace: WorkspaceName, id: string): Promise<boolean> {

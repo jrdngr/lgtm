@@ -82,10 +82,12 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     requestAnimationFrame(() => body.current?.focus());
   }
 
-  /** Hides the bottom panel when focus is in it, and otherwise shows and focuses it, with a
-   * new terminal when it has no tabs or `terminal` is set. */
+  /** Hides the bottom panel when focus is in it or it has no tabs, and otherwise shows and
+   * focuses it. It opens with a terminal when it would open empty, and `terminal` adds one. */
   function toggleBottom(terminal = false) {
-    if (inBottom() && !terminal) {
+    const open = bottom.get().open;
+    const empty = !bottomDockOf(selected)?.panels.length;
+    if (open && !terminal && (inBottom() || empty)) {
       bottom.set({ open: false });
       focusPanel(dockOf(selected)?.activePanel);
       return;
@@ -94,7 +96,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     flushSync(() => bottom.set({ open: true }));
     const dock = bottomDockOf(selected);
     if (!dock) return;
-    if (terminal || dock.panels.length === 0) addTerminal(dock);
+    if (terminal || empty) addTerminal(dock);
     else focusPanel(dock.activePanel);
   }
 

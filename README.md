@@ -80,7 +80,7 @@ In the header and review toolbar:
 - **Layout:** the two icons pick Unified or Split; the lit one is current.
 - Progress for the whole review: a bar of reviewed (green), skipped (grey), and flagged (red) rows with the reviewed percentage. Hover it for the counts. **Reset review…** in the ⋯ menu at the end clears every mark in it after you confirm.
 
-Bottom panel: a second pane grid docked along the bottom of the window, under the side panels, which it pushes up. Its tabs and splits work like the main grid's, and each workspace has its own. Hiding it with ⌃\` keeps its terminals running, and closing its last tab hides it too. Drag its top edge to resize; the height and whether it's open are remembered.
+Bottom panel: a second pane grid docked along the bottom of the window, under the side panels, which it pushes up. Its tabs and splits work like the main grid's, and each workspace has its own. Drag tabs between it and the main grid; terminals keep running when they move, but an editor with unsaved changes stays put. It opens with a terminal when it would open empty. Hiding it with ⌃\` keeps its terminals running, and closing its last tab hides it too, while dragging its last tab out leaves it open. Drag its top edge to resize; the height and whether it's open are remembered.
 
 Panes: the **+** tab after each pane's tabs opens a new Terminal or Graph tab in that pane. The split icons at the right of each pane's tab strip split it right or down into an empty pane, which offers the same kinds of tab.
 

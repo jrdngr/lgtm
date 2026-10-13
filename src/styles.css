@@ -327,6 +327,10 @@ kbd {
   background: var(--bg);
 }
 
+.terminal-host {
+  height: 100%;
+}
+
 .workbench-body {
   display: flex;
   flex: 1;

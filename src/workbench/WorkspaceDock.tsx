@@ -19,6 +19,7 @@ import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
+import { isMoving, takeTabsFrom } from "./crossDock";
 import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
 import { NewTab, SplitButtons } from "./GroupActions";
@@ -110,6 +111,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     api.onDidAddPanel(panes);
     api.onDidRemovePanel(panes);
     api.onDidLayoutChange(save);
+    takeTabsFrom(api, () => latest.current.bottom, workspace);
     registerDock(workspace, api);
   }
 
@@ -118,17 +120,20 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     const saved = await load();
     if (latest.current.bottom !== api) return;
     restoreLayout(api, saved.bottom);
-    // Closing the last tab hides the panel. Checked once the close settles, since moving a
-    // tab removes it from its pane before adding it to the next.
-    api.onDidRemovePanel(() =>
+    // Closing the last tab hides the panel, while dragging it to the main dock leaves the panel
+    // open. Checked once the close settles, since moving a tab within the dock removes it from
+    // its pane before adding it to the next.
+    api.onDidRemovePanel((panel) => {
+      if (isMoving(panel)) return;
       setTimeout(() => {
         if (gone.current || !shown.current || api.panels.length > 0 || !bottom.get().open) return;
         api.clear();
         bottom.set({ open: false });
         focusPanel(latest.current.main?.activePanel);
-      }),
-    );
+      });
+    });
     api.onDidLayoutChange(save);
+    takeTabsFrom(api, () => latest.current.main, workspace);
     registerDock(workspace, api, "bottom");
   }
 
