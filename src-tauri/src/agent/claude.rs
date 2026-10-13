@@ -4,7 +4,12 @@ use serde_json::Value;
 
 /// Arguments for a run that reads its prompt from stdin. It can read files, and edit them
 /// too with `edit`. Nothing else is available, and the user's MCP servers stay off.
-pub fn args<'a>(resume: Option<&'a str>, edit: bool, schema: Option<&'a str>) -> Vec<&'a str> {
+pub fn args<'a>(
+    resume: Option<&'a str>,
+    edit: bool,
+    schema: Option<&'a str>,
+    model: Option<&'a str>,
+) -> Vec<&'a str> {
     let mut args = vec![
         "-p",
         "--output-format",
@@ -28,6 +33,9 @@ pub fn args<'a>(resume: Option<&'a str>, edit: bool, schema: Option<&'a str>) ->
     }
     if let Some(schema) = schema {
         args.extend(["--json-schema", schema]);
+    }
+    if let Some(model) = model {
+        args.extend(["--model", model]);
     }
     args
 }

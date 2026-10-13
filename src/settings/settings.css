@@ -1,0 +1,198 @@
+.settings {
+  height: 100%;
+  overflow: auto;
+}
+
+.settings-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+  display: grid;
+  gap: 24px;
+}
+
+.settings-page h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-section {
+  display: grid;
+  gap: 10px;
+  scroll-margin-top: 16px;
+}
+
+.settings-section h2 {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs);
+  font-weight: 600;
+}
+
+.settings-section p {
+  margin: 0;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(0, 1.4fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-label label {
+  font-weight: 500;
+}
+
+.settings-help {
+  color: var(--muted);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+}
+
+.settings-control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-input {
+  min-width: 0;
+  font: inherit;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 7px;
+}
+
+.settings-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-number {
+  width: 72px;
+}
+
+.settings-resolved {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  min-width: 0;
+}
+
+.settings-resolved > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-section code {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  background: var(--hover);
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+.settings-tools-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-tools-head .settings-help {
+  flex: 1;
+}
+
+.settings-tools {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--fs-sm);
+}
+
+.settings-tools th,
+.settings-tools td {
+  text-align: left;
+  vertical-align: top;
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid var(--hair);
+}
+
+.settings-tools th {
+  font-family: var(--mono);
+  font-weight: 600;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.settings-path {
+  font-family: var(--mono);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.settings-tool-action {
+  text-align: right;
+}
+
+.settings-ok {
+  color: var(--added);
+}
+
+.settings-warn {
+  color: var(--amber);
+}
+
+.settings-prompt {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.settings-prompt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-prompt-head b {
+  font-weight: 600;
+}
+
+.settings-prompt-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-prompt-scope {
+  width: 72px;
+  flex: none;
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+
+.settings-prompt-file .settings-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: none;
+  padding: 0;
+}
+
+button.danger {
+  color: var(--error);
+}

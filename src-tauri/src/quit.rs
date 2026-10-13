@@ -34,7 +34,12 @@ pub fn intercept(app: &AppHandle) {
             should_terminate as extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject) -> usize,
         );
         let cls = delegate.class() as *const AnyClass as *mut AnyClass;
-        ffi::class_addMethod(cls, sel!(applicationShouldTerminate:), imp, c"Q@:@".as_ptr());
+        ffi::class_addMethod(
+            cls,
+            sel!(applicationShouldTerminate:),
+            imp,
+            c"Q@:@".as_ptr(),
+        );
     }
 }
 

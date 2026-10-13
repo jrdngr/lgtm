@@ -8,6 +8,7 @@ pub mod notes;
 pub mod pty;
 pub mod repo;
 pub mod review;
+pub mod settings;
 pub mod workspaces;
 
 use std::path::PathBuf;

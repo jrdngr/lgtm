@@ -16,6 +16,7 @@ import { GraphPanel } from "../graph/GraphPanel";
 import { commands, unwrap } from "../ipc";
 import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
+import { SettingsPanel } from "../settings/SettingsPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
@@ -34,6 +35,7 @@ const components = {
   graph: GraphPanel,
   editor: EditorPanel,
   prPreview: PrPreview,
+  settings: SettingsPanel,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

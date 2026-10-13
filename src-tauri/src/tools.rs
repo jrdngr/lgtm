@@ -1,8 +1,12 @@
 //! Checks that the command-line tools the app runs are installed and new enough.
 
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 use specta::Type;
 use tokio::process::Command;
+
+use crate::settings;
 
 /// A tool that's missing or too old.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
@@ -86,21 +90,69 @@ fn problem(tool: &Tool, out: Option<&str>) -> Option<ToolProblem> {
     }
 }
 
+/// A tool as found: where it is, its version, and what's wrong with it.
+#[derive(Clone, Debug, Serialize, Type)]
+pub struct ToolStatus {
+    pub tool: String,
+    /// The file on PATH, or for claude the command line the Claude setting runs.
+    pub location: Option<String>,
+    pub version: Option<String>,
+    pub problem: Option<ToolProblem>,
+}
+
+/// The file `name` runs from PATH.
+pub fn which(name: &str) -> Option<PathBuf> {
+    if name.contains('/') {
+        return Path::new(name).is_file().then(|| PathBuf::from(name));
+    }
+    let paths = std::env::var_os("PATH")?;
+    std::env::split_paths(&paths)
+        .map(|dir| dir.join(name))
+        .find(|p| p.is_file())
+}
+
 async fn version(name: &str) -> Option<String> {
-    let out = Command::new(name).arg("--version").output().await.ok()?;
+    let mut cmd = if name == "claude" {
+        settings::claude::command().ok()?
+    } else {
+        Command::new(name)
+    };
+    let out = cmd.arg("--version").output().await.ok()?;
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// Every tool that's missing or too old.
-pub async fn check() -> Vec<ToolProblem> {
-    let mut problems = Vec::new();
+/// Every tool, found or not.
+pub async fn status() -> Vec<ToolStatus> {
+    let mut found = Vec::new();
     for tool in &TOOLS {
         let out = version(tool.name).await;
-        problems.extend(problem(tool, out.as_deref()));
+        let location = if tool.name == "claude" {
+            settings::claude::status().resolved
+        } else {
+            which(tool.name).map(|p| p.to_string_lossy().into_owned())
+        };
+        found.push(ToolStatus {
+            tool: tool.name.to_string(),
+            location,
+            version: out
+                .as_deref()
+                .and_then(parse_version)
+                .map(|(a, b, c)| format!("{a}.{b}.{c}")),
+            problem: problem(tool, out.as_deref()),
+        });
     }
-    problems
+    found
+}
+
+/// Every tool that's missing or too old.
+pub async fn check() -> Vec<ToolProblem> {
+    status()
+        .await
+        .into_iter()
+        .filter_map(|t| t.problem)
+        .collect()
 }
 
 #[cfg(test)]

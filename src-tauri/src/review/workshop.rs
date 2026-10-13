@@ -111,6 +111,7 @@ impl RepoCtx {
                 resume: resume.as_deref(),
                 edit: ask.change,
                 schema: None,
+                purpose: agent::Purpose::Ask,
             },
             |p| {
                 if let agent::Progress::Text(t) = p {

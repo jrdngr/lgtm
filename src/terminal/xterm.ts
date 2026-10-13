@@ -2,6 +2,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { watchSettings } from "../settings/store";
 
 /** Opens an xterm in `container`, on WebGL when the webview supports it. */
 export function createTerminal(container: HTMLElement) {
@@ -29,5 +30,11 @@ export function createTerminal(container: HTMLElement) {
     if (container.offsetWidth > 0 && container.offsetHeight > 0) fit.fit();
   };
   refit();
-  return { term, refit };
+  // Follows the font size setting until the terminal is disposed.
+  const unwatch = watchSettings((s) => {
+    if (term.options.fontSize === s.terminalFontSize) return;
+    term.options.fontSize = s.terminalFontSize;
+    refit();
+  });
+  return { term, refit, unwatch };
 }

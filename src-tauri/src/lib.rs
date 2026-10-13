@@ -13,6 +13,7 @@ mod layout;
 mod mcp;
 mod menu;
 mod pr;
+mod prompts;
 mod pty;
 #[cfg(target_os = "macos")]
 mod quit;
@@ -20,6 +21,7 @@ mod recent;
 mod repo;
 mod resolve;
 mod review;
+mod settings;
 mod store;
 mod syntax;
 mod tools;
@@ -72,12 +74,17 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::reset_review_marks,
             commands::review::review_graph,
             commands::review::focus_review,
+            commands::settings::get_settings,
+            commands::settings::save_settings,
+            commands::settings::claude_command,
+            commands::settings::tool_status,
+            commands::settings::prompt_files,
+            commands::settings::edit_prompt,
+            commands::settings::remove_prompt,
             commands::repo::mcp_status,
             commands::repo::register_mcp,
             commands::notes::run_walkthrough,
             commands::notes::stop_walkthrough,
-            commands::notes::walkthrough_prompt,
-            commands::notes::edit_walkthrough_prompt,
             commands::comments::add_comment,
             commands::comments::edit_comment,
             commands::comments::delete_comment,
@@ -118,6 +125,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::RepoChanged,
             events::SwitchRepo,
             events::WordWrap,
+            events::SettingsChanged,
+            events::OpenSettings,
             events::WorkingCopyStale,
             events::BotRunActivity,
             events::BotRunChanged,
@@ -166,6 +175,7 @@ pub fn run() {
         std::process::exit(mcp::bridge_main());
     }
     adopt_login_shell_path();
+    settings::load();
     if args.first().is_some_and(|a| a == "gc") {
         std::process::exit(workspaces::gc::main(&args[1..]));
     }

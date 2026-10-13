@@ -277,6 +277,7 @@ impl RepoCtx {
                         resume: resume.as_deref(),
                         edit: false,
                         schema: Some(schema),
+                        purpose: agent::Purpose::Reviewers,
                     };
                     let reply = agent::run(runs, &self.agent_key(&run_key(id, idx)), task, |p| {
                         if let Progress::Tool(activity) = p {

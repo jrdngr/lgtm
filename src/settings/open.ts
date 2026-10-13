@@ -1,0 +1,50 @@
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEffect, useRef } from "react";
+import { events } from "../bindings";
+import { dockOf } from "../workbench/docks";
+import type { WorkspaceName } from "../workspaces/context";
+
+/** The Settings tab's sections, which panels can open it at. */
+export type SettingsSection = "claude" | "models" | "terminal" | "tools" | "prompts";
+
+export interface SettingsParams {
+  section?: SettingsSection;
+  /** Changes on every open, so opening it again scrolls to the section again. */
+  nonce?: number;
+}
+
+const ID = "settings";
+
+/** Opens the Settings tab in the workspace's dock, or focuses it, at `section`. */
+export function openSettings(workspace: WorkspaceName, section?: SettingsSection) {
+  const api = dockOf(workspace);
+  if (!api) return;
+  const params: SettingsParams = { section, nonce: Date.now() };
+  const open = api.getPanel(ID);
+  if (open) {
+    open.api.updateParameters(params);
+    return open.api.setActive();
+  }
+  const active = api.activePanel;
+  api.addPanel({
+    id: ID,
+    component: "settings",
+    title: "Settings",
+    params,
+    position: active ? { referencePanel: active, direction: "within" } : undefined,
+  });
+}
+
+/** lgtm > Settings… opens the tab in the selected workspace. */
+export function useSettingsMenu(selected: WorkspaceName) {
+  const current = useRef(selected);
+  current.current = selected;
+  useEffect(() => {
+    const sub = events
+      .openSettings(getCurrentWebviewWindow())
+      .listen(() => openSettings(current.current));
+    return () => {
+      sub.then((stop) => stop());
+    };
+  }, []);
+}

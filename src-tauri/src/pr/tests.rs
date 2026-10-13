@@ -122,7 +122,10 @@ async fn the_workspace_follows_the_new_head_with_its_own_commits() {
     write(d, "mine.txt", "m\n");
     j.snapshot().await.unwrap();
     move_onto(j, &old, &new).await.unwrap();
-    assert_eq!(j.commit_ids("@-").await.unwrap(), std::slice::from_ref(&new));
+    assert_eq!(
+        j.commit_ids("@-").await.unwrap(),
+        std::slice::from_ref(&new)
+    );
     assert!(d.join("mine.txt").exists() && d.join("b.txt").exists());
 
     // Pushing its own commit makes that the new head, and nothing needs to move.

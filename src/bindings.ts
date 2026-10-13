@@ -79,6 +79,21 @@ export const commands = {
 	reviewGraph: (review: number) => typedError<GraphDto, string>(__TAURI_INVOKE("review_graph", { review })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
+	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
+	/**  Saves the settings and tells every window. */
+	saveSettings: (settings: Settings) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
+	/**  How the Claude command resolves. `refresh` asks the login shell again. */
+	claudeCommand: (refresh: boolean) => typedError<ClaudeCommand, string>(__TAURI_INVOKE("claude_command", { refresh })),
+	toolStatus: () => __TAURI_INVOKE<ToolStatus[]>("tool_status"),
+	/**  Each prompt and which of its files the window's repo uses. */
+	promptFiles: (workspace: string | null) => typedError<PromptInfo[], string>(__TAURI_INVOKE("prompt_files", { workspace })),
+	/**
+	 *  The path of `scope`'s prompt file, to open in the editor. Writes the built-in prompt there
+	 *  first when there's no file yet.
+	 */
+	editPrompt: (workspace: string | null, prompt: Prompt, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("edit_prompt", { workspace, prompt, scope })),
+	/**  Deletes `scope`'s prompt file. */
+	removePrompt: (workspace: string | null, prompt: Prompt, scope: Scope) => typedError<null, string>(__TAURI_INVOKE("remove_prompt", { workspace, prompt, scope })),
 	/**  Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code. */
 	mcpStatus: () => typedError<McpStatus, string>(__TAURI_INVOKE("mcp_status")),
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
@@ -93,16 +108,6 @@ export const commands = {
 	skipped: number,
 } | null, string>(__TAURI_INVOKE("run_walkthrough", { review, activity })),
 	stopWalkthrough: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_walkthrough", { review })),
-	/**  The walkthrough prompt file the workspace's reviews use, `null` for the built-in prompt. */
-	walkthroughPrompt: (workspace: string | null) => typedError<{
-	scope: Scope,
-	path: string,
-} | null, string>(__TAURI_INVOKE("walkthrough_prompt", { workspace })),
-	/**
-	 *  The path of `scope`'s walkthrough prompt, to open in the editor. Writes the built-in prompt
-	 *  there first when there's no file yet.
-	 */
-	editWalkthroughPrompt: (workspace: string | null, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("edit_walkthrough_prompt", { workspace, scope })),
 	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
 	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
@@ -204,8 +209,10 @@ export const events = {
 	botFixText: makeEvent<BotFixText>("bot-fix-text"),
 	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
+	openSettings: makeEvent<OpenSettings>("open-settings"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
+	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
@@ -337,6 +344,16 @@ export type ChangeDto = {
 export type CheckState = "unchecked" | "checked" | 
 /**  Was checked, but the file now has changed rows the check didn't cover. */
 "changedSinceReviewed";
+
+/**  How the `claude` setting resolved, for the Settings tab. */
+export type ClaudeCommand = {
+	setting: string,
+	/**  The command line that runs, like `ucode claude` for the alias `cc`. */
+	resolved: string | null,
+	/**  It's a shell function, so each run goes through the login shell. */
+	viaShell: boolean,
+	error: string | null,
+};
 
 export type CodeSymbol = {
 	name: string,
@@ -605,6 +622,16 @@ export type Minimal = {
 	recommendations: string,
 };
 
+/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
+export type Models = {
+	/**  Asks and changes on notes, Fix headless, and conflict resolution. */
+	ask: string,
+	walkthrough: string,
+	reviewers: string,
+	/**  Triage and replies on PR threads. */
+	replies: string,
+};
+
 export type NearbyPrDto = {
 	number: number,
 	title: string,
@@ -646,6 +673,9 @@ export type NoteDto = {
 	position: number,
 	source: Source,
 };
+
+/**  lgtm > Settings… was chosen while this window had focus. */
+export type OpenSettings = Record<string, never>;
 
 export type OpenedPr = {
 	workspace: string,
@@ -777,10 +807,18 @@ export type ProgressDto = {
 	changed: number,
 };
 
-/**  The prompt file a walkthrough uses. */
-export type PromptFile = {
-	scope: Scope,
-	path: string,
+/**  An editable prompt. */
+export type Prompt = "walkthrough";
+
+/**  A prompt and its files, for the Settings tab. */
+export type PromptInfo = {
+	prompt: Prompt,
+	/**  The file in use, `None` for the built-in prompt. */
+	inUse: Scope | null,
+	global: string | null,
+	repo: string,
+	globalExists: boolean,
+	repoExists: boolean,
 };
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
@@ -912,6 +950,18 @@ export type Ruling = {
 
 export type Scope = "global" | "repo";
 
+export type Settings = {
+	/**  How to start Claude Code: a command line, or an alias or function from the login shell. */
+	claude: string,
+	models: Models,
+	terminalFontSize: number,
+};
+
+/**  The settings were saved. */
+export type SettingsChanged = {
+	settings: Settings,
+};
+
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
 /**  How a change compares with the previous session. */
@@ -978,6 +1028,15 @@ export type ToolProblem = {
 	fix: string,
 	/**  Whether the app can't work without it. Otherwise only some features need it. */
 	required: boolean,
+};
+
+/**  A tool as found: where it is, its version, and what's wrong with it. */
+export type ToolStatus = {
+	tool: string,
+	/**  The file on PATH, or for claude the command line the Claude setting runs. */
+	location: string | null,
+	version: string | null,
+	problem: ToolProblem | null,
 };
 
 export type Verdict = "comment" | "approve" | "requestChanges";

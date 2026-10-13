@@ -2,6 +2,7 @@ import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { RepoInfo } from "../ipc";
+import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -49,6 +50,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
   useWordWrapMenu();
+  useSettingsMenu(selected);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

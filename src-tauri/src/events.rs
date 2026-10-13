@@ -13,6 +13,16 @@ pub struct RepoChanged {}
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SwitchRepo {}
 
+/// The settings were saved.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct SettingsChanged {
+    pub settings: crate::settings::Settings,
+}
+
+/// lgtm > Settings… was chosen while this window had focus.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct OpenSettings {}
+
 /// View > Word Wrap was turned on or off.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct WordWrap {

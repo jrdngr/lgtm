@@ -4,8 +4,8 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 
 use super::{CmdResult, err, layout_path, repo_root};
 use crate::jj::init;
-use crate::repo::{self, RepoInfo};
 use crate::menu::WordWrapItem;
+use crate::repo::{self, RepoInfo};
 use crate::{layout, recent};
 
 #[tauri::command]

@@ -55,7 +55,7 @@ export function releaseSession(id: string) {
 }
 
 function startSession(host: HTMLDivElement, workspace: WorkspaceName, setup: boolean): Session {
-  const { term, refit } = createTerminal(host);
+  const { term, refit, unwatch } = createTerminal(host);
   let pty: number | undefined;
   let disposed = false;
   let title = "";
@@ -96,6 +96,7 @@ function startSession(host: HTMLDivElement, workspace: WorkspaceName, setup: boo
       disposed = true;
       for (const s of subs) s.dispose();
       if (pty !== undefined) commands.ptyKill(pty);
+      unwatch();
       term.dispose();
       host.remove();
     },

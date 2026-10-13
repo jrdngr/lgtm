@@ -1,3 +1,4 @@
+import { openSettings } from "../settings/open";
 import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
@@ -5,17 +6,16 @@ import { useWorkspace } from "../workspaces/context";
 import { useCurrentReview } from "./current";
 import { setTourState, useTourState } from "./tour";
 import { WalkthroughTour } from "./WalkthroughPanelTour";
-import { useWalkthroughPrompt } from "./WalkthroughPrompt";
 import { stopWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./notes.css";
 
 /** The current review's walkthrough: its notes along the chosen tour, filtered by category.
  * Click a note to go to it; `n` and `N` in the review step through the tour. */
 export function WalkthroughPanel() {
-  const review = useCurrentReview(useWorkspace());
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
   const run = useWalkthroughRun(review?.id);
   const state = useTourState(review?.id);
-  const prompt = useWalkthroughPrompt();
   if (!review) {
     return (
       <div className="side-split">
@@ -27,7 +27,7 @@ export function WalkthroughPanel() {
   const { notes } = review;
   const running = !!run?.running;
   const stop = () => stopWalkthrough(review.id);
-  const error = (!running && run?.error) || prompt.error;
+  const error = !running && run?.error;
   return (
     <div className="side-split">
       <SectionHeader
@@ -45,7 +45,11 @@ export function WalkthroughPanel() {
         <Menu
           label="Walkthrough actions"
           items={[
-            ...prompt.items,
+            {
+              label: "Edit prompt…",
+              title: "Opens the prompt files in Settings",
+              onSelect: () => openSettings(workspace, "prompts"),
+            },
             running
               ? { label: "Stop walkthrough", onSelect: stop }
               : { label: "Write walkthrough", title: "h", onSelect: review.runWalkthrough },

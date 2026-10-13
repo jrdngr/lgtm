@@ -23,6 +23,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 
 | Keys | Action |
 |---|---|
+| ⌘, | lgtm › Settings…: opens the Settings tab |
 | ⌘N | New window, opening on the repo picker |
 | ⌘O | Open a different repo: swaps this window for the repo picker |
 | ⌥Z | View > Word Wrap: wrap long lines in reviews and editors instead of scrolling sideways (off by default, remembered) |
@@ -106,7 +107,7 @@ Languages: Rust, TypeScript, JavaScript, Python, Go, Swift, and shell get highli
 
 Notes show as blocks under their code, and the Walkthrough tab (⌘⇧H) lists them. The tab's tour card picks the tour: **Reading order** covers every note, and each flow is its own tour. Its ‹ › stepper, like `n` and `N`, steps through the active tour, moving the cursor to each note, and each tour remembers where you are. The notes list as a path, with the ones behind you dimmed and the current one ringed; important notes show their level and flow steps their place in the flow. The category chips, with their note counts, hide or show a category (dashed when hidden), and the eye button turns the blocks under the code off. A note's **Comment** button adds it as your own comment, with its category as an emoji. Notes are never published; each new walkthrough replaces the last.
 
-The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. The Walkthrough tab's ⋯ menu shows which prompt is in use, and its **Edit global prompt** and **Edit repo prompt** open that file, copying the built-in prompt there first. Delete the file to go back to the built-in prompt. The note format the agent returns is fixed.
+The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. Manage it in Settings › Prompts; the Walkthrough tab's ⋯ › **Edit prompt…** opens that section. The note format the agent returns is fixed.
 
 Pull requests: the Workspaces sidebar's **PR** icon button toggles a field that takes a PR number or URL (Escape closes it) and checks the PR out into its own `pr-<N>` workspace. Below the workspaces, **On this stack** lists the open PRs of bookmarks pushed from the selected workspace's stack (`@`'s ancestors down to `trunk()`, and their descendants, so a new change on a stack commit still sees the commits above it), nearest `@` first. A PR counts when its head branch has a pushed bookmark's name in the GitHub repo that bookmark was pushed to, so PRs from your fork show up too. Click one to preview it in a **PR #N** tab, read straight from GitHub without checking anything out: the PR's conversation and review summaries on top, then its diff with review threads under their lines. Each click replaces the preview. Double-click a PR, or press Enter on it, to review it in its own workspace like the PR button does. The list loads when you switch workspaces and on its refresh button; it needs `gh` signed in. When it's empty, its note says whether no bookmarks were pushed from the stack or which ones have no open PR.
 
@@ -115,6 +116,16 @@ Agents in terminals: lgtm offers to register itself with Claude Code (`claude mc
 At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to install or update whichever is missing.
 
 Mouse: click a row, drag or shift-click for a range, double-click for the function, triple-click for the hunk. Click a file header, hunk header, or ƒ marker to select that unit.
+
+## Settings
+
+lgtm › Settings… (⌘,) opens a Settings tab. Settings are saved to `~/.config/lgtm/settings.toml` and apply to every window.
+
+- **Claude command:** what runs Claude Code for every agent (default `claude`). It can be a command line, or an alias or function from your login shell, like `cc`. An alias is expanded once and run directly; a function runs through `$SHELL -l -i -c` each time. The line under it shows what it resolved to, and ⟳ reads your shell again. Registering the MCP server still runs plain `claude`.
+- **Models:** the `--model` for Ask and Change (also Fix headless and conflict resolution), Walkthrough, Reviewers, and Replies. Empty uses Claude Code's default.
+- **Terminal font size**, applied to open terminals right away.
+- **Tools:** where jj, claude and gh were found and their versions, and the MCP server's registration with a Register button.
+- **Prompts:** each agent prompt's global and repo file, and which one is in use. Create copies the built-in prompt into the file; Delete removes it.
 
 ## Config
 

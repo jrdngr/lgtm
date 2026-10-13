@@ -79,6 +79,7 @@ impl RepoCtx {
                 resume: None,
                 edit: true,
                 schema: None,
+                purpose: agent::Purpose::Ask,
             };
             let reply = agent::run(&runs, &self.agent_key(&fix_key(id, idx)), task, |p| {
                 if let Progress::Text(text) = p {

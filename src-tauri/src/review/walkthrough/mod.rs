@@ -2,8 +2,6 @@
 //! what needs a careful look, how complex flows run, background the diff doesn't show, and
 //! open questions, in a reading order.
 
-pub(crate) mod prompt;
-
 use anyhow::Context;
 use serde::Deserialize;
 
@@ -69,7 +67,7 @@ impl RepoCtx {
             let r = review.lock().unwrap();
             (r.ws.clone(), r.revset.clone(), r.from.clone(), r.to.clone())
         };
-        let instructions = prompt::load(&ws.root)?;
+        let instructions = crate::prompts::load(crate::prompts::Prompt::Walkthrough, &ws.root)?;
         let context = crate::bots::describe(&ws, &revset, from, to).await?;
         let prompt = format!(
             "{context}\n\nYou're in the repository and can read any file. Don't edit files.\n\n\
@@ -81,6 +79,7 @@ impl RepoCtx {
             resume: None,
             edit: false,
             schema: Some(SCHEMA),
+            purpose: agent::Purpose::Walkthrough,
         };
         let reply = agent::run(runs, &self.agent_key(&run_key(id)), task, |p| {
             if let Progress::Tool(t) = p {

@@ -17,6 +17,7 @@ vi.mock("./xterm", () => ({
   createTerminal: () => ({
     term: { cols: 80, rows: 24, onData: sub, onTitleChange: sub, onResize: sub, dispose() {} },
     refit() {},
+    unwatch() {},
   }),
 }));
 const sub = () => ({ dispose() {} });

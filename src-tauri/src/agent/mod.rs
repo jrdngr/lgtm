@@ -10,10 +10,12 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, bail};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command;
 use tokio::sync::oneshot;
 
 use claude::Line;
+
+use crate::settings;
+pub use crate::settings::Purpose;
 
 /// How a run ended.
 pub struct Reply {
@@ -83,6 +85,8 @@ pub struct Task<'a> {
     pub edit: bool,
     /// A JSON schema the reply must match.
     pub schema: Option<&'a str>,
+    /// What the run is for, which picks its model.
+    pub purpose: Purpose,
 }
 
 /// What a run reports as it goes.
@@ -102,15 +106,24 @@ pub async fn run(
 ) -> anyhow::Result<Reply> {
     let (_registered, mut stop) = runs.register(key)?;
 
-    let mut child = Command::new("claude")
-        .args(claude::args(task.resume, task.edit, task.schema))
+    let model = settings::get()
+        .models
+        .for_purpose(task.purpose)
+        .map(String::from);
+    let mut child = settings::claude::command()?
+        .args(claude::args(
+            task.resume,
+            task.edit,
+            task.schema,
+            model.as_deref(),
+        ))
         .current_dir(task.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true)
         .spawn()
-        .context("couldn't start `claude`. Is Claude Code installed?")?;
+        .context("couldn't start Claude Code. Check the Claude command in Settings.")?;
     let mut stdin = child.stdin.take().context("no stdin")?;
     stdin.write_all(task.prompt.as_bytes()).await?;
     drop(stdin);
@@ -182,6 +195,7 @@ mod tests {
             resume,
             edit: true,
             schema: None,
+            purpose: Purpose::Ask,
         };
         let first = run(
             &runs,
