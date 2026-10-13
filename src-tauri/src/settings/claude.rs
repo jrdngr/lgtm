@@ -1,6 +1,6 @@
-//! The command that starts Claude Code, from the `claude` setting. A command on PATH runs as
-//! is. Otherwise the login shell says what the name is: an alias is expanded once and run
-//! directly, and a function runs through the shell on every call.
+//! The command that starts Claude Code, from the `claude` setting. The login shell says what
+//! the name is: a program runs as is, an alias is expanded once and run directly, and a
+//! function runs through the shell on every call.
 
 use std::sync::RwLock;
 
@@ -101,9 +101,6 @@ fn resolve_with(
         args: before.iter().chain(rest).cloned().collect(),
         via_shell: false,
     };
-    if on_path(first) {
-        return Ok(direct(first, &[]));
-    }
     let through_shell = Resolved {
         program: shell.to_string(),
         args: ["-l", "-i", "-c", &format!("{setting} \"$@\""), "lgtm"]
@@ -111,10 +108,18 @@ fn resolve_with(
             .to_vec(),
         via_shell: true,
     };
-    Ok(match interpret(&lookup(first)?) {
+    // The shell decides first: an alias or function shadows a program of the same name, like
+    // `cc` for Claude over the C compiler.
+    let found = match lookup(first) {
+        Ok(out) => interpret(&out),
+        Err(_) if on_path(first) => Lookup::Path(first.clone()),
+        Err(e) => return Err(e),
+    };
+    Ok(match found {
         Lookup::Path(path) => direct(&path, &[]),
         Lookup::Alias(alias) if on_path(&alias[0]) => direct(&alias[0], &alias[1..]),
         Lookup::Alias(_) | Lookup::Shell => through_shell,
+        Lookup::Missing if on_path(first) => direct(first, &[]),
         Lookup::Missing => {
             bail!("`{first}` isn't a command, alias or function in your login shell")
         }
@@ -220,6 +225,11 @@ mod tests {
         let function = resolve("cc", "cc").unwrap();
         assert_eq!(function.program, "/bin/zsh");
         assert_eq!(function.args, ["-l", "-i", "-c", "cc \"$@\"", "lgtm"]);
+
+        // An alias wins over a program of the same name.
+        let on_path = |n: &str| n == "cc" || n == "ucode";
+        let shadowed = resolve_with("cc", "/bin/zsh", on_path, shell("alias cc='ucode claude'"));
+        assert_eq!(shadowed.unwrap().program, "ucode");
 
         // An alias to something that isn't on PATH, like another alias, needs the shell too.
         assert!(resolve("cc", "alias cc='uc claude'").unwrap().via_shell);
