@@ -22,7 +22,7 @@
 }
 
 .status-added {
-  color: #3fb950;
+  color: var(--added);
 }
 
 .status-removed {
@@ -31,7 +31,7 @@
 
 .status-renamed,
 .status-copied {
-  color: #d29922;
+  color: var(--amber);
 }
 
 .file-header .tag {

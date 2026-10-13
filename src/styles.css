@@ -1,4 +1,9 @@
 :root {
+  /* Type scale: --fs-xs labels and counts, --fs-sm secondary text, --fs body. */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs: 13px;
+  --mono: Menlo, ui-monospace, monospace;
   --bg: #1e1e1e;
   --panel: #252526;
   --fg: #d4d4d4;
@@ -14,9 +19,19 @@
   --skipped: #6e7681;
   --flagged: #f85149;
   --selection: rgb(79 140 201 / 28%);
+  --raise: #2c2c2e;
+  --hair: #303030;
+  --faint: #5f6368;
+  --hover: rgb(255 255 255 / 6%);
+  --added: #3fb950;
+  --github: #a371f7;
+  --link: #6b7280;
+  --rev-at: #3fb950;
+  --rev-id: #8a8a8a;
+  --rev-unique: #c586c0;
   color-scheme: dark;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 13px;
+  font-size: var(--fs);
   color: var(--fg);
   background: var(--bg);
 }
@@ -40,6 +55,102 @@ button {
 
 button:hover:not(:disabled) {
   border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+/* The one action an area is for. */
+button.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: #5b98d4;
+}
+
+/* Toolbar and row actions: no box until hovered. */
+button.quiet {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+button.quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--hover);
+  color: var(--fg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+kbd {
+  font: 10px var(--mono);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0 4px;
+}
+
+/* A short state label: pending, resolved, outdated, code changed. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 17px;
+  white-space: nowrap;
+  color: var(--muted);
+  background: var(--hover);
+}
+
+.pill.amber {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
+}
+
+.pill.green {
+  color: var(--added);
+  background: rgb(63 185 80 / 14%);
+}
+
+.pill.red {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
+.pill.purple {
+  color: var(--github);
+  background: rgb(163 113 247 / 14%);
+}
+
+.pill.blue {
+  color: var(--accent);
+  background: rgb(79 140 201 / 16%);
+}
+
+/* Shown only while their row or card is hovered or holds focus. */
+.reveal {
+  visibility: hidden;
+}
+
+:hover > .reveal,
+:hover > * > .reveal,
+:focus-within > .reveal,
+:focus-within > * > .reveal,
+.reveal:has(.open) {
+  visibility: visible;
 }
 
 .error {
@@ -250,27 +361,51 @@ button:hover:not(:disabled) {
 
 .side-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 4px 6px 0;
-  border-bottom: 1px solid var(--border);
+  align-items: stretch;
+  height: 34px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--hair);
 }
 
 .side-tabs button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
   border: none;
-  border-bottom: 2px solid transparent;
   border-radius: 0;
   background: none;
-  padding: 3px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
+  padding: 0;
   color: var(--muted);
+}
+
+.side-tabs button:hover:not(:disabled) {
+  color: var(--fg);
 }
 
 .side-tabs button.selected {
   color: var(--fg);
-  border-bottom-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.side-badge {
+  position: absolute;
+  top: 4px;
+  right: 1px;
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  color: #fff;
+  background: var(--accent);
+}
+
+.side-badge.amber {
+  color: #111;
+  background: var(--amber);
 }
 
 .side-split {
@@ -341,16 +476,106 @@ button:hover:not(:disabled) {
 }
 
 .icon-button {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 4px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border-color: transparent;
   background: none;
   color: var(--muted);
 }
 
+.icon-button:hover:not(:disabled),
+.icon-button.open {
+  border-color: transparent;
+  background: var(--hover);
+  color: var(--fg);
+}
+
 .icon-button[aria-pressed="true"] {
   color: var(--fg);
+}
+
+.menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--raise);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+}
+
+.menu-list button {
+  border: none;
+  border-radius: 4px;
+  background: none;
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-list button:hover:not(:disabled) {
+  background: var(--selection);
+}
+
+.menu-list button.danger {
+  color: var(--error);
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.section-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-meta {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.ring-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.ring-wrap.done {
+  color: var(--added);
+}
+
+.ring {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: conic-gradient(var(--added) var(--done), var(--border) 0);
 }
 
 /* Important note levels, in the Symbols view. */

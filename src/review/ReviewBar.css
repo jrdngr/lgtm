@@ -60,16 +60,16 @@
 }
 
 .rev-at {
-  color: #3fb950;
+  color: var(--rev-at);
   font-weight: bold;
 }
 
 .rev-id {
-  color: #8a8a8a;
+  color: var(--rev-id);
 }
 
 .rev-unique {
-  color: #c586c0;
+  color: var(--rev-unique);
   font-weight: bold;
 }
 
@@ -79,7 +79,7 @@
 }
 
 .rev-desc.empty {
-  color: #d29922;
+  color: var(--amber);
 }
 
 .risk-run {

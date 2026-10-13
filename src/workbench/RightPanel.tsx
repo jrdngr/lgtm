@@ -64,10 +64,15 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       side="right"
       {...props}
       views={[
-        { id: "diff", title: "Diff", render: () => <DiffTab /> },
-        { id: "repo", title: "Files", render: () => <FilesTab /> },
-        { id: "comments", title: "Comments", render: () => <CommentsPanel /> },
-        { id: "reports", title: "Reports", render: () => <ReportsTab onOpen={onOpenReport} /> },
+        { id: "diff", title: "Diff", icon: "diff", render: () => <DiffTab /> },
+        { id: "repo", title: "Files", icon: "folder", render: () => <FilesTab /> },
+        { id: "comments", title: "Comments", icon: "comments", render: () => <CommentsPanel /> },
+        {
+          id: "reports",
+          title: "Reports",
+          icon: "map",
+          render: () => <ReportsTab onOpen={onOpenReport} />,
+        },
       ]}
     />
   );

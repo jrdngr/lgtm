@@ -160,6 +160,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             {
               id: "workspaces",
               title: "Workspaces",
+              icon: "folder",
               render: () => (
                 <WorkspacesSidebar
                   selected={selected}
