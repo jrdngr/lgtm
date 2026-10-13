@@ -134,13 +134,14 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
         eprintln!("lgtm: save recent repos: {e}");
     }
-    WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title(name(&root))
         .inner_size(1400.0, 900.0)
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
         .disable_drag_drop_handler()
         .build()
         .map_err(|e| e.to_string())?;
+    crate::zoom::apply(&window);
     close_start(app);
     Ok(())
 }
@@ -159,7 +160,7 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
         .title("lgtm")
         .inner_size(480.0, 420.0)
         .build()
-        .map(|_| ())
+        .map(|window| crate::zoom::apply(&window))
 }
 
 /// Opens the repo named on a command line, or the start window when none is given.

@@ -27,6 +27,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘N | New window, opening on the repo picker |
 | ⌘O | Open a different repo: swaps this window for the repo picker |
 | ⌥Z | View > Word Wrap: wrap long lines in reviews and editors instead of scrolling sideways (off by default, remembered) |
+| ⌘= / ⌘- / ⌘0 | View > Zoom In / Zoom Out / Actual Size: scales every window's text and UI together (remembered) |
 | ⌃\` | Bottom panel: show it and focus it (with a new terminal when it's empty), or hide it when it has focus |
 | ⌃⇧\` | New terminal in the bottom panel |
 | ⌘T | New terminal tab, in the pane grid or bottom panel, whichever has focus |

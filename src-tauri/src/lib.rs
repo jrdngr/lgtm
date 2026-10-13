@@ -29,6 +29,7 @@ mod tools;
 mod watch;
 mod workspace;
 mod workspaces;
+mod zoom;
 
 use std::path::Path;
 

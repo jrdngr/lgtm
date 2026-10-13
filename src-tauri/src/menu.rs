@@ -1,17 +1,20 @@
 //! The app menu: the platform default plus Settings in the app menu, New Window and Open
-//! Repository in File, and Word Wrap in View.
+//! Repository in File, and Word Wrap and zoom in View.
 
 use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event as _;
 
 use crate::events::{OpenSettings, SwitchRepo, WordWrap};
-use crate::repo;
+use crate::{repo, zoom};
 
 const NEW_WINDOW: &str = "new-window";
 const OPEN_REPO: &str = "open-repo";
 const WORD_WRAP: &str = "word-wrap";
 const SETTINGS: &str = "settings";
+const ZOOM_IN: &str = "zoom-in";
+const ZOOM_OUT: &str = "zoom-out";
+const ZOOM_RESET: &str = "zoom-reset";
 
 /// View > Word Wrap. Windows keep the setting and tell the menu what it is.
 pub struct WordWrapItem<R: Runtime>(pub CheckMenuItem<R>);
@@ -52,7 +55,14 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                     false,
                     Some("Alt+Z"),
                 )?;
-                sub.prepend_items(&[&wrap, &PredefinedMenuItem::separator(app)?])?;
+                sub.prepend_items(&[
+                    &wrap,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(app, ZOOM_IN, "Zoom In", true, Some("CmdOrCtrl+="))?,
+                    &MenuItem::with_id(app, ZOOM_OUT, "Zoom Out", true, Some("CmdOrCtrl+-"))?,
+                    &MenuItem::with_id(app, ZOOM_RESET, "Actual Size", true, Some("CmdOrCtrl+0"))?,
+                    &PredefinedMenuItem::separator(app)?,
+                ])?;
                 app.manage(WordWrapItem(wrap));
             }
             _ => {}
@@ -67,6 +77,9 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
         OPEN_REPO => switch_repo(app),
         WORD_WRAP => word_wrap(app),
         SETTINGS => open_settings(app),
+        ZOOM_IN => zoom::step(app, Some(1)),
+        ZOOM_OUT => zoom::step(app, Some(-1)),
+        ZOOM_RESET => zoom::step(app, None),
         _ => Ok(()),
     };
     if let Err(e) = result {
