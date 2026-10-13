@@ -3,6 +3,7 @@
 //! did. Sessions live in the store, never in the repo.
 
 pub mod agent;
+mod discuss;
 pub mod queue;
 
 use anyhow::Context;

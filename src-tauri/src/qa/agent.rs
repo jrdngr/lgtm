@@ -1,11 +1,11 @@
 //! The agent steps of a Q&A session: building the questions from the prompt, applying each
-//! answer to the open questions, discussing or re-asking a question, writing a plan, and
-//! applying the decisions to the repo. Every step continues one conversation per session.
+//! answer to the open questions, writing a plan, and applying the decisions to the repo.
+//! Discussing a question is in `discuss`. Every step continues one conversation per session.
 
 use anyhow::Context;
 use serde::Deserialize;
 
-use super::queue::{self, NewQuestion, QState, Rewrite, Turn, Update};
+use super::queue::{self, NewQuestion, QState, Update};
 use super::{Applied, Plan, PlanFile, Session};
 use crate::agent::{self, Progress, Runs};
 use crate::prompts::{self, Prompt};
@@ -47,7 +47,7 @@ fn new_question() -> String {
     )
 }
 
-fn rewrite() -> String {
+pub(super) fn rewrite() -> String {
     format!(
         r#"{{
       "type": "object",
@@ -136,7 +136,10 @@ struct Planned {
     files: Vec<PlanFile>,
 }
 
-fn parse<T: serde::de::DeserializeOwned>(reply: &agent::Reply, what: &str) -> anyhow::Result<T> {
+pub(super) fn parse<T: serde::de::DeserializeOwned>(
+    reply: &agent::Reply,
+    what: &str,
+) -> anyhow::Result<T> {
     let value = reply
         .structured
         .clone()
@@ -146,12 +149,12 @@ fn parse<T: serde::de::DeserializeOwned>(reply: &agent::Reply, what: &str) -> an
 }
 
 /// One step of the session's conversation.
-struct Step {
-    turn: String,
-    edit: bool,
-    schema: Option<String>,
+pub(super) struct Step {
+    pub turn: String,
+    pub edit: bool,
+    pub schema: Option<String>,
     /// Starts a new conversation instead of continuing the session's.
-    fresh: bool,
+    pub fresh: bool,
 }
 
 /// Every decision, a line each, for the plan and the write.
@@ -222,7 +225,7 @@ impl RepoCtx {
         ))
     }
 
-    async fn qa_step(
+    pub(super) async fn qa_step(
         &self,
         ws: &Workspace,
         id: &str,
@@ -381,107 +384,6 @@ impl RepoCtx {
         self.qa_session(ws, id)
     }
 
-    /// A discussion turn on question `qid`, which isn't a decision. Streams the reply.
-    pub async fn discuss_question(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        qid: &str,
-        message: &str,
-        runs: &Runs,
-        on_text: impl Fn(String),
-    ) -> anyhow::Result<Session> {
-        let q = self.qa_session(ws, id)?.queue;
-        let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
-        let turn = if question.discussion.is_empty() {
-            format!(
-                "Let's discuss this question. It's a discussion, not a decision: answer \
-                 briefly. {}\n\n{}\n\n{message}",
-                rewrite_rule(qid),
-                queue::question_text(question)
-            )
-        } else {
-            format!("About {qid}: {message}\n\n({})", rewrite_rule(qid))
-        };
-        self.edit_qa(ws, id, |s| {
-            s.queue.discuss(
-                qid,
-                Turn {
-                    you: true,
-                    text: message.to_string(),
-                },
-            )
-        })?;
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    edit: false,
-                    schema: None,
-                    fresh: false,
-                },
-                |p| {
-                    if let Progress::Text(t) = p {
-                        on_text(t)
-                    }
-                },
-            )
-            .await?;
-        let (text, rewritten) = split_rewrite(&reply.text);
-        self.edit_qa(ws, id, |s| {
-            s.queue.discuss(
-                qid,
-                Turn {
-                    you: false,
-                    text: text.to_string(),
-                },
-            )?;
-            if let Some(mut r) = rewritten {
-                r.id = qid.to_string();
-                s.queue.reask(r)?;
-            }
-            Ok(())
-        })?;
-        self.qa_session(ws, id)
-    }
-
-    /// Rewrites question `qid` with what came out of its discussion.
-    pub async fn reask_question(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        qid: &str,
-        runs: &Runs,
-    ) -> anyhow::Result<Session> {
-        let turn = format!(
-            "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
-             id. Say in a few words what changed."
-        );
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    edit: false,
-                    schema: Some(rewrite()),
-                    fresh: false,
-                },
-                |_| {},
-            )
-            .await?;
-        if !reply.stopped {
-            let mut r: Rewrite = parse(&reply, "re-ask")?;
-            r.id = qid.to_string();
-            self.edit_qa(ws, id, |s| s.queue.reask(r))?;
-        }
-        self.qa_session(ws, id)
-    }
-
     /// Has the agent plan the write from the decisions, or revise its plan with the user's
     /// comments on it. Nothing is written.
     pub async fn write_plan(
@@ -598,35 +500,6 @@ impl RepoCtx {
     }
 }
 
-const REWRITE_TAG: &str = "<rewrite>";
-
-/// How a discussion reply rewrites its question when the talk changes it.
-fn rewrite_rule(qid: &str) -> String {
-    format!(
-        "If this changes {qid}'s context, options or recommendation, end your reply with the \
-         rewritten question by the same rules, as JSON with the fields id, what (what changed, \
-         in a few words), subject, context, options and why, between {REWRITE_TAG} and \
-         </rewrite>. Otherwise leave it out."
-    )
-}
-
-/// A discussion reply's text, and the rewrite it ends with, if any. A rewrite that isn't
-/// valid JSON is dropped from the text all the same.
-fn split_rewrite(reply: &str) -> (&str, Option<Rewrite>) {
-    let Some((text, rest)) = reply.split_once(REWRITE_TAG) else {
-        return (reply.trim(), None);
-    };
-    let json = rest.split("</rewrite>").next().unwrap_or_default().trim();
-    let json = json
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```");
-    let rewrite = serde_json::from_str(json)
-        .inspect_err(|e| eprintln!("lgtm: discussion rewrite: {e}"))
-        .ok();
-    (text.trim(), rewrite)
-}
-
 fn note_line(note: &str) -> String {
     if note.trim().is_empty() {
         String::new()
@@ -652,19 +525,6 @@ mod tests {
         for s in [ask_schema(), update_schema(), rewrite(), PLAN_SCHEMA.into()] {
             serde_json::from_str::<serde_json::Value>(&s).unwrap();
         }
-    }
-
-    #[test]
-    fn a_discussion_reply_splits_off_its_rewrite() {
-        assert_eq!(split_rewrite(" Sure. ").0, "Sure.");
-        let reply = "Good point, adding it.\n\n<rewrite>\n```json\n{\"id\":\"Q2\",\"what\":\"added C\",\
-                     \"subject\":\"s\",\"context\":[],\"options\":[{\"label\":\"C\",\"bullets\":[]}],\
-                     \"why\":\"w\"}\n```\n</rewrite>";
-        let (text, r) = split_rewrite(reply);
-        assert_eq!(text, "Good point, adding it.");
-        assert_eq!(r.unwrap().what, "added C");
-        let (text, r) = split_rewrite("Hm.\n<rewrite>{not json</rewrite>");
-        assert_eq!((text, r), ("Hm.", None));
     }
 
     #[test]

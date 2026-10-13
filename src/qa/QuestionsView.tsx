@@ -4,7 +4,7 @@ import { commands } from "../ipc";
 import { GrowingText } from "../ui/GrowingText";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
-import { decide as decideQuestion } from "./actions";
+import { decide as decideQuestion, discuss as discussQuestion } from "./actions";
 import { Discussion } from "./Discussion";
 import { answerLabel, countable, current, lastDecided, type Question, type Session } from "./model";
 import { QuestionCard } from "./QuestionCard";
@@ -93,15 +93,11 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     if (next) setWant(next.id);
   }
 
-  function discuss(message: string) {
-    if (!q) return;
-    const qid = q.id;
-    runStep(
-      ws,
-      id,
-      { kind: "discuss", about: qid, subject: `${d.title}: ${qid}`, streams: true },
-      (ch) => commands.discussQuestion(ws, id, qid, message, ch),
-    );
+  async function discuss(message: string) {
+    if (!q || !(await discussQuestion(ws, d, q.id, message))) return;
+    setWant(undefined);
+    setMode(undefined);
+    focusRoot();
   }
 
   function reask() {

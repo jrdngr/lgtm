@@ -91,14 +91,14 @@ export function applyText(d: Session): string {
   return parts.join("\n\n");
 }
 
-const TAG = "<rewrite>";
+const TAGS = ["<rewrite>", "<decide>"];
 
-/** A streaming reply without the rewrite it may end with, which shows on the question
- * instead, including a tag still coming in. */
+/** A streaming reply without the tags it may end with, which act on the question instead,
+ * including a tag still coming in. */
 export function shownReply(text: string) {
-  const at = text.indexOf(TAG);
-  if (at >= 0) return text.slice(0, at);
-  for (let n = TAG.length - 1; n > 0; n--)
-    if (text.endsWith(TAG.slice(0, n))) return text.slice(0, -n);
+  const at = Math.min(...TAGS.map((t) => text.indexOf(t)).filter((i) => i >= 0));
+  if (Number.isFinite(at)) return text.slice(0, at);
+  for (let n = TAGS[0].length - 1; n > 0; n--)
+    if (TAGS.some((t) => text.endsWith(t.slice(0, n)))) return text.slice(0, -n);
   return text;
 }

@@ -8,10 +8,31 @@ import { act, removeSession, runStep, selectSession, setError, setView } from ".
 export async function decide(ws: WorkspaceName, d: Session, id: string, answer: AnswerInput) {
   const r = await act(ws, commands.actOnQuestion(ws, d.id, { kind: "decide", id, answer }));
   if (r.status === "error") return false;
-  runStep(ws, d.id, { kind: "answer", about: id, subject: `${d.title}: after ${id}` }, () =>
+  updateAfter(ws, d, id);
+  return true;
+}
+
+/** Has the agent update the questions still open after `id` was decided. */
+export function updateAfter(ws: WorkspaceName, d: Session, id: string) {
+  return runStep(ws, d.id, { kind: "answer", about: id, subject: `${d.title}: after ${id}` }, () =>
     commands.applyAnswer(ws, d.id, id),
   );
-  return true;
+}
+
+/** A discussion turn on question `id`. When the user settles it there, the agent decides it
+ * and then updates the questions still open. Returns whether it was decided. */
+export async function discuss(ws: WorkspaceName, d: Session, id: string, message: string) {
+  const state = (s: Session) => s.queue.questions.find((q) => q.id === id)?.state;
+  const wasOpen = state(d) === "open";
+  const r = await runStep(
+    ws,
+    d.id,
+    { kind: "discuss", about: id, subject: `${d.title}: ${id}`, streams: true },
+    (ch) => commands.discussQuestion(ws, d.id, id, message, ch),
+  );
+  const decided = wasOpen && r.status === "ok" && state(r.data) === "decided";
+  if (decided) updateAfter(ws, r.data, id);
+  return decided;
 }
 
 /** Saves a prompt as a new session, or into session `d`. Returns the session's id. */
