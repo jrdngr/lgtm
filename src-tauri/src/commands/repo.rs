@@ -1,10 +1,11 @@
 use std::path::Path;
 
-use tauri::{AppHandle, WebviewWindow};
+use tauri::{AppHandle, Manager, WebviewWindow};
 
 use super::{CmdResult, err, layout_path, repo_root};
 use crate::jj::init;
 use crate::repo::{self, RepoInfo};
+use crate::menu::WordWrapItem;
 use crate::{layout, recent};
 
 #[tauri::command]
@@ -26,6 +27,16 @@ pub(crate) fn switch_repo(app: AppHandle, window: WebviewWindow) -> CmdResult<()
     // Start first, so closing the last repo window doesn't quit the app.
     repo::open_start(&app).map_err(|e| e.to_string())?;
     window.destroy().map_err(|e| e.to_string())
+}
+
+/// Shows the window's saved Word Wrap setting as View > Word Wrap's check.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn set_word_wrap(app: AppHandle, on: bool) -> CmdResult<()> {
+    match app.try_state::<WordWrapItem<tauri::Wry>>() {
+        Some(item) => item.0.set_checked(on).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
 }
 
 /// Closes this window without another close request, once the window has confirmed it.

@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching } from "@codemirror/language";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
-import { EditorState, type Extension } from "@codemirror/state";
+import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
   drawSelection,
   EditorView,
@@ -28,6 +28,11 @@ const theme = EditorView.theme(
   { dark: true },
 );
 
+/** Holds line wrapping, so View > Word Wrap can switch it in open editors. */
+export const wrapping = new Compartment();
+
+export const wrapExtension = (on: boolean): Extension => (on ? EditorView.lineWrapping : []);
+
 interface Hooks {
   save(): void;
   changed(u: ViewUpdate): void;
@@ -38,7 +43,12 @@ export function lineEnding(text: string): Extension {
   return text.includes("\r\n") ? EditorState.lineSeparator.of("\r\n") : [];
 }
 
-export function editorExtensions(path: string, text: string, hooks: Hooks): Extension[] {
+export function editorExtensions(
+  path: string,
+  text: string,
+  wrap: boolean,
+  hooks: Hooks,
+): Extension[] {
   const save = () => {
     hooks.save();
     return true;
@@ -60,6 +70,7 @@ export function editorExtensions(path: string, text: string, hooks: Hooks): Exte
       ...searchKeymap,
     ]),
     lineEnding(text),
+    wrapping.of(wrapExtension(wrap)),
     treeSitter(path),
     theme,
     EditorView.updateListener.of(hooks.changed),

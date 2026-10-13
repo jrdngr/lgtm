@@ -1,5 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { type ReactNode, type RefObject, useCallback, useEffect } from "react";
+import { type ReactNode, type RefObject, useCallback, useEffect, useMemo } from "react";
+import { wordWrap } from "../workbench/wordWrap";
 import { Cell } from "./Cell";
 import { FileHeader } from "./FileHeader";
 import {
@@ -11,6 +12,7 @@ import {
 } from "./model";
 import type { Selection } from "./selection";
 import { type MarkIndex, type Progress, plural } from "./state";
+import { contentWidth } from "./width";
 
 const ROW_HEIGHT = 20;
 const FILE_HEIGHT = 30;
@@ -96,6 +98,8 @@ function stickyFile(
 
 export function DiffLines(props: Props) {
   const { files, markers, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
+  const wrap = wordWrap.use();
+  const width = useMemo(() => (wrap ? undefined : contentWidth(files, mode)), [files, mode, wrap]);
 
   const virtualizer = useVirtualizer({
     count: lines.length,
@@ -106,6 +110,22 @@ export function DiffLines(props: Props) {
     getItemKey: useCallback((i: number) => lineKey(lines[i]), [lines]),
     overscan: 30,
   });
+
+  // Wrapped rows take their measured heights; unwrapped ones go back to fixed heights.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when wrapping changes
+  useEffect(() => {
+    virtualizer.measure();
+  }, [wrap, virtualizer]);
+
+  // Lines that don't scroll sideways (headers, comments) fit the visible width.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const fit = () => el.style.setProperty("--view-w", `${el.clientWidth}px`);
+    const observer = new ResizeObserver(fit);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [scrollRef]);
 
   useEffect(() => {
     virtualizer.scrollToIndex(cursor, { align: "auto" });
@@ -225,7 +245,7 @@ export function DiffLines(props: Props) {
   return (
     <div
       ref={scrollRef}
-      className="diff-scroll"
+      className={`diff-scroll${wrap ? " wrap" : ""}`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) props.onBackgroundMouseDown();
       }}
@@ -240,12 +260,13 @@ export function DiffLines(props: Props) {
           </div>
         </div>
       )}
-      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+      <div style={{ height: virtualizer.getTotalSize(), width, position: "relative" }}>
         {virtualizer.getVirtualItems().map((v) => {
           const selected = v.index >= selection.start && v.index <= selection.end;
-          // Comment and note blocks size to their content; every other line has a fixed height.
+          // Comment and note blocks size to their content, as do rows when they wrap. Every
+          // other line has a fixed height.
           const kind = lines[v.index].kind;
-          const sized = kind === "comment" || kind === "note";
+          const sized = kind === "comment" || kind === "note" || (wrap && kind === "rows");
           return (
             <div
               key={v.key}
@@ -261,7 +282,11 @@ export function DiffLines(props: Props) {
                 transform: `translateY(${v.start}px)`,
               }}
             >
-              {render(lines[v.index], v.index)}
+              {kind === "rows" ? (
+                render(lines[v.index], v.index)
+              ) : (
+                <div className="pin">{render(lines[v.index], v.index)}</div>
+              )}
             </div>
           );
         })}

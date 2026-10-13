@@ -22,6 +22,8 @@ export const commands = {
 	switchRepo: () => typedError<null, string>(__TAURI_INVOKE("switch_repo")),
 	/**  Closes this window without another close request, once the window has confirmed it. */
 	closeWindow: () => typedError<null, string>(__TAURI_INVOKE("close_window")),
+	/**  Shows the window's saved Word Wrap setting as View > Word Wrap's check. */
+	setWordWrap: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_word_wrap", { on })),
 	loadLayout: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("load_layout", { workspace })),
 	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
 	/**
@@ -200,6 +202,7 @@ export const events = {
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
+	wordWrap: makeEvent<WordWrap>("word-wrap"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
 };
 
@@ -980,6 +983,11 @@ export type WalkthroughDone = {
 	state: StateDto,
 	/**  Notes the agent put outside the review's files. */
 	skipped: number,
+};
+
+/**  View > Word Wrap was turned on or off. */
+export type WordWrap = {
+	on: boolean,
 };
 
 /**

@@ -13,6 +13,12 @@ pub struct RepoChanged {}
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SwitchRepo {}
 
+/// View > Word Wrap was turned on or off.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct WordWrap {
+    pub on: bool,
+}
+
 /// A workspace's working copy became stale (`message` is jj's error) or stopped being stale
 /// (`null`). `workspace` is `null` for the main one.
 #[derive(Clone, Serialize, Type, Event)]

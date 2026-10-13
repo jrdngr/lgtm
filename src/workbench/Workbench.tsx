@@ -15,6 +15,7 @@ import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "
 import { prOpen } from "./subviews";
 import { useCloseGuard } from "./useCloseGuard";
 import { WorkspaceDock } from "./WorkspaceDock";
+import { useWordWrapMenu } from "./wordWrap";
 
 /** Shortcuts acting on the selected workspace's panes. */
 const shortcuts: Partial<Record<string, (api: DockviewApi) => void>> = {
@@ -41,6 +42,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const rightBody = useRef<HTMLDivElement>(null);
   const api = () => dockOf(selected);
   useCloseGuard();
+  useWordWrapMenu();
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

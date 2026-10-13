@@ -234,7 +234,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     const row = scrollRef.current?.querySelector(".line.cursor")?.getBoundingClientRect();
     if (!root) return;
     setMenu({
-      x: (row?.left ?? root.left) - root.left + 80,
+      // A row scrolled sideways starts left of the pane.
+      x: Math.max(row?.left ?? root.left, root.left) - root.left + 80,
       y: (row?.bottom ?? root.top + 60) - root.top,
     });
   }

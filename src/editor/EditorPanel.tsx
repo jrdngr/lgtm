@@ -4,13 +4,14 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { commands, errorText, unwrap } from "../ipc";
 import { isMac } from "../workbench/keys";
+import { wordWrap } from "../workbench/wordWrap";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { minimalChange } from "./change";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { emitSaved } from "./saved";
-import { editorExtensions } from "./setup";
+import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
 import "./editor.css";
 
@@ -32,6 +33,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   /** The text shown rendered, for markdown, or undefined while editing. */
   const [rendered, setRendered] = useState<string>();
   const saveRef = useRef(async () => false);
+  const wrap = wordWrap.use();
 
   useEffect(() => {
     let live = true;
@@ -39,7 +41,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
     unwrap(commands.readFile(workspace, path)).then(
       (text) => {
         if (!live || !host.current) return;
-        const extensions = editorExtensions(path, text, {
+        const extensions = editorExtensions(path, text, wordWrap.get(), {
           save: () => saveRef.current(),
           changed: (u) => {
             if (!u.docChanged) return;
@@ -62,6 +64,10 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
       made?.destroy();
     };
   }, [workspace, path]);
+
+  useEffect(() => {
+    view?.dispatch({ effects: wrapping.reconfigure(wrapExtension(wrap)) });
+  }, [view, wrap]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` reopens at the same line
   useEffect(() => {

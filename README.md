@@ -24,6 +24,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 |---|---|
 | ⌘N | New window, opening on the repo picker |
 | ⌘O | Open a different repo: swaps this window for the repo picker |
+| ⌥Z | View > Word Wrap: wrap long lines in reviews and editors instead of scrolling sideways (off by default, remembered) |
 | ⌘T | New terminal tab |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |

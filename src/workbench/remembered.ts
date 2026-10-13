@@ -16,6 +16,7 @@ export function remembered<T extends string | boolean>(key: string, initial: T, 
     return () => listeners.delete(l);
   };
   return {
+    get: () => value,
     set(next: T) {
       value = next;
       try {
