@@ -1,0 +1,631 @@
+//! The agent steps of a Q&A session: building the questions from the prompt, applying each
+//! answer to the open questions, discussing or re-asking a question, writing a plan, and
+//! applying the decisions to the repo. Every step continues one conversation per session.
+
+use anyhow::Context;
+use serde::Deserialize;
+
+use super::queue::{self, NewQuestion, QState, Rewrite, Turn, Update};
+use super::{Applied, Plan, PlanFile, Session};
+use crate::agent::{self, Progress, Runs};
+use crate::prompts::{self, Prompt};
+use crate::review::{RepoCtx, now_ms};
+use crate::workspace::Workspace;
+
+const CHOICE: &str = r#"{
+  "type": "object",
+  "properties": {
+    "label": { "type": "string" },
+    "bullets": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["label", "bullets"],
+  "additionalProperties": false
+}"#;
+
+fn question_props() -> String {
+    format!(
+        r#""subject": {{ "type": "string" }},
+        "context": {{ "type": "array", "items": {{ "type": "string" }} }},
+        "options": {{ "type": "array", "items": {CHOICE}, "minItems": 1 }},
+        "why": {{ "type": "string" }}"#
+    )
+}
+
+fn new_question() -> String {
+    format!(
+        r#"{{
+      "type": "object",
+      "properties": {{
+        "sub": {{ "type": "boolean" }},
+        {},
+        "sources": {{ "type": "array", "items": {{ "type": "string" }} }}
+      }},
+      "required": ["sub", "subject", "context", "options", "why", "sources"],
+      "additionalProperties": false
+    }}"#,
+        question_props()
+    )
+}
+
+fn rewrite() -> String {
+    format!(
+        r#"{{
+      "type": "object",
+      "properties": {{
+        "id": {{ "type": "string" }},
+        "what": {{ "type": "string" }},
+        {}
+      }},
+      "required": ["id", "what", "subject", "context", "options", "why"],
+      "additionalProperties": false
+    }}"#,
+        question_props()
+    )
+}
+
+fn update_schema() -> String {
+    format!(
+        r#"{{
+  "type": "object",
+  "properties": {{
+    "drop": {{
+      "type": "array",
+      "items": {{
+        "type": "object",
+        "properties": {{ "id": {{ "type": "string" }}, "why": {{ "type": "string" }} }},
+        "required": ["id", "why"],
+        "additionalProperties": false
+      }}
+    }},
+    "rewrite": {{ "type": "array", "items": {} }},
+    "add": {{ "type": "array", "items": {} }}
+  }},
+  "required": ["drop", "rewrite", "add"],
+  "additionalProperties": false
+}}"#,
+        rewrite(),
+        new_question()
+    )
+}
+
+fn ask_schema() -> String {
+    format!(
+        r#"{{
+  "type": "object",
+  "properties": {{
+    "title": {{ "type": "string" }},
+    "questions": {{ "type": "array", "items": {} }}
+  }},
+  "required": ["title", "questions"],
+  "additionalProperties": false
+}}"#,
+        new_question()
+    )
+}
+
+const PLAN_SCHEMA: &str = r#"{
+  "type": "object",
+  "properties": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "change": { "enum": ["new", "edit", "delete"] },
+          "edits": { "type": "array", "items": { "type": "string" } },
+          "decisions": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["path", "change", "edits", "decisions"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["files"],
+  "additionalProperties": false
+}"#;
+
+#[derive(Deserialize)]
+struct Asked {
+    title: String,
+    questions: Vec<NewQuestion>,
+}
+
+#[derive(Deserialize)]
+struct Planned {
+    files: Vec<PlanFile>,
+}
+
+fn parse<T: serde::de::DeserializeOwned>(reply: &agent::Reply, what: &str) -> anyhow::Result<T> {
+    let value = reply
+        .structured
+        .clone()
+        .with_context(|| format!("the {what} returned no result"))?;
+    serde_json::from_value(value)
+        .with_context(|| format!("the {what} returned an unexpected result"))
+}
+
+/// One step of the session's conversation.
+struct Step {
+    turn: String,
+    edit: bool,
+    schema: Option<String>,
+    /// Starts a new conversation instead of continuing the session's.
+    fresh: bool,
+}
+
+/// Every decision, a line each, for the plan and the write.
+fn decisions(s: &Session) -> String {
+    s.queue
+        .questions
+        .iter()
+        .filter(|q| q.state == QState::Decided)
+        .map(|q| format!("- {} ({}): {}", q.id, q.text.subject, queue::answer_text(q)))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// The plan as text, with the user's comments on it.
+fn plan_text(plan: &Plan) -> String {
+    let mut out = String::new();
+    for f in &plan.files {
+        let change = match f.change {
+            super::FileChange::New => "new",
+            super::FileChange::Edit => "edit",
+            super::FileChange::Delete => "delete",
+        };
+        out.push_str(&format!(
+            "- {} ({change}; {})\n",
+            f.path,
+            f.decisions.join(", ")
+        ));
+        for e in &f.edits {
+            out.push_str(&format!("  - {e}\n"));
+        }
+    }
+    for c in &plan.comments {
+        out.push_str(&format!(
+            "\nMy comment on \"{}\": {}\n",
+            c.quote.trim(),
+            c.body.trim()
+        ));
+    }
+    out
+}
+
+/// A path from a tool call, relative to the workspace root.
+fn written(tool: &str, root: &std::path::Path) -> Option<String> {
+    let path = tool
+        .strip_prefix("Edit ")
+        .or_else(|| tool.strip_prefix("Write "))?;
+    let rel = std::path::Path::new(path)
+        .strip_prefix(root)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_string());
+    Some(rel)
+}
+
+impl RepoCtx {
+    fn qa_key(&self, ws: &Workspace, id: &str) -> String {
+        self.agent_key(&format!("qa-{}-{id}", ws.name.as_deref().unwrap_or("")))
+    }
+
+    /// The opening of the session's conversation: where things are and the rules.
+    fn qa_intro(&self, ws: &Workspace) -> anyhow::Result<String> {
+        let qq = prompts::load(Prompt::Qq, &ws.root)?;
+        let write = prompts::load(Prompt::QaWrite, &ws.root)?;
+        Ok(format!(
+            "We're working through the decisions for a change to this repository, one \
+             question at a time, before you write it. You're in the repository and can read \
+             any file. Don't edit files until I ask you to apply. You can't run commands.\n\n\
+             {qq}\n\n{write}"
+        ))
+    }
+
+    async fn qa_step(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        runs: &Runs,
+        step: Step,
+        on: impl Fn(Progress),
+    ) -> anyhow::Result<agent::Reply> {
+        let session = if step.fresh {
+            None
+        } else {
+            self.qa_session(ws, id)?.agent
+        };
+        let first = |turn: &str| -> anyhow::Result<String> {
+            Ok(format!("{}\n\n{turn}", self.qa_intro(ws)?))
+        };
+        let prompt = match session {
+            Some(_) => step.turn.clone(),
+            None => first(&step.turn)?,
+        };
+        let key = self.qa_key(ws, id);
+        let _busy = if step.edit { Some(ws.claim()?) } else { None };
+        let task = |prompt| agent::Task {
+            cwd: &ws.root,
+            prompt,
+            resume: None,
+            edit: step.edit,
+            schema: step.schema.as_deref(),
+            purpose: agent::Purpose::Qa,
+        };
+        let mut reply = agent::run(
+            runs,
+            &key,
+            agent::Task {
+                resume: session.as_deref(),
+                ..task(&prompt)
+            },
+            &on,
+        )
+        .await;
+        // A session Claude Code no longer has starts over with the intro.
+        if session.is_some() && reply.as_ref().is_err() {
+            let prompt = first(&step.turn)?;
+            reply = agent::run(runs, &key, task(&prompt), &on).await;
+        }
+        if step.edit {
+            ws.snapshot().await.ok();
+        }
+        let reply = reply?;
+        if !reply.stopped && reply.session.is_some() {
+            self.edit_qa(ws, id, |s| {
+                s.agent = reply.session.clone();
+                Ok(())
+            })?;
+        }
+        Ok(reply)
+    }
+
+    /// Has the agent turn the prompt into questions. Replaces the queue.
+    pub async fn ask_qa(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        runs: &Runs,
+        on_tool: impl Fn(String),
+    ) -> anyhow::Result<Session> {
+        let s = self.qa_session(ws, id)?;
+        let read_first = if s.attach.is_empty() {
+            String::new()
+        } else {
+            format!("\n\nRead these first: {}", s.attach.join(", "))
+        };
+        let turn = format!(
+            "Here's what I want:\n\n{}{read_first}\n\nRead whatever in the repo it touches. \
+             Then return a short title for it and every question I need to answer before you \
+             write it, in the order to ask them.",
+            s.prompt.trim()
+        );
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: false,
+                    schema: Some(ask_schema()),
+                    fresh: true,
+                },
+                tool_only(on_tool),
+            )
+            .await?;
+        if !reply.stopped {
+            let Asked { title, questions } = parse(&reply, "questions")?;
+            self.edit_qa(ws, id, |s| {
+                if !title.trim().is_empty() {
+                    s.title = title.trim().to_string();
+                }
+                s.queue = queue::Queue::default();
+                s.queue.add_round(questions);
+                s.plan = None;
+                Ok(())
+            })?;
+        }
+        self.qa_session(ws, id)
+    }
+
+    /// Applies the answer to `qid` to the open questions: drops, rewrites and new ones.
+    pub async fn apply_answer(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        qid: &str,
+        runs: &Runs,
+    ) -> anyhow::Result<Session> {
+        let q = self.qa_session(ws, id)?.queue;
+        let answered = q.get(qid).with_context(|| format!("no question {qid}"))?;
+        let open: Vec<String> = q
+            .questions
+            .iter()
+            .filter(|o| o.state == QState::Open && o.id != qid)
+            .map(queue::question_text)
+            .collect();
+        if open.is_empty() {
+            return self.qa_session(ws, id);
+        }
+        let turn = format!(
+            "I answered {qid} ({}): {}.\n\nApply that to the open questions below. Drop the \
+             ones it settles, with why in a few words (\"settled by {qid}\"). Rewrite the ones \
+             it reshapes, saying in a few words what changed. Add any new decision it raises. \
+             Leave out questions it doesn't affect.\n\n{}",
+            answered.text.subject,
+            queue::answer_text(answered),
+            open.join("\n\n---\n\n")
+        );
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: false,
+                    schema: Some(update_schema()),
+                    fresh: false,
+                },
+                |_| {},
+            )
+            .await?;
+        if !reply.stopped {
+            let update: Update = parse(&reply, "update")?;
+            self.edit_qa(ws, id, |s| {
+                s.queue.apply(qid, update);
+                Ok(())
+            })?;
+        }
+        self.qa_session(ws, id)
+    }
+
+    /// A discussion turn on question `qid`, which isn't a decision. Streams the reply.
+    pub async fn discuss_question(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        qid: &str,
+        message: &str,
+        runs: &Runs,
+        on_text: impl Fn(String),
+    ) -> anyhow::Result<Session> {
+        let q = self.qa_session(ws, id)?.queue;
+        let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
+        let turn = if question.discussion.is_empty() {
+            format!(
+                "Let's discuss this question. It's a discussion, not a decision: answer \
+                 briefly.\n\n{}\n\n{message}",
+                queue::question_text(question)
+            )
+        } else {
+            format!("About {qid}: {message}")
+        };
+        self.edit_qa(ws, id, |s| {
+            s.queue.discuss(
+                qid,
+                Turn {
+                    you: true,
+                    text: message.to_string(),
+                },
+            )
+        })?;
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: false,
+                    schema: None,
+                    fresh: false,
+                },
+                |p| {
+                    if let Progress::Text(t) = p {
+                        on_text(t)
+                    }
+                },
+            )
+            .await?;
+        self.edit_qa(ws, id, |s| {
+            s.queue.discuss(
+                qid,
+                Turn {
+                    you: false,
+                    text: reply.text.trim().to_string(),
+                },
+            )
+        })?;
+        self.qa_session(ws, id)
+    }
+
+    /// Rewrites question `qid` with what came out of its discussion.
+    pub async fn reask_question(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        qid: &str,
+        runs: &Runs,
+    ) -> anyhow::Result<Session> {
+        let turn = format!(
+            "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
+             id. Say in a few words what changed."
+        );
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: false,
+                    schema: Some(rewrite()),
+                    fresh: false,
+                },
+                |_| {},
+            )
+            .await?;
+        if !reply.stopped {
+            let mut r: Rewrite = parse(&reply, "re-ask")?;
+            r.id = qid.to_string();
+            self.edit_qa(ws, id, |s| s.queue.reask(r))?;
+        }
+        self.qa_session(ws, id)
+    }
+
+    /// Has the agent plan the write from the decisions, or revise its plan with the user's
+    /// comments on it. Nothing is written.
+    pub async fn write_plan(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        runs: &Runs,
+        on_tool: impl Fn(String),
+    ) -> anyhow::Result<Session> {
+        let s = self.qa_session(ws, id)?;
+        let turn = match &s.plan {
+            Some(plan) if !plan.comments.is_empty() => format!(
+                "Revise your plan with my comments. Don't edit files yet.\n\n{}",
+                plan_text(plan)
+            ),
+            _ => format!(
+                "Every question is decided:\n\n{}\n\n{}Plan the write by the planning rules. \
+                 Don't edit files yet.",
+                decisions(&s),
+                note_line(&s.note)
+            ),
+        };
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: false,
+                    schema: Some(PLAN_SCHEMA.into()),
+                    fresh: false,
+                },
+                tool_only(on_tool),
+            )
+            .await?;
+        if !reply.stopped {
+            let Planned { files } = parse(&reply, "plan")?;
+            self.edit_qa(ws, id, |s| {
+                s.plan = Some(Plan {
+                    files,
+                    comments: vec![],
+                });
+                Ok(())
+            })?;
+        }
+        self.qa_session(ws, id)
+    }
+
+    /// Has the agent write the decisions into the workspace's @, following the plan when
+    /// there is one. Archives the session when it succeeds.
+    pub async fn apply_qa(
+        &self,
+        ws: &Workspace,
+        id: &str,
+        runs: &Runs,
+        on_tool: impl Fn(String),
+    ) -> anyhow::Result<Session> {
+        let s = self.qa_session(ws, id)?;
+        let plan = s
+            .plan
+            .as_ref()
+            .map(|p| format!("Follow this plan:\n\n{}\n\n", plan_text(p)))
+            .unwrap_or_default();
+        let turn = format!(
+            "Apply it now: write the changes the prompt and these decisions call for, by the \
+             applying rules.\n\n{}\n\n{}{plan}",
+            decisions(&s),
+            note_line(&s.note)
+        );
+        let files = std::sync::Mutex::new(Vec::<String>::new());
+        let reply = self
+            .qa_step(
+                ws,
+                id,
+                runs,
+                Step {
+                    turn,
+                    edit: true,
+                    schema: None,
+                    fresh: false,
+                },
+                |p| {
+                    if let Progress::Tool(t) = p {
+                        if let Some(f) = written(&t, &ws.root) {
+                            let mut files = files.lock().unwrap();
+                            if !files.contains(&f) {
+                                files.push(f);
+                            }
+                        }
+                        on_tool(t)
+                    }
+                },
+            )
+            .await?;
+        if !reply.stopped {
+            let files = files.into_inner().unwrap();
+            self.edit_qa(ws, id, |s| {
+                s.applied = Some(Applied {
+                    summary: reply.text.trim().to_string(),
+                    files,
+                    at: now_ms() as f64,
+                });
+                s.archived = true;
+                Ok(())
+            })?;
+        }
+        self.qa_session(ws, id)
+    }
+
+    /// Stops whatever the agent is doing on the session.
+    pub fn stop_qa(&self, ws: &Workspace, id: &str, runs: &Runs) {
+        runs.stop_all(&self.qa_key(ws, id));
+    }
+}
+
+fn note_line(note: &str) -> String {
+    if note.trim().is_empty() {
+        String::new()
+    } else {
+        format!("Also: {}\n\n", note.trim())
+    }
+}
+
+fn tool_only(on_tool: impl Fn(String)) -> impl Fn(Progress) {
+    move |p| {
+        if let Progress::Tool(t) = p {
+            on_tool(t)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_schemas_are_json() {
+        for s in [ask_schema(), update_schema(), rewrite(), PLAN_SCHEMA.into()] {
+            serde_json::from_str::<serde_json::Value>(&s).unwrap();
+        }
+    }
+
+    #[test]
+    fn writes_are_read_from_tool_calls() {
+        let root = std::path::Path::new("/r/ws");
+        assert_eq!(
+            written("Edit /r/ws/src/a.rs", root).as_deref(),
+            Some("src/a.rs")
+        );
+        assert_eq!(written("Write /tmp/x", root).as_deref(), Some("/tmp/x"));
+        assert_eq!(written("Read /r/ws/src/a.rs", root), None);
+    }
+}

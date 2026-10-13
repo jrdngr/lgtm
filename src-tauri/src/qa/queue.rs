@@ -1,6 +1,6 @@
-//! A design's question queue, kept in its `questions.json`: questions in ask order, each built
-//! the qqueue way (context, options with the recommendation first, the reason for it), and
-//! what was decided. Answers reshape the open questions through updates from the agent.
+//! A Q&A session's question queue: questions in ask order, each built the qqueue way (context,
+//! options with the recommendation first, the reason for it), and what was decided. Answers
+//! reshape the open questions through updates from the agent.
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -66,7 +66,7 @@ pub struct Turn {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct DesignQuestion {
+pub struct QaQuestion {
     /// `Q4`, or `Q4a` for a subquestion.
     pub id: String,
     pub round: u32,
@@ -90,10 +90,7 @@ pub struct DesignQuestion {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Queue {
-    pub questions: Vec<DesignQuestion>,
-    /// The last round folded into the design.
-    #[serde(default)]
-    pub revised: u32,
+    pub questions: Vec<QaQuestion>,
 }
 
 /// A question from the agent. A subquestion belongs to the top-level question before it.
@@ -157,11 +154,11 @@ fn number(id: &str) -> u32 {
 }
 
 impl Queue {
-    pub fn get(&self, id: &str) -> Option<&DesignQuestion> {
+    pub fn get(&self, id: &str) -> Option<&QaQuestion> {
         self.questions.iter().find(|q| q.id == id)
     }
 
-    fn get_mut(&mut self, id: &str) -> anyhow::Result<&mut DesignQuestion> {
+    fn get_mut(&mut self, id: &str) -> anyhow::Result<&mut QaQuestion> {
         self.questions
             .iter_mut()
             .find(|q| q.id == id)
@@ -195,7 +192,7 @@ impl Queue {
                 }
             };
             ids.push(id.clone());
-            self.questions.push(DesignQuestion {
+            self.questions.push(QaQuestion {
                 id,
                 round,
                 text: n.text(),
@@ -239,7 +236,7 @@ impl Queue {
             .iter_mut()
             .filter(|q| q.state == QState::Decided)
             .max_by(|a, b| {
-                let at = |q: &DesignQuestion| q.answer.as_ref().map_or(0.0, |a| a.at);
+                let at = |q: &QaQuestion| q.answer.as_ref().map_or(0.0, |a| a.at);
                 at(a).total_cmp(&at(b))
             })?;
         last.state = QState::Open;
@@ -340,17 +337,10 @@ impl Queue {
             .filter(|q| q.state == QState::Open)
             .count()
     }
-
-    /// Decisions in rounds not yet folded into the design.
-    pub fn unrevised(&self) -> impl Iterator<Item = &DesignQuestion> {
-        self.questions
-            .iter()
-            .filter(|q| q.state == QState::Decided && q.round > self.revised)
-    }
 }
 
 /// An answer in words, for the agent and for copying.
-pub fn answer_text(q: &DesignQuestion) -> String {
+pub fn answer_text(q: &QaQuestion) -> String {
     let Some(a) = &q.answer else {
         return "not decided".into();
     };
@@ -373,7 +363,7 @@ pub fn answer_text(q: &DesignQuestion) -> String {
 }
 
 /// A question in the qqueue template, as plain text.
-pub fn question_text(q: &DesignQuestion) -> String {
+pub fn question_text(q: &QaQuestion) -> String {
     let t = &q.text;
     let mut out = format!("{} — {}\n\nContext:\n\n", q.id, t.subject);
     for c in &t.context {

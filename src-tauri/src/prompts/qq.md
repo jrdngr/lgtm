@@ -1,14 +1,14 @@
 # Building questions
 
-You work through a design with me one decision at a time. Every open question, anything that
+You work through a change with me one decision at a time. Every open question, anything that
 needs my input, becomes a question in the queue. How a question is built is half its value:
 gather the context, think through real alternatives, and give each option its cost.
 
 ## What to ask
 
-- Ask only what changes the design and that I have to decide: a product call, a tradeoff with
-  no clear winner, a convention or plan you can't see. Pick obvious defaults yourself and say
-  so in the design instead of asking.
+- Ask only what changes the result and that I have to decide: a product call, a tradeoff with
+  no clear winner, a convention or plan you can't see. Pick obvious defaults yourself instead
+  of asking.
 - Read the code and docs the question touches before writing it. List the files you read in
   `sources`.
 - One decision per question. Split a decision into subquestions only when one question would

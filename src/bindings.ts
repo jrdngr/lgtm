@@ -220,39 +220,26 @@ export const commands = {
 	/**  Has an agent resolve a conflicted change, streaming its reply through `on_text`. */
 	resolveConflict: (workspace: string | null, change: string, onText: Channel<string>) => typedError<ResolveDto, string>(__TAURI_INVOKE("resolve_conflict", { workspace, change, onText })),
 	stopResolve: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("stop_resolve", { workspace })),
-	/**  The workspace's designs. */
-	listDesigns: (workspace: string | null) => typedError<DesignDto_Serialize[], string>(__TAURI_INVOKE("list_designs", { workspace })),
-	createDesign: (workspace: string | null, name: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("create_design", { workspace, name })),
-	/**  Saves the brief and the paths the agent reads before drafting. */
-	saveDesignBrief: (workspace: string | null, slug: string, brief: string, attach: string[]) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("save_design_brief", { workspace, slug, brief, attach })),
-	designFile: (workspace: string | null, slug: string, path: string) => typedError<DesignText, string>(__TAURI_INVOKE("design_file", { workspace, slug, path })),
-	/**  Records `text` as what the user has seen of `path`. */
-	markDesignSeen: (workspace: string | null, slug: string, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("mark_design_seen", { workspace, slug, path, text })),
-	actOnQuestion: (workspace: string | null, slug: string, act: QuestionAct) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, slug, act })),
-	/**  Has the agent write the design from its brief, with its open questions. */
-	draftDesign: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("draft_design", { workspace, slug, onTool })),
+	/**  The workspace's Q&A sessions, oldest first. */
+	listQa: (workspace: string | null) => typedError<Session_Serialize[], string>(__TAURI_INVOKE("list_qa", { workspace })),
+	/**  Starts a session from a prompt. Nothing runs until it's asked. */
+	createQa: (workspace: string | null, prompt: string, attach: string[]) => typedError<Session_Serialize, string>(__TAURI_INVOKE("create_qa", { workspace, prompt, attach })),
+	editQa: (workspace: string | null, id: string, edit: SessionEdit) => typedError<Session_Serialize, string>(__TAURI_INVOKE("edit_qa", { workspace, id, edit })),
+	deleteQa: (workspace: string | null, id: string) => typedError<null, string>(__TAURI_INVOKE("delete_qa", { workspace, id })),
+	actOnQuestion: (workspace: string | null, session: string, act: QuestionAct) => typedError<Session_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, session, act })),
+	/**  Has the agent turn the session's prompt into questions. */
+	askQa: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("ask_qa", { workspace, session, onTool })),
 	/**  Applies the answer to question `id` to the rest of the queue. */
-	applyAnswer: (workspace: string | null, slug: string, id: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, slug, id })),
+	applyAnswer: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, session, id })),
 	/**  A discussion turn on a question, streaming the agent's reply through `on_text`. */
-	discussQuestion: (workspace: string | null, slug: string, id: string, message: string, onText: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("discuss_question", { workspace, slug, id, message, onText })),
+	discussQuestion: (workspace: string | null, session: string, id: string, message: string, onText: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("discuss_question", { workspace, session, id, message, onText })),
 	/**  Rewrites a question after its discussion. */
-	reaskQuestion: (workspace: string | null, slug: string, id: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, slug, id })),
-	/**  Folds the new decisions into the design. */
-	reviseDesign: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("revise_design", { workspace, slug, onTool })),
-	addDesignComment: (workspace: string | null, slug: string, comment: CommentInput) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("add_design_comment", { workspace, slug, comment })),
-	/**  Changes a comment's text, or deletes it when `body` is null. */
-	editDesignComment: (workspace: string | null, slug: string, id: number, body: string | null) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("edit_design_comment", { workspace, slug, id, body })),
-	/**  Has the agent apply the queued comments in one turn. */
-	applyDesignComments: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("apply_design_comments", { workspace, slug, onTool })),
-	/**  Answers an ask comment, streaming the reply through `on_text`. */
-	answerDesignComment: (workspace: string | null, slug: string, id: number, onText: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("answer_design_comment", { workspace, slug, id, onText })),
-	/**  Makes a doc, diagram or HTML page for the design. */
-	makeDesignArtifact: (workspace: string | null, slug: string, kind: ArtifactKind, about: string, onTool: Channel<string>) => typedError<Made_Serialize, string>(__TAURI_INVOKE("make_design_artifact", { workspace, slug, kind, about, onTool })),
-	/**  Makes an HTML page from one of the design's markdown or Mermaid files. */
-	makeDesignHtml: (workspace: string | null, slug: string, source: string, onTool: Channel<string>) => typedError<Made_Serialize, string>(__TAURI_INVOKE("make_design_html", { workspace, slug, source, onTool })),
-	stopDesign: (workspace: string | null, slug: string) => typedError<null, string>(__TAURI_INVOKE("stop_design", { workspace, slug })),
-	/**  Opens one of the design's files in the default browser. */
-	openDesignFile: (workspace: string | null, slug: string, path: string) => typedError<null, string>(__TAURI_INVOKE("open_design_file", { workspace, slug, path })),
+	reaskQuestion: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, session, id })),
+	/**  Plans the write, or revises the plan with the comments on it. */
+	writePlan: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("write_plan", { workspace, session, onTool })),
+	/**  Writes the decisions into the workspace's @. */
+	applyQa: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_qa", { workspace, session, onTool })),
+	stopQa: (workspace: string | null, session: string) => typedError<null, string>(__TAURI_INVOKE("stop_qa", { workspace, session })),
 };
 
 /** Events */
@@ -262,8 +249,8 @@ export const events = {
 	botFixText: makeEvent<BotFixText>("bot-fix-text"),
 	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
-	designChanged: makeEvent<DesignChanged>("design-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
+	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
@@ -326,8 +313,13 @@ export type Answer_Serialize = {
 	at: number | null,
 };
 
-/**  What to make for the design. */
-export type ArtifactKind = "doc" | "diagram" | "htmlPage";
+/**  What Apply did. */
+export type Applied = {
+	summary: string,
+	/**  Files it created or edited, relative to the workspace root. */
+	files: string[],
+	at: number | null,
+};
 
 /**  A message for a comment's agent. */
 export type Ask = {
@@ -490,115 +482,11 @@ export type CommentDto = {
 	done: boolean,
 };
 
-/**  A comment on a passage of one of the design's markdown files. */
-export type CommentInput = {
-	path: string,
-	quote: string,
-	start: number,
-	end: number,
-	body: string,
-	kind: CommentKind,
-};
-
-export type CommentKind = 
-/**  Asks the agent to change the doc. */
-"change" | 
-/**  A question about the passage; nothing changes. */
-"ask";
-
-export type CommentState = "queued" | "applied" | "answered";
-
 export type DefaultPersona = {
 	name: string,
 	description: string,
 	global: Installed,
 	repo: Installed,
-};
-
-/**  A terminal agent changed a design's questions. */
-export type DesignChanged = {
-	workspace: string | null,
-	slug: string,
-};
-
-export type DesignDto = DesignDto_Serialize | DesignDto_Deserialize;
-
-export type DesignDto_Deserialize = {
-	slug: string,
-	name: string,
-	/**  The folder, relative to the workspace root. */
-	dir: string,
-	brief: string,
-	hasDesign: boolean,
-	queue: Queue_Deserialize,
-	/**  Why `questions.json` couldn't be read, when it couldn't. */
-	queueError: string | null,
-	/**  Markdown files, relative to the folder: the design, then the docs. */
-	docs: string[],
-	/**  Standalone Mermaid files. */
-	diagrams: string[],
-	html: HtmlFile[],
-	comments: DocComment[],
-	attach: string[],
-};
-
-export type DesignDto_Serialize = {
-	slug: string,
-	name: string,
-	/**  The folder, relative to the workspace root. */
-	dir: string,
-	brief: string,
-	hasDesign: boolean,
-	queue: Queue_Serialize,
-	/**  Why `questions.json` couldn't be read, when it couldn't. */
-	queueError: string | null,
-	/**  Markdown files, relative to the folder: the design, then the docs. */
-	docs: string[],
-	/**  Standalone Mermaid files. */
-	diagrams: string[],
-	html: HtmlFile[],
-	comments: DocComment[],
-	attach: string[],
-};
-
-export type DesignQuestion = DesignQuestion_Serialize | DesignQuestion_Deserialize;
-
-export type DesignQuestion_Deserialize = {
-	/**  `Q4`, or `Q4a` for a subquestion. */
-	id: string,
-	round: number,
-	text: QText,
-	/**  Files the agent read to build it. */
-	sources?: string[],
-	state: QState,
-	answer?: Answer_Deserialize | null,
-	/**  Why it was dropped, like "settled by Q3". */
-	dropped?: string | null,
-	change?: Change | null,
-	/**  A discussion that isn't a decision. */
-	discussion?: Turn[],
-};
-
-export type DesignQuestion_Serialize = {
-	/**  `Q4`, or `Q4a` for a subquestion. */
-	id: string,
-	round: number,
-	text: QText,
-	/**  Files the agent read to build it. */
-	sources: string[],
-	state: QState,
-	answer: Answer_Serialize | null,
-	/**  Why it was dropped, like "settled by Q3". */
-	dropped: string | null,
-	change: Change | null,
-	/**  A discussion that isn't a decision. */
-	discussion: Turn[],
-};
-
-/**  A file in the design's folder, and what it said when the user last looked. */
-export type DesignText = {
-	text: string,
-	seen: string | null,
 };
 
 export type DiscussionDto = {
@@ -611,22 +499,7 @@ export type DiscussionDto = {
 	viewer: string,
 };
 
-/**  A comment on a passage of one of the design's markdown files. */
-export type DocComment = {
-	id: number,
-	/**  Relative to the design's folder. */
-	path: string,
-	/**  The selected text, so the comment still finds its place after edits. */
-	quote: string,
-	/**  First and last source lines of the selection, from 1. */
-	start: number,
-	end: number,
-	body: string,
-	kind: CommentKind,
-	state: CommentState,
-	/**  The agent's answer to an ask, or what it did for a change. */
-	reply: string | null,
-};
+export type FileChange = "new" | "edit" | "delete";
 
 export type FileDto = {
 	path: string,
@@ -763,14 +636,6 @@ export type HeadDto = {
 	state: string,
 };
 
-export type HtmlFile = {
-	path: string,
-	/**  The markdown it was made from, when lgtm made it from one. */
-	source: string | null,
-	/**  The markdown changed since. */
-	stale: boolean,
-};
-
 export type Hunk = {
 	oldStart: number,
 	oldLines: number,
@@ -823,21 +688,6 @@ export type LogLine = {
 	changeId: string | null,
 	/**  Whether this line starts the workspace's working-copy commit. */
 	workingCopy: boolean,
-};
-
-/**  A design after the agent made a file for it, and the file's path in the design. */
-export type Made = Made_Serialize | Made_Deserialize;
-
-/**  A design after the agent made a file for it, and the file's path in the design. */
-export type Made_Deserialize = {
-	design: DesignDto_Deserialize,
-	path: string,
-};
-
-/**  A design after the agent made a file for it, and the file's path in the design. */
-export type Made_Serialize = {
-	design: DesignDto_Serialize,
-	path: string,
 };
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
@@ -906,8 +756,8 @@ export type Models = {
 	reviewers: string,
 	/**  Triage and replies on PR threads. */
 	replies: string,
-	/**  Every step of a design: drafting, questions, revising, docs. */
-	design: string,
+	/**  Every step of a Q&A session: questions, plan, apply. */
+	qa: string,
 };
 
 export type NearbyPrDto = {
@@ -1015,6 +865,28 @@ export type PlacedThreadDto = {
 	thread: PreviewThreadDto,
 };
 
+export type Plan = {
+	files: PlanFile[],
+	comments?: PlanComment[],
+};
+
+/**  A comment on a passage of the plan. */
+export type PlanComment = {
+	id: number,
+	quote: string,
+	body: string,
+};
+
+/**  A file the plan would touch. */
+export type PlanFile = {
+	path: string,
+	change: FileChange,
+	/**  What changes in it, a line each. */
+	edits: string[],
+	/**  The ids of the decisions it follows from. */
+	decisions: string[],
+};
+
 export type PostDto = {
 	author: string,
 	body: string,
@@ -1089,14 +961,10 @@ export type ProgressDto = {
 export type Prompt = "walkthrough" | 
 /**  How takes and replies on GitHub threads are written. */
 "reply" | 
-/**  How design questions are built, after the qqueue skill. */
+/**  How Q&A questions are built, after the qqueue skill. */
 "qq" | 
-/**  Drafting and revising a design document. */
-"designDraft" | 
-/**  A design's docs and Mermaid diagrams. */
-"designDocs" | 
-/**  A design's HTML pages. */
-"designHtml";
+/**  How Q&A plans and writes its result. */
+"qaWrite";
 
 /**  A prompt and its files, for the Settings tab. */
 export type PromptInfo = {
@@ -1122,6 +990,46 @@ export type QText = {
 	why: string,
 };
 
+/**  A terminal agent changed a Q&A session's questions. */
+export type QaChanged = {
+	workspace: string | null,
+	id: string,
+};
+
+export type QaQuestion = QaQuestion_Serialize | QaQuestion_Deserialize;
+
+export type QaQuestion_Deserialize = {
+	/**  `Q4`, or `Q4a` for a subquestion. */
+	id: string,
+	round: number,
+	text: QText,
+	/**  Files the agent read to build it. */
+	sources?: string[],
+	state: QState,
+	answer?: Answer_Deserialize | null,
+	/**  Why it was dropped, like "settled by Q3". */
+	dropped?: string | null,
+	change?: Change | null,
+	/**  A discussion that isn't a decision. */
+	discussion?: Turn[],
+};
+
+export type QaQuestion_Serialize = {
+	/**  `Q4`, or `Q4a` for a subquestion. */
+	id: string,
+	round: number,
+	text: QText,
+	/**  Files the agent read to build it. */
+	sources: string[],
+	state: QState,
+	answer: Answer_Serialize | null,
+	/**  Why it was dropped, like "settled by Q3". */
+	dropped: string | null,
+	change: Change | null,
+	/**  A discussion that isn't a decision. */
+	discussion: Turn[],
+};
+
 export type Question = {
 	question: string,
 	findings: string[],
@@ -1141,15 +1049,11 @@ export type QuestionAct = { kind: "decide"; id: string; answer: AnswerInput } |
 export type Queue = Queue_Serialize | Queue_Deserialize;
 
 export type Queue_Deserialize = {
-	questions: DesignQuestion_Deserialize[],
-	/**  The last round folded into the design. */
-	revised?: number,
+	questions: QaQuestion_Deserialize[],
 };
 
 export type Queue_Serialize = {
-	questions: DesignQuestion_Serialize[],
-	/**  The last round folded into the design. */
-	revised: number,
+	questions: QaQuestion_Serialize[],
 };
 
 export type QuickWin = {
@@ -1274,6 +1178,59 @@ export type Ruling = {
 
 export type Scope = "global" | "repo";
 
+export type Session = Session_Serialize | Session_Deserialize;
+
+/**  A change to a session that doesn't need the agent. */
+export type SessionEdit = { kind: "prompt"; prompt: string; attach: string[] } | 
+/**  What the user adds for the write. */
+{ kind: "note"; note: string } | 
+/**  Implemented, or back to active. */
+{ kind: "archive"; archived: boolean } | 
+/**  It went to a terminal, named by its title. */
+{ kind: "sent"; terminal: string } | { kind: "planComment"; quote: string; body: string } | { kind: "deletePlanComment"; id: number } | { kind: "discardPlan" };
+
+export type Session_Deserialize = {
+	id: string,
+	title: string,
+	prompt: string,
+	/**  Paths the agent reads first, relative to the workspace root. */
+	attach?: string[],
+	queue?: Queue_Deserialize,
+	/**  Anything the user adds for the write. */
+	note?: string,
+	plan?: Plan | null,
+	applied?: Applied | null,
+	/**  The terminal it was sent to, when it was. */
+	sent?: string | null,
+	/**  Implemented: applied, or marked so after a send. */
+	archived?: boolean,
+	created: number | null,
+	/**  The agent's conversation, resumed by each step. */
+	agent?: string | null,
+	nextComment?: number,
+};
+
+export type Session_Serialize = {
+	id: string,
+	title: string,
+	prompt: string,
+	/**  Paths the agent reads first, relative to the workspace root. */
+	attach: string[],
+	queue: Queue_Serialize,
+	/**  Anything the user adds for the write. */
+	note: string,
+	plan: Plan | null,
+	applied: Applied | null,
+	/**  The terminal it was sent to, when it was. */
+	sent: string | null,
+	/**  Implemented: applied, or marked so after a send. */
+	archived: boolean,
+	created: number | null,
+	/**  The agent's conversation, resumed by each step. */
+	agent: string | null,
+	nextComment: number,
+};
+
 export type Settings = {
 	/**  How to start Claude Code: a command line, or an alias or function from the login shell. */
 	claude: string,
@@ -1281,11 +1238,6 @@ export type Settings = {
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot[],
-	/**
-	 *  Where designs go in a repo, relative to its root. A repo's `.lgtm/config.toml` can
-	 *  override it.
-	 */
-	designDir: string,
 };
 
 /**  The settings were saved. */

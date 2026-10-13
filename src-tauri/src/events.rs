@@ -82,9 +82,9 @@ pub struct ReviewStateChanged {
     pub state: crate::review::StateDto,
 }
 
-/// A terminal agent changed a design's questions.
+/// A terminal agent changed a Q&A session's questions.
 #[derive(Clone, Serialize, Type, Event)]
-pub struct DesignChanged {
+pub struct QaChanged {
     pub workspace: Option<String>,
-    pub slug: String,
+    pub id: String,
 }

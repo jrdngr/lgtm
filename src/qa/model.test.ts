@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QState } from "../bindings";
-import { changedLines, current, type Design, type Question, qqText, step } from "./model";
+import { applyText, current, type Question, qqText, type Session, step } from "./model";
 
 function question(id: string, state: QState, round = 1, option: number | null = null): Question {
   return {
@@ -24,48 +24,42 @@ function question(id: string, state: QState, round = 1, option: number | null = 
   };
 }
 
-function design(over: Partial<Design> = {}): Design {
+function session(over: Partial<Session> = {}): Session {
   return {
-    slug: "d",
-    name: "D",
-    dir: "docs/design/d",
-    brief: "",
-    hasDesign: true,
-    queue: { questions: [], revised: 0 },
-    queueError: null,
-    docs: ["design.md", "brief.md"],
-    diagrams: [],
-    html: [],
-    comments: [],
+    id: "1",
+    title: "T",
+    prompt: "Add templates",
     attach: [],
+    queue: { questions: [] },
+    note: "",
+    plan: null,
+    applied: null,
+    sent: null,
+    archived: false,
+    created: 1,
+    agent: null,
+    nextComment: 0,
     ...over,
   };
 }
 
 describe("step", () => {
-  it("follows the loop from brief to refine", () => {
-    expect(step(design({ hasDesign: false }))).toBe("brief");
-    const open = { questions: [question("Q1", "open")], revised: 0 };
-    expect(step(design({ queue: open }))).toBe("questions");
-    const decided = { questions: [question("Q1", "decided", 1, 0)], revised: 0 };
-    expect(step(design({ queue: decided }))).toBe("revise");
-    const revised = { ...decided, revised: 1 };
-    expect(step(design({ queue: revised }))).toBe("docs");
-    expect(step(design({ queue: revised, diagrams: ["docs/flow.mmd"] }))).toBe("html");
-    const html = [{ path: "html/design.html", source: "design.md", stale: false }];
-    expect(step(design({ queue: revised, docs: ["design.md", "docs/a.md"], html }))).toBe("refine");
+  it("goes from the prompt through questions to Apply", () => {
+    expect(step(session())).toBe("prompt");
+    expect(step(session({ queue: { questions: [question("Q1", "open")] } }))).toBe("questions");
+    const decided = [question("Q1", "decided", 1, 0), question("Q2", "dropped")];
+    expect(step(session({ queue: { questions: decided } }))).toBe("apply");
   });
 });
 
 describe("current", () => {
-  const d = design({
+  const d = session({
     queue: {
       questions: [
         question("Q1", "decided", 1, 0),
         question("Q2", "dropped"),
         question("Q3", "open"),
       ],
-      revised: 0,
     },
   });
 
@@ -100,16 +94,25 @@ describe("qqText", () => {
   });
 });
 
-describe("changedLines", () => {
-  it("finds added and changed lines, and where lines went", () => {
-    const { added, removed } = changedLines("a\nb\nc\nd", "a\nB\nc\nnew\nd");
-    expect([...added]).toEqual([2, 4]);
-    expect([...removed]).toEqual([2]);
-  });
-
-  it("marks lines gone from the end after the last line", () => {
-    const { added, removed } = changedLines("a\nb\nc", "a");
-    expect(added.size).toBe(0);
-    expect([...removed]).toEqual([1]);
+describe("applyText", () => {
+  it("carries the decisions, the note, the plan and its comments", () => {
+    const d = session({
+      queue: { questions: [question("Q1", "decided", 1, 1), question("Q2", "open")] },
+      note: " Keep it small ",
+      plan: {
+        files: [{ path: "a.rs", change: "edit", edits: ["Load", "Save"], decisions: ["Q1"] }],
+        comments: [{ id: 1, quote: "Save", body: "Not yet" }],
+      },
+    });
+    expect(applyText(d)).toBe(
+      [
+        "Add templates",
+        "Decisions:\nQ1 — Subject Q1: Change it",
+        "Also: Keep it small",
+        "Plan:\n- a.rs (edit): Load; Save",
+        'My comments on the plan:\n- On "Save": Not yet',
+        "Write the changes these decisions call for into this repo.",
+      ].join("\n\n"),
+    );
   });
 });

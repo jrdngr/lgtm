@@ -10,7 +10,7 @@ const MODELS: [keyof Models, string, string][] = [
   ["walkthrough", "Walkthrough", "Writing the walkthrough"],
   ["reviewers", "Reviewers", "Persona reviews and their reports"],
   ["replies", "Replies", "Triage and replies on PR threads"],
-  ["design", "Design", "Drafting designs, their questions, docs, and HTML pages"],
+  ["qa", "Q&A", "Questions, plans and Apply in Q&A sessions"],
 ];
 
 /** A text field that saves when it loses focus or Enter is pressed. */
@@ -152,25 +152,6 @@ export function AgentSettings({ settings }: { settings: Settings }) {
             />
           </Row>
         ))}
-      </Section>
-      <Section id="designs" title="Designs">
-        <Row
-          label="Folder"
-          htmlFor="settings-design-dir"
-          help={
-            <>
-              Where designs go in a repo, relative to its root. A repo's{" "}
-              <code>.lgtm/config.toml</code> can set its own with <code>[design] dir</code>.
-            </>
-          }
-        >
-          <SavedInput
-            id="settings-design-dir"
-            value={settings.designDir}
-            placeholder="docs/design"
-            onSave={(dir) => saveSettings({ designDir: dir.trim() || "docs/design" })}
-          />
-        </Row>
       </Section>
     </>
   );

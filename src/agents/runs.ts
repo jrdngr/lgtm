@@ -10,7 +10,7 @@ export type AgentKind =
   | "fix"
   | "walkthrough"
   | "resolve"
-  | "design";
+  | "qa";
 export type Outcome = "running" | "done" | "failed" | "stopped";
 
 export const KIND_NAMES: Record<AgentKind, string> = {
@@ -21,7 +21,7 @@ export const KIND_NAMES: Record<AgentKind, string> = {
   fix: "Fix threads",
   walkthrough: "Walkthrough",
   resolve: "Resolve",
-  design: "Design",
+  qa: "Q&A",
 };
 
 /** A headless agent run the window started, other than a persona review. */

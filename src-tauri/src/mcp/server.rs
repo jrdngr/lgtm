@@ -16,8 +16,8 @@ use tauri_specta::Event as _;
 
 use super::{Hello, inputs};
 use crate::bots::output::Output;
-use crate::design::queue::{Choice, NewQuestion, QState, answer_text};
-use crate::events::{AgentRevset, AgentShow, BotRunChanged, DesignChanged, ReviewStateChanged};
+use crate::events::{AgentRevset, AgentShow, BotRunChanged, QaChanged, ReviewStateChanged};
+use crate::qa::queue::{Choice, NewQuestion, QState, answer_text};
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
@@ -28,9 +28,9 @@ reviews a change there and marks rows with colors they label, like reviewed or f
 this terminal's workspace: read its state, comments, walkthrough, symbol graph and Reviewer \
 findings; add comments; write a walkthrough; submit your own review findings; and point the \
 review at \
-code or a revset. You can't mark code. Lines are on the new side of the diff. For designs, \
-ask the human questions through lgtm's question queue (design_ask) instead of in the chat, \
-then read their decisions with design_answers.";
+code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
+through decisions with the human, ask through lgtm's Q&A queue (qa_ask) instead of in the \
+chat, then read their decisions with qa_answers.";
 
 type Out = Result<String, String>;
 
@@ -304,21 +304,21 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "The designs in this workspace, with how many of their questions are \
-        open and decided."
+        description = "The workspace's active Q&A sessions (not yet implemented), with how many \
+        of their questions are open and decided."
     )]
-    async fn list_designs(&self) -> Out {
+    async fn list_qa(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let designs = ctx.designs(&ws).map_err(failed)?;
-        let list: Vec<_> = designs
+        let sessions = ctx.qa_sessions(&ws).map_err(failed)?;
+        let list: Vec<_> = sessions
             .iter()
-            .map(|d| {
-                let count = |s| d.queue.questions.iter().filter(|q| q.state == s).count();
+            .filter(|s| !s.archived)
+            .map(|s| {
+                let count = |st| s.queue.questions.iter().filter(|q| q.state == st).count();
                 serde_json::json!({
-                    "design": d.slug,
-                    "name": d.name,
-                    "folder": d.dir,
+                    "session": s.id,
+                    "title": s.title,
                     "open": count(QState::Open),
                     "decided": count(QState::Decided),
                 })
@@ -327,27 +327,33 @@ impl Lgtm {
         json(&list)
     }
 
-    #[tool(description = "A design's question queue: every question, its state and answer.")]
-    async fn design_questions(&self, Parameters(p): Parameters<inputs::Design>) -> Out {
+    #[tool(
+        description = "A Q&A session's prompt and question queue: every question, its \
+        state and answer."
+    )]
+    async fn qa_questions(&self, Parameters(p): Parameters<inputs::QaSession>) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        json(&ctx.design(&ws, &p.design).map_err(failed)?.queue)
+        let s = ctx.qa_session(&ws, &p.session).map_err(failed)?;
+        json(&serde_json::json!({ "prompt": s.prompt, "queue": s.queue }))
     }
 
     #[tool(
-        description = "Ask the human design questions through lgtm. They show one at a time \
-        in the design's Questions view, in the qqueue format: context bullets, options with the \
-        recommended one first, and why. Returns the new questions' ids; read the decisions \
-        later with design_answers."
+        description = "Ask the human questions through lgtm's Q&A. They show one at a time in \
+        the Q&A tab, in the qqueue format: context bullets, options with the recommended one \
+        first, and why. Returns the session and the new questions' ids; read the decisions \
+        later with qa_answers."
     )]
-    async fn design_ask(&self, Parameters(p): Parameters<inputs::DesignAsk>) -> Out {
+    async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let slug = crate::design::slugify(&p.design);
-        let (_, dir) = ctx.design_dir(&ws, &slug).map_err(failed)?;
-        if !dir.is_dir() {
-            ctx.create_design(&ws, &p.design).map_err(failed)?;
-        }
+        let id = match p.session {
+            Some(id) => id,
+            None => {
+                let title = p.title.unwrap_or_default();
+                ctx.create_qa(&ws, &title, vec![]).map_err(failed)?.id
+            }
+        };
         let questions = p
             .questions
             .into_iter()
@@ -367,25 +373,26 @@ impl Lgtm {
                 sources: q.sources,
             })
             .collect();
-        let ids =
-            crate::design::edit_queue(&dir, |q| Ok(q.add_round(questions))).map_err(failed)?;
-        DesignChanged {
+        let ids = ctx
+            .edit_qa(&ws, &id, |s| Ok(s.queue.add_round(questions)))
+            .map_err(failed)?;
+        QaChanged {
             workspace: self.hello.workspace.clone(),
-            slug: slug.clone(),
+            id: id.clone(),
         }
         .emit_to(&self.app, &label)
         .ok();
         Ok(format!(
-            "Queued {} in design {slug}. The human answers them in lgtm.",
+            "Queued {} in session {id}. The human answers them in lgtm.",
             ids.join(", ")
         ))
     }
 
-    #[tool(description = "The decisions on a design's questions so far, in ask order.")]
-    async fn design_answers(&self, Parameters(p): Parameters<inputs::Design>) -> Out {
+    #[tool(description = "The decisions on a Q&A session's questions so far, in ask order.")]
+    async fn qa_answers(&self, Parameters(p): Parameters<inputs::QaSession>) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let queue = ctx.design(&ws, &p.design).map_err(failed)?.queue;
+        let queue = ctx.qa_session(&ws, &p.session).map_err(failed)?.queue;
         let list: Vec<_> = queue
             .questions
             .iter()

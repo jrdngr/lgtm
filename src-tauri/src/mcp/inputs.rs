@@ -162,20 +162,20 @@ pub struct ThreadId {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct Design {
-    /// The design's folder name, from list_designs.
-    pub design: String,
+pub struct QaSession {
+    /// The session's id, from list_qa or qa_ask.
+    pub session: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct DesignChoice {
+pub struct QaChoice {
     pub label: String,
     /// 1-3 bullets: what it means, and what it costs.
     pub bullets: Vec<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct DesignQuestion {
+pub struct QaQuestion {
     /// A subquestion of the top-level question before it.
     #[serde(default)]
     pub sub: bool,
@@ -184,7 +184,7 @@ pub struct DesignQuestion {
     /// Only the facts that change the answer, one per bullet.
     pub context: Vec<String>,
     /// The recommended option first, always.
-    pub options: Vec<DesignChoice>,
+    pub options: Vec<QaChoice>,
     /// Why option 1 is recommended, in a line or two.
     pub why: String,
     /// Files you read to build the question.
@@ -193,9 +193,11 @@ pub struct DesignQuestion {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct DesignAsk {
-    /// The design's folder name. A design that doesn't exist yet is created.
-    pub design: String,
+pub struct QaAsk {
+    /// The session to add to, from list_qa. Leave it out to start one.
+    pub session: Option<String>,
+    /// For a new session: what it's deciding, in a line.
+    pub title: Option<String>,
     /// In the order to ask them.
-    pub questions: Vec<DesignQuestion>,
+    pub questions: Vec<QaQuestion>,
 }

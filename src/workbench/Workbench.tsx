@@ -116,7 +116,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+T": () => showThread(selected),
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
-    "Mod+Shift+I": () => showView("right", "design"),
+    "Mod+Shift+I": () => showView("right", "qa"),
     toggle: () => toggleBottom(),
     terminal: () => toggleBottom(true),
   };

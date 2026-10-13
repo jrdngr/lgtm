@@ -5,11 +5,10 @@ import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { decide as decideQuestion } from "./actions";
 import { Discussion } from "./Discussion";
-import { DoneCard } from "./DoneCard";
-import { answerLabel, countable, current, type Design, lastDecided, type Question } from "./model";
+import { answerLabel, countable, current, lastDecided, type Question, type Session } from "./model";
 import { QuestionCard } from "./QuestionCard";
 import { Rail } from "./Rail";
-import { act, type Busy, runStep, showDesign } from "./store";
+import { act, type Busy, runStep, setView } from "./store";
 
 const isEditable = (t: EventTarget) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
@@ -18,14 +17,14 @@ type Mode = "note" | "other" | "discuss";
 
 interface Props {
   ws: WorkspaceName;
-  d: Design;
+  d: Session;
   busy?: Busy;
   streams: Record<string, string>;
   /** Moves keyboard focus into the view. */
   focusKey: number;
 }
 
-/** The design's open questions, one at a time in the qqueue template. Number keys pick an
+/** The session's open questions, one at a time in the qqueue template. Number keys pick an
  * option, ↵ decides it, and the agent then updates the questions still open. */
 export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const [want, setWant] = useState<string>();
@@ -40,8 +39,8 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const list = countable(d);
   const prev = lastDecided(d);
   /** The agent is changing the queue: answers wait for it. */
-  const locked = !!busy;
-  const updating = busy?.kind === "answer" || busy?.kind === "reask" || busy?.kind === "draft";
+  const locked = !!busy || d.archived;
+  const updating = busy?.kind === "answer" || busy?.kind === "reask";
 
   // Each question starts on its recommendation, with nothing being written.
   const qid = q?.id;
@@ -59,8 +58,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     if (focusKey) rootRef.current?.focus({ preventScroll: true });
   }, [focusKey]);
 
-  const slug = d.slug;
-  const open = () => showDesign(ws, slug, "questions");
+  const id = d.id;
 
   async function decide(option: number | null, withNote?: string, otherText?: string) {
     if (!q || locked || q.state !== "open") return;
@@ -72,7 +70,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   }
 
   function quick(a: Parameters<typeof commands.actOnQuestion>[2]) {
-    return act(ws, commands.actOnQuestion(ws, slug, a));
+    return act(ws, commands.actOnQuestion(ws, id, a));
   }
 
   async function undo() {
@@ -89,25 +87,22 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
 
   function discuss(message: string) {
     if (!q) return;
-    const id = q.id;
+    const qid = q.id;
     runStep(
       ws,
-      slug,
-      { kind: "discuss", about: id, subject: `${d.name}: ${id}`, streams: true, open },
-      (ch) => commands.discussQuestion(ws, slug, id, message, ch),
+      id,
+      { kind: "discuss", about: qid, subject: `${d.title}: ${qid}`, streams: true },
+      (ch) => commands.discussQuestion(ws, id, qid, message, ch),
     );
   }
 
   function reask() {
     if (!q) return;
-    const id = q.id;
+    const qid = q.id;
     setMode(undefined);
     focusRoot();
-    runStep(
-      ws,
-      slug,
-      { kind: "reask", about: id, subject: `${d.name}: ask ${id} again`, open },
-      () => commands.reaskQuestion(ws, slug, id),
+    runStep(ws, id, { kind: "reask", about: qid, subject: `${d.title}: ask ${qid} again` }, () =>
+      commands.reaskQuestion(ws, id, qid),
     );
   }
 
@@ -144,14 +139,12 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     e.stopPropagation();
   }
 
-  if (d.queueError)
-    return <div className="review-error">Can't read questions.json: {d.queueError}</div>;
   if (!d.queue.questions.length)
     return (
       <div className="placeholder">
-        {busy?.kind === "draft"
-          ? "Questions show here once the draft is written"
-          : "No questions yet. Draft the design from its brief first."}
+        {busy?.kind === "ask"
+          ? "Questions show here once the agent has read the prompt"
+          : "No questions yet. Ask from the prompt first."}
       </div>
     );
 
@@ -181,7 +174,12 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
       />
       <div className="qq-main">
         {!q ? (
-          <DoneCard ws={ws} d={d} busy={busy} />
+          <div className="qa-card">
+            <h2>All decided</h2>
+            <button type="button" className="primary" onClick={() => setView(ws, "apply")}>
+              On to Apply
+            </button>
+          </div>
         ) : (
           <>
             {prev && prev.id !== q.id && (
@@ -207,12 +205,10 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
             </div>
             {updating && busy?.about && (
               <div className="qq-bar updating">
-                <span className="design-spin" />
+                <span className="qa-spin" />
                 {busy.kind === "reask"
                   ? `Rewriting ${busy.about} after your discussion`
-                  : busy.kind === "draft"
-                    ? "Drafting the design"
-                    : `Updating the open questions after your answer to ${busy.about}`}
+                  : `Updating the open questions after your answer to ${busy.about}`}
               </div>
             )}
             {q.change && !updating && (
@@ -321,7 +317,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
                 key={q.id}
                 q={q}
                 busy={!!busy}
-                streaming={busy?.kind === "discuss" ? streams[`${slug}:${q.id}`] : undefined}
+                streaming={busy?.kind === "discuss" ? streams[`${id}:${q.id}`] : undefined}
                 onSend={discuss}
                 onReask={reask}
                 onClose={() => {

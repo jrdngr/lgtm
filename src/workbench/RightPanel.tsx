@@ -1,12 +1,12 @@
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useRuns } from "../bots/runs";
-import { DesignPanel } from "../design/DesignPanel";
-import { openQuestions } from "../design/model";
-import { useDesigns } from "../design/store";
 import { RepoTree } from "../editor/RepoTree";
 import { usePr } from "../github/pr";
 import { SymbolsPanel } from "../graph/SymbolsPanel";
+import { openQuestions } from "../qa/model";
+import { QaPanel } from "../qa/QaPanel";
+import { useQa } from "../qa/store";
 import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
 import { NotesPanel } from "../review/NotesPanel";
@@ -29,15 +29,15 @@ interface Props {
 }
 
 /** The right side panel: the review's changes and symbols, the repo's files, notes, the PR in a
- * PR workspace, the walkthrough, reviewers, and designs. Tabs count threads that need you,
- * walkthrough notes, running reviews, and open design questions. */
+ * PR workspace, the walkthrough, reviewers, and Q&A. Tabs count threads that need you,
+ * walkthrough notes, running reviews, and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const runs = useRuns(workspace);
   const pr = usePr(workspace);
   const githubOff = useGithubOff();
-  const designs = useDesigns(workspace);
+  const qa = useQa(workspace);
   return (
     <SidePanel
       side="right"
@@ -74,12 +74,12 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           render: () => <BotsPanel onOpen={onOpenReport} />,
         },
         {
-          id: "design",
-          title: "Design",
-          icon: "layers",
-          badge: designs.designs.reduce((n, d) => n + openQuestions(d).length, 0),
+          id: "qa",
+          title: "Q&A",
+          icon: "help",
+          badge: qa.sessions.reduce((n, d) => n + (d.archived ? 0 : openQuestions(d).length), 0),
           badgeTone: "amber",
-          render: () => <DesignPanel />,
+          render: () => <QaPanel />,
         },
       ]}
     />

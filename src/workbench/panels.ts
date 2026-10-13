@@ -5,7 +5,7 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs" | "design";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs" | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -14,11 +14,11 @@ const TITLES: Record<PanelKind, string> = {
   graph: "Graph",
   threads: "Threads",
   runs: "Agent runs",
-  design: "Design",
+  qa: "Q&A",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "graph", "design", "runs"];
+export const KINDS: PanelKind[] = ["review", "terminal", "graph", "qa", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -86,18 +86,18 @@ export function openThreads(api: DockviewApi) {
   addPanel(api, "threads", {}, besideReview(api), "threads");
 }
 
-/** Shows the Design tab as a tab in the review's pane, or brings it forward. */
-export function openDesign(api: DockviewApi) {
-  const open = api.getPanel("design");
+/** Shows the Q&A tab as a tab in the review's pane, or brings it forward. */
+export function openQa(api: DockviewApi) {
+  const open = api.getPanel("qa");
   if (open) return open.api.setActive();
   const review = api.panels.find(isReviewPanel);
-  addPanel(api, "design", {}, review ? { referencePanel: review } : undefined, "design");
+  addPanel(api, "qa", {}, review ? { referencePanel: review } : undefined, "qa");
 }
 
 /** Tabs a dock has one of. */
-const SINGLE: PanelKind[] = ["graph", "design"];
+const SINGLE: PanelKind[] = ["graph", "qa"];
 
-/** Opens a `kind` tab in `group`. The graph and Design are one per dock, so an open one moves
+/** Opens a `kind` tab in `group`. The graph and Q&A are one per dock, so an open one moves
  * here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;

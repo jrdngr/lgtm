@@ -128,15 +128,9 @@ async fn undo_and_redo_step_through_mark_changes() {
         .marks;
     assert_eq!(marks[0].color, MarkColor::Gray);
 
-    assert_eq!(
-        ctx.undo(review.id).unwrap().marks[0].color,
-        MarkColor::Cyan
-    );
+    assert_eq!(ctx.undo(review.id).unwrap().marks[0].color, MarkColor::Cyan);
     assert!(ctx.undo(review.id).unwrap().marks.is_empty());
-    assert_eq!(
-        ctx.redo(review.id).unwrap().marks[0].color,
-        MarkColor::Cyan
-    );
+    assert_eq!(ctx.redo(review.id).unwrap().marks[0].color, MarkColor::Cyan);
 }
 
 #[tokio::test]

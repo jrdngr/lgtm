@@ -14,7 +14,7 @@ import "./runs.css";
 type Row = { at: number; agent: AgentRun } | { at: number; bot: BotRun };
 
 /** Every agent run in the workspace, newest first: chats, triage and fixes, walkthroughs,
- * conflict resolves, design steps, and persona reviews. */
+ * conflict resolves, Q&A steps, and persona reviews. */
 export function RunsPanel() {
   const workspace = useWorkspace();
   const agents = useAgentRuns(workspace);
