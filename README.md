@@ -54,7 +54,7 @@ In a review pane:
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |
 | `h` | Walkthrough: an agent guides you through the change |
-| `]` / `[` | Next / previous hunk |
+| `]` / `[` | Next / previous change (each run of changed rows) |
 | `}` / `{` | Next / previous file |
 | `n` / `N` | Next / previous note in the walkthrough's tour |
 | `Esc` | Back to the cursor row |

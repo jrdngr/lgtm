@@ -198,21 +198,35 @@ function fileTargetAt(lines: DisplayLine[], header: number): JumpTarget {
 export const fileTargets = (lines: DisplayLine[]): JumpTarget[] =>
   lines.flatMap((l, i) => (l.kind === "file" ? [fileTargetAt(lines, i)] : []));
 
-/** Jumping to a hunk puts the cursor on its first row, or on the header when no row of it is
- * shown. Two lines above the header stay in view, so the sticky file header can't cover it. */
-export function hunkJumpTarget(lines: DisplayLine[], header: number): JumpTarget {
-  const top = Math.max(header - 2, 0);
-  for (let i = header + 1; i < lines.length; i++) {
-    const kind = lines[i].kind;
-    if (kind === "rows") return { cursor: i, top };
-    if (kind === "file" || kind === "hunk") break;
-  }
-  return { cursor: header, top };
+/** Every shown change's jump target, in display order: the first row of each run of changed
+ * rows, so a long hunk with several edits stops at each. A hunk with no rows shown stops on
+ * its header. A hunk's first stop keeps two lines above the header in view, so the sticky
+ * file header can't cover it; later stops keep a few lines of context above. */
+export function changeTargets(files: FlatFile[], lines: DisplayLine[]): JumpTarget[] {
+  const out: JumpTarget[] = [];
+  let header = 0;
+  let first = true;
+  let inChange = false;
+  lines.forEach((l, i) => {
+    if (l.kind === "hunk") {
+      header = i;
+      first = true;
+      inChange = false;
+      const next = lines[i + 1]?.kind;
+      if (next !== "rows" && next !== "gap") out.push({ cursor: i, top: Math.max(i - 2, 0) });
+    } else if (l.kind === "file" || l.kind === "gap") {
+      inChange = false;
+    } else if (l.kind === "rows") {
+      const changed = l.rows.some((r) => files[l.file].rows[r].kind !== "context");
+      if (changed && !inChange) {
+        out.push({ cursor: i, top: first ? Math.max(header - 2, 0) : Math.max(i - 3, 0) });
+        first = false;
+      }
+      inChange = changed;
+    }
+  });
+  return out;
 }
-
-/** Every shown hunk's jump target, in display order. */
-export const hunkTargets = (lines: DisplayLine[]): JumpTarget[] =>
-  lines.flatMap((l, i) => (l.kind === "hunk" ? [hunkJumpTarget(lines, i)] : []));
 
 /** The first target after `cursor` (`dir` 1) or the last one before it (-1). Doesn't wrap. */
 export function stepTarget(

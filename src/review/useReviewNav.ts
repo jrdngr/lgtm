@@ -2,12 +2,12 @@ import type { DockviewApi, DockviewPanelApi } from "dockview-react";
 import type { CommentDto, NoteDto } from "../bindings";
 import { openFileIn } from "../editor/open";
 import {
+  changeTargets,
   commentJumpTarget,
   type DisplayLine,
   type FlatFile,
   fileJumpTarget,
   fileTargets,
-  hunkTargets,
   type JumpTarget,
   rowJumpTarget,
   stepTarget,
@@ -67,8 +67,9 @@ export function useReviewNav(n: Nav) {
     else jump(note.file);
   }
 
+  /** Goes to the next or previous run of changed rows. */
   function stepHunk(dir: 1 | -1) {
-    const target = stepTarget(hunkTargets(lines), n.cursor, dir);
+    const target = stepTarget(changeTargets(files, lines), n.cursor, dir);
     if (target) jumpTo(target);
   }
 

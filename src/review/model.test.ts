@@ -4,13 +4,13 @@ import { file, layout, review, rows, sym } from "./fixture.test-utils";
 import {
   buildLines,
   changedRows,
+  changeTargets,
   commentJumpTarget,
   type DisplayLine,
   fileJumpTarget,
   fileTargets,
   flatten,
   hunkKey,
-  hunkTargets,
   stepTarget,
   symbolMarkers,
 } from "./model";
@@ -112,43 +112,40 @@ describe("jump targets", () => {
   });
 });
 
-describe("hunk stepping", () => {
-  const lines: DisplayLine[] = [
-    { kind: "file", file: 0 },
-    { kind: "hunk", file: 0, hunk: 0 },
-    { kind: "rows", file: 0, hunk: 0, rows: [0] },
-    { kind: "rows", file: 0, hunk: 0, rows: [1] },
-    { kind: "hunk", file: 0, hunk: 1 },
-    { kind: "file", file: 1 },
-    { kind: "hunk", file: 1, hunk: 0 },
-    { kind: "gap", file: 1, hunk: 0, rows: [0] },
-    { kind: "rows", file: 1, hunk: 0, rows: [1] },
-  ];
-  const targets = hunkTargets(lines);
+describe("change stepping", () => {
+  // One long hunk with two edits, as prose often diffs, then a collapsed hunk, then a file.
+  const stepFiles = flatten(
+    review([
+      file("doc.md", [rows([" a", "-b", "+B", " c", " d", "+e", " f"]), rows(["+g"])]),
+      file("b.rs", [rows([" x", "-y"])]),
+    ]),
+  );
+  const lines = buildLines(stepFiles, layout({ collapsedHunks: new Set([hunkKey("doc.md", 1)]) }));
+  const targets = changeTargets(stepFiles, lines);
   const step = (cursor: number, dir: 1 | -1) => stepTarget(targets, cursor, dir)?.cursor;
 
-  it("lands on a hunk's first shown row, or its header when it's collapsed", () => {
+  it("stops at each run of changed rows, or a collapsed hunk's header", () => {
+    // 0 file, 1 hunk, 2-8 rows, 9 hunk (collapsed), 10 file, 11 hunk, 12-13 rows
     expect(targets).toEqual([
-      { cursor: 2, top: 0 },
-      { cursor: 4, top: 2 },
-      { cursor: 8, top: 4 },
+      { cursor: 3, top: 0 },
+      { cursor: 7, top: 4 },
+      { cursor: 9, top: 7 },
+      { cursor: 13, top: 9 },
     ]);
   });
 
-  it("goes back to the previous hunk from inside one and stops at the ends", () => {
-    expect(step(3, 1)).toBe(4);
-    expect(step(4, 1)).toBe(8);
-    expect(step(8, 1)).toBeUndefined();
-    expect(step(3, -1)).toBe(2);
-    expect(step(8, -1)).toBe(4);
-    expect(step(2, -1)).toBeUndefined();
+  it("goes back from inside a change and stops at the ends", () => {
+    expect(step(5, 1)).toBe(7);
+    expect(step(5, -1)).toBe(3);
+    expect(step(13, 1)).toBeUndefined();
+    expect(step(3, -1)).toBeUndefined();
   });
 
   it("steps files the same way, going back to the current file's start first", () => {
-    const files = fileTargets(lines);
-    expect(files.map((t) => t.cursor)).toEqual([2, 8]);
-    expect(stepTarget(files, 4, 1)?.cursor).toBe(8);
-    expect(stepTarget(files, 4, -1)?.cursor).toBe(2);
+    const fileStops = fileTargets(lines);
+    expect(fileStops.map((t) => t.cursor)).toEqual([2, 12]);
+    expect(stepTarget(fileStops, 5, 1)?.cursor).toBe(12);
+    expect(stepTarget(fileStops, 5, -1)?.cursor).toBe(2);
   });
 });
 
