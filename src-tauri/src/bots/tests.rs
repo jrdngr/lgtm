@@ -277,7 +277,7 @@ async fn personas_review_cross_review_and_synthesize_a_real_change() {
 
     let (dir, ctx) = repo();
     let defaults = ["security-bot".to_string(), "simplicity-bot".to_string()];
-    personas::install(dir.path(), &defaults, personas::Scope::Repo).unwrap();
+    super::install::install(dir.path(), &defaults, personas::Scope::Repo).unwrap();
     write(
         dir.path(),
         "login.py",

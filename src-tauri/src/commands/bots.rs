@@ -5,7 +5,8 @@ use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
-use crate::bots::personas::{self, DefaultPersona, Personas, Scope};
+use crate::bots::install::{self, DefaultPersona};
+use crate::bots::personas::{self, Personas, Scope};
 use crate::bots::{BotOptions, BotRun, Event, Notify};
 use crate::events::{BotFixText, BotRunActivity, BotRunChanged};
 
@@ -145,7 +146,7 @@ pub(crate) async fn default_personas(
     workspace: Option<String>,
 ) -> CmdResult<Vec<DefaultPersona>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    Ok(personas::defaults(&ws.root))
+    Ok(install::defaults(&ws.root))
 }
 
 /// Writes the named default personas globally or into the workspace's repo.
@@ -158,7 +159,7 @@ pub(crate) async fn install_personas(
     scope: Scope,
 ) -> CmdResult<()> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    personas::install(&ws.root, &names, scope).map_err(err)
+    install::install(&ws.root, &names, scope).map_err(err)
 }
 
 /// Writes a starter file for a new persona. Returns its path, to open in the editor.

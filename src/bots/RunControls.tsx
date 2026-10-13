@@ -1,35 +1,23 @@
-import type { ReactNode } from "react";
 import type { BotRun } from "../bindings";
 import { commands } from "../ipc";
+import { IconButton } from "../ui/icons";
 import { runState } from "./personas";
 
 export type Act = (f: () => Promise<{ status: string; error?: string }>) => void;
 
-/** Stop while the run is going. Otherwise Retry when it halted, then `children`. */
-export function RunControls({
-  run,
-  act,
-  children,
-}: {
-  run: BotRun;
-  act: Act;
-  children: ReactNode;
-}) {
+/** Stop while the run is going, or Retry once it halted. */
+export function RunControls({ run, act }: { run: BotRun; act: Act }) {
   if (run.active) {
     return (
-      <button type="button" onClick={() => act(() => commands.stopBots(run.id))}>
-        Stop
-      </button>
+      <IconButton icon="stop" label="Stop" onClick={() => act(() => commands.stopBots(run.id))} />
     );
   }
+  if (runState(run).state !== "halted") return null;
   return (
-    <>
-      {runState(run).state === "halted" && (
-        <button type="button" onClick={() => act(() => commands.continueBots(run.id, run.options))}>
-          Retry
-        </button>
-      )}
-      {children}
-    </>
+    <IconButton
+      icon="retry"
+      label="Retry"
+      onClick={() => act(() => commands.continueBots(run.id, run.options))}
+    />
   );
 }

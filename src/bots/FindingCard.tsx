@@ -3,9 +3,11 @@ import type { Finding } from "../bindings";
 import { openFile } from "../editor/open";
 import { useCurrentReview } from "../review/current";
 import { rowsText } from "../review/sendText";
+import { IconButton } from "../ui/icons";
 import { useWorkspace } from "../workspaces/context";
-import { BADGES, type Exchange, findingText, locationText, place } from "./findings";
+import { type Exchange, findingText, locationText, place } from "./findings";
 import { Inline, Markdown } from "./Markdown";
+import { SevTag } from "./Severity";
 
 const STANCES = { concede: "conceded", defend: "defended", partlyConcede: "partly conceded" };
 
@@ -35,8 +37,8 @@ interface Props {
   onSend(text: string): void;
 }
 
-/** A finding: a header with its badge, title, and places in the code, which opens to show the
- * evidence, the fix, and the cross-review behind it. */
+/** A finding: its severity tag and title, then where it is, who raised it, and its id. Opens to
+ * show the evidence, the fix, and the cross-review behind it. */
 export function FindingCard(props: Props) {
   const {
     finding: f,
@@ -64,45 +66,53 @@ export function FindingCard(props: Props) {
     setCommented(ok);
   }
 
+  const id = f.id?.includes("#") ? f.id : `#${f.id}`;
+  const who = raisers
+    ? raisers.map((r, i) => (
+        <span key={r.persona} title={`${r.persona} rated it ${r.severity}`}>
+          {i > 0 && ", "}
+          {r.persona}
+          {!r.inLens && " (off-lens)"}
+        </span>
+      ))
+    : `${source}${f.offLens ? " (off-lens)" : ""}`;
+
   return (
-    <div className={`finding finding-${f.severity}`} data-finding={f.id}>
+    <div className="finding" data-finding={f.id}>
       <div className="finding-top">
         <input
           type="checkbox"
           className="finding-check"
           checked={checked}
           onChange={onCheck}
-          title="Pick it to send to the agent with others"
+          title="Pick it to fix or send with others"
         />
+        <SevTag severity={f.severity} />
         <button type="button" className="finding-head" onClick={onToggle} aria-expanded={open}>
-          <span className="finding-badge">{BADGES[f.severity]}</span>
-          <span className="finding-title">
-            <Inline>{f.title}</Inline>
-          </span>
-          <span className="finding-id">{f.id?.includes("#") ? f.id : `#${f.id}`}</span>
+          <Inline>{f.title}</Inline>
         </button>
+        <span className="finding-actions reveal">
+          <IconButton
+            icon="send"
+            label="Send to terminal: paste it into a terminal's prompt"
+            disabled={!review}
+            onClick={() => onSend(findingText(f, source))}
+          />
+          <IconButton
+            icon={commented ? "check" : "comments"}
+            label={
+              commented ? "Commented" : first ? "Comment: add it as a comment on its code" : notHere
+            }
+            disabled={!first || commented}
+            onClick={comment}
+          />
+        </span>
       </div>
       <div className="finding-meta">
-        {raisers ? (
-          raisers.map((r) => (
-            <span
-              key={r.persona}
-              className="finding-chip"
-              title={`${r.persona} rated it ${r.severity}`}
-            >
-              {r.persona}
-              {!r.inLens && " (off-lens)"}
-            </span>
-          ))
-        ) : (
-          <span className="finding-chip">
-            {source}
-            {f.offLens && " (off-lens)"}
-          </span>
-        )}
         {f.locations.map((loc, i) => (
           <button
             type="button"
+            className="finding-loc"
             // biome-ignore lint/suspicious/noArrayIndexKey: a finding's locations never reorder
             key={i}
             title={placed[i] ? "Show in the review" : "Open in the editor"}
@@ -115,23 +125,9 @@ export function FindingCard(props: Props) {
             {locationText(loc)}
           </button>
         ))}
-        <span className="spacer" />
-        <button
-          type="button"
-          disabled={!review}
-          title="Paste this finding into a terminal's prompt"
-          onClick={() => onSend(findingText(f, source))}
-        >
-          Send to terminal
-        </button>
-        <button
-          type="button"
-          disabled={!first || commented}
-          title={first ? "Add this finding as a comment on its code" : notHere}
-          onClick={comment}
-        >
-          {commented ? "Commented" : "Comment"}
-        </button>
+        <span className="finding-dot">·</span>
+        <span className="finding-who">{who}</span>
+        <span className="finding-dot">· {id}</span>
       </div>
       {open && (
         <div className="finding-body">

@@ -3,15 +3,14 @@ import { useRef, useState } from "react";
 import type { BotOptions, Finding } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
+import { IconButton } from "../ui/icons";
+import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
-import { Closing, Tally } from "./Closing";
 import { FindingCard } from "./FindingCard";
 import { Fixes } from "./Fixes";
-import { findingsText, history, type Picked, report } from "./findings";
-import { Markdown } from "./Markdown";
-import { Progress } from "./Progress";
+import { finalFindings, findingsText, history, type Picked, report } from "./findings";
 import { runState } from "./personas";
-import { MinimalView, PersonaView, SelectAll } from "./ReportViews";
+import { MinimalView, PersonaView, SynthesisView } from "./ReportViews";
 import { type Act, RunControls } from "./RunControls";
 import { refreshRun, runAction, useRun } from "./runs";
 import "./bots.css";
@@ -26,10 +25,12 @@ const VIEW_NAMES: Record<View, string> = {
 };
 
 const ADD: [keyof BotOptions, string][] = [
-  ["synthesize", "Synthesis"],
-  ["crossReview", "Cross-review"],
-  ["minimal", "Minimal"],
+  ["synthesize", "Add synthesis"],
+  ["crossReview", "Add cross-review"],
+  ["minimal", "Add minimal report"],
 ];
+
+const STATE_PILLS = { running: "blue", done: "green", halted: "red" };
 
 const NO_OPTIONS: BotOptions = {
   synthesize: false,
@@ -175,97 +176,74 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   } else if (view === "fixes") {
     body = <Fixes run={run} onGo={(id) => goTo(id.includes("#") ? "personas" : "synthesis", id)} />;
   } else if (view === "synthesis" && r.synthesis) {
-    const s = r.synthesis;
-    body = (
-      <>
-        <div className="bots-verdict">
-          <Markdown>{s.verdict}</Markdown>
-          <Tally findings={s.findings} />
-          <SelectAll
-            onClick={() => checkAll(s.findings.map((f) => ({ f, source: "synthesis" })))}
-          />
-        </div>
-        {s.findings.map((f) => card(f, "synthesis"))}
-        <Closing r={r} onGo={go} />
-      </>
-    );
+    body = <SynthesisView r={r} card={card} checkAll={checkAll} onGo={go} />;
   } else {
-    body = <PersonaView r={r} persona={persona} card={card} checkAll={checkAll} />;
+    body = (
+      <PersonaView
+        run={run}
+        r={r}
+        persona={persona}
+        onPersona={setPersona}
+        card={card}
+        checkAll={checkAll}
+      />
+    );
   }
 
+  const n = finalFindings(r).length;
   return (
     <div className="bots-report" ref={root}>
       <div className="bots-report-bar">
-        <code>{run.revset}</code> @ <code>{run.to.slice(0, 8)}</code>
-        <span className="bots-views" role="tablist">
-          {views.map((v) => (
-            <button
-              type="button"
-              role="tab"
-              key={v}
-              aria-selected={v === view}
-              className={v === view ? "selected" : undefined}
-              onClick={() => setPicked(v)}
-            >
-              {VIEW_NAMES[v]}
-            </button>
-          ))}
+        <span className="bots-report-title">
+          Review of <code className="bots-revset">{run.revset}</code>
         </span>
-        <span className={`bots-run-meta bots-state-${state}`}>{label}</span>
+        <code className="bots-commit" title={run.to}>
+          {run.to.slice(0, 4)}
+        </code>
+        <span className={`pill ${STATE_PILLS[state]}`}>
+          {state === "done" ? `Done · ${n} ${n === 1 ? "finding" : "findings"}` : label}
+        </span>
         {review && review.to !== run.to && (
           <span
-            className="bots-run-meta bots-state-halted"
+            className="pill amber"
             title="Locations and line numbers may not match the open review, and agents read files from the working copy"
           >
-            open review is at <code>{review.to.slice(0, 8)}</code>
+            Open review is at {review.to.slice(0, 8)}
           </span>
         )}
         <span className="spacer" />
-        <RunControls run={run} act={act}>
-          {ADD.filter(([key]) => !run.options[key]).map(([key, text]) => (
-            <button
-              type="button"
-              key={key}
-              disabled={key === "crossReview" && run.personas.length < 2}
-              onClick={() =>
-                act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true }))
-              }
-            >
-              + {text}
-            </button>
-          ))}
-        </RunControls>
+        <RunControls run={run} act={act} />
+        <Menu
+          label="Report actions"
+          items={ADD.filter(([key]) => !run.active && !run.options[key]).map(([key, text]) => ({
+            label: text,
+            disabled: key === "crossReview" && run.personas.length < 2,
+            title:
+              key === "crossReview" && run.personas.length < 2
+                ? "Needs two or more personas"
+                : undefined,
+            onSelect: () =>
+              act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true })),
+          }))}
+        />
       </div>
-      {view === "personas" && <Progress run={run} persona={persona} onPersona={setPersona} />}
-      {checked.size > 0 && (
-        <div className="bots-picked">
-          {checked.size} picked
+      <div className="bots-tabs" role="tablist">
+        {views.map((v) => (
           <button
             type="button"
-            onClick={fixChecked}
-            title="Have a headless agent edit the working copy to fix them"
+            role="tab"
+            key={v}
+            aria-selected={v === view}
+            onClick={() => setPicked(v)}
           >
-            Fix headless
+            {VIEW_NAMES[v]}
           </button>
-          <button
-            type="button"
-            disabled={!review}
-            title={review ? "Paste them into a terminal's prompt" : "Open a review first"}
-            onClick={sendChecked}
-          >
-            Send to terminal
-          </button>
-          <button type="button" onClick={() => setChecked(new Map())}>
-            Clear
-          </button>
-        </div>
-      )}
+        ))}
+      </div>
       {notice && (
         <div className={notice.error ? "bots-error bots-notice" : "bots-notice"}>
           {notice.text}
-          <button type="button" onClick={() => setNotice(undefined)} title="Dismiss">
-            ✕
-          </button>
+          <IconButton icon="x" label="Dismiss" onClick={() => setNotice(undefined)} />
         </div>
       )}
       {failures.map((p, i) => (
@@ -275,7 +253,30 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
         </div>
       ))}
       {error && <div className="bots-error">{error}</div>}
-      <div className="bots-report-body">{body}</div>
+      <div className={`bots-report-body${checked.size > 0 ? " docked" : ""}`}>{body}</div>
+      {checked.size > 0 && (
+        <div className="bots-picked">
+          <b>{checked.size} picked</b>
+          <span className="spacer" />
+          <button
+            type="button"
+            disabled={!review}
+            title={review ? "Paste them into a terminal's prompt" : "Open a review first"}
+            onClick={sendChecked}
+          >
+            Send to terminal
+          </button>
+          <button
+            type="button"
+            className="primary"
+            onClick={fixChecked}
+            title="Have a headless agent edit the working copy to fix them"
+          >
+            Fix headless
+          </button>
+          <IconButton icon="x" label="Clear picks" onClick={() => setChecked(new Map())} />
+        </div>
+      )}
     </div>
   );
 }

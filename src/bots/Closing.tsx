@@ -1,5 +1,4 @@
-import type { Finding } from "../bindings";
-import { BADGES, type Report, tally } from "./findings";
+import type { Report } from "./findings";
 import { Markdown } from "./Markdown";
 
 /** Links to findings by id, which scroll to their cards. */
@@ -12,19 +11,6 @@ export function Refs({ ids, onGo }: { ids: string[]; onGo(id: string): void }) {
         </button>
       ))}
     </>
-  );
-}
-
-export function Tally({ findings }: { findings: Finding[] }) {
-  if (findings.length === 0) return <span className="bots-tally">No findings</span>;
-  return (
-    <span className="bots-tally">
-      {tally(findings).map(([s, n]) => (
-        <span key={s}>
-          {n} {BADGES[s].split(" ")[0]} {s}
-        </span>
-      ))}
-    </span>
   );
 }
 

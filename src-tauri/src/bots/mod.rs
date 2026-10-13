@@ -3,6 +3,7 @@
 //! those findings.
 
 mod fix;
+pub mod install;
 pub mod output;
 pub mod personas;
 mod pipeline;

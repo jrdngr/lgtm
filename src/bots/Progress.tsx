@@ -1,45 +1,47 @@
-import type { BotRun, Part, Step } from "../bindings";
+import type { BotRun, Part } from "../bindings";
 
-/** A part's state in a few words: what it's doing, how it ended, or what it found. */
-function describe(parts: Part[], step: Step, done: boolean): { state: string; text: string } {
+/** A persona's review in a few words: what it's doing, why it halted, or how much it found. */
+function describe(parts: Part[], done: boolean): { state: string; text: string; count?: number } {
   const running = parts.find((p) => p.status === "running");
   if (running) return { state: "running", text: running.activity ?? "starting" };
   const failed = parts.find((p) => p.status === "failed" || p.status === "stopped");
   if (failed) return { state: "halted", text: failed.error ?? failed.status };
   if (parts.length === 0) return { state: "waiting", text: done ? "nothing to do" : "waiting" };
   const out = parts[0].output;
-  if (step === "reports" && out?.kind === "review") {
-    return { state: "done", text: `${out.findings.length} findings` };
-  }
-  return { state: "done", text: "done" };
+  const count = out?.kind === "review" ? out.findings.length : undefined;
+  return { state: "done", text: `${count ?? 0} findings`, count };
 }
 
 interface Props {
   run: BotRun;
-  /** The persona the By persona view shows, if one is picked. */
+  /** The persona whose findings are shown, if one is picked. */
   persona?: string;
   onPersona(name: string | undefined): void;
 }
 
-/** One chip per persona with its state. Clicking one shows only its findings. */
+/** A filter chip per persona with its finding count, or its state while it isn't done. */
 export function Progress({ run, persona, onPersona }: Props) {
   return (
-    <div className="bots-progress">
+    <>
       {run.personas.map((p) => {
         const parts = run.parts.filter((x) => x.step === "reports" && x.persona === p.name);
-        const { state, text } = describe(parts, "reports", run.done.includes("reports"));
+        const { state, text, count } = describe(parts, run.done.includes("reports"));
         return (
           <button
             type="button"
             key={p.name}
-            className={`bots-chip bots-chip-${state}${persona === p.name ? " selected" : ""}`}
+            className={`bots-chip bots-chip-${state}`}
+            aria-pressed={persona === p.name}
             title={`${p.description}\n${text}`}
             onClick={() => onPersona(persona === p.name ? undefined : p.name)}
           >
-            {p.name} <span className="bots-chip-text">{text}</span>
+            {p.name}
+            <span className="bots-chip-text">
+              {state === "done" ? count : state === "halted" ? "halted" : state}
+            </span>
           </button>
         );
       })}
-    </div>
+    </>
   );
 }

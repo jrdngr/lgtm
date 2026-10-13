@@ -531,7 +531,9 @@ export type HunkDto = {
 };
 
 export type Installed = "no" | "yes" | 
-/**  Installed, but the file differs from the template. */
+/**  Installed as an older shipped version, untouched since. */
+"outdated" | 
+/**  Installed, and edited since. */
 "changed";
 
 /**  A change to the repo, on a revision given by change id. */

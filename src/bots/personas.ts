@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { BotOptions, BotRun, Personas, Step } from "../bindings";
+import type { BotOptions, BotRun, Part, Personas, Step } from "../bindings";
 import { onSaved } from "../editor/saved";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
@@ -46,13 +46,22 @@ export type RunState = "running" | "done" | "halted";
 export function runState(run: BotRun): { state: RunState; label: string } {
   if (run.active) {
     const step = run.parts.filter((p) => p.status === "running").at(-1)?.step ?? "reports";
-    if (step !== "reports") return { state: "running", label: STEP_NAMES[step] };
+    if (step !== "reports") return { state: "running", label: `Running · ${STEP_NAMES[step]}` };
     const reports = run.parts.filter((p) => p.step === "reports" && p.status === "done").length;
-    return { state: "running", label: `reviewing ${reports}/${run.personas.length}` };
+    return { state: "running", label: `Running · ${reports} of ${run.personas.length} done` };
   }
   if (steps(run.options).every((s) => run.done.includes(s))) {
-    return { state: "done", label: "done" };
+    return { state: "done", label: "Done" };
   }
-  const failed = run.parts.some((p) => p.status === "failed");
-  return { state: "halted", label: failed ? "failed" : "stopped" };
+  return { state: "halted", label: "Halted" };
+}
+
+/** What a run is doing, which part halted it, or who reviewed. */
+export function runDetail(run: BotRun): string {
+  const who = (p: Part) => p.persona ?? STEP_NAMES[p.step];
+  const running = run.parts.filter((p) => p.status === "running").at(-1);
+  if (run.active) return running ? `${who(running)} ${running.activity ?? "starting"}` : "starting";
+  const halted = run.parts.find((p) => p.status === "failed" || p.status === "stopped");
+  if (halted) return `${who(halted)} ${halted.status}`;
+  return run.personas.map((p) => p.name).join(", ");
 }

@@ -6,10 +6,12 @@ import { useWorkspace } from "../workspaces/context";
 const STATE: Record<Installed, string> = {
   no: "",
   yes: "installed",
+  outdated: "older version, will update",
   changed: "edited, will replace your edits",
 };
 
-/** Installs the default personas globally or into the repo. Also restores edited ones. */
+/** Installs the default personas globally or into the repo. Also updates older versions and
+ * restores edited ones. */
 export function Installer({ onDone }: { onDone(): void }) {
   const workspace = useWorkspace();
   const [defaults, setDefaults] = useState<DefaultPersona[]>([]);
@@ -43,7 +45,9 @@ export function Installer({ onDone }: { onDone(): void }) {
 
   return (
     <div className="bots-installer">
-      <div className="bots-section">Install default personas</div>
+      <div className="bots-section">
+        <span className="bots-label">Install default personas</span>
+      </div>
       <div className="bots-scope">
         {(["global", "repo"] as const).map((s) => (
           <label key={s}>
@@ -70,7 +74,7 @@ export function Installer({ onDone }: { onDone(): void }) {
       </div>
       {error && <div className="bots-error">{error}</div>}
       <div className="bots-actions">
-        <button type="button" disabled={picked.size === 0} onClick={install}>
+        <button type="button" className="primary" disabled={picked.size === 0} onClick={install}>
           Install {picked.size}
         </button>
         <button type="button" onClick={onDone}>

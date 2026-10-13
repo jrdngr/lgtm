@@ -1,103 +1,47 @@
+/* Reviewers panel */
+
 .bots {
-  height: 100%;
-  overflow: auto;
   padding-bottom: 8px;
 }
 
 .bots-section {
   display: flex;
   align-items: center;
-  padding: 8px 8px 2px;
-  font-size: 11px;
+  gap: 6px;
+  padding: 10px 10px 4px;
+}
+
+.bots-label {
+  font-size: var(--fs-xs);
   font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
-}
-
-.bots-section .spacer,
-.finding-meta .spacer,
-.bots-report-bar .spacer {
-  flex: 1;
-}
-
-.bots-section button,
-.bots-personas button,
-.bots-runs button,
-.bots-footer button {
-  font-size: 11px;
-  font-weight: normal;
-  text-transform: none;
-  padding: 0 6px;
 }
 
 .bots label {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 0;
-  white-space: nowrap;
-}
-
-.bots label[hidden] {
-  display: none;
-}
-
-.bots label.bots-sub {
-  padding-left: 16px;
-}
-
-.bots-options,
-.bots-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  padding: 2px 8px;
-}
-
-.bots-personas,
-.bots-runs {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.bots-personas li {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  padding: 0 8px;
-}
-
-.bots-personas label {
-  flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.bots-scope-tag,
-.bots-installed,
-.bots-hint {
-  font-size: 11px;
+.bots-error {
+  padding: 4px 10px;
+  color: var(--error);
+  white-space: pre-wrap;
+}
+
+.bots-empty {
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
   color: var(--muted);
-}
-
-.bots-installed {
-  margin-left: 4px;
-}
-
-.bots-installed-changed,
-.bots-broken {
-  color: var(--amber);
-}
-
-.bots-broken span:first-child {
-  flex: 1;
 }
 
 .bots-new {
   display: flex;
   gap: 4px;
-  padding: 2px 8px 4px;
+  padding: 8px 10px 4px;
 }
 
 .bots-new input,
@@ -115,102 +59,372 @@
   flex: 1;
 }
 
+.bots-personas,
+.bots-runs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Checkbox, name and ✎ on the first line; the description under the name. */
+.bots-personas li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 6px;
+  padding: 3px 6px 3px 10px;
+}
+
+.bots-personas li:hover {
+  background: var(--hover);
+}
+
+.bots-personas .icon-button {
+  width: 20px;
+  height: 20px;
+}
+
+.bots-persona-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-personas li.off .bots-persona-name {
+  color: var(--muted);
+}
+
+.bots-persona-desc {
+  grid-column: 1 / -1;
+  padding-left: 19px;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.bots-personas li.bots-broken,
+.bots-personas li.bots-broken .bots-persona-desc {
+  color: var(--error);
+}
+
+.bots-personas li.bots-broken .bots-persona-desc {
+  padding-left: 0;
+}
+
+.bots-options {
+  display: grid;
+  gap: 2px;
+  padding: 2px 10px 8px;
+}
+
+.bots-segments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.bots-segments button {
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 3px 2px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.bots-segments > :not(:first-child) {
+  border-left: 1px solid var(--border);
+}
+
+.bots-segments button[aria-pressed="true"] {
+  background: var(--selection);
+  color: var(--fg);
+}
+
+.bots-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-size: var(--fs-sm);
+  text-align: left;
+}
+
+.bots-switch:disabled {
+  opacity: 1;
+  color: var(--muted);
+}
+
+.bots-switch-track {
+  position: relative;
+  flex: none;
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--border);
+}
+
+.bots-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.bots-switch[aria-checked="true"] .bots-switch-track {
+  background: var(--accent);
+}
+
+.bots-switch[aria-checked="true"] .bots-switch-track::after {
+  left: 12px;
+  background: #fff;
+}
+
+.bots-switch:disabled .bots-switch-track {
+  opacity: 0.5;
+}
+
+.bots-sub {
+  padding-left: 32px;
+}
+
+.bots-run-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% - 20px);
+  margin: 4px 10px 6px;
+  padding: 5px;
+  border-radius: 5px;
+  font-weight: 600;
+}
+
+.bots-run-button small {
+  overflow: hidden;
+  font: var(--fs-xs) var(--mono);
+  font-weight: normal;
+  opacity: 0.8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A dot or spinner, the outcome, and revset, commit and detail under it. */
+.bots-runs li {
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+}
+
+.bots-runs li:hover {
+  background: var(--hover);
+}
+
+.bots-run {
+  display: grid;
+  grid-template-columns: 10px 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0 5px 10px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.bots-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.bots-dot-done {
+  background: var(--added);
+}
+
+.bots-dot-halted {
+  background: var(--error);
+}
+
+.bots-dot-running {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(79 140 201 / 30%);
+  border-top-color: var(--accent);
+  animation: bots-spin 0.9s linear infinite;
+}
+
+@keyframes bots-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.bots-run-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.bots-run-meta {
+  grid-column: 2;
+  overflow: hidden;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bots-run-meta code {
+  font: 10.5px var(--mono);
+}
+
+.bots-run-side {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.bots-run-actions {
+  display: flex;
+  align-items: center;
+}
+
+.bots-run-actions .icon-button {
+  width: 20px;
+  height: 20px;
+}
+
+.bots-run-time {
+  min-width: 18px;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+  text-align: right;
+}
+
+/* Installer */
+
 .bots-scope {
   display: flex;
   gap: 12px;
-  padding: 2px 8px;
+  padding: 2px 10px;
+}
+
+.bots-hint,
+.bots-installed {
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }
 
 .bots-hint {
-  padding: 0 8px 4px;
+  padding: 0 10px 4px;
+}
+
+.bots-list {
+  display: grid;
+  gap: 2px;
+  padding: 2px 10px;
+}
+
+.bots-installed {
+  margin-left: 4px;
+}
+
+.bots-installed-changed {
+  color: var(--amber);
+}
+
+.bots-installed-outdated {
+  color: var(--accent);
 }
 
 .bots-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 8px 2px;
+  padding: 8px 10px 2px;
 }
 
-.bots-target,
-.bots-empty {
-  color: var(--muted);
-  font-size: 12px;
-}
+/* Severity tags */
 
-.bots-empty {
-  padding: 4px 8px;
-}
-
-.bots-error {
-  padding: 4px 8px;
-  color: var(--error);
-  white-space: pre-wrap;
-}
-
-.bots-footer {
-  padding: 8px;
-}
-
-.bots-runs li {
-  display: flex;
+.sev {
+  display: inline-flex;
   align-items: center;
+  flex: none;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 17px;
+  white-space: nowrap;
 }
 
-.bots-runs li:hover {
-  background: var(--selection);
+.sev-critical {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
 }
 
-.bots-runs .bots-run {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-  padding: 4px 8px;
-  border: none;
-  border-radius: 0;
-  background: none;
-  text-align: left;
-  font-size: 13px;
+.sev-high {
+  color: #f0883e;
+  background: rgb(240 136 62 / 14%);
 }
 
-.bots-run-meta {
-  font-size: 11px;
-  color: var(--muted);
+.sev-medium {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
 }
 
-.bots-run-buttons {
-  display: flex;
-  gap: 4px;
-  padding-right: 8px;
-}
-
-.bots-state {
-  margin-right: 6px;
-}
-
-.bots-chip-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--muted);
-}
-
-.bots-state-running,
-.bots-chip-running .bots-chip-text {
+.sev-low {
   color: var(--accent);
+  background: rgb(79 140 201 / 14%);
 }
 
-.bots-state-done {
-  color: var(--reviewed);
+.sev-info {
+  color: var(--muted);
+  background: var(--hover);
 }
 
-.bots-state-halted,
-.bots-chip-halted .bots-chip-text {
-  color: var(--error);
+.bots-run-title .sev {
+  margin-left: 4px;
 }
+
+.bots-tally {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bots-none {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+/* Report pane */
 
 .bots-report {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -219,73 +433,82 @@
 
 .bots-report-bar {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.bots-report-bar button {
-  font-size: 12px;
-  padding: 1px 8px;
-}
-
-.bots-views {
-  display: flex;
-  margin-left: 8px;
-}
-
-.bots-views button {
-  border-radius: 0;
-}
-
-.bots-views button:first-child {
-  border-radius: 4px 0 0 4px;
-}
-
-.bots-views button:last-child {
-  border-radius: 0 4px 4px 0;
-}
-
-.bots-views button.selected {
-  border-color: var(--accent);
-  background: var(--selection);
-}
-
-.bots-progress {
-  display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px 8px;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 2px 6px 2px 10px;
   border-bottom: 1px solid var(--border);
+  font-size: var(--fs-sm);
 }
 
-.bots-chip {
-  display: inline-flex;
-  gap: 4px;
-  max-width: 280px;
-  padding: 1px 8px;
-  font-size: 11px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--panel);
+.bots-report-title {
+  font-weight: 600;
   white-space: nowrap;
 }
 
-.bots-chip.selected {
-  border-color: var(--accent);
+.bots-revset {
+  font: var(--fs-sm) var(--mono);
+  color: var(--rev-unique);
+}
+
+.bots-commit {
+  font: var(--fs-xs) var(--mono);
+  color: var(--faint);
+}
+
+.bots-tabs {
+  display: flex;
+  gap: 14px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.bots-tabs button {
+  padding: 6px 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.bots-tabs button:hover {
+  color: var(--fg);
+}
+
+.bots-tabs button[aria-selected="true"] {
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.bots-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 2px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.bots-notice .icon-button {
+  margin-left: auto;
 }
 
 .bots-report-body {
   flex: 1;
   overflow: auto;
-  padding: 8px 16px 24px;
+  padding: 8px 12px 24px;
   line-height: 1.5;
   user-select: text;
 }
 
+/* Room for the picked-findings bar floating over the bottom. */
+.bots-report-body.docked {
+  padding-bottom: 64px;
+}
+
 .bots-report-body h3 {
-  font-size: 13px;
+  font-size: var(--fs);
   margin: 16px 0 4px;
 }
 
@@ -294,9 +517,7 @@
 }
 
 .bots-report-body code {
-  font:
-    12px Menlo,
-    monospace;
+  font: var(--fs-sm) var(--mono);
 }
 
 .bots-report-body pre {
@@ -310,49 +531,92 @@
   display: inline;
 }
 
+.bots-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.bots-filters button.quiet,
+.bots-verdict button.quiet {
+  padding: 0 6px;
+  font-size: var(--fs-xs);
+}
+
+.bots-chip {
+  display: inline-flex;
+  gap: 5px;
+  max-width: 240px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+.bots-chip[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--selection);
+}
+
+.bots-chip-text {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.bots-chip-running .bots-chip-text {
+  color: var(--accent);
+}
+
+.bots-chip-halted .bots-chip-text {
+  color: var(--error);
+}
+
+/* A verdict as a quote, with its tally beside it. */
 .bots-verdict {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 12px;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  gap: 6px 16px;
+  margin: 4px 0 10px;
+  padding: 6px 10px;
+  border-left: 3px solid var(--border);
+  border-radius: 0 4px 4px 0;
+  background: var(--panel);
 }
 
-.bots-tally {
+.bots-verdict-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.bots-verdict-side {
   display: flex;
-  gap: 10px;
-  font-size: 12px;
-  color: var(--muted);
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
 }
 
 .finding {
   margin: 8px 0;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--muted);
-  border-radius: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
   background: var(--panel);
-}
-
-.finding-critical {
-  border-left-color: #f85149;
-}
-
-.finding-high {
-  border-left-color: #f0883e;
-}
-
-.finding-medium {
-  border-left-color: #d29922;
-}
-
-.finding-low {
-  border-left-color: #4f8cc9;
 }
 
 .finding-top {
   display: flex;
-  align-items: baseline;
-  padding-left: 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 2px 10px;
+}
+
+.finding-top .sev {
+  text-transform: uppercase;
 }
 
 .finding-check {
@@ -360,57 +624,64 @@
 }
 
 .finding-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 10px 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
   border: none;
   background: none;
+  font-weight: 600;
   text-align: left;
-}
-
-.finding-badge {
-  font-size: 11px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.finding-title {
-  flex: 1;
-  font-weight: 600;
+.finding-head[aria-expanded="true"] {
+  white-space: normal;
 }
 
-.finding-id,
-.finding-who {
-  font-size: 11px;
-  color: var(--muted);
+.finding-actions {
+  display: flex;
+}
+
+.finding-actions .icon-button {
+  width: 20px;
+  height: 20px;
 }
 
 .finding-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 2px 10px 6px;
+  gap: 6px;
+  padding: 0 8px 7px 10px;
+  font-size: var(--fs-xs);
 }
 
-.finding-meta button,
-.finding-ref {
-  font-size: 11px;
-  padding: 0 6px;
+.finding-loc {
+  padding: 0;
+  border: none;
+  background: none;
+  font: 10.5px var(--mono);
+  color: var(--accent);
 }
 
-.finding-chip {
-  font-size: 11px;
-  padding: 0 6px;
-  border-radius: 8px;
-  background: var(--bg);
+.finding-loc:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.finding-dot {
+  color: var(--faint);
+}
+
+.finding-who {
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
 .finding-body {
   padding: 0 12px 8px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hair);
 }
 
 .finding-body ul {
@@ -425,35 +696,30 @@
 
 .finding-ref {
   margin-right: 4px;
+  padding: 0 6px;
+  font-size: var(--fs-xs);
 }
 
+/* The picked findings' actions, floating over the bottom so picking doesn't shift the list. */
 .bots-picked {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--selection);
-}
-
-.bots-picked button,
-.bots-verdict button {
-  font-size: 12px;
-  padding: 1px 8px;
-}
-
-.bots-notice {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--raise);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 40%);
+  font-size: var(--fs-sm);
 }
 
-.bots-notice button {
-  margin-left: auto;
-  font-size: 11px;
-  padding: 0 6px;
+.bots-picked button:not(.icon-button) {
+  padding: 1px 10px;
+  font-size: var(--fs-sm);
 }
 
 .bots-fix {

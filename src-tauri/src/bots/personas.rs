@@ -1,7 +1,6 @@
 //! Personas: markdown files with a `description` and `off_lens` front matter, and the profile
 //! as the body. Global ones live in the user's config dir, and a repo's in `.lgtm/personas`,
-//! where they override global ones of the same name. The defaults ship only as templates for
-//! the installer.
+//! where they override global ones of the same name.
 
 use std::path::{Path, PathBuf};
 
@@ -36,46 +35,6 @@ pub struct PersonaFile {
     pub path: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum Installed {
-    No,
-    Yes,
-    /// Installed, but the file differs from the template.
-    Changed,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct DefaultPersona {
-    pub name: String,
-    pub description: String,
-    pub global: Installed,
-    pub repo: Installed,
-}
-
-const DEFAULTS: [(&str, &str); 7] = [
-    ("simplicity-bot", include_str!("defaults/simplicity-bot.md")),
-    ("security-bot", include_str!("defaults/security-bot.md")),
-    (
-        "correctness-bot",
-        include_str!("defaults/correctness-bot.md"),
-    ),
-    (
-        "performance-bot",
-        include_str!("defaults/performance-bot.md"),
-    ),
-    (
-        "maintainability-bot",
-        include_str!("defaults/maintainability-bot.md"),
-    ),
-    (
-        "architecture-bot",
-        include_str!("defaults/architecture-bot.md"),
-    ),
-    ("general-bot", include_str!("defaults/general-bot.md")),
-];
-
 const NEW_PERSONA: &str = "---
 description: What this persona cares about most, in a few words
 off_lens: true
@@ -103,7 +62,7 @@ pub fn repo_dir(root: &Path) -> PathBuf {
     root.join(".lgtm").join("personas")
 }
 
-fn dir(scope: Scope, root: &Path) -> anyhow::Result<PathBuf> {
+pub(super) fn dir(scope: Scope, root: &Path) -> anyhow::Result<PathBuf> {
     match scope {
         Scope::Global => global_dir().context("no home directory"),
         Scope::Repo => Ok(repo_dir(root)),
@@ -206,44 +165,6 @@ pub fn load(root: &Path) -> Personas {
     out
 }
 
-fn installed(dir: Option<&Path>, name: &str, template: &str) -> Installed {
-    match dir.and_then(|d| std::fs::read_to_string(d.join(format!("{name}.md"))).ok()) {
-        None => Installed::No,
-        Some(text) if text == template => Installed::Yes,
-        Some(_) => Installed::Changed,
-    }
-}
-
-pub fn defaults(root: &Path) -> Vec<DefaultPersona> {
-    let global = global_dir();
-    let repo = repo_dir(root);
-    DEFAULTS
-        .iter()
-        .map(|(name, template)| DefaultPersona {
-            name: name.to_string(),
-            description: parse(name, template)
-                .map(|p| p.description)
-                .unwrap_or_default(),
-            global: installed(global.as_deref(), name, template),
-            repo: installed(Some(&repo), name, template),
-        })
-        .collect()
-}
-
-/// Writes the named default personas into `scope`'s directory, replacing what's there.
-pub fn install(root: &Path, names: &[String], scope: Scope) -> anyhow::Result<()> {
-    let dir = dir(scope, root)?;
-    std::fs::create_dir_all(&dir)?;
-    for name in names {
-        let (_, template) = DEFAULTS
-            .iter()
-            .find(|(n, _)| n == name)
-            .with_context(|| format!("no default persona named `{name}`"))?;
-        std::fs::write(dir.join(format!("{name}.md")), template)?;
-    }
-    Ok(())
-}
-
 /// Names are file names: letters, digits, `.`, `_` and `-`.
 fn valid_name(name: &str) -> bool {
     !name.is_empty()
@@ -287,6 +208,7 @@ pub fn is_persona_file(root: &Path, path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::bots::install::{Installed, defaults, install};
 
     #[test]
     fn parses_front_matter_and_the_profile() {
@@ -301,17 +223,6 @@ mod tests {
         assert!(parse("x", "- just a profile").unwrap().off_lens);
         assert!(parse("x", "---\nmodel: big\n---\n").is_err());
         assert!(parse("x", "---\noff_lens: maybe\n---\n").is_err());
-    }
-
-    #[test]
-    fn every_default_parses() {
-        for (name, text) in DEFAULTS {
-            let p = parse(name, text).unwrap();
-            assert!(
-                !p.description.is_empty() && p.profile.starts_with("- "),
-                "{name}"
-            );
-        }
     }
 
     #[test]

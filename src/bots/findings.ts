@@ -14,6 +14,16 @@ import type { FlatFile } from "../review/model";
 
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
 
+/** Short names for the flat severity tags. */
+export const SEVERITY_NAMES: Record<Severity, string> = {
+  critical: "critical",
+  high: "high",
+  medium: "med",
+  low: "low",
+  info: "info",
+};
+
+/** Emoji badges, for finding text sent out as comments and prompts. */
 export const BADGES: Record<Severity, string> = {
   critical: "🔴 CRITICAL",
   high: "🟠 HIGH",
@@ -70,6 +80,11 @@ export function report(run: BotRun): Report {
     minimal: outputs(run, "minimal")[0]?.output,
     exchanges,
   };
+}
+
+/** A run's findings: the synthesis's when there is one, otherwise every persona's. */
+export function finalFindings(r: Report): Finding[] {
+  return r.synthesis?.findings ?? [...r.byPersona.values()].flat();
 }
 
 /** The persona findings a finding stands for: its sources, or itself. */

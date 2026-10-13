@@ -1,13 +1,17 @@
 import { useState } from "react";
-import type { BotOptions, BotRun } from "../bindings";
+import type { BotOptions, BotRun, Personas } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useAgentsOff } from "../tools/agents";
+import { IconButton } from "../ui/icons";
+import { Menu } from "../ui/Menu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { Installer } from "./Installer";
+import { NewPersona } from "./NewPersona";
 import { PersonaList } from "./PersonaList";
 import { usePersonas } from "./personas";
+import { ReportOptions } from "./ReportOptions";
 import { RunList } from "./RunList";
 import "./bots.css";
 
@@ -32,62 +36,78 @@ function loadPicks(): Picks {
   }
 }
 
-const OPTION_LABELS: [keyof BotOptions, string, string][] = [
-  ["synthesize", "Synthesis", "Merge every persona's findings into one set"],
-  ["crossReview", "Cross-review", "Personas challenge each other's findings before synthesis"],
-  ["adversarial", "Adversarial", "Cross-review argues against every medium and higher finding"],
-  ["minimal", "Minimal", "Only the findings that matter to what the change is for"],
-];
-
 /** Runs personas on the current review, and lists the workspace's runs. The side panel mounts
  * it each time it's shown, so persona files are read again then. */
 export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
+  const workspace = useWorkspace();
+  const loaded = usePersonas(workspace);
+  const [adding, setAdding] = useState(false);
+  const [installing, setInstalling] = useState(false);
+  const none = loaded.personas?.personas.length === 0 && loaded.personas.broken.length === 0;
+
+  let body: React.ReactNode;
+  if (!loaded.personas) {
+    body = loaded.error && <div className="bots-error">Couldn't read personas: {loaded.error}</div>;
+  } else if (installing || none) {
+    body = (
+      <>
+        {none && <div className="bots-empty">No personas yet. Install the defaults to start.</div>}
+        <Installer
+          onDone={() => {
+            setInstalling(false);
+            loaded.reload();
+          }}
+        />
+      </>
+    );
+  } else {
+    body = <Setup personas={loaded.personas} onOpen={onOpen} />;
+  }
+
   return (
     <div className="side-split">
-      <SectionHeader title="Reviewers" />
-      <div className="side-split-body">
-        <Personas onOpen={onOpen} />
+      <SectionHeader title="Reviewers">
+        <IconButton icon="plus" label="New persona" onClick={() => setAdding(true)} />
+        <Menu
+          items={[{ label: "Install default personas…", onSelect: () => setInstalling(true) }]}
+        />
+      </SectionHeader>
+      <div className="side-split-body bots">
+        {adding && (
+          <NewPersona
+            onClose={() => setAdding(false)}
+            onCreated={() => {
+              setAdding(false);
+              loaded.reload();
+            }}
+          />
+        )}
+        {body}
       </div>
     </div>
   );
 }
 
-function Personas({ onOpen }: { onOpen(run: BotRun): void }) {
+interface SetupProps {
+  personas: Personas;
+  onOpen(run: BotRun): void;
+}
+
+/** Personas and report options to pick, the Run button, and the runs so far. */
+function Setup({ personas, onOpen }: SetupProps) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const agentsOff = useAgentsOff();
-  const { personas, error: loadError, reload } = usePersonas(workspace);
   const [picks, setPicksState] = useState(loadPicks);
-  const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
   const { unpicked, options } = picks;
 
   function setPicks(next: Picks) {
     setPicksState(next);
-    localStorage.setItem(STORE_KEY, JSON.stringify(next));
-  }
-
-  if (!personas) {
-    return loadError ? (
-      <div className="bots">
-        <div className="bots-error">Couldn't read personas: {loadError}</div>
-      </div>
-    ) : null;
-  }
-  const none = personas.personas.length === 0 && personas.broken.length === 0;
-  if (installing || none) {
-    return (
-      <div className="bots">
-        {none && <div className="bots-empty">No personas yet. Install the defaults to start.</div>}
-        <Installer
-          onDone={() => {
-            setInstalling(false);
-            reload();
-          }}
-        />
-      </div>
-    );
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(next));
+    } catch {}
   }
 
   const picked = personas.personas.map((p) => p.name).filter((n) => !unpicked.includes(n));
@@ -96,8 +116,6 @@ function Personas({ onOpen }: { onOpen(run: BotRun): void }) {
       ...picks,
       unpicked: unpicked.includes(name) ? unpicked.filter((n) => n !== name) : [...unpicked, name],
     });
-  const setOption = (key: keyof BotOptions, on: boolean) =>
-    setPicks({ ...picks, options: { ...options, [key]: on } });
 
   async function start() {
     if (!review) return;
@@ -109,62 +127,50 @@ function Personas({ onOpen }: { onOpen(run: BotRun): void }) {
     onOpen(r.data);
   }
 
-  const lone = picked.length < 2;
+  const n = picked.length;
+  // Why Run can't start, in place of what it runs on.
+  const blocked = agentsOff
+    ? "needs claude, which isn't installed or is too old"
+    : !review
+      ? "open a review first"
+      : n === 0
+        ? "pick a persona"
+        : undefined;
+
   return (
-    <div className="bots">
-      <PersonaList personas={personas} picked={picked} onToggle={toggle} onChanged={reload} />
-      <div className="bots-section">Reports</div>
-      <div className="bots-options">
-        {OPTION_LABELS.map(([key, label, title]) => {
-          const cross = key === "crossReview" || key === "adversarial";
-          return (
-            <label
-              key={key}
-              title={cross && lone ? "Needs two or more personas" : title}
-              className={key === "adversarial" ? "bots-sub" : undefined}
-              hidden={key === "adversarial" && !options.crossReview}
-            >
-              <input
-                type="checkbox"
-                disabled={cross && lone}
-                checked={options[key] && !(cross && lone)}
-                onChange={(e) => setOption(key, e.target.checked)}
-              />
-              {label}
-            </label>
-          );
-        })}
-      </div>
-      <div className="bots-actions">
-        <button
-          type="button"
-          disabled={agentsOff || !review || picked.length === 0 || starting}
-          onClick={start}
-          title="Run each persona headless with claude -p"
-        >
-          {starting
-            ? "Starting…"
-            : `Run ${picked.length} ${picked.length === 1 ? "persona" : "personas"}`}
-        </button>
-        <span className="bots-target">
-          {agentsOff ? (
-            "Needs claude, which isn't installed or is too old"
-          ) : review ? (
-            <>
-              on <code>{review.revset}</code>
-            </>
-          ) : (
-            "Open a review to run personas on it"
-          )}
+    <>
+      <div className="bots-section">
+        <span className="bots-label">Personas</span>
+        <span className="spacer" />
+        <span className="section-meta">
+          {n} of {personas.personas.length}
         </span>
       </div>
+      <PersonaList personas={personas} picked={picked} onToggle={toggle} />
+      <div className="bots-section">
+        <span className="bots-label">Report</span>
+      </div>
+      <ReportOptions
+        options={options}
+        lone={n < 2}
+        onChange={(o) => setPicks({ ...picks, options: o })}
+      />
+      <button
+        type="button"
+        className="primary bots-run-button"
+        disabled={!!blocked || starting}
+        onClick={start}
+        title="Run each persona headless with claude -p"
+      >
+        {starting
+          ? "Starting…"
+          : n
+            ? `Run ${n} ${n === 1 ? "reviewer" : "reviewers"}`
+            : "Run reviewers"}
+        <small>{blocked ?? <>on {review?.revset}</>}</small>
+      </button>
       {error && <div className="bots-error">{error}</div>}
       <RunList workspace={workspace} onOpen={onOpen} onError={setError} />
-      <div className="bots-footer">
-        <button type="button" onClick={() => setInstalling(true)}>
-          Install default personas…
-        </button>
-      </div>
-    </div>
+    </>
   );
 }
