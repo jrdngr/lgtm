@@ -1,5 +1,6 @@
 import type { WorkspaceName } from "../workspaces/context";
 import type { SideState } from "./SidePanel";
+import { movedView } from "./subviews";
 
 export interface Sides {
   left: SideState;
@@ -8,16 +9,7 @@ export interface Sides {
 
 const DEFAULT_SIDES: Sides = {
   left: { open: true, width: 230, view: "workspaces" },
-  right: { open: true, width: 260, view: "diff" },
-};
-
-/** Right panel tabs from older builds, by the tab that holds them now. */
-const MOVED: Record<string, string> = {
-  files: "diff",
-  symbols: "diff",
-  pr: "comments",
-  walkthrough: "reports",
-  bots: "reports",
+  right: { open: true, width: 260, view: "changes" },
 };
 
 const key = (root: string) => `lgtm:sides:${root}`;
@@ -29,7 +21,7 @@ export function loadSides(root: string): Sides {
     const right = { ...DEFAULT_SIDES.right, ...saved?.right };
     return {
       left: { ...DEFAULT_SIDES.left, ...saved?.left },
-      right: { ...right, view: MOVED[right.view] ?? right.view },
+      right: { ...right, view: movedView(right.view) },
     };
   } catch {
     return DEFAULT_SIDES;

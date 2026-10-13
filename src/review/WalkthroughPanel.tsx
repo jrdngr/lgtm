@@ -1,4 +1,6 @@
 import type { NoteDto } from "../bindings";
+import { IconButton } from "../ui/icons";
+import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { rowLabel } from "./comments";
 import { type CurrentReview, useCurrentReview } from "./current";
@@ -22,7 +24,14 @@ export function WalkthroughPanel() {
   const review = useCurrentReview(useWorkspace());
   const run = useWalkthroughRun(review?.id);
   const state = useTourState(review?.id);
-  if (!review) return <div className="placeholder">No review open</div>;
+  if (!review) {
+    return (
+      <div className="side-split">
+        <SectionHeader title="Walkthrough" />
+        <Empty>No review open</Empty>
+      </div>
+    );
+  }
   const { notes } = review;
   const tour = activeTour(review.id, notes);
   const at = state.at[tour.id];
@@ -30,92 +39,105 @@ export function WalkthroughPanel() {
     setTourState(review.id, {
       hidden: state.hidden.includes(c) ? state.hidden.filter((h) => h !== c) : [...state.hidden, c],
     });
+  const counts = new Map<NoteDto["category"], number>();
+  for (const n of tours(notes).find((t) => t.id === tour.id)?.notes ?? []) {
+    counts.set(n.category, (counts.get(n.category) ?? 0) + 1);
+  }
   return (
-    <div className="comment-list note-list">
-      <div className="tree-total">
-        {run?.running ? (
-          <>
-            <span className="risk-note">{run.note}</span>
-            <span className="spacer" />
-            <button type="button" onClick={() => stopWalkthrough(review.id)}>
-              Stop
-            </button>
-          </>
-        ) : (
-          <>
-            <span className={run?.error ? "error" : undefined}>
-              {run?.error ?? `${notes.length} ${notes.length === 1 ? "note" : "notes"}`}
-            </span>
-            <span className="spacer" />
-            <button type="button" onClick={review.runWalkthrough} title="h in the review">
-              Walkthrough
-            </button>
-          </>
+    <div className="side-split">
+      <SectionHeader
+        title="Walkthrough"
+        meta={notes.length > 0 && `${notes.length} ${notes.length === 1 ? "note" : "notes"}`}
+      >
+        {notes.length > 0 && (
+          <IconButton
+            icon={state.inline ? "eye" : "eyeOff"}
+            label={state.inline ? "Hide notes in the review" : "Show notes in the review"}
+            aria-pressed={state.inline}
+            onClick={() => setTourState(review.id, { inline: !state.inline })}
+          />
         )}
-      </div>
-      <WalkthroughPrompt />
-      {notes.length > 0 && (
-        <div className="note-tools">
-          <select
-            value={tour.id}
-            onChange={(e) => setTourState(review.id, { active: e.target.value })}
-            title="The tour n and N step through"
-          >
-            {tours(notes).map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.notes.length})
-              </option>
-            ))}
-          </select>
-          {CATEGORY_ORDER.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={`note-filter${state.hidden.includes(c) ? "" : " on"}`}
-              onClick={() => toggle(c)}
-              title={`Show ${CATEGORIES[c].label.toLowerCase()} notes`}
+        {run?.running ? (
+          <IconButton
+            icon="x"
+            label="Stop the walkthrough"
+            onClick={() => stopWalkthrough(review.id)}
+          />
+        ) : (
+          <IconButton
+            icon="sparkle"
+            label="Write a walkthrough (h)"
+            onClick={review.runWalkthrough}
+          />
+        )}
+      </SectionHeader>
+      <div className="side-split-body comment-list note-list">
+        {(run?.running || run?.error) && (
+          <div className={`note-status${run.error && !run.running ? " error" : ""}`}>
+            {run.running ? run.note : run.error}
+          </div>
+        )}
+        <WalkthroughPrompt />
+        {notes.length > 0 && (
+          <div className="note-tools">
+            <select
+              className="note-tour"
+              value={tour.id}
+              onChange={(e) => setTourState(review.id, { active: e.target.value })}
+              title="The tour n and N step through"
             >
-              {CATEGORIES[c].emoji}
-            </button>
+              {tours(notes).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.notes.length})
+                </option>
+              ))}
+            </select>
+            {CATEGORY_ORDER.filter((c) => counts.has(c)).map((c) => {
+              const on = !state.hidden.includes(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  className={`note-filter${on ? " on" : ""}`}
+                  aria-pressed={on}
+                  onClick={() => toggle(c)}
+                  title={`${on ? "Hide" : "Show"} ${CATEGORIES[c].label.toLowerCase()} notes`}
+                >
+                  {CATEGORIES[c].emoji} {counts.get(c)}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {notes.length === 0 && !run?.running && (
+          <div className="placeholder">
+            No walkthrough yet. Walkthrough (h) has an agent guide you through the change: what
+            needs a careful look, how its flows run, and what to ask.
+          </div>
+        )}
+        <ul>
+          {tour.notes.map((n, i) => (
+            <li key={n.id} className={i === at ? "current" : undefined}>
+              <button
+                type="button"
+                onClick={() => {
+                  const note = goToStep(review.id, notes, tour.id, i);
+                  if (note) showNote(review, note);
+                }}
+                title={`${n.path}, from ${SOURCE[n.source]}`}
+              >
+                <span className="comment-where">
+                  <span className="note-emoji">{CATEGORIES[n.category].emoji}</span>
+                  {n.flow && tour.id !== READING_ORDER ? `${n.flow.step}. ` : ""}
+                  {rowLabel(review.files, n.file, n.path, n.rows?.start)}
+                  {!n.rows && <span className="comment-outdated">code changed</span>}
+                </span>
+                <span className="comment-preview">{n.title}</span>
+              </button>
+            </li>
           ))}
-          <label title="Show notes under their code in the review">
-            <input
-              type="checkbox"
-              checked={state.inline}
-              onChange={(e) => setTourState(review.id, { inline: e.target.checked })}
-            />
-            In review
-          </label>
-        </div>
-      )}
-      {notes.length === 0 && !run?.running && (
-        <div className="placeholder">
-          No walkthrough yet. Walkthrough (h) has an agent guide you through the change: what needs
-          a careful look, how its flows run, and what to ask.
-        </div>
-      )}
-      <ul>
-        {tour.notes.map((n, i) => (
-          <li key={n.id} className={i === at ? "current" : undefined}>
-            <button
-              type="button"
-              onClick={() => {
-                const note = goToStep(review.id, notes, tour.id, i);
-                if (note) showNote(review, note);
-              }}
-              title={`${n.path}, from ${SOURCE[n.source]}`}
-            >
-              <span className="comment-where">
-                <span className="note-emoji">{CATEGORIES[n.category].emoji}</span>
-                {n.flow && tour.id !== READING_ORDER ? `${n.flow.step}. ` : ""}
-                {rowLabel(review.files, n.file, n.path, n.rows?.start)}
-                {!n.rows && <span className="comment-outdated">code changed</span>}
-              </span>
-              <span className="comment-preview">{n.title}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+        </ul>
+      </div>
     </div>
   );
 }

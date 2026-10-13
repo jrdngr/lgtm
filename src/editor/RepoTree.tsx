@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileEntry } from "../bindings";
 import { commands, unwrap } from "../ipc";
 import { useCurrentReview } from "../review/current";
-import { toggled } from "../review/tree";
+import { guideAt, indent, toggled } from "../review/tree";
+import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
@@ -74,7 +75,7 @@ function Name({ name, decor, dir }: { name: string; decor?: Decor; dir?: boolean
 
 function Dir({ dir, depth, listings, open, onToggle, decor }: DirProps) {
   const listing = listings.get(dir);
-  const pad = { paddingLeft: 8 + depth * 12 };
+  const pad = { paddingLeft: indent(depth) };
   const workspace = useWorkspace();
   if (!listing)
     return (
@@ -89,7 +90,7 @@ function Dir({ dir, depth, listings, open, onToggle, decor }: DirProps) {
       </div>
     );
   return (
-    <ul>
+    <ul style={depth > 0 ? guideAt(depth) : undefined}>
       {listing.map((e) => (
         <li key={e.path}>
           {e.dir ? (
@@ -130,15 +131,18 @@ export function RepoTree() {
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
   return (
-    <div className="file-tree">
-      <Dir
-        dir=""
-        depth={0}
-        listings={listings}
-        open={open}
-        onToggle={(d) => setOpen(toggled(open, d))}
-        decor={decor}
-      />
+    <div className="side-split">
+      <SectionHeader title="Repo" />
+      <div className="side-split-body file-tree">
+        <Dir
+          dir=""
+          depth={0}
+          listings={listings}
+          open={open}
+          onToggle={(d) => setOpen(toggled(open, d))}
+          decor={decor}
+        />
+      </div>
     </div>
   );
 }

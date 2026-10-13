@@ -12,7 +12,7 @@ import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
-import { diffView, prOpen, reportView } from "./subviews";
+import { prOpen } from "./subviews";
 import { WorkspaceDock } from "./WorkspaceDock";
 
 /** Shortcuts acting on the selected workspace's panes. */
@@ -76,28 +76,16 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
-    "Mod+Shift+E": () => {
-      diffView.set("files");
-      showView("right", "diff");
-    },
-    "Mod+Shift+Y": () => {
-      diffView.set("symbols");
-      showView("right", "diff");
-    },
+    "Mod+Shift+E": () => showView("right", "changes"),
+    "Mod+Shift+Y": () => showView("right", "symbols"),
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+P": () => {
       prOpen.set(true);
       showView("right", "comments");
     },
-    "Mod+Shift+H": () => {
-      reportView.set("walkthrough");
-      showView("right", "reports");
-    },
-    "Mod+Shift+O": () => {
-      reportView.set("reviewers");
-      showView("right", "reports");
-    },
+    "Mod+Shift+H": () => showView("right", "walkthrough"),
+    "Mod+Shift+O": () => showView("right", "reviewers"),
   };
 
   /** The action for a chord, if it has one now. */

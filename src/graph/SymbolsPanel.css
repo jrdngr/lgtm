@@ -1,0 +1,69 @@
+.symbol-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.symbol-file {
+  padding: 6px 8px 2px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.symbol-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 22px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  padding: 0 8px 0 14px;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+}
+
+.symbol-list button:hover {
+  background: var(--hover);
+}
+
+.symbol-sign {
+  flex: none;
+  width: 12px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.symbol-added .symbol-sign {
+  color: var(--added);
+}
+
+.symbol-removed .symbol-sign {
+  color: var(--flagged);
+}
+
+.symbol-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-removed .symbol-name {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.symbol-list .pill {
+  padding: 0 5px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}

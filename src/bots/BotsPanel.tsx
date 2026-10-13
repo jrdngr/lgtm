@@ -3,6 +3,7 @@ import type { BotOptions, BotRun } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useAgentsOff } from "../tools/agents";
+import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { Installer } from "./Installer";
 import { PersonaList } from "./PersonaList";
@@ -41,6 +42,17 @@ const OPTION_LABELS: [keyof BotOptions, string, string][] = [
 /** Runs personas on the current review, and lists the workspace's runs. The side panel mounts
  * it each time it's shown, so persona files are read again then. */
 export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
+  return (
+    <div className="side-split">
+      <SectionHeader title="Reviewers" />
+      <div className="side-split-body">
+        <Personas onOpen={onOpen} />
+      </div>
+    </div>
+  );
+}
+
+function Personas({ onOpen }: { onOpen(run: BotRun): void }) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const agentsOff = useAgentsOff();

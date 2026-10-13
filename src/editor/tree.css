@@ -18,7 +18,5 @@
 .file-tree .decor {
   margin-left: auto;
   padding-right: 4px;
-  font:
-    11px Menlo,
-    monospace;
+  font: 600 var(--fs-xs) var(--mono);
 }

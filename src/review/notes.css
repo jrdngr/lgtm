@@ -65,30 +65,47 @@
 }
 
 .note-list li.current button {
-  background: var(--panel);
+  background: var(--hover);
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.note-list {
+  padding-top: 0;
+}
+
+.note-status {
+  padding: 4px 10px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .note-tools {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hair);
 }
 
-.note-tools select {
+.note-tools .note-tour {
+  flex: 1 0 100%;
   min-width: 0;
-  flex: 1;
 }
 
 .note-filter {
-  padding: 0 6px;
-  font-size: 12px;
-  opacity: 0.45;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  line-height: 18px;
+  color: var(--muted);
+  background: none;
+  opacity: 0.5;
 }
 
 .note-filter.on {
+  color: var(--fg);
+  background: var(--hover);
   opacity: 1;
 }

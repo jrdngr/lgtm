@@ -1,27 +1,21 @@
 import { useMemo, useState } from "react";
+import { IconButton } from "../ui/icons";
+import { Ring } from "../ui/Ring";
+import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { STATUS_LABEL } from "./FileHeader";
-import { matchesFilter, type Progress } from "./state";
-import { buildTree, type TreeNode, toggled } from "./tree";
+import { matchesFilter, type Progress, plural } from "./state";
+import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
 import "./FilesPanel.css";
-
-export function Count({ p }: { p: Progress }) {
-  const done = p.changed > 0 && p.unreviewed === 0;
-  const pct = p.changed ? Math.round(((p.changed - p.unreviewed) / p.changed) * 100) : 100;
-  return (
-    <span className={`count${done ? " done" : ""}`} title={titleOf(p)}>
-      <span className="bar">
-        <span style={{ width: `${pct}%` }} />
-      </span>
-      {p.reviewed}/{p.changed}
-    </span>
-  );
-}
 
 function titleOf(p: Progress) {
   return `${p.reviewed} reviewed, ${p.skipped} skipped, ${p.flagged} flagged, ${p.unreviewed} left`;
 }
+
+/** Rows reviewed, skipped or flagged: everything but those left. */
+const handled = (p: Progress) => p.changed - p.unreviewed;
+const isDone = (p: Progress) => p.changed > 0 && p.unreviewed === 0;
 
 interface TreeProps {
   depth: number;
@@ -32,7 +26,7 @@ interface TreeProps {
 
 function Children({ nodes, ...props }: TreeProps & { nodes: TreeNode[] }) {
   return (
-    <ul>
+    <ul style={props.depth > 0 ? guideAt(props.depth) : undefined}>
       {nodes.map((c) => (
         <Node key={c.kind === "dir" ? c.path : c.file} node={c} {...props} />
       ))}
@@ -41,20 +35,31 @@ function Children({ nodes, ...props }: TreeProps & { nodes: TreeNode[] }) {
 }
 
 function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: TreeNode }) {
-  const pad = { paddingLeft: 8 + depth * 12 };
+  const pad = { paddingLeft: indent(depth) };
+  const p = node.progress;
   if (node.kind === "file") {
     const dto = review.files[node.file].dto;
     const check = review.checks[node.file];
+    const changed = check === "changedSinceReviewed";
+    const cls = [
+      (isDone(p) || check === "checked") && "done",
+      dto.status === "removed" && "removed",
+    ].filter(Boolean);
     return (
       <li>
-        <button type="button" style={pad} onClick={() => review.jump(node.file)} title={dto.path}>
+        <button
+          type="button"
+          style={pad}
+          className={cls.join(" ") || undefined}
+          onClick={() => review.jump(node.file)}
+          title={dto.path}
+        >
+          <span className="chevron" />
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
-          <span className={`name${check === "changedSinceReviewed" ? " amber" : ""}`}>
-            {node.name}
-          </span>
-          {check === "checked" && <span className="checked">✓</span>}
-          {node.progress.flagged > 0 && <span className="flag">⚑{node.progress.flagged}</span>}
-          <Count p={node.progress} />
+          <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
+          {changed && <span className="pill amber">changed</span>}
+          {p.flagged > 0 && <span className="pill red">⚑ {p.flagged}</span>}
+          {p.changed > 0 && <Ring done={handled(p) / p.changed} title={titleOf(p)} />}
         </button>
       </li>
     );
@@ -62,10 +67,19 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
   const isClosed = closed.has(node.path);
   return (
     <li>
-      <button type="button" style={pad} className="dir" onClick={() => onToggle(node.path)}>
+      <button
+        type="button"
+        style={pad}
+        className="dir"
+        onClick={() => onToggle(node.path)}
+        title={titleOf(p)}
+      >
         <span className="chevron">{isClosed ? "▸" : "▾"}</span>
         <span className="name">{node.name}</span>
-        <Count p={node.progress} />
+        <span className="dir-count reveal">
+          {handled(p)}/{p.changed}
+        </span>
+        {isDone(p) && <Ring done={1} />}
       </button>
       {!isClosed && (
         <Children
@@ -80,8 +94,8 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
   );
 }
 
-/** The current review's files as a tree with per-file and per-directory progress. It follows
- * the review pane's line filter. Click a file to jump to it. */
+/** The current review's files as a tree with per-file progress, and per-folder counts on
+ * hover. It follows the review pane's line filter. Click a file to jump to it. */
 export function FilesPanel() {
   const review = useCurrentReview(useWorkspace());
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
@@ -93,22 +107,51 @@ export function FilesPanel() {
       ),
     [review],
   );
-  if (!review || !tree) return <div className="placeholder">No review open</div>;
-  if (tree.children.length === 0) {
+  if (!review || !tree) {
     return (
-      <div className="placeholder">
-        {review.files.length === 0 ? "No changes" : `No ${review.filter} files`}
+      <div className="side-split">
+        <SectionHeader title="Changes" />
+        <Empty>No review open</Empty>
       </div>
     );
   }
-  const toggle = (path: string) => setClosed(toggled(closed, path));
+  const p = tree.progress;
+  const pct = p.changed ? Math.round((handled(p) / p.changed) * 100) : 100;
+  const anyClosed = closed.size > 0;
   return (
-    <div className="file-tree">
-      <div className="tree-total">
-        <span>All files</span>
-        <Count p={tree.progress} />
-      </div>
-      <Children nodes={tree.children} depth={0} review={review} closed={closed} onToggle={toggle} />
+    <div className="side-split">
+      <SectionHeader
+        title="Changes"
+        meta={
+          p.changed > 0 && (
+            <span title={titleOf(p)}>
+              {review.filter === "all" ? "" : `${review.filter} · `}
+              {handled(p)} of {p.changed} {plural(p.changed)} · {pct}%
+            </span>
+          )
+        }
+      >
+        {tree.children.length > 0 && (
+          <IconButton
+            icon={anyClosed ? "expand" : "collapse"}
+            label={anyClosed ? "Expand all folders" : "Collapse all folders"}
+            onClick={() => setClosed(new Set(anyClosed ? [] : dirPaths(tree)))}
+          />
+        )}
+      </SectionHeader>
+      {tree.children.length === 0 ? (
+        <Empty>{review.files.length === 0 ? "No changes" : `No ${review.filter} files`}</Empty>
+      ) : (
+        <div className="side-split-body file-tree">
+          <Children
+            nodes={tree.children}
+            depth={0}
+            review={review}
+            closed={closed}
+            onToggle={(path) => setClosed(toggled(closed, path))}
+          />
+        </div>
+      )}
     </div>
   );
 }

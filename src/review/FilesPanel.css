@@ -10,6 +10,22 @@
   padding: 0;
 }
 
+/* A nested list's indent guide, placed by `--guide`. */
+.file-tree ul ul {
+  position: relative;
+}
+
+.file-tree ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--guide);
+  width: 1px;
+  background: var(--hair);
+  pointer-events: none;
+}
+
 .file-tree button,
 .tree-total {
   display: flex;
@@ -24,6 +40,12 @@
   white-space: nowrap;
 }
 
+.file-tree button {
+  height: 22px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .tree-total {
   color: var(--muted);
   border-bottom: 1px solid var(--border);
@@ -31,19 +53,38 @@
 }
 
 .file-tree button:hover {
-  background: var(--selection);
+  background: var(--hover);
 }
 
 .file-tree .status {
-  font:
-    11px Menlo,
-    monospace;
+  flex: none;
+  width: 12px;
+  text-align: center;
+  font: 600 var(--fs-xs) var(--mono);
+}
+
+.file-tree .status-modified {
+  color: var(--amber);
 }
 
 .file-tree .name {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.file-tree :where(.dir) .name:not([class*="decor-"]) {
+  color: var(--muted);
+}
+
+.file-tree .done .name {
+  opacity: 0.6;
+}
+
+.file-tree .removed .name {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 
 .file-tree .name.amber {
@@ -51,43 +92,18 @@
 }
 
 .file-tree .chevron {
+  flex: none;
   width: 10px;
   color: var(--muted);
 }
 
-.file-tree .checked {
-  color: var(--reviewed);
+.file-tree .pill {
+  padding: 0 5px;
 }
 
-.file-tree .flag {
-  font-size: 11px;
-  color: var(--flagged);
-}
-
-.count {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
+.file-tree .dir-count {
+  font-size: var(--fs-xs);
   color: var(--muted);
-}
-
-.count.done {
-  color: var(--reviewed);
-}
-
-.count .bar {
-  width: 28px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--border);
-  overflow: hidden;
-}
-
-.count .bar span {
-  display: block;
-  height: 100%;
-  background: var(--reviewed);
 }
 
 .file-tree .tree-note {

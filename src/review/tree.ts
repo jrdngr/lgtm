@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import type { FlatFile } from "./model";
 import { emptyProgress, type Progress, sumProgress } from "./state";
 
@@ -70,4 +71,16 @@ export function toggled<T>(s: ReadonlySet<T>, k: T): Set<T> {
   const next = new Set(s);
   if (!next.delete(k)) next.add(k);
   return next;
+}
+
+/** A tree row's left padding at `depth`. */
+export const indent = (depth: number) => 8 + depth * 12;
+
+/** Style for a nested list at `depth`: its indent guide runs under its folder's chevron. */
+export const guideAt = (depth: number) =>
+  ({ "--guide": `${indent(depth - 1) + 5}px` }) as CSSProperties;
+
+/** Paths of every folder in the tree. */
+export function dirPaths(d: TreeDir): string[] {
+  return d.children.flatMap((c) => (c.kind === "dir" ? [c.path, ...dirPaths(c)] : []));
 }
