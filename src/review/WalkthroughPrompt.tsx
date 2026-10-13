@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { PromptFile, Scope } from "../bindings";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
+import type { MenuItem } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
 
-/** Which prompt the walkthrough uses, with buttons that open the global or repo prompt file,
- * written from the built-in prompt the first time. */
-export function WalkthroughPrompt() {
+/** The walkthrough's prompt as menu items: which prompt it uses, then edits of the global or
+ * repo prompt file, written from the built-in prompt the first time. */
+export function useWalkthroughPrompt(): { items: MenuItem[]; error?: string } {
   const workspace = useWorkspace();
   const [file, setFile] = useState<PromptFile | null>(null);
   const [error, setError] = useState<string>();
@@ -26,23 +27,23 @@ export function WalkthroughPrompt() {
     openFile(workspace, r.data);
   }
 
-  return (
-    <div className="note-tools">
-      <span title={file?.path ?? "No walkthrough.md, so the built-in prompt"}>
-        Prompt: {file ? file.scope : "built-in"}
-      </span>
-      <span className="spacer" />
-      <button type="button" onClick={() => edit("global")} title="~/.config/lgtm/walkthrough.md">
-        Edit global
-      </button>
-      <button
-        type="button"
-        onClick={() => edit("repo")}
-        title=".lgtm/walkthrough.md, used over the global one"
-      >
-        Edit repo
-      </button>
-      {error && <span className="error">{error}</span>}
-    </div>
-  );
+  const items: MenuItem[] = [
+    {
+      label: `Prompt: ${file ? file.scope : "built-in"}`,
+      title: file?.path ?? "No walkthrough.md, so the built-in prompt",
+      disabled: true,
+      onSelect() {},
+    },
+    {
+      label: "Edit global prompt",
+      title: "~/.config/lgtm/walkthrough.md",
+      onSelect: () => edit("global"),
+    },
+    {
+      label: "Edit repo prompt",
+      title: ".lgtm/walkthrough.md, used over the global one",
+      onSelect: () => edit("repo"),
+    },
+  ];
+  return { items, error };
 }

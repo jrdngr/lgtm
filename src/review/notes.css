@@ -26,11 +26,6 @@
   border-left-color: var(--amber);
 }
 
-.note-flow {
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .note-head {
   display: flex;
   align-items: center;
@@ -64,48 +59,315 @@
   margin: 2px 0;
 }
 
-.note-list li.current button {
-  background: var(--hover);
-  box-shadow: inset 2px 0 0 var(--accent);
+.note-head .pill {
+  font-size: 10px;
 }
 
-.note-list {
-  padding-top: 0;
-}
-
-.note-status {
-  padding: 4px 10px;
-  font-size: var(--fs-xs);
+/* Category marks: alert by level, compass, bulb, help circle. */
+.note-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
   color: var(--muted);
+}
+
+.note-icon-important.level-high {
+  color: var(--flagged);
+}
+
+.note-icon-important.level-medium {
+  color: var(--amber);
+}
+
+.note-icon-flow {
+  color: #39c5bb;
+}
+
+.note-icon-context {
+  color: #e3b341;
+}
+
+.note-icon-question {
+  color: var(--github);
+}
+
+/* The agent at work, or how it failed. */
+.note-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 10px 0;
+  padding: 4px 4px 4px 8px;
+  border-radius: 6px;
+  background: rgb(79 140 201 / 10%);
+  font-size: var(--fs-sm);
+}
+
+.note-run.error {
+  padding: 6px 8px;
+  color: var(--error);
+  background: rgb(248 81 73 / 10%);
   overflow-wrap: anywhere;
 }
 
-.note-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--hair);
+.note-run-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.note-tools .note-tour {
-  flex: 1 0 100%;
+.note-run button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: var(--fs-sm);
+}
+
+.note-spin {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid rgb(79 140 201 / 30%);
+  border-top-color: var(--accent);
+  animation: note-spin 0.8s linear infinite;
+}
+
+@keyframes note-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+.note-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 20px;
+  text-align: center;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.note-empty p {
+  margin: 0;
+}
+
+.note-empty kbd {
+  margin-left: 4px;
+  color: rgb(255 255 255 / 80%);
+  border-color: rgb(255 255 255 / 40%);
+}
+
+/* The tour card: the tour's name over a hidden select, the stepper, and a progress line. */
+.note-tour {
+  margin: 8px 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.note-tour-top {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 9px;
+  font-size: var(--fs-sm);
+}
+
+.note-tour-top:has(select:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-radius: 6px 6px 0 0;
+}
+
+.note-tour-top select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.note-tour-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-stepper {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.note-stepper > span {
+  padding: 0 6px;
+  line-height: 20px;
+  border-inline: 1px solid var(--border);
+}
+
+.note-stepper .icon-button {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+}
+
+.note-tour-caret {
+  display: inline-grid;
+  color: var(--muted);
+}
+
+.note-tour-progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 0 0 6px 6px;
+  background: var(--border);
+}
+
+.note-tour-progress b {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+/* Category filters: dashed when hidden. */
+.note-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 10px 6px;
+}
+
+.note-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px 1px 6px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  background: none;
+}
+
+.note-chip.off {
+  color: var(--faint);
+  border-style: dashed;
+}
+
+.note-chip.off .note-icon {
+  color: inherit;
+}
+
+/* The tour's notes as a path: a dot per note on a line. */
+.note-path {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0 8px;
+}
+
+.note-path li {
+  position: relative;
+}
+
+.note-path li::before {
+  content: "";
+  position: absolute;
+  left: 22px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--hair);
+}
+
+.note-path li:first-child::before {
+  top: 14px;
+}
+
+.note-path li:last-child::before {
+  bottom: calc(100% - 14px);
+}
+
+.note-path button {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px 6px 12px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.note-path button:hover {
+  background: var(--hover);
+}
+
+.note-path li.current button {
+  background: rgb(79 140 201 / 10%);
+}
+
+.note-dot {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.note-path li.current .note-dot {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(79 140 201 / 30%);
+}
+
+.note-path-text {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
 }
 
-.note-filter {
-  padding: 0 8px;
-  border-radius: 999px;
-  font-size: var(--fs-xs);
-  line-height: 18px;
-  color: var(--muted);
-  background: none;
-  opacity: 0.5;
+.note-path-title {
+  font-size: 12.5px;
+  line-height: 1.35;
 }
 
-.note-filter.on {
-  color: var(--fg);
-  background: var(--hover);
-  opacity: 1;
+.note-path li.seen .note-path-title {
+  color: var(--muted);
+}
+
+.note-path-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font: 10.5px var(--mono);
+  color: var(--faint);
+}
+
+.note-path-where .pill {
+  padding: 0 5px;
+  font:
+    600 9.5px / 16px -apple-system,
+    system-ui,
+    sans-serif;
 }

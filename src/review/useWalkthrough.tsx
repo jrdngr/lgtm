@@ -1,8 +1,8 @@
 import { useMemo } from "react";
 import type { NoteDto, ReviewDto } from "../bindings";
 import type { FlatFile } from "./model";
-import { flowLabel, NoteBlock, noteCommentText } from "./NoteBlock";
-import { noteSlots } from "./notes";
+import { NoteBlock, noteCommentText } from "./NoteBlock";
+import { flowLabel, noteSlots } from "./notes";
 import { rowsText } from "./sendText";
 import { currentNote, useTourState } from "./tour";
 

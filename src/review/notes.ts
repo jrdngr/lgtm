@@ -1,11 +1,13 @@
 import type { Category, NoteDto } from "../bindings";
+import type { IconName } from "../ui/icons";
 import { fileSlot, markKey } from "./model";
 
-export const CATEGORIES: Record<Category, { emoji: string; label: string }> = {
-  important: { emoji: "⚠️", label: "Important" },
-  flow: { emoji: "🧭", label: "Flow step" },
-  context: { emoji: "💡", label: "Context" },
-  question: { emoji: "❓", label: "Question" },
+/** Each category's mark: an icon in the app, an emoji in comment text. */
+export const CATEGORIES: Record<Category, { icon: IconName; emoji: string; label: string }> = {
+  important: { icon: "alert", emoji: "⚠️", label: "Important" },
+  flow: { icon: "compass", emoji: "🧭", label: "Flow step" },
+  context: { icon: "bulb", emoji: "💡", label: "Context" },
+  question: { icon: "help", emoji: "❓", label: "Question" },
 };
 
 export const CATEGORY_ORDER: Category[] = ["important", "flow", "context", "question"];
@@ -61,6 +63,14 @@ export function tours(notes: NoteDto[]): Tour[] {
       notes: [...steps].sort((a, b) => (a.flow?.step ?? 0) - (b.flow?.step ?? 0)),
     })),
   ];
+}
+
+/** Where a note is in its flow, like "Login 2/5". */
+export function flowLabel(note: NoteDto, notes: NoteDto[]): string | undefined {
+  if (!note.flow) return undefined;
+  const name = note.flow.flow;
+  const steps = notes.filter((n) => n.flow?.flow === name).length;
+  return `${name} ${note.flow.step}/${steps}`;
 }
 
 /** The step `dir` away from `at` in a tour of `length` notes, wrapping around. Starts at the

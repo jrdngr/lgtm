@@ -339,16 +339,6 @@
   width: 100%;
 }
 
-.note-list .comment-where {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.note-list .comment-preview {
-  white-space: normal;
-}
-
 /* The Comments view: header, the scrolling list, and the submit box pinned under it. */
 .comments-view {
   display: flex;
