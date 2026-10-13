@@ -192,16 +192,19 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             },
           ]}
         />
-        <div className="docks">
-          {mounted.map((d) => (
-            <WorkspaceDock
-              key={workspaceKey(d.name)}
-              workspace={d.name}
-              hidden={d.name !== selected}
-              setup={d.setup}
-              bottomEl={bottomEl}
-            />
-          ))}
+        <div className="workbench-center">
+          <div className="docks">
+            {mounted.map((d) => (
+              <WorkspaceDock
+                key={workspaceKey(d.name)}
+                workspace={d.name}
+                hidden={d.name !== selected}
+                setup={d.setup}
+                bottomEl={bottomEl}
+              />
+            ))}
+          </div>
+          <BottomPanel docksRef={setBottomEl} />
         </div>
         <WorkspaceContext.Provider value={selected}>
           <RightPanel
@@ -212,7 +215,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           />
         </WorkspaceContext.Provider>
       </div>
-      <BottomPanel docksRef={setBottomEl} />
     </div>
   );
 }

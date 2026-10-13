@@ -337,7 +337,7 @@ kbd {
   min-height: 0;
 }
 
-/* Docked under the side panels and panes, which it pushes up. */
+/* Docked under the panes, between the side panels, pushing the panes up. */
 .bottom-panel {
   position: relative;
   display: flex;
@@ -363,10 +363,18 @@ kbd {
   background: var(--accent);
 }
 
+.workbench-center {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
 .docks {
   position: relative;
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .dock {

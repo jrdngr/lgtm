@@ -5,7 +5,7 @@ const MIN_HEIGHT = 80;
 /** Room left above the panel for the toolbar and some of the panes. */
 const MIN_ABOVE = 160;
 
-/** A panel docked along the bottom of the window, under the side panels and panes. Each
+/** A panel docked under the panes, between the side panels. Each
  * workspace's bottom dock renders into `docksRef`. Hidden rather than unmounted, so its
  * terminals keep running. */
 export function BottomPanel({ docksRef }: { docksRef(el: HTMLDivElement | null): void }) {
