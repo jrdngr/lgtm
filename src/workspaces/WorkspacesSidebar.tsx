@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
 import { commands } from "../ipc";
@@ -64,6 +65,7 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
 
   async function remove(ws: string) {
     setConfirming(undefined);
+    if (!(await confirmWorkspace(ws))) return;
     onDeleted(ws);
     const r = await commands.deleteWorkspace(ws);
     if (r.status === "error") setError(r.error);

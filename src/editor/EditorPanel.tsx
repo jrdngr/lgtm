@@ -78,10 +78,11 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
 
   useEffect(() => {
     api.setTitle(dirty ? `● ${baseName(path)}` : baseName(path));
-    setUnsaved(api.id, dirty ? () => saveRef.current() : undefined);
-  }, [api, path, dirty]);
+    const name = workspace ? `${path} (${workspace})` : path;
+    setUnsaved(workspace, api.id, dirty ? { name, save: () => saveRef.current() } : undefined);
+  }, [api, workspace, path, dirty]);
 
-  useEffect(() => () => setUnsaved(api.id, undefined), [api]);
+  useEffect(() => () => setUnsaved(workspace, api.id, undefined), [api, workspace]);
 
   useEffect(() => {
     const sub = api.onDidActiveChange((e) => e.isActive && view?.focus());

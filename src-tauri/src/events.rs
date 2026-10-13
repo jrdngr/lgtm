@@ -8,6 +8,11 @@ use tauri_specta::Event;
 #[derive(Clone, Serialize, Type, Event)]
 pub struct RepoChanged {}
 
+/// File > Open Repository in this window. The window swaps itself for the start window once
+/// unsaved edits are dealt with.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct SwitchRepo {}
+
 /// A workspace's working copy became stale (`message` is jj's error) or stopped being stale
 /// (`null`). `workspace` is `null` for the main one.
 #[derive(Clone, Serialize, Type, Event)]

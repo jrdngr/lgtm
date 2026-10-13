@@ -13,6 +13,7 @@ import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
 import { prOpen } from "./subviews";
+import { useCloseGuard } from "./useCloseGuard";
 import { WorkspaceDock } from "./WorkspaceDock";
 
 /** Shortcuts acting on the selected workspace's panes. */
@@ -39,6 +40,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const leftBody = useRef<HTMLDivElement>(null);
   const rightBody = useRef<HTMLDivElement>(null);
   const api = () => dockOf(selected);
+  useCloseGuard();
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

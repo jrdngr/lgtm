@@ -18,6 +18,10 @@ export const commands = {
 	initJj: (root: string) => typedError<null, string>(__TAURI_INVOKE("init_jj", { root })),
 	/**  Recently opened repos, most recent first. */
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
+	/**  Swaps this window for the start window. */
+	switchRepo: () => typedError<null, string>(__TAURI_INVOKE("switch_repo")),
+	/**  Closes this window without another close request, once the window has confirmed it. */
+	closeWindow: () => typedError<null, string>(__TAURI_INVOKE("close_window")),
 	loadLayout: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("load_layout", { workspace })),
 	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
 	/**
@@ -195,6 +199,7 @@ export const events = {
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
+	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
 };
 
@@ -931,6 +936,12 @@ export type Status = "running" | "done" | "failed" | "stopped";
 
 /**  The steps of a run, in order. */
 export type Step = "reports" | "challenges" | "rebuttals" | "synthesis" | "minimal";
+
+/**
+ *  File > Open Repository in this window. The window swaps itself for the start window once
+ *  unsaved edits are dealt with.
+ */
+export type SwitchRepo = Record<string, never>;
 
 export type SymbolKind = "function" | "class" | "module";
 

@@ -44,6 +44,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::git_root,
             commands::repo::init_jj,
             commands::repo::recent_repos,
+            commands::repo::switch_repo,
+            commands::repo::close_window,
             commands::repo::load_layout,
             commands::repo::save_layout,
             commands::pty::pty_spawn,
@@ -110,6 +112,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         ])
         .events(collect_events![
             events::RepoChanged,
+            events::SwitchRepo,
             events::WorkingCopyStale,
             events::BotRunActivity,
             events::BotRunChanged,

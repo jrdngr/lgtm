@@ -19,6 +19,22 @@ pub(crate) fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
     repo::open(&app, Path::new(&path))
 }
 
+/// Swaps this window for the start window.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn switch_repo(app: AppHandle, window: WebviewWindow) -> CmdResult<()> {
+    // Start first, so closing the last repo window doesn't quit the app.
+    repo::open_start(&app).map_err(|e| e.to_string())?;
+    window.destroy().map_err(|e| e.to_string())
+}
+
+/// Closes this window without another close request, once the window has confirmed it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn close_window(window: WebviewWindow) -> CmdResult<()> {
+    window.destroy().map_err(|e| e.to_string())
+}
+
 /// The git repo containing `path` when it isn't a jj repo, so the start window can offer to init.
 #[tauri::command]
 #[specta::specta]
