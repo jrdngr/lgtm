@@ -6,7 +6,7 @@ export interface MenuItem {
   onSelect(): void;
   disabled?: boolean;
   title?: string;
-  /** Destructive: shown in red, last. */
+  /** Destructive: shown in red. */
   danger?: boolean;
 }
 
@@ -16,28 +16,57 @@ interface Props {
   className?: string;
 }
 
-/** A ⋯ button opening a short list of actions under it. Closes on a pick, Escape, or a click
- * outside. */
+/** Where the list sits: fixed to the window, so a scrolling side panel can't clip it. */
+interface Place {
+  right: number;
+  top?: number;
+  bottom?: number;
+}
+
+/** Room the list needs below the button before it opens upward instead. */
+const ROOM = 160;
+
+function placeBy(button: Element): Place {
+  const r = button.getBoundingClientRect();
+  const right = window.innerWidth - r.right;
+  return window.innerHeight - r.bottom < ROOM && r.top > ROOM
+    ? { right, bottom: window.innerHeight - r.top + 2 }
+    : { right, top: r.bottom + 2 };
+}
+
+/** A ⋯ button opening a short list of actions under it, or over it near the window's bottom.
+ * Closes on a pick, Escape, a click outside, or a scroll. */
 export function Menu({ items, label = "More actions", className }: Props) {
-  const [open, setOpen] = useState(false);
+  const [place, setPlace] = useState<Place>();
+  const open = place !== undefined;
+  const close = () => setPlace(undefined);
   const ref = useRef<HTMLDivElement>(null);
   const shown = items.filter((i): i is MenuItem => !!i);
 
   useEffect(() => {
     if (!open) return;
+    const shut = () => setPlace(undefined);
     const away = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (!ref.current?.contains(e.target as Node)) shut();
     };
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       e.stopPropagation();
-      setOpen(false);
+      shut();
+    };
+    // The list stays where it opened, so it closes rather than drift from its button.
+    const scrolled = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) shut();
     };
     window.addEventListener("pointerdown", away, true);
     window.addEventListener("keydown", esc, true);
+    window.addEventListener("scroll", scrolled, true);
+    window.addEventListener("resize", shut);
     return () => {
       window.removeEventListener("pointerdown", away, true);
       window.removeEventListener("keydown", esc, true);
+      window.removeEventListener("scroll", scrolled, true);
+      window.removeEventListener("resize", shut);
     };
   }, [open]);
 
@@ -52,11 +81,11 @@ export function Menu({ items, label = "More actions", className }: Props) {
         className={open ? "open" : undefined}
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((o) => !o);
+          setPlace(open ? undefined : placeBy(e.currentTarget));
         }}
       />
       {open && (
-        <div className="menu-list" role="menu">
+        <div className="menu-list" role="menu" style={place}>
           {shown.map((item) => (
             <button
               type="button"
@@ -67,7 +96,7 @@ export function Menu({ items, label = "More actions", className }: Props) {
               title={item.title}
               onClick={(e) => {
                 e.stopPropagation();
-                setOpen(false);
+                close();
                 item.onSelect();
               }}
             >
