@@ -91,6 +91,19 @@ pub struct QaQuestion {
 #[serde(rename_all = "camelCase")]
 pub struct Queue {
     pub questions: Vec<QaQuestion>,
+    /// What each answer's update did to the other questions, so undo can put them back.
+    #[serde(default)]
+    pub effects: Vec<Effect>,
+}
+
+/// The questions an update after `after` dropped or rewrote, as they were, and the ones it
+/// added.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Effect {
+    pub after: String,
+    pub before: Vec<QaQuestion>,
+    pub added: Vec<String>,
 }
 
 /// A question from the agent. A subquestion belongs to the top-level question before it.
@@ -229,7 +242,8 @@ impl Queue {
         Ok(())
     }
 
-    /// Reopens the last decision. Returns its id.
+    /// Reopens the last decision and undoes what it did to the other questions. Returns its
+    /// id.
     pub fn undo(&mut self) -> Option<String> {
         let last = self
             .questions
@@ -241,7 +255,9 @@ impl Queue {
             })?;
         last.state = QState::Open;
         last.answer = None;
-        Some(last.id.clone())
+        let id = last.id.clone();
+        self.revert(&id);
+        Some(id)
     }
 
     /// Reopens a decided question so it can be answered again.
@@ -295,6 +311,7 @@ impl Queue {
     /// Applies what the answer to `after` does to the rest of the queue. Decided questions
     /// are never dropped; ids the queue doesn't have are skipped.
     pub fn apply(&mut self, after: &str, update: Update) {
+        let mut before = vec![];
         for d in update.drop {
             if d.id == after {
                 continue;
@@ -302,17 +319,62 @@ impl Queue {
             if let Some(q) = self.questions.iter_mut().find(|q| q.id == d.id)
                 && q.state == QState::Open
             {
+                before.push(q.clone());
                 q.state = QState::Dropped;
                 q.dropped = Some(d.why);
             }
         }
         for r in update.rewrite {
-            if r.id != after {
-                self.rewrite(r, after).ok();
+            if r.id == after {
+                continue;
+            }
+            let was = self.get(&r.id).cloned();
+            self.rewrite(r, after).ok();
+            if let Some(was) = was
+                && self.get(&was.id) != Some(&was)
+                && !before.iter().any(|b| b.id == was.id)
+            {
+                before.push(was);
             }
         }
         let round = self.round().max(1);
-        self.push(update.add, round);
+        let added = self.push(update.add, round);
+        // A second update after the same answer adds to the first; undo goes back past both.
+        match self.effects.iter_mut().find(|e| e.after == after) {
+            Some(e) => {
+                for b in before {
+                    if !e.before.iter().any(|x| x.id == b.id) {
+                        e.before.push(b);
+                    }
+                }
+                e.added.extend(added);
+            }
+            None => self.effects.push(Effect {
+                after: after.to_string(),
+                before,
+                added,
+            }),
+        }
+    }
+
+    /// Puts back what the update after `id` did: dropped questions return, rewritten ones
+    /// still open get their old text, and added ones nobody has decided or discussed go.
+    fn revert(&mut self, id: &str) {
+        let Some(i) = self.effects.iter().position(|e| e.after == id) else {
+            return;
+        };
+        let effect = self.effects.remove(i);
+        for was in effect.before {
+            if let Some(q) = self.questions.iter_mut().find(|q| q.id == was.id)
+                && q.state != QState::Decided
+            {
+                let discussion = std::mem::take(&mut q.discussion);
+                *q = QaQuestion { discussion, ..was };
+            }
+        }
+        self.questions.retain(|q| {
+            !effect.added.contains(&q.id) || q.state != QState::Open || !q.discussion.is_empty()
+        });
     }
 
     /// Rewrites one question after a discussion.
@@ -506,6 +568,14 @@ mod tests {
                 .subject,
             "c"
         );
+
+        // Undoing Q1 puts back everything its updates did, and drops the question they added.
+        assert_eq!(q.undo().as_deref(), Some("Q1"));
+        assert_eq!(ids(&q), ["Q1", "Q2", "Q3"]);
+        assert_eq!(q.get("Q2").unwrap().state, QState::Open);
+        assert_eq!(q.get("Q3").unwrap().text.subject, "c");
+        assert!(q.get("Q3").unwrap().change.is_none());
+        assert!(q.effects.is_empty());
     }
 
     #[test]

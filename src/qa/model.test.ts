@@ -30,7 +30,7 @@ function session(over: Partial<Session> = {}): Session {
     title: "T",
     prompt: "Add templates",
     attach: [],
-    queue: { questions: [] },
+    queue: { effects: [], questions: [] },
     note: "",
     plan: null,
     applied: null,
@@ -46,15 +46,18 @@ function session(over: Partial<Session> = {}): Session {
 describe("step", () => {
   it("goes from the prompt through questions to Apply", () => {
     expect(step(session())).toBe("prompt");
-    expect(step(session({ queue: { questions: [question("Q1", "open")] } }))).toBe("questions");
+    expect(step(session({ queue: { effects: [], questions: [question("Q1", "open")] } }))).toBe(
+      "questions",
+    );
     const decided = [question("Q1", "decided", 1, 0), question("Q2", "dropped")];
-    expect(step(session({ queue: { questions: decided } }))).toBe("apply");
+    expect(step(session({ queue: { effects: [], questions: decided } }))).toBe("apply");
   });
 });
 
 describe("current", () => {
   const d = session({
     queue: {
+      effects: [],
       questions: [
         question("Q1", "decided", 1, 0),
         question("Q2", "dropped"),
@@ -97,7 +100,7 @@ describe("qqText", () => {
 describe("applyText", () => {
   it("carries the decisions, the note, the plan and its comments", () => {
     const d = session({
-      queue: { questions: [question("Q1", "decided", 1, 1), question("Q2", "open")] },
+      queue: { effects: [], questions: [question("Q1", "decided", 1, 1), question("Q2", "open")] },
       note: " Keep it small ",
       plan: {
         files: [{ path: "a.rs", change: "edit", edits: ["Load", "Save"], decisions: ["Q1"] }],

@@ -167,7 +167,7 @@ In Questions:
 | `o` | Answer with none of the options |
 | `d` | Discuss the question with the agent. When the talk changes its context, options or recommendation, the agent rewrites it (amber bar, `p` for the previous text); ⌘↵ there asks for a rewrite. Settle it in the talk ("go with 2") and the agent decides it, then updates the open questions as after any decision; new questions go in the queue, not the chat |
 | `s` | Later: move it to the end |
-| `u` | Undo the last decision |
+| `u` | Undo the last decision, with what it did to the other questions: dropped ones come back, rewritten ones get their old text, added ones go |
 | `r` | Change a decided question's answer |
 | `p` | Show or hide a rewritten question's previous text |
 | ↑ / ↓ or `j` / `k` | Select the next / previous option |

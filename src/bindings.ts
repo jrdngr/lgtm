@@ -499,6 +499,32 @@ export type DiscussionDto = {
 	viewer: string,
 };
 
+/**
+ *  The questions an update after `after` dropped or rewrote, as they were, and the ones it
+ *  added.
+ */
+export type Effect = Effect_Serialize | Effect_Deserialize;
+
+/**
+ *  The questions an update after `after` dropped or rewrote, as they were, and the ones it
+ *  added.
+ */
+export type Effect_Deserialize = {
+	after: string,
+	before: QaQuestion_Deserialize[],
+	added: string[],
+};
+
+/**
+ *  The questions an update after `after` dropped or rewrote, as they were, and the ones it
+ *  added.
+ */
+export type Effect_Serialize = {
+	after: string,
+	before: QaQuestion_Serialize[],
+	added: string[],
+};
+
 export type FileChange = "new" | "edit" | "delete";
 
 export type FileDto = {
@@ -1050,10 +1076,14 @@ export type Queue = Queue_Serialize | Queue_Deserialize;
 
 export type Queue_Deserialize = {
 	questions: QaQuestion_Deserialize[],
+	/**  What each answer's update did to the other questions, so undo can put them back. */
+	effects?: Effect_Deserialize[],
 };
 
 export type Queue_Serialize = {
 	questions: QaQuestion_Serialize[],
+	/**  What each answer's update did to the other questions, so undo can put them back. */
+	effects: Effect_Serialize[],
 };
 
 export type QuickWin = {
