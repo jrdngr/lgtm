@@ -131,3 +131,32 @@ pub struct Findings {
     pub verdict: String,
     pub findings: Vec<Finding>,
 }
+
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Verdict {
+    Agree,
+    AgreeWithChanges,
+    PushBack,
+    /// The human has a call to make.
+    NeedsYou,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct SetTake {
+    /// The thread's id, from list_threads.
+    pub thread_id: u32,
+    pub verdict: Verdict,
+    /// Why, leading with the facts that justify the verdict.
+    pub why: String,
+    /// For needsYou: what the human has to decide.
+    pub question: Option<String>,
+    /// The whole reply to post, in the human's voice. Leave it out to keep the current one.
+    pub reply: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct ThreadId {
+    /// The thread's id, from list_threads.
+    pub thread_id: u32,
+}

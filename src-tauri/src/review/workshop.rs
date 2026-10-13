@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::Deserialize;
 use specta::Type;
 
-use super::{RepoCtx, StateDto};
+use super::{RepoCtx, StateDto, replies};
 use crate::agent::{self, Runs};
 use crate::store::{Author, Comment, GhLink, Message};
 
@@ -90,18 +90,36 @@ impl RepoCtx {
         }
         // A change edits the working copy, which mustn't move under it.
         let _busy = ask.change.then(|| ws.claim()).transpose()?;
+        // A thread's chat works on its take and reply, under the reply rules.
+        let (thread, first) = {
+            let store = self.store.lock().unwrap();
+            let c = store.comment(cid)?.context("the comment is gone")?;
+            (c.thread.is_some(), c.workshop.session.is_none())
+        };
+        let intro = match thread && first {
+            true => {
+                let (_, context, rules) = self.replies_context(id).await?;
+                Some((context, rules))
+            }
+            false => None,
+        };
         let (prompt, resume) = {
             let store = self.store.lock().unwrap();
             let mut c = store.comment(cid)?.context("the comment is gone")?;
-            let prompt = prompt(&revset, &c, ask);
+            let prompt = match thread {
+                true => replies::chat_prompt(&c, ask, intro.as_ref()),
+                false => prompt(&revset, &c, ask),
+            };
             c.workshop.messages.push(Message {
                 author: Author::User,
                 text: ask.message.clone(),
                 change: ask.change,
+                updated: false,
             });
             store.set_workshop(cid, &c.workshop)?;
             (prompt, c.workshop.session)
         };
+        let schema = thread.then(replies::chat_schema);
         let reply = agent::run(
             runs,
             &self.workshop_key(comment),
@@ -110,8 +128,11 @@ impl RepoCtx {
                 prompt: &prompt,
                 resume: resume.as_deref(),
                 edit: ask.change,
-                schema: None,
-                purpose: agent::Purpose::Ask,
+                schema: schema.as_deref(),
+                purpose: match thread {
+                    true => agent::Purpose::Replies,
+                    false => agent::Purpose::Ask,
+                },
             },
             |p| {
                 if let agent::Progress::Text(t) = p {
@@ -125,6 +146,13 @@ impl RepoCtx {
             Ok(r) => r.text.clone(),
             Err(e) => format!("{e:#}"),
         };
+        let turn: Option<replies::ChatTurn> = match &reply {
+            Ok(r) if !r.stopped => r
+                .structured
+                .clone()
+                .and_then(|v| serde_json::from_value(v).ok()),
+            _ => None,
+        };
         let session = reply.ok().and_then(|r| r.session);
         if ask.change {
             // Pick up the edits now rather than waiting on the watcher.
@@ -136,10 +164,23 @@ impl RepoCtx {
             if let Some(s) = session {
                 c.workshop.session = Some(s);
             }
+            let (text, updated) = match turn {
+                Some(turn) => {
+                    let before = c.body.clone();
+                    let (message, updated) = replies::apply_chat(&mut c, turn);
+                    if c.body != before {
+                        store.set_comment_body(cid, &c.body, super::now_ms())?;
+                    }
+                    store.set_thread(cid, &c.thread)?;
+                    (message, updated)
+                }
+                None => (text, false),
+            };
             c.workshop.messages.push(Message {
                 author: Author::Agent,
                 text,
                 change: false,
+                updated,
             });
             Ok(store.set_workshop(cid, &c.workshop)?)
         })

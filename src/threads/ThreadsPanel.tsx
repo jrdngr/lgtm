@@ -8,6 +8,8 @@ import { usePr } from "../github/pr";
 import { useDiscussion } from "../github/useDiscussion";
 import { type CommandResult, commands } from "../ipc";
 import { type CurrentReview, useCurrentReview } from "../review/current";
+import { openSettings } from "../settings/open";
+import { useAgentsOff } from "../tools/agents";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { isMac } from "../workbench/keys";
@@ -18,8 +20,9 @@ import { SendBox } from "./SendBox";
 import { StageBar } from "./StageBar";
 import { byStage, STAGES, threadLabel, threadWhere } from "./stages";
 import { TakePill } from "./ThreadBits";
-import { threadText } from "./text";
+import { finalText, threadText } from "./text";
 import { useThreadChat } from "./useThreadChat";
+import { useThreadRun } from "./useThreadRun";
 import "../review/comments.css";
 import "./threads.css";
 
@@ -63,6 +66,8 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
   const viewer = discussion.d?.viewer ?? viewerLogin(review.comments);
   const [error, setError] = useState<string>();
   const chat = useThreadChat(review, setError);
+  const runner = useThreadRun(review, setError);
+  const agentsOff = useAgentsOff();
   const [focus, setFocus] = useState<number>();
   const [showDone, setShowDone] = useState(false);
   const [confirm, setConfirm] = useState(0);
@@ -119,6 +124,7 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod && e.key === "Enter") setConfirm((n) => n + 1);
     else if (mod) return;
+    else if (e.key === "t" && !agentsOff) runner.start("triage");
     else if (e.key === "j" || e.key === "ArrowDown") move(1);
     else if (e.key === "k" || e.key === "ArrowUp") move(-1);
     else if (!current) return;
@@ -135,6 +141,8 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
   }
 
   const toFix = threads.filter((t) => t.state.stage === "toFix");
+  const fresh = threads.filter((t) => t.state.stage === "new").length;
+  const run = runner.run;
 
   return (
     <div ref={rootRef} className="threads" tabIndex={-1} onKeyDown={onKey}>
@@ -146,6 +154,16 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
         <span className="faint">
           {open} open · {threads.length - open} done
         </span>
+        {!agentsOff && fresh > 0 && !run && (
+          <button
+            type="button"
+            className="primary"
+            onClick={() => runner.start("triage")}
+            title="An agent reads each new thread's code and drafts a take and reply (t)"
+          >
+            ✦ Triage {fresh} new
+          </button>
+        )}
         <IconButton
           icon="sync"
           label="Sync with GitHub"
@@ -157,12 +175,35 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
         <Menu
           items={[
             { label: showDone ? "Hide done" : "Show done", onSelect: () => setShowDone(!showDone) },
+            {
+              label: "Copy final replies",
+              title: "Final replies, threads fixed as asked, and what's still open, as text",
+              onSelect: () => navigator.clipboard.writeText(finalText(threads)),
+            },
+            {
+              label: "Edit reply prompt…",
+              title: "The rules the agent follows for takes and replies",
+              onSelect: () => openSettings(workspace, "prompts"),
+            },
           ]}
         />
       </div>
       <div className="threads-bar">
         <StageBar threads={threads} />
       </div>
+      {run && (
+        <div className="threads-run">
+          <span className="spinner" />
+          <span>
+            {run.kind === "triage" ? "Triaging" : "Fixing"}
+            {run.activity && ` · ${run.activity}`}
+          </span>
+          <span className="spacer" />
+          <button type="button" onClick={runner.stop}>
+            Stop
+          </button>
+        </div>
+      )}
       {error && <div className="review-error">{error}</div>}
       <div className="threads-list">
         {threads.length === 0 && (
@@ -185,6 +226,17 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
                 <b>{name}</b>
                 <span className="faint">{ts.length}</span>
                 <span className="spacer" />
+                {s === "toFix" && !agentsOff && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={() => runner.start("fix")}
+                    disabled={!!run}
+                    title="An agent changes the code in @ for these threads"
+                  >
+                    Fix {toFix.length}
+                  </button>
+                )}
                 {s === "toFix" && (
                   <button
                     type="button"

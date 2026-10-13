@@ -58,6 +58,8 @@ pub enum Purpose {
     Ask,
     Walkthrough,
     Reviewers,
+    /// Triage, fixes and the reply chat on GitHub threads.
+    Replies,
 }
 
 impl Models {
@@ -66,6 +68,7 @@ impl Models {
             Purpose::Ask => &self.ask,
             Purpose::Walkthrough => &self.walkthrough,
             Purpose::Reviewers => &self.reviewers,
+            Purpose::Replies => &self.replies,
         };
         Some(model.trim()).filter(|m| !m.is_empty())
     }

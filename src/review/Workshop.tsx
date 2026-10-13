@@ -28,7 +28,7 @@ function AgentText({ text, onUse }: { text: string; onUse?(text: string): void }
 }
 
 function who(m: Message) {
-  if (m.author === "agent") return "Agent";
+  if (m.author === "agent") return m.updated ? "Agent · updated take and reply" : "Agent";
   return m.change ? "You · change" : "You";
 }
 

@@ -7,6 +7,10 @@ import { Section } from "./SettingsPanel";
 
 const PROMPTS: Record<Prompt, { name: string; help: string }> = {
   walkthrough: { name: "Walkthrough", help: "What the walkthrough agent looks for and writes." },
+  reply: {
+    name: "Replies",
+    help: "How the agent takes a position on PR threads and drafts replies in your voice.",
+  },
 };
 
 const SCOPES: [Scope, string][] = [

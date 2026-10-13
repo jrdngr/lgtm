@@ -19,6 +19,7 @@ mod matching;
 mod note_tests;
 mod notes;
 mod progress;
+mod replies;
 mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;

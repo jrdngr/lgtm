@@ -20,6 +20,7 @@ use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
+use crate::store::{Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks what they've reviewed. These tools act on the review open in \
@@ -114,6 +115,53 @@ impl Lgtm {
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Replied.".into())
+    }
+
+    #[tool(
+        description = "In a PR workspace, the PR's GitHub threads: where each is, its posts, \
+        its stage (new, decide, toFix, reply, ready, done), the take on it, and the reply \
+        drafted. Nothing here is posted until the human sends it."
+    )]
+    async fn list_threads(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        json(&ctx.agent_threads(self.workspace()).map_err(failed)?)
+    }
+
+    #[tool(
+        description = "Set a thread's take (verdict and why) and, optionally, its whole reply. \
+        This never posts to GitHub."
+    )]
+    async fn set_thread_take(&self, Parameters(p): Parameters<inputs::SetTake>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let verdict = match p.verdict {
+            inputs::Verdict::Agree => TakeVerdict::Agree,
+            inputs::Verdict::AgreeWithChanges => TakeVerdict::AgreeWithChanges,
+            inputs::Verdict::PushBack => TakeVerdict::PushBack,
+            inputs::Verdict::NeedsYou => TakeVerdict::NeedsYou,
+        };
+        let take = Take {
+            verdict,
+            why: p.why,
+            question: p.question,
+        };
+        let (review, state) = ctx
+            .agent_set_take(self.workspace(), p.thread_id, take, p.reply)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Set the take.".into())
+    }
+
+    #[tool(
+        description = "Mark a thread's reply final, so it's ready for the human to send. Use \
+        it only when the human said the reply is good. This never posts to GitHub."
+    )]
+    async fn mark_thread_ready(&self, Parameters(p): Parameters<inputs::ThreadId>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let (review, state) = ctx
+            .agent_thread_ready(self.workspace(), p.thread_id)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Marked it ready.".into())
     }
 
     #[tool(

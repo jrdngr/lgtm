@@ -326,6 +326,7 @@ impl RepoCtx {
                 author: Author::Agent,
                 text: text.to_string(),
                 change: false,
+                updated: false,
             });
             Ok(store.set_workshop(c.id, &c.workshop)?)
         })?;

@@ -115,3 +115,50 @@ pub(crate) fn stop_workshop(
     repo(&window)?.stop_workshop(comment, &runs);
     Ok(())
 }
+
+/// Triages the new threads on the review's PR, reporting each tool call through `on_tool`.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn triage_threads(
+    window: WebviewWindow,
+    runs: State<'_, Runs>,
+    review: u32,
+    on_tool: Channel<String>,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .triage(review, &runs, |t| {
+            on_tool.send(t).ok();
+        })
+        .await
+        .map_err(err)
+}
+
+/// Has an agent change the code for the threads to fix, reporting each tool call through
+/// `on_tool`.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn fix_threads(
+    window: WebviewWindow,
+    runs: State<'_, Runs>,
+    review: u32,
+    on_tool: Channel<String>,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .fix_threads(review, &runs, |t| {
+            on_tool.send(t).ok();
+        })
+        .await
+        .map_err(err)
+}
+
+/// Stops the review's triage or fix run.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn stop_thread_run(
+    window: WebviewWindow,
+    runs: State<Runs>,
+    review: u32,
+) -> CmdResult<()> {
+    repo(&window)?.stop_thread_run(review, &runs);
+    Ok(())
+}

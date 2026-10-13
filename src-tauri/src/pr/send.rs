@@ -73,7 +73,9 @@ impl RepoCtx {
             .into_iter()
             .filter(|c| c.thread.as_ref().is_some_and(|t| t.stage == Stage::Ready))
             .collect();
-        let drafts = ready.iter().any(|c| c.github.is_none() && !c.body.trim().is_empty());
+        let drafts = ready
+            .iter()
+            .any(|c| c.github.is_none() && !c.body.trim().is_empty());
         anyhow::ensure!(
             !drafts || self.shows_whole(id, &pr.revset())?,
             "open the whole PR ({}) in the Combined view to send new comments, where GitHub's \

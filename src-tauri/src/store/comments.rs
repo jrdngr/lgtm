@@ -63,6 +63,9 @@ pub struct Message {
     /// A user message that asked for a change, which the agent could make by editing files.
     #[serde(default)]
     pub change: bool,
+    /// An agent message that rewrote its thread's take or reply.
+    #[serde(default)]
+    pub updated: bool,
 }
 
 /// The agent conversation inside a comment block.
@@ -337,6 +340,7 @@ mod tests {
                 author: Author::Agent,
                 text: "hi".into(),
                 change: false,
+                updated: false,
             }],
         };
         store.set_workshop(c.id, &workshop).unwrap();

@@ -14,20 +14,24 @@ use crate::bots::personas::{Scope, config_dir, is_plain_file};
 #[serde(rename_all = "camelCase")]
 pub enum Prompt {
     Walkthrough,
+    /// How takes and replies on GitHub threads are written.
+    Reply,
 }
 
 impl Prompt {
-    pub const ALL: [Prompt; 1] = [Prompt::Walkthrough];
+    pub const ALL: [Prompt; 2] = [Prompt::Walkthrough, Prompt::Reply];
 
     fn file(self) -> &'static str {
         match self {
             Prompt::Walkthrough => "walkthrough.md",
+            Prompt::Reply => "reply.md",
         }
     }
 
     pub fn default_text(self) -> &'static str {
         match self {
             Prompt::Walkthrough => include_str!("walkthrough.md"),
+            Prompt::Reply => include_str!("reply.md"),
         }
     }
 }

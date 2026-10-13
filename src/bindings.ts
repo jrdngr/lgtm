@@ -127,6 +127,15 @@ export const commands = {
 	 */
 	workshopComment: (review: number, comment: number, ask: Ask, onText: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("workshop_comment", { review, comment, ask, onText })),
 	stopWorkshop: (comment: number) => typedError<null, string>(__TAURI_INVOKE("stop_workshop", { comment })),
+	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
+	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
+	/**
+	 *  Has an agent change the code for the threads to fix, reporting each tool call through
+	 *  `on_tool`.
+	 */
+	fixThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("fix_threads", { review, onTool })),
+	/**  Stops the review's triage or fix run. */
+	stopThreadRun: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_thread_run", { review })),
 	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
 	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options })),
 	/**  Adds `options` to a finished or halted run and runs what it's missing. */
@@ -629,6 +638,8 @@ export type Message = {
 	text: string,
 	/**  A user message that asked for a change, which the agent could make by editing files. */
 	change?: boolean,
+	/**  An agent message that rewrote its thread's take or reply. */
+	updated?: boolean,
 };
 
 export type Minimal = {
@@ -826,7 +837,9 @@ export type ProgressDto = {
 };
 
 /**  An editable prompt. */
-export type Prompt = "walkthrough";
+export type Prompt = "walkthrough" | 
+/**  How takes and replies on GitHub threads are written. */
+"reply";
 
 /**  A prompt and its files, for the Settings tab. */
 export type PromptInfo = {

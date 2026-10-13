@@ -1,5 +1,5 @@
 import type { GhPost, ThreadDto } from "../bindings";
-import { threadWhere } from "./stages";
+import { threadLabel, threadWhere } from "./stages";
 
 /** A thread's posts split at the viewer's last one: what came before, and what's unanswered
  * since. With no unanswered post, the last post is the one shown. */
@@ -16,4 +16,31 @@ export function threadText(t: ThreadDto): string {
   const code = t.snippet ? `\n${t.snippet}\n` : "";
   const ask = t.github ? posts.join("\n\n") : t.body.trim();
   return `${t.path || "The PR"} (${threadWhere(t)})${code}\n${ask}`;
+}
+
+/** The final replies laid out to paste elsewhere: final replies, threads fixed as asked, and
+ * the ones still open. */
+export function finalText(threads: ThreadDto[]): string {
+  const head = (t: ThreadDto) => `${threadWhere(t)}: ${threadLabel(t)}`;
+  const comment = (t: ThreadDto) => {
+    const last = t.github?.posts.at(-1)?.body.trim();
+    return last ? `\n- Comment: "${last}"` : "";
+  };
+  const url = (t: ThreadDto) => (t.github?.url ? `\n- ${t.github.url}` : "");
+  const ready = threads.filter((t) => t.state.stage === "ready");
+  const replies = ready
+    .filter((t) => t.body.trim())
+    .map((t) => `${head(t)}${comment(t)}\n- Reply (final): "${t.body.trim()}"${url(t)}`);
+  const fixed = ready.filter((t) => !t.body.trim()).map((t) => `${head(t)}${comment(t)}${url(t)}`);
+  const open = threads
+    .filter((t) => t.state.stage !== "ready" && t.state.stage !== "done")
+    .map(head);
+  return [
+    ["Final replies", replies, "\n\n"],
+    ["Fixed as asked", fixed, "\n\n"],
+    ["Still open", open, "\n"],
+  ]
+    .filter(([, items]) => items.length > 0)
+    .map(([title, items, sep]) => `${title}\n\n${(items as string[]).join(sep as string)}`)
+    .join("\n\n");
 }

@@ -336,3 +336,30 @@
 .focused-take {
   font-size: var(--fs-sm);
 }
+
+.threads-run {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.threads-run .spinner {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid rgb(79 140 201 / 30%);
+  border-top-color: var(--accent);
+  animation: threads-spin 0.8s linear infinite;
+}
+
+@keyframes threads-spin {
+  to {
+    rotate: 360deg;
+  }
+}
