@@ -54,6 +54,13 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     void qid;
   }, [qid]);
 
+  // A rewrite starts the question on its new recommendation.
+  const options = JSON.stringify(q?.text.options);
+  useEffect(() => {
+    setSel(0);
+    void options;
+  }, [options]);
+
   const focusRoot = () => rootRef.current?.focus({ preventScroll: true });
   useEffect(() => {
     if (focusKey) rootRef.current?.focus({ preventScroll: true });

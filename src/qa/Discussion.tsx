@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MarkdownView } from "../editor/MarkdownView";
 import { isMac } from "../workbench/keys";
-import type { Question } from "./model";
+import { type Question, shownReply } from "./model";
 
 interface Props {
   q: Question;
@@ -13,8 +13,8 @@ interface Props {
   onClose(): void;
 }
 
-/** Talking a question over with the agent. Nothing is decided; ⌘↵ has the agent ask the
- * question again in light of the talk. */
+/** Talking a question over with the agent. Nothing is decided. When the talk changes the
+ * question, the agent rewrites it; ⌘↵ asks it to. */
 export function Discussion({ q, streaming, busy, onSend, onReask, onClose }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -44,7 +44,11 @@ export function Discussion({ q, streaming, busy, onSend, onReask, onClose }: Pro
       ))}
       {streaming !== undefined && (
         <div className="qq-turn">
-          {streaming ? <MarkdownView text={streaming} /> : <span className="faint">Thinking…</span>}
+          {shownReply(streaming) ? (
+            <MarkdownView text={shownReply(streaming)} />
+          ) : (
+            <span className="faint">Thinking…</span>
+          )}
         </div>
       )}
       <textarea

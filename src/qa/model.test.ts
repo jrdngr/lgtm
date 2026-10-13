@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { QState } from "../bindings";
-import { applyText, current, type Question, qqText, type Session, step } from "./model";
+import { applyText, current, type Question, qqText, type Session, shownReply, step } from "./model";
 
 function question(id: string, state: QState, round = 1, option: number | null = null): Question {
   return {
@@ -114,5 +114,13 @@ describe("applyText", () => {
         "Write the changes these decisions call for into this repo.",
       ].join("\n\n"),
     );
+  });
+});
+
+describe("shownReply", () => {
+  it("hides the rewrite, even while its tag is still streaming in", () => {
+    expect(shownReply('Fair.\n<rewrite>{"id":')).toBe("Fair.\n");
+    expect(shownReply("Fair.\n<rew")).toBe("Fair.\n");
+    expect(shownReply("a < b")).toBe("a < b");
   });
 });

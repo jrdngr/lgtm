@@ -90,3 +90,15 @@ export function applyText(d: Session): string {
   parts.push("Write the changes these decisions call for into this repo.");
   return parts.join("\n\n");
 }
+
+const TAG = "<rewrite>";
+
+/** A streaming reply without the rewrite it may end with, which shows on the question
+ * instead, including a tag still coming in. */
+export function shownReply(text: string) {
+  const at = text.indexOf(TAG);
+  if (at >= 0) return text.slice(0, at);
+  for (let n = TAG.length - 1; n > 0; n--)
+    if (text.endsWith(TAG.slice(0, n))) return text.slice(0, -n);
+  return text;
+}

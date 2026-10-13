@@ -165,7 +165,7 @@ In Questions:
 | ↵ | Decide the selected option |
 | `n` | Add a note to the selected option, then ↵ to decide |
 | `o` | Answer with none of the options |
-| `d` | Discuss the question with the agent; ⌘↵ there asks it again |
+| `d` | Discuss the question with the agent. When the talk changes its context, options or recommendation, the agent rewrites it (amber bar, `p` for the previous text); ⌘↵ there asks for a rewrite |
 | `s` | Later: move it to the end |
 | `u` | Undo the last decision |
 | `r` | Change a decided question's answer |

@@ -396,11 +396,12 @@ impl RepoCtx {
         let turn = if question.discussion.is_empty() {
             format!(
                 "Let's discuss this question. It's a discussion, not a decision: answer \
-                 briefly.\n\n{}\n\n{message}",
+                 briefly. {}\n\n{}\n\n{message}",
+                rewrite_rule(qid),
                 queue::question_text(question)
             )
         } else {
-            format!("About {qid}: {message}")
+            format!("About {qid}: {message}\n\n({})", rewrite_rule(qid))
         };
         self.edit_qa(ws, id, |s| {
             s.queue.discuss(
@@ -429,14 +430,20 @@ impl RepoCtx {
                 },
             )
             .await?;
+        let (text, rewritten) = split_rewrite(&reply.text);
         self.edit_qa(ws, id, |s| {
             s.queue.discuss(
                 qid,
                 Turn {
                     you: false,
-                    text: reply.text.trim().to_string(),
+                    text: text.to_string(),
                 },
-            )
+            )?;
+            if let Some(mut r) = rewritten {
+                r.id = qid.to_string();
+                s.queue.reask(r)?;
+            }
+            Ok(())
         })?;
         self.qa_session(ws, id)
     }
@@ -591,6 +598,35 @@ impl RepoCtx {
     }
 }
 
+const REWRITE_TAG: &str = "<rewrite>";
+
+/// How a discussion reply rewrites its question when the talk changes it.
+fn rewrite_rule(qid: &str) -> String {
+    format!(
+        "If this changes {qid}'s context, options or recommendation, end your reply with the \
+         rewritten question by the same rules, as JSON with the fields id, what (what changed, \
+         in a few words), subject, context, options and why, between {REWRITE_TAG} and \
+         </rewrite>. Otherwise leave it out."
+    )
+}
+
+/// A discussion reply's text, and the rewrite it ends with, if any. A rewrite that isn't
+/// valid JSON is dropped from the text all the same.
+fn split_rewrite(reply: &str) -> (&str, Option<Rewrite>) {
+    let Some((text, rest)) = reply.split_once(REWRITE_TAG) else {
+        return (reply.trim(), None);
+    };
+    let json = rest.split("</rewrite>").next().unwrap_or_default().trim();
+    let json = json
+        .trim_start_matches("```json")
+        .trim_start_matches("```")
+        .trim_end_matches("```");
+    let rewrite = serde_json::from_str(json)
+        .inspect_err(|e| eprintln!("lgtm: discussion rewrite: {e}"))
+        .ok();
+    (text.trim(), rewrite)
+}
+
 fn note_line(note: &str) -> String {
     if note.trim().is_empty() {
         String::new()
@@ -616,6 +652,19 @@ mod tests {
         for s in [ask_schema(), update_schema(), rewrite(), PLAN_SCHEMA.into()] {
             serde_json::from_str::<serde_json::Value>(&s).unwrap();
         }
+    }
+
+    #[test]
+    fn a_discussion_reply_splits_off_its_rewrite() {
+        assert_eq!(split_rewrite(" Sure. ").0, "Sure.");
+        let reply = "Good point, adding it.\n\n<rewrite>\n```json\n{\"id\":\"Q2\",\"what\":\"added C\",\
+                     \"subject\":\"s\",\"context\":[],\"options\":[{\"label\":\"C\",\"bullets\":[]}],\
+                     \"why\":\"w\"}\n```\n</rewrite>";
+        let (text, r) = split_rewrite(reply);
+        assert_eq!(text, "Good point, adding it.");
+        assert_eq!(r.unwrap().what, "added C");
+        let (text, r) = split_rewrite("Hm.\n<rewrite>{not json</rewrite>");
+        assert_eq!((text, r), ("Hm.", None));
     }
 
     #[test]
