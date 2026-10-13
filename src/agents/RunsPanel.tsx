@@ -8,19 +8,8 @@ import { ago, fullDate } from "../ui/time";
 import { dockOf } from "../workbench/docks";
 import { openReport } from "../workbench/panels";
 import { useWorkspace, type WorkspaceName } from "../workspaces/context";
-import { type AgentKind, type AgentRun, clearFinished, useAgentRuns } from "./runs";
+import { type AgentRun, clearFinished, KIND_NAMES, useAgentRuns } from "./runs";
 import "./runs.css";
-
-const KIND_NAMES: Record<AgentKind, string> = {
-  ask: "Ask",
-  change: "Change",
-  reply: "Reply chat",
-  triage: "Triage",
-  fix: "Fix threads",
-  walkthrough: "Walkthrough",
-  resolve: "Resolve",
-  design: "Design",
-};
 
 type Row = { at: number; agent: AgentRun } | { at: number; bot: BotRun };
 

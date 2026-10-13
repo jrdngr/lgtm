@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 export type AgentKind =
@@ -11,6 +12,17 @@ export type AgentKind =
   | "resolve"
   | "design";
 export type Outcome = "running" | "done" | "failed" | "stopped";
+
+export const KIND_NAMES: Record<AgentKind, string> = {
+  ask: "Ask",
+  change: "Change",
+  reply: "Reply chat",
+  triage: "Triage",
+  fix: "Fix threads",
+  walkthrough: "Walkthrough",
+  resolve: "Resolve",
+  design: "Design",
+};
 
 /** A headless agent run the window started, other than a persona review. */
 export interface AgentRun {
@@ -62,9 +74,14 @@ export function startRun(
   const kept = list.filter((r, i) => r.outcome === "running" || i < KEEP);
   byWorkspace.set(key, [{ ...run, id, started: Date.now(), outcome: "running" }, ...kept]);
   for (const l of listeners) l();
+  const label = KIND_NAMES[run.kind];
+  report(workspace, `run:${id}`, "running", label);
   return {
     activity: (detail) => update(key, id, (r) => (r.outcome === "running" ? { ...r, detail } : r)),
-    end: (outcome, detail) => update(key, id, (r) => ({ ...r, outcome, detail })),
+    end: (outcome, detail) => {
+      update(key, id, (r) => ({ ...r, outcome, detail }));
+      report(workspace, `run:${id}`, outcome, label);
+    },
   };
 }
 

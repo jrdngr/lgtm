@@ -1,7 +1,9 @@
 import { Channel } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
 import { commands, type PtyEvent } from "../ipc";
+import { report } from "../workspaces/activity";
 import type { WorkspaceName } from "../workspaces/context";
+import { isBusyTitle, titleLabel } from "./title";
 import { createTerminal } from "./xterm";
 
 /** An xterm and the shell it runs, in an element its panel shows. */
@@ -39,7 +41,7 @@ export function openSession(
   const host = document.createElement("div");
   host.className = "terminal-host";
   container.append(host);
-  const session = startSession(host, workspace, setup);
+  const session = startSession(id, host, workspace, setup);
   sessions.set(id, { session, panels: 1 });
   return session;
 }
@@ -54,16 +56,25 @@ export function releaseSession(id: string) {
   }, KEEP_MS);
 }
 
-function startSession(host: HTMLDivElement, workspace: WorkspaceName, setup: boolean): Session {
+function startSession(
+  id: string,
+  host: HTMLDivElement,
+  workspace: WorkspaceName,
+  setup: boolean,
+): Session {
   const { term, refit, unwatch } = createTerminal(host);
   let pty: number | undefined;
   let disposed = false;
   let title = "";
+  const activity = `term:${id}`;
 
   const channel = new Channel<PtyEvent>();
   channel.onmessage = (e) => {
     if (e.kind === "data") term.write(e.data);
-    else term.write(`\r\n[process exited with code ${e.code}]\r\n`);
+    else {
+      term.write(`\r\n[process exited with code ${e.code}]\r\n`);
+      report(workspace, activity, "done", titleLabel(title));
+    }
   };
 
   const { cols, rows } = term;
@@ -83,6 +94,7 @@ function startSession(host: HTMLDivElement, workspace: WorkspaceName, setup: boo
     term.onData((data) => pty !== undefined && commands.ptyWrite(pty, data)),
     term.onTitleChange((t) => {
       title = t;
+      report(workspace, activity, isBusyTitle(t) ? "running" : "done", titleLabel(t));
     }),
     term.onResize(({ cols, rows }) => pty !== undefined && commands.ptyResize(pty, cols, rows)),
   ];
@@ -94,6 +106,7 @@ function startSession(host: HTMLDivElement, workspace: WorkspaceName, setup: boo
     title: () => title,
     dispose() {
       disposed = true;
+      report(workspace, activity, "stopped", titleLabel(title));
       for (const s of subs) s.dispose();
       if (pty !== undefined) commands.ptyKill(pty);
       unwatch();

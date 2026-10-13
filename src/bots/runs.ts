@@ -2,6 +2,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { type BotRun, events } from "../bindings";
 import { commands } from "../ipc";
+import { type ActivityState, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 /** Persona review runs the window has seen, kept current by the backend's events. */
@@ -16,8 +17,25 @@ function changed() {
   for (const l of listeners) l();
 }
 
+/** How a run or fix stands, from its parts' statuses. */
+function stateOf(active: boolean, statuses: ActivityState[]): ActivityState {
+  if (active) return "running";
+  if (statuses.includes("failed")) return "failed";
+  return statuses.includes("stopped") ? "stopped" : "done";
+}
+
+/** Tells the workspace's activity how the review and each of its fixes stand. */
+function reportRun(run: BotRun) {
+  const parts = run.parts.map((p) => p.status);
+  report(run.workspace, `bot:${run.id}`, stateOf(!!run.active, parts), "Reviewers");
+  for (const [i, f] of (run.fixes ?? []).entries()) {
+    report(run.workspace, `bot:${run.id}:fix:${i}`, f.status, "Fix findings");
+  }
+}
+
 function put(run: BotRun) {
   runs.set(run.id, run);
+  reportRun(run);
   changed();
 }
 
@@ -44,7 +62,10 @@ export async function runAction(
 export async function loadRuns(workspace: WorkspaceName) {
   const r = await commands.botRuns(workspace);
   if (r.status !== "ok") return;
-  for (const run of r.data) runs.set(run.id, run);
+  for (const run of r.data) {
+    runs.set(run.id, run);
+    reportRun(run);
+  }
   changed();
 }
 

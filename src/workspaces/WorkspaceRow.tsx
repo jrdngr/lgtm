@@ -3,6 +3,7 @@ import { usePr } from "../github/pr";
 import { useMarkSetup } from "../review/marks";
 import { Menu } from "../ui/Menu";
 import { Ring } from "../ui/Ring";
+import { useActivity } from "./activity";
 import { doneShare, progressTitle } from "./progress";
 
 /** Characters of a change id shown, its unique prefix included. */
@@ -55,6 +56,18 @@ function Lines({ w }: { w: WorkspaceDto }) {
   );
 }
 
+/** A spinner while the workspace's agents work, or a dot once one finishes while you're away:
+ * green, or red when one failed. */
+function ActivityMark({ w }: { w: WorkspaceDto }) {
+  const a = useActivity(w.name);
+  if (!a) return null;
+  if (a.kind === "working") {
+    return <span className="ws-activity working" title={`Working: ${a.labels.join(", ")}`} />;
+  }
+  const tone = a.failed ? "failed" : "done";
+  return <span className={`ws-activity ${tone}`} title={`Finished: ${a.labels.join(", ")}`} />;
+}
+
 interface Props {
   w: WorkspaceDto;
   progress?: ProgressDto;
@@ -63,7 +76,7 @@ interface Props {
   onDelete(): void;
 }
 
-/** One workspace: its PR or change, review progress, and a ⋯ menu on hover. */
+/** One workspace: its PR or change, its agents, review progress, and a ⋯ menu on hover. */
 export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: Props) {
   const setup = useMarkSetup();
   return (
@@ -79,6 +92,7 @@ export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: P
             items={[{ label: "Delete…", danger: true, onSelect: onDelete }]}
           />
         )}
+        <ActivityMark w={w} />
         {p && p.changed > 0 && <Ring done={doneShare(p)} title={progressTitle(p, setup)} percent />}
       </span>
     </li>

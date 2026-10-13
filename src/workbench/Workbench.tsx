@@ -5,6 +5,7 @@ import type { RepoInfo } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
 import { showThread } from "../threads/focus";
 import { McpOffer } from "../tools/McpOffer";
+import { selectActivity } from "../workspaces/activity";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { BottomPanel } from "./BottomPanel";
@@ -51,6 +52,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useCloseGuard();
   useWordWrapMenu();
   useSettingsMenu(selected);
+  useEffect(() => selectActivity(selected), [selected]);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

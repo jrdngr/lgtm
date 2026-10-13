@@ -129,3 +129,33 @@
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+
+.ws-activity {
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  margin: 0 4px;
+  border-radius: 50%;
+}
+
+.ws-activity.done {
+  background: var(--added);
+}
+
+.ws-activity.failed {
+  background: var(--error);
+}
+
+.ws-activity.working {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgb(79 140 201 / 30%);
+  border-top-color: var(--accent);
+  animation: ws-spin 0.9s linear infinite;
+}
+
+@keyframes ws-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
