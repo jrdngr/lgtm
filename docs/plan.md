@@ -21,7 +21,7 @@ Assumes the Tauri v2 stack in `stack.md`. Each milestone ends with something Jor
 - Undo/redo for marks.
 - Validate the window size and threshold against a real repo's history.
 
-Added after M1: a flat Files panel with reviewed/changed counts (click to jump), Open Recent on the start window, and a Justfile.
+Added after M1: a flat Files panel with reviewed/changed counts (click to jump), Open Recent on the start window, and a justfile.
 
 ## M2: Review workflow
 

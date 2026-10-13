@@ -2,6 +2,12 @@
 dev:
     pnpm tauri dev
 
+# Fetch, start a new change on main@origin, and run the app
+go:
+    jj git fetch
+    jj new main@origin
+    just dev
+
 # Typecheck, lint, and run all tests
 test:
     pnpm check

@@ -9,6 +9,7 @@ Needs Rust, Node 22, pnpm, [just](https://github.com/casey/just), and jj 0.46 or
 ```sh
 pnpm install
 just dev         # hot reload; shows the repo picker
+just go          # jj git fetch, jj new main@origin, then just dev
 just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
 just build       # release binary and .app
 just run [repo]  # run the release build
