@@ -3,6 +3,7 @@ pub mod anchor;
 mod bots;
 mod commands;
 mod config;
+mod design;
 pub mod diff;
 mod events;
 mod files;
@@ -127,6 +128,25 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::github::reply_pr,
             commands::github::resolve_conflict,
             commands::github::stop_resolve,
+            commands::design::list_designs,
+            commands::design::create_design,
+            commands::design::save_design_brief,
+            commands::design::design_file,
+            commands::design::mark_design_seen,
+            commands::design::act_on_question,
+            commands::design::draft_design,
+            commands::design::apply_answer,
+            commands::design::discuss_question,
+            commands::design::reask_question,
+            commands::design::revise_design,
+            commands::design::add_design_comment,
+            commands::design::edit_design_comment,
+            commands::design::apply_design_comments,
+            commands::design::answer_design_comment,
+            commands::design::make_design_artifact,
+            commands::design::make_design_html,
+            commands::design::stop_design,
+            commands::design::open_design_file,
         ])
         .events(collect_events![
             events::RepoChanged,
@@ -140,7 +160,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::BotFixText,
             events::AgentShow,
             events::AgentRevset,
-            events::ReviewStateChanged
+            events::ReviewStateChanged,
+            events::DesignChanged
         ])
 }
 

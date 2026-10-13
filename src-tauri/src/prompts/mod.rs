@@ -16,15 +16,34 @@ pub enum Prompt {
     Walkthrough,
     /// How takes and replies on GitHub threads are written.
     Reply,
+    /// How design questions are built, after the qqueue skill.
+    Qq,
+    /// Drafting and revising a design document.
+    DesignDraft,
+    /// A design's docs and Mermaid diagrams.
+    DesignDocs,
+    /// A design's HTML pages.
+    DesignHtml,
 }
 
 impl Prompt {
-    pub const ALL: [Prompt; 2] = [Prompt::Walkthrough, Prompt::Reply];
+    pub const ALL: [Prompt; 6] = [
+        Prompt::Walkthrough,
+        Prompt::Reply,
+        Prompt::Qq,
+        Prompt::DesignDraft,
+        Prompt::DesignDocs,
+        Prompt::DesignHtml,
+    ];
 
     fn file(self) -> &'static str {
         match self {
             Prompt::Walkthrough => "walkthrough.md",
             Prompt::Reply => "reply.md",
+            Prompt::Qq => "qq.md",
+            Prompt::DesignDraft => "design-draft.md",
+            Prompt::DesignDocs => "design-docs.md",
+            Prompt::DesignHtml => "design-html.md",
         }
     }
 
@@ -32,6 +51,10 @@ impl Prompt {
         match self {
             Prompt::Walkthrough => include_str!("walkthrough.md"),
             Prompt::Reply => include_str!("reply.md"),
+            Prompt::Qq => include_str!("qq.md"),
+            Prompt::DesignDraft => include_str!("design-draft.md"),
+            Prompt::DesignDocs => include_str!("design-docs.md"),
+            Prompt::DesignHtml => include_str!("design-html.md"),
         }
     }
 }

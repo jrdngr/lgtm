@@ -5,7 +5,7 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs" | "design";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -14,10 +14,11 @@ const TITLES: Record<PanelKind, string> = {
   graph: "Graph",
   threads: "Threads",
   runs: "Agent runs",
+  design: "Design",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "graph", "runs"];
+export const KINDS: PanelKind[] = ["review", "terminal", "graph", "design", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -85,14 +86,26 @@ export function openThreads(api: DockviewApi) {
   addPanel(api, "threads", {}, besideReview(api), "threads");
 }
 
-/** Opens a `kind` tab in `group`. The graph is one per dock, so an open one moves here. */
+/** Shows the Design tab as a tab in the review's pane, or brings it forward. */
+export function openDesign(api: DockviewApi) {
+  const open = api.getPanel("design");
+  if (open) return open.api.setActive();
+  const review = api.panels.find(isReviewPanel);
+  addPanel(api, "design", {}, review ? { referencePanel: review } : undefined, "design");
+}
+
+/** Tabs a dock has one of. */
+const SINGLE: PanelKind[] = ["graph", "design"];
+
+/** Opens a `kind` tab in `group`. The graph and Design are one per dock, so an open one moves
+ * here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
-  const graph = kind === "graph" ? api.getPanel("graph") : undefined;
-  if (graph) {
-    graph.api.moveTo({ group });
-    return graph.api.setActive();
+  const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;
+  if (single) {
+    single.api.moveTo({ group });
+    return single.api.setActive();
   }
-  addPanel(api, kind, {}, { referenceGroup: group }, kind === "graph" ? "graph" : undefined);
+  addPanel(api, kind, {}, { referenceGroup: group }, SINGLE.includes(kind) ? kind : undefined);
 }
 
 /** Splits `group` with an empty pane, which offers the kinds of tab to open in it. */

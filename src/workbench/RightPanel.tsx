@@ -1,6 +1,9 @@
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useRuns } from "../bots/runs";
+import { DesignPanel } from "../design/DesignPanel";
+import { openQuestions } from "../design/model";
+import { useDesigns } from "../design/store";
 import { RepoTree } from "../editor/RepoTree";
 import { usePr } from "../github/pr";
 import { SymbolsPanel } from "../graph/SymbolsPanel";
@@ -26,14 +29,15 @@ interface Props {
 }
 
 /** The right side panel: the review's changes and symbols, the repo's files, notes, the PR in a
- * PR workspace, the walkthrough, and reviewers. Tabs count threads that need you, walkthrough
- * notes, and running reviews. */
+ * PR workspace, the walkthrough, reviewers, and designs. Tabs count threads that need you,
+ * walkthrough notes, running reviews, and open design questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const runs = useRuns(workspace);
   const pr = usePr(workspace);
   const githubOff = useGithubOff();
+  const designs = useDesigns(workspace);
   return (
     <SidePanel
       side="right"
@@ -68,6 +72,14 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           icon: "users",
           badge: runs.filter((r) => r.active).length,
           render: () => <BotsPanel onOpen={onOpenReport} />,
+        },
+        {
+          id: "design",
+          title: "Design",
+          icon: "layers",
+          badge: designs.designs.reduce((n, d) => n + openQuestions(d).length, 0),
+          badgeTone: "amber",
+          render: () => <DesignPanel />,
         },
       ]}
     />

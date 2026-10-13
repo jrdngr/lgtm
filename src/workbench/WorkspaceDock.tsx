@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RunsPanel } from "../agents/RunsPanel";
 import { ReportPanel } from "../bots/ReportPanel";
+import { DesignTab } from "../design/DesignTab";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
@@ -40,6 +41,7 @@ const components = {
   settings: SettingsPanel,
   threads: ThreadsPanel,
   runs: RunsPanel,
+  design: DesignTab,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

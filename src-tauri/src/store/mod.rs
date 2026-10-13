@@ -4,6 +4,7 @@
 mod bots;
 mod checks;
 mod comments;
+mod designs;
 mod marks;
 mod notes;
 mod prs;
@@ -204,6 +205,7 @@ impl Store {
         bots::create_table(&db)?;
         notes::create_table(&db)?;
         prs::create_table(&db)?;
+        designs::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

@@ -40,6 +40,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘⇧T | Open or focus the Threads tab (PR workspaces) |
 | ⌘⇧H | Show the Walkthrough tab |
 | ⌘⇧O | Show the Reviewers tab |
+| ⌘⇧I | Show the Design tab |
 
 In a review pane:
 
@@ -66,7 +67,7 @@ In a review pane:
 | `n` / `N` | Next / previous note in the walkthrough's tour |
 | `Esc` | Back to the cursor row |
 
-The right panel has six icon tabs, plus PR in a PR workspace. PR counts threads that need you (new or waiting on a decision), Walkthrough its notes, and Reviewers its running reviews.
+The right panel has seven icon tabs, plus PR in a PR workspace. PR counts threads that need you (new or waiting on a decision), Walkthrough its notes, Reviewers its running reviews, and Design its open questions.
 
 - **Files** (⌘⇧R) shows the whole repo.
 - **Changes** (⌘⇧E) shows the review's files as a tree, with the rows done so far in its header. Each file has a ring filling as you review it, or a ✓ once done; hover it for the counts, or hover a folder to see its count. Done files dim, deleted ones are struck through, and a file changed since you checked it says **changed**. It follows the review's line filter. Click a file to jump to it.
@@ -75,6 +76,7 @@ The right panel has six icon tabs, plus PR in a PR workspace. PR counts threads 
 - **PR** (⌘⇧P, PR workspaces only) shows the PR: its state, a **Yours** pill on your own PR, its title, a bar of how far its threads are, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. Below, every thread on the PR (review threads, comments and review summaries on the PR itself, and your drafts) is grouped by stage: New, Decide, To fix, Reply, Ready, Done (folded). Click a thread to open it in place and write its reply; ⌘-click shows its code in the review. The box at the bottom sends what's Ready (see below).
 - **Walkthrough** (⌘⇧H) lists the walkthrough's notes.
 - **Reviewers** (⌘⇧O) runs review personas.
+- **Design** (⌘⇧I) lists the workspace's designs with their step and open questions, and the current design's next question with **Go with 1** (see Design below).
 
 Notes and threads show under their code as cards: blue for a note, purple for a GitHub thread or draft. Their actions show on hover: ✎ edit, ✓ done (notes), ✦ ask the agent (or `a`), ↗ send to a terminal, and in ⋯: Move to a stage (threads), Draft PR comment from this (notes, in PR workspaces), and Delete (notes and drafts). The agent box stays open while there's a conversation with the agent. Done notes, and done or resolved threads, fold to one line; click to open one.
 
@@ -140,14 +142,43 @@ At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to in
 
 Mouse: click a row, drag or shift-click for a range, double-click for the function, triple-click for the hunk. Click a file header, hunk header, or ƒ marker to select that unit.
 
-**Agent runs** (a tab from any pane's **+** menu, in the main or bottom panel) lists every headless agent run in the workspace, newest first: Ask and Change, thread reply chats, Triage, Fix threads, Walkthrough, conflict Resolve, and Reviewers. Each row shows its kind, what it's about, what it's doing or how it ended, and its age; hover for Stop while it runs, Retry after it failed or stopped, and ↗ to show what it worked on. **Clear finished** empties the list of everything but running runs. The list lasts until the window closes, except Reviewers runs, which are stored.
+**Agent runs** (a tab from any pane's **+** menu, in the main or bottom panel) lists every headless agent run in the workspace, newest first: Ask and Change, thread reply chats, Triage, Fix threads, Walkthrough, conflict Resolve, Design steps, and Reviewers. Each row shows its kind, what it's about, what it's doing or how it ended, and its age; hover for Stop while it runs, Retry after it failed or stopped, and ↗ to show what it worked on. **Clear finished** empties the list of everything but running runs. The list lasts until the window closes, except Reviewers runs, which are stored.
+
+## Design
+
+The **Design** tab (from a pane's **+** menu, or a design in the Design panel) takes a design from a brief through questions to docs, after the qqueue workflow. Each design is a folder in the repo, `docs/design/<name>/` by default, holding `brief.md`, `design.md`, `questions.json`, and what's made from them: `docs/` (markdown and Mermaid), `diagrams/`, and `html/`. Comments on the docs, the agent's session, and what you last saw stay in lgtm.
+
+The header's ▾ picks the design or makes a new one, the steps show where it is (Brief › Questions › Revise › Docs › HTML › Refine), and the views are:
+
+- **Brief:** what to design, and files the agent reads first. **Draft design** (⌘↵) has a headless `claude -p` write `design.md` and its open questions. **Send to terminal** pastes a prompt for Claude Code in a terminal, which asks you through lgtm's MCP tools instead.
+- **Questions:** one question at a time in the qqueue template: the last decision, "Question N of M", the subject, context, options with the recommended one first in green, and the recommendation. The rail lists every question: ✓ decided, ✎ changed, struck through when dropped, subquestions indented. After each decision the agent updates the questions still open: until it's done the next question is greyed and can't be answered, under a blue bar. A question it rewrote shows an amber bar with what changed; `p` shows what it said before. One it dropped says why. When none are open, **Revise design** folds the new decisions into `design.md`; the agent may ask follow-ups.
+- **Docs:** the design's markdown, rendered with Mermaid diagrams. Blocks changed since you last looked are marked amber (`]` / `[` move between them; **Mark seen** clears them). Select text, then `c` to comment (queued) or `a` to ask (answered beside it). **Apply comments** (⇧⌘↵) has the agent make the queued changes.
+- **Files:** the docs, diagrams and HTML pages, with a preview. **Make** asks the agent for a doc, Mermaid diagram, or HTML page about what you describe; **Make HTML** turns a doc or diagram into a standalone page, and says when its source changed since. HTML previews can't run scripts; **Open in browser** shows the page as is.
+
+In Questions:
+
+| Key | Action |
+| --- | --- |
+| `1`–`9` | Select an option (only the question's own) |
+| ↵ | Decide the selected option |
+| `n` | Add a note to the selected option, then ↵ to decide |
+| `o` | Answer with none of the options |
+| `d` | Discuss the question with the agent; ⌘↵ there asks it again |
+| `s` | Later: move it to the end |
+| `u` | Undo the last decision |
+| `r` | Change a decided question's answer |
+| `p` | Show or hide a rewritten question's previous text |
+| `j` / `k` | Browse the questions |
+
+The tab's ⋯ copies the question as qq text or every decision, and opens the design prompts. In terminals, the MCP server's `list_designs`, `design_questions`, `design_ask` and `design_answers` let Claude Code ask you a design's questions in the tab and read your answers.
 
 ## Settings
 
 lgtm › Settings… (⌘,) opens a Settings tab. Settings are saved to `~/.config/lgtm/settings.toml` and apply to every window.
 
 - **Claude command:** what runs Claude Code for every agent (default `claude`). It can be a command line, or an alias or function from your login shell, like `cc`. An alias is expanded once and run directly; a function runs through `$SHELL -l -i -c` each time. The line under it shows what it resolved to, and ⟳ reads your shell again. Registering the MCP server still runs plain `claude`.
-- **Models:** the `--model` for Ask and Change (also Fix headless and conflict resolution), Walkthrough, Reviewers, and Replies. Empty uses Claude Code's default.
+- **Models:** the `--model` for Ask and Change (also Fix headless and conflict resolution), Walkthrough, Reviewers, Replies, and Design. Empty uses Claude Code's default.
+- **Designs:** the folder designs go in, relative to the repo root (default `docs/design`).
 - **Terminal font size**, applied to open terminals right away.
 - **Tools:** where jj, claude and gh were found and their versions, and the MCP server's registration with a Register button.
 - **Prompts:** each agent prompt's global and repo file, and which one is in use. Create copies the built-in prompt into the file; Delete removes it.
@@ -163,6 +194,9 @@ skip = ["*.lock", "**/generated/**"]
 [anchor]
 window = 2       # context lines above and below a marked line
 threshold = 0.5  # minimum context score for a duplicate line to match
+
+[design]
+dir = "docs/design"  # where designs go, relative to the repo root
 ```
 
 ## Anchoring check

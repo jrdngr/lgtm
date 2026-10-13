@@ -16,7 +16,8 @@ use tauri_specta::Event as _;
 
 use super::{Hello, inputs};
 use crate::bots::output::Output;
-use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
+use crate::design::queue::{Choice, NewQuestion, QState, answer_text};
+use crate::events::{AgentRevset, AgentShow, BotRunChanged, DesignChanged, ReviewStateChanged};
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
@@ -27,7 +28,9 @@ reviews a change there and marks rows with colors they label, like reviewed or f
 this terminal's workspace: read its state, comments, walkthrough, symbol graph and Reviewer \
 findings; add comments; write a walkthrough; submit your own review findings; and point the \
 review at \
-code or a revset. You can't mark code. Lines are on the new side of the diff.";
+code or a revset. You can't mark code. Lines are on the new side of the diff. For designs, \
+ask the human questions through lgtm's question queue (design_ask) instead of in the chat, \
+then read their decisions with design_answers.";
 
 type Out = Result<String, String>;
 
@@ -298,6 +301,108 @@ impl Lgtm {
         .emit_to(&self.app, &label)
         .map_err(|e| e.to_string())?;
         Ok("The review pane is loading it.".into())
+    }
+
+    #[tool(
+        description = "The designs in this workspace, with how many of their questions are \
+        open and decided."
+    )]
+    async fn list_designs(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let designs = ctx.designs(&ws).map_err(failed)?;
+        let list: Vec<_> = designs
+            .iter()
+            .map(|d| {
+                let count = |s| d.queue.questions.iter().filter(|q| q.state == s).count();
+                serde_json::json!({
+                    "design": d.slug,
+                    "name": d.name,
+                    "folder": d.dir,
+                    "open": count(QState::Open),
+                    "decided": count(QState::Decided),
+                })
+            })
+            .collect();
+        json(&list)
+    }
+
+    #[tool(description = "A design's question queue: every question, its state and answer.")]
+    async fn design_questions(&self, Parameters(p): Parameters<inputs::Design>) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        json(&ctx.design(&ws, &p.design).map_err(failed)?.queue)
+    }
+
+    #[tool(
+        description = "Ask the human design questions through lgtm. They show one at a time \
+        in the design's Questions view, in the qqueue format: context bullets, options with the \
+        recommended one first, and why. Returns the new questions' ids; read the decisions \
+        later with design_answers."
+    )]
+    async fn design_ask(&self, Parameters(p): Parameters<inputs::DesignAsk>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let slug = crate::design::slugify(&p.design);
+        let (_, dir) = ctx.design_dir(&ws, &slug).map_err(failed)?;
+        if !dir.is_dir() {
+            ctx.create_design(&ws, &p.design).map_err(failed)?;
+        }
+        let questions = p
+            .questions
+            .into_iter()
+            .map(|q| NewQuestion {
+                sub: q.sub,
+                subject: q.subject,
+                context: q.context,
+                options: q
+                    .options
+                    .into_iter()
+                    .map(|o| Choice {
+                        label: o.label,
+                        bullets: o.bullets,
+                    })
+                    .collect(),
+                why: q.why,
+                sources: q.sources,
+            })
+            .collect();
+        let ids =
+            crate::design::edit_queue(&dir, |q| Ok(q.add_round(questions))).map_err(failed)?;
+        DesignChanged {
+            workspace: self.hello.workspace.clone(),
+            slug: slug.clone(),
+        }
+        .emit_to(&self.app, &label)
+        .ok();
+        Ok(format!(
+            "Queued {} in design {slug}. The human answers them in lgtm.",
+            ids.join(", ")
+        ))
+    }
+
+    #[tool(description = "The decisions on a design's questions so far, in ask order.")]
+    async fn design_answers(&self, Parameters(p): Parameters<inputs::Design>) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let queue = ctx.design(&ws, &p.design).map_err(failed)?.queue;
+        let list: Vec<_> = queue
+            .questions
+            .iter()
+            .filter(|q| q.state != QState::Open)
+            .map(|q| {
+                serde_json::json!({
+                    "id": q.id,
+                    "subject": q.text.subject,
+                    "answer": match q.state {
+                        QState::Dropped => format!("dropped: {}", q.dropped.as_deref().unwrap_or("")),
+                        _ => answer_text(q),
+                    },
+                })
+            })
+            .collect();
+        let open = queue.open_count();
+        json(&serde_json::json!({ "decided": list, "stillOpen": open }))
     }
 }
 

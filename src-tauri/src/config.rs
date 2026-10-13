@@ -6,6 +6,9 @@
 //! [anchor]
 //! window = 2
 //! threshold = 0.5
+//!
+//! [design]
+//! dir = "docs/design"
 //! ```
 
 use std::path::Path;
@@ -25,6 +28,14 @@ struct Raw {
     skip: Vec<String>,
     #[serde(default)]
     anchor: RawAnchor,
+    #[serde(default)]
+    design: RawDesign,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawDesign {
+    dir: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -38,6 +49,8 @@ struct RawAnchor {
 pub struct Config {
     pub skip: GlobSet,
     pub matching: MatchConfig,
+    /// Where designs go, when the repo sets it.
+    pub design_dir: Option<String>,
     /// The file's text, so cached results built under other settings can be told apart.
     pub source: String,
 }
@@ -72,6 +85,7 @@ impl Config {
         Ok(Self {
             skip: skip.build()?,
             matching,
+            design_dir: raw.design.dir.filter(|d| !d.trim().is_empty()),
             source: text.to_string(),
         })
     }

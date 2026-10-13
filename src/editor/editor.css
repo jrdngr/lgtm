@@ -121,3 +121,35 @@
 .editor-host[hidden] {
   display: none;
 }
+
+.mermaid-diagram {
+  margin: 12px 0;
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error pre {
+  white-space: pre-wrap;
+}
+
+/* Blocks new or changed since the user last looked. */
+.markdown-view .md-changed {
+  box-shadow: inset 3px 0 var(--amber);
+  background: rgb(210 153 34 / 7%);
+  padding-left: 8px;
+}
+
+.markdown-view .md-changed .md-changed {
+  box-shadow: none;
+  background: none;
+  padding-left: 0;
+}
+
+/* Blocks after which lines are gone. */
+.markdown-view .md-removed {
+  border-bottom: 2px dashed rgb(248 81 73 / 50%);
+}

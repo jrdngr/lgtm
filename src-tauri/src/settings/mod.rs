@@ -31,6 +31,9 @@ pub struct Settings {
     pub terminal_font_size: u16,
     /// Every mark color, the ones in use first in key order.
     pub marks: Vec<marks::MarkSlot>,
+    /// Where designs go in a repo, relative to its root. A repo's `.lgtm/config.toml` can
+    /// override it.
+    pub design_dir: String,
 }
 
 impl Default for Settings {
@@ -40,6 +43,7 @@ impl Default for Settings {
             models: Models::default(),
             terminal_font_size: 13,
             marks: marks::defaults(),
+            design_dir: "docs/design".into(),
         }
     }
 }
@@ -54,6 +58,8 @@ pub struct Models {
     pub reviewers: String,
     /// Triage and replies on PR threads.
     pub replies: String,
+    /// Every step of a design: drafting, questions, revising, docs.
+    pub design: String,
 }
 
 /// What an agent run is for, which picks its model.
@@ -64,6 +70,7 @@ pub enum Purpose {
     Reviewers,
     /// Triage, fixes and the reply chat on GitHub threads.
     Replies,
+    Design,
 }
 
 impl Models {
@@ -73,6 +80,7 @@ impl Models {
             Purpose::Walkthrough => &self.walkthrough,
             Purpose::Reviewers => &self.reviewers,
             Purpose::Replies => &self.replies,
+            Purpose::Design => &self.design,
         };
         Some(model.trim()).filter(|m| !m.is_empty())
     }

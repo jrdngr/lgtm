@@ -160,3 +160,42 @@ pub struct ThreadId {
     /// The thread's id, from list_threads.
     pub thread_id: u32,
 }
+
+#[derive(Deserialize, JsonSchema)]
+pub struct Design {
+    /// The design's folder name, from list_designs.
+    pub design: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DesignChoice {
+    pub label: String,
+    /// 1-3 bullets: what it means, and what it costs.
+    pub bullets: Vec<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DesignQuestion {
+    /// A subquestion of the top-level question before it.
+    #[serde(default)]
+    pub sub: bool,
+    /// A few words naming the decision.
+    pub subject: String,
+    /// Only the facts that change the answer, one per bullet.
+    pub context: Vec<String>,
+    /// The recommended option first, always.
+    pub options: Vec<DesignChoice>,
+    /// Why option 1 is recommended, in a line or two.
+    pub why: String,
+    /// Files you read to build the question.
+    #[serde(default)]
+    pub sources: Vec<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DesignAsk {
+    /// The design's folder name. A design that doesn't exist yet is created.
+    pub design: String,
+    /// In the order to ask them.
+    pub questions: Vec<DesignQuestion>,
+}

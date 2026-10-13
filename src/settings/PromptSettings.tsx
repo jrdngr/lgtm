@@ -11,6 +11,10 @@ const PROMPTS: Record<Prompt, { name: string; help: string }> = {
     name: "Replies",
     help: "How the agent takes a position on PR threads and drafts replies in your voice.",
   },
+  qq: { name: "Design questions", help: "How the agent builds a design's questions (qqueue)." },
+  designDraft: { name: "Design draft", help: "How the agent drafts and revises a design." },
+  designDocs: { name: "Design docs", help: "How the agent writes a design's docs and diagrams." },
+  designHtml: { name: "Design HTML", help: "How the agent makes a design's HTML pages." },
 };
 
 const SCOPES: [Scope, string][] = [

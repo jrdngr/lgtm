@@ -19,12 +19,13 @@ const KIND_NAMES: Record<AgentKind, string> = {
   fix: "Fix threads",
   walkthrough: "Walkthrough",
   resolve: "Resolve",
+  design: "Design",
 };
 
 type Row = { at: number; agent: AgentRun } | { at: number; bot: BotRun };
 
 /** Every agent run in the workspace, newest first: chats, triage and fixes, walkthroughs,
- * conflict resolves, and persona reviews. */
+ * conflict resolves, design steps, and persona reviews. */
 export function RunsPanel() {
   const workspace = useWorkspace();
   const agents = useAgentRuns(workspace);

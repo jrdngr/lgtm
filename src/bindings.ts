@@ -220,6 +220,39 @@ export const commands = {
 	/**  Has an agent resolve a conflicted change, streaming its reply through `on_text`. */
 	resolveConflict: (workspace: string | null, change: string, onText: Channel<string>) => typedError<ResolveDto, string>(__TAURI_INVOKE("resolve_conflict", { workspace, change, onText })),
 	stopResolve: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("stop_resolve", { workspace })),
+	/**  The workspace's designs. */
+	listDesigns: (workspace: string | null) => typedError<DesignDto_Serialize[], string>(__TAURI_INVOKE("list_designs", { workspace })),
+	createDesign: (workspace: string | null, name: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("create_design", { workspace, name })),
+	/**  Saves the brief and the paths the agent reads before drafting. */
+	saveDesignBrief: (workspace: string | null, slug: string, brief: string, attach: string[]) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("save_design_brief", { workspace, slug, brief, attach })),
+	designFile: (workspace: string | null, slug: string, path: string) => typedError<DesignText, string>(__TAURI_INVOKE("design_file", { workspace, slug, path })),
+	/**  Records `text` as what the user has seen of `path`. */
+	markDesignSeen: (workspace: string | null, slug: string, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("mark_design_seen", { workspace, slug, path, text })),
+	actOnQuestion: (workspace: string | null, slug: string, act: QuestionAct) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, slug, act })),
+	/**  Has the agent write the design from its brief, with its open questions. */
+	draftDesign: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("draft_design", { workspace, slug, onTool })),
+	/**  Applies the answer to question `id` to the rest of the queue. */
+	applyAnswer: (workspace: string | null, slug: string, id: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, slug, id })),
+	/**  A discussion turn on a question, streaming the agent's reply through `on_text`. */
+	discussQuestion: (workspace: string | null, slug: string, id: string, message: string, onText: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("discuss_question", { workspace, slug, id, message, onText })),
+	/**  Rewrites a question after its discussion. */
+	reaskQuestion: (workspace: string | null, slug: string, id: string) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, slug, id })),
+	/**  Folds the new decisions into the design. */
+	reviseDesign: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("revise_design", { workspace, slug, onTool })),
+	addDesignComment: (workspace: string | null, slug: string, comment: CommentInput) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("add_design_comment", { workspace, slug, comment })),
+	/**  Changes a comment's text, or deletes it when `body` is null. */
+	editDesignComment: (workspace: string | null, slug: string, id: number, body: string | null) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("edit_design_comment", { workspace, slug, id, body })),
+	/**  Has the agent apply the queued comments in one turn. */
+	applyDesignComments: (workspace: string | null, slug: string, onTool: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("apply_design_comments", { workspace, slug, onTool })),
+	/**  Answers an ask comment, streaming the reply through `on_text`. */
+	answerDesignComment: (workspace: string | null, slug: string, id: number, onText: Channel<string>) => typedError<DesignDto_Serialize, string>(__TAURI_INVOKE("answer_design_comment", { workspace, slug, id, onText })),
+	/**  Makes a doc, diagram or HTML page for the design. */
+	makeDesignArtifact: (workspace: string | null, slug: string, kind: ArtifactKind, about: string, onTool: Channel<string>) => typedError<Made_Serialize, string>(__TAURI_INVOKE("make_design_artifact", { workspace, slug, kind, about, onTool })),
+	/**  Makes an HTML page from one of the design's markdown or Mermaid files. */
+	makeDesignHtml: (workspace: string | null, slug: string, source: string, onTool: Channel<string>) => typedError<Made_Serialize, string>(__TAURI_INVOKE("make_design_html", { workspace, slug, source, onTool })),
+	stopDesign: (workspace: string | null, slug: string) => typedError<null, string>(__TAURI_INVOKE("stop_design", { workspace, slug })),
+	/**  Opens one of the design's files in the default browser. */
+	openDesignFile: (workspace: string | null, slug: string, path: string) => typedError<null, string>(__TAURI_INVOKE("open_design_file", { workspace, slug, path })),
 };
 
 /** Events */
@@ -229,6 +262,7 @@ export const events = {
 	botFixText: makeEvent<BotFixText>("bot-fix-text"),
 	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
+	designChanged: makeEvent<DesignChanged>("design-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
@@ -262,6 +296,38 @@ export type AgentShow = {
 	path: string,
 	line: number | null,
 };
+
+export type Answer = Answer_Serialize | Answer_Deserialize;
+
+/**  An answer to a question: an option from 0, or none of them with `other`. */
+export type AnswerInput = {
+	option: number | null,
+	note: string | null,
+	other: string | null,
+};
+
+export type Answer_Deserialize = {
+	/**  The option picked, from 0. `None` for an answer outside the options. */
+	option: number | null,
+	note?: string | null,
+	/**  The answer in the user's words, when it's none of the options. */
+	other?: string | null,
+	/**  When it was decided, in ms, so the last decision can be undone. */
+	at: number | null,
+};
+
+export type Answer_Serialize = {
+	/**  The option picked, from 0. `None` for an answer outside the options. */
+	option: number | null,
+	note?: string | null,
+	/**  The answer in the user's words, when it's none of the options. */
+	other?: string | null,
+	/**  When it was decided, in ms, so the last decision can be undone. */
+	at: number | null,
+};
+
+/**  What to make for the design. */
+export type ArtifactKind = "doc" | "diagram" | "htmlPage";
 
 /**  A message for a comment's agent. */
 export type Ask = {
@@ -350,6 +416,15 @@ export type Challenge = {
 	argument: string,
 };
 
+/**  A rewrite the user hasn't looked at yet. */
+export type Change = {
+	/**  What it was rewritten after: a question id, or "discussion". */
+	after: string,
+	/**  What changed, in a few words. */
+	what: string,
+	previous: QText,
+};
+
 export type ChangeDto = {
 	changeId: string,
 	commitId: string,
@@ -366,6 +441,12 @@ export type ChangeDto = {
 export type CheckState = "unchecked" | "checked" | 
 /**  Was checked, but the file now has changed rows the check didn't cover. */
 "changedSinceReviewed";
+
+export type Choice = {
+	label: string,
+	/**  What it means and what it costs. */
+	bullets: string[],
+};
 
 /**  How the `claude` setting resolved, for the Settings tab. */
 export type ClaudeCommand = {
@@ -409,11 +490,115 @@ export type CommentDto = {
 	done: boolean,
 };
 
+/**  A comment on a passage of one of the design's markdown files. */
+export type CommentInput = {
+	path: string,
+	quote: string,
+	start: number,
+	end: number,
+	body: string,
+	kind: CommentKind,
+};
+
+export type CommentKind = 
+/**  Asks the agent to change the doc. */
+"change" | 
+/**  A question about the passage; nothing changes. */
+"ask";
+
+export type CommentState = "queued" | "applied" | "answered";
+
 export type DefaultPersona = {
 	name: string,
 	description: string,
 	global: Installed,
 	repo: Installed,
+};
+
+/**  A terminal agent changed a design's questions. */
+export type DesignChanged = {
+	workspace: string | null,
+	slug: string,
+};
+
+export type DesignDto = DesignDto_Serialize | DesignDto_Deserialize;
+
+export type DesignDto_Deserialize = {
+	slug: string,
+	name: string,
+	/**  The folder, relative to the workspace root. */
+	dir: string,
+	brief: string,
+	hasDesign: boolean,
+	queue: Queue_Deserialize,
+	/**  Why `questions.json` couldn't be read, when it couldn't. */
+	queueError: string | null,
+	/**  Markdown files, relative to the folder: the design, then the docs. */
+	docs: string[],
+	/**  Standalone Mermaid files. */
+	diagrams: string[],
+	html: HtmlFile[],
+	comments: DocComment[],
+	attach: string[],
+};
+
+export type DesignDto_Serialize = {
+	slug: string,
+	name: string,
+	/**  The folder, relative to the workspace root. */
+	dir: string,
+	brief: string,
+	hasDesign: boolean,
+	queue: Queue_Serialize,
+	/**  Why `questions.json` couldn't be read, when it couldn't. */
+	queueError: string | null,
+	/**  Markdown files, relative to the folder: the design, then the docs. */
+	docs: string[],
+	/**  Standalone Mermaid files. */
+	diagrams: string[],
+	html: HtmlFile[],
+	comments: DocComment[],
+	attach: string[],
+};
+
+export type DesignQuestion = DesignQuestion_Serialize | DesignQuestion_Deserialize;
+
+export type DesignQuestion_Deserialize = {
+	/**  `Q4`, or `Q4a` for a subquestion. */
+	id: string,
+	round: number,
+	text: QText,
+	/**  Files the agent read to build it. */
+	sources?: string[],
+	state: QState,
+	answer?: Answer_Deserialize | null,
+	/**  Why it was dropped, like "settled by Q3". */
+	dropped?: string | null,
+	change?: Change | null,
+	/**  A discussion that isn't a decision. */
+	discussion?: Turn[],
+};
+
+export type DesignQuestion_Serialize = {
+	/**  `Q4`, or `Q4a` for a subquestion. */
+	id: string,
+	round: number,
+	text: QText,
+	/**  Files the agent read to build it. */
+	sources: string[],
+	state: QState,
+	answer: Answer_Serialize | null,
+	/**  Why it was dropped, like "settled by Q3". */
+	dropped: string | null,
+	change: Change | null,
+	/**  A discussion that isn't a decision. */
+	discussion: Turn[],
+};
+
+/**  A file in the design's folder, and what it said when the user last looked. */
+export type DesignText = {
+	text: string,
+	seen: string | null,
 };
 
 export type DiscussionDto = {
@@ -424,6 +609,23 @@ export type DiscussionDto = {
 	pendingReview: boolean,
 	/**  The login `gh` is signed in as. */
 	viewer: string,
+};
+
+/**  A comment on a passage of one of the design's markdown files. */
+export type DocComment = {
+	id: number,
+	/**  Relative to the design's folder. */
+	path: string,
+	/**  The selected text, so the comment still finds its place after edits. */
+	quote: string,
+	/**  First and last source lines of the selection, from 1. */
+	start: number,
+	end: number,
+	body: string,
+	kind: CommentKind,
+	state: CommentState,
+	/**  The agent's answer to an ask, or what it did for a change. */
+	reply: string | null,
 };
 
 export type FileDto = {
@@ -561,6 +763,14 @@ export type HeadDto = {
 	state: string,
 };
 
+export type HtmlFile = {
+	path: string,
+	/**  The markdown it was made from, when lgtm made it from one. */
+	source: string | null,
+	/**  The markdown changed since. */
+	stale: boolean,
+};
+
 export type Hunk = {
 	oldStart: number,
 	oldLines: number,
@@ -613,6 +823,21 @@ export type LogLine = {
 	changeId: string | null,
 	/**  Whether this line starts the workspace's working-copy commit. */
 	workingCopy: boolean,
+};
+
+/**  A design after the agent made a file for it, and the file's path in the design. */
+export type Made = Made_Serialize | Made_Deserialize;
+
+/**  A design after the agent made a file for it, and the file's path in the design. */
+export type Made_Deserialize = {
+	design: DesignDto_Deserialize,
+	path: string,
+};
+
+/**  A design after the agent made a file for it, and the file's path in the design. */
+export type Made_Serialize = {
+	design: DesignDto_Serialize,
+	path: string,
 };
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
@@ -681,6 +906,8 @@ export type Models = {
 	reviewers: string,
 	/**  Triage and replies on PR threads. */
 	replies: string,
+	/**  Every step of a design: drafting, questions, revising, docs. */
+	design: string,
 };
 
 export type NearbyPrDto = {
@@ -861,7 +1088,15 @@ export type ProgressDto = {
 /**  An editable prompt. */
 export type Prompt = "walkthrough" | 
 /**  How takes and replies on GitHub threads are written. */
-"reply";
+"reply" | 
+/**  How design questions are built, after the qqueue skill. */
+"qq" | 
+/**  Drafting and revising a design document. */
+"designDraft" | 
+/**  A design's docs and Mermaid diagrams. */
+"designDocs" | 
+/**  A design's HTML pages. */
+"designHtml";
 
 /**  A prompt and its files, for the Settings tab. */
 export type PromptInfo = {
@@ -876,9 +1111,45 @@ export type PromptInfo = {
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
+export type QState = "open" | "decided" | "dropped";
+
+/**  What a question says. The first option is always the recommendation. */
+export type QText = {
+	subject: string,
+	context: string[],
+	options: Choice[],
+	/**  Why option 1 is recommended. */
+	why: string,
+};
+
 export type Question = {
 	question: string,
 	findings: string[],
+};
+
+/**  What can happen to a question without the agent. */
+export type QuestionAct = { kind: "decide"; id: string; answer: AnswerInput } | 
+/**  Reopens the last decision. */
+{ kind: "undo" } | 
+/**  Moves it to the end of the queue. */
+{ kind: "later"; id: string } | 
+/**  Opens a decided question to answer it again. */
+{ kind: "reopen"; id: string } | 
+/**  The user saw what a rewrite changed. */
+{ kind: "seen"; id: string };
+
+export type Queue = Queue_Serialize | Queue_Deserialize;
+
+export type Queue_Deserialize = {
+	questions: DesignQuestion_Deserialize[],
+	/**  The last round folded into the design. */
+	revised?: number,
+};
+
+export type Queue_Serialize = {
+	questions: DesignQuestion_Serialize[],
+	/**  The last round folded into the design. */
+	revised: number,
 };
 
 export type QuickWin = {
@@ -1010,6 +1281,11 @@ export type Settings = {
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot[],
+	/**
+	 *  Where designs go in a repo, relative to its root. A repo's `.lgtm/config.toml` can
+	 *  override it.
+	 */
+	designDir: string,
 };
 
 /**  The settings were saved. */
@@ -1153,6 +1429,11 @@ export type ToolStatus = {
 	location: string | null,
 	version: string | null,
 	problem: ToolProblem | null,
+};
+
+export type Turn = {
+	you: boolean,
+	text: string,
 };
 
 export type Verdict = "comment" | "approve" | "requestChanges";

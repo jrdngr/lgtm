@@ -1,7 +1,15 @@
 import { useSyncExternalStore } from "react";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
-export type AgentKind = "ask" | "change" | "reply" | "triage" | "fix" | "walkthrough" | "resolve";
+export type AgentKind =
+  | "ask"
+  | "change"
+  | "reply"
+  | "triage"
+  | "fix"
+  | "walkthrough"
+  | "resolve"
+  | "design";
 export type Outcome = "running" | "done" | "failed" | "stopped";
 
 /** A headless agent run the window started, other than a persona review. */

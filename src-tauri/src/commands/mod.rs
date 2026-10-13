@@ -2,6 +2,7 @@
 
 pub mod bots;
 pub mod comments;
+pub mod design;
 pub mod files;
 pub mod github;
 pub mod notes;
