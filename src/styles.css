@@ -299,6 +299,16 @@ kbd {
   margin-right: 8px;
 }
 
+.toolbar .repo-sep {
+  margin: 0 5px;
+  color: var(--faint);
+  font-weight: normal;
+}
+
+.toolbar .repo-workspace {
+  color: var(--muted);
+}
+
 .spacer {
   flex: 1;
 }

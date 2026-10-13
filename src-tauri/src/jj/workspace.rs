@@ -12,19 +12,23 @@ pub struct WorkspaceInfo {
     pub root: PathBuf,
     /// The change and first description line of the workspace's `@`.
     pub change_id: String,
+    /// Length of the shortest prefix of `change_id` that's unique in the repo.
+    pub unique: u32,
     pub description: String,
 }
 
-const LIST_TEMPLATE: &str = r#"name ++ "\t" ++ self.root() ++ "\t" ++ target.change_id().short(8) ++ "\t" ++ target.description().first_line() ++ "\n""#;
+const LIST_TEMPLATE: &str = r#"name ++ "\t" ++ self.root() ++ "\t" ++ target.change_id().short(8) ++ "\t"
+  ++ target.change_id().shortest().prefix().len() ++ "\t" ++ target.description().first_line() ++ "\n""#;
 
 fn parse_workspaces(out: &str) -> Vec<WorkspaceInfo> {
     out.lines()
         .filter_map(|l| {
-            let mut parts = l.splitn(4, '\t');
+            let mut parts = l.splitn(5, '\t');
             Some(WorkspaceInfo {
                 name: parts.next()?.to_string(),
                 root: PathBuf::from(parts.next()?),
                 change_id: parts.next()?.to_string(),
+                unique: parts.next()?.parse().ok()?,
                 description: parts.next().unwrap_or_default().to_string(),
             })
         })
@@ -118,9 +122,10 @@ mod tests {
 
     #[test]
     fn parses_workspace_list() {
-        let got = parse_workspaces("default\t/r/main\tabc\t\nfix\t/ws/r/fix\txyz\tFix:\ta\n");
+        let got = parse_workspaces("default\t/r/main\tabc\t1\t\nfix\t/ws/r/fix\txyz\t2\tFix:\ta\n");
         assert_eq!(got[0].description, "");
         assert_eq!(got[1].root, PathBuf::from("/ws/r/fix"));
+        assert_eq!(got[1].unique, 2);
         assert_eq!(got[1].description, "Fix:\ta");
     }
 }

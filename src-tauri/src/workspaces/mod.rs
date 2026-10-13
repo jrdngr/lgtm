@@ -37,6 +37,8 @@ pub struct WorkspaceDto {
     pub title: String,
     pub root: String,
     pub change_id: String,
+    /// Length of the shortest prefix of `change_id` that's unique in the repo.
+    pub unique: u32,
     pub description: String,
 }
 
@@ -137,6 +139,7 @@ impl RepoCtx {
             title: w.name,
             root: w.root.display().to_string(),
             change_id: w.change_id,
+            unique: w.unique,
             description: w.description,
         };
         Ok(main

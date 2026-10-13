@@ -3,6 +3,8 @@ import type { NearbyPrDto, NearbyPrsDto } from "../bindings";
 import { closePrPreview, openPrPreview } from "../github/preview";
 import { type CommandResult, commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
+import { IconButton } from "../ui/icons";
+import { SectionHeader } from "../ui/SectionHeader";
 import { dockOf } from "../workbench/docks";
 import type { WorkspaceName } from "./context";
 
@@ -86,18 +88,17 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
 
   return (
     <div className="nearby-prs">
-      <div className="workspaces-bar">
-        Pull requests
-        <span className="spacer" />
-        <button
-          type="button"
+      <SectionHeader
+        title="On this stack"
+        meta={opening !== undefined ? `Fetching #${opening}…` : loading ? "Loading…" : undefined}
+      >
+        <IconButton
+          icon="sync"
+          label="Find open PRs of bookmarks pushed from this workspace's stack"
           onClick={load}
           disabled={loading || githubOff}
-          title="Find open PRs of bookmarks pushed from this workspace's stack"
-        >
-          {loading ? "Loading" : "Refresh"}
-        </button>
-      </div>
+        />
+      </SectionHeader>
       {githubOff ? (
         <div className="nearby-note">Needs the GitHub CLI (gh)</div>
       ) : (
@@ -117,15 +118,12 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
                 open(pr);
               }}
               disabled={opening !== undefined}
-              title={`${pr.url}\nDouble-click to review it in its own workspace`}
+              title={`${pr.bookmark} · ${pr.author}\n${pr.url}\nDouble-click to review it in its own workspace`}
             >
-              <span className="workspace-title">
-                #{pr.number} {pr.title}
-              </span>
-              <span className="workspace-desc">
-                {opening === pr.number
-                  ? "Fetching…"
-                  : `${pr.bookmark} · ${pr.author}${pr.draft ? " · draft" : ""}`}
+              <span className="workspace-title nearby-title">
+                <span className="pill">#{pr.number}</span>
+                <span className="ellipsis">{pr.title}</span>
+                {pr.draft && <span className="pill">draft</span>}
               </span>
             </button>
           </li>

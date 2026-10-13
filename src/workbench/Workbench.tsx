@@ -137,6 +137,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         />
         <span className="repo" title={repo.root}>
           {repo.name}
+          <span className="repo-sep">/</span>
+          <span className="repo-workspace">{selected ?? "main"}</span>
         </span>
         <span className="spacer" />
         <div className="toolbar-center">

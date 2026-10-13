@@ -985,6 +985,8 @@ export type WorkspaceDto = {
 	title: string,
 	root: string,
 	changeId: string,
+	/**  Length of the shortest prefix of `change_id` that's unique in the repo. */
+	unique: number,
 	description: string,
 };
 

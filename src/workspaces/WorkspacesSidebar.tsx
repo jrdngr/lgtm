@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { OpenPr } from "../github/OpenPr";
-import { reloadPr, usePr } from "../github/pr";
+import { reloadPr } from "../github/pr";
 import { commands } from "../ipc";
-import { Count } from "../review/FilesPanel";
 import { useGithubOff } from "../tools/agents";
+import { IconButton } from "../ui/icons";
+import { SectionHeader } from "../ui/SectionHeader";
 import { type WorkspaceName, workspaceKey } from "./context";
 import { NearbyPrs } from "./NearbyPrs";
 import { useWorkspaces } from "./useWorkspaces";
+import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
 
 interface Props {
@@ -16,12 +18,6 @@ interface Props {
   onDeleted(name: string): void;
   /** The selected workspace isn't in the repo any more. */
   onMissing(): void;
-}
-
-/** A PR workspace's PR, in place of its working copy's description. */
-function PrTitle({ name, fallback }: { name: string; fallback: string }) {
-  const pr = usePr(name);
-  return <>{pr ? `#${pr.number} ${pr.title}` : fallback}</>;
 }
 
 /** The repo's jj workspaces with review progress. Click one to switch to it. */
@@ -76,23 +72,23 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
 
   return (
     <div className="workspaces">
-      <div className="workspaces-bar">
-        <span className="spacer" />
-        <button
-          type="button"
+      <SectionHeader title="Workspaces">
+        <IconButton
+          icon="pr"
+          label={
+            githubOff ? "Needs the GitHub CLI (gh)" : "Review a GitHub PR in its own workspace"
+          }
           onClick={() => setOpeningPr((o) => !o)}
           disabled={githubOff}
           aria-pressed={openingPr}
-          title={
-            githubOff ? "Needs the GitHub CLI (gh)" : "Review a GitHub PR in its own workspace"
-          }
-        >
-          PR
-        </button>
-        <button type="button" onClick={() => setNaming(true)} disabled={naming}>
-          New
-        </button>
-      </div>
+        />
+        <IconButton
+          icon="plus"
+          label="New workspace"
+          onClick={() => setNaming(true)}
+          disabled={naming}
+        />
+      </SectionHeader>
       {openingPr && (
         <OpenPr onClose={() => setOpeningPr(false)} onError={setError} onOpened={prOpened} />
       )}
@@ -108,7 +104,7 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setNaming(false)}
           />
-          <button type="submit" disabled={busy || !name.trim()}>
+          <button type="submit" className="primary" disabled={busy || !name.trim()}>
             {busy ? "Creating" : "Create"}
           </button>
         </form>
@@ -117,7 +113,6 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
       <ul>
         {workspaces?.map((w) => {
           const key = workspaceKey(w.name);
-          const p = progress.get(key);
           if (confirming === w.name) {
             return (
               <li key={key} className="workspace confirm">
@@ -125,48 +120,21 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
                 <button type="button" onClick={() => remove(confirming)}>
                   Delete
                 </button>
-                <button type="button" onClick={() => setConfirming(undefined)}>
+                <button type="button" className="quiet" onClick={() => setConfirming(undefined)}>
                   Cancel
                 </button>
               </li>
             );
           }
           return (
-            <li key={key} className={`workspace${selected === w.name ? " selected" : ""}`}>
-              <button
-                type="button"
-                className="workspace-open"
-                onClick={() => onSelect(w.name)}
-                title={w.root}
-              >
-                <span className="workspace-title">
-                  {w.title}
-                  {w.name === null && <span className="workspace-main">main</span>}
-                </span>
-                <span className="workspace-desc">
-                  {w.name?.startsWith("pr-") ? (
-                    <PrTitle name={w.name} fallback={`${w.changeId} ${w.description}`} />
-                  ) : (
-                    `${w.changeId} ${w.description || "(no description)"}`
-                  )}
-                </span>
-                {p && (
-                  <span className="workspace-progress" title={`Progress of ${p.revset}`}>
-                    <Count p={p} />
-                  </span>
-                )}
-              </button>
-              {w.name !== null && (
-                <button
-                  type="button"
-                  className="workspace-delete"
-                  title="Delete workspace"
-                  onClick={() => setConfirming(w.name ?? undefined)}
-                >
-                  ✕
-                </button>
-              )}
-            </li>
+            <WorkspaceRow
+              key={key}
+              w={w}
+              progress={progress.get(key)}
+              selected={selected === w.name}
+              onSelect={() => onSelect(w.name)}
+              onDelete={() => setConfirming(w.name ?? undefined)}
+            />
           );
         })}
       </ul>

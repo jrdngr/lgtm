@@ -36,7 +36,7 @@ export function OpenPr({ onOpened, onClose, onError }: Props) {
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
       />
-      <button type="submit" disabled={busy || !input.trim()}>
+      <button type="submit" className="primary" disabled={busy || !input.trim()}>
         {busy ? "Fetching" : "Review"}
       </button>
     </form>
