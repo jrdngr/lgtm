@@ -76,7 +76,7 @@ The right panel has seven icon tabs, plus PR in a PR workspace. PR counts thread
 - **PR** (⌘⇧P, PR workspaces only) shows the PR: its state, a **Yours** pill on your own PR, its title, a bar of how far its threads are, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. Below, every thread on the PR (review threads, comments and review summaries on the PR itself, and your drafts) is grouped by stage: New, Decide, To fix, Reply, Ready, Done (folded). Click a thread to open it in place and write its reply; ⌘-click shows its code in the review. The box at the bottom sends what's Ready (see below).
 - **Walkthrough** (⌘⇧H) lists the walkthrough's notes.
 - **Reviewers** (⌘⇧O) runs review personas.
-- **Q&A** (⌘⇧I) lists the workspace's active Q&A sessions with where they are, and the current one's next question with **Go with 1**; archived ones fold under **Archived**, and **+** starts one (see Q&A below).
+- **Q&A** (⌘⇧I) lists the workspace's active Q&A sessions with where they are; archived ones fold under **Archived**, and **+** starts one (see Q&A below).
 
 Notes and threads show under their code as cards: blue for a note, purple for a GitHub thread or draft. Their actions show on hover: ✎ edit, ✓ done (notes), ✦ ask the agent (or `a`), ↗ send to a terminal, and in ⋯: Move to a stage (threads), Draft PR comment from this (notes, in PR workspaces), and Delete (notes and drafts). The agent box stays open while there's a conversation with the agent. Done notes, and done or resolved threads, fold to one line; click to open one.
 
@@ -169,7 +169,8 @@ In Questions:
 | `u` | Undo the last decision |
 | `r` | Change a decided question's answer |
 | `p` | Show or hide a rewritten question's previous text |
-| `j` / `k` | Browse the questions |
+| ↑ / ↓ or `j` / `k` | Select the next / previous option |
+| `]` / `[` | Next / previous question |
 
 The tab's ⋯ copies the question as qq text or every decision, marks the session implemented or reopens it, deletes it, and opens the Q&A prompts. In terminals, the MCP server's `list_qa`, `qa_ask` and `qa_answers` let Claude Code ask you a session's questions in the tab (making a session when it has none) and read your answers.
 

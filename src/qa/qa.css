@@ -647,8 +647,7 @@ p.qq-changed {
   line-height: 1.4;
 }
 
-.qa-row-name,
-.qa-next-subject {
+.qa-row-name {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -674,30 +673,4 @@ p.qq-changed {
 .qa-folded {
   margin-top: 6px;
   color: var(--muted);
-}
-
-.qa-next {
-  padding: 6px 10px 10px 18px;
-  font-size: var(--fs-sm);
-}
-
-.qa-next-subject {
-  display: block;
-  padding: 0;
-  line-height: 1.4;
-}
-
-.qa-next-options {
-  margin: 4px 0 6px;
-  padding-left: 18px;
-  color: var(--muted);
-}
-
-.qa-next-options li:first-child {
-  color: var(--fg);
-}
-
-.qa-next-actions {
-  display: flex;
-  gap: 6px;
 }

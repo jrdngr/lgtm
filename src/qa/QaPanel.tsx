@@ -1,8 +1,6 @@
 import { useState } from "react";
-import { Inline } from "../bots/Markdown";
 import { IconButton } from "../ui/icons";
 import { useWorkspace } from "../workspaces/context";
-import { decide } from "./actions";
 import { countable, openQuestions, type Session } from "./model";
 import { busyName, showQa, startFresh, useQa } from "./store";
 import "./qa.css";
@@ -16,40 +14,6 @@ function status(d: Session) {
   if (d.sent != null) return "Sent to a terminal";
   if (d.plan) return "Planned";
   return "Ready to apply";
-}
-
-/** The session's next question, small, to settle with its recommendation from here. */
-function Next({ d, locked }: { d: Session; locked: boolean }) {
-  const ws = useWorkspace();
-  const q = openQuestions(d)[0];
-  if (!q) return null;
-  return (
-    <div className="qa-next">
-      <button type="button" className="qa-next-subject" onClick={() => showQa(ws, d.id)}>
-        <span className="faint">Next ·</span> <b>{q.id}</b> <Inline>{q.text.subject}</Inline>
-      </button>
-      <ol className="qa-next-options">
-        {q.text.options.map((o) => (
-          <li key={o.label}>
-            <Inline>{o.label}</Inline>
-          </li>
-        ))}
-      </ol>
-      <div className="qa-next-actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={locked}
-          onClick={() => decide(ws, d, q.id, { option: 0, note: null, other: null })}
-        >
-          Go with 1
-        </button>
-        <button type="button" onClick={() => showQa(ws, d.id)}>
-          Open
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function Row({ d, current, busyLabel }: { d: Session; current: boolean; busyLabel?: string }) {
@@ -68,13 +32,11 @@ function Row({ d, current, busyLabel }: { d: Session; current: boolean; busyLabe
               : status(d))}
         </span>
       </button>
-      {current && !d.archived && <Next d={d} locked={!!busyLabel} />}
     </div>
   );
 }
 
-/** The workspace's Q&A sessions: active ones with where they are and the current one's next
- * question, archived ones folded. */
+/** The workspace's Q&A sessions: active ones with where they are, archived ones folded. */
 export function QaPanel() {
   const ws = useWorkspace();
   const state = useQa(ws);

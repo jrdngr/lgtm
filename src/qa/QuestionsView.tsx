@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
+import { GrowingText } from "../ui/GrowingText";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { decide as decideQuestion } from "./actions";
@@ -123,8 +124,12 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     } else if (e.key === "u" && prev && !locked) undo();
     else if (e.key === "r" && q.state === "decided" && !locked) quick({ kind: "reopen", id: q.id });
     else if (e.key === "p" && q.change) setShowPrev(!showPrev);
-    else if (e.key === "j" || e.key === "ArrowDown") browse(1);
-    else if (e.key === "k" || e.key === "ArrowUp") browse(-1);
+    else if ((e.key === "j" || e.key === "ArrowDown") && isOpen && !locked)
+      setSel(Math.min(sel + 1, q.text.options.length - 1));
+    else if ((e.key === "k" || e.key === "ArrowUp") && isOpen && !locked)
+      setSel(Math.max(sel - 1, 0));
+    else if (e.key === "]") browse(1);
+    else if (e.key === "[") browse(-1);
     else return;
     e.preventDefault();
   }
@@ -152,14 +157,19 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const hints: [string, string][] = [];
   if (q?.state === "open" && !locked) {
     const n = q.text.options.length;
-    hints.push([n > 1 ? `1–${n}` : "1", "select"], ["↵", "decide"], ["n", "note"], ["o", "other"]);
+    hints.push(
+      [n > 1 ? `1–${n} ↑↓` : "1", "select"],
+      ["↵", "decide"],
+      ["n", "note"],
+      ["o", "other"],
+    );
   }
   if (q) hints.push(["d", "discuss"]);
   if (q?.state === "open") hints.push(["s", "later"]);
   if (q?.state === "decided" && !locked) hints.push(["r", "change answer"]);
   if (prev && !locked) hints.push(["u", "undo"]);
   if (q?.change) hints.push(["p", showPrev ? "hide previous" : "show previous"]);
-  if (list.length > 1) hints.push(["j k", "browse"]);
+  if (list.length > 1) hints.push(["[ ]", "browse"]);
 
   return (
     <div ref={rootRef} className="qq" tabIndex={-1} onKeyDown={onKey}>
@@ -255,8 +265,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
               under={(i) =>
                 mode === "note" &&
                 i === sel && (
-                  <input
-                    // biome-ignore lint/a11y/noAutofocus: the note is what `n` asked for
+                  <GrowingText
                     autoFocus
                     className="qq-input"
                     value={note}
@@ -271,8 +280,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
               <QuestionCard id={q.id} text={q.change.previous} className="previous" locked />
             )}
             {mode === "other" && (
-              <input
-                // biome-ignore lint/a11y/noAutofocus: the answer is what `o` asked for
+              <GrowingText
                 autoFocus
                 className="qq-input"
                 value={other}
@@ -289,7 +297,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
                   disabled={locked}
                   onClick={() => decide(sel, mode === "note" ? note : undefined)}
                 >
-                  {sel === 0 ? "Go with 1" : `Go with ${sel + 1}`} <kbd>↵</kbd>
+                  {sel === 0 ? "Take Recommended" : `Go with ${sel + 1}`} <kbd>↵</kbd>
                 </button>
                 <button type="button" disabled={locked} onClick={() => setMode("note")}>
                   Note

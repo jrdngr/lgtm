@@ -70,7 +70,6 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
         className="qa-prompt-text"
         value={prompt}
         readOnly={!!d?.archived}
-        placeholder="What you want done. The agent asks every decision it needs before it writes anything."
         onChange={(e) => setPrompt(e.target.value)}
         onBlur={() => d && save()}
       />
