@@ -194,8 +194,8 @@ fn name_index(nodes: &[GraphNode]) -> NameIndex<'_> {
 const MAX_AMBIGUOUS: usize = 2;
 
 /// The changed symbols a use of `name` in `path` points at. A function needs a call, a type
-/// any mention, and a module is never linked, since its name is often a variable's too. Ones
-/// in the same file win; otherwise too many candidates means none.
+/// any mention, and a module or section is never linked, since its name is often a
+/// variable's too. Ones in the same file win; otherwise too many candidates means none.
 fn targets(index: &NameIndex, name: &str, call: bool, path: &str) -> Vec<u32> {
     let Some(all) = index.get(name) else {
         return vec![];
@@ -203,7 +203,7 @@ fn targets(index: &NameIndex, name: &str, call: bool, path: &str) -> Vec<u32> {
     let fits = |n: &&&GraphNode| match n.kind {
         SymbolKind::Function => call,
         SymbolKind::Class => true,
-        SymbolKind::Module => false,
+        SymbolKind::Module | SymbolKind::Section => false,
     };
     let candidates: Vec<&&GraphNode> = all.iter().filter(fits).collect();
     let local: Vec<u32> = candidates

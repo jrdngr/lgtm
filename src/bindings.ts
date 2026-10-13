@@ -946,7 +946,7 @@ export type Step = "reports" | "challenges" | "rebuttals" | "synthesis" | "minim
  */
 export type SwitchRepo = Record<string, never>;
 
-export type SymbolKind = "function" | "class" | "module";
+export type SymbolKind = "function" | "class" | "module" | "section";
 
 export type Synthesis = {
 	verdict: string,

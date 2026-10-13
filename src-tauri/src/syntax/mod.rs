@@ -1,6 +1,7 @@
 //! Tree-sitter: languages, highlighting, and symbol ranges.
 
 mod langs;
+mod queries;
 mod refs;
 
 pub use refs::Ref;
@@ -42,6 +43,7 @@ pub enum SymbolKind {
     Function,
     Class,
     Module,
+    Section,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
@@ -102,9 +104,13 @@ impl Parsed {
             let has_error = start.has_error() || node.has_error() || end.has_error();
             out.push(CodeSymbol {
                 name: source[name.byte_range()].to_string(),
-                kind: kind_of(node.kind()),
+                kind: if self.lang.outline {
+                    SymbolKind::Section
+                } else {
+                    kind_of(node.kind())
+                },
                 start_line: start.start_position().row as u32 + 1,
-                end_line: end.end_position().row as u32 + 1,
+                end_line: last_row(end) as u32 + 1,
                 has_error,
             });
         }
@@ -197,6 +203,17 @@ fn highlight_lines(
     out
 }
 
+/// The node's last row. Block grammars like Markdown and YAML end a node at the start of
+/// the next line, which isn't part of it.
+fn last_row(node: Node) -> usize {
+    let end = node.end_position();
+    if end.column == 0 && end.row > node.start_position().row {
+        end.row - 1
+    } else {
+        end.row
+    }
+}
+
 fn kind_of(node_kind: &str) -> SymbolKind {
     match node_kind {
         "mod_item" | "internal_module" => SymbolKind::Module,
@@ -212,112 +229,4 @@ fn kind_of(node_kind: &str) -> SymbolKind {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::sync::LazyLock;
-
-    use super::*;
-
-    fn symbols(path: &str, src: &str) -> Vec<(String, u32, u32)> {
-        parse(path, src)
-            .unwrap()
-            .symbols(src)
-            .into_iter()
-            .map(|s| (s.name, s.start_line, s.end_line))
-            .collect()
-    }
-
-    #[test]
-    fn every_language_builds() {
-        assert_eq!(LazyLock::force(&LANGS).len(), 12);
-    }
-
-    #[test]
-    fn python_symbol_includes_decorators() {
-        let src = "import x\n\n@app.get('/')\n@cached\ndef get_user():\n    return 1\n";
-        assert_eq!(symbols("a.py", src), [("get_user".into(), 3, 6)]);
-    }
-
-    #[test]
-    fn rust_symbol_includes_attributes_and_doc_comments_but_not_detached_comments() {
-        let src = "// unrelated\n\n/// Docs.\n#[inline]\nfn f() {}\n\nimpl S {\n    fn g() {}\n}\n";
-        assert_eq!(
-            symbols("a.rs", src),
-            [("f".into(), 3, 5), ("S".into(), 7, 9), ("g".into(), 8, 8)]
-        );
-    }
-
-    #[test]
-    fn typescript_method_includes_decorator_and_exported_function_includes_export() {
-        let src = "class A {\n  @dec()\n  m() {}\n}\nexport function f() {\n}\n";
-        assert_eq!(
-            symbols("a.ts", src),
-            [("A".into(), 1, 4), ("m".into(), 2, 3), ("f".into(), 5, 6)]
-        );
-    }
-
-    #[test]
-    fn swift_symbols_cover_types_members_and_extensions() {
-        let src = "/// Docs.\n@MainActor\nstruct S {\n    init() {}\n    func f() {}\n}\n\nprotocol P {\n    func g()\n}\n\nextension S {\n    deinit {}\n}\n";
-        assert_eq!(
-            symbols("a.swift", src),
-            [
-                ("S".into(), 1, 6),
-                ("init".into(), 4, 4),
-                ("f".into(), 5, 5),
-                ("P".into(), 8, 10),
-                ("g".into(), 9, 9),
-                ("S".into(), 12, 14),
-                ("deinit".into(), 13, 13),
-            ]
-        );
-    }
-
-    #[test]
-    fn symbol_with_parse_error_is_flagged() {
-        let src = "fn ok() {}\nfn broken( {\n}\n";
-        let syms = parse("a.rs", src).unwrap().symbols(src);
-        assert!(!syms[0].has_error);
-        assert!(syms.iter().skip(1).all(|s| s.has_error), "{syms:?}");
-    }
-
-    #[test]
-    fn highlight_segments_cover_requested_lines_in_utf16_units() {
-        let src = "fn main() {\n    let s = \"é\";\n}\n";
-        let lines = parse("a.rs", src).unwrap().highlight(src, &[2]);
-        assert_eq!(lines.keys().collect::<Vec<_>>(), [&2]);
-        let segs = &lines[&2];
-        assert_eq!(
-            segs.iter().map(|s| s.1).sum::<u32>(),
-            "    let s = \"é\";".encode_utf16().count() as u32
-        );
-        let keyword = HIGHLIGHT_NAMES
-            .iter()
-            .position(|n| *n == "keyword")
-            .unwrap() as u8;
-        assert!(segs.iter().any(|s| s.0 == Some(keyword)));
-    }
-
-    #[test]
-    fn highlight_file_has_a_segment_list_per_line() {
-        let lines = highlight_file("a.rs", "fn f() {}\n\nlet x = 1;\n");
-        assert_eq!(lines.len(), 4);
-        assert!(lines[1].is_empty() && lines[3].is_empty());
-        assert!(highlight_file("notes.txt", "hi").is_empty());
-    }
-
-    #[test]
-    fn markdown_highlights_inline_text_and_fenced_code_by_language() {
-        let src = "# Title\n\nSome `code` and **bold**.\n\n```rust\nfn f() {}\n```\n";
-        let lines = highlight_file("a.md", src);
-        let class = |n: &str| Some(HIGHLIGHT_NAMES.iter().position(|h| *h == n).unwrap() as u8);
-        let has = |line: usize, n: &str| lines[line].iter().any(|s| s.0 == class(n));
-        assert!(has(0, "tag"), "{:?}", lines[0]);
-        assert!(has(2, "string") && has(2, "keyword"), "{:?}", lines[2]);
-        assert!(has(5, "keyword"), "{:?}", lines[5]);
-    }
-
-    #[test]
-    fn unknown_extension_has_no_parser() {
-        assert!(parse("notes.txt", "hi").is_none());
-    }
-}
+mod tests;
