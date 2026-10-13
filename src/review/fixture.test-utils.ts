@@ -88,7 +88,8 @@ export function layout(over: Partial<Layout> = {}): Layout {
     collapsedFiles: new Set(),
     collapsedHunks: new Set(),
     filter: "all",
-    rowState: () => "unreviewed",
+    rowState: () => "unmarked",
+    done: (c) => c !== "red",
     revealed: new Set(),
     ...over,
   };

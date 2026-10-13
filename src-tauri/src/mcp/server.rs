@@ -23,11 +23,11 @@ use crate::store::Source;
 use crate::store::{Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
-reviews a change there and marks what they've reviewed. These tools act on the review open in \
+reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
 this terminal's workspace: read its state, comments, walkthrough, symbol graph and Reviewer \
 findings; add comments; write a walkthrough; submit your own review findings; and point the \
 review at \
-code or a revset. You can't mark code reviewed. Lines are on the new side of the diff.";
+code or a revset. You can't mark code. Lines are on the new side of the diff.";
 
 type Out = Result<String, String>;
 
@@ -78,7 +78,8 @@ impl Lgtm {
 impl Lgtm {
     #[tool(
         description = "The open review: its revset and commits, and per file the changed \
-        rows the human has reviewed, skipped or flagged, and the line ranges still unreviewed."
+        rows the human has marked (by mark label), how many count as done, and the line \
+        ranges still left."
     )]
     async fn get_review(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;

@@ -20,7 +20,9 @@ vi.mock("../bindings", async (actual) => {
       },
     },
   );
-  const events = new Proxy({}, { get: () => () => ({ listen: async () => () => {} }) });
+  // An event is listened to directly or for a window: `e.listen` or `e(window).listen`.
+  const listen = async () => () => {};
+  const events = new Proxy({}, { get: () => Object.assign(() => ({ listen }), { listen }) });
   return { ...(await actual<object>()), commands, events };
 });
 

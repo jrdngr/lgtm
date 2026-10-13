@@ -1,0 +1,100 @@
+.mark-palette {
+  position: fixed;
+  z-index: 40;
+  width: 300px;
+  padding: 4px 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--raise);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
+}
+
+.mark-palette-head {
+  padding: 4px 10px 6px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.mark-palette-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 6px 0 10px;
+}
+
+.mark-palette-row.dragging {
+  opacity: 0.4;
+}
+
+.mark-palette-row .grip {
+  width: 12px;
+  font-size: 11px;
+  color: var(--faint);
+  cursor: grab;
+}
+
+.mark-palette-row .swatch {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.mark-palette-row .label {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  font: inherit;
+  color: var(--fg);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.mark-palette-row .label:hover,
+.mark-palette-row .label:focus {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.mark-palette-row .done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.mark-palette-row kbd {
+  width: 10px;
+  text-align: center;
+  font: 10.5px var(--mono);
+  color: var(--muted);
+}
+
+.mark-palette-row.off .swatch {
+  opacity: 0.4;
+}
+
+.mark-palette-row.off .name {
+  flex: 1;
+  padding-left: 7px;
+  color: var(--faint);
+}
+
+.mark-palette-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--hair);
+}
+
+.mark-palette-foot {
+  padding: 6px 10px 2px;
+  border-top: 1px solid var(--hair);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

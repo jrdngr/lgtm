@@ -3,7 +3,7 @@ use tauri::WebviewWindow;
 use super::{CmdResult, err, repo};
 use crate::jj::{JjAction, LogLine};
 use crate::review::{GraphDto, RefreshDto, ReviewDto, RowRef, StateDto, View};
-use crate::store::MarkState;
+use crate::store::MarkColor;
 
 /// Loads the review for `revset` after snapshotting the working copy. Starts a review
 /// session, or with `resume` continues the revset's latest one.
@@ -74,7 +74,7 @@ pub(crate) async fn refresh_review(
     repo(&window)?.refresh(review, view).await.map_err(err)
 }
 
-/// Marks changed rows, or clears their marks when `state` is null. Files in `check` are
+/// Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 /// checked in the same undo step.
 #[tauri::command]
 #[specta::specta]
@@ -82,12 +82,23 @@ pub(crate) fn mark_rows(
     window: WebviewWindow,
     review: u32,
     rows: Vec<RowRef>,
-    state: Option<MarkState>,
+    color: Option<MarkColor>,
     check: Vec<u32>,
 ) -> CmdResult<StateDto> {
     repo(&window)?
-        .mark(review, &rows, state, &check)
+        .mark(review, &rows, color, &check)
         .map_err(err)
+}
+
+/// Clears a file's marks and unchecks it, in one undo step.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn clear_file_marks(
+    window: WebviewWindow,
+    review: u32,
+    file: u32,
+) -> CmdResult<StateDto> {
+    repo(&window)?.clear_file(review, file).map_err(err)
 }
 
 #[tauri::command]

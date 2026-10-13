@@ -19,6 +19,7 @@
 
 .mark-menu button {
   display: flex;
+  align-items: center;
   gap: 10px;
   text-align: left;
   border: none;
@@ -40,4 +41,11 @@
   padding: 2px 8px 4px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.menu-swatch {
+  width: 10px;
+  height: 10px;
+  margin-right: -4px;
+  border-radius: 2px;
 }

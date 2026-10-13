@@ -68,6 +68,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::trunk_bookmark,
             commands::review::jj_act,
             commands::review::mark_rows,
+            commands::review::clear_file_marks,
             commands::review::set_files_checked,
             commands::review::undo_marks,
             commands::review::redo_marks,

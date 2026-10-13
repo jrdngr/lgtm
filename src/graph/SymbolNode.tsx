@@ -13,7 +13,7 @@ export interface BoxData extends Record<string, unknown> {
   outside: boolean;
   /** Changed symbols in a closed folder, file or group. */
   count: number;
-  /** Share of its changed rows that are reviewed or skipped. */
+  /** Share of its changed rows that are done. */
   done?: number;
   /** The worst level of the important notes on its rows. */
   risk?: string;

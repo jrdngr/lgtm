@@ -1,7 +1,8 @@
 import { useRef } from "react";
-import type { MarkState } from "../bindings";
+import type { MarkColor } from "../bindings";
 import { isMac } from "../workbench/keys";
-import { MENU_KEYS, type MenuAction } from "./MarkMenu";
+import { type MenuAction, menuAction } from "./MarkMenu";
+import { colorForKey, type MarkSetup } from "./marks";
 import type { DisplayLine, FlatFile } from "./model";
 import { expand, reviewSelection } from "./selection";
 import type { SelectionApi } from "./useSelection";
@@ -10,12 +11,13 @@ interface Ctx {
   files: FlatFile[];
   lines: DisplayLine[];
   s: SelectionApi;
+  setup: MarkSetup;
   menu: boolean;
   closeMenu(): void;
   pick(action: MenuAction): void;
   step(undo: boolean): void;
   copy(): void;
-  applyMark(state: MarkState | null): void;
+  applyMark(color: MarkColor | null): void;
   openMenuAtCursor(): void;
   startComment(): void;
   /** Opens a draft for the PR on GitHub on the selection. */
@@ -51,7 +53,10 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
     if (ctx.menu) {
       e.preventDefault();
       if (e.key === "Escape") ctx.closeMenu();
-      else if (MENU_KEYS[e.key] && !e.repeat) ctx.pick(MENU_KEYS[e.key]);
+      else {
+        const action = menuAction(e.key, ctx.setup);
+        if (action && !e.repeat) ctx.pick(action);
+      }
       return;
     }
     const mod = isMac ? e.metaKey : e.ctrlKey;
@@ -103,8 +108,21 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "Escape":
         s.collapse();
         break;
-      case " ":
-        if (!e.repeat) ctx.applyMark("reviewed");
+      case "1":
+      case "2":
+      case "3":
+      case "4":
+      case "5":
+      case "6":
+      case "7":
+      case "8":
+      case "9": {
+        const color = colorForKey(ctx.setup, e.key);
+        if (color && !e.repeat) ctx.applyMark(color);
+        break;
+      }
+      case "0":
+        if (!e.repeat) ctx.applyMark(null);
         break;
       case "m":
         ctx.openMenuAtCursor();

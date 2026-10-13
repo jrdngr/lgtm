@@ -66,10 +66,12 @@ export const commands = {
 	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**
-	 *  Marks changed rows, or clears their marks when `state` is null. Files in `check` are
+	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
 	 */
-	markRows: (review: number, rows: RowRef[], state: "reviewed" | "skipped" | "flagged" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, state, check })),
+	markRows: (review: number, rows: RowRef[], color: "violet" | "red" | "gray" | "orange" | "cyan" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
+	/**  Clears a file's marks and unchecks it, in one undo step. */
+	clearFileMarks: (review: number, file: number) => typedError<StateDto, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
 	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
 	undoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("undo_marks", { review })),
 	redoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("redo_marks", { review })),
@@ -613,15 +615,31 @@ export type LogLine = {
 	workingCopy: boolean,
 };
 
+/**  A mark's color. What each one means is the user's: see `settings::marks`. */
+export type MarkColor = "violet" | "red" | "gray" | "orange" | "cyan" | "pink" | "yellow" | "blue" | "tan";
+
+export type MarkCount = {
+	color: MarkColor,
+	rows: number,
+};
+
 export type MarkDto = {
 	file: number,
 	row: number,
-	state: MarkState,
+	color: MarkColor,
 	review: string,
 	createdAt: number | null,
 };
 
-export type MarkState = "reviewed" | "skipped" | "flagged";
+export type MarkSlot = {
+	color: MarkColor,
+	/**  Empty for a color with no label. */
+	label: string,
+	/**  Rows with this mark count toward progress. */
+	done: boolean,
+	/**  In the review header and on a number key. Hidden colors keep their marks. */
+	shown: boolean,
+};
 
 export type McpSetup = 
 /**  Registered to run this app. */
@@ -829,15 +847,15 @@ export type PreviewThreadDto = {
 	hunk: string,
 };
 
-/**  Changed-row counts by state, as the review header counts them. */
+/**  Changed-row counts, as the review header counts them. */
 export type ProgressDto = {
 	/**  The revset counted: the workspace's latest review, or `@`. */
 	revset: string,
-	reviewed: number,
-	skipped: number,
-	flagged: number,
-	unreviewed: number,
+	/**  Rows that count as done: marked in a done color, or in a checked or skipped file. */
+	done: number,
 	changed: number,
+	/**  Marked rows by color, in key order. */
+	marks: MarkCount[],
 };
 
 /**  An editable prompt. */
@@ -990,6 +1008,8 @@ export type Settings = {
 	claude: string,
 	models: Models,
 	terminalFontSize: number,
+	/**  Every mark color, the ones in use first in key order. */
+	marks: MarkSlot[],
 };
 
 /**  The settings were saved. */

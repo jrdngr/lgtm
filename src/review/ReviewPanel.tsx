@@ -15,10 +15,11 @@ import { Conflicts } from "./Conflicts";
 import { commentNear, commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { MarkMenu } from "./MarkMenu";
+import { useMarkSetup } from "./marks";
 import { buildLines, changedRows, symbolMarkers, type ViewMode } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
-import { type Filter, plural, sumProgress } from "./state";
+import { type Filter, filterLabel, plural, sumProgress } from "./state";
 import { openRevisions } from "./target";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
@@ -63,7 +64,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const focusRoot = useCallback(() => rootRef.current?.focus({ preventScroll: true }), []);
 
   const review = loaded?.review;
-  const { files, index, rowState, progress } = useReviewState(review);
+  const setup = useMarkSetup();
+  const { files, index, rowState, progress } = useReviewState(review, setup.done);
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
@@ -91,11 +93,23 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         collapsedHunks,
         filter,
         rowState,
+        done: setup.done,
         revealed,
         comments: slots,
         notes: w.slots,
       }),
-    [files, mode, collapsedFiles, collapsedHunks, filter, rowState, revealed, slots, w.slots],
+    [
+      files,
+      mode,
+      collapsedFiles,
+      collapsedHunks,
+      filter,
+      rowState,
+      setup.done,
+      revealed,
+      slots,
+      w.slots,
+    ],
   );
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, place } = s;
@@ -116,6 +130,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     followChecks: fold.followChecks,
     sendText,
     closeMenu,
+    primary: setup.primary,
   });
 
   /** Loads `target` as the review. Returns the error message when it fails. */
@@ -213,7 +228,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     api,
     workspace,
     review,
-    { files, progress, rowState, checks: index.checks, filter },
+    { files, progress, rowState, done: setup.done, checks: index.checks, filter },
     {
       jump,
       jumpToComment,
@@ -256,6 +271,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     files,
     lines,
     s,
+    setup,
     menu: !!menu,
     closeMenu,
     pick: a.pick,
@@ -309,6 +325,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         filter={filter}
         onFilter={changeFilter}
         progress={total}
+        setup={setup}
+        onMark={a.applyMark}
         onReset={a.resetMarks}
         walkthrough={walkthrough}
       />
@@ -325,7 +343,9 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       {error && <div className="review-error">{error}</div>}
       {review && lines.length === 0 && (
         <div className="placeholder">
-          {review.files.length === 0 ? `No changes in ${review.revset}` : `No ${filter} rows`}
+          {review.files.length === 0
+            ? `No changes in ${review.revset}`
+            : `No ${filterLabel(filter, setup)} rows`}
         </div>
       )}
       {review && (
@@ -335,6 +355,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           lines={lines}
           mode={mode}
           index={index}
+          setup={setup}
           progress={progress}
           selection={sel}
           cursor={cursor}
@@ -343,6 +364,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           scrollRef={scrollRef}
           scrollTo={scrollTo}
           onBackgroundMouseDown={() => place(cursor)}
+          onClearFile={a.clearFile}
           renderComment={(id) => (
             <CommentBlock id={id} comment={c.comments.find((x) => x.id === id)} c={c} />
           )}
@@ -363,6 +385,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           x={menu.x}
           y={menu.y}
           changed={changedCount}
+          setup={setup}
           onPick={a.pick}
           onClose={closeMenu}
         />

@@ -1,5 +1,6 @@
 import type { CodeSymbol, FileDto, ReviewDto, RowDto } from "../bindings";
-import type { Filter, RowStateFn } from "./state";
+import type { DoneFn } from "./marks";
+import { type Filter, type RowStateFn, rowMatches } from "./state";
 
 export type ViewMode = "unified" | "split";
 
@@ -62,6 +63,7 @@ export interface Layout {
   collapsedHunks: ReadonlySet<string>;
   filter: Filter;
   rowState: RowStateFn;
+  done: DoneFn;
   /** Gap bars clicked open, by `gapKey`. */
   revealed: ReadonlySet<string>;
   /** Comment ids by the `markKey` of the row their block follows, or `fileSlot` for ones
@@ -72,10 +74,11 @@ export interface Layout {
 }
 
 export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
-  const { mode, filter, rowState } = layout;
+  const { mode, filter, rowState, done } = layout;
   const out: DisplayLine[] = [];
   files.forEach((f, file) => {
-    const matches = (r: number) => needsReview(f.rows[r]) && rowState(file, r) === filter;
+    const matches = (r: number) =>
+      needsReview(f.rows[r]) && rowMatches(rowState(file, r), filter, done);
     // A change's removed rows show with its added rows.
     const shown = (r: number) => filter === "all" || matches(r) || addedMatch(f.rows, r, matches);
     if (filter !== "all" && !f.rows.some((_, r) => shown(r))) return;

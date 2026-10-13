@@ -9,6 +9,7 @@
 //! ```
 
 pub mod claude;
+pub mod marks;
 
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
@@ -28,6 +29,8 @@ pub struct Settings {
     pub claude: String,
     pub models: Models,
     pub terminal_font_size: u16,
+    /// Every mark color, the ones in use first in key order.
+    pub marks: Vec<marks::MarkSlot>,
 }
 
 impl Default for Settings {
@@ -36,6 +39,7 @@ impl Default for Settings {
             claude: "claude".into(),
             models: Models::default(),
             terminal_font_size: 13,
+            marks: marks::defaults(),
         }
     }
 }
@@ -95,7 +99,9 @@ fn merge(base: &mut toml::Table, file: toml::Table) {
 fn parse(text: &str) -> anyhow::Result<Settings> {
     let mut settings = toml::Table::try_from(Settings::default())?;
     merge(&mut settings, toml::from_str(text)?);
-    Ok(settings.try_into()?)
+    let mut settings: Settings = settings.try_into()?;
+    marks::normalize(&mut settings.marks);
+    Ok(settings)
 }
 
 fn load_from(path: &Path) -> anyhow::Result<Settings> {
@@ -124,7 +130,8 @@ pub fn get() -> Settings {
 }
 
 /// Writes `settings` to the file and makes them current.
-pub fn save(settings: Settings) -> anyhow::Result<()> {
+pub fn save(mut settings: Settings) -> anyhow::Result<()> {
+    marks::normalize(&mut settings.marks);
     let path = path().context("no home directory")?;
     std::fs::create_dir_all(path.parent().context("settings path has no parent")?)?;
     std::fs::write(&path, toml::to_string(&settings)?)

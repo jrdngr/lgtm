@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { ChangeDto, ReviewDto, View } from "../bindings";
+import type { ChangeDto, MarkColor, ReviewDto, View } from "../bindings";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
+import { MarkBar } from "./MarkBar";
+import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
-import { FILTERS, type Filter, type Progress } from "./state";
+import { type Filter, type Progress, progressTitle } from "./state";
 import { stopWalkthrough, type WalkthroughRun } from "./walkthroughRun";
 import "./ReviewBar.css";
 
@@ -22,13 +24,17 @@ function changeLabel(c: ChangeDto) {
   return `${shortId(c)} ${c.description || "(no description)"}${since ? ` · ${since}` : ""}`;
 }
 
-const FILTER_LABEL: Record<Filter, string> = {
-  all: "All lines",
-  unreviewed: "Unreviewed",
-  reviewed: "Reviewed",
-  skipped: "Skipped",
-  flagged: "Flagged",
-};
+/** All, Not done, and each color in use, plus the current one if it was since removed. */
+function filterOptions(setup: MarkSetup, current: Filter): [Filter, string][] {
+  const colors = setup.shown.map((s) => s.color);
+  if (current !== "all" && current !== "left" && !colors.includes(current)) colors.push(current);
+  const label = (c: MarkColor) => setup.label(c).replace(/^./, (x) => x.toUpperCase());
+  return [
+    ["all", "All lines"],
+    ["left", "Not done"],
+    ...colors.map((c) => [c, label(c)] as [Filter, string]),
+  ];
+}
 
 /** The change a per-change view starts on: the first one that changed since last session. */
 function defaultChange(review: ReviewDto, kind: "change" | "sinceLast"): string | undefined {
@@ -48,6 +54,9 @@ interface Props {
   filter: Filter;
   onFilter(filter: Filter): void;
   progress: Progress;
+  setup: MarkSetup;
+  /** Marks the selection with a color. */
+  onMark(color: MarkColor): void;
   onReset(): void;
   walkthrough?: WalkthroughRun;
 }
@@ -101,9 +110,9 @@ export function ReviewBar(props: Props) {
           onChange={(e) => props.onFilter(e.target.value as Filter)}
           aria-label="Line filter"
         >
-          {FILTERS.map((f) => (
+          {filterOptions(props.setup, props.filter).map(([f, label]) => (
             <option key={f} value={f}>
-              {FILTER_LABEL[f]}
+              {label}
             </option>
           ))}
         </select>
@@ -131,7 +140,12 @@ export function ReviewBar(props: Props) {
         </span>
       )}
       <span className="spacer" />
-      {review && <ProgressBar progress={props.progress} />}
+      <MarkBar
+        setup={props.setup}
+        onMark={review ? props.onMark : undefined}
+        onFilter={props.onFilter}
+      />
+      {review && <ProgressBar progress={props.progress} setup={props.setup} />}
       <ResetMenu disabled={!review} onReset={props.onReset} />
     </div>
   );
@@ -139,17 +153,27 @@ export function ReviewBar(props: Props) {
 
 const share = (n: number, of: number) => (of > 0 ? (n / of) * 100 : 0);
 
-/** Reviewed, skipped, and flagged rows as one bar, with the reviewed share beside it. */
-function ProgressBar({ progress: p }: { progress: Progress }) {
-  const title = `${p.reviewed} reviewed, ${p.skipped} skipped, ${p.flagged} flagged, ${p.unreviewed} left`;
+/** Marked rows as one bar split by color, then rows done by their file, with the done share
+ * beside it. */
+function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSetup }) {
   return (
-    <span className="progress" title={title}>
+    <span className="progress" title={progressTitle(p, setup)}>
       <span className="progress-stack">
-        <span className="p-reviewed" style={{ width: `${share(p.reviewed, p.changed)}%` }} />
-        <span className="p-skipped" style={{ width: `${share(p.skipped, p.changed)}%` }} />
-        <span className="p-flagged" style={{ width: `${share(p.flagged, p.changed)}%` }} />
+        {setup.slots.map(
+          (s) =>
+            (p.marks[s.color] ?? 0) > 0 && (
+              <span
+                key={s.color}
+                style={{
+                  width: `${share(p.marks[s.color] ?? 0, p.changed)}%`,
+                  background: markVar(s.color),
+                }}
+              />
+            ),
+        )}
+        <span className="p-by-file" style={{ width: `${share(p.byFile, p.changed)}%` }} />
       </span>
-      <span className="progress-pct">{Math.floor(share(p.reviewed, p.changed))}%</span>
+      <span className="progress-pct">{Math.floor(share(p.done, p.changed))}%</span>
     </span>
   );
 }

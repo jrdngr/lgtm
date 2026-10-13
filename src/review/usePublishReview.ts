@@ -13,6 +13,7 @@ import {
   retractReview,
 } from "./current";
 import { isIdle } from "./idle";
+import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 
@@ -20,6 +21,7 @@ interface Data {
   files: FlatFile[];
   progress: Progress[];
   rowState: RowStateFn;
+  done: DoneFn;
   checks: CheckState[];
   filter: Filter;
 }
@@ -44,7 +46,7 @@ export function usePublishReview(
   api: DockviewPanelApi,
   workspace: WorkspaceName,
   review: ReviewDto | undefined,
-  { files, progress, rowState, checks, filter }: Data,
+  { files, progress, rowState, done, checks, filter }: Data,
   actions: Actions,
 ) {
   const published = useRef<CurrentReview>(undefined);
@@ -63,6 +65,7 @@ export function usePublishReview(
         files,
         progress,
         rowState,
+        done,
         checks,
         filter,
         comments: review?.state.comments ?? [],
@@ -99,7 +102,7 @@ export function usePublishReview(
       sub.dispose();
       off();
     };
-  }, [api, workspace, review, files, progress, rowState, checks, filter]);
+  }, [api, workspace, review, files, progress, rowState, done, checks, filter]);
 
   useEffect(() => () => retractReview(workspace, published.current), [workspace]);
 

@@ -13,12 +13,22 @@
   --add: rgb(46 160 67 / 15%);
   --del: rgb(248 81 73 / 15%);
   --reviewed: #2ea043;
-  --reviewed-tint: rgb(46 160 67 / 12%);
   --error: #f85149;
   --amber: #d29922;
   --skipped: #6e7681;
   --flagged: #f85149;
   --selection: rgb(79 140 201 / 28%);
+  /* Mark colors. None is green or amber, so marks stand out on added rows and from amber
+   * "changed since" rows. */
+  --mark-violet: #a371f7;
+  --mark-red: #f85149;
+  --mark-gray: #6e7681;
+  --mark-orange: #f0883e;
+  --mark-cyan: #39c5cf;
+  --mark-pink: #db61a2;
+  --mark-yellow: #e3b341;
+  --mark-blue: #58a6ff;
+  --mark-tan: #b08968;
   --raise: #2c2c2e;
   --hair: #303030;
   --faint: #5f6368;

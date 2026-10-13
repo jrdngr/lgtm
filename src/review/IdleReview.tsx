@@ -13,6 +13,7 @@ import {
   useCurrentReview,
 } from "./current";
 import { inReviewPane, isIdle, markIdle } from "./idle";
+import { useMarkSetup } from "./marks";
 import { startRevset, workspaceRevset } from "./revset";
 import { publishTarget, type ReviewTarget, retractTarget, targetOf } from "./target";
 import { useAgentRequests } from "./useAgentRequests";
@@ -40,7 +41,8 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
   const { loaded, loading, open, setState } = useReview(workspace);
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const review = loaded?.review;
-  const { files, index, rowState, progress } = useReviewState(review);
+  const setup = useMarkSetup();
+  const { files, index, rowState, progress } = useReviewState(review, setup.done);
   const published = useRef<CurrentReview>(undefined);
   const target = useRef<ReviewTarget>(undefined);
 
@@ -88,6 +90,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       files,
       progress,
       rowState,
+      done: setup.done,
       checks: index.checks,
       filter: "all",
       comments: review.state.comments,
@@ -117,7 +120,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
     publishReview(workspace, published.current);
     // Agents in the workspace's terminals act on this review.
     commands.focusReview(workspace, review.id);
-  }, [workspace, review, files, progress, rowState, index]);
+  }, [workspace, review, files, progress, rowState, setup.done, index]);
 
   useEffect(
     () => () => {

@@ -7,12 +7,40 @@ use specta::Type;
 use super::{Store, enum_from, enum_to, from_blob, to_blob};
 use crate::anchor::Anchor;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+/// A mark's color. What each one means is the user's: see `settings::marks`.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Type,
+)]
 #[serde(rename_all = "camelCase")]
-pub enum MarkState {
-    Reviewed,
-    Skipped,
-    Flagged,
+pub enum MarkColor {
+    Violet,
+    Red,
+    Gray,
+    Orange,
+    Cyan,
+    Pink,
+    Yellow,
+    Blue,
+    Tan,
+}
+
+impl MarkColor {
+    pub const ALL: [MarkColor; 9] = [
+        Self::Violet,
+        Self::Red,
+        Self::Gray,
+        Self::Orange,
+        Self::Cyan,
+        Self::Pink,
+        Self::Yellow,
+        Self::Blue,
+        Self::Tan,
+    ];
+
+    /// The color's name, as stored.
+    pub fn name(self) -> String {
+        enum_to(&self)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,7 +51,7 @@ pub struct Mark {
     pub commit: String,
     /// 1-based line in that file side.
     pub line: u32,
-    pub state: MarkState,
+    pub color: MarkColor,
     /// The review that created the mark, e.g. its revset.
     pub review: String,
     /// Unix milliseconds.
@@ -31,7 +59,7 @@ pub struct Mark {
 }
 
 const COLUMNS: &str =
-    "id, path, side, line_hash, above, below, commit_id, line, state, review, created_at";
+    "id, path, side, line_hash, above, below, commit_id, line, color, review, created_at";
 
 fn row_to_mark(r: &rusqlite::Row) -> rusqlite::Result<Mark> {
     Ok(Mark {
@@ -45,7 +73,7 @@ fn row_to_mark(r: &rusqlite::Row) -> rusqlite::Result<Mark> {
         },
         commit: r.get(6)?,
         line: r.get(7)?,
-        state: enum_from(r.get(8)?)?,
+        color: enum_from(r.get(8)?)?,
         review: r.get(9)?,
         created_at: r.get(10)?,
     })
@@ -53,7 +81,7 @@ fn row_to_mark(r: &rusqlite::Row) -> rusqlite::Result<Mark> {
 
 pub(super) fn insert(tx: &Transaction, m: &Mark) -> rusqlite::Result<Mark> {
     tx.execute(
-        "INSERT INTO marks (id, path, side, line_hash, above, below, commit_id, line, state, review, created_at)
+        "INSERT INTO marks (id, path, side, line_hash, above, below, commit_id, line, color, review, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             (m.id != 0).then_some(m.id),
@@ -64,7 +92,7 @@ pub(super) fn insert(tx: &Transaction, m: &Mark) -> rusqlite::Result<Mark> {
             to_blob(&m.anchor.below),
             m.commit,
             m.line,
-            enum_to(&m.state),
+            enum_to(&m.color),
             m.review,
             m.created_at,
         ],
@@ -103,7 +131,7 @@ mod tests {
             },
             commit: "abc".into(),
             line: 7,
-            state: MarkState::Flagged,
+            color: MarkColor::Red,
             review: review.into(),
             created_at: 1000,
         }

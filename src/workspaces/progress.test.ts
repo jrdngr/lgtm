@@ -2,13 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { ProgressDto } from "../bindings";
 import { doneShare } from "./progress";
 
-const p = (changed: number, unreviewed: number): ProgressDto => ({
+const p = (changed: number, left: number): ProgressDto => ({
   revset: "@",
-  reviewed: changed - unreviewed,
-  skipped: 0,
-  flagged: 0,
-  unreviewed,
+  done: changed - left,
   changed,
+  marks: [],
 });
 
 describe("doneShare", () => {

@@ -89,7 +89,7 @@ function Legend() {
           <dt>
             <span className="gline" />
           </dt>
-          <dd>Share reviewed</dd>
+          <dd>Share done</dd>
           <dt>
             <span className="gdash" />
           </dt>

@@ -1,13 +1,16 @@
 import type { ProgressDto } from "../bindings";
+import type { MarkSetup } from "../review/marks";
 
-/** The share of a workspace's changed rows looked at, kept under 1 until none are left so the
- * ring shows ✓ only when the review is done. */
+/** The share of a workspace's changed rows that are done, kept under 1 until none are left so
+ * the ring shows ✓ only when the review is done. */
 export function doneShare(p: ProgressDto): number {
-  if (p.unreviewed === 0) return 1;
-  return Math.min((p.changed - p.unreviewed) / p.changed, 0.99);
+  if (p.done === p.changed) return 1;
+  return Math.min(p.done / p.changed, 0.99);
 }
 
 /** The counts behind the share, for a tooltip. */
-export function progressTitle(p: ProgressDto): string {
-  return `${p.reviewed} reviewed, ${p.skipped} skipped, ${p.flagged} flagged, ${p.unreviewed} left of ${p.changed}\nProgress of ${p.revset}`;
+export function progressTitle(p: ProgressDto, setup: MarkSetup): string {
+  const marks = p.marks.map((m) => `${m.rows} ${setup.label(m.color)}`);
+  const counts = [...marks, `${p.changed - p.done} left of ${p.changed}`].join(", ");
+  return `${counts}\nProgress of ${p.revset}`;
 }

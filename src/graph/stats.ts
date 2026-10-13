@@ -8,7 +8,7 @@ import type { Box, Tree } from "./tree";
 export interface BoxStats {
   /** Changed symbols in it. */
   count: number;
-  /** Its changed rows that are reviewed or skipped, and all of them. */
+  /** Its changed rows that are done, and all of them. */
   done: number;
   all: number;
   risk?: string;

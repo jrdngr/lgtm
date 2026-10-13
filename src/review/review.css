@@ -161,28 +161,13 @@
   width: 4px;
 }
 
-.cell.mark-reviewed .strip {
-  background: var(--reviewed);
+/* --m is the row's mark color. */
+.cell.marked .strip {
+  background: var(--m);
 }
 
-.cell.mark-skipped .strip {
-  background: var(--skipped);
-}
-
-.cell.mark-flagged .strip {
-  background: var(--flagged);
-}
-
-.cell.mark-reviewed .code {
-  background: var(--reviewed-tint);
-}
-
-.cell.mark-skipped .code {
-  background: rgb(110 118 129 / 15%);
-}
-
-.cell.mark-flagged .code {
-  background: rgb(248 81 73 / 14%);
+.cell.marked .code {
+  background: color-mix(in srgb, var(--m) 15%, transparent);
 }
 
 .fn-marker {

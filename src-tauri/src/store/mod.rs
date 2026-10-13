@@ -16,7 +16,7 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, GhLink, GhPost, Message, Pin, Workshop};
-pub use marks::{Mark, MarkState};
+pub use marks::{Mark, MarkColor};
 pub use notes::{Category, FlowStep, Level, Note, Source};
 pub use sessions::Session;
 pub use threads::{Stage, Take, TakeVerdict, ThreadState};
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS marks (
     below BLOB NOT NULL,
     commit_id TEXT NOT NULL,
     line INTEGER NOT NULL,
-    state TEXT NOT NULL,
+    color TEXT NOT NULL,
     review TEXT NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -136,7 +136,26 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
              ALTER TABLE sessions ADD COLUMN revset TEXT NOT NULL DEFAULT '';",
         )?;
     }
-    migrate_autoincrement(db)
+    migrate_autoincrement(db)?;
+    migrate_mark_colors(db)
+}
+
+/// Marks were once reviewed, skipped or flagged; those are now the colors they were drawn in.
+fn migrate_mark_colors(db: &Connection) -> rusqlite::Result<()> {
+    let has_state: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('marks') WHERE name = 'state'",
+        [],
+        |r| r.get(0),
+    )?;
+    if has_state {
+        db.execute_batch(
+            "ALTER TABLE marks RENAME COLUMN state TO color;
+             UPDATE marks SET color = CASE color
+                 WHEN 'reviewed' THEN 'violet' WHEN 'skipped' THEN 'gray' WHEN 'flagged' THEN 'red'
+                 ELSE color END;",
+        )?;
+    }
+    Ok(())
 }
 
 /// Marks and checks once reused a deleted row's id, which undo history still refers to.
@@ -275,16 +294,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn old_tables_gain_autoincrement_and_keep_their_rows() {
+    fn old_tables_gain_autoincrement_and_mark_colors_and_keep_their_rows() {
         let db = Connection::open_in_memory().unwrap();
-        db.execute_batch(&SCHEMA.replace("AUTOINCREMENT", ""))
-            .unwrap();
+        db.execute_batch(
+            &SCHEMA
+                .replace("AUTOINCREMENT", "")
+                .replace("color TEXT", "state TEXT"),
+        )
+        .unwrap();
         db.execute_batch(
             "INSERT INTO marks VALUES (1, 'a.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0),
-                                      (2, 'b.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0);",
+                                      (2, 'b.rs', 'new', 0, x'', x'', 'c', 1, 'flagged', 'r', 0);",
         )
         .unwrap();
         let store = Store::init(db).unwrap();
+        let colors: Vec<MarkColor> = store
+            .marks_for_review("r")
+            .unwrap()
+            .into_iter()
+            .map(|m| m.color)
+            .collect();
+        assert_eq!(colors, [MarkColor::Violet, MarkColor::Red]);
         let sql: String = store
             .db
             .query_row(
@@ -301,8 +331,8 @@ mod tests {
         store
             .db
             .execute_batch(
-                "INSERT INTO marks (path, side, line_hash, above, below, commit_id, line, state, \
-                 review, created_at) VALUES ('c.rs', 'new', 0, x'', x'', 'c', 1, 'reviewed', 'r', 0)",
+                "INSERT INTO marks (path, side, line_hash, above, below, commit_id, line, color, \
+                 review, created_at) VALUES ('c.rs', 'new', 0, x'', x'', 'c', 1, 'violet', 'r', 0)",
             )
             .unwrap();
         let ids: Vec<i64> = store

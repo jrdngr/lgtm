@@ -1,4 +1,5 @@
 import type { CheckState, CommentDto, NoteDto, StateDto, ThreadDto } from "../bindings";
+import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 import type { SendOutcome } from "./useSendText";
@@ -14,6 +15,8 @@ export interface CurrentReview {
   files: FlatFile[];
   progress: Progress[];
   rowState: RowStateFn;
+  /** Whether rows with a mark count as done. */
+  done: DoneFn;
   checks: CheckState[];
   filter: Filter;
   comments: CommentDto[];

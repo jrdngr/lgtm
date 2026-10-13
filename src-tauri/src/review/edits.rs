@@ -4,23 +4,42 @@ use std::collections::HashSet;
 
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::anchor::Side;
-use crate::store::{Edit, FileCheck, Mark, MarkState, Store};
+use crate::store::{Edit, FileCheck, Mark, MarkColor, Store};
 
 impl RepoCtx {
-    /// Marks changed rows, or clears their marks when `state` is `None`. `check` lists files
-    /// to check in the same step, for a whole-file selection marked reviewed.
+    /// Marks changed rows, or clears their marks when `color` is `None`. `check` lists files
+    /// to check in the same step, for a whole-file selection marked with the first color.
     pub fn mark(
         &self,
         id: u32,
         rows: &[RowRef],
-        state: Option<MarkState>,
+        color: Option<MarkColor>,
         check: &[u32],
     ) -> anyhow::Result<StateDto> {
         self.edit(id, |review, store| {
-            let mut edit = review.mark_edit(store, rows, state)?;
+            let mut edit = review.mark_edit(store, rows, color)?;
             let checks = review.check_edit(check, true);
             edit.checks_removed = checks.checks_removed;
             edit.checks_added = checks.checks_added;
+            Ok(edit)
+        })
+    }
+
+    /// Clears every mark in a file and unchecks it, in one undo step.
+    pub fn clear_file(&self, id: u32, file: u32) -> anyhow::Result<StateDto> {
+        self.edit(id, |review, store| {
+            let rows: Vec<RowRef> = review
+                .files
+                .get(file as usize)
+                .map(|f| {
+                    f.keyed
+                        .iter()
+                        .map(|k| RowRef::new(file as usize, k.row))
+                        .collect()
+                })
+                .unwrap_or_default();
+            let mut edit = review.mark_edit(store, &rows, None)?;
+            edit.checks_removed = review.check_edit(&[file], false).checks_removed;
             Ok(edit)
         })
     }
@@ -99,7 +118,7 @@ impl Review {
         &self,
         store: &Store,
         rows: &[RowRef],
-        state: Option<MarkState>,
+        color: Option<MarkColor>,
     ) -> anyhow::Result<Edit> {
         let created_at = now_ms();
         let mut edit = Edit::default();
@@ -111,10 +130,10 @@ impl Review {
                     continue;
                 }
                 let existing = self.matched.get(&rref);
-                if existing.map(|m| m.state) == state {
+                if existing.map(|m| m.color) == color {
                     continue;
                 }
-                let Some(state) = state else {
+                let Some(color) = color else {
                     edit.marks_removed.extend(existing.cloned());
                     continue;
                 };
@@ -127,7 +146,7 @@ impl Review {
                     anchor: k.anchor.clone(),
                     commit,
                     line: k.line,
-                    state,
+                    color,
                     review: self.label.clone(),
                     created_at,
                 });

@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useCallback, useEffect, useMemo } from 
 import { wordWrap } from "../workbench/wordWrap";
 import { Cell } from "./Cell";
 import { FileHeader } from "./FileHeader";
+import type { MarkSetup } from "./marks";
 import {
   type DisplayLine,
   type FlatFile,
@@ -62,6 +63,7 @@ interface Props extends LineHandlers {
   lines: DisplayLine[];
   mode: ViewMode;
   index: MarkIndex;
+  setup: MarkSetup;
   progress: Progress[];
   selection: Selection;
   cursor: number;
@@ -71,6 +73,7 @@ interface Props extends LineHandlers {
   /** Scrolls this line to the top whenever a new object is passed. */
   scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
+  onClearFile(file: number): void;
   renderComment(id: number): ReactNode;
   renderNote(id: number): ReactNode;
 }
@@ -151,10 +154,12 @@ export function DiffLines(props: Props) {
         dto={file.dto}
         check={index.checks[fileIdx] ?? "unchecked"}
         progress={props.progress[fileIdx]}
+        setup={props.setup}
         collapsed={props.collapsedFiles.has(file.dto.path)}
         onClick={() => props.onFileClick(fileIdx)}
         onToggle={() => props.onToggleFile(fileIdx)}
         onCheck={(checked) => props.onCheckFile(fileIdx, checked)}
+        onClear={() => props.onClearFile(fileIdx)}
       />
     );
   };
@@ -214,6 +219,7 @@ export function DiffLines(props: Props) {
           fileIdx={line.file}
           row={line.rows[0]}
           index={index}
+          setup={props.setup}
           marker={markerFor(line.rows[0])}
         />
       ) : (
@@ -223,6 +229,7 @@ export function DiffLines(props: Props) {
             fileIdx={line.file}
             row={line.left}
             index={index}
+            setup={props.setup}
             side="left"
             marker={markerFor(line.left)}
           />
@@ -231,6 +238,7 @@ export function DiffLines(props: Props) {
             fileIdx={line.file}
             row={line.right}
             index={index}
+            setup={props.setup}
             side="right"
             marker={line.right !== line.left ? markerFor(line.right) : undefined}
           />

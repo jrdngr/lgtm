@@ -2,7 +2,7 @@
 
 use super::tests::{jj, marked, repo, row_of, write};
 use super::*;
-use crate::store::MarkState;
+use crate::store::MarkColor;
 use views::Since;
 
 fn rows_text(review: &ReviewDto, rows: &[RowRef]) -> Vec<String> {
@@ -61,7 +61,7 @@ async fn whole_file_reviewed_marks_lines_and_checks_in_one_step() {
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "package a", 0);
     let state = ctx
-        .mark(review.id, &[row], Some(MarkState::Reviewed), &[0])
+        .mark(review.id, &[row], Some(MarkColor::Violet), &[0])
         .unwrap();
     assert_eq!(
         (state.marks.len(), state.checks[0]),
@@ -75,13 +75,42 @@ async fn whole_file_reviewed_marks_lines_and_checks_in_one_step() {
 }
 
 #[tokio::test]
+async fn clearing_a_file_drops_its_marks_and_check_but_not_other_files() {
+    let (dir, ctx) = repo();
+    write(dir.path(), "a.go", "package a\n\nvar x = 1\n");
+    write(dir.path(), "b.go", "package b\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let a = row_of(&review, 0, "package a", 0);
+    let x = row_of(&review, 0, "var x = 1", 0);
+    let b = row_of(&review, 1, "package b", 0);
+    ctx.mark(review.id, &[a], Some(MarkColor::Violet), &[0])
+        .unwrap();
+    ctx.mark(review.id, &[x, b], Some(MarkColor::Red), &[])
+        .unwrap();
+
+    let state = ctx.clear_file(review.id, 0).unwrap();
+    assert_eq!(
+        (marked(&review, &state.marks), state.checks[0]),
+        (
+            vec![("package b".to_string(), MarkColor::Red)],
+            CheckState::Unchecked
+        )
+    );
+    let state = ctx.undo(review.id).unwrap();
+    assert_eq!(
+        (state.marks.len(), state.checks[0]),
+        (3, CheckState::Checked)
+    );
+}
+
+#[tokio::test]
 async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {\n    one();\n}\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    one();", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
 
     write(d, "a.rs", "fn a() {\n    two();\n}\n");
@@ -92,7 +121,7 @@ async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     // Reviewing the amber row clears it.
     let row = row_of(&review, 0, "    two();", 0);
     let state = ctx
-        .mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+        .mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
     assert!(state.amber.is_empty());
 }
@@ -184,7 +213,7 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
     let review = ctx.open(None, "@", false).await.unwrap();
     let b = row_of(&review, 0, "fn b() {}", 0);
     let state = ctx
-        .mark(review.id, &[b], Some(MarkState::Flagged), &[])
+        .mark(review.id, &[b], Some(MarkColor::Red), &[])
         .unwrap();
     assert_eq!(marked(&review, &state.marks).len(), 1);
 
@@ -196,7 +225,7 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
     assert_eq!(moved.to, new_b);
     assert_eq!(
         marked(&refreshed.review, &refreshed.review.state.marks),
-        [("fn b() {}".to_string(), MarkState::Flagged)]
+        [("fn b() {}".to_string(), MarkColor::Red)]
     );
     // Undo history survives the refresh.
     assert!(ctx.undo(review.id).unwrap().marks.is_empty());
@@ -219,12 +248,12 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
         ["fn a2() {}"]
     );
     let b = row_of(&review, 1, "fn b() {}", 0);
-    ctx.mark(review.id, &[b], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[b], Some(MarkColor::Violet), &[])
         .unwrap();
 
     let reopened = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(
         marked(&reopened, &reopened.state.marks),
-        [("fn b() {}".to_string(), MarkState::Reviewed)]
+        [("fn b() {}".to_string(), MarkColor::Violet)]
     );
 }

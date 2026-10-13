@@ -3,19 +3,28 @@
 use serde::Serialize;
 use specta::Type;
 
+use super::agent::RowState;
 use super::{RepoCtx, Review, View};
+use crate::settings;
+use crate::store::MarkColor;
 
-/// Changed-row counts by state, as the review header counts them.
+/// Changed-row counts, as the review header counts them.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ProgressDto {
     /// The revset counted: the workspace's latest review, or `@`.
     pub revset: String,
-    pub reviewed: u32,
-    pub skipped: u32,
-    pub flagged: u32,
-    pub unreviewed: u32,
+    /// Rows that count as done: marked in a done color, or in a checked or skipped file.
+    pub done: u32,
     pub changed: u32,
+    /// Marked rows by color, in key order.
+    pub marks: Vec<MarkCount>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+pub struct MarkCount {
+    pub color: MarkColor,
+    pub rows: u32,
 }
 
 impl RepoCtx {
@@ -34,14 +43,34 @@ impl RepoCtx {
         review.files = loaded.files;
         review.rematch(&self.store.lock().unwrap())?;
 
-        let c = review.summary().rows;
-        Ok(ProgressDto {
+        let slots = settings::get().marks;
+        let mut p = ProgressDto {
             revset,
-            reviewed: c.reviewed,
-            skipped: c.skipped,
-            flagged: c.flagged,
-            unreviewed: c.unreviewed,
-            changed: c.reviewed + c.skipped + c.flagged + c.unreviewed,
-        })
+            ..ProgressDto::default()
+        };
+        let mut by_color = std::collections::BTreeMap::<MarkColor, u32>::new();
+        for (fi, f) in review.files.iter().enumerate() {
+            for row in 0..f.rows.len() {
+                let Some(state) = review.row_state(fi, row) else {
+                    continue;
+                };
+                p.changed += 1;
+                p.done += u32::from(state.done(&slots));
+                if let RowState::Mark(color) = state {
+                    *by_color.entry(color).or_default() += 1;
+                }
+            }
+        }
+        p.marks = slots
+            .iter()
+            .filter_map(|s| {
+                let rows = by_color.get(&s.color).copied().unwrap_or(0);
+                (rows > 0).then_some(MarkCount {
+                    color: s.color,
+                    rows,
+                })
+            })
+            .collect();
+        Ok(p)
     }
 }

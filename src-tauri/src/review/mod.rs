@@ -41,7 +41,7 @@ use specta::Type;
 
 use crate::anchor::MatchConfig;
 use crate::jj::Jj;
-use crate::store::{Edit, Mark, MarkState, Session, Store};
+use crate::store::{Edit, Mark, MarkColor, Session, Store};
 use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
@@ -132,7 +132,7 @@ impl RowRef {
 pub struct MarkDto {
     pub file: u32,
     pub row: u32,
-    pub state: MarkState,
+    pub color: MarkColor,
     pub review: String,
     pub created_at: f64,
 }
@@ -420,7 +420,7 @@ impl Review {
             .map(|(r, m)| MarkDto {
                 file: r.file,
                 row: r.row,
-                state: m.state,
+                color: m.color,
                 review: m.review.clone(),
                 created_at: m.created_at as f64,
             })

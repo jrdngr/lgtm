@@ -1,4 +1,5 @@
 import { HIGHLIGHT_NAMES, type MarkDto, type RowDto } from "../bindings";
+import { type MarkSetup, markVar } from "./marks";
 import { type FlatFile, markKey, SIGN } from "./model";
 import type { MarkIndex } from "./state";
 import "./syntax.css";
@@ -27,10 +28,10 @@ function Code({ row }: { row: RowDto }) {
   );
 }
 
-function markTitle(m: MarkDto | undefined) {
+function markTitle(m: MarkDto | undefined, setup: MarkSetup) {
   if (!m) return undefined;
   const when = m.createdAt === null ? "" : ` · ${new Date(m.createdAt).toLocaleString()}`;
-  return `${m.state} in ${m.review}${when}`;
+  return `${setup.label(m.color)} in ${m.review}${when}`;
 }
 
 interface CellProps {
@@ -38,26 +39,29 @@ interface CellProps {
   fileIdx: number;
   row: number | undefined;
   index: MarkIndex;
+  setup: MarkSetup;
   marker?: { name: string; onClick: () => void };
   side?: "left" | "right";
 }
 
-/** One row's gutter and code, with its mark as classes. Undefined `row` is an empty side. */
-export function Cell({ file, fileIdx, row, index, marker, side }: CellProps) {
+/** One row's gutter and code, tinted by its mark. A checked file's unmarked rows show the
+ * first mark color. Undefined `row` is an empty side. */
+export function Cell({ file, fileIdx, row, index, setup, marker, side }: CellProps) {
   if (row === undefined) return <div className="cell empty" />;
   const r = file.rows[row];
   const key = markKey(fileIdx, row);
   const mark = r.kind === "context" ? undefined : index.marks.get(key);
   const checked = r.kind !== "context" && index.checks[fileIdx] === "checked";
-  const state = mark?.state ?? (checked ? "reviewed" : undefined);
-  const amber = !state && index.amber.has(key);
+  const color = mark?.color ?? (checked ? setup.primary : undefined);
+  const amber = !color && index.amber.has(key);
   const commented = index.commented.has(key);
   const hot = index.hot.get(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
-      className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${state ? ` mark-${state}` : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
-      title={amber ? "changed since reviewed" : markTitle(mark)}
+      className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${color ? " marked" : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
+      style={color ? ({ "--m": markVar(color) } as React.CSSProperties) : undefined}
+      title={amber ? "changed since marked" : markTitle(mark, setup)}
     >
       <span
         className={`risk${hot?.level ? ` risk-${hot.level}` : ""}`}

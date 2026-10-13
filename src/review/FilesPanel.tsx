@@ -5,21 +5,18 @@ import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { STATUS_LABEL } from "./FileHeader";
-import { matchesFilter, type Progress, plural } from "./state";
+import { MarkCounts } from "./MarkCounts";
+import { type MarkSetup, useMarkSetup } from "./marks";
+import { filterLabel, matchesFilter, type Progress, plural, progressTitle } from "./state";
 import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
 import "./FilesPanel.css";
 
-function titleOf(p: Progress) {
-  return `${p.reviewed} reviewed, ${p.skipped} skipped, ${p.flagged} flagged, ${p.unreviewed} left`;
-}
-
-/** Rows reviewed, skipped or flagged: everything but those left. */
-const handled = (p: Progress) => p.changed - p.unreviewed;
-const isDone = (p: Progress) => p.changed > 0 && p.unreviewed === 0;
+const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
 
 interface TreeProps {
   depth: number;
   review: CurrentReview;
+  setup: MarkSetup;
   closed: ReadonlySet<string>;
   onToggle(path: string): void;
 }
@@ -34,7 +31,7 @@ function Children({ nodes, ...props }: TreeProps & { nodes: TreeNode[] }) {
   );
 }
 
-function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: TreeNode }) {
+function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { node: TreeNode }) {
   const pad = { paddingLeft: indent(depth) };
   const p = node.progress;
   if (node.kind === "file") {
@@ -58,8 +55,8 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
           {changed && <span className="pill amber">changed</span>}
-          {p.flagged > 0 && <span className="pill red">⚑ {p.flagged}</span>}
-          {p.changed > 0 && <Ring done={handled(p) / p.changed} title={titleOf(p)} />}
+          <MarkCounts progress={p} setup={setup} notDone />
+          {p.changed > 0 && <Ring done={p.done / p.changed} title={progressTitle(p, setup)} />}
         </button>
       </li>
     );
@@ -72,12 +69,12 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
         style={pad}
         className="dir"
         onClick={() => onToggle(node.path)}
-        title={titleOf(p)}
+        title={progressTitle(p, setup)}
       >
         <span className="chevron">{isClosed ? "▸" : "▾"}</span>
         <span className="name">{node.name}</span>
         <span className="dir-count reveal">
-          {handled(p)}/{p.changed}
+          {p.done}/{p.changed}
         </span>
         {isDone(p) && <Ring done={1} />}
       </button>
@@ -86,6 +83,7 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
           nodes={node.children}
           depth={depth + 1}
           review={review}
+          setup={setup}
           closed={closed}
           onToggle={onToggle}
         />
@@ -98,6 +96,7 @@ function Node({ node, depth, review, closed, onToggle }: TreeProps & { node: Tre
  * hover. It follows the review pane's line filter. Click a file to jump to it. */
 export function FilesPanel() {
   const review = useCurrentReview(useWorkspace());
+  const setup = useMarkSetup();
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const tree = useMemo(
     () =>
@@ -116,7 +115,8 @@ export function FilesPanel() {
     );
   }
   const p = tree.progress;
-  const pct = p.changed ? Math.round((handled(p) / p.changed) * 100) : 100;
+  const pct = p.changed ? Math.round((p.done / p.changed) * 100) : 100;
+  const filter = filterLabel(review.filter, setup);
   const anyClosed = closed.size > 0;
   return (
     <div className="side-split">
@@ -124,9 +124,9 @@ export function FilesPanel() {
         title="Changes"
         meta={
           p.changed > 0 && (
-            <span title={titleOf(p)}>
-              {review.filter === "all" ? "" : `${review.filter} · `}
-              {handled(p)} of {p.changed} {plural(p.changed)} · {pct}%
+            <span title={progressTitle(p, setup)}>
+              {review.filter === "all" ? "" : `${filter} · `}
+              {p.done} of {p.changed} {plural(p.changed)} done · {pct}%
             </span>
           )
         }
@@ -140,13 +140,14 @@ export function FilesPanel() {
         )}
       </SectionHeader>
       {tree.children.length === 0 ? (
-        <Empty>{review.files.length === 0 ? "No changes" : `No ${review.filter} files`}</Empty>
+        <Empty>{review.files.length === 0 ? "No changes" : `No ${filter} files`}</Empty>
       ) : (
         <div className="side-split-body file-tree">
           <Children
             nodes={tree.children}
             depth={0}
             review={review}
+            setup={setup}
             closed={closed}
             onToggle={(path) => setClosed(toggled(closed, path))}
           />

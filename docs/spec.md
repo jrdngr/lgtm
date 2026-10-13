@@ -114,9 +114,9 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 
 #### Choosing the mark
 
-- `space` marks the selection reviewed.
+- `1`–`9` mark the selection with the color in use on that key. `0` clears its marks.
 - `c` comments on the selection (Section 2).
-- `m` and right-click open the same menu, one letter per item: `r` reviewed, `s` skip, `f` flag, `u` clear mark, `c` comment, `g` change with agent, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
+- `m` and right-click open the same menu: the colors in use on their numbers, `0` clear mark, `c` comment, `g` change with agent, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
 - Marks never toggle. Applying a mark the code already has changes nothing. Clear mark removes it.
 - Mark keys ignore key repeat.
 - The cursor stays put after marking.
@@ -125,24 +125,33 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 
 #### Labels and states
 
-Mark colors can carry optional labels. The default set:
+Marks are colors: a gutter strip plus a faint tint. There are nine (violet, red, grey, orange, cyan, pink, yellow, blue, tan), none green or amber so they stand out on added rows and from amber rows. Each color has:
 
-- **Reviewed**: green gutter strip plus a faint tint.
-- **Skipped**: grey. Counts toward progress but shows separately.
-- **Flagged**: red, "come back to this". Has its own filter.
+- An optional label. A labeled color shows as a box with the label, an unlabeled one as a square.
+- Whether its rows count as done, for progress.
+- Whether it's in use. The colors in use sit in the review toolbar in order, and the order sets their number keys. A + opens the palette of all nine to add, remove, rename, and drag to reorder. Removing a color keeps its marks.
+
+The defaults, on `1`–`3`:
+
+- **reviewed**: violet, done.
+- **flagged**: red, "come back to this", not done.
+- **skipped**: grey, done.
+
+The setup is global, in `settings.toml`, the same in every repo.
 
 One derived state:
 
-- **Changed since reviewed**: amber. An unreviewed row that replaced a line whose mark was lost, found by the same line diff used for remapping. Needs the previous session's match state, since marks are repo-scoped and most unmatched marks are unrelated.
+- **Changed since reviewed**: amber. An unmarked row that replaced a line whose mark was lost, found by the same line diff used for remapping. Needs the previous session's match state, since marks are repo-scoped and most unmatched marks are unrelated.
 
 Line marks never collapse anything. Hunks collapse only by hand (`za` or the hunk's collapse button).
 
 #### File reviewed status
 
-- Each file header has a checkbox. `x` toggles the checkbox of the file under the cursor. Checking it marks the file reviewed and collapses it. A whole-file selection marked reviewed does the same.
+- Each file header has a checkbox. `x` toggles the checkbox of the file under the cursor. Checking it marks the file done and collapses it; its unmarked rows show in the first color. A whole-file selection marked with the first color does the same, when that color counts as done.
+- The header counts the file's marks by color. An eraser, on hover, clears the file's marks and unchecks it in one undo step.
 - File status is separate from line marks. Checking never changes line marks, and unchecking restores them exactly.
-- Skip and flag on a whole-file selection apply to its lines. Files have no skipped or flagged status, and those never collapse a file.
-- When every changed line in a file is reviewed, its checkbox gets an accent ring. It is never checked automatically.
+- Other colors on a whole-file selection apply to its lines. Files have no status but checked, and other colors never collapse a file.
+- When every changed line in a file is done, its checkbox gets an accent ring. It is never checked automatically.
 - Checking stores the anchors of the file's changed rows at that moment. If later changes bring in rows outside that set, the file unchecks itself, expands, and its header shows "changed since reviewed". The new rows are amber. A rebase that doesn't change the code keeps it checked.
 - Files matching `skip` globs in `.lgtm/config.toml` (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
 - Any file can be collapsed or expanded with its collapse button regardless of status.
@@ -155,11 +164,11 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 
 #### Progress
 
-- Per file and per review: reviewed / skipped / flagged / remaining line counts.
-- A checked file counts as fully reviewed in every progress figure, whatever its line marks say.
+- Per file and per review: line counts by mark color, and how many are done.
+- A checked file counts as fully done in every progress figure, whatever its line marks say.
 - The file tree shows per-file progress. The review header shows overall progress. The workspace sidebar shows each workspace's review progress.
-- A line filter sits at the top of the review: All, Unreviewed, Reviewed, Skipped, Flagged (single choice).
-  - Only changed rows in that state show. Amber rows count as unreviewed, and rows in a checked file count as reviewed.
+- A line filter sits at the top of the review: All, Not done, then each color in use (single choice).
+  - Only changed rows in that state show. Amber rows count as not done, and rows in a checked file count as done.
   - Hidden runs render as thin gap bars. Files and hunks with no matching rows are hidden. The file tree follows the same filter.
   - Each review pane keeps its own filter.
   - Clicking a gap bar shows the rows it hides until the filter changes.

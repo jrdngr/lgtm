@@ -1,5 +1,6 @@
 import type { ProgressDto, WorkspaceDto } from "../bindings";
 import { usePr } from "../github/pr";
+import { useMarkSetup } from "../review/marks";
 import { Menu } from "../ui/Menu";
 import { Ring } from "../ui/Ring";
 import { doneShare, progressTitle } from "./progress";
@@ -64,6 +65,7 @@ interface Props {
 
 /** One workspace: its PR or change, review progress, and a ⋯ menu on hover. */
 export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: Props) {
+  const setup = useMarkSetup();
   return (
     <li className={`workspace${selected ? " selected" : ""}`}>
       <button type="button" className="workspace-open" onClick={onSelect} title={w.root}>
@@ -77,7 +79,7 @@ export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: P
             items={[{ label: "Delete…", danger: true, onSelect: onDelete }]}
           />
         )}
-        {p && p.changed > 0 && <Ring done={doneShare(p)} title={progressTitle(p)} percent />}
+        {p && p.changed > 0 && <Ring done={doneShare(p)} title={progressTitle(p, setup)} percent />}
       </span>
     </li>
   );

@@ -69,16 +69,8 @@
   background: var(--border);
 }
 
-.progress-stack .p-reviewed {
-  background: var(--reviewed);
-}
-
-.progress-stack .p-skipped {
+.progress-stack .p-by-file {
   background: var(--faint);
-}
-
-.progress-stack .p-flagged {
-  background: var(--flagged);
 }
 
 .progress-pct {

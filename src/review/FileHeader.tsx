@@ -1,4 +1,7 @@
 import type { CheckState, FileDto } from "../bindings";
+import { IconButton } from "../ui/icons";
+import { MarkCounts } from "./MarkCounts";
+import type { MarkSetup } from "./marks";
 import type { Progress } from "./state";
 import "./FileHeader.css";
 
@@ -14,17 +17,22 @@ interface Props {
   dto: FileDto;
   check: CheckState;
   progress: Progress;
+  setup: MarkSetup;
   collapsed: boolean;
   onClick(): void;
   onToggle(): void;
   onCheck(checked: boolean): void;
+  /** Clears the file's marks and unchecks it. */
+  onClear(): void;
 }
 
-/** Checkbox, collapse button, path, and tags. The checkbox gets a ring once every changed
- * line is reviewed, but is never checked automatically. */
-export function FileHeader({ dto, check, progress, collapsed, onClick, onToggle, onCheck }: Props) {
+/** Checkbox, collapse button, path, tags, and marks by color. The checkbox gets a ring once
+ * every changed line is done, but is never checked automatically. */
+export function FileHeader(props: Props) {
+  const { dto, check, progress, collapsed, onClick, onToggle, onCheck } = props;
   const checked = check === "checked";
-  const allReviewed = !checked && progress.changed > 0 && progress.reviewed === progress.changed;
+  const allDone = !checked && progress.changed > 0 && progress.done === progress.changed;
+  const marked = Object.values(progress.marks).some((n) => n > 0);
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   return (
     <div
@@ -36,9 +44,9 @@ export function FileHeader({ dto, check, progress, collapsed, onClick, onToggle,
       </button>
       <input
         type="checkbox"
-        className={allReviewed ? "ring" : undefined}
+        className={allDone ? "ring" : undefined}
         checked={checked}
-        title={checked ? "Reviewed. Uncheck to restore line marks" : "Mark file reviewed"}
+        title={checked ? "Done. Uncheck to restore line marks" : "Mark file done"}
         onMouseDown={stop}
         onChange={() => onCheck(!checked)}
       />
@@ -55,13 +63,18 @@ export function FileHeader({ dto, check, progress, collapsed, onClick, onToggle,
       {dto.binary && <span className="tag">binary</span>}
       {dto.conflict && <span className="tag conflict">conflict</span>}
       <span className="spacer" />
-      {progress.flagged > 0 && (
-        <span className="pill red" title={`${progress.flagged} flagged`}>
-          ⚑ {progress.flagged}
-        </span>
+      {(marked || checked) && (
+        <IconButton
+          icon="eraser"
+          label="Clear marks in this file"
+          className="reveal"
+          onMouseDown={stop}
+          onClick={props.onClear}
+        />
       )}
-      <span className="file-count">
-        {progress.reviewed}/{progress.changed}
+      <MarkCounts progress={progress} setup={props.setup} />
+      <span className="file-count" title={`${progress.done} of ${progress.changed} done`}>
+        {progress.done}/{progress.changed}
       </span>
     </div>
   );

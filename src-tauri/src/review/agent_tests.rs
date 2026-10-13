@@ -1,9 +1,9 @@
 use super::tests::{jj, repo, write};
 use super::*;
-use crate::store::{Author, MarkState};
+use crate::store::{Author, MarkColor};
 
 #[tokio::test]
-async fn agents_see_unreviewed_ranges_and_can_comment_and_reply() {
+async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {}\n");
@@ -13,13 +13,18 @@ async fn agents_see_unreviewed_ranges_and_can_comment_and_reply() {
     assert!(ctx.summary(None).is_err(), "nothing is focused yet");
     ctx.focus(None, review.id);
 
-    let first = tests::row_of(&review, 0, "fn b() {}", 0);
-    ctx.mark(review.id, &[first], Some(MarkState::Reviewed), &[])
+    let b = tests::row_of(&review, 0, "fn b() {}", 0);
+    let c = tests::row_of(&review, 0, "fn c() {}", 0);
+    ctx.mark(review.id, &[b], Some(MarkColor::Violet), &[])
+        .unwrap();
+    ctx.mark(review.id, &[c], Some(MarkColor::Red), &[])
         .unwrap();
     let summary = ctx.summary(None).unwrap();
     let f = &summary.files[0];
-    assert_eq!((f.rows.reviewed, f.rows.unreviewed), (1, 2));
-    assert_eq!(f.unreviewed, ["3-4"]);
+    assert_eq!((f.rows.done, f.rows.left), (1, 2));
+    let marks: Vec<_> = f.rows.marks.iter().map(|(k, n)| (k.as_str(), *n)).collect();
+    assert_eq!(marks, [("flagged", 1), ("reviewed", 1)]);
+    assert_eq!(f.left, ["3-4"], "flagged rows aren't done");
 
     let (id, state) = ctx.agent_comment(None, "a.rs", 3, 3, "why c?").unwrap();
     assert_eq!(id, review.id);

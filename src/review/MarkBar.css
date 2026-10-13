@@ -1,0 +1,39 @@
+.mark-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mark-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px 0 3px;
+  border: none;
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.mark-chip:disabled {
+  opacity: 0.6;
+}
+
+.mark-chip kbd {
+  font: 600 10px var(--mono);
+  line-height: 15px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 28%);
+}
+
+.mark-chip.square {
+  justify-content: center;
+  width: 20px;
+  padding: 0;
+}
+
+.mark-chip.square kbd {
+  background: none;
+}

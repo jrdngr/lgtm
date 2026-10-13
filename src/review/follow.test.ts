@@ -11,18 +11,18 @@ const lineOf = (lines: typeof all, row: number) =>
 
 describe("follow", () => {
   it("moves the cursor to the next shown row when its row leaves the filter", () => {
-    const reviewed = new Set([1]);
-    const unreviewed = buildLines(
+    const marked = new Set([1]);
+    const left = buildLines(
       files,
       layout({
-        filter: "unreviewed",
-        rowState: (_, r) => (reviewed.has(r) ? "reviewed" : "unreviewed"),
+        filter: "left",
+        rowState: (_, r) => (marked.has(r) ? "violet" : "unmarked"),
       }),
     );
-    const before = buildLines(files, layout({ filter: "unreviewed" }));
+    const before = buildLines(files, layout({ filter: "left" }));
     const at = lineOf(before, 1);
-    const next = follow(before, unreviewed, { sel: lineSelection(at), cursor: at, anchor: at });
-    expect(unreviewed[next.cursor]).toMatchObject({ kind: "rows", rows: [2] });
+    const next = follow(before, left, { sel: lineSelection(at), cursor: at, anchor: at });
+    expect(left[next.cursor]).toMatchObject({ kind: "rows", rows: [2] });
     expect(next.sel.level).toBe("line");
   });
 

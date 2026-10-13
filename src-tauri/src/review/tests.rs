@@ -41,7 +41,7 @@ pub fn write(dir: &Path, path: &str, text: &str) {
 }
 
 /// (file, text) of each marked row with its state.
-pub fn marked(review: &ReviewDto, marks: &[MarkDto]) -> Vec<(String, MarkState)> {
+pub fn marked(review: &ReviewDto, marks: &[MarkDto]) -> Vec<(String, MarkColor)> {
     marks
         .iter()
         .map(|m| {
@@ -52,7 +52,7 @@ pub fn marked(review: &ReviewDto, marks: &[MarkDto]) -> Vec<(String, MarkState)>
                 .flat_map(|h| &h.rows)
                 .nth(m.row as usize)
                 .unwrap();
-            (row.text.clone(), m.state)
+            (row.text.clone(), m.color)
         })
         .collect()
 }
@@ -85,12 +85,12 @@ async fn marks_follow_code_through_edits_and_rewrites() {
     let review = ctx.open(None, "@", false).await.unwrap();
     let in_b = row_of(&review, 0, "    x();", 1);
     let marks = ctx
-        .mark(review.id, &[in_b], Some(MarkState::Flagged), &[])
+        .mark(review.id, &[in_b], Some(MarkColor::Red), &[])
         .unwrap()
         .marks;
     assert_eq!(
         marked(&review, &marks),
-        [("    x();".into(), MarkState::Flagged)]
+        [("    x();".into(), MarkColor::Red)]
     );
 
     // Insert a function above both and reformat: the mark stays on the copy in `b`.
@@ -120,22 +120,22 @@ async fn undo_and_redo_step_through_mark_changes() {
     write(d, "a.py", "def f():\n    return 1\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    return 1", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
     let marks = ctx
-        .mark(review.id, &[row], Some(MarkState::Skipped), &[])
+        .mark(review.id, &[row], Some(MarkColor::Gray), &[])
         .unwrap()
         .marks;
-    assert_eq!(marks[0].state, MarkState::Skipped);
+    assert_eq!(marks[0].color, MarkColor::Gray);
 
     assert_eq!(
-        ctx.undo(review.id).unwrap().marks[0].state,
-        MarkState::Reviewed
+        ctx.undo(review.id).unwrap().marks[0].color,
+        MarkColor::Violet
     );
     assert!(ctx.undo(review.id).unwrap().marks.is_empty());
     assert_eq!(
-        ctx.redo(review.id).unwrap().marks[0].state,
-        MarkState::Reviewed
+        ctx.redo(review.id).unwrap().marks[0].color,
+        MarkColor::Violet
     );
 }
 
@@ -148,7 +148,7 @@ async fn marks_survive_a_rename_added_to_the_reviewed_change() {
     write(d, "old.py", "def f():\n    log()\n    return 1\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    log()", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
 
     std::fs::rename(d.join("old.py"), d.join("new.py")).unwrap();
@@ -156,7 +156,7 @@ async fn marks_survive_a_rename_added_to_the_reviewed_change() {
     assert_eq!(review.files[0].old_path.as_deref(), Some("old.py"));
     assert_eq!(
         marked(&review, &review.state.marks),
-        [("    log()".into(), MarkState::Reviewed)]
+        [("    log()".into(), MarkColor::Violet)]
     );
 }
 
@@ -178,7 +178,7 @@ async fn marks_follow_a_heavily_edited_rename_reported_as_delete_and_add() {
         .position(|f| f.path == "old.rs")
         .unwrap();
     let row = row_of(&review, file, "let marked = 1;", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Flagged), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Red), &[])
         .unwrap();
 
     std::fs::remove_file(d.join("old.rs")).unwrap();
@@ -191,7 +191,7 @@ async fn marks_follow_a_heavily_edited_rename_reported_as_delete_and_add() {
     assert!(review.files.iter().all(|f| f.old_path.is_none()));
     assert_eq!(
         marked(&review, &review.state.marks),
-        [("let marked = 1;".into(), MarkState::Flagged)]
+        [("let marked = 1;".into(), MarkColor::Red)]
     );
 }
 
@@ -204,7 +204,7 @@ async fn a_mark_on_a_split_file_matches_in_only_one_of_its_parts() {
     write(d, "old.rs", "fn a() {}\nuse x;\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "use x;", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
 
     std::fs::remove_file(d.join("old.rs")).unwrap();
@@ -213,7 +213,7 @@ async fn a_mark_on_a_split_file_matches_in_only_one_of_its_parts() {
     let review = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(
         marked(&review, &review.state.marks),
-        [("use x;".into(), MarkState::Reviewed)]
+        [("use x;".into(), MarkColor::Violet)]
     );
 }
 
@@ -224,9 +224,9 @@ async fn reapplying_same_state_is_a_no_op_and_reset_removes_review_marks() {
     write(d, "a.go", "package a\n\nfunc F() {}\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "func F() {}", 0);
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
-    ctx.mark(review.id, &[row], Some(MarkState::Reviewed), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
         .unwrap();
     // One undo step undoes the only real change.
     assert!(ctx.undo(review.id).unwrap().marks.is_empty());

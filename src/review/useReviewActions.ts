@@ -1,4 +1,4 @@
-import type { MarkState, ReviewDto, StateDto } from "../bindings";
+import type { MarkColor, ReviewDto, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { NOT_AT_WORKING_COPY } from "./CommentBlock";
 import { draftFor } from "./comments";
@@ -22,6 +22,8 @@ interface Deps {
   followChecks(files: number[]): void;
   sendText(text: string, onSent?: () => void): void;
   closeMenu(): void;
+  /** The mark that also checks a whole-file selection. */
+  primary: MarkColor | undefined;
 }
 
 /** What the review does to its selection: mark, check, comment, copy, and send. */
@@ -45,13 +47,14 @@ export function useReviewActions(d: Deps) {
     clearTextSelection();
   }
 
-  async function applyMark(state: MarkState | null) {
+  async function applyMark(color: MarkColor | null) {
     if (!review) return;
     const rows = changedRows(files, lines, sel.start, sel.end);
     if (rows.length === 0) return;
     const line = lines[sel.start];
-    const check = sel.level === "file" && state === "reviewed" && line ? [line.file] : [];
-    settle(await commands.markRows(review.id, rows, state, check), (next) => {
+    const whole = sel.level === "file" && color !== null && color === d.primary;
+    const check = whole && line ? [line.file] : [];
+    settle(await commands.markRows(review.id, rows, color, check), (next) => {
       finishAction();
       applied(next, check);
     });
@@ -62,6 +65,11 @@ export function useReviewActions(d: Deps) {
     settle(await commands.setFilesChecked(review.id, [file], checked), (next) =>
       applied(next, [file]),
     );
+  }
+
+  async function clearFile(file: number) {
+    if (!review) return;
+    settle(await commands.clearFileMarks(review.id, file), (next) => applied(next, [file]));
   }
 
   async function step(undo: boolean) {
@@ -109,8 +117,8 @@ export function useReviewActions(d: Deps) {
     else if (action === "change") {
       if (review?.hasWorkingCopy) startComment("ask");
       else setError(NOT_AT_WORKING_COPY);
-    } else applyMark(action === "clear" ? null : (action as MarkState));
+    } else applyMark(action === "clear" ? null : action);
   }
 
-  return { applyMark, setChecked, step, resetMarks, copy, startComment, pick };
+  return { applyMark, setChecked, clearFile, step, resetMarks, copy, startComment, pick };
 }

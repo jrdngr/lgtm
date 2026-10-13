@@ -1,23 +1,56 @@
 //! What an agent in a terminal sees of a review and can do to it, through the MCP server.
 //! Agents can read everything and add comments and walkthrough notes, but never mark rows.
 
+use std::collections::BTreeMap;
+
 use anyhow::Context;
 use serde::Serialize;
 
 use super::comments::RowSpan;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::diff::{FileStatus, RowKind};
-use crate::store::{Author, Comment, MarkState, Message, Workshop};
+use crate::settings::{self, marks};
+use crate::store::{Author, Comment, MarkColor, Message, Workshop};
 
 /// What comments and notes from a terminal agent record as their source review.
 const BY_AGENT: &str = "terminal agent";
 
-#[derive(Clone, Copy, Default, Serialize)]
+#[derive(Clone, Default, Serialize)]
 pub struct Counts {
-    pub reviewed: u32,
-    pub skipped: u32,
-    pub flagged: u32,
-    pub unreviewed: u32,
+    /// Rows that count as done: marked in a done color, or in a checked or skipped file.
+    pub done: u32,
+    pub left: u32,
+    /// Marked rows by the mark's label, or its color when it has none.
+    pub marks: BTreeMap<String, u32>,
+}
+
+impl Counts {
+    fn add(&mut self, other: &Counts) {
+        self.done += other.done;
+        self.left += other.left;
+        for (k, n) in &other.marks {
+            *self.marks.entry(k.clone()).or_default() += n;
+        }
+    }
+}
+
+/// What a changed row has: a mark, or none in a checked file, a skipped file, or neither.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum RowState {
+    Mark(MarkColor),
+    Checked,
+    Skipped,
+    Unmarked,
+}
+
+impl RowState {
+    pub(super) fn done(self, slots: &[marks::MarkSlot]) -> bool {
+        match self {
+            Self::Mark(color) => marks::is_done(slots, color),
+            Self::Checked | Self::Skipped => true,
+            Self::Unmarked => false,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -30,8 +63,8 @@ pub struct FileSummary {
     /// The reviewer ticked the whole file off.
     pub checked: bool,
     pub rows: Counts,
-    /// Line ranges of changed code the reviewer hasn't reviewed, skipped or flagged.
-    pub unreviewed: Vec<String>,
+    /// Line ranges of changed code that isn't done.
+    pub left: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -41,7 +74,7 @@ pub struct Summary {
     /// The diff's old and new commits.
     pub from: Option<String>,
     pub to: String,
-    /// Changed rows by state, across the review.
+    /// Changed rows by mark, across the review.
     pub rows: Counts,
     pub files: Vec<FileSummary>,
 }
@@ -79,20 +112,21 @@ pub struct AgentNote {
 
 impl Review {
     /// A row's state; `None` for rows that don't need review: context and replaced rows.
-    fn row_state(&self, fi: usize, row: usize) -> Option<Option<MarkState>> {
+    /// A checked file's rows count as checked whatever their marks.
+    pub(super) fn row_state(&self, fi: usize, row: usize) -> Option<RowState> {
         let file = &self.files[fi];
         let pos = &file.rows[row];
         if pos.kind == RowKind::Context || pos.replaced {
             return None;
         }
         if self.checks[fi].as_ref().is_some_and(|c| c.current) {
-            return Some(Some(MarkState::Reviewed));
+            return Some(RowState::Checked);
         }
-        let mark = self.matched.get(&RowRef::new(fi, row as u32));
-        Some(
-            mark.map(|m| m.state)
-                .or(file.skipped.then_some(MarkState::Skipped)),
-        )
+        Some(match self.matched.get(&RowRef::new(fi, row as u32)) {
+            Some(m) => RowState::Mark(m.color),
+            None if file.skipped => RowState::Skipped,
+            None => RowState::Unmarked,
+        })
     }
 
     /// The lines rows `start..=end` of file `fi` are on: new-side lines when there are any.
@@ -131,6 +165,7 @@ impl Review {
     }
 
     pub(super) fn summary(&self) -> Summary {
+        let slots = settings::get().marks;
         let mut total = Counts::default();
         let files = self
             .files
@@ -138,44 +173,39 @@ impl Review {
             .enumerate()
             .map(|(fi, f)| {
                 let mut counts = Counts::default();
-                let mut unreviewed = Vec::new();
+                let mut left = Vec::new();
                 let mut run: Option<(usize, usize)> = None;
                 for row in 0..f.rows.len() {
-                    let state = self.row_state(fi, row);
-                    let count = match state {
-                        None => None,
-                        Some(Some(MarkState::Reviewed)) => Some(&mut counts.reviewed),
-                        Some(Some(MarkState::Skipped)) => Some(&mut counts.skipped),
-                        Some(Some(MarkState::Flagged)) => Some(&mut counts.flagged),
-                        Some(None) => Some(&mut counts.unreviewed),
-                    };
-                    if let Some(c) = count {
-                        *c += 1;
-                    }
-                    run = match (state, run) {
-                        (Some(None), Some((a, _))) => Some((a, row)),
-                        (Some(None), None) => Some((row, row)),
-                        (_, Some((a, b))) => {
-                            unreviewed.push(self.lines(fi, a, b));
-                            None
+                    let Some(state) = self.row_state(fi, row) else {
+                        if let Some((a, b)) = run.take() {
+                            left.push(self.lines(fi, a, b));
                         }
-                        (_, None) => None,
+                        continue;
                     };
+                    if let RowState::Mark(color) = state {
+                        *counts.marks.entry(marks::label(&slots, color)).or_default() += 1;
+                    }
+                    if state.done(&slots) {
+                        counts.done += 1;
+                        if let Some((a, b)) = run.take() {
+                            left.push(self.lines(fi, a, b));
+                        }
+                    } else {
+                        counts.left += 1;
+                        run = Some(run.map_or((row, row), |(a, _)| (a, row)));
+                    }
                 }
                 if let Some((a, b)) = run {
-                    unreviewed.push(self.lines(fi, a, b));
+                    left.push(self.lines(fi, a, b));
                 }
-                total.reviewed += counts.reviewed;
-                total.skipped += counts.skipped;
-                total.flagged += counts.flagged;
-                total.unreviewed += counts.unreviewed;
+                total.add(&counts);
                 FileSummary {
                     path: f.path.clone(),
                     old_path: f.old_path.clone(),
                     status: f.status,
                     checked: self.checks[fi].as_ref().is_some_and(|c| c.current),
                     rows: counts,
-                    unreviewed,
+                    left,
                 }
             })
             .collect();
