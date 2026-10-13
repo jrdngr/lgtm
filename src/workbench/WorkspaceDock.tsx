@@ -7,6 +7,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
@@ -17,10 +18,12 @@ import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
-import { registerDock } from "./docks";
+import { bottom } from "./bottom";
+import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
 import { NewTab, SplitButtons } from "./GroupActions";
-import { defaultLayout, dropStalePanels, isReviewPanel } from "./panels";
+import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
+import { defaultLayout, focusPanel, isReviewPanel } from "./panels";
 import { Tab } from "./Tab";
 
 const components = {
@@ -35,35 +38,27 @@ const components = {
   files: () => null,
 };
 
-function restoreLayout(api: DockviewApi, saved: string | null, setup: boolean) {
-  if (saved) {
-    try {
-      api.fromJSON(JSON.parse(saved));
-      dropStalePanels(api);
-      if (api.panels.length > 0) return;
-    } catch (e) {
-      console.warn("discarding unreadable layout", e);
-      api.clear();
-    }
-  }
-  defaultLayout(api, setup);
-}
-
 interface Props {
   workspace: WorkspaceName;
   hidden: boolean;
   /** A new workspace: its first terminal runs `.lgtm/setup`. */
   setup: boolean;
+  /** Where the workspace's bottom dock renders, once the bottom panel is up. */
+  bottomEl?: HTMLElement | null;
 }
 
-/** One workspace's panes, with its own saved layout. Hidden docks stay mounted so their
- * terminals keep running. */
-export function WorkspaceDock({ workspace, hidden, setup }: Props) {
+/** One workspace's panes, in its main dock and its bottom dock, with their own saved layout.
+ * Hidden docks stay mounted so their terminals keep running. */
+export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   const timer = useRef<number>(undefined);
   const gone = useRef(false);
-  /** The dock's latest api. React can mount the dock twice, and panes added to the first,
+  const shown = useRef(!hidden);
+  shown.current = !hidden;
+  /** Each dock's latest api. React can mount a dock twice, and panes added to the first,
    * already disposed api would stay mounted outside the dock. */
-  const latest = useRef<DockviewApi>(undefined);
+  const latest = useRef<Partial<Record<DockSlot, DockviewApi>>>({});
+  const loading = useRef<Promise<SavedLayout>>(undefined);
+  const loaded = useRef<SavedLayout>(undefined);
   /** Unknown until the layout is restored. */
   const [hasPane, setHasPane] = useState<boolean>();
   useAgentShow(workspace);
@@ -74,41 +69,87 @@ export function WorkspaceDock({ workspace, hidden, setup }: Props) {
       gone.current = true;
       clearTimeout(timer.current);
       registerDock(workspace, undefined);
+      registerDock(workspace, undefined, "bottom");
     };
   }, [workspace]);
 
-  async function ready({ api }: DockviewReadyEvent) {
-    latest.current = api;
-    const saved = await unwrap(commands.loadLayout(workspace)).catch(() => null);
-    if (latest.current !== api) return;
-    restoreLayout(api, saved, setup);
+  /** The saved layout, loaded once for both docks. */
+  function load() {
+    loading.current ??= unwrap(commands.loadLayout(workspace))
+      .then(parseLayout)
+      .catch(() => ({}))
+      .then((saved) => {
+        loaded.current = saved;
+        return saved;
+      });
+    return loading.current;
+  }
+
+  /** Saves both docks. A dock that isn't up yet keeps what was saved for it. */
+  function save() {
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => {
+      const saved = loaded.current;
+      if (gone.current || !saved) return;
+      const { main, bottom: below } = latest.current;
+      const layout: SavedLayout = {
+        main: main ? main.toJSON() : saved.main,
+        bottom: below ? (below.panels.length ? below.toJSON() : undefined) : saved.bottom,
+      };
+      commands.saveLayout(workspace, JSON.stringify(layout));
+    }, 500);
+  }
+
+  async function readyMain({ api }: DockviewReadyEvent) {
+    latest.current.main = api;
+    const saved = await load();
+    if (latest.current.main !== api) return;
+    restoreLayout(api, saved.main, () => defaultLayout(api, setup));
     const panes = () => setHasPane(api.panels.some(isReviewPanel));
     panes();
     api.onDidAddPanel(panes);
     api.onDidRemovePanel(panes);
-    api.onDidLayoutChange(() => {
-      clearTimeout(timer.current);
-      timer.current = window.setTimeout(
-        () => gone.current || commands.saveLayout(workspace, JSON.stringify(api.toJSON())),
-        500,
-      );
-    });
+    api.onDidLayoutChange(save);
     registerDock(workspace, api);
   }
 
+  async function readyBottom({ api }: DockviewReadyEvent) {
+    latest.current.bottom = api;
+    const saved = await load();
+    if (latest.current.bottom !== api) return;
+    restoreLayout(api, saved.bottom);
+    // Closing the last tab hides the panel. Checked once the close settles, since moving a
+    // tab removes it from its pane before adding it to the next.
+    api.onDidRemovePanel(() =>
+      setTimeout(() => {
+        if (gone.current || !shown.current || api.panels.length > 0 || !bottom.get().open) return;
+        api.clear();
+        bottom.set({ open: false });
+        focusPanel(latest.current.main?.activePanel);
+      }),
+    );
+    api.onDidLayoutChange(save);
+    registerDock(workspace, api, "bottom");
+  }
+
+  const dock = (ready: (e: DockviewReadyEvent) => void) => (
+    <div className="dock" hidden={hidden}>
+      <DockviewReact
+        components={components}
+        defaultTabComponent={Tab}
+        leftHeaderActionsComponent={NewTab}
+        rightHeaderActionsComponent={SplitButtons}
+        watermarkComponent={EmptyGroup}
+        onReady={ready}
+        theme={themeDark}
+      />
+    </div>
+  );
+
   return (
     <WorkspaceContext.Provider value={workspace}>
-      <div className="dock" hidden={hidden}>
-        <DockviewReact
-          components={components}
-          defaultTabComponent={Tab}
-          leftHeaderActionsComponent={NewTab}
-          rightHeaderActionsComponent={SplitButtons}
-          watermarkComponent={EmptyGroup}
-          onReady={ready}
-          theme={themeDark}
-        />
-      </div>
+      {dock(readyMain)}
+      {bottomEl && createPortal(dock(readyBottom), bottomEl)}
       {hasPane !== undefined && <WorkspaceReview workspace={workspace} hasPane={hasPane} />}
     </WorkspaceContext.Provider>
   );

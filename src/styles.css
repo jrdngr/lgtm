@@ -230,11 +230,6 @@ kbd {
   height: 100%;
 }
 
-.workbench > :last-child {
-  flex: 1;
-  min-height: 0;
-}
-
 .toolbar {
   position: relative;
   /* Above the panes, so the revision picker opens over them. */
@@ -334,7 +329,34 @@ kbd {
 
 .workbench-body {
   display: flex;
+  flex: 1;
   min-height: 0;
+}
+
+/* Docked under the side panels and panes, which it pushes up. */
+.bottom-panel {
+  position: relative;
+  display: flex;
+  flex: none;
+  border-top: 1px solid var(--border);
+}
+
+.bottom-panel[hidden] {
+  display: none;
+}
+
+.bottom-resizer {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 5px;
+  cursor: row-resize;
+  z-index: 1;
+}
+
+.bottom-resizer:hover {
+  background: var(--accent);
 }
 
 .docks {

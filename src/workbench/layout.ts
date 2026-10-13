@@ -1,0 +1,39 @@
+import type { DockviewApi, SerializedDockview } from "dockview-react";
+import { dropStalePanels } from "./panels";
+
+/** A workspace's saved docks. The bottom one is left out while it has no panels. */
+export interface SavedLayout {
+  main?: SerializedDockview;
+  bottom?: SerializedDockview;
+}
+
+/** Reads a saved layout. Layouts from earlier builds are the main dock's alone. */
+export function parseLayout(saved: string | null): SavedLayout {
+  if (!saved) return {};
+  try {
+    const json = JSON.parse(saved);
+    return "main" in json || "bottom" in json ? json : { main: json };
+  } catch (e) {
+    console.warn("discarding unreadable layout", e);
+    return {};
+  }
+}
+
+/** Restores `saved` into `api`, or calls `fallback` when that leaves it without panels. */
+export function restoreLayout(
+  api: DockviewApi,
+  saved: SerializedDockview | undefined,
+  fallback?: () => void,
+) {
+  if (saved) {
+    try {
+      api.fromJSON(saved);
+      dropStalePanels(api);
+      if (api.panels.length > 0) return;
+    } catch (e) {
+      console.warn("discarding unreadable layout", e);
+      api.clear();
+    }
+  }
+  fallback?.();
+}

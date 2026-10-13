@@ -1,12 +1,15 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { RepoInfo } from "../ipc";
 import { McpOffer } from "../tools/McpOffer";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
-import { dockOf } from "./docks";
-import { chord } from "./keys";
-import { addTerminal, openReport } from "./panels";
+import { BottomPanel } from "./BottomPanel";
+import { bottom } from "./bottom";
+import { bottomDockOf, dockOf } from "./docks";
+import { bottomKey, chord } from "./keys";
+import { addTerminal, focusPanel, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
@@ -40,7 +43,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const [sides, setSidesState] = useState<Sides>(() => loadSides(repo.root));
   const leftBody = useRef<HTMLDivElement>(null);
   const rightBody = useRef<HTMLDivElement>(null);
-  const api = () => dockOf(selected);
+  const [bottomEl, setBottomEl] = useState<HTMLDivElement | null>(null);
+  const inBottom = () => !!bottomEl?.contains(document.activeElement);
+  /** The dock with focus: the bottom one when focus is in it, else the main one. */
+  const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
   useWordWrapMenu();
 
@@ -76,6 +82,22 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     requestAnimationFrame(() => body.current?.focus());
   }
 
+  /** Hides the bottom panel when focus is in it, and otherwise shows and focuses it, with a
+   * new terminal when it has no tabs or `terminal` is set. */
+  function toggleBottom(terminal = false) {
+    if (inBottom() && !terminal) {
+      bottom.set({ open: false });
+      focusPanel(dockOf(selected)?.activePanel);
+      return;
+    }
+    // Shown before focusing, since a hidden terminal can't take focus or size itself.
+    flushSync(() => bottom.set({ open: true }));
+    const dock = bottomDockOf(selected);
+    if (!dock) return;
+    if (terminal || dock.panels.length === 0) addTerminal(dock);
+    else focusPanel(dock.activePanel);
+  }
+
   const panelKeys: Partial<Record<string, () => void>> = {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
@@ -90,6 +112,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     },
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
+    toggle: () => toggleBottom(),
+    terminal: () => toggleBottom(true),
   };
 
   /** The action for a chord, if it has one now. */
@@ -103,7 +127,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
-      const run = keyRef.current?.(chord(e) ?? "");
+      const run = keyRef.current?.(bottomKey(e) ?? chord(e) ?? "");
       if (!run) return;
       e.preventDefault();
       e.stopPropagation();
@@ -173,6 +197,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
               workspace={d.name}
               hidden={d.name !== selected}
               setup={d.setup}
+              bottomEl={bottomEl}
             />
           ))}
         </div>
@@ -185,6 +210,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           />
         </WorkspaceContext.Provider>
       </div>
+      <BottomPanel docksRef={setBottomEl} />
     </div>
   );
 }

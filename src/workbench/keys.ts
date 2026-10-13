@@ -15,3 +15,10 @@ export function chord(e: KeyboardEvent): string | undefined {
   const key = e.altKey && /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : e.key.toUpperCase();
   return `Mod+${alt}${shift}${key}`;
 }
+
+/** Ctrl+` toggles the bottom panel and Ctrl+Shift+` opens a terminal in it, on every platform,
+ * as in VS Code. By key code, so it's the key left of 1 on any layout. */
+export function bottomKey(e: KeyboardEvent): "toggle" | "terminal" | undefined {
+  if (e.code !== "Backquote" || !e.ctrlKey || e.metaKey || e.altKey) return undefined;
+  return e.shiftKey ? "terminal" : "toggle";
+}

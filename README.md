@@ -25,7 +25,9 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘N | New window, opening on the repo picker |
 | ⌘O | Open a different repo: swaps this window for the repo picker |
 | ⌥Z | View > Word Wrap: wrap long lines in reviews and editors instead of scrolling sideways (off by default, remembered) |
-| ⌘T | New terminal tab |
+| ⌃\` | Bottom panel: show it and focus it (with a new terminal when it's empty), or hide it when it has focus |
+| ⌃⇧\` | New terminal in the bottom panel |
+| ⌘T | New terminal tab, in the pane grid or bottom panel, whichever has focus |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |
 | ⌘⇧E | Show the Changes tab (reopens the right panel if closed) |
@@ -77,6 +79,8 @@ In the header and review toolbar:
 - **Line filter:** All lines, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
 - **Layout:** the two icons pick Unified or Split; the lit one is current.
 - Progress for the whole review: a bar of reviewed (green), skipped (grey), and flagged (red) rows with the reviewed percentage. Hover it for the counts. **Reset review…** in the ⋯ menu at the end clears every mark in it after you confirm.
+
+Bottom panel: a second pane grid docked along the bottom of the window, under the side panels, which it pushes up. Its tabs and splits work like the main grid's, and each workspace has its own. Hiding it with ⌃\` keeps its terminals running, and closing its last tab hides it too. Drag its top edge to resize; the height and whether it's open are remembered.
 
 Panes: the **+** tab after each pane's tabs opens a new Terminal or Graph tab in that pane. The split icons at the right of each pane's tab strip split it right or down into an empty pane, which offers the same kinds of tab.
 

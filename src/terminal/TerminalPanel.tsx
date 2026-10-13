@@ -1,7 +1,9 @@
 import { Channel } from "@tauri-apps/api/core";
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { commands, type PtyEvent } from "../ipc";
+import { bottom } from "../workbench/bottom";
 import { useWorkspace } from "../workspaces/context";
 import { registerTerminal, touchTerminal } from "./registry";
 import { createTerminal } from "./xterm";
@@ -55,6 +57,8 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
       canPaste: () => term.modes.bracketedPasteMode,
       paste: (text) => term.paste(text),
       focus: () => {
+        // A terminal in the hidden bottom panel shows it first, or it can't take focus.
+        if (container.closest(".bottom-panel")) flushSync(() => bottom.set({ open: true }));
         api.setActive();
         term.focus();
       },

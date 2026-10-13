@@ -21,6 +21,15 @@ export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === 
 
 export const kindTitle = (kind: PanelKind) => TITLES[kind];
 
+/** Makes `panel` active and puts keyboard focus in it. */
+export function focusPanel(panel: IDockviewPanel | undefined) {
+  if (!panel) return;
+  panel.api.setActive();
+  panel.view.content.element
+    .querySelector<HTMLElement>("textarea, input, [contenteditable='true'], [tabindex]")
+    ?.focus();
+}
+
 function addPanel(
   api: DockviewApi,
   component: PanelKind,
