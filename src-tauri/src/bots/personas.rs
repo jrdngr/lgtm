@@ -54,7 +54,7 @@ pub struct DefaultPersona {
     pub repo: Installed,
 }
 
-const DEFAULTS: [(&str, &str); 6] = [
+const DEFAULTS: [(&str, &str); 7] = [
     ("simplicity-bot", include_str!("defaults/simplicity-bot.md")),
     ("security-bot", include_str!("defaults/security-bot.md")),
     (
@@ -68,6 +68,10 @@ const DEFAULTS: [(&str, &str); 6] = [
     (
         "maintainability-bot",
         include_str!("defaults/maintainability-bot.md"),
+    ),
+    (
+        "architecture-bot",
+        include_str!("defaults/architecture-bot.md"),
     ),
     ("general-bot", include_str!("defaults/general-bot.md")),
 ];

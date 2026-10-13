@@ -96,7 +96,7 @@ Notes from building M4.5:
 
 Notes from building M5:
 - Personas are markdown files: `description` and `off_lens` front matter, and the profile as the body. The file name is the persona's name. Global ones are in `$XDG_CONFIG_HOME/lgtm/personas` (falling back to `~/.config`), a repo's in `.lgtm/personas`, and a repo persona hides a global one of the same name. Files that can't be read are listed with why.
-- Nothing is built in. The Reviewers view offers to install the six defaults (the wee-bots personas) globally or into the repo, all picked, except ones whose file was edited, which say so and start unpicked. Installing again restores the originals. A repo install adds files to `@`.
+- Nothing is built in. The Reviewers view offers to install the seven defaults (the wee-bots personas) globally or into the repo, all picked, except ones whose file was edited, which say so and start unpicked. Installing again restores the originals. A repo install adds files to `@`.
 - The view rereads persona files each time it's shown. Edit opens a persona's file in the default editor, and New writes a starter file and opens it.
 - A run copies its personas when it starts, so retries and later steps use them as they were.
 - The rubric, the prompts and the steps belong to the app. Every step runs `claude -p --json-schema` with its own schema, and the result is stored as structured data: a persona's findings, challenges, rebuttals, the synthesis, and the minimal pick. A reply that doesn't match fails the part.

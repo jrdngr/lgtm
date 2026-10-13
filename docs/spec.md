@@ -30,7 +30,7 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 
 Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, but independent of it.
 
-- Personas are user-defined markdown files, global or per repo. The six wee-bots personas (`simplicity-bot`, `security-bot`, `correctness-bot`, `performance-bot`, `maintainability-bot`, `general-bot`) ship as defaults the user installs, and can reinstall to restore them.
+- Personas are user-defined markdown files, global or per repo. The seven wee-bots personas (`simplicity-bot`, `security-bot`, `correctness-bot`, `performance-bot`, `maintainability-bot`, `architecture-bot`, `general-bot`) ship as defaults the user installs, and can reinstall to restore them.
 - The user dispatches any subset of personas against a review.
 - The app owns the severity rubric, the prompts, and the finding format. Agents return structured findings, and the report is UI built from them, not text.
 - The user can ask for a synthesis across all findings, a cross-review before it, and a minimal set of findings for the task.
