@@ -2145,6 +2145,7 @@ dependencies = [
  "globset",
  "ignore",
  "notify",
+ "objc2",
  "portable-pty",
  "rmcp",
  "rusqlite",

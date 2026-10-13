@@ -14,6 +14,8 @@ mod mcp;
 mod menu;
 mod pr;
 mod pty;
+#[cfg(target_os = "macos")]
+mod quit;
 mod recent;
 mod repo;
 mod resolve;
@@ -182,6 +184,8 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            #[cfg(target_os = "macos")]
+            quit::intercept(app.handle());
             match repo::data_dir(app) {
                 Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
                 Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
