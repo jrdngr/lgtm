@@ -62,14 +62,15 @@ function paths(segments: Iterable<Segment>, placed: Placed, routed: Routed): Pat
   return out;
 }
 
-/** The segments of every link that starts or ends at `box`, or passes through its ports. */
-function litSegments(routed: Routed, box: string): Segment[] {
+/** The segments of every link that starts or ends at one of `boxes`, or passes through its
+ * ports. */
+function litSegments(routed: Routed, boxes: ReadonlySet<string>): Segment[] {
   const out = new Map<string, Segment>();
   for (const r of routed.routes) {
     const touches =
-      r.link.from === box ||
-      r.link.to === box ||
-      r.stops.some((s) => routed.ports.get(s)?.box === box);
+      boxes.has(r.link.from) ||
+      boxes.has(r.link.to) ||
+      r.stops.some((s) => boxes.has(routed.ports.get(s)?.box ?? ""));
     if (!touches) continue;
     for (let i = 1; i < r.stops.length; i++) {
       const key = `${r.stops[i - 1]}>${r.stops[i]}`;
@@ -80,34 +81,38 @@ function litSegments(routed: Routed, box: string): Segment[] {
   return [...out.values()];
 }
 
-/** The graph's links and ports, drawn under the boxes. Links of `focus` are drawn again on
- * top, so hovering a box shows what it uses and what uses it. */
+/** The graph's links and ports, drawn dim under the boxes. Links of the `hover`ed and
+ * `selected` boxes are drawn again on top in the accent, so they show what those boxes use
+ * and what uses them. */
 export function EdgesLayer({
   routed,
   placed,
-  focus,
+  hover,
+  selected,
 }: {
   routed: Routed;
   placed: Placed;
-  focus?: string;
+  hover?: string;
+  selected?: string;
 }) {
   const all = useMemo(() => paths(routed.segments.values(), placed, routed), [routed, placed]);
   const ports = useMemo(
     () => [...placed.ports.values()].map((p) => `M${p.x - 3},${p.y - 3}h6v6h-6z`).join(""),
     [placed],
   );
-  const lit = useMemo(
-    () => (focus === undefined ? empty() : paths(litSegments(routed, focus), placed, routed)),
-    [routed, placed, focus],
-  );
+  const lit = useMemo(() => {
+    const focus = new Set([hover, selected].filter((b): b is string => b !== undefined));
+    return focus.size === 0 ? empty() : paths(litSegments(routed, focus), placed, routed);
+  }, [routed, placed, hover, selected]);
   return (
     <ViewportPortal>
-      <svg className={`glinks${focus === undefined ? "" : " dimmed"}`} aria-hidden="true">
+      <svg className="glinks" aria-hidden="true">
         <path className="glink" d={all.links} />
         <path className="glink caller" d={all.callers} />
         <path className="garrow" d={all.arrows + all.joins} />
         <path className="gport" d={ports} />
-        <path className="glink lit" d={lit.links + lit.callers} />
+        <path className="glink lit" d={lit.links} />
+        <path className="glink caller lit" d={lit.callers} />
         <path className="garrow lit" d={lit.arrows + lit.joins} />
       </svg>
     </ViewportPortal>

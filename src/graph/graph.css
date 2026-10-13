@@ -1,4 +1,7 @@
 .graph-panel {
+  /* Each level of open box, and its header band, is a shade lighter than the one around it. */
+  --g-level: rgb(255 255 255 / 2.5%);
+  --g-band: rgb(255 255 255 / 3%);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -10,23 +13,86 @@
   min-height: 0;
 }
 
-.graph-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 10px;
-  border-bottom: 1px solid var(--border);
-  color: var(--muted);
-}
-
-.graph-bar label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 .graph-panel .react-flow {
   --xy-background-color: var(--bg);
+}
+
+.gchip {
+  margin-right: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.gchip.on {
+  border-color: transparent;
+  background: var(--selection);
+  color: var(--fg);
+}
+
+.glegend {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  grid-template-columns: 20px auto;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--raise);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.glegend dt {
+  display: flex;
+  justify-content: center;
+  font-family: var(--mono);
+}
+
+.glegend dd {
+  margin: 0;
+}
+
+.gline,
+.gdash,
+.glit {
+  width: 16px;
+  border-top: 2px solid var(--reviewed);
+}
+
+.gdash {
+  border-top: 1.5px dashed var(--link);
+}
+
+.glit {
+  border-top-color: var(--accent);
+}
+
+.gzoom {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.gzoom .icon-button {
+  width: 26px;
+  border-radius: 0;
+}
+
+.gzoom .icon-button + .icon-button {
+  border-top: 1px solid var(--hair);
 }
 
 .glinks {
@@ -41,8 +107,9 @@
 
 .glink {
   fill: none;
-  stroke: #6b7280;
-  stroke-width: 1.5;
+  stroke: var(--link);
+  stroke-width: 1.25;
+  opacity: 0.5;
 }
 
 .glink.caller {
@@ -50,35 +117,34 @@
 }
 
 .garrow {
-  fill: #6b7280;
+  fill: var(--link);
+  opacity: 0.5;
 }
 
 .gport {
   fill: var(--bg);
-  stroke: #6b7280;
-  stroke-width: 1.5;
-}
-
-.glinks.dimmed .glink:not(.lit),
-.glinks.dimmed .garrow:not(.lit) {
-  opacity: 0.25;
+  stroke: var(--link);
+  stroke-width: 1.25;
 }
 
 .glink.lit {
   stroke: var(--accent);
-  stroke-width: 2.5;
+  stroke-width: 2.25;
+  opacity: 1;
 }
 
 .garrow.lit {
   fill: var(--accent);
+  opacity: 1;
 }
 
 .gfile {
+  position: relative;
   width: 100%;
   height: 100%;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgb(255 255 255 / 3%);
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: var(--g-level);
   box-sizing: border-box;
 }
 
@@ -86,89 +152,141 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 10px;
+  height: 24px;
+  padding: 0 18px 0 10px;
+  border-radius: 7px 7px 0 0;
+  background: var(--g-band);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.gfile-file .gfile-head,
+.gfile-group .gfile-head {
+  color: var(--fg);
 }
 
 .gfile.outside {
   border-style: dashed;
 }
 
-.gfile-folder {
-  background: rgb(255 255 255 / 1.5%);
+.gfile.selected {
+  border-color: var(--accent);
 }
 
-.gfile-group {
-  background: var(--panel);
-  border-left: 3px solid var(--accent);
-}
-
-.gfile.risk-high {
-  border-color: var(--flagged);
-}
-
-.gfile.risk-medium {
-  border-color: var(--amber);
+.glabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gchevron {
   display: inline-block;
+  flex: none;
   width: 12px;
   color: var(--muted);
 }
 
 .gcount {
-  margin-left: 6px;
+  margin-left: auto;
+  padding-left: 6px;
   color: var(--muted);
-  font-size: 11px;
-}
-
-.gnode-box {
-  border-left-color: var(--border);
+  font-size: var(--fs-xs);
 }
 
 .gcallers {
-  margin-left: 8px;
-  padding: 0 5px;
-  border: 1px dashed var(--skipped);
-  border-radius: 8px;
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 999px;
   background: none;
   color: var(--muted);
+  font-family: system-ui, sans-serif;
   font-size: 10px;
   line-height: 14px;
   cursor: pointer;
 }
 
+.gcount + .gcallers {
+  margin-left: 6px;
+}
+
+.gnode:hover .gcallers,
+.gfile-head:hover .gcallers,
 .gcallers.open {
-  border-style: solid;
+  border-color: var(--border);
+  background: var(--hover);
   color: var(--fg);
 }
 
+.gdot {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.gdot.risk-high {
+  background: var(--flagged);
+}
+
+.gdot.risk-medium {
+  background: var(--amber);
+}
+
+.gfile > .gdot {
+  top: 8px;
+  right: 8px;
+}
+
+.glegend .gdot {
+  position: static;
+}
+
 .gnode {
+  position: relative;
+  display: flex;
+  align-items: center;
   height: 40px;
   box-sizing: border-box;
-  padding: 5px 10px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 4px;
-  background: var(--panel);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  padding: 0 16px 0 10px;
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  background: var(--raise);
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
-.gnode:hover {
+.gnode-box {
+  background: var(--g-level);
+  font-family: inherit;
+}
+
+.gnode-file,
+.gnode-group {
+  color: var(--fg);
+}
+
+.gnode-folder {
+  color: var(--muted);
+}
+
+.gnode:hover,
+.gnode.selected {
   border-color: var(--accent);
 }
 
 .gnode-name {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .gnode-sign {
@@ -177,30 +295,44 @@
   color: var(--muted);
 }
 
-.gnode-added {
-  border-left-color: var(--reviewed);
+.gsign {
+  flex: none;
+  width: 12px;
+  font-family: var(--mono);
 }
 
-.gnode-removed {
-  border-left-color: var(--flagged);
+.gsign-added {
+  color: var(--added);
 }
 
-.gnode-removed .gnode-name {
+.gsign-modified {
+  color: var(--amber);
+}
+
+.gsign-removed {
+  color: var(--flagged);
+}
+
+.gnode-removed .glabel {
   text-decoration: line-through;
   color: var(--muted);
 }
 
 .gnode-caller {
-  border-left-color: var(--skipped);
   border-style: dashed;
+  border-color: var(--border);
+  background: none;
   color: var(--muted);
 }
 
 .gnode-bar {
-  height: 3px;
-  margin-top: 6px;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 0 0 4px 4px;
   background: var(--border);
-  border-radius: 2px;
   overflow: hidden;
 }
 
@@ -208,18 +340,6 @@
   display: block;
   height: 100%;
   background: var(--reviewed);
-}
-
-.gnode.risk-high {
-  box-shadow: 0 0 0 2px var(--flagged);
-}
-
-.gnode.risk-medium {
-  box-shadow: 0 0 0 2px var(--amber);
-}
-
-.gnode.risk-low {
-  box-shadow: 0 0 0 1px var(--muted);
 }
 
 .symbol-list {

@@ -170,3 +170,11 @@ function expandAround(tree: Tree, expanded: ReadonlySet<string>, nodes: number[]
   }
   return out;
 }
+
+/** Every folder, file and group open, or all of them closed. Callers shown stay as they are. */
+export const setAllExpanded = (tree: Tree, view: View, open: boolean): View => ({
+  ...view,
+  expanded: new Set(
+    open ? [...tree.boxes.values()].filter((b) => b.kind !== "symbol").map((b) => b.id) : [],
+  ),
+});

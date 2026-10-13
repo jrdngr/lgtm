@@ -24,6 +24,7 @@ export interface BoxData extends Record<string, unknown> {
   title: string;
 }
 
+/** "2 callers" in dim text, a chip on hover or while they're shown. */
 function CallersBadge({ data }: { data: BoxData }) {
   if (data.callers === 0) return null;
   return (
@@ -31,12 +32,12 @@ function CallersBadge({ data }: { data: BoxData }) {
       type="button"
       className={`gcallers${data.callersOpen ? " open" : ""}`}
       title={data.callersOpen ? "Hide callers" : "Show callers"}
+      aria-pressed={data.callersOpen}
       onClick={(e) => {
         e.stopPropagation();
         data.onCallers();
       }}
     >
-      {data.callersOpen ? "−" : "+"}
       {data.callers} {data.callers === 1 ? "caller" : "callers"}
     </button>
   );
@@ -45,20 +46,31 @@ function CallersBadge({ data }: { data: BoxData }) {
 const chevron = (data: BoxData, open: boolean) =>
   data.expandable ? <span className="gchevron">{open ? "▾" : "▸"}</span> : null;
 
-/** A symbol, or a closed folder, file or group, with a bar for how much of it is reviewed. */
-export function BoxNode({ data }: NodeProps & { data: BoxData }) {
+const sign = (status?: NodeStatus) =>
+  status && status !== "caller" ? (
+    <span className={`gsign gsign-${status}`}>{STATUS_SIGN[status]}</span>
+  ) : null;
+
+/** A dot in the corner for the worst important note in it. */
+const riskDot = (risk?: string) =>
+  risk ? <span className={`gdot risk-${risk}`} title={`Important note, ${risk}`} /> : null;
+
+/** A symbol, or a closed folder, file or group, with a line along its bottom for how much of
+ * it is reviewed. */
+export function BoxNode({ data, selected }: NodeProps & { data: BoxData }) {
   const { box, status, done, risk, count } = data;
-  const kind = status ?? (data.outside ? "caller" : "box");
+  const kind = status ?? (data.outside ? "caller" : `box gnode-${box.kind}`);
   return (
-    <div className={`gnode gnode-${kind}${risk ? ` risk-${risk}` : ""}`} title={data.title}>
+    <div className={`gnode gnode-${kind}${selected ? " selected" : ""}`} title={data.title}>
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <div className="gnode-name">
         {chevron(data, false)}
-        {status && <span className="gnode-sign">{STATUS_SIGN[status]}</span>}
-        {box.label}
+        {sign(status)}
+        <span className="glabel">{box.label}</span>
         {box.kind !== "symbol" && count > 0 && <span className="gcount">{count}</span>}
         <CallersBadge data={data} />
       </div>
+      {riskDot(risk)}
       {done !== undefined && (
         <div className="gnode-bar">
           <span style={{ width: `${Math.round(done * 100)}%` }} />
@@ -69,21 +81,22 @@ export function BoxNode({ data }: NodeProps & { data: BoxData }) {
   );
 }
 
-/** An open folder, file or group: a box around what's in it. */
-export function OpenBoxNode({ data }: NodeProps & { data: BoxData }) {
+/** An open folder, file or group: a box around what's in it, under a header band. */
+export function OpenBoxNode({ data, selected }: NodeProps & { data: BoxData }) {
   const { box, status, risk } = data;
   return (
     <div
-      className={`gfile gfile-${box.kind}${data.outside ? " outside" : ""}${risk ? ` risk-${risk}` : ""}`}
+      className={`gfile gfile-${box.kind}${data.outside ? " outside" : ""}${selected ? " selected" : ""}`}
       title={data.title}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} />
-      <span className="gfile-head">
+      <div className="gfile-head">
         {chevron(data, true)}
-        {status && <span className="gnode-sign">{STATUS_SIGN[status]}</span>}
-        {box.label}
+        {sign(status)}
+        <span className="glabel">{box.label}</span>
         <CallersBadge data={data} />
-      </span>
+      </div>
+      {riskDot(risk)}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
   );

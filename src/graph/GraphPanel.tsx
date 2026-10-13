@@ -1,4 +1,4 @@
-import { Background, type Node, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
+import { type Node, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
 import type { GraphDto } from "../bindings";
@@ -6,6 +6,7 @@ import { type CurrentReview, useCurrentReview } from "../review/current";
 import { isMac } from "../workbench/keys";
 import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 import { EdgesLayer } from "./EdgesLayer";
+import { GraphBar, ZoomControls } from "./GraphBar";
 import { layout, type Placed, type Scene } from "./layout";
 import { showNode } from "./nodes";
 import { route } from "./ports";
@@ -20,6 +21,7 @@ import {
   nextCallers,
   presentBoxes,
   presentNodes,
+  setAllExpanded,
   toggleAllCallers,
   toggleCallers,
   type View,
@@ -77,7 +79,8 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
   const { scene, present, shown, next } = useScene(graph, tree, view);
   const placed = usePlaced(scene);
   const flow = useReactFlow();
-  const [focus, setFocus] = useState<string>();
+  const [hover, setHover] = useState<string>();
+  const [selected, setSelected] = useState<string>();
   const nodes = useMemo(() => {
     if (!placed) return [];
     const stats = boxStats(review, graph, tree, present);
@@ -114,12 +117,13 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
         type: at.open ? "open" : "box",
         parentId: box.parent && placed.boxes.has(box.parent) ? box.parent : undefined,
         position: { x: at.at.x, y: at.at.y },
+        selected: id === selected,
         style: { width: at.at.width, height: at.open ? at.at.height : undefined },
         data,
       });
     }
     return out;
-  }, [review, graph, tree, view, setView, scene, placed, present, shown, next]);
+  }, [review, graph, tree, view, setView, scene, placed, present, shown, next, selected]);
   // Fit when the boxes change, not on every progress update.
   useEffect(() => {
     if (placed) requestAnimationFrame(() => flow.fitView({ padding: 0.1 }));
@@ -135,6 +139,7 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
       minZoom={0.1}
       onNodeClick={(e, n) => {
         const { box, expandable } = n.data as BoxData;
+        setSelected(n.id);
         if (isMac ? e.metaKey : e.ctrlKey) return jumpToBox(review, graph, tree, box, workspace);
         if (expandable) {
           const expanded = new Set(view.expanded);
@@ -144,11 +149,12 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
         const own = box.own[0];
         if (own !== undefined) showNode(review, graph.nodes[own], workspace);
       }}
-      onNodeMouseEnter={(_, n) => setFocus(n.id)}
-      onNodeMouseLeave={() => setFocus(undefined)}
+      onPaneClick={() => setSelected(undefined)}
+      onNodeMouseEnter={(_, n) => setHover(n.id)}
+      onNodeMouseLeave={() => setHover(undefined)}
     >
-      <EdgesLayer routed={scene.routed} placed={placed} focus={focus} />
-      <Background gap={24} />
+      <EdgesLayer routed={scene.routed} placed={placed} hover={hover} selected={selected} />
+      <ZoomControls />
     </ReactFlow>
   );
 }
@@ -188,18 +194,14 @@ function Loaded({
   );
   return (
     <div className="graph-panel">
-      <div className="graph-bar">
-        <span>{changed} changed symbols</span>
-        <label>
-          <input
-            type="checkbox"
-            checked={firstHop > 0 && allOpen}
-            disabled={firstHop === 0}
-            onChange={(e) => setView(toggleAllCallers(graph, tree, view, e.target.checked))}
-          />
-          {firstHop} unchanged callers
-        </label>
-      </div>
+      <GraphBar
+        changed={changed}
+        callers={firstHop}
+        callersOpen={allOpen}
+        onCallers={(open) => setView(toggleAllCallers(graph, tree, view, open))}
+        onExpandAll={() => setView(setAllExpanded(tree, view, true))}
+        onCollapseAll={() => setView(setAllExpanded(tree, view, false))}
+      />
       <div className="graph-canvas">
         <ReactFlowProvider>
           <Flow
