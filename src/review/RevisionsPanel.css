@@ -1,13 +1,9 @@
-.revset {
-  font:
-    12px Menlo,
-    monospace;
-  color: var(--fg);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 3px 6px;
-  width: 260px;
+/* Dims everything behind the panel and closes it on a click. */
+.rev-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgb(0 0 0 / 20%);
 }
 
 .commit-picker {
@@ -21,17 +17,75 @@
   flex-direction: column;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 6px 20px rgb(0 0 0 / 40%);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 50%);
   outline: none;
+  overflow: hidden;
 }
 
 .picker-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.revset-field {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  font: var(--fs-sm) var(--mono);
+}
+
+.revset-field:focus-within {
+  border-color: var(--accent);
+}
+
+.revset-field span {
+  color: var(--muted);
+}
+
+.revset-field input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+}
+
+.picker-bar button {
+  white-space: nowrap;
+}
+
+.picker-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.picker-presets button {
+  padding: 1px 7px;
+  border-radius: 999px;
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+
+.picker-presets button.on {
+  color: var(--fg);
+  border-color: transparent;
+  background: var(--selection);
 }
 
 .log-lines {
@@ -44,6 +98,7 @@
 }
 
 .log-line {
+  position: relative;
   padding: 0 8px;
 }
 
@@ -52,26 +107,70 @@
 }
 
 .log-line.pickable:hover {
-  background: rgb(255 255 255 / 5%);
+  background: var(--hover);
 }
 
 .log-line.picked {
+  background: rgb(79 140 201 / 12%);
+}
+
+.log-line.cursor {
   background: var(--selection);
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.log-actions {
+  position: absolute;
+  top: 0;
+  right: 8px;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.log-actions button {
+  padding: 0 6px;
+  font:
+    var(--fs-xs) / 16px -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  background: var(--raise);
+}
+
+.log-new {
+  position: relative;
+}
+
+.log-new .menu-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  min-width: 0;
+}
+
+.log-new .menu-list button {
+  background: none;
+  font-size: var(--fs-sm);
+  line-height: 18px;
 }
 
 .picker-footer {
   display: flex;
-  gap: 8px;
-  padding: 3px 8px;
-  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--hair);
   color: var(--muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
+}
+
+.picker-footer > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .picker-last {
   color: var(--fg);
-}
-
-.log-line.cursor {
-  box-shadow: inset 3px 0 var(--accent);
 }

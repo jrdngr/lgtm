@@ -63,6 +63,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::close_review,
             commands::review::refresh_review,
             commands::review::log_graph,
+            commands::review::trunk_bookmark,
             commands::review::jj_act,
             commands::review::mark_rows,
             commands::review::set_files_checked,

@@ -225,7 +225,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   usePublishTarget(
     api,
     workspace,
-    { revset, changes: review?.changes ?? NO_CHANGES, loading },
+    { revset, changes: review?.changes ?? NO_CHANGES, loading, stale: !!stale },
     { load, focus: focusRoot },
   );
 

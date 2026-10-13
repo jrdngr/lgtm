@@ -263,30 +263,93 @@ kbd {
   max-height: 70vh;
 }
 
-/* The revision selector: a field showing what's reviewed, not a button. */
+/* The revision selector: a field showing what's reviewed, not a button. Amber only warns. */
 .toolbar .rev-select {
+  gap: 7px;
   max-width: 100%;
-  padding: 3px 10px;
-  border: 1px solid rgb(210 153 34 / 60%);
-  border-radius: 4px;
-  background: rgb(210 153 34 / 14%);
+  padding: 3px 6px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
   cursor: pointer;
 }
 
 .toolbar .rev-select:hover:not(:disabled),
 .toolbar .rev-select.open {
+  border-color: var(--muted);
+  background: var(--raise);
+}
+
+.toolbar .rev-select.warn {
+  border-color: rgb(210 153 34 / 55%);
+}
+
+.toolbar .rev-select.warn:hover:not(:disabled),
+.toolbar .rev-select.warn.open {
   border-color: var(--amber);
-  background: rgb(210 153 34 / 22%);
 }
 
-.rev-select-empty {
-  color: var(--muted);
+.toolbar .rev-select .rev-label {
+  align-items: center;
+  gap: 7px;
 }
 
-.rev-select-caret {
+.toolbar .rev-select .icon {
   flex: none;
+  color: var(--accent);
+}
+
+.toolbar .rev-select.warn .icon {
+  color: var(--amber);
+}
+
+.toolbar .rev-select .rev-desc {
+  font:
+    var(--fs-sm) / 1.4 -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: var(--fg);
+}
+
+.toolbar .rev-select .rev-desc.empty {
+  font-style: italic;
+  color: var(--amber);
+}
+
+.toolbar .rev-select .rev-arrow {
   color: var(--muted);
-  font-size: 10px;
+}
+
+.toolbar .rev-select .rev-count {
+  flex: none;
+  padding-left: 7px;
+  border-left: 1px solid var(--border);
+  font:
+    var(--fs-xs) -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: var(--muted);
+}
+
+.toolbar .rev-select kbd {
+  flex: none;
+}
+
+/* Holds the field's width while a review loads. */
+.rev-shimmer {
+  flex: 1;
+  min-width: 120px;
+  height: 10px;
+  border-radius: 3px;
+  background:
+    linear-gradient(90deg, var(--hair) 25%, var(--raise) 50%, var(--hair) 75%) 0 0 / 200% 100%;
+  animation: rev-shimmer 1.2s linear infinite;
+}
+
+@keyframes rev-shimmer {
+  to {
+    background-position: -200% 0;
+  }
 }
 
 .toolbar .repo {

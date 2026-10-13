@@ -3,7 +3,8 @@ import type { JjAction, LogLine } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
 import { AnsiText } from "./AnsiText";
-import "./MarkMenu.css";
+import { RevisionsPanelActions } from "./RevisionsPanelActions";
+import { RevisionsPanelFooter } from "./RevisionsPanelFooter";
 import "./RevisionsPanel.css";
 
 interface Props {
@@ -17,9 +18,6 @@ interface Props {
   onClose(): void;
 }
 
-const HINTS =
-  "↵ review · e edit · n new after · N new before · s squash · u undo · U redo · / revset";
-
 /** Cursor moves. Shifted keys extend the range from the anchor. */
 const MOVES: Record<string, number> = { j: 1, ArrowDown: 1, J: 1, k: -1, ArrowUp: -1, K: -1 };
 
@@ -29,7 +27,7 @@ const REV_ACTIONS: Record<string, (rev: string) => [JjAction, string, string?]> 
   e: (rev) => [{ kind: "edit", rev }, `Editing ${rev}`, "@"],
   n: (rev) => [{ kind: "newAfter", rev }, `New commit after ${rev}`, `${rev}::@`],
   N: (rev) => [{ kind: "newBefore", rev }, `New commit before ${rev}`, `@::${rev}`],
-  s: (rev) => [{ kind: "squash", rev }, `Squashed ${rev} into its parent`],
+  s: (rev) => [{ kind: "squash", rev }, `Squashed ${rev}`],
 };
 
 /** Line index of each commit's first line, newest first, and the commit each line belongs to
@@ -43,8 +41,14 @@ function layout(lines: LogLine[]) {
   return { commits, owner };
 }
 
+/** Revsets offered under the field: `@`, its parent, and everything since trunk, named by
+ * trunk's bookmark when it has one. */
+function presets(trunk: string | null) {
+  return ["@", "@-", `${trunk ?? "trunk()"}..@`];
+}
+
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
- * commits. Keys act on the highlighted commit. */
+ * commits. Keys and the cursor row's buttons act on the highlighted commit. */
 export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
   const [error, setError] = useState<string>();
@@ -56,6 +60,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   /** How many jj operations the last action took, so undo and redo take back all of them. */
   const [steps, setSteps] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [trunk, setTrunk] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +80,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
     reload();
+    commands.trunkBookmark(workspace).then((r) => r.status === "ok" && setTrunk(r.data));
     rootRef.current?.focus({ preventScroll: true });
   }, []);
 
@@ -84,12 +90,30 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
 
   const [lo, hi] = anchor === undefined ? [cursor, cursor] : [cursor, anchor].sort((a, b) => a - b);
 
-  /** Older to newer, or the one commit. Log order is newest first. */
-  function picked(): string | undefined {
-    const newer = changeAt(lo);
-    const older = changeAt(hi);
+  /** Older to newer, or the one commit, from cursor `c` and anchor `a`. Log order is newest
+   * first. */
+  function rangeOf(c: number, a = c): string | undefined {
+    const newer = changeAt(Math.min(c, a));
+    const older = changeAt(Math.max(c, a));
     if (!newer || !older) return undefined;
     return newer === older ? newer : `${older}::${newer}`;
+  }
+  const picked = () => rangeOf(cursor, anchor);
+
+  /** Moves the cursor, and the anchor for a range, and shows the pick in the field. */
+  function move(c: number, a?: number) {
+    setCursor(c);
+    setAnchor(a);
+    setTyped(rangeOf(c, a) ?? typed);
+  }
+
+  /** What the review button loads: the pick while the field shows it, else the field. */
+  function reviewLabel() {
+    if (typed.trim() === "@") return "Review @";
+    if (typed !== picked()) return "Review revset";
+    if (hi > lo) return `Review ${hi - lo + 1} changes`;
+    const line = lines?.[commits[lo]];
+    return `Review ${line?.workingCopy ? "@" : line?.changeId}`;
   }
 
   async function review(target: string | undefined) {
@@ -118,6 +142,11 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     }
   }
 
+  function runKey(key: string) {
+    const rev = changeAt(cursor);
+    if (rev) act(...REV_ACTIONS[key](rev));
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
     e.stopPropagation();
     if (e.target === inputRef.current) {
@@ -125,14 +154,12 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
       return;
     }
     const n = commits.length;
-    const rev = changeAt(cursor);
     const d = MOVES[e.key];
-    const revAction = REV_ACTIONS[e.key];
     if (d) {
-      setAnchor(e.key === "J" || e.key === "K" ? (a) => a ?? cursor : undefined);
-      setCursor((c) => Math.min(Math.max(c + d, 0), n - 1));
-    } else if (revAction) {
-      if (rev) act(...revAction(rev));
+      const range = e.key === "J" || e.key === "K";
+      move(Math.min(Math.max(cursor + d, 0), n - 1), range ? (anchor ?? cursor) : undefined);
+    } else if (e.key in REV_ACTIONS) {
+      runKey(e.key);
     } else {
       switch (e.key) {
         case "Enter":
@@ -160,7 +187,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
 
   return (
     <>
-      <div className="menu-backdrop" onMouseDown={onClose} />
+      <div className="rev-backdrop" onMouseDown={onClose} />
       <div
         ref={rootRef}
         className="commit-picker"
@@ -175,47 +202,59 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
             review(typed.trim());
           }}
         >
-          <input
-            ref={inputRef}
-            className="revset"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            spellCheck={false}
-            aria-label="Revset"
-          />
-          <button type="submit">Load</button>
-          <span className="spacer" />
-          <code>{picked() ?? ""}</code>
+          <label className="revset-field">
+            <span>revset</span>
+            <input
+              ref={inputRef}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              spellCheck={false}
+            />
+          </label>
+          <button type="submit" className="primary">
+            {reviewLabel()}
+          </button>
         </form>
+        <div className="picker-presets">
+          {presets(trunk).map((p) => (
+            <button
+              type="button"
+              key={p}
+              className={p === revset ? "on" : undefined}
+              onClick={() => review(p)}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
         {error && <div className="review-error">{error}</div>}
         {!lines && !error && <div className="placeholder">Loading</div>}
         <pre className="log-lines">
           {lines?.map((l, i) => {
             const c = owner[i];
             const inRange = c >= lo && c <= hi;
+            const isCursor = c === cursor && !!l.commitId;
             return (
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity
                 key={i}
-                className={`log-line${c >= 0 ? " pickable" : ""}${inRange ? " picked" : ""}${c === cursor && l.commitId ? " cursor" : ""}`}
+                className={`log-line${c >= 0 ? " pickable" : ""}${inRange ? " picked" : ""}${isCursor ? " cursor" : ""}`}
                 onMouseDown={(e) => {
                   if (c < 0) return;
-                  setAnchor(e.shiftKey ? (anchor ?? cursor) : undefined);
-                  setCursor(c);
+                  move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
                 }}
                 onDoubleClick={() => review(changeAt(c))}
               >
                 <AnsiText text={l.text} />
+                {isCursor && !busy && (
+                  <RevisionsPanelActions onReview={() => review(picked())} onKey={runKey} />
+                )}
                 {"\n"}
               </div>
             );
           })}
         </pre>
-        <div className="picker-footer">
-          {last && <span className="picker-last">{last} · u to undo</span>}
-          <span className="spacer" />
-          <span>{busy ? "Working…" : HINTS}</span>
-        </div>
+        <RevisionsPanelFooter last={last} busy={busy} />
       </div>
     </>
   );

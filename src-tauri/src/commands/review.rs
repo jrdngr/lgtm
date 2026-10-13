@@ -39,6 +39,18 @@ pub(crate) async fn log_graph(
     ws.jj.log_graph().await.map_err(err)
 }
 
+/// The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's
+/// presets. `None` when trunk has no bookmark.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn trunk_bookmark(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Option<String>> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    ws.jj.trunk_bookmark().await.map_err(err)
+}
+
 /// Runs a revisions panel action in the workspace. Returns how many jj operations it took.
 #[tauri::command]
 #[specta::specta]

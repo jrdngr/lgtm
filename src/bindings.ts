@@ -58,6 +58,11 @@ export const commands = {
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  `jj log` with the user's default revset and template, for picking commits. */
 	logGraph: (workspace: string | null) => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph", { workspace })),
+	/**
+	 *  The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's
+	 *  presets. `None` when trunk has no bookmark.
+	 */
+	trunkBookmark: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("trunk_bookmark", { workspace })),
 	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**
@@ -554,6 +559,8 @@ export type LogLine = {
 	/**  Set on the first line of each commit. */
 	commitId: string | null,
 	changeId: string | null,
+	/**  Whether this line starts the workspace's working-copy commit. */
+	workingCopy: boolean,
 };
 
 export type MarkDto = {

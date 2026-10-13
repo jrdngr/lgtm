@@ -9,6 +9,8 @@ export interface ReviewTarget {
   /** The review's changes, oldest first. Empty until it loads. */
   changes: ChangeDto[];
   loading: boolean;
+  /** The working copy is stale, so edits aren't picked up. */
+  stale?: boolean;
   /** Loads a revset as the review. Returns the error message when it fails. */
   load(revset: string): Promise<string | undefined>;
   /** Gives keys back to the review pane. */

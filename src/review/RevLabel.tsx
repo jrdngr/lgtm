@@ -1,8 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ChangeDto } from "../bindings";
+import { Icon } from "../ui/icons";
 
 /** Change ids show at least their unique prefix, and up to this many characters with room. */
 const MAX_ID = 5;
+/** A range's ends show this many characters, or their unique prefix if longer. */
+const RANGE_ID = 3;
 
 function Id({ id, unique, length }: { id: string; unique: number; length: number }) {
   return (
@@ -13,20 +16,10 @@ function Id({ id, unique, length }: { id: string; unique: number; length: number
   );
 }
 
-/** A revset with each change id it names cut to its unique prefix. */
-function Revset({ revset, changes }: { revset: string; changes: ChangeDto[] }) {
-  const parts = revset.split(/([^a-z0-9]+)/);
+function Desc({ change }: { change: ChangeDto }) {
   return (
-    <span className="rev-set">
-      {parts.map((p, i) => {
-        const c = p && changes.find((ch) => ch.changeId.startsWith(p) && p.length >= ch.unique);
-        return c ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
-          <Id key={i} id={c.changeId} unique={c.unique} length={c.unique} />
-        ) : (
-          p
-        );
-      })}
+    <span className={change.description ? "rev-desc" : "rev-desc empty"}>
+      {change.description || "no description"}
     </span>
   );
 }
@@ -38,7 +31,8 @@ interface Props {
 }
 
 /** What's reviewed, colored as jj colors it. One commit shows as `@ id description`, with as
- * much of the id as fits up to `MAX_ID`. A range shows its revset with short ids. */
+ * much of the id as fits up to `MAX_ID`. A range shows `oldest → newest`, the newest
+ * description, and how many changes it has. */
 export function RevLabel({ revset, changes }: Props) {
   const ref = useRef<HTMLSpanElement>(null);
   const head = changes.at(-1);
@@ -61,23 +55,29 @@ export function RevLabel({ revset, changes }: Props) {
   useLayoutEffect(() => {
     const desc = ref.current?.querySelector(".rev-desc");
     const cut = desc && desc.scrollWidth > desc.clientWidth;
-    if (cut && head && length > head.unique) setLength(length - 1);
+    if (single && cut && head && length > head.unique) setLength(length - 1);
   });
 
   if (!head) return <span className="rev-label">{revset}</span>;
+  if (single) {
+    return (
+      <span ref={ref} className="rev-label">
+        <Icon name="commit" size={14} />
+        {head.workingCopy && <span className="rev-at">@</span>}
+        <Id id={head.changeId} unique={head.unique} length={length} />
+        <Desc change={head} />
+      </span>
+    );
+  }
+  const first = changes[0];
   return (
     <span ref={ref} className="rev-label">
-      {single ? (
-        <>
-          {head.workingCopy && <span className="rev-at">@</span>}
-          <Id id={head.changeId} unique={head.unique} length={length} />
-          <span className={head.description ? "rev-desc" : "rev-desc empty"}>
-            {head.description || "(no description set)"}
-          </span>
-        </>
-      ) : (
-        <Revset revset={revset} changes={changes} />
-      )}
+      <Icon name="gitTree" size={14} />
+      <Id id={first.changeId} unique={first.unique} length={RANGE_ID} />
+      <span className="rev-arrow">→</span>
+      <Id id={head.changeId} unique={head.unique} length={RANGE_ID} />
+      <Desc change={head} />
+      <span className="rev-count">{changes.length} changes</span>
     </span>
   );
 }
