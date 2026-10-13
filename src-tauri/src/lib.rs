@@ -11,6 +11,7 @@ mod gitmeta;
 mod jj;
 mod layout;
 mod mcp;
+mod menu;
 mod pr;
 mod pty;
 mod recent;
@@ -170,6 +171,8 @@ pub fn run() {
             repo::open_from_args(app, argv.get(1..).unwrap_or_default(), Path::new(&cwd));
         }))
         .plugin(tauri_plugin_dialog::init())
+        .menu(menu::build)
+        .on_menu_event(menu::handle)
         .manage(Ptys::default())
         .manage(Runs::default())
         .manage(RepoWindows::default())

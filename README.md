@@ -16,12 +16,14 @@ just run [repo]  # run the release build
 
 Debug builds regenerate `src/bindings.ts` from the Rust commands. `cargo test` fails if it's stale; rerun with `UPDATE_BINDINGS=1` to refresh it.
 
-A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second launch for the same repo focuses its window.
+A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second launch for the same repo focuses its window. Each repo opens in its own window, and a repo is never open in two: picking one that's already open focuses its window.
 
 ## Shortcuts
 
 | Keys | Action |
 |---|---|
+| ⌘N | New window, opening on the repo picker |
+| ⌘O | Open a different repo: swaps this window for the repo picker |
 | ⌘T | New terminal tab |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |

@@ -108,6 +108,7 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     let label = format!("repo-{}", key(&root));
 
     if let Some(window) = app.get_webview_window(&label) {
+        close_start(app);
         window.unminimize().ok();
         return window.set_focus().map_err(|e| e.to_string());
     }
@@ -140,11 +141,14 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         .disable_drag_drop_handler()
         .build()
         .map_err(|e| e.to_string())?;
+    close_start(app);
+    Ok(())
+}
 
+fn close_start(app: &AppHandle) {
     if let Some(start) = app.get_webview_window(START_LABEL) {
         start.close().ok();
     }
-    Ok(())
 }
 
 pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
