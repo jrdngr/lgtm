@@ -435,3 +435,54 @@
   font: var(--fs-xs) var(--mono);
   color: var(--faint);
 }
+
+/* A thread's reply heading: Reply draft or Final, and the take behind it. */
+.reply-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 0 36px;
+  font-size: var(--fs-sm);
+}
+
+.take-toggle {
+  padding: 0 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.take-why {
+  margin: 4px 10px 0 36px;
+  padding: 6px 8px;
+  border-left: 2px solid var(--github);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.take-question {
+  margin-top: 4px;
+  color: var(--amber);
+}
+
+.item-icon {
+  display: flex;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.item-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+button.group-head.fold {
+  width: 100%;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.group-head.fold:hover {
+  color: var(--fg);
+}

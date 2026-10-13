@@ -4,6 +4,8 @@ import { Markdown } from "../bots/Markdown";
 import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar, Post } from "../github/Post";
 import { viewerLogin } from "../github/people";
+import { STAGES } from "../threads/stages";
+import { ReplyHead, StagePill, TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
@@ -23,8 +25,8 @@ interface Props {
   c: Comments;
 }
 
-/** A comment under its code: a GitHub thread or your own comment, an editor for its text, and
- * a conversation with an agent about it. */
+/** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
+ * editor for its text and a conversation with an agent about it. Done ones fold to a line. */
 export function CommentBlock({ id, comment, c }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
@@ -33,8 +35,12 @@ export function CommentBlock({ id, comment, c }: Props) {
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
   const gh = comment?.github;
+  const thread = comment?.thread;
   const viewer = viewerLogin(c.comments);
   const asking = c.asking(id);
+  const isNew = id === NEW_COMMENT;
+  const github = !!gh || !!thread || (isNew && !!c.draft?.github);
+  const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
 
   useEffect(() => {
     if (c.focus?.id !== id) return;
@@ -45,21 +51,24 @@ export function CommentBlock({ id, comment, c }: Props) {
     c.focused();
   });
 
-  if (gh?.resolved && !expanded && editing === undefined && !asking) {
+  if (comment && done && !expanded && editing === undefined && !asking) {
+    const summary = gh ? lastPost(gh, viewer) : comment.body.split("\n")[0];
     return (
-      <div className="comment-block gh resolved">
+      <div className={`comment-block ${github ? "gh" : "mine"} resolved`}>
         <button
           type="button"
           className="card-bar collapsed"
           aria-expanded={false}
           onClick={() => setExpanded(true)}
-          title="Show the thread"
+          title={github ? "Show the thread" : "Show the note"}
         >
           <span className="chevron">▸</span>
-          <span className="pill green">✓ Resolved</span>
-          <span className="card-summary">{lastPost(gh, viewer)}</span>
+          <span className={`pill${gh?.resolved ? " green" : ""}`}>
+            {gh?.resolved ? "✓ Resolved" : "✓ Done"}
+          </span>
+          <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
-          <span className="card-count">{gh.posts.length}</span>
+          {gh && <span className="card-count">{gh.posts.length}</span>}
         </button>
       </div>
     );
@@ -72,43 +81,52 @@ export function CommentBlock({ id, comment, c }: Props) {
     e.preventDefault();
   }
 
-  const isNew = id === NEW_COMMENT;
   const body = editing ?? comment?.body ?? "";
   const changed = comment && !comment.rows;
-  const publishing = c.publishing.has(id);
-  const canPublish = c.canPublish && !!body.trim() && !publishing;
-  const publishTitle = "Add to your pending review on GitHub. Submit it from the Comments view.";
   const when = comment && (comment.updatedAt ?? comment.createdAt);
-  const kind = gh ? "gh" : "mine";
-
-  const publishButton = c.canPublish && (
+  const source = isNew
+    ? github
+      ? "New draft for GitHub"
+      : "New note"
+    : gh
+      ? thread?.summary || "GitHub"
+      : thread
+        ? "Draft for GitHub"
+        : "Note";
+  const canFinal = !!gh && !!body.trim() && thread?.stage !== "ready";
+  const finalButton = (
     <button
       type="button"
       className="primary"
-      onClick={() => c.publish(id)}
-      disabled={!canPublish}
-      title={publishTitle}
+      onClick={() => c.final(id)}
+      title="Make this the reply to send. It goes out with Send to GitHub in the PR tab."
     >
-      {publishing ? "Publishing…" : "Publish"}
+      Final
     </button>
   );
+  const stageItems = thread
+    ? STAGES.filter(([s]) => s !== thread.stage).map(([s, label]) => ({
+        label: `Move to ${label}`,
+        onSelect: () => c.setStage(id, s),
+      }))
+    : [];
 
   return (
-    <div className={`comment-block ${kind}${gh?.resolved ? " resolved" : ""}`}>
+    <div className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}`}>
       <div className="card-bar">
-        {gh?.resolved && (
+        {done && (
           <button
             type="button"
             className="chevron quiet"
             aria-expanded={true}
             onClick={() => setExpanded(false)}
-            title="Fold the thread"
+            title="Fold"
           >
             ▾
           </button>
         )}
         <span className="card-source" title={comment ? `Review: ${comment.review}` : undefined}>
-          {isNew ? "New comment" : gh ? "GitHub" : "Your comment"}
+          {source}
         </span>
         {gh && (
           <>
@@ -126,6 +144,8 @@ export function CommentBlock({ id, comment, c }: Props) {
             </span>
           </>
         ) : null}
+        {thread && <TakePill take={thread.take} />}
+        {thread && <StagePill state={thread} />}
         {gh?.resolved && <span className="pill green">✓ Resolved</span>}
         {gh?.outdated && <span className="pill">Outdated</span>}
         {changed && (
@@ -148,6 +168,14 @@ export function CommentBlock({ id, comment, c }: Props) {
               onClick={() => c.edit(comment)}
             />
           )}
+          {comment && !thread && (
+            <IconButton
+              icon="check"
+              label={comment.done ? "Open again" : "Done"}
+              aria-pressed={comment.done}
+              onClick={() => c.setDone(comment.id, !comment.done)}
+            />
+          )}
           {!agentsOff && (
             <IconButton
               icon="sparkle"
@@ -162,15 +190,14 @@ export function CommentBlock({ id, comment, c }: Props) {
           {comment && (
             <Menu
               items={[
-                editing === undefined &&
-                  !gh &&
-                  c.canPublish && {
-                    label: "Publish",
-                    onSelect: () => c.publish(id),
-                    disabled: !canPublish,
-                    title: publishTitle,
+                ...stageItems,
+                !thread &&
+                  c.canDraft && {
+                    label: "Draft PR comment from this",
+                    title: "Start a draft for GitHub on the same lines, with this note's text",
+                    onSelect: () => c.draftFromNote(comment.id),
                   },
-                { label: "Delete", onSelect: () => c.remove(comment.id), danger: true },
+                !gh && { label: "Delete", onSelect: () => c.remove(comment.id), danger: true },
               ]}
             />
           )}
@@ -178,13 +205,11 @@ export function CommentBlock({ id, comment, c }: Props) {
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
       {gh && <GhThread link={gh} viewer={viewer} />}
-      {editing === undefined && gh && comment?.body && (
-        <Post
-          author={viewer ?? "You"}
-          name="You"
-          pills={<span className="pill blue">Not published</span>}
-          body={comment.body}
-        />
+      {editing === undefined && gh && thread && comment?.body && (
+        <>
+          <ReplyHead state={thread} />
+          <Post author={viewer ?? "You"} name="You" body={comment.body} />
+        </>
       )}
       {editing === undefined && !gh && (
         <div className="post">
@@ -201,7 +226,9 @@ export function CommentBlock({ id, comment, c }: Props) {
             className="comment-input"
             value={editing}
             rows={Math.min(12, Math.max(3, editing.split("\n").length))}
-            placeholder={gh ? "Write a reply" : "Write a comment"}
+            placeholder={
+              gh ? "Write a reply" : github ? "Write a comment for GitHub" : "Write a note"
+            }
             onChange={(e) => c.setBody(id, e.target.value)}
             onKeyDown={onBodyKey}
           />
@@ -212,12 +239,12 @@ export function CommentBlock({ id, comment, c }: Props) {
             </button>
             <button
               type="button"
-              className={c.canPublish ? undefined : "primary"}
+              className={canFinal ? undefined : "primary"}
               onClick={() => c.save(id)}
             >
               Save <kbd>{SAVE_KEY}</kbd>
             </button>
-            {publishButton}
+            {canFinal && finalButton}
           </div>
         </div>
       ) : (
@@ -227,7 +254,7 @@ export function CommentBlock({ id, comment, c }: Props) {
             <button type="button" className="reply-field" onClick={() => c.edit(comment)}>
               {comment.body ? "Edit reply…" : "Reply…"}
             </button>
-            {comment.body && publishButton}
+            {canFinal && finalButton}
           </div>
         )
       )}

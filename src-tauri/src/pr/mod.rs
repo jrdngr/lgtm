@@ -6,9 +6,9 @@ mod cleanup;
 mod discussion;
 mod nearby;
 mod preview;
-mod publish;
 mod pull;
 mod refetch;
+mod send;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -21,6 +21,7 @@ pub use discussion::DiscussionDto;
 pub use nearby::NearbyPrsDto;
 pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
+pub use send::Fixed;
 
 /// A PR workspace's PR, as stored.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

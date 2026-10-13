@@ -142,3 +142,17 @@ pub async fn comment(pr: &str, body: &str) -> anyhow::Result<()> {
     gh::graphql(COMMENT, json!({ "pr": pr, "body": body })).await?;
     Ok(())
 }
+
+const RESOLVE: &str =
+    "mutation($thread:ID!){resolveReviewThread(input:{threadId:$thread}){thread{id}}}";
+
+/// Resolves a review thread right away.
+pub async fn resolve(thread: &str) -> anyhow::Result<()> {
+    gh::graphql(RESOLVE, json!({ "thread": thread })).await?;
+    Ok(())
+}
+
+/// Whether the viewer has a pending review on the PR.
+pub async fn has_pending(pr: &str) -> anyhow::Result<bool> {
+    Ok(pending(pr).await?.is_some())
+}

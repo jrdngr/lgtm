@@ -3,7 +3,14 @@ import type { ReviewDto, StateDto } from "../bindings";
 import { flatten } from "./model";
 import { fileProgress, indexState, rowStates } from "./state";
 
-const NO_STATE: StateDto = { marks: [], checks: [], amber: [], comments: [], notes: [] };
+const NO_STATE: StateDto = {
+  marks: [],
+  checks: [],
+  amber: [],
+  comments: [],
+  notes: [],
+  threads: [],
+};
 
 /** A review's files, and the state and progress of their rows. */
 export function useReviewState(review: ReviewDto | undefined) {

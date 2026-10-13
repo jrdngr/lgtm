@@ -1,6 +1,6 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
-import type { CommentDto, ReviewDto, StateDto } from "../bindings";
+import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
@@ -53,8 +53,8 @@ interface Deps {
   onDone(): void;
   /** Called after the agent was asked to change the code, to show its edits. */
   onChanged(): void;
-  /** The review is a PR's, so comments can be published to it. */
-  canPublish: boolean;
+  /** The review is in a PR workspace, so drafts for GitHub can be written. */
+  canDraft: boolean;
 }
 
 /** The comment being drafted, bodies being edited, and workshop conversations. */
@@ -67,7 +67,7 @@ export function useComments({
   send,
   onDone,
   onChanged,
-  canPublish,
+  canDraft,
 }: Deps) {
   const [draft, setDraft] = useState<Draft>();
   /** Bodies being edited, by comment id. Present means the block is in edit mode. */
@@ -75,7 +75,6 @@ export function useComments({
   /** Unsent workshop messages, by comment id. */
   const [asks, setAsks] = useState<ReadonlyMap<number, string>>(new Map());
   const [running, setRunning] = useState<ReadonlyMap<number, Running>>(new Map());
-  const [publishing, setPublishing] = useState<ReadonlySet<number>>(new Set());
   /** Blocks whose ask box was opened. It also shows while a block has a conversation. */
   const [askOpen, setAskOpen] = useState<ReadonlySet<number>>(new Set());
   /** The text box that should take focus when its block next renders. */
@@ -122,7 +121,9 @@ export function useComments({
     if (!review || !draft) return undefined;
     const before = new Set(comments.map((c) => c.id));
     const rows = draft.rows.map((row) => ({ file: draft.file, row }));
-    const state = await apply(commands.addComment(review.id, rows, body, draft.snippet));
+    const state = await apply(
+      commands.addComment(review.id, rows, body, draft.snippet, !!draft.github),
+    );
     const id = state?.comments.find((c) => !before.has(c.id))?.id;
     if (id === undefined) return undefined;
     setDraft(undefined);
@@ -205,14 +206,24 @@ export function useComments({
     return cid;
   }
 
-  /** Adds the block's text to the PR's pending review, saving it first. */
-  async function publish(id: number) {
-    if (!review || publishing.has(id)) return;
+  /** Saves the thread's reply as final, which makes it ready to send. */
+  async function final(id: number) {
     const cid = await saveEdit(id);
-    if (cid === undefined) return;
-    setPublishing((s) => new Set(s).add(cid));
-    await apply(commands.publishComment(review.id, cid));
-    setPublishing((s) => withoutId(s, cid));
+    if (review && cid !== undefined) await apply(commands.setThreadStage(review.id, cid, "ready"));
+    onDone();
+  }
+
+  async function setStage(id: number, stage: Stage) {
+    if (review) await apply(commands.setThreadStage(review.id, id, stage));
+  }
+
+  async function setDone(id: number, done: boolean) {
+    if (review) await apply(commands.setNoteDone(review.id, id, done));
+  }
+
+  /** Starts a GitHub draft on the note's code, with its text. */
+  async function draftFromNote(id: number) {
+    if (review) await apply(commands.draftFromNote(review.id, id));
   }
 
   /** Shows the block's ask box with the cursor in it. */
@@ -250,13 +261,15 @@ export function useComments({
     stop: commands.stopWorkshop,
     use,
     send: sendComment,
-    publish,
-    publishing,
+    final,
+    setStage,
+    setDone,
+    draftFromNote,
     /** Whether the block's ask box shows: opened, or holding a conversation. */
     asking: (id: number) => askOpen.has(id) || running.has(id) || !!byId(id)?.messages.length,
     openAsk,
     closeAsk,
-    canPublish,
+    canDraft,
     /** The agent edits `@`, so a change only shows when the review includes it. */
     canChange: review?.hasWorkingCopy ?? false,
     done: onDone,

@@ -44,6 +44,7 @@ pub struct Nodes<T> {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Comment {
+    pub id: String,
     pub author: Option<Login>,
     pub body: String,
     pub created_at: String,
@@ -53,6 +54,7 @@ pub struct Comment {
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Review {
+    pub id: String,
     pub author: Option<Login>,
     pub body: String,
     /// PENDING, COMMENTED, APPROVED, CHANGES_REQUESTED or DISMISSED.
@@ -63,6 +65,8 @@ pub struct Review {
 }
 
 pub struct Discussion {
+    /// The login `gh` is signed in as.
+    pub viewer: String,
     /// The PR's head on GitHub, which threads' lines are numbered on.
     pub head: String,
     pub threads: Vec<Thread>,
@@ -71,14 +75,15 @@ pub struct Discussion {
 }
 
 const QUERY: &str = "query($owner:String!,$name:String!,$number:Int!,$after:String){
+viewer{login}
 repository(owner:$owner,name:$name){pullRequest(number:$number){
   headRefOid
   reviewThreads(first:50,after:$after){pageInfo{hasNextPage endCursor} nodes{
     id isResolved isOutdated path line startLine diffSide startDiffSide
     comments(first:100){nodes{author{login} body createdAt url state diffHunk}}
   }}
-  comments(last:100){nodes{author{login} body createdAt url}}
-  reviews(last:100){nodes{author{login} body state submittedAt url viewerDidAuthor}}
+  comments(last:100){nodes{id author{login} body createdAt url}}
+  reviews(last:100){nodes{id author{login} body state submittedAt url viewerDidAuthor}}
 }}}";
 
 pub async fn discussion(repo: &GhRepo, number: u32) -> anyhow::Result<Discussion> {
@@ -97,6 +102,7 @@ pub async fn discussion(repo: &GhRepo, number: u32) -> anyhow::Result<Discussion
             let comments: Nodes<Comment> = gh::at(&mut pr, "/comments")?;
             let reviews: Nodes<Review> = gh::at(&mut pr, "/reviews")?;
             return Ok(Discussion {
+                viewer: gh::at(&mut v, "/viewer/login")?,
                 head: gh::at(&mut pr, "/headRefOid")?,
                 threads,
                 comments: comments.nodes,

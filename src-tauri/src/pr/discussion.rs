@@ -28,6 +28,8 @@ pub struct DiscussionDto {
     pub posts: Vec<PostDto>,
     /// Whether the viewer has a review that isn't submitted yet.
     pub pending_review: bool,
+    /// The login `gh` is signed in as.
+    pub viewer: String,
 }
 
 /// Conversation comments and submitted reviews that say something, oldest first.
@@ -69,6 +71,7 @@ impl RepoCtx {
             pr: PrDto::from(&pr),
             posts,
             pending_review,
+            viewer: d.viewer,
         })
     }
 

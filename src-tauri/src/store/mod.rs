@@ -8,6 +8,7 @@ mod marks;
 mod notes;
 mod prs;
 mod sessions;
+mod threads;
 
 use std::path::Path;
 
@@ -18,6 +19,7 @@ pub use comments::{Author, Comment, GhLink, GhPost, Message, Pin, Workshop};
 pub use marks::{Mark, MarkState};
 pub use notes::{Category, FlowStep, Level, Note, Source};
 pub use sessions::Session;
+pub use threads::{Stage, ThreadState};
 
 pub struct Store {
     db: Connection,

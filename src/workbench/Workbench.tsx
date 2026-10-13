@@ -16,7 +16,6 @@ import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
-import { prOpen } from "./subviews";
 import { useCloseGuard } from "./useCloseGuard";
 import { WorkspaceDock } from "./WorkspaceDock";
 import { useWordWrapMenu } from "./wordWrap";
@@ -110,10 +109,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+Y": () => showView("right", "symbols"),
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
-    "Mod+Shift+P": () => {
-      prOpen.set(true);
-      showView("right", "comments");
-    },
+    "Mod+Shift+P": () => showView("right", "pr"),
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     toggle: () => toggleBottom(),

@@ -35,6 +35,7 @@ type Actions = Pick<
   | "runWalkthrough"
   | "refetchPr"
   | "pullPr"
+  | "apply"
 >;
 
 /** Publishes this pane as the workspace's current review while it's active, when none is
@@ -66,6 +67,8 @@ export function usePublishReview(
         filter,
         comments: review?.state.comments ?? [],
         notes: review?.state.notes ?? [],
+        threads: review?.state.threads ?? [],
+        apply: (state) => latest.current.apply(state),
         runWalkthrough: () => latest.current.runWalkthrough(),
         refetchPr: () => latest.current.refetchPr(),
         pullPr: (quiet) => latest.current.pullPr(quiet),

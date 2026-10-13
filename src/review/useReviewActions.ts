@@ -84,15 +84,20 @@ export function useReviewActions(d: Deps) {
     if (text) d.sendText(text, finishAction);
   }
 
-  /** Opens a comment draft on the selection, in its ask box when it's for a change. */
-  function startComment(field: "body" | "ask" = "body") {
+  /** Opens a note on the selection, in its ask box when it's for a change. `github` makes it a
+   * draft for the PR instead. */
+  function startComment(field: "body" | "ask" = "body", github = false) {
+    if (github && !d.c.canDraft) {
+      setError("Drafts for GitHub need a PR workspace. Press c for a note.");
+      return;
+    }
     const draft = draftFor(files, lines, sel.start, sel.end);
     if (!draft) {
       setError("Select changed rows to comment on.");
       return;
     }
     setError(undefined);
-    d.c.start(draft, field);
+    d.c.start({ ...draft, github }, field);
     finishAction();
   }
 

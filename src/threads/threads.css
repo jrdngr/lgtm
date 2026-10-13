@@ -1,0 +1,164 @@
+/* The stage bar: a thin segmented line, one color per stage. */
+.stage-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.stage-bar {
+  display: flex;
+  flex: 1;
+  gap: 2px;
+  height: 4px;
+}
+
+.stage-seg {
+  border-radius: 2px;
+}
+
+.stage-seg.amber {
+  background: var(--amber);
+}
+
+.stage-seg.blue {
+  background: var(--accent);
+}
+
+.stage-seg.purple {
+  background: var(--github);
+}
+
+.stage-seg.green {
+  background: var(--added);
+}
+
+.stage-seg.grey {
+  background: var(--faint);
+}
+
+/* Threads grouped by stage in the PR tab. */
+.stage-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px 2px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.stage-head:hover {
+  color: var(--fg);
+}
+
+.stage-head .chevron {
+  width: 10px;
+  font-size: 9px;
+}
+
+.stage-head .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.thread-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 10px 2px 22px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+
+.thread-row:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.thread-row[aria-expanded="true"] {
+  background: var(--selection);
+}
+
+.thread-row .item-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+
+/* A thread opened in a list. */
+.thread-card {
+  margin: 2px 8px 8px 16px;
+  border: 1px solid var(--hair);
+  border-left: 2px solid var(--github);
+  border-radius: 4px;
+  background: var(--panel);
+  user-select: text;
+}
+
+.thread-card-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+}
+
+.thread-card > .post:first-of-type {
+  padding-top: 0;
+}
+
+.thread-question {
+  margin: 6px 10px 0;
+  font-size: var(--fs-sm);
+}
+
+.thread-reply {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.thread-reply .comment-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.send-fixed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.send-fixed select {
+  flex: 1;
+  min-width: 0;
+}
+
+.send-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}

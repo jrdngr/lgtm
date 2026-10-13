@@ -22,6 +22,7 @@ mod progress;
 mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;
+mod threads;
 mod views;
 pub(crate) mod walkthrough;
 #[cfg(test)]
@@ -51,6 +52,7 @@ use matching::MatchedCheck;
 pub use notes::{NoteDto, NoteInput};
 pub use progress::ProgressDto;
 pub use rowmap::RowMove;
+pub use threads::{ThreadDto, pulled_stage};
 pub use views::{ChangeDto, View};
 pub use workshop::{Ask, NOT_AT_WORKING_COPY};
 
@@ -157,6 +159,9 @@ pub struct StateDto {
     pub comments: Vec<CommentDto>,
     /// The review's walkthrough notes, in reading order. Ones whose code is gone have no rows.
     pub notes: Vec<NoteDto>,
+    /// In a PR workspace, every thread and draft on the PR, in file order, then comments on
+    /// the PR by time.
+    pub threads: Vec<ThreadDto>,
 }
 
 pub struct Review {
@@ -174,6 +179,7 @@ pub struct Review {
     amber: Vec<RowRef>,
     comments: Vec<CommentDto>,
     notes: Vec<NoteDto>,
+    threads: Vec<ThreadDto>,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
     baseline: HashSet<i64>,
@@ -365,6 +371,7 @@ impl Review {
             amber: vec![],
             comments: vec![],
             notes: vec![],
+            threads: vec![],
             baseline: HashSet::new(),
             session: 0,
             from: None,
@@ -433,6 +440,7 @@ impl Review {
             amber: self.amber.clone(),
             comments: self.comments.clone(),
             notes: self.notes.clone(),
+            threads: self.threads.clone(),
         }
     }
 }

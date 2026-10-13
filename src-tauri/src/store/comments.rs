@@ -1,10 +1,12 @@
-//! Local review comments. A comment is anchored like a mark, on the first and last changed
-//! rows of the selection it was made on, and keeps its workshop conversation with an agent.
+//! Review comments: local notes, and GitHub threads and drafts of them. A comment is anchored
+//! like a mark, on the first and last changed rows of the selection it was made on, and keeps
+//! its workshop conversation with an agent.
 
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use super::threads::{ThreadState, thread_from_sql, thread_to_sql};
 use super::{Store, json_err};
 use crate::anchor::{Anchor, Side};
 
@@ -82,8 +84,8 @@ pub struct GhPost {
     pub pending: bool,
 }
 
-/// The GitHub review thread a comment is on. The comment's body is then a reply not yet
-/// published.
+/// The GitHub thread a comment is on: a review thread on code, or a comment or review summary
+/// on the PR, whose comment's path is empty. The comment's body is then a reply not yet sent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GhLink {
@@ -95,6 +97,9 @@ pub struct GhLink {
     pub resolved: bool,
     pub outdated: bool,
     pub posts: Vec<GhPost>,
+    /// The thread's last line on the PR head, while it isn't outdated.
+    #[serde(default)]
+    pub line: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -111,6 +116,10 @@ pub struct Comment {
     pub updated_at: i64,
     pub workshop: Workshop,
     pub github: Option<GhLink>,
+    /// Set on threads and drafts of them; notes have none.
+    pub thread: Option<ThreadState>,
+    /// A note the user is done with.
+    pub done: bool,
 }
 
 const SCHEMA: &str = "
@@ -124,26 +133,37 @@ CREATE TABLE IF NOT EXISTS comments (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     workshop TEXT NOT NULL,
-    github TEXT NOT NULL DEFAULT ''
+    github TEXT NOT NULL DEFAULT '',
+    thread TEXT NOT NULL DEFAULT '',
+    done INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS comments_path ON comments (path);
 ";
 
+/// Columns added after the table first shipped, for stores made before them.
+const ADDED: [(&str, &str); 3] = [
+    ("github", "TEXT NOT NULL DEFAULT ''"),
+    ("thread", "TEXT NOT NULL DEFAULT ''"),
+    ("done", "INTEGER NOT NULL DEFAULT 0"),
+];
+
 pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
     db.execute_batch(SCHEMA)?;
-    let has_github: bool = db.query_row(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('comments') WHERE name = 'github'",
-        [],
-        |r| r.get(0),
-    )?;
-    if !has_github {
-        db.execute_batch("ALTER TABLE comments ADD COLUMN github TEXT NOT NULL DEFAULT '';")?;
+    for (name, def) in ADDED {
+        let has: bool = db.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('comments') WHERE name = ?",
+            [name],
+            |r| r.get(0),
+        )?;
+        if !has {
+            db.execute_batch(&format!("ALTER TABLE comments ADD COLUMN {name} {def};"))?;
+        }
     }
     Ok(())
 }
 
-const COLUMNS: &str =
-    "id, path, pins, body, snippet, review, created_at, updated_at, workshop, github";
+pub(super) const COLUMNS: &str =
+    "id, path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread, done";
 
 fn github_to_sql(g: &Option<GhLink>) -> rusqlite::Result<String> {
     match g {
@@ -159,7 +179,9 @@ fn github_from_sql(s: String) -> rusqlite::Result<Option<GhLink>> {
     serde_json::from_str(&s).map(Some).map_err(json_err)
 }
 
-fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
+pub(super) fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
+    let github = github_from_sql(r.get(9)?)?;
+    let thread = thread_from_sql(r.get(10)?, github.as_ref())?;
     Ok(Comment {
         id: r.get(0)?,
         path: r.get(1)?,
@@ -170,7 +192,9 @@ fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
         created_at: r.get(6)?,
         updated_at: r.get(7)?,
         workshop: serde_json::from_str(&r.get::<_, String>(8)?).map_err(json_err)?,
-        github: github_from_sql(r.get(9)?)?,
+        github,
+        thread,
+        done: r.get(11)?,
     })
 }
 
@@ -187,8 +211,8 @@ impl Store {
     /// Inserts a comment and returns its id.
     pub fn add_comment(&self, c: &Comment) -> rusqlite::Result<i64> {
         self.db.execute(
-            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop, github)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread, done)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 c.path,
                 serde_json::to_string(&c.pins).map_err(json_err)?,
@@ -199,6 +223,8 @@ impl Store {
                 c.updated_at,
                 serde_json::to_string(&c.workshop).map_err(json_err)?,
                 github_to_sql(&c.github)?,
+                thread_to_sql(&c.thread)?,
+                c.done,
             ],
         )?;
         Ok(self.db.last_insert_rowid())
@@ -256,20 +282,12 @@ impl Store {
         Ok(())
     }
 
-    /// Comments on GitHub threads of `repo`'s PR `pr`.
-    pub fn pr_comments(&self, repo: &str, pr: u32) -> rusqlite::Result<Vec<Comment>> {
-        let sql = format!("SELECT {COLUMNS} FROM comments WHERE github != ''");
-        let mut stmt = self.db.prepare(&sql)?;
-        let rows = stmt.query_map([], row_to_comment)?;
-        let all: rusqlite::Result<Vec<Comment>> = rows.collect();
-        Ok(all?
-            .into_iter()
-            .filter(|c| {
-                c.github
-                    .as_ref()
-                    .is_some_and(|g| g.repo == repo && g.pr == pr)
-            })
-            .collect())
+    pub fn set_comment_done(&self, id: i64, done: bool) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE comments SET done = ? WHERE id = ?",
+            params![done, id],
+        )?;
+        Ok(())
     }
 
     pub fn delete_comment(&self, id: i64) -> rusqlite::Result<()> {
@@ -281,6 +299,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::threads::Stage;
 
     #[test]
     fn comments_round_trip() {
@@ -305,6 +324,8 @@ mod tests {
             updated_at: 1,
             workshop: Workshop::default(),
             github: None,
+            thread: None,
+            done: false,
         };
         c.id = store.add_comment(&c).unwrap();
         assert_eq!(store.comments_for_paths(&["a.rs"]).unwrap(), [c.clone()]);
@@ -331,10 +352,21 @@ mod tests {
             resolved: false,
             outdated: false,
             posts: vec![],
+            line: Some(4),
         });
         store.set_github(c.id, &link).unwrap();
-        assert_eq!(store.pr_comments("o/n", 3).unwrap()[0].github, link);
-        assert!(store.pr_comments("o/n", 4).unwrap().is_empty());
+        // A thread pulled before thread states existed gets one.
+        let got = &store.pr_threads("o/n", 3).unwrap()[0];
+        assert_eq!(got.github, link);
+        assert_eq!(got.thread, Some(ThreadState::new("o/n", 3, Stage::New)));
+        assert!(store.pr_threads("o/n", 4).unwrap().is_empty());
+
+        let mut thread = ThreadState::new("o/n", 3, Stage::Ready);
+        thread.summary = "Clamp".into();
+        store.set_thread(c.id, &Some(thread.clone())).unwrap();
+        store.set_comment_done(c.id, true).unwrap();
+        let got = store.comment(c.id).unwrap().unwrap();
+        assert_eq!((got.thread, got.done), (Some(thread), true));
 
         store.delete_comment(c.id).unwrap();
         assert_eq!(store.comment(c.id).unwrap(), None);

@@ -22,7 +22,7 @@ async fn comments_follow_their_code_and_outlive_it() {
         row_of(&review, 0, "    two();", 0),
     ];
     let state = ctx
-        .add_comment(review.id, &rows, "why two?", "+one\n+two")
+        .add_comment(review.id, &rows, "why two?", "+one\n+two", false)
         .unwrap();
     assert_eq!(state.comments.len(), 1);
 
@@ -80,7 +80,8 @@ async fn a_comment_on_a_renamed_file_keeps_its_removed_rows() {
         row_of(&review, 0, "    return 1", 0),
         row_of(&review, 0, "    return 2", 0),
     ];
-    ctx.add_comment(review.id, &rows, "why?", "-1\n+2").unwrap();
+    ctx.add_comment(review.id, &rows, "why?", "-1\n+2", false)
+        .unwrap();
 
     let review = ctx.open(None, "@", false).await.unwrap();
     let c = &review.state.comments[0];

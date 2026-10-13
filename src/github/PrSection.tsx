@@ -1,14 +1,15 @@
 import { useState } from "react";
-import type { PrDto } from "../bindings";
+import type { PrDto, ThreadDto } from "../bindings";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
+import { StageBar } from "../threads/StageBar";
 import { IconButton } from "../ui/icons";
 import { ago } from "../ui/time";
 import { useWorkspace } from "../workspaces/context";
 import { Avatar } from "./Post";
 import { PrDiscussion } from "./PrDiscussion";
 import { viewerLogin } from "./people";
-import { useDiscussion } from "./useDiscussion";
+import type { Discussion } from "./useDiscussion";
 import "./github.css";
 
 const STATES: Record<string, [string, string]> = {
@@ -23,16 +24,22 @@ function synced(at: number | undefined) {
   return a === "now" ? " · synced just now" : ` · synced ${a} ago`;
 }
 
-/** A PR workspace's PR atop its comments: state, title and branches, a Sync button, and the
- * conversation, which folds away. */
-export function PrSection({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }) {
+interface Props {
+  pr: PrDto;
+  review: CurrentReview | undefined;
+  discussion: Discussion;
+  threads: ThreadDto[];
+}
+
+/** A PR workspace's PR atop its threads: state, title, how far along its threads are, branches,
+ * a Sync button, and the conversation, which folds away. */
+export function PrSection({ pr, review, discussion, threads }: Props) {
   const workspace = useWorkspace();
-  const discussion = useDiscussion(workspace, pr);
   const [error, setError] = useState<string>();
   // Hovering Sync re-renders, so its tooltip's age is current.
   const [, hovered] = useState(0);
   const state = discussion.head && STATES[discussion.head.state];
-  const viewer = review && viewerLogin(review.comments);
+  const viewer = discussion.d?.viewer ?? (review && viewerLogin(review.comments));
 
   /** Fetches the PR, which pulls its threads into the review, and reads its conversation. */
   function sync() {
@@ -51,6 +58,7 @@ export function PrSection({ pr, review }: { pr: PrDto; review: CurrentReview | u
         <div className="pr-row">
           {state && <span className={`pill ${state[0]}`}>{state[1]}</span>}
           <span className="pr-number">#{pr.number}</span>
+          {pr.author === viewer && <span className="pill blue">Yours</span>}
           <span className="spacer" />
           <IconButton icon="external" label="Open on GitHub" onClick={openPage} />
           <IconButton
@@ -63,6 +71,7 @@ export function PrSection({ pr, review }: { pr: PrDto; review: CurrentReview | u
           />
         </div>
         <div className="pr-title">{pr.title}</div>
+        <StageBar threads={threads} />
         <div className="pr-row pr-meta">
           <Avatar name={pr.author} small />
           <span>{pr.author === viewer ? "You" : pr.author}</span>

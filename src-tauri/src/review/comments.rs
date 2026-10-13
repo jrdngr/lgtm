@@ -7,9 +7,10 @@ use serde::Serialize;
 use specta::Type;
 
 use super::matching::{Remaps, SideRows, pools};
+use super::threads::after_edit;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::anchor::{self, MarkRef};
-use crate::store::{Comment, GhLink, Message, Pin, Store, Workshop};
+use crate::store::{Comment, GhLink, Message, Pin, Store, ThreadState, Workshop};
 
 /// The first and last rows a comment covers, by index among its file's rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
@@ -36,6 +37,10 @@ pub struct CommentDto {
     pub messages: Vec<Message>,
     /// The GitHub thread it's on, whose replies show above it.
     pub github: Option<GhLink>,
+    /// Set on GitHub threads and drafts of them; notes have none.
+    pub thread: Option<ThreadState>,
+    /// A note the user is done with.
+    pub done: bool,
 }
 
 impl Review {
@@ -50,7 +55,7 @@ impl Review {
             let at = c.rows.map_or(u32::MAX, |r| r.end);
             (c.file, at, c.created_at as i64)
         });
-        Ok(())
+        self.rematch_threads(store)
     }
 
     /// Where a comment goes, or `None` when none of the review's files is its file.
@@ -68,6 +73,8 @@ impl Review {
             updated_at: c.updated_at as f64,
             messages: c.workshop.messages,
             github: c.github,
+            thread: c.thread,
+            done: c.done,
         })
     }
 
@@ -184,15 +191,21 @@ impl RepoCtx {
     }
 
     /// Comments on `rows`, the changed rows of a selection. `snippet` is the code as shown.
+    /// `draft` makes it a draft of a GitHub thread on the workspace's PR instead of a note.
     pub fn add_comment(
         &self,
         id: u32,
         rows: &[RowRef],
         body: &str,
         snippet: &str,
+        draft: bool,
     ) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |review, store| {
             let (path, pins) = review.pins(store, rows)?;
+            let thread = match draft {
+                true => Some(review.draft_state(store, body)?),
+                false => None,
+            };
             let now = now_ms();
             store.add_comment(&Comment {
                 id: 0,
@@ -205,14 +218,25 @@ impl RepoCtx {
                 updated_at: now,
                 workshop: Workshop::default(),
                 github: None,
+                thread,
+                done: false,
             })?;
             Ok(())
         })
     }
 
+    /// Saves a comment's text. A thread's reply moves its stage along.
     pub fn edit_comment(&self, id: u32, comment: u32, body: &str) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |_, store| {
-            Ok(store.set_comment_body(comment as i64, body, now_ms())?)
+            let cid = comment as i64;
+            let c = store.comment(cid)?.context("the comment is gone")?;
+            if let Some(mut t) = c.thread
+                && c.body != body
+            {
+                t.stage = after_edit(t.stage, c.github.is_none(), body);
+                store.set_thread(cid, &Some(t))?;
+            }
+            Ok(store.set_comment_body(cid, body, now_ms())?)
         })
     }
 

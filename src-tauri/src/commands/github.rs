@@ -6,7 +6,7 @@ use tauri::{State, WebviewWindow};
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
 use crate::github::Verdict;
-use crate::pr::{DiscussionDto, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto};
+use crate::pr::{DiscussionDto, Fixed, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto};
 use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
@@ -109,32 +109,19 @@ pub(crate) async fn pull_pr_comments(window: WebviewWindow, review: u32) -> CmdR
     repo(&window)?.pull_pr_comments(review).await.map_err(err)
 }
 
-/// Adds a comment's text to the pending review on GitHub: a reply on its thread, or a new
-/// thread on its code.
+/// Sends the PR's ready threads to GitHub and submits the review with `verdict` and
+/// `summary`. `fixed` says what happens to ready threads with no reply.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn publish_comment(
+pub(crate) async fn send_threads(
     window: WebviewWindow,
     review: u32,
-    comment: u32,
+    fixed: Fixed,
+    verdict: Verdict,
+    summary: String,
 ) -> CmdResult<StateDto> {
     repo(&window)?
-        .publish_comment(review, comment)
-        .await
-        .map_err(err)
-}
-
-/// Submits the pending review.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn submit_review(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    verdict: Verdict,
-    body: String,
-) -> CmdResult<()> {
-    repo(&window)?
-        .submit_review(workspace.as_deref(), verdict, &body)
+        .send_threads(review, fixed, verdict, &summary)
         .await
         .map_err(err)
 }

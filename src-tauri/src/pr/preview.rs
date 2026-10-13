@@ -163,7 +163,7 @@ impl RepoCtx {
         let threads = d
             .threads
             .into_iter()
-            .map(|t| pulled(t, &name, number))
+            .map(|t| pulled(t, &name, number, &d.viewer))
             .filter(|t| !t.link.posts.is_empty())
             .collect();
         let (files, elsewhere) = layout(parse_git(&diff)?, threads);
@@ -197,12 +197,14 @@ mod tests {
                 resolved: false,
                 outdated: line.is_none(),
                 posts: Vec::new(),
+                line: None,
             },
             path: path.into(),
             side,
             start: None,
             line,
             hunk: String::new(),
+            answered: false,
         }
     }
 

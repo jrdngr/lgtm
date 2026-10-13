@@ -1,4 +1,4 @@
-import type { CheckState, CommentDto, NoteDto } from "../bindings";
+import type { CheckState, CommentDto, NoteDto, StateDto, ThreadDto } from "../bindings";
 import type { FlatFile } from "./model";
 import type { Filter, Progress, RowStateFn } from "./state";
 import type { SendOutcome } from "./useSendText";
@@ -19,6 +19,10 @@ export interface CurrentReview {
   comments: CommentDto[];
   /** The walkthrough, in reading order. */
   notes: NoteDto[];
+  /** In a PR workspace, every thread and draft on the PR. */
+  threads: ThreadDto[];
+  /** Shows a new state, after a side view changed comments or threads. */
+  apply(state: StateDto): void;
   /** Starts an agent writing the review's walkthrough. */
   runWalkthrough(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */

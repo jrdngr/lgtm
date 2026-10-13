@@ -6,10 +6,10 @@ use std::collections::HashMap;
 
 use anyhow::{Context, bail};
 
-use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
+use super::{RepoCtx, Review, RowRef, StateDto, now_ms, pulled_stage};
 use crate::anchor::{FileIndex, Side, norm_for, remap_lines};
 use crate::diff::RowKind;
-use crate::store::{Comment, GhLink, Workshop};
+use crate::store::{Comment, GhLink, ThreadState, Workshop};
 
 /// A thread pulled from GitHub, to become a comment block.
 pub struct PulledThread {
@@ -21,6 +21,8 @@ pub struct PulledThread {
     pub line: Option<u32>,
     /// GitHub's diff hunk, the snippet when the code can't be found.
     pub hunk: String,
+    /// The viewer had the last word.
+    pub answered: bool,
 }
 
 /// Where a comment goes on the PR head's diff.
@@ -155,23 +157,31 @@ impl RepoCtx {
         label: &str,
     ) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |review, store| {
-            // Each known thread's comment, and whether it has no anchor yet.
-            let mut known: HashMap<String, (i64, bool)> = HashMap::new();
+            // Each known thread's comment.
+            let mut known: HashMap<String, Comment> = HashMap::new();
             if let Some(first) = threads.first() {
-                for c in store.pr_comments(&first.link.repo, first.link.pr)? {
-                    let thread = c.github.expect("pr comments have links").thread;
-                    known.insert(thread, (c.id, c.pins.is_empty()));
+                for c in store.pr_threads(&first.link.repo, first.link.pr)? {
+                    if let Some(g) = &c.github {
+                        known.insert(g.thread.clone(), c);
+                    }
                 }
             }
             let now = now_ms();
             for t in threads {
                 let rows = review.thread_rows(&t, head_texts.get(&t.path).map(String::as_str));
-                if let Some(&(cid, unpinned)) = known.get(&t.link.thread) {
-                    store.set_github(cid, &Some(t.link))?;
+                if let Some(c) = known.get(&t.link.thread) {
+                    let (Some(old), Some(link)) = (&c.thread, &c.github) else {
+                        continue;
+                    };
+                    let mut state = old.clone();
+                    state.stage = pulled_stage(Some((old, link)), &t.link, t.answered);
+                    store.set_thread(c.id, &Some(state))?;
+                    store.set_github(c.id, &Some(t.link))?;
                     // A thread pulled while its code wasn't in the review gets placed now.
-                    if let (true, Some(rows)) = (unpinned, &rows) {
+                    if let (true, false, Some(rows)) = (c.pins.is_empty(), t.path.is_empty(), &rows)
+                    {
                         let (path, pins) = review.pins(store, rows)?;
-                        store.set_comment_pins(cid, &path, &pins, &review.snippet(rows))?;
+                        store.set_comment_pins(c.id, &path, &pins, &review.snippet(rows))?;
                     }
                     continue;
                 }
@@ -180,6 +190,8 @@ impl RepoCtx {
                     None => (t.path.clone(), vec![]),
                 };
                 let snippet = rows.map_or(t.hunk.clone(), |r| review.snippet(&r));
+                let stage = pulled_stage(None, &t.link, t.answered);
+                let thread = ThreadState::new(&t.link.repo, t.link.pr, stage);
                 store.add_comment(&Comment {
                     id: 0,
                     path,
@@ -191,6 +203,8 @@ impl RepoCtx {
                     updated_at: now,
                     workshop: Workshop::default(),
                     github: Some(t.link),
+                    thread: Some(thread),
+                    done: false,
                 })?;
             }
             Ok(())

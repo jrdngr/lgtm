@@ -17,6 +17,8 @@ export interface Draft {
   rows: number[];
   /** The selection's rows in `file` as a diff. */
   snippet: string;
+  /** A draft for the PR on GitHub, rather than a note. */
+  github?: boolean;
 }
 
 /** A draft on display lines `start..=end`: their changed rows in the last file that has any.

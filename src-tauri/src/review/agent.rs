@@ -302,6 +302,8 @@ impl RepoCtx {
                 updated_at: now,
                 workshop: Workshop::default(),
                 github: None,
+                thread: None,
+                done: false,
             })?;
             Ok(())
         })?;

@@ -78,7 +78,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     send: sendText,
     onDone: focusRoot,
     onChanged: () => refresh(),
-    canPublish: pr.whole,
+    canDraft: !!pr.pr,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const w = useWalkthrough(review, files, commentOn);
@@ -183,7 +183,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   async function commentOn(file: number, rows: number[], body: string, snippet: string) {
     if (!review) return false;
     const refs = rows.map((row) => ({ file, row }));
-    const r = await commands.addComment(review.id, refs, body, snippet);
+    const r = await commands.addComment(review.id, refs, body, snippet, false);
     if (r.status === "error") {
       setError(r.error);
       return false;
@@ -218,6 +218,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       runWalkthrough: runWalkthroughNow,
       refetchPr: pr.refetch,
       pullPr: pr.pull,
+      apply: edited,
     },
   );
 
@@ -257,6 +258,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     applyMark: a.applyMark,
     openMenuAtCursor,
     startComment: a.startComment,
+    startDraft: () => a.startComment("body", true),
     askAgent,
     openRevisions: () => openRevisions(workspace),
     openGraph: () => openGraph(containerApi),

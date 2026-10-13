@@ -18,12 +18,14 @@ fn thread(id: &str, line: Option<u32>) -> PulledThread {
             resolved: false,
             outdated: line.is_none(),
             posts: vec![],
+            line: None,
         },
         path: "a.rs".into(),
         side: Side::New,
         start: None,
         line,
         hunk: "@@ hunk".into(),
+        answered: false,
     }
 }
 

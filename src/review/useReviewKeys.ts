@@ -18,6 +18,8 @@ interface Ctx {
   applyMark(state: MarkState | null): void;
   openMenuAtCursor(): void;
   startComment(): void;
+  /** Opens a draft for the PR on GitHub on the selection. */
+  startDraft(): void;
   /** Opens the agent box of the comment at the cursor. */
   askAgent(): void;
   openRevisions(): void;
@@ -109,6 +111,9 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "c":
         if (!e.repeat) ctx.startComment();
+        break;
+      case "C":
+        if (!e.repeat) ctx.startDraft();
         break;
       case "a":
         if (!e.repeat) ctx.askAgent();

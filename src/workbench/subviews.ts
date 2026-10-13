@@ -1,6 +1,6 @@
 import { remembered } from "./remembered";
 
-/** Whether the Comments tab's PR section is open. */
+/** Whether the PR tab's conversation is open. */
 export const prOpen = remembered("lgtm:side:pr", true, [true, false]);
 
 /** What an older build's right panel remembered under `key`, such as a tab's inner view. */
@@ -13,7 +13,7 @@ function savedSub(key: string): unknown {
 }
 
 /** Right panel views from older builds, by the view that shows them now. */
-const MOVED: Record<string, string> = { files: "changes", pr: "comments", bots: "reviewers" };
+const MOVED: Record<string, string> = { files: "changes", bots: "reviewers" };
 
 /** The right panel view for a view id saved by any build. Older builds nested Files and
  * Symbols under "diff", and Walkthrough and Reviewers under "reports", each remembering the

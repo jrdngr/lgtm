@@ -92,6 +92,8 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       filter: "all",
       comments: review.state.comments,
       notes: review.state.notes,
+      threads: review.state.threads,
+      apply: (state) => editedRef.current(state),
       jump: (file) => inPane((r) => r.jump(file)),
       jumpToComment: (id) => inPane((r) => r.jumpToComment(id)),
       jumpToRow: (file, row) => inPane((r) => r.jumpToRow(file, row)),
@@ -106,7 +108,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       pullPr: (quiet) => inPane((r) => r.pullPr(quiet)),
       async commentOn(file, rows, body, snippet) {
         const refs = rows.map((row) => ({ file, row }));
-        const r = await commands.addComment(review.id, refs, body, snippet);
+        const r = await commands.addComment(review.id, refs, body, snippet, false);
         if (r.status === "error") return false;
         editedRef.current(r.data);
         return true;

@@ -108,8 +108,17 @@ export const commands = {
 	skipped: number,
 } | null, string>(__TAURI_INVOKE("run_walkthrough", { review, activity })),
 	stopWalkthrough: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_walkthrough", { review })),
-	/**  Comments on the changed `rows` of a selection. `snippet` is the code as shown. */
-	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
+	/**
+	 *  Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
+	 *  makes it a draft for the workspace's PR on GitHub instead of a note.
+	 */
+	addComment: (review: number, rows: RowRef[], body: string, snippet: string, draft: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet, draft })),
+	/**  Moves a thread to `stage`. */
+	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
+	/**  Marks a note done, or open again. */
+	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
+	/**  Starts a GitHub draft on a note's code, with its text. */
+	draftFromNote: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("draft_from_note", { review, comment })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
 	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
 	/**
@@ -187,12 +196,10 @@ export const commands = {
 	/**  Pulls the PR's review threads into the review as comments. */
 	pullPrComments: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("pull_pr_comments", { review })),
 	/**
-	 *  Adds a comment's text to the pending review on GitHub: a reply on its thread, or a new
-	 *  thread on its code.
+	 *  Sends the PR's ready threads to GitHub and submits the review with `verdict` and
+	 *  `summary`. `fixed` says what happens to ready threads with no reply.
 	 */
-	publishComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("publish_comment", { review, comment })),
-	/**  Submits the pending review. */
-	submitReview: (workspace: string | null, verdict: Verdict, body: string) => typedError<null, string>(__TAURI_INVOKE("submit_review", { workspace, verdict, body })),
+	sendThreads: (review: number, fixed: Fixed, verdict: Verdict, summary: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_threads", { review, fixed, verdict, summary })),
 	/**  The PR's conversation: comments and review summaries. */
 	prDiscussion: (workspace: string | null) => typedError<DiscussionDto, string>(__TAURI_INVOKE("pr_discussion", { workspace })),
 	/**  Posts to the PR's conversation right away. */
@@ -381,6 +388,10 @@ export type CommentDto = {
 	messages: Message[],
 	/**  The GitHub thread it's on, whose replies show above it. */
 	github: GhLink | null,
+	/**  Set on GitHub threads and drafts of them; notes have none. */
+	thread: ThreadState | null,
+	/**  A note the user is done with. */
+	done: boolean,
 };
 
 export type DefaultPersona = {
@@ -396,6 +407,8 @@ export type DiscussionDto = {
 	posts: PostDto[],
 	/**  Whether the viewer has a review that isn't submitted yet. */
 	pendingReview: boolean,
+	/**  The login `gh` is signed in as. */
+	viewer: string,
 };
 
 export type FileDto = {
@@ -454,6 +467,9 @@ export type Fix = {
 	createdAt: number | null,
 };
 
+/**  What happens to a ready thread with no reply: one that was fixed as asked. */
+export type Fixed = "leave" | "reply" | "resolve" | "replyResolve";
+
 /**  Where a note sits in a flow. */
 export type FlowStep = {
 	flow: string,
@@ -462,8 +478,8 @@ export type FlowStep = {
 };
 
 /**
- *  The GitHub review thread a comment is on. The comment's body is then a reply not yet
- *  published.
+ *  The GitHub thread a comment is on: a review thread on code, or a comment or review summary
+ *  on the PR, whose comment's path is empty. The comment's body is then a reply not yet sent.
  */
 export type GhLink = {
 	/**  `owner/name` of the PR's repo. */
@@ -474,6 +490,8 @@ export type GhLink = {
 	resolved: boolean,
 	outdated: boolean,
 	posts: GhPost[],
+	/**  The thread's last line on the PR head, while it isn't outdated. */
+	line?: number | null,
 };
 
 /**  A post in a GitHub review thread. */
@@ -978,6 +996,21 @@ export type Source =
 /**  An agent in a terminal, through the MCP server. */
 "terminal";
 
+/**  Where a thread is in the reply workflow. */
+export type Stage = 
+/**  Synced, not triaged yet. */
+"new" | 
+/**  Needs a call only the user can make. */
+"decide" | 
+/**  Agreed; the code is to change as asked. */
+"toFix" | 
+/**  A reply is being worked out. */
+"reply" | 
+/**  The reply is final, or the fix is in and needs none. Goes out with the next send. */
+"ready" | 
+/**  Sent, resolved, or answered already. */
+"done";
+
 export type Stance = "concede" | "defend" | "partlyConcede";
 
 /**  Everything marking and commenting can change. */
@@ -994,6 +1027,11 @@ export type StateDto = {
 	comments: CommentDto[],
 	/**  The review's walkthrough notes, in reading order. Ones whose code is gone have no rows. */
 	notes: NoteDto[],
+	/**
+	 *  In a PR workspace, every thread and draft on the PR, in file order, then comments on
+	 *  the PR by time.
+	 */
+	threads: ThreadDto[],
 };
 
 export type Status = "running" | "done" | "failed" | "stopped";
@@ -1016,6 +1054,43 @@ export type Synthesis = {
 	quickWins: QuickWin[],
 	questions: Question[],
 	fixFirst: Action[],
+};
+
+export type Take = {
+	verdict: TakeVerdict,
+	why: string,
+	/**  What the user has to decide, for `NeedsYou`. */
+	question: string | null,
+};
+
+/**  What the agent thinks of a thread's ask. */
+export type TakeVerdict = "agree" | "agreeWithChanges" | "pushBack" | "needsYou";
+
+export type ThreadDto = {
+	/**  Its comment's id. */
+	id: number,
+	/**  Empty for a comment on the PR itself. */
+	path: string,
+	/**  Its last line, as GitHub numbers it or as drafted. */
+	line: number | null,
+	/**  The reply not yet sent, or a draft's text. */
+	body: string,
+	state: ThreadState,
+	github: GhLink | null,
+	/**  Whether the review shows its code. */
+	placed: boolean,
+	createdAt: number | null,
+};
+
+/**  A thread's place in the workflow, kept across syncs and restarts. */
+export type ThreadState = {
+	/**  `owner/name` of the PR's repo. */
+	repo: string,
+	pr: number,
+	stage: Stage,
+	take: Take | null,
+	/**  A few words on what the thread asks, from triage. */
+	summary: string,
 };
 
 /**  A tool that's missing or too old. */

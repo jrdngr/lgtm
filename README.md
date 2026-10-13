@@ -35,8 +35,8 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘⇧E | Show the Changes tab (reopens the right panel if closed) |
 | ⌘⇧Y | Show the Symbols tab |
 | ⌘⇧R | Show the Files tab |
-| ⌘⇧M | Show the Comments tab |
-| ⌘⇧P | Show the Comments tab with the PR open |
+| ⌘⇧M | Show the Notes tab |
+| ⌘⇧P | Show the PR tab (PR workspaces) |
 | ⌘⇧H | Show the Walkthrough tab |
 | ⌘⇧O | Show the Reviewers tab |
 
@@ -52,8 +52,9 @@ In a review pane:
 | ⌘A | Select the whole review |
 | ⌘Z / ⇧⌘Z | Undo / redo mark changes |
 | ⌘C | Copy selected code text, or the selected rows when no text is selected |
-| `c` | Comment on the selection |
-| `a` | Ask the agent about the comment at the cursor |
+| `c` | Write a note on the selection |
+| `C` | Write a draft for GitHub on the selection (PR workspaces) |
+| `a` | Ask the agent about the note or thread at the cursor |
 | `x` | Check or uncheck the file under the cursor |
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |
@@ -63,16 +64,21 @@ In a review pane:
 | `n` / `N` | Next / previous note in the walkthrough's tour |
 | `Esc` | Back to the cursor row |
 
-The right panel has six icon tabs. Comments counts pending GitHub posts, Walkthrough its notes, and Reviewers its running reviews.
+The right panel has six icon tabs, plus PR in a PR workspace. PR counts threads that need you (new or waiting on a decision), Walkthrough its notes, and Reviewers its running reviews.
 
 - **Files** (⌘⇧R) shows the whole repo.
 - **Changes** (⌘⇧E) shows the review's files as a tree, with the rows done so far in its header. Each file has a ring filling as you review it, or a ✓ once done; hover it for the counts, or hover a folder to see its count. Done files dim, deleted ones are struck through, and a file changed since you checked it says **changed**. It follows the review's line filter. Click a file to jump to it.
 - **Symbols** (⌘⇧Y) lists the changed symbols by file, with how many unchanged callers use each and how much of it is reviewed. With no Review tab open, clicking a file or symbol opens one on the current revset.
-- **Comments** (⌘⇧M) lists the review's comments by file, with Open, Pending, Resolved and All filters once some are GitHub threads; its ⋯ menu sends them all to a terminal. In a PR workspace the PR sits on top: its state, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. The review submit box (Comment, Approve, Request changes) stays at the bottom.
+- **Notes** (⌘⇧M) lists your notes by file, with done ones folded at the end. A row shows when the agent answered or changed the code. Its ⋯ menu sends the open notes to a terminal. Notes never leave your machine.
+- **PR** (⌘⇧P, PR workspaces only) shows the PR: its state, a **Yours** pill on your own PR, its title, a bar of how far its threads are, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. Below, every thread on the PR (review threads, comments and review summaries on the PR itself, and your drafts) is grouped by stage: New, Decide, To fix, Reply, Ready, Done (folded). Click a thread to open it in place and write its reply; ⌘-click shows its code in the review. The box at the bottom sends what's Ready (see below).
 - **Walkthrough** (⌘⇧H) lists the walkthrough's notes.
 - **Reviewers** (⌘⇧O) runs review personas.
 
-Comments show under their code as cards: purple for a GitHub thread, blue for your own. Their actions show on hover: ✎ edit, ✦ ask the agent (or `a`), ↗ send to a terminal, and Publish and Delete in ⋯. The agent box stays open while the comment has a conversation with the agent. Resolved threads fold to one line; click to open one.
+Notes and threads show under their code as cards: blue for a note, purple for a GitHub thread or draft. Their actions show on hover: ✎ edit, ✓ done (notes), ✦ ask the agent (or `a`), ↗ send to a terminal, and in ⋯: Move to a stage (threads), Draft PR comment from this (notes, in PR workspaces), and Delete (notes and drafts). The agent box stays open while there's a conversation with the agent. Done notes, and done or resolved threads, fold to one line; click to open one.
+
+Threads move through stages: **New** (synced, not triaged), **Decide** (needs your call), **To fix**, **Reply** (a reply is being written), **Ready** (the reply is final, or the fix needs none), and **Done**. Writing a reply moves a thread to Reply; **Final** moves it to Ready, and editing a final reply moves it back. A draft (`C`) is Ready once it has text. Sync keeps each thread's stage, brings one back to New when someone posts to it, and marks it Done when it's resolved. Comments on the PR from others come in as threads too, Done when you posted to the PR after them.
+
+**Send to GitHub** in the PR tab sends everything Ready at once: replies on code and new drafts go into one review, so reviewers get one notification, and replies to comments on the PR post as PR comments that open with a quote of what they answer. On someone else's PR the button carries your verdict (Comment, Approve, Request changes) and summary. Ready threads with no reply (fixed as asked) follow the **Fixed threads** choice, remembered per repo: leave as is, reply "Done", resolve, or both. A short list of what goes out shows before it sends; sent threads move to Done and the PR syncs. New drafts need the whole PR open in the Combined view, where GitHub's lines match.
 
 In the header and review toolbar:
 
@@ -105,7 +111,7 @@ Languages: Rust, TypeScript, JavaScript, Python, Go, Swift, and shell get highli
 - **Context** (bulb): intent or background the diff doesn't show.
 - **Question** (question circle): something for you or the author to settle.
 
-Notes show as blocks under their code, and the Walkthrough tab (⌘⇧H) lists them. The tab's tour card picks the tour: **Reading order** covers every note, and each flow is its own tour. Its ‹ › stepper, like `n` and `N`, steps through the active tour, moving the cursor to each note, and each tour remembers where you are. The notes list as a path, with the ones behind you dimmed and the current one ringed; important notes show their level and flow steps their place in the flow. The category chips, with their note counts, hide or show a category (dashed when hidden), and the eye button turns the blocks under the code off. A note's **Comment** button adds it as your own comment, with its category as an emoji. Notes are never published; each new walkthrough replaces the last.
+Notes show as blocks under their code, and the Walkthrough tab (⌘⇧H) lists them. The tab's tour card picks the tour: **Reading order** covers every note, and each flow is its own tour. Its ‹ › stepper, like `n` and `N`, steps through the active tour, moving the cursor to each note, and each tour remembers where you are. The notes list as a path, with the ones behind you dimmed and the current one ringed; important notes show their level and flow steps their place in the flow. The category chips, with their note counts, hide or show a category (dashed when hidden), and the eye button turns the blocks under the code off. A walkthrough note's **Comment** button adds it as one of your notes, with its category as an emoji. Notes are never published; each new walkthrough replaces the last.
 
 The walkthrough prompt is a markdown file: the repo's `.lgtm/walkthrough.md`, else `~/.config/lgtm/walkthrough.md`, else the built-in one. Manage it in Settings › Prompts; the Walkthrough tab's ⋯ › **Edit prompt…** opens that section. The note format the agent returns is fixed.
 
