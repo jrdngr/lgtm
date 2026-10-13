@@ -132,7 +132,7 @@ export function RepoTree() {
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
   return (
     <div className="side-split">
-      <SectionHeader title="Repo" />
+      <SectionHeader title="Files" />
       <div className="side-split-body file-tree">
         <Dir
           dir=""

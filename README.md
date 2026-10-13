@@ -32,7 +32,7 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌘⇧D | Split terminal down |
 | ⌘⇧E | Show the Changes tab (reopens the right panel if closed) |
 | ⌘⇧Y | Show the Symbols tab |
-| ⌘⇧R | Show the Repo tab |
+| ⌘⇧R | Show the Files tab |
 | ⌘⇧M | Show the Comments tab |
 | ⌘⇧P | Show the Comments tab with the PR open |
 | ⌘⇧H | Show the Walkthrough tab |
@@ -63,10 +63,10 @@ In a review pane:
 
 The right panel has six icon tabs. Comments counts pending GitHub posts, Walkthrough its notes, and Reviewers its running reviews.
 
+- **Files** (⌘⇧R) shows the whole repo.
 - **Changes** (⌘⇧E) shows the review's files as a tree, with the rows done so far in its header. Each file has a ring filling as you review it, or a ✓ once done; hover it for the counts, or hover a folder to see its count. Done files dim, deleted ones are struck through, and a file changed since you checked it says **changed**. It follows the review's line filter. Click a file to jump to it.
 - **Symbols** (⌘⇧Y) lists the changed symbols by file, with how many unchanged callers use each and how much of it is reviewed. With no Review tab open, clicking a file or symbol opens one on the current revset.
-- **Repo** (⌘⇧R) shows the whole repo.
- **Comments** (⌘⇧M) lists the review's comments by file, with Open, Pending, Resolved and All filters once some are GitHub threads; its ⋯ menu sends them all to a terminal. In a PR workspace the PR sits on top: its state, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. The review submit box (Comment, Approve, Request changes) stays at the bottom.
+- **Comments** (⌘⇧M) lists the review's comments by file, with Open, Pending, Resolved and All filters once some are GitHub threads; its ⋯ menu sends them all to a terminal. In a PR workspace the PR sits on top: its state, branches, ↗ to open it on GitHub, and ⟳ Sync, which fetches the PR, pulls its threads, and reloads its conversation. The conversation folds to one line of each reviewer's verdict. The review submit box (Comment, Approve, Request changes) stays at the bottom.
 - **Walkthrough** (⌘⇧H) lists the walkthrough's notes.
 - **Reviewers** (⌘⇧O) runs review personas.
 

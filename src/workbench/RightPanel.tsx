@@ -35,9 +35,9 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       side="right"
       {...props}
       views={[
-        { id: "changes", title: "Changes", icon: "diff", render: () => <FilesPanel /> },
+        { id: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
+        { id: "changes", title: "Changes", icon: "gitTree", render: () => <FilesPanel /> },
         { id: "symbols", title: "Symbols", icon: "symbols", render: () => <SymbolsPanel /> },
-        { id: "repo", title: "Repo", icon: "folder", render: () => <RepoTab /> },
         {
           id: "comments",
           title: "Comments",
