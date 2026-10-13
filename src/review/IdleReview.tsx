@@ -106,9 +106,9 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       runWalkthrough: () => inPane((r) => r.runWalkthrough()),
       refetchPr: () => inPane((r) => r.refetchPr()),
       pullPr: (quiet) => inPane((r) => r.pullPr(quiet)),
-      async commentOn(file, rows, body, snippet) {
+      async commentOn(file, rows, body, snippet, draft = false) {
         const refs = rows.map((row) => ({ file, row }));
-        const r = await commands.addComment(review.id, refs, body, snippet, false);
+        const r = await commands.addComment(review.id, refs, body, snippet, draft);
         if (r.status === "error") return false;
         editedRef.current(r.data);
         return true;

@@ -8,6 +8,7 @@ import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { RunsPanel } from "../agents/RunsPanel";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
@@ -38,6 +39,7 @@ const components = {
   prPreview: PrPreview,
   settings: SettingsPanel,
   threads: ThreadsPanel,
+  runs: RunsPanel,
   // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
   tasks: () => null,
   files: () => null,

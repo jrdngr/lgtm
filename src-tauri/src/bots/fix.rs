@@ -6,7 +6,7 @@ use anyhow::ensure;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{Notify, Status, run_prefix};
+use super::{BotRun, Notify, Status, run_prefix};
 use crate::agent::{self, Progress, Runs};
 use crate::review::{NOT_AT_WORKING_COPY, RepoCtx, now_ms};
 
@@ -38,6 +38,22 @@ pub(super) fn fix_key(run: u32, fix: usize) -> String {
 }
 
 impl RepoCtx {
+    /// Dismisses `findings`, or with `dismissed` false, brings them back.
+    pub fn dismiss_findings(
+        &self,
+        id: u32,
+        findings: &[String],
+        dismissed: bool,
+    ) -> anyhow::Result<BotRun> {
+        self.edit_run(id, |run| {
+            run.dismissed.retain(|f| !findings.contains(f));
+            if dismissed {
+                run.dismissed.extend(findings.iter().cloned());
+            }
+            run.clone()
+        })
+    }
+
     /// Starts an agent fixing `findings` in the run's workspace, in the background. `text` is
     /// those findings as markdown. Streams its reply as events and snapshots the working copy
     /// when it's done.

@@ -5,7 +5,7 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -13,10 +13,11 @@ const TITLES: Record<PanelKind, string> = {
   report: "Reviewers",
   graph: "Graph",
   threads: "Threads",
+  runs: "Agent runs",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "graph"];
+export const KINDS: PanelKind[] = ["review", "terminal", "graph", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 

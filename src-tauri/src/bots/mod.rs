@@ -121,6 +121,9 @@ pub struct BotRun {
     /// Agent runs that fixed picked findings, oldest first.
     #[serde(default)]
     pub fixes: Vec<Fix>,
+    /// Ids of findings the user dismissed.
+    #[serde(default)]
+    pub dismissed: Vec<String>,
     /// Whether it's running now. Only memory knows, so the stored value is ignored.
     #[serde(default)]
     pub active: bool,

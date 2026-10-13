@@ -76,8 +76,8 @@ export function usePublishReview(
         jumpToComment: (id) => latest.current.jumpToComment(id),
         jumpToRow: (file, row) => latest.current.jumpToRow(file, row),
         show: (path, line) => latest.current.show(path, line),
-        commentOn: (file, rows, body, snippet) =>
-          latest.current.commentOn(file, rows, body, snippet),
+        commentOn: (file, rows, body, snippet, draft) =>
+          latest.current.commentOn(file, rows, body, snippet, draft),
         send: (text, onSent, report) => latest.current.send(text, onSent, report),
       };
       publishReview(workspace, published.current);

@@ -27,6 +27,7 @@ fn run(names: &[&str], options: BotOptions) -> BotRun {
         done: vec![],
         created_at: 1.0,
         fixes: vec![],
+        dismissed: vec![],
         active: false,
     }
 }

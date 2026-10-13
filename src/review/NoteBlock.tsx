@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { NoteDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
+import { IconButton } from "../ui/icons";
 import { LevelPill, NoteIcon } from "./NoteIcon";
 import { CATEGORIES } from "./notes";
 import "./notes.css";
@@ -11,13 +12,15 @@ interface Props {
   current: boolean;
   /** Where it is in its flow, like "Login 2/5". */
   flowLabel?: string;
-  /** Turns the note into a comment. Resolves to whether it worked. */
-  onComment(note: NoteDto): Promise<boolean>;
+  /** Keeps the note as one of yours, or with `draft`, as a draft for the PR. Resolves to
+   * whether it worked. */
+  onComment(note: NoteDto, draft: boolean): Promise<boolean>;
+  canDraft: boolean;
 }
 
 /** A walkthrough note under its code. */
-export function NoteBlock({ note, current, flowLabel, onComment }: Props) {
-  const [commented, setCommented] = useState(false);
+export function NoteBlock({ note, current, flowLabel, onComment, canDraft }: Props) {
+  const [kept, setKept] = useState<"note" | "draft">();
   const { label } = CATEGORIES[note.category];
   return (
     <div
@@ -31,15 +34,26 @@ export function NoteBlock({ note, current, flowLabel, onComment }: Props) {
         {note.category === "important" && note.level && <LevelPill level={note.level} />}
         {flowLabel && <span className="pill">{flowLabel}</span>}
         <span className="spacer" />
-        <button
-          type="button"
-          className="quiet"
-          disabled={commented || !note.rows}
-          onClick={async () => setCommented(await onComment(note))}
-          title="Add it as your comment"
-        >
-          {commented ? "Commented" : "Comment"}
-        </button>
+        {kept ? (
+          <span className="faint">{kept === "note" ? "Kept as note" : "Drafted"}</span>
+        ) : (
+          <span className="note-actions reveal">
+            <IconButton
+              icon="comments"
+              label="Keep as note"
+              disabled={!note.rows}
+              onClick={async () => (await onComment(note, false)) && setKept("note")}
+            />
+            {canDraft && (
+              <IconButton
+                icon="pr"
+                label="Draft PR comment"
+                disabled={!note.rows}
+                onClick={async () => (await onComment(note, true)) && setKept("draft")}
+              />
+            )}
+          </span>
+        )}
       </div>
       {note.body && (
         <div className="note-body">
@@ -50,6 +64,6 @@ export function NoteBlock({ note, current, flowLabel, onComment }: Props) {
   );
 }
 
-/** The note as a comment: its category and title, then its body. */
+/** The note as one of yours: its category and title, then its body. */
 export const noteCommentText = (note: NoteDto) =>
   `${CATEGORIES[note.category].emoji} **${note.title}**\n\n${note.body}`.trim();

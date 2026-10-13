@@ -1,0 +1,106 @@
+.runs-panel {
+  height: 100%;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.runs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.runs-count,
+.runs-empty {
+  color: var(--faint);
+}
+
+.runs-empty {
+  padding: 12px 10px;
+}
+
+.runs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.runs-row {
+  display: grid;
+  grid-template-columns: 10px 90px minmax(80px, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+}
+
+.runs-row:hover {
+  background: var(--hover);
+}
+
+.runs-subject,
+.runs-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runs-subject {
+  font-family: var(--mono);
+}
+
+.runs-detail {
+  color: var(--faint);
+}
+
+.runs-detail.failed {
+  color: var(--error);
+}
+
+.runs-side {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.runs-actions {
+  display: flex;
+}
+
+.runs-time {
+  min-width: 28px;
+  color: var(--faint);
+  text-align: right;
+}
+
+.runs-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.runs-dot-done {
+  background: var(--added);
+}
+
+.runs-dot-failed {
+  background: var(--error);
+}
+
+.runs-dot-running {
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  background: none;
+  border: 2px solid rgb(79 140 201 / 30%);
+  border-top-color: var(--accent);
+  animation: runs-spin 0.9s linear infinite;
+}
+
+@keyframes runs-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

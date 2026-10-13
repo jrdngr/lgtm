@@ -1,6 +1,7 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useRef, useState } from "react";
 import type { BotOptions, Finding } from "../bindings";
+import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { IconButton } from "../ui/icons";
@@ -13,6 +14,7 @@ import { runState } from "./personas";
 import { MinimalView, PersonaView, SynthesisView } from "./ReportViews";
 import { type Act, RunControls } from "./RunControls";
 import { refreshRun, runAction, useRun } from "./runs";
+import { SettledFold } from "./SettledFold";
 import "./bots.css";
 
 type View = "minimal" | "synthesis" | "personas" | "fixes";
@@ -55,7 +57,9 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   /** Findings picked to send to the agent, by id. */
   const [checked, setChecked] = useState<Map<string, Picked>>(new Map());
-  const review = useCurrentReview(useWorkspace());
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
+  const canDraft = !!usePr(workspace);
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<{ error: boolean; text: string }>();
   const root = useRef<HTMLDivElement>(null);
@@ -143,6 +147,21 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
     if (run) send(fixPrompt(run.revset, [...checked.values()]), () => setChecked(new Map()));
   }
 
+  const current = run;
+  /** Covered by a Fix headless run that finished, or dismissed. */
+  const stateOf = (id: string) =>
+    current.fixes?.some((x) => x.status === "done" && x.findings.includes(id))
+      ? ("fixed" as const)
+      : current.dismissed?.includes(id)
+        ? ("dismissed" as const)
+        : undefined;
+
+  async function dismiss(id: string, dismissed: boolean) {
+    const res = await commands.dismissFindings(current.id, [id], dismissed);
+    if (res.status === "error") return setNotice({ error: true, text: res.error });
+    await refreshRun(current.id);
+  }
+
   const card = (f: Finding, source: string) => {
     const h = history(r, f);
     const id = f.id ?? "";
@@ -158,7 +177,24 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
         checked={checked.has(id)}
         onCheck={() => check(f, source)}
         onSend={(text) => send(text)}
+        state={stateOf(id)}
+        onDismiss={(d) => dismiss(id, d)}
+        canDraft={canDraft}
       />
+    );
+  };
+
+  /** Cards in order, with fixed and dismissed ones folded at the end. */
+  const cards = (list: [Finding, string][]) => {
+    const settled = list.filter(([f]) => stateOf(f.id ?? ""));
+    const rest = list.filter(([f]) => !stateOf(f.id ?? ""));
+    return (
+      <>
+        {rest.map(([f, s]) => card(f, s))}
+        {settled.length > 0 && (
+          <SettledFold count={settled.length}>{settled.map(([f, s]) => card(f, s))}</SettledFold>
+        )}
+      </>
     );
   };
 
@@ -167,7 +203,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
     body = (
       <MinimalView
         r={r}
-        card={card}
+        cards={cards}
         checkAll={checkAll}
         sourceOf={sourceOf}
         onGo={(id) => goTo(r.synthesis ? "synthesis" : "personas", id)}
@@ -176,7 +212,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   } else if (view === "fixes") {
     body = <Fixes run={run} onGo={(id) => goTo(id.includes("#") ? "personas" : "synthesis", id)} />;
   } else if (view === "synthesis" && r.synthesis) {
-    body = <SynthesisView r={r} card={card} checkAll={checkAll} onGo={go} />;
+    body = <SynthesisView r={r} cards={cards} checkAll={checkAll} onGo={go} />;
   } else {
     body = (
       <PersonaView
@@ -184,7 +220,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
         r={r}
         persona={persona}
         onPersona={setPersona}
-        card={card}
+        cards={cards}
         checkAll={checkAll}
       />
     );

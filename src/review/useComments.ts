@@ -1,8 +1,11 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
+import { endFrom, startRun } from "../agents/runs";
 import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
+import { useWorkspace } from "../workspaces/context";
 import { commentText, type Draft, followDraft } from "./comments";
+import { currentReview } from "./current";
 import type { Moves } from "./follow";
 import { type FlatFile, NEW_COMMENT } from "./model";
 
@@ -69,6 +72,7 @@ export function useComments({
   onChanged,
   canDraft,
 }: Deps) {
+  const workspace = useWorkspace();
   const [draft, setDraft] = useState<Draft>();
   /** Bodies being edited, by comment id. Present means the block is in edit mode. */
   const [edits, setEdits] = useState<ReadonlyMap<number, string>>(new Map());
@@ -174,15 +178,27 @@ export function useComments({
     if (cid !== id) setFocus({ id: cid, field: "ask" });
     setAsks((m) => without(m, cid));
     setRunning((m) => withEntry(m, cid, { ask: message, change, reply: "" }));
+    const c = byId(cid);
+    const handle = startRun(workspace, {
+      kind: change ? "change" : c?.thread ? "reply" : "ask",
+      subject: c?.path || "Comment",
+      stop: () => commands.stopWorkshop(cid),
+      open: () => currentReview(workspace)?.jumpToComment(cid),
+    });
     const channel = new Channel<string>();
     channel.onmessage = (text) =>
       setRunning((m) => {
         const r = m.get(cid);
         return r ? withEntry(m, cid, { ...r, reply: r.reply + text }) : m;
       });
-    await apply(
-      commands.workshopComment(review.id, cid, { message, draft: body, change }, channel),
+    const r = await commands.workshopComment(
+      review.id,
+      cid,
+      { message, draft: body, change },
+      channel,
     );
+    endFrom(handle, r);
+    await apply(Promise.resolve(r));
     setRunning((m) => without(m, cid));
     if (change) onChanged();
   }

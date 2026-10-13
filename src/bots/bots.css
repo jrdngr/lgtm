@@ -761,3 +761,13 @@
 .bots-fix-stopped .bots-fix-status {
   color: var(--error);
 }
+
+.finding.settled {
+  opacity: 0.7;
+}
+
+.settled-fold > button {
+  margin: 8px 0 4px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}

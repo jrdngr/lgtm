@@ -175,3 +175,17 @@ pub(crate) async fn new_persona(
     let path = personas::create(&ws.root, &name, scope).map_err(err)?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+/// Dismisses findings of a run, or with `dismissed` false, brings them back.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn dismiss_findings(
+    window: WebviewWindow,
+    run: u32,
+    findings: Vec<String>,
+    dismissed: bool,
+) -> CmdResult<BotRun> {
+    repo(&window)?
+        .dismiss_findings(run, &findings, dismissed)
+        .map_err(err)
+}

@@ -6,7 +6,8 @@ import { Markdown } from "./Markdown";
 import { Progress } from "./Progress";
 import { Tally } from "./Severity";
 
-type Card = (f: Finding, source: string) => ReactNode;
+/** Finding cards with their sources, settled ones folded at the end. */
+type Cards = (list: [Finding, string][]) => ReactNode;
 
 function SelectAll({ onClick }: { onClick(): void }) {
   return (
@@ -39,7 +40,7 @@ function Verdict({
 
 interface MinimalProps {
   r: Report;
-  card: Card;
+  cards: Cards;
   checkAll(picks: Picked[]): void;
   sourceOf(f: Finding): string;
   /** Shows an off-task finding in the view that has it. */
@@ -47,7 +48,7 @@ interface MinimalProps {
 }
 
 /** The findings that matter for the task, with off-task critical ones linked. */
-export function MinimalView({ r, card, checkAll, sourceOf, onGo }: MinimalProps) {
+export function MinimalView({ r, cards, checkAll, sourceOf, onGo }: MinimalProps) {
   const m = r.minimal;
   if (!m) return null;
   const byId = findingsById(r);
@@ -61,7 +62,7 @@ export function MinimalView({ r, card, checkAll, sourceOf, onGo }: MinimalProps)
       >
         For “{m.task}”: {kept.length} of {r.synthesis?.findings.length ?? byId.size} findings
       </Verdict>
-      {kept.map((f) => card(f, sourceOf(f)))}
+      {cards(kept.map((f) => [f, sourceOf(f)]))}
       {offTask.length > 0 && (
         <section>
           <h3>Off-task critical and high</h3>
@@ -78,13 +79,13 @@ export function MinimalView({ r, card, checkAll, sourceOf, onGo }: MinimalProps)
 
 interface SynthesisProps {
   r: Report;
-  card: Card;
+  cards: Cards;
   checkAll(picks: Picked[]): void;
   onGo(id: string): void;
 }
 
 /** The synthesis's verdict and merged findings, then what to fix first and its questions. */
-export function SynthesisView({ r, card, checkAll, onGo }: SynthesisProps) {
+export function SynthesisView({ r, cards, checkAll, onGo }: SynthesisProps) {
   const s = r.synthesis;
   if (!s) return null;
   return (
@@ -95,7 +96,7 @@ export function SynthesisView({ r, card, checkAll, onGo }: SynthesisProps) {
       >
         <Markdown>{s.verdict}</Markdown>
       </Verdict>
-      {s.findings.map((f) => card(f, "synthesis"))}
+      {cards(s.findings.map((f) => [f, "synthesis"]))}
       <Closing r={r} onGo={onGo} />
     </>
   );
@@ -107,12 +108,12 @@ interface PersonaProps {
   /** Shows only this persona's findings. */
   persona: string | undefined;
   onPersona(name: string | undefined): void;
-  card: Card;
+  cards: Cards;
   checkAll(picks: Picked[]): void;
 }
 
 /** Every persona's findings, worst first, or one persona's with its verdict. */
-export function PersonaView({ run, r, persona, onPersona, card, checkAll }: PersonaProps) {
+export function PersonaView({ run, r, persona, onPersona, cards, checkAll }: PersonaProps) {
   const who = [...r.byPersona.keys()].filter((p) => !persona || p === persona);
   const findings = who.flatMap((p) => (r.byPersona.get(p) ?? []).map((f) => ({ p, f })));
   findings.sort((a, b) => SEVERITIES.indexOf(a.f.severity) - SEVERITIES.indexOf(b.f.severity));
@@ -134,7 +135,7 @@ export function PersonaView({ run, r, persona, onPersona, card, checkAll }: Pers
           </div>
         </div>
       )}
-      {findings.map(({ p, f }) => card(f, p))}
+      {cards(findings.map(({ p, f }) => [f, p]))}
     </>
   );
 }

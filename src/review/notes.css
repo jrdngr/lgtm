@@ -371,3 +371,13 @@
     system-ui,
     sans-serif;
 }
+
+.note-actions {
+  display: flex;
+  align-items: center;
+}
+
+.note-head .faint {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}

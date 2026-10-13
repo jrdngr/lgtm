@@ -150,6 +150,8 @@ export const commands = {
 	 *  markdown. Its reply streams as events.
 	 */
 	fixFindings: (run: number, findings: string[], text: string) => typedError<null, string>(__TAURI_INVOKE("fix_findings", { run, findings, text })),
+	/**  Dismisses findings of a run, or with `dismissed` false, brings them back. */
+	dismissFindings: (run: number, findings: string[], dismissed: boolean) => typedError<BotRun, string>(__TAURI_INVOKE("dismiss_findings", { run, findings, dismissed })),
 	stopFix: (run: number, fix: number) => typedError<null, string>(__TAURI_INVOKE("stop_fix", { run, fix })),
 	/**  The personas a review in the workspace can use, and files that couldn't be read. */
 	listPersonas: (workspace: string | null) => typedError<Personas, string>(__TAURI_INVOKE("list_personas", { workspace })),
@@ -307,6 +309,8 @@ export type BotRun = {
 	createdAt: number | null,
 	/**  Agent runs that fixed picked findings, oldest first. */
 	fixes?: Fix[],
+	/**  Ids of findings the user dismissed. */
+	dismissed?: string[],
 	/**  Whether it's running now. Only memory knows, so the stored value is ignored. */
 	active?: boolean,
 };

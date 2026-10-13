@@ -13,7 +13,15 @@ const NO_NOTES: NoteDto[] = [];
 export function useWalkthrough(
   review: ReviewDto | undefined,
   files: FlatFile[],
-  commentOn: (file: number, rows: number[], body: string, snippet: string) => Promise<boolean>,
+  commentOn: (
+    file: number,
+    rows: number[],
+    body: string,
+    snippet: string,
+    draft?: boolean,
+  ) => Promise<boolean>,
+  /** The review is in a PR workspace, so notes can become drafts for GitHub. */
+  canDraft: boolean,
 ) {
   const tour = useTourState(review?.id);
   const notes = review?.state.notes ?? NO_NOTES;
@@ -24,13 +32,13 @@ export function useWalkthrough(
   );
   const current = review ? currentNote(review.id, notes) : undefined;
 
-  function comment(n: NoteDto) {
+  function comment(n: NoteDto, draft: boolean) {
     const f = files[n.file];
     const span = n.rows;
     if (!f || !span) return Promise.resolve(false);
     const rows: number[] = [];
     for (let r = span.start; r <= span.end; r++) if (f.rows[r]?.kind !== "context") rows.push(r);
-    return commentOn(n.file, rows, noteCommentText(n), rowsText(f, rows));
+    return commentOn(n.file, rows, noteCommentText(n), rowsText(f, rows), draft);
   }
 
   function renderNote(id: number) {
@@ -42,6 +50,7 @@ export function useWalkthrough(
         current={current?.id === id}
         flowLabel={flowLabel(n, notes)}
         onComment={comment}
+        canDraft={canDraft}
       />
     );
   }

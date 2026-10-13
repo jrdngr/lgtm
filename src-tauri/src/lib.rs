@@ -103,6 +103,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::bot_runs,
             commands::bots::bot_run,
             commands::bots::fix_findings,
+            commands::bots::dismiss_findings,
             commands::bots::stop_fix,
             commands::bots::list_personas,
             commands::bots::default_personas,

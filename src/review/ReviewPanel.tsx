@@ -81,7 +81,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     canDraft: !!pr.pr,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
-  const w = useWalkthrough(review, files, commentOn);
+  const w = useWalkthrough(review, files, commentOn, !!pr.pr);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
   const lines = useMemo(
     () =>
@@ -180,10 +180,16 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     focusRoot,
   });
 
-  async function commentOn(file: number, rows: number[], body: string, snippet: string) {
+  async function commentOn(
+    file: number,
+    rows: number[],
+    body: string,
+    snippet: string,
+    draft = false,
+  ) {
     if (!review) return false;
     const refs = rows.map((row) => ({ file, row }));
-    const r = await commands.addComment(review.id, refs, body, snippet, false);
+    const r = await commands.addComment(review.id, refs, body, snippet, draft);
     if (r.status === "error") {
       setError(r.error);
       return false;
@@ -195,7 +201,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   function runWalkthroughNow() {
     if (!review) return;
     if (agentsOff()) return setError("Walkthrough needs Claude Code, which is turned off.");
-    runWalkthrough(review.id, edited);
+    runWalkthrough(workspace, review.id, revset, edited);
   }
 
   function openInEditor() {

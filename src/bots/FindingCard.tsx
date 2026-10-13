@@ -35,6 +35,11 @@ interface Props {
   onCheck(): void;
   /** Pastes text into a terminal's prompt. */
   onSend(text: string): void;
+  /** Fixed by a Fix headless run, or dismissed by hand. */
+  state?: "fixed" | "dismissed";
+  onDismiss(dismissed: boolean): void;
+  /** The review is in a PR workspace, so findings can become drafts for GitHub. */
+  canDraft: boolean;
 }
 
 /** A finding: its severity tag and title, then where it is, who raised it, and its id. Opens to
@@ -50,20 +55,25 @@ export function FindingCard(props: Props) {
     checked,
     onCheck,
     onSend,
+    state,
+    onDismiss,
+    canDraft,
   } = props;
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
-  const [commented, setCommented] = useState(false);
+  const [kept, setKept] = useState<"note" | "draft">();
   const placed = f.locations.map((loc) => (review ? place(review.files, loc) : undefined));
   const first = placed.find((p) => p);
   const notHere = review ? "Not in the open review" : "Open a review to see the code";
   const raisers = f.raisedBy?.length ? f.raisedBy : undefined;
 
-  async function comment() {
+  async function keep(draft: boolean) {
     if (!review || !first) return;
     const snippet = rowsText(review.files[first.file], first.changed);
-    const ok = await review.commentOn(first.file, first.changed, findingText(f, source), snippet);
-    setCommented(ok);
+    const text = findingText(f, source);
+    if (await review.commentOn(first.file, first.changed, text, snippet, draft)) {
+      setKept(draft ? "draft" : "note");
+    }
   }
 
   const id = f.id?.includes("#") ? f.id : `#${f.id}`;
@@ -78,7 +88,7 @@ export function FindingCard(props: Props) {
     : `${source}${f.offLens ? " (off-lens)" : ""}`;
 
   return (
-    <div className="finding" data-finding={f.id}>
+    <div className={`finding${state ? " settled" : ""}`} data-finding={f.id}>
       <div className="finding-top">
         <input
           type="checkbox"
@@ -91,6 +101,11 @@ export function FindingCard(props: Props) {
         <button type="button" className="finding-head" onClick={onToggle} aria-expanded={open}>
           <Inline>{f.title}</Inline>
         </button>
+        {state && (
+          <span className={`pill${state === "fixed" ? " green" : ""}`}>
+            {state === "fixed" ? "Fixed" : "Dismissed"}
+          </span>
+        )}
         <span className="finding-actions reveal">
           <IconButton
             icon="send"
@@ -99,13 +114,28 @@ export function FindingCard(props: Props) {
             onClick={() => onSend(findingText(f, source))}
           />
           <IconButton
-            icon={commented ? "check" : "comments"}
-            label={
-              commented ? "Commented" : first ? "Comment: add it as a comment on its code" : notHere
-            }
-            disabled={!first || commented}
-            onClick={comment}
+            icon={kept === "note" ? "check" : "comments"}
+            label={kept === "note" ? "Kept as note" : first ? "Keep as note on its code" : notHere}
+            disabled={!first || !!kept}
+            onClick={() => keep(false)}
           />
+          {canDraft && (
+            <IconButton
+              icon={kept === "draft" ? "check" : "pr"}
+              label={
+                kept === "draft" ? "Drafted" : first ? "Draft PR comment on its code" : notHere
+              }
+              disabled={!first || !!kept}
+              onClick={() => keep(true)}
+            />
+          )}
+          {state !== "fixed" && (
+            <IconButton
+              icon={state === "dismissed" ? "retry" : "x"}
+              label={state === "dismissed" ? "Bring it back" : "Dismiss"}
+              onClick={() => onDismiss(state !== "dismissed")}
+            />
+          )}
         </span>
       </div>
       <div className="finding-meta">

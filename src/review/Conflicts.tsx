@@ -1,5 +1,6 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useState } from "react";
+import { startRun } from "../agents/runs";
 import type { ChangeDto, ResolveDto } from "../bindings";
 import { commands } from "../ipc";
 import { useAgentsOff } from "../tools/agents";
@@ -41,9 +42,18 @@ export function Conflicts({ workspace, changes, send, onDone }: Props) {
 
   async function resolve(change: string) {
     setRun({ change, text: "" });
+    const handle = startRun(workspace, {
+      kind: "resolve",
+      subject: change,
+      stop: () => commands.stopResolve(workspace),
+      retry: () => resolve(change),
+    });
     const channel = new Channel<string>();
     channel.onmessage = (t) => setRun((r) => r && { ...r, text: r.text + t });
     const r = await commands.resolveConflict(workspace, change, channel);
+    if (r.status === "error") handle.end("failed", r.error);
+    else if (r.data.stopped) handle.end("stopped");
+    else handle.end("done", r.data.conflicted ? "Still has conflicts" : "Resolved");
     setRun((prev) =>
       r.status === "ok"
         ? { change, text: r.data.text, result: r.data }
