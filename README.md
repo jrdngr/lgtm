@@ -65,8 +65,9 @@ In the header and review toolbar:
 
 - **Revset:** the selector in the center of the header shows what's reviewed (`@` by default), with or without a Review tab open. New Review tabs open on it. Click it or press `r` to open `jj log` as you have it configured, then pick a commit or range, or type a revset.
 - **View:** Combined, Per change, or Since last session (what each change does differently from the last time this revset was reviewed). The second picker chooses the change.
-- **Line filter:** All, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
-- Progress counts for the whole review. **Reset** clears every mark in it.
+- **Line filter:** All lines, Unreviewed, Reviewed, Skipped, Flagged. Hidden rows become thin gap bars; click one to show its rows.
+- **Layout:** the two icons pick Unified or Split; the lit one is current.
+- Progress for the whole review: a bar of reviewed (green), skipped (grey), and flagged (red) rows with the reviewed percentage. Hover it for the counts. **Reset review…** in the ⋯ menu at the end clears every mark in it after you confirm.
 
 Panes: the **+** tab after each pane's tabs opens a new Terminal or Graph tab in that pane. The split icons at the right of each pane's tab strip split it right or down into an empty pane, which offers the same kinds of tab.
 

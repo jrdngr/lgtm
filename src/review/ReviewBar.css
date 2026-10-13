@@ -1,29 +1,104 @@
-.review-bar select {
-  font: inherit;
-  color: var(--fg);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 2px 4px;
+/* A select drawn as its label and a caret. */
+.quiet-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
-.review-bar .change-picker {
+.quiet-select select {
+  appearance: none;
+  font: inherit;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 16px 2px 6px;
+  cursor: pointer;
+}
+
+.quiet-select select:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.quiet-select::after {
+  content: "▾";
+  position: absolute;
+  right: 5px;
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.quiet-select.change-picker select {
   max-width: 280px;
+  text-overflow: ellipsis;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.mode-toggle .icon-button {
+  width: 24px;
+  height: 20px;
+  border: none;
+  border-radius: 0;
+}
+
+.mode-toggle .icon-button[aria-pressed="true"] {
+  background: var(--selection);
 }
 
 .review-bar .progress {
   display: flex;
-  gap: 8px;
-  font-size: 12px;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.progress-stack {
+  display: flex;
+  width: 120px;
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.progress-stack .p-reviewed {
+  background: var(--reviewed);
+}
+
+.progress-stack .p-skipped {
+  background: var(--faint);
+}
+
+.progress-stack .p-flagged {
+  background: var(--flagged);
+}
+
+.progress-pct {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.reset-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
-.progress .p-reviewed {
-  color: var(--reviewed);
-}
-
-.progress .p-flagged {
-  color: var(--flagged);
+.reset-confirm button.danger {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
 }
 
 .review-note {

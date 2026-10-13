@@ -43,7 +43,10 @@ export function FileHeader({ dto, check, progress, collapsed, onClick, onToggle,
         onChange={() => onCheck(!checked)}
       />
       <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
-      <span className="path">{dto.oldPath ? `${dto.oldPath} → ${dto.path}` : dto.path}</span>
+      <span className="path">
+        {dto.oldPath && <span className="dir">{dto.oldPath} → </span>}
+        <Path path={dto.path} />
+      </span>
       {check === "changedSinceReviewed" && (
         <span className="tag amber">changed since reviewed</span>
       )}
@@ -52,9 +55,25 @@ export function FileHeader({ dto, check, progress, collapsed, onClick, onToggle,
       {dto.binary && <span className="tag">binary</span>}
       {dto.conflict && <span className="tag conflict">conflict</span>}
       <span className="spacer" />
+      {progress.flagged > 0 && (
+        <span className="pill red" title={`${progress.flagged} flagged`}>
+          ⚑ {progress.flagged}
+        </span>
+      )}
       <span className="file-count">
         {progress.reviewed}/{progress.changed}
       </span>
     </div>
+  );
+}
+
+/** A path with its directory dimmed so the filename stands out. */
+function Path({ path }: { path: string }) {
+  const cut = path.lastIndexOf("/") + 1;
+  return (
+    <>
+      {cut > 0 && <span className="dir">{path.slice(0, cut)}</span>}
+      {path.slice(cut)}
+    </>
   );
 }

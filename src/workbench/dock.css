@@ -1,0 +1,31 @@
+/* Dockview's dark theme, recolored with the app's tokens. */
+.dock .dockview-theme-dark {
+  --dv-group-view-background-color: var(--bg);
+  --dv-tabs-and-actions-container-background-color: var(--panel);
+  --dv-tabs-and-actions-container-font-size: var(--fs);
+  --dv-activegroup-visiblepanel-tab-background-color: var(--bg);
+  --dv-activegroup-hiddenpanel-tab-background-color: var(--panel);
+  --dv-inactivegroup-visiblepanel-tab-background-color: var(--bg);
+  --dv-inactivegroup-hiddenpanel-tab-background-color: var(--panel);
+  --dv-tab-divider-color: var(--border);
+  --dv-activegroup-visiblepanel-tab-color: var(--fg);
+  --dv-activegroup-hiddenpanel-tab-color: var(--muted);
+  --dv-inactivegroup-visiblepanel-tab-color: var(--muted);
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--faint);
+  --dv-separator-border: var(--border);
+  --dv-paneview-header-border-color: var(--border);
+  --dv-paneview-active-outline-color: var(--accent);
+  --dv-icon-hover-background-color: var(--hover);
+  --dv-drag-over-background-color: var(--selection);
+  --dv-edge-dock-indicator-color: var(--accent);
+  --dv-tabs-container-scrollbar-color: var(--faint);
+}
+
+/* The focused group's current tab carries an accent underline. */
+.dock
+  .dockview-theme-dark
+  .dv-groupview.dv-active-group
+  > .dv-tabs-and-actions-container
+  .dv-tab.dv-active-tab {
+  box-shadow: inset 0 -2px var(--accent);
+}

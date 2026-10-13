@@ -5,6 +5,7 @@ import {
   themeDark,
 } from "dockview-react";
 import "dockview-react/dist/styles/dockview.css";
+import "./dock.css";
 import { useEffect, useRef, useState } from "react";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";

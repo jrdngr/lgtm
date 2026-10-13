@@ -13,12 +13,23 @@
 }
 
 .file-header .status {
-  font:
-    11px Menlo,
-    monospace;
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--border);
+  font: 600 11px var(--mono);
+}
+
+.file-header .status-modified {
+  color: var(--amber);
+}
+
+.file-header .path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+
+.file-header .dir {
+  color: var(--muted);
 }
 
 .status-added {
