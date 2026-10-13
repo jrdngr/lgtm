@@ -9,11 +9,11 @@ import "../review/ReviewBar.css";
 function hover({ revset, changes, stale }: ReviewTarget) {
   const n = changes.length;
   const count = `${n} change${n === 1 ? "" : "s"}`;
-  return `${revset} · ${count}${stale ? " · working copy is stale" : ""}\nRevisions (r)`;
+  return `${revset} · ${count}${stale ? " · working copy is stale" : ""}\nRevisions (@)`;
 }
 
 /** What the workspace reviews, in the header, whether or not a review pane is open. Opens
- * the revisions panel to pick another revset or change commits; `r` in a review opens it
+ * the revisions panel to pick another revset or change commits; `@` in a review opens it
  * too. Amber warns of a change with no description or a stale working copy. */
 export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
   const target = useReviewTarget(workspace);
@@ -53,14 +53,14 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
         aria-busy={loading}
         onClick={() => setOpen(true)}
         style={loading ? { width: width.current } : undefined}
-        title={loading || !target ? "Revisions (r)" : hover(target)}
+        title={loading || !target ? "Revisions (@)" : hover(target)}
       >
         {loading || !target ? (
           <span className="rev-shimmer" />
         ) : (
           <RevLabel revset={target.revset} changes={target.changes} />
         )}
-        <kbd>r</kbd>
+        <kbd>@</kbd>
       </button>
       {open && target && (
         <RevisionsPanel

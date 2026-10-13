@@ -69,7 +69,7 @@ export const commands = {
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
 	 */
-	markRows: (review: number, rows: RowRef[], color: "violet" | "red" | "gray" | "orange" | "cyan" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
+	markRows: (review: number, rows: RowRef[], color: "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
 	/**  Clears a file's marks and unchecks it, in one undo step. */
 	clearFileMarks: (review: number, file: number) => typedError<StateDto, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
 	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
@@ -841,7 +841,7 @@ export type Made_Serialize = {
 };
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
-export type MarkColor = "violet" | "red" | "gray" | "orange" | "cyan" | "pink" | "yellow" | "blue" | "tan";
+export type MarkColor = "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
 
 export type MarkCount = {
 	color: MarkColor,

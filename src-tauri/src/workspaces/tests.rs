@@ -34,7 +34,7 @@ async fn a_workspace_has_its_own_working_copy_and_progress() {
     let paths: Vec<&str> = review.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["a.py"]);
     let row = row_of(&review, 0, "x = 1", 0);
-    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Cyan), &[])
         .unwrap();
 
     let p = ctx.progress(Some("t1")).await.unwrap();

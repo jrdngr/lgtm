@@ -13,11 +13,11 @@ use crate::anchor::Anchor;
 )]
 #[serde(rename_all = "camelCase")]
 pub enum MarkColor {
-    Violet,
+    Cyan,
     Red,
     Gray,
     Orange,
-    Cyan,
+    Violet,
     Pink,
     Yellow,
     Blue,
@@ -26,11 +26,11 @@ pub enum MarkColor {
 
 impl MarkColor {
     pub const ALL: [MarkColor; 9] = [
-        Self::Violet,
+        Self::Cyan,
         Self::Red,
         Self::Gray,
         Self::Orange,
-        Self::Cyan,
+        Self::Violet,
         Self::Pink,
         Self::Yellow,
         Self::Blue,

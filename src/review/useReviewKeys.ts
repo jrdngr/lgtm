@@ -136,7 +136,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "a":
         if (!e.repeat) ctx.askAgent();
         break;
-      case "r":
+      case "@":
         ctx.openRevisions();
         break;
       case "g":

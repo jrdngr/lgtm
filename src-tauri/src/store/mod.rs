@@ -152,7 +152,7 @@ fn migrate_mark_colors(db: &Connection) -> rusqlite::Result<()> {
         db.execute_batch(
             "ALTER TABLE marks RENAME COLUMN state TO color;
              UPDATE marks SET color = CASE color
-                 WHEN 'reviewed' THEN 'violet' WHEN 'skipped' THEN 'gray' WHEN 'flagged' THEN 'red'
+                 WHEN 'reviewed' THEN 'cyan' WHEN 'skipped' THEN 'gray' WHEN 'flagged' THEN 'red'
                  ELSE color END;",
         )?;
     }
@@ -316,7 +316,7 @@ mod tests {
             .into_iter()
             .map(|m| m.color)
             .collect();
-        assert_eq!(colors, [MarkColor::Violet, MarkColor::Red]);
+        assert_eq!(colors, [MarkColor::Cyan, MarkColor::Red]);
         let sql: String = store
             .db
             .query_row(

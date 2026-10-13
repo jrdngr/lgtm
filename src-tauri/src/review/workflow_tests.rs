@@ -61,7 +61,7 @@ async fn whole_file_reviewed_marks_lines_and_checks_in_one_step() {
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "package a", 0);
     let state = ctx
-        .mark(review.id, &[row], Some(MarkColor::Violet), &[0])
+        .mark(review.id, &[row], Some(MarkColor::Cyan), &[0])
         .unwrap();
     assert_eq!(
         (state.marks.len(), state.checks[0]),
@@ -83,7 +83,7 @@ async fn clearing_a_file_drops_its_marks_and_check_but_not_other_files() {
     let a = row_of(&review, 0, "package a", 0);
     let x = row_of(&review, 0, "var x = 1", 0);
     let b = row_of(&review, 1, "package b", 0);
-    ctx.mark(review.id, &[a], Some(MarkColor::Violet), &[0])
+    ctx.mark(review.id, &[a], Some(MarkColor::Cyan), &[0])
         .unwrap();
     ctx.mark(review.id, &[x, b], Some(MarkColor::Red), &[])
         .unwrap();
@@ -110,7 +110,7 @@ async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     write(d, "a.rs", "fn a() {\n    one();\n}\n");
     let review = ctx.open(None, "@", false).await.unwrap();
     let row = row_of(&review, 0, "    one();", 0);
-    ctx.mark(review.id, &[row], Some(MarkColor::Violet), &[])
+    ctx.mark(review.id, &[row], Some(MarkColor::Cyan), &[])
         .unwrap();
 
     write(d, "a.rs", "fn a() {\n    two();\n}\n");
@@ -121,7 +121,7 @@ async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     // Reviewing the amber row clears it.
     let row = row_of(&review, 0, "    two();", 0);
     let state = ctx
-        .mark(review.id, &[row], Some(MarkColor::Violet), &[])
+        .mark(review.id, &[row], Some(MarkColor::Cyan), &[])
         .unwrap();
     assert!(state.amber.is_empty());
 }
@@ -248,12 +248,12 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
         ["fn a2() {}"]
     );
     let b = row_of(&review, 1, "fn b() {}", 0);
-    ctx.mark(review.id, &[b], Some(MarkColor::Violet), &[])
+    ctx.mark(review.id, &[b], Some(MarkColor::Cyan), &[])
         .unwrap();
 
     let reopened = ctx.open(None, "@", false).await.unwrap();
     assert_eq!(
         marked(&reopened, &reopened.state.marks),
-        [("fn b() {}".to_string(), MarkColor::Violet)]
+        [("fn b() {}".to_string(), MarkColor::Cyan)]
     );
 }

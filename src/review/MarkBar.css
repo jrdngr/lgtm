@@ -25,6 +25,7 @@
   line-height: 15px;
   padding: 0 4px;
   border-radius: 3px;
+  color: #fff;
   background: rgb(0 0 0 / 28%);
 }
 
@@ -35,5 +36,6 @@
 }
 
 .mark-chip.square kbd {
+  color: inherit;
   background: none;
 }

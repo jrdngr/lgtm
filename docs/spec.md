@@ -125,7 +125,7 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 
 #### Labels and states
 
-Marks are colors: a gutter strip plus a faint tint. There are nine (violet, red, grey, orange, cyan, pink, yellow, blue, tan), none green or amber so they stand out on added rows and from amber rows. Each color has:
+Marks are colors: a gutter strip plus a faint tint. There are nine (cyan, red, grey, orange, violet, pink, yellow, blue, tan), none green or amber so they stand out on added rows and from amber rows. Each color has:
 
 - An optional label. A labeled color shows as a box with the label, an unlabeled one as a square.
 - Whether its rows count as done, for progress.
@@ -133,7 +133,7 @@ Marks are colors: a gutter strip plus a faint tint. There are nine (violet, red,
 
 The defaults, on `1`–`3`:
 
-- **reviewed**: violet, done.
+- **reviewed**: cyan, done.
 - **flagged**: red, "come back to this", not done.
 - **skipped**: grey, done.
 

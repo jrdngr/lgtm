@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [[marks]]
-//! color = "violet"
+//! color = "cyan"
 //! label = "reviewed"
 //! done = true
 //! shown = true
@@ -38,7 +38,7 @@ fn slot(color: MarkColor, label: &str, done: bool, shown: bool) -> MarkSlot {
 /// Reviewed, flagged and skipped in use; the other colors unlabeled and hidden.
 pub fn defaults() -> Vec<MarkSlot> {
     let mut slots = vec![
-        slot(MarkColor::Violet, "reviewed", true, true),
+        slot(MarkColor::Cyan, "reviewed", true, true),
         slot(MarkColor::Red, "flagged", false, true),
         slot(MarkColor::Gray, "skipped", true, true),
     ];
@@ -90,9 +90,9 @@ mod tests {
         normalize(&mut slots);
         assert_eq!(slots.len(), MarkColor::ALL.len());
         assert_eq!(slots[0], slot(MarkColor::Tan, "later", false, true));
-        assert_eq!(slots[1], slot(MarkColor::Violet, "", true, false));
+        assert_eq!(slots[1], slot(MarkColor::Cyan, "", true, false));
         assert!(!is_done(&slots, MarkColor::Tan));
         assert_eq!(label(&slots, MarkColor::Tan), "later");
-        assert_eq!(label(&slots, MarkColor::Violet), "violet");
+        assert_eq!(label(&slots, MarkColor::Cyan), "cyan");
     }
 }

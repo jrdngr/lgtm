@@ -16,7 +16,7 @@ describe("follow", () => {
       files,
       layout({
         filter: "left",
-        rowState: (_, r) => (marked.has(r) ? "violet" : "unmarked"),
+        rowState: (_, r) => (marked.has(r) ? "cyan" : "unmarked"),
       }),
     );
     const before = buildLines(files, layout({ filter: "left" }));

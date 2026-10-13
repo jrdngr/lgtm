@@ -28,7 +28,7 @@ export const isTarget = store.isOwner;
 export const useReviewTarget = store.use;
 export const onTargetChange = store.subscribe;
 
-/** Asks the header to open the revision picker, as `r` in a review does. */
+/** Asks the header to open the revision picker, as `@` in a review does. */
 export function openRevisions(workspace: WorkspaceName) {
   for (const o of openers) o(workspace);
 }

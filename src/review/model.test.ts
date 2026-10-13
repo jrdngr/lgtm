@@ -45,7 +45,7 @@ describe("buildLines", () => {
   });
 
   it("shows a change's removed rows with its added rows, which alone take the state", () => {
-    const marked = (_: number, row: number) => (row === 3 ? "unmarked" : "violet");
+    const marked = (_: number, row: number) => (row === 3 ? "unmarked" : "cyan");
     const lines = buildLines(files, layout({ filter: "left", rowState: marked }));
     expect(
       lines.map((l) => (l.kind === "rows" || l.kind === "gap" ? [l.kind, l.rows] : l.kind)),
@@ -194,7 +194,7 @@ describe("fileProgress", () => {
   const done = (c: MarkColor) => c !== "red";
 
   it("counts rows that need review by mark, leaving out a change's removed rows", () => {
-    const index = indexed([mark(1, "violet"), mark(3, "red")]);
+    const index = indexed([mark(1, "cyan"), mark(3, "red")]);
     expect(fileProgress(files, rowStates(files, index), done)).toEqual([
       { marks: { red: 1 }, byFile: 0, done: 0, changed: 2 },
     ]);
