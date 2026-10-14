@@ -449,8 +449,8 @@ pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String
     };
     let turn = format!(
         "My reply draft now:\n\n{draft}\n\n{asked}\n\nAnswer in `message`, briefly. When the \
-         take or the reply should change, also return the new verdict and why, and the whole \
-         new reply."
+         reply should change, also return the whole new reply. Return a new verdict and why only \
+         when your view of the thread itself changes, never to describe edits to the reply."
     );
     match intro {
         None => turn,
