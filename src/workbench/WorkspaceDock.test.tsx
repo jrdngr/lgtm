@@ -90,9 +90,12 @@ describe("Diff file list", () => {
   it("shows a Review tab hidden behind another once the current one closes", async () => {
     const { api, el, reviews, fileButton } = await mount("b");
     const [first] = reviews();
-    const terminal = api.panels.find((p) => !reviews().includes(p));
-    if (!terminal) throw new Error("no terminal");
-    // A second review, then a terminal in front of it.
+    // A terminal pane below the review, then a second review behind the terminal.
+    const terminal = api.addPanel({
+      id: "terminal",
+      component: "terminal",
+      position: { referencePanel: first, direction: "below" },
+    });
     const second = api.addPanel({
       id: "second",
       component: "review",

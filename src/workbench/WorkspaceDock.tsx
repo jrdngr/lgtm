@@ -7,7 +7,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { RunsPanel } from "../agents/RunsPanel";
 import { ReportPanel } from "../bots/ReportPanel";
 import { EditorPanel } from "../editor/EditorPanel";
@@ -29,7 +29,7 @@ import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
 import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
-import { defaultLayout, focusPanel, isReviewPanel } from "./panels";
+import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "./panels";
 import { Tab } from "./Tab";
 
 const components = {
@@ -116,7 +116,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     latest.current.main = api;
     const saved = await load();
     if (latest.current.main !== api) return;
-    restoreLayout(api, saved.main, () => defaultLayout(api, setup));
+    restoreLayout(api, saved.main, () => defaultLayout(api));
     const panes = () => setHasPane(api.panels.some(isReviewPanel));
     panes();
     api.onDidAddPanel(panes);
@@ -131,6 +131,12 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     const saved = await load();
     if (latest.current.bottom !== api) return;
     restoreLayout(api, saved.bottom);
+    // A new workspace opens the panel on a terminal, and an open panel never comes up empty.
+    const fresh = !saved.main && !saved.bottom;
+    if (api.panels.length === 0 && (fresh || (shown.current && bottom.get().open))) {
+      if (fresh && shown.current) flushSync(() => bottom.set({ open: true }));
+      addTerminal(api, undefined, setup);
+    }
     // Closing the last tab hides the panel, while dragging it to the main dock leaves the panel
     // open. Checked once the close settles, since moving a tab within the dock removes it from
     // its pane before adding it to the next.

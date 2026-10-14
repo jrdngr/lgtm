@@ -127,10 +127,9 @@ export function openReviewTab(api: DockviewApi) {
   return addPanel(api, "review", {}, largest ? { referenceGroup: largest } : undefined);
 }
 
-/** A review with a terminal below it. */
-export function defaultLayout(api: DockviewApi, setup = false) {
+/** A new workspace's main dock: a review. Its terminal opens in the bottom dock. */
+export function defaultLayout(api: DockviewApi) {
   addPanel(api, "review");
-  addTerminal(api, "below", setup);
 }
 
 /** Drops panels earlier builds kept in the grid (Tasks, Files, Design) and panes that belonged to
