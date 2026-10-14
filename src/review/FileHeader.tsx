@@ -65,15 +65,13 @@ export function FileHeader(props: Props) {
       {dto.binary && <span className="tag">binary</span>}
       {dto.conflict && <span className="tag conflict">conflict</span>}
       <span className="spacer" />
-      {(marked || checked) && (
-        <IconButton
-          icon="eraser"
-          label="Clear marks in this file"
-          className="reveal"
-          onMouseDown={stop}
-          onClick={props.onClear}
-        />
-      )}
+      <IconButton
+        icon="eraser"
+        label="Clear marks in this file"
+        disabled={!marked && !checked}
+        onMouseDown={stop}
+        onClick={props.onClear}
+      />
       <MarkCounts progress={progress} setup={props.setup} />
       <span className="file-count" title={`${progress.done} of ${progress.changed} done`}>
         {progress.done}/{progress.changed}
