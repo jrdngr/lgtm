@@ -16,6 +16,9 @@ pub(super) struct EditDto {
     pub path: String,
     pub old: String,
     pub new: String,
+    /// Replace every occurrence of `old` rather than exactly one.
+    #[serde(default)]
+    pub all: bool,
 }
 
 /// Files that run or steer agents, which a proposal may not touch.
@@ -78,8 +81,9 @@ pub(super) fn build(root: &Path, edits: &[EditDto]) -> (Vec<Proposed>, Vec<Strin
             continue;
         }
         match p.after.matches(e.old.as_str()).count() {
-            1 => p.after = p.after.replacen(e.old.as_str(), &e.new, 1),
             0 => problems.push(format!("A change to {path} didn't match the file.")),
+            _ if e.all => p.after = p.after.replace(e.old.as_str(), &e.new),
+            1 => p.after = p.after.replacen(e.old.as_str(), &e.new, 1),
             _ => problems.push(format!("A change to {path} matched more than one place.")),
         }
     }
@@ -156,6 +160,7 @@ mod tests {
             path: path.into(),
             old: old.into(),
             new: new.into(),
+            all: false,
         }
     }
 
@@ -170,17 +175,23 @@ mod tests {
                 edit("a.rs", "fn a()", "/// A.\nfn a()"),
                 edit("a.rs", "fn b()", "fn c()"),
                 edit("a.rs", "missing", "x"),
+                edit("a.rs", "fn", "x"),
+                EditDto {
+                    all: true,
+                    ..edit("a.rs", "{}", "{ }")
+                },
                 edit("new.md", "", "hi\n"),
                 edit(".claude/settings.json", "", "{}"),
             ],
         );
         assert_eq!(proposal.len(), 2);
-        assert_eq!(proposal[0].after, "/// A.\nfn a() {}\nfn c() {}\n");
+        assert_eq!(proposal[0].after, "/// A.\nfn a() { }\nfn c() { }\n");
         assert_eq!(
             (proposal[1].before.as_str(), proposal[1].after.as_str()),
             ("", "hi\n")
         );
-        assert_eq!(problems.len(), 2);
+        // The missing match, the ambiguous one, and the protected file.
+        assert_eq!(problems.len(), 3);
     }
 
     #[test]

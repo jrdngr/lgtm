@@ -86,7 +86,8 @@ pub(super) fn chat_schema() -> String {
         "properties": {{
           "path": {{ "type": "string" }},
           "old": {{ "type": "string" }},
-          "new": {{ "type": "string" }}
+          "new": {{ "type": "string" }},
+          "all": {{ "type": "boolean" }}
         }},
         "required": ["path", "old", "new"],
         "additionalProperties": false
@@ -448,11 +449,13 @@ impl RepoCtx {
 
 /// A chat turn on a thread. The first carries the change, the rules, and the thread.
 /// How a turn that can't edit files offers the code changes its reply promises.
-const PROPOSE: &str = "\n\nYou can't edit files in this turn. When the reply promises a code \
-change, return it in `edits` as exact replacements: `path` from the repository root, `old` \
-copied exactly from the file and unique in it (empty for a new file), and `new`. They're \
-written when I make the reply final. Return `edits` only when the proposed changes should \
-change; it replaces the ones before, and an empty list drops them.";
+const PROPOSE: &str = "\n\nYou change code by proposing edits: return them in `edits`, and I \
+see them as diffs that are written when I make the reply final. Your tools can't write files, \
+so never say you can't make a change; propose it. Each edit is an exact replacement: `path` \
+from the repository root, `old` copied exactly from the file and unique in it (empty for a new \
+file), and `new`. Set `all` to replace every occurrence of `old` in the file instead, as for a \
+rename; a rename needs an edit for each file that uses the name. Return `edits` only when the \
+proposed changes should change; it replaces the ones before, and an empty list drops them.";
 
 pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String)>) -> String {
     const EDIT: &str = "Edit the files directly and change only what's needed.";
