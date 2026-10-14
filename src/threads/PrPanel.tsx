@@ -253,7 +253,7 @@ export function PrPanel() {
       ) : (
         <>
           <SectionHeader title="PR" />
-          <Empty>This workspace isn't a PR's</Empty>
+          <Empty>No PR selected</Empty>
         </>
       )}
     </div>

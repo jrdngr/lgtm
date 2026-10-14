@@ -1,14 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
 import { commands } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
-import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
+import { type AddKind, onAddRequest } from "./addRequests";
 import { type WorkspaceName, workspaceKey } from "./context";
-import { NearbyPrs } from "./NearbyPrs";
+import { StackPrs } from "./StackPrs";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
@@ -33,6 +33,13 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string>();
+
+  function start(kind: AddKind) {
+    if (kind === "workspace") setNaming(true);
+    else if (!githubOff) setOpeningPr(true);
+  }
+  // Resubscribed each render, so the shortcut sees the current state.
+  useEffect(() => onAddRequest(start));
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -69,35 +76,35 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     reload();
   }
 
+  const addItems = [
+    { label: "New Workspace…", keys: "⇧⌘N", onSelect: () => start("workspace") },
+    {
+      label: "Review a PR by URL or Number…",
+      keys: "⌥⌘N",
+      disabled: githubOff,
+      onSelect: () => start("pr"),
+    },
+  ];
+
   /** The menu of the header and the space around the rows. Text fields keep their own. */
   function menu(e: React.MouseEvent) {
     if ((e.target as Element).closest("input, textarea")) return;
-    openMenu(e, [
-      { label: "New Workspace…", onSelect: () => setNaming(true) },
-      { label: "Review a GitHub PR…", disabled: githubOff, onSelect: () => setOpeningPr(true) },
-      "-",
-      { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide },
-    ]);
+    openMenu(e, [...addItems, "-", { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide }]);
   }
 
   return (
     <div className="workspaces" onContextMenu={menu}>
       <SectionHeader title="Workspaces">
-        <IconButton
-          icon="pr"
-          label={
-            githubOff ? "Needs the GitHub CLI (gh)" : "Review a GitHub PR in its own workspace"
-          }
-          onClick={() => setOpeningPr((o) => !o)}
-          disabled={githubOff}
-          aria-pressed={openingPr}
-        />
-        <IconButton
-          icon="plus"
-          label="New workspace"
-          onClick={() => setNaming(true)}
-          disabled={naming}
-        />
+        <button
+          type="button"
+          className="ws-new"
+          onClick={(e) => {
+            e.stopPropagation();
+            openMenu(e, addItems);
+          }}
+        >
+          + New ▾
+        </button>
       </SectionHeader>
       {openingPr && (
         <OpenPr onClose={() => setOpeningPr(false)} onError={setError} onOpened={prOpened} />
@@ -136,7 +143,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
               </li>
             );
           }
-          return (
+          const row = (
             <WorkspaceRow
               key={key}
               w={w}
@@ -144,11 +151,13 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
               selected={selected === w.name}
               onSelect={() => onSelect(w.name)}
               onDelete={() => setConfirming(w.name ?? undefined)}
+              onError={setError}
             />
           );
+          if (selected !== w.name) return row;
+          return [row, <StackPrs key={`${key} stack`} workspace={w.name} onError={setError} />];
         })}
       </ul>
-      <NearbyPrs workspace={selected} onOpened={prOpened} onError={setError} />
     </div>
   );
 }

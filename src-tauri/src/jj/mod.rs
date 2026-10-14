@@ -19,7 +19,7 @@ pub mod workspace;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogLine;
-pub use near::NearBookmark;
+pub use near::{NearBookmark, StackSide};
 pub use workspace::WorkspaceInfo;
 
 /// True when `err` came from jj refusing to work on a stale working copy.

@@ -68,12 +68,9 @@ fn order(t: &ThreadDto) -> (bool, String, u32, String) {
 }
 
 impl Review {
-    /// The PR the review's workspace was checked out for, as `(repo, number)`.
+    /// The PR of the review's workspace, as `(repo, number)`.
     pub(super) fn pr(&self, store: &Store) -> anyhow::Result<Option<(String, u32)>> {
-        let Some(name) = &self.ws.name else {
-            return Ok(None);
-        };
-        Ok(store.pr(name)?.map(|p| (p.repo.to_string(), p.number)))
+        Ok(store.pr(self.ws.key())?.map(|p| (p.repo.to_string(), p.number)))
     }
 
     pub(super) fn rematch_threads(&mut self, store: &Store) -> anyhow::Result<()> {

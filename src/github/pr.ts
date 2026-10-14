@@ -3,7 +3,7 @@ import type { PrDto } from "../bindings";
 import { commands } from "../ipc";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
-/** Each workspace's PR, `null` when it isn't a PR workspace. Absent until loaded. */
+/** Each workspace's PR, `null` when it has none. Absent until loaded. */
 const prs = new Map<string, PrDto | null>();
 const listeners = new Set<() => void>();
 const loading = new Map<string, Promise<PrDto | null>>();
@@ -34,6 +34,12 @@ export function prOf(workspace: WorkspaceName, retries = 5): Promise<PrDto | nul
     loading.set(key, p);
   }
   return p;
+}
+
+/** Sets the workspace's PR, as picking one from its stack does. */
+export function setPr(workspace: WorkspaceName, pr: PrDto | null) {
+  prs.set(workspaceKey(workspace), pr);
+  for (const l of listeners) l();
 }
 
 /** Loads the workspace's PR again, after a refetch changed it. */

@@ -16,6 +16,7 @@ import {
   openReviewTab,
 } from "../workbench/panels";
 import type { WorkspaceName } from "./context";
+import { clearStackPr } from "./stack";
 
 /** The row's Delete, in its ⋯ menu and its right-click menu. The main workspace can't go. */
 export const deleteItem = (w: WorkspaceDto, onDelete: () => void): MenuItem => ({
@@ -59,15 +60,17 @@ export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): 
     { label: "Open Workspace", onSelect: open },
     "-",
     { label: "New Terminal Here", onSelect: inIt((api) => focusPanel(addTerminal(api))) },
-    !pr && { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
+    (!pr || pr.stack) && { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
     "-",
     ...(pr
       ? [
-          {
-            label: "Sync PR",
-            disabled: !currentReview(ws),
-            onSelect: () => currentReview(ws)?.refetchPr(),
-          },
+          pr.stack
+            ? { label: "Deselect PR", onSelect: () => run(clearStackPr(ws, pr)) }
+            : {
+                label: "Sync PR",
+                disabled: !currentReview(ws),
+                onSelect: () => currentReview(ws)?.refetchPr(),
+              },
           { label: "Open PR on GitHub", onSelect: () => run(unwrap(commands.openPrPage(ws))) },
           { label: "Copy PR URL", onSelect: () => copy(pr.url) },
           "-" as const,

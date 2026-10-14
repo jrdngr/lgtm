@@ -10,6 +10,7 @@ import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
+import { type AddKind, requestAdd } from "../workspaces/addRequests";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
@@ -141,6 +142,12 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     if (panel && (await confirmClose(selected, panel.id))) panel.api.close();
   }
 
+  /** Starts adding a workspace or PR in the Workspaces panel, showing it first. */
+  function addFromPanel(kind: AddKind) {
+    showView("left", "workspaces");
+    requestAnimationFrame(() => requestAdd(kind));
+  }
+
   const panelKeys: Partial<Record<string, () => void>> = {
     "Mod+W": () => void closeTab(),
     "Mod+B": () => toggle("left"),
@@ -156,6 +163,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
     "Mod+J": () => openRevisions(selected),
+    "Mod+Shift+N": () => addFromPanel("workspace"),
+    "Mod+Alt+N": () => addFromPanel("pr"),
     toggle: () => toggleBottom(),
     terminal: () => toggleBottom(true),
   };

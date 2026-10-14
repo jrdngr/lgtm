@@ -1,11 +1,13 @@
 import type { ProgressDto, WorkspaceDto } from "../bindings";
 import { usePr } from "../github/pr";
+import { errorText } from "../ipc";
 import { useMarkSetup } from "../review/marks";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { Ring } from "../ui/Ring";
 import { clearFinished, useActivity } from "./activity";
 import { doneShare, progressTitle } from "./progress";
+import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";
 
 /** Characters of a change id shown, its unique prefix included. */
@@ -31,18 +33,16 @@ function Change({ w }: { w: WorkspaceDto }) {
   );
 }
 
-/** Title and second line: a PR workspace leads with its PR, others with their name. */
-function Lines({ w }: { w: WorkspaceDto }) {
+/** A PR workspace is one line, its PR. Others show their name, with the PR picked from their
+ * stack and its ✕, then their change. */
+function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void }) {
   const pr = usePr(w.name);
-  if (pr) {
+  if (pr && !pr.stack) {
     return (
-      <>
-        <span className="workspace-title">
-          <span className="pill purple">#{pr.number}</span>
-          <span className="ellipsis">{pr.title}</span>
-        </span>
-        <span className="workspace-desc">{w.title}</span>
-      </>
+      <span className="workspace-title">
+        <span className="pill purple">#{pr.number}</span>
+        <span className="ellipsis">{pr.title}</span>
+      </span>
     );
   }
   return (
@@ -50,6 +50,22 @@ function Lines({ w }: { w: WorkspaceDto }) {
       <span className="workspace-title">
         <span className="ellipsis">{w.title}</span>
         {w.name === null && <span className="pill">main</span>}
+        {pr && (
+          <span className="pill purple" title={pr.title}>
+            #{pr.number}
+            {/* biome-ignore lint/a11y/useKeyWithClickEvents: the PR tab's menu deselects by keyboard */}
+            <span
+              className="pill-x"
+              title="Deselect PR"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearStackPr(w.name, pr).catch((err) => onError(errorText(err)));
+              }}
+            >
+              ✕
+            </span>
+          </span>
+        )}
       </span>
       <span className="workspace-desc">
         <Change w={w} />
@@ -76,10 +92,11 @@ interface Props {
   selected: boolean;
   onSelect(): void;
   onDelete(): void;
+  onError(message: string): void;
 }
 
 /** One workspace: its PR or change, its agents, review progress, and a ⋯ menu on hover. */
-export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: Props) {
+export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete, onError }: Props) {
   const setup = useMarkSetup();
   const pr = usePr(w.name);
   const dot = useActivity(w.name)?.kind === "finished";
@@ -96,7 +113,7 @@ export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: P
   return (
     <li className={`workspace${selected ? " selected" : ""}`} onContextMenu={menu}>
       <button type="button" className="workspace-open" onClick={onSelect} title={w.root}>
-        <Lines w={w} />
+        <Lines w={w} onError={onError} />
       </button>
       <span className="workspace-side">
         {w.name !== null && (

@@ -112,24 +112,6 @@
   padding: 1px 8px;
 }
 
-.nearby-prs {
-  margin-top: 8px;
-}
-
-.nearby-title {
-  font-weight: normal;
-}
-
-.nearby-prs .workspace-open {
-  padding-block: 4px;
-}
-
-.nearby-note {
-  padding: 6px 10px;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-
 .ws-activity {
   box-sizing: border-box;
   width: 8px;
@@ -158,4 +140,151 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.ws-new {
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--raise);
+  font-size: var(--fs-xs);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.pill .pill-x {
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.pill .pill-x:hover {
+  opacity: 1;
+}
+
+.stack-prs {
+  margin: 0 0 4px 12px;
+  border-left: 1px solid var(--hair);
+}
+
+.stack-cap {
+  padding: 3px 10px 1px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.stack-pr {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 3px 8px 3px 10px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--fs-sm);
+}
+
+.stack-pr:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.stack-pr.on,
+.stack-pr.on:hover:not(:disabled) {
+  background: rgb(163 113 247 / 16%);
+}
+
+.stack-radio {
+  flex: none;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border: 1.5px solid var(--faint);
+  border-radius: 50%;
+}
+
+.stack-pr.on .stack-radio {
+  border-color: var(--github);
+  background: radial-gradient(var(--github) 0 45%, transparent 50%);
+}
+
+.stack-lines {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.stack-l1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.stack-l1 .ellipsis {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack-pr.on .stack-l1 .ellipsis {
+  color: #e8e8e8;
+}
+
+.stack-num {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--github);
+}
+
+.stack-pos {
+  flex: none;
+  font: 10px var(--mono);
+  color: var(--faint);
+}
+
+.stack-pos.here {
+  color: var(--added);
+}
+
+.stack-bm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 10.5px var(--mono);
+  color: var(--faint);
+}
+
+.stack-ask {
+  display: grid;
+  gap: 6px;
+  margin: 4px 8px 6px;
+  padding: 7px 9px;
+  border: 1px solid rgb(210 153 34 / 45%);
+  border-radius: 6px;
+  background: rgb(210 153 34 / 14%);
+  font-size: var(--fs-sm);
+}
+
+.stack-ask code {
+  font: var(--fs-xs) var(--mono);
+  color: var(--rev-unique);
+}
+
+.stack-ask-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.stack-note {
+  padding: 4px 10px 6px 22px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
 }

@@ -208,7 +208,7 @@ export const commands = {
 	 *  one that has it. Returns the workspace.
 	 */
 	openPr: (input: string) => typedError<string, string>(__TAURI_INVOKE("open_pr", { input })),
-	/**  The PR the workspace was checked out for, if any. */
+	/**  The workspace's PR, checked out or picked from its stack, if any. */
 	prInfo: (workspace: string | null) => typedError<{
 	number: number,
 	/**  `owner/name`. */
@@ -222,13 +222,39 @@ export const commands = {
 	head: string,
 	/**  The revset the workspace reviews. */
 	revset: string,
+	/**  Picked from the workspace's stack rather than checked out into it. */
+	stack: boolean,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Opens the workspace's PR on GitHub in the browser. */
 	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
 	/**  Opens a web page in the default browser. */
 	openUrl: (url: string) => typedError<null, string>(__TAURI_INVOKE("open_url", { url })),
-	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
-	nearbyPrs: (workspace: string | null) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace })),
+	/**
+	 *  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. GitHub is
+	 *  asked again only with `refresh` or when the bookmarks change.
+	 */
+	nearbyPrs: (workspace: string | null, refresh: boolean) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace, refresh })),
+	/**  Brings the workspace's stack PR in line with `@`, and returns the workspace's PR. */
+	syncStackPr: (workspace: string | null) => typedError<{
+	number: number,
+	/**  `owner/name`. */
+	repo: string,
+	title: string,
+	url: string,
+	author: string,
+	baseRef: string,
+	headRef: string,
+	/**  The head commit as last fetched. */
+	head: string,
+	/**  The revset the workspace reviews. */
+	revset: string,
+	/**  Picked from the workspace's stack rather than checked out into it. */
+	stack: boolean,
+} | null, string>(__TAURI_INVOKE("sync_stack_pr", { workspace })),
+	/**  Picks stack PR `number` as the workspace's PR. With `edit`, edits its change first. */
+	selectStackPr: (workspace: string | null, number: number, edit: boolean) => typedError<PrDto, string>(__TAURI_INVOKE("select_stack_pr", { workspace, number, edit })),
+	/**  Deselects the workspace's stack PR. */
+	clearStackPr: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("clear_stack_pr", { workspace })),
 	/**
 	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
 	 *  conversation and its diff with review threads.
@@ -924,6 +950,14 @@ export type NearbyPrDto = {
 	/**  The pushed bookmark that is the PR's head. */
 	bookmark: string,
 	draft: boolean,
+	/**  Where the bookmark is from `@`, as a jj revset like `@-`. Empty off `@`'s line. */
+	position: string,
+	/**  The change the bookmark is on. */
+	change: string,
+	/**  The bookmark is on `@` or below it, so `@` builds on the PR. */
+	under: boolean,
+	/**  The commit the bookmark was last pushed at. */
+	pushed: string,
 };
 
 /**
@@ -1061,6 +1095,8 @@ export type PrDto = {
 	head: string,
 	/**  The revset the workspace reviews. */
 	revset: string,
+	/**  Picked from the workspace's stack rather than checked out into it. */
+	stack: boolean,
 };
 
 export type PrPreviewDto = {

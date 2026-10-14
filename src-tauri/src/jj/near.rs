@@ -4,13 +4,43 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::Jj;
 
-/// A remote bookmark on `@`'s stack.
+/// Where a commit sits relative to `@`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StackSide {
+    At,
+    /// An ancestor of `@`.
+    Below,
+    /// A descendant of `@`.
+    Above,
+    /// On another branch of the stack.
+    Beside,
+}
+
+/// A bookmark on `@`'s stack.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NearBookmark {
     pub name: String,
+    /// The remote it was pushed to, or empty for the local bookmark.
     pub remote: String,
     /// Parent edges between it and `@`: 0 on `@`, then counting out both ways.
     pub distance: u32,
+    pub side: StackSide,
+    /// The commit's change id, shortest unique prefix first.
+    pub change: String,
+    pub commit: String,
+}
+
+impl NearBookmark {
+    /// Where it is as a jj revset from `@`, like `@`, `@--` or `@+`. Empty beside `@`.
+    pub fn position(&self) -> String {
+        let n = self.distance as usize;
+        match self.side {
+            StackSide::At => "@".into(),
+            StackSide::Below => format!("@{}", "-".repeat(n)),
+            StackSide::Above => format!("@{}", "+".repeat(n)),
+            StackSide::Beside => String::new(),
+        }
+    }
 }
 
 /// `@`'s stack: its ancestors down to trunk and their descendants, so a new change on top
@@ -18,27 +48,29 @@ pub struct NearBookmark {
 /// Empty when `@` is in trunk, where the descendants would be every branch.
 const STACK: &str = "(trunk()..@)::";
 
-/// `@`, `a` for its ancestors or `d` for the rest, then the commit id, its parents' ids and its
-/// remote bookmarks.
-const TEMPLATE: &str = r#"if(self.contained_in("@"), "@", if(self.contained_in("::@"), "a", "d")) ++ "\t"
+/// `@`, `a` for its ancestors, `d` for its descendants or `o` for the rest, then the commit
+/// id, its parents' ids, its change id, its remote bookmarks and its local ones.
+const TEMPLATE: &str = r#"if(self.contained_in("@"), "@", if(self.contained_in("::@"), "a", if(self.contained_in("@::"), "d", "o"))) ++ "\t"
   ++ commit_id ++ "\t" ++ parents.map(|p| p.commit_id()).join(",") ++ "\t"
-  ++ remote_bookmarks.filter(|b| b.remote() != "git").map(|b| b.name() ++ "\x1f" ++ b.remote()).join("\x1e")
+  ++ change_id.shortest(4) ++ "\t"
+  ++ remote_bookmarks.filter(|b| b.remote() != "git").map(|b| b.name() ++ "\x1f" ++ b.remote()).join("\x1e") ++ "\t"
+  ++ local_bookmarks.map(|b| b.name()).join("\x1e")
   ++ "\n""#;
 
 /// Parses `jj log` lines and measures each commit's distance from `@` through the parent
 /// edges between them. Returns the bookmarks nearest first, ancestors before descendants at
 /// the same distance.
 fn parse_near(out: &str) -> Vec<NearBookmark> {
-    let rows: Vec<[&str; 4]> = out
+    let rows: Vec<[&str; 6]> = out
         .lines()
         .filter_map(|line| {
-            let mut f = line.splitn(4, '\t');
-            Some([f.next()?, f.next()?, f.next()?, f.next()?])
+            let mut f = line.splitn(6, '\t');
+            Some([f.next()?, f.next()?, f.next()?, f.next()?, f.next()?, f.next()?])
         })
         .collect();
     let ids: HashSet<&str> = rows.iter().map(|r| r[1]).collect();
     let mut edges: HashMap<&str, Vec<&str>> = HashMap::new();
-    for &[_, id, parents, _] in &rows {
+    for &[_, id, parents, ..] in &rows {
         for p in parents.split(',').filter(|p| ids.contains(p)) {
             edges.entry(id).or_default().push(p);
             edges.entry(p).or_default().push(id);
@@ -60,19 +92,30 @@ fn parse_near(out: &str) -> Vec<NearBookmark> {
     }
     let mut all: Vec<_> = rows
         .iter()
-        .map(|&[side, id, _, refs]| (dist.get(id).copied().unwrap_or(u32::MAX), side == "d", refs))
+        .map(|row| (dist.get(row[1]).copied().unwrap_or(u32::MAX), row[0] != "a" && row[0] != "@", row))
         .collect();
-    all.sort_by_key(|&(d, is_desc, _)| (d, is_desc));
+    all.sort_by_key(|&(d, off, _)| (d, off));
     all.into_iter()
-        .flat_map(|(d, _, refs)| {
-            refs.split('\x1e').filter_map(move |r| {
-                let (name, remote) = r.split_once('\x1f')?;
-                Some(NearBookmark {
-                    name: name.to_string(),
-                    remote: remote.to_string(),
-                    distance: d,
-                })
-            })
+        .flat_map(|(distance, _, &[side, commit, _, change, remote, local])| {
+            let side = match side {
+                "@" => StackSide::At,
+                "a" => StackSide::Below,
+                "d" => StackSide::Above,
+                _ => StackSide::Beside,
+            };
+            let at = move |name: &str, remote: &str| NearBookmark {
+                name: name.to_string(),
+                remote: remote.to_string(),
+                distance,
+                side,
+                change: change.to_string(),
+                commit: commit.to_string(),
+            };
+            let remote = remote
+                .split('\x1e')
+                .filter_map(move |r| r.split_once('\x1f').map(|(n, rm)| at(n, rm)));
+            let local = local.split('\x1e').filter(|n| !n.is_empty()).map(move |n| at(n, ""));
+            remote.chain(local)
         })
         .collect()
 }
@@ -91,6 +134,10 @@ impl Jj {
 mod tests {
     use crate::review::tests::{jj, repo, write};
 
+    fn pushed(got: Vec<super::NearBookmark>) -> Vec<super::NearBookmark> {
+        got.into_iter().filter(|b| !b.remote.is_empty()).collect()
+    }
+
     fn names(got: &[super::NearBookmark]) -> Vec<(&str, u32)> {
         got.iter().map(|b| (b.name.as_str(), b.distance)).collect()
     }
@@ -98,18 +145,35 @@ mod tests {
     #[test]
     fn measures_distance_along_each_branch() {
         // `@` has two branches above it, b1 -> b2 -> b3 and c1, which jj lists one after the
-        // other. Lines are `side`, commit id, parents, `name\x1fremote`.
+        // other, and `side` branches off `base`. Lines are `side`, commit id, parents, change
+        // id, `name\x1fremote` and local bookmarks.
         let out = [
-            "d\tc1\tat\tc1\x1fo",
-            "d\tb3\tb2\tb3\x1fo",
-            "d\tb2\tb1\t",
-            "d\tb1\tat\tb1\x1fo",
-            "@\tat\tbase\t",
-            "a\tbase\ttrunk\tbase\x1fo",
+            "o\tside\tbase\tsi\tside\x1fo\t",
+            "d\tc1\tat\tc1\tc1\x1fo\t",
+            "d\tb3\tb2\tb3\tb3\x1fo\t",
+            "d\tb2\tb1\tb2\t\tb3",
+            "d\tb1\tat\tb1\tb1\x1fo\t",
+            "@\tat\tbase\tat\t\t",
+            "a\tbase\ttrunk\tba\tbase\x1fo\t",
         ]
         .join("\n");
         let got = super::parse_near(&out);
-        assert_eq!(names(&got), [("base", 1), ("c1", 1), ("b1", 1), ("b3", 3)]);
+        assert_eq!(
+            names(&got),
+            [("base", 1), ("c1", 1), ("b1", 1), ("side", 2), ("b3", 2), ("b3", 3)]
+        );
+        let at: Vec<_> = got.iter().map(|b| (b.remote.as_str(), b.position())).collect();
+        assert_eq!(
+            at,
+            [
+                ("o", "@-".into()),
+                ("o", "@+".into()),
+                ("o", "@+".into()),
+                ("o", String::new()),
+                ("", "@++".into()),
+                ("o", "@+++".into()),
+            ]
+        );
     }
 
     #[tokio::test]
@@ -157,7 +221,7 @@ mod tests {
         // From the middle of the stack: `three` is on @, `one` two below, `four` and `five`
         // above. `main` is trunk and `local-only` was never pushed.
         jj(d, &["edit", "three"]);
-        let got = ctx.main.jj.bookmarks_near().await.unwrap();
+        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
         assert_eq!(
             names(&got),
             [("three", 0), ("four", 1), ("one", 2), ("five", 2)]
@@ -166,7 +230,7 @@ mod tests {
 
         // A new change on `three` still sees the stack above it, through `three`.
         jj(d, &["new", "three"]);
-        let got = ctx.main.jj.bookmarks_near().await.unwrap();
+        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
         assert_eq!(
             names(&got),
             [("three", 1), ("four", 2), ("one", 3), ("five", 3)]
@@ -174,6 +238,6 @@ mod tests {
 
         // At trunk, other branches aren't near.
         jj(d, &["new", "main"]);
-        assert!(ctx.main.jj.bookmarks_near().await.unwrap().is_empty());
+        assert!(pushed(ctx.main.jj.bookmarks_near().await.unwrap()).is_empty());
     }
 }

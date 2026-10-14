@@ -1,5 +1,5 @@
-//! PR workspaces: checking a GitHub PR out into its own workspace, refetching it, and its
-//! discussion.
+//! PR workspaces: checking a GitHub PR out into its own workspace, or picking one from a
+//! workspace's stack, refetching it, and its discussion.
 
 mod checkout;
 mod cleanup;
@@ -9,6 +9,7 @@ mod preview;
 mod pull;
 mod refetch;
 mod send;
+mod stack;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -23,7 +24,7 @@ pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
 pub use send::Fixed;
 
-/// A PR workspace's PR, as stored.
+/// A workspace's PR, as stored: the one it was checked out for, or one picked from its stack.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrRecord {
     pub workspace: String,
@@ -47,6 +48,9 @@ pub struct PrRecord {
     pub added_remote: Option<String>,
     /// The head commit as last fetched.
     pub head: String,
+    /// Picked from the workspace's stack, which it follows `@` along, rather than checked out.
+    #[serde(default)]
+    pub stack: bool,
 }
 
 impl PrRecord {
@@ -81,6 +85,8 @@ pub struct PrDto {
     pub head: String,
     /// The revset the workspace reviews.
     pub revset: String,
+    /// Picked from the workspace's stack rather than checked out into it.
+    pub stack: bool,
 }
 
 impl From<&PrRecord> for PrDto {
@@ -95,17 +101,15 @@ impl From<&PrRecord> for PrDto {
             head_ref: p.head_ref.clone(),
             head: p.head.clone(),
             revset: p.revset(),
+            stack: p.stack,
         }
     }
 }
 
 impl RepoCtx {
-    /// The PR `workspace` was checked out for, if any.
+    /// The PR `workspace` (`None` for the main one) was checked out for or picked, if any.
     pub fn pr_record(&self, workspace: Option<&str>) -> anyhow::Result<Option<PrRecord>> {
-        let Some(name) = workspace else {
-            return Ok(None);
-        };
-        Ok(self.store.lock().unwrap().pr(name)?)
+        Ok(self.store.lock().unwrap().pr(workspace.unwrap_or(""))?)
     }
 
     /// The PR of the review's workspace, when the review shows the whole PR in the Combined
@@ -123,7 +127,7 @@ impl RepoCtx {
 
     fn need_pr(&self, workspace: Option<&str>) -> anyhow::Result<PrRecord> {
         self.pr_record(workspace)?
-            .ok_or_else(|| anyhow::anyhow!("this workspace isn't a PR's"))
+            .ok_or_else(|| anyhow::anyhow!("this workspace has no PR"))
     }
 }
 

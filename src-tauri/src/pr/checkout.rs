@@ -155,6 +155,7 @@ impl RepoCtx {
                 head_remote: fetched.head_remote,
                 added_remote: fetched.added_remote,
                 head: info.head_ref_oid,
+                stack: false,
             };
             self.store.lock().unwrap().save_pr(&record)?;
             anyhow::Ok(name)

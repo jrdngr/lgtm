@@ -16,16 +16,59 @@ pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<S
     repo(&window)?.open_pr(&input).await.map_err(err)
 }
 
-/// Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first.
+/// Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. GitHub is
+/// asked again only with `refresh` or when the bookmarks change.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn nearby_prs(
     window: WebviewWindow,
     workspace: Option<String>,
+    refresh: bool,
 ) -> CmdResult<NearbyPrsDto> {
     repo(&window)?
-        .nearby_prs(workspace.as_deref())
+        .nearby_prs(workspace.as_deref(), refresh)
         .await
+        .map_err(err)
+}
+
+/// Brings the workspace's stack PR in line with `@`, and returns the workspace's PR.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn sync_stack_pr(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Option<PrDto>> {
+    repo(&window)?
+        .sync_stack_pr(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
+/// Picks stack PR `number` as the workspace's PR. With `edit`, edits its change first.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn select_stack_pr(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    number: u32,
+    edit: bool,
+) -> CmdResult<PrDto> {
+    let repo = repo(&window)?;
+    let ws = workspace.as_deref();
+    let pr = if edit {
+        repo.edit_stack_pr(ws, number).await
+    } else {
+        repo.select_stack_pr(ws, number).await
+    };
+    pr.map_err(err)
+}
+
+/// Deselects the workspace's stack PR.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn clear_stack_pr(window: WebviewWindow, workspace: Option<String>) -> CmdResult<()> {
+    repo(&window)?
+        .clear_stack_pr(workspace.as_deref())
         .map_err(err)
 }
 
@@ -37,7 +80,7 @@ pub(crate) async fn pr_preview(window: WebviewWindow, input: String) -> CmdResul
     repo(&window)?.pr_preview(&input).await.map_err(err)
 }
 
-/// The PR the workspace was checked out for, if any.
+/// The workspace's PR, checked out or picked from its stack, if any.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn pr_info(
