@@ -52,7 +52,7 @@ export function RunList({ workspace, onOpen, onError }: Props) {
       <div className="bots-section">
         <span className="bots-label">Runs</span>
       </div>
-      {runs.length === 0 && <div className="bots-empty">No reviewer runs yet</div>}
+      {runs.length === 0 && <div className="bots-empty">No runs yet</div>}
       <ul className="bots-runs">
         {runs.map((run) => {
           const { state } = runState(run);

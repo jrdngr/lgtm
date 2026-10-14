@@ -139,6 +139,9 @@ const PATHS = {
   chevronDown: <path d="m6 9 6 6 6-6" />,
   stop: <rect x="6" y="6" width="12" height="12" rx="1.5" />,
   retry: <path d="M4 12a8 8 0 1 0 2.3-5.7L4 8.5M4 4v4.5h4.5" />,
+  star: (
+    <path d="m12 2.7 2.85 5.85 6.45.9-4.65 4.5 1.05 6.45L12 17.4l-5.7 3 1.05-6.45L2.7 9.45l6.45-.9z" />
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

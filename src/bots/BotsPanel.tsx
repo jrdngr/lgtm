@@ -3,7 +3,8 @@ import type { BotOptions, BotRun, Personas } from "../bindings";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useAgentsOff } from "../tools/agents";
-import { IconButton } from "../ui/icons";
+import { Busy } from "../ui/Busy";
+import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
@@ -15,18 +16,20 @@ import { ReportOptions } from "./ReportOptions";
 import { RunList } from "./RunList";
 import { seedRun } from "./runs";
 import "./bots.css";
-import { Busy } from "../ui/Busy";
 
 const STORE_KEY = "lgtm.bots";
 
 interface Picks {
   /** Personas left unpicked, so new ones start picked. */
   unpicked: string[];
+  /** Starred personas, which Favorites picks. */
+  favorites: string[];
   options: BotOptions;
 }
 
 const DEFAULT_PICKS: Picks = {
   unpicked: [],
+  favorites: [],
   options: { synthesize: true, crossReview: false, adversarial: false, minimal: false },
 };
 
@@ -103,7 +106,7 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
   const [picks, setPicksState] = useState(loadPicks);
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
-  const { unpicked, options } = picks;
+  const { unpicked, favorites, options } = picks;
 
   function setPicks(next: Picks) {
     setPicksState(next);
@@ -112,12 +115,15 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
     } catch {}
   }
 
-  const picked = personas.personas.map((p) => p.name).filter((n) => !unpicked.includes(n));
-  const toggle = (name: string) =>
-    setPicks({
-      ...picks,
-      unpicked: unpicked.includes(name) ? unpicked.filter((n) => n !== name) : [...unpicked, name],
-    });
+  const names = personas.personas.map((p) => p.name);
+  const picked = names.filter((n) => !unpicked.includes(n));
+  const flip = (list: string[], name: string) =>
+    list.includes(name) ? list.filter((n) => n !== name) : [...list, name];
+  const toggle = (name: string) => setPicks({ ...picks, unpicked: flip(unpicked, name) });
+  const star = (name: string) => setPicks({ ...picks, favorites: flip(favorites, name) });
+  const pickOnly = (keep: (name: string) => boolean) =>
+    setPicks({ ...picks, unpicked: names.filter((n) => !keep(n)) });
+  const anyFavorite = names.some((n) => favorites.includes(n));
 
   async function start() {
     if (!review) return;
@@ -137,19 +143,44 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
     : !review
       ? "open a review first"
       : n === 0
-        ? "pick a persona"
+        ? "pick a reviewer"
         : undefined;
 
   return (
     <>
       <div className="bots-section">
-        <span className="bots-label">Personas</span>
-        <span className="spacer" />
         <span className="section-meta">
-          {n} of {personas.personas.length}
+          {n} of {names.length} picked
+        </span>
+        <span className="spacer" />
+        <span className="bots-links">
+          <button type="button" onClick={() => pickOnly(() => true)}>
+            All
+          </button>
+          <i>·</i>
+          <button type="button" onClick={() => pickOnly(() => false)}>
+            None
+          </button>
+          <i>·</i>
+          <button
+            type="button"
+            disabled={!anyFavorite}
+            title={anyFavorite ? "Pick just the starred reviewers" : "Star a reviewer first"}
+            onClick={() => pickOnly((n) => favorites.includes(n))}
+          >
+            <Icon name="star" size={10} />
+            Favorites
+          </button>
         </span>
       </div>
-      <PersonaList personas={personas} picked={picked} onToggle={toggle} onChanged={onChanged} />
+      <PersonaList
+        personas={personas}
+        picked={picked}
+        favorites={favorites}
+        onToggle={toggle}
+        onStar={star}
+        onChanged={onChanged}
+      />
       <div className="bots-section">
         <span className="bots-label">Report</span>
       </div>

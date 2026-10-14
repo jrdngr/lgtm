@@ -66,59 +66,120 @@
   padding: 0;
 }
 
-/* Checkbox, name and ✎ on the first line; the description under the name. */
+/* One line per persona: checkbox, name, description cut to fit, then ☆ and ⋯. */
 .bots-personas li {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   align-items: center;
-  gap: 0 6px;
-  padding: 3px 6px 3px 10px;
+  gap: 2px;
+  height: 26px;
+  padding: 0 4px 0 10px;
 }
 
 .bots-personas li:hover {
   background: var(--hover);
 }
 
+.bots-personas label,
+.bots-persona-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
 .bots-personas .icon-button {
-  width: 20px;
-  height: 20px;
+  flex: none;
+  width: 22px;
+  height: 22px;
 }
 
 .bots-persona-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
+  flex: none;
   font-size: var(--fs-sm);
   font-weight: 600;
   white-space: nowrap;
 }
 
-.bots-persona-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .bots-personas li.off .bots-persona-name {
+  font-weight: 500;
   color: var(--muted);
 }
 
 .bots-persona-desc {
-  grid-column: 1 / -1;
-  padding-left: 19px;
+  min-width: 0;
+  overflow: hidden;
   font-size: var(--fs-xs);
-  line-height: 1.35;
-  color: var(--muted);
+  color: var(--faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.bots-personas li.bots-broken,
-.bots-personas li.bots-broken .bots-persona-desc {
+.bots-personas .bots-star {
+  color: var(--faint);
+}
+
+.bots-personas .bots-star:not(.on) {
+  opacity: 0;
+}
+
+.bots-personas li:hover .bots-star,
+.bots-personas .bots-star:focus-visible {
+  opacity: 1;
+}
+
+.bots-personas .bots-star.on {
+  color: var(--amber);
+}
+
+.bots-star.on path {
+  fill: currentColor;
+}
+
+.bots-personas li.bots-broken .bots-persona-name,
+.bots-personas li.bots-broken .bots-persona-desc,
+.bots-warn {
   color: var(--error);
 }
 
-.bots-personas li.bots-broken .bots-persona-desc {
-  padding-left: 0;
+.bots-warn {
+  width: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* All · None · Favorites */
+.bots-links {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.bots-links button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.bots-links button:hover:not(:disabled) {
+  background: rgb(79 140 201 / 14%);
+}
+
+.bots-links button:disabled {
+  color: var(--faint);
+}
+
+.bots-links i {
+  font-size: var(--fs-xs);
+  font-style: normal;
+  color: var(--faint);
 }
 
 .bots-options {

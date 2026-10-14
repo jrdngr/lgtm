@@ -10,7 +10,9 @@ import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 interface Props {
   personas: Personas;
   picked: string[];
+  favorites: string[];
   onToggle(name: string): void;
+  onStar(name: string): void;
   /** After a persona file is copied or trashed. */
   onChanged(): void;
 }
@@ -34,60 +36,72 @@ function personaMenu(ws: WorkspaceName, path: string, onChanged: () => void, cop
     await unwrap(commands.trashPath(ws, path));
     return true;
   }
-  return (): CtxEntry[] => [
+  return contextMenu((): CtxEntry[] => [
     { label: "Edit", onSelect: () => openFile(ws, path) },
     copyable && { label: "Duplicate…", onSelect: () => done(duplicate(ws, path)) },
     { label: "Reveal in Finder", onSelect: () => reveal(ws, path) },
     "-",
     { label: "Delete Persona…", onSelect: () => done(remove()) },
-  ];
+  ]);
 }
 
-/** The personas to pick from, each with its description, and ✎ on hover to edit its file.
- * Files that can't be read show their error. */
-export function PersonaList({ personas, picked, onToggle, onChanged }: Props) {
+/** One line per persona: its checkbox, name and description, a star to make it a favorite,
+ * and ⋯ for its file. Files that can't be read show their error. */
+export function PersonaList({ personas, picked, favorites, onToggle, onStar, onChanged }: Props) {
   const workspace = useWorkspace();
-  const edit = (path: string) => openFile(workspace, path);
-
   return (
     <ul className="bots-personas">
       {personas.personas.map((p) => {
         const on = picked.includes(p.name);
+        const fav = favorites.includes(p.name);
+        const menu = personaMenu(workspace, p.path, onChanged);
         return (
-          <li
-            key={p.name}
-            className={on ? undefined : "off"}
-            onContextMenu={contextMenu(personaMenu(workspace, p.path, onChanged))}
-          >
-            <label>
+          <li key={p.name} className={on ? undefined : "off"} onContextMenu={menu}>
+            <label title={p.description || undefined}>
               <input type="checkbox" checked={on} onChange={() => onToggle(p.name)} />
-              <span className="bots-persona-name">
-                <span className="bots-persona-text">{p.name}</span>
-              </span>
+              <span className="bots-persona-name">{p.name}</span>
+              <span className="bots-persona-desc">{p.description}</span>
             </label>
             <IconButton
-              icon="edit"
-              label={`Edit ${p.path}`}
-              className="reveal"
-              onClick={() => edit(p.path)}
+              icon="star"
+              label={fav ? `Unfavorite ${p.name}` : `Favorite ${p.name}`}
+              className={`bots-star${fav ? " on" : ""}`}
+              aria-pressed={fav}
+              onClick={() => onStar(p.name)}
             />
-            {p.description && <span className="bots-persona-desc">{p.description}</span>}
+            <IconButton
+              icon="more"
+              label={`Actions for ${p.name}`}
+              className="reveal"
+              onClick={menu}
+            />
           </li>
         );
       })}
-      {personas.broken.map((b) => (
-        <li
-          key={b.path}
-          className="bots-broken"
-          onContextMenu={contextMenu(personaMenu(workspace, b.path, onChanged, false))}
-        >
-          <span className="bots-persona-name">
-            <span className="bots-persona-text">{b.path.split("/").pop()}</span>
-          </span>
-          <IconButton icon="edit" label={`Edit ${b.path}`} onClick={() => edit(b.path)} />
-          <span className="bots-persona-desc">Can't read it: {b.error}</span>
-        </li>
-      ))}
+      {personas.broken.map((b) => {
+        const name = b.path.split("/").pop();
+        const menu = personaMenu(workspace, b.path, onChanged, false);
+        return (
+          <li
+            key={b.path}
+            className="bots-broken"
+            title={`Can't read it: ${b.error}`}
+            onContextMenu={menu}
+          >
+            <span className="bots-persona-row">
+              <span className="bots-warn">!</span>
+              <span className="bots-persona-name">{name}</span>
+              <span className="bots-persona-desc">Can't read it: {b.error}</span>
+            </span>
+            <IconButton
+              icon="more"
+              label={`Actions for ${name}`}
+              className="reveal"
+              onClick={menu}
+            />
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -41,6 +41,16 @@ export function Installer({ onDone }: { onDone(): void }) {
     <div className="bots-installer">
       <div className="bots-section">
         <span className="bots-label">Install default personas</span>
+        <span className="spacer" />
+        <span className="bots-links">
+          <button type="button" onClick={() => setPicked(new Set(defaults.map((d) => d.name)))}>
+            All
+          </button>
+          <i>·</i>
+          <button type="button" onClick={() => setPicked(new Set())}>
+            None
+          </button>
+        </span>
       </div>
       <div className="bots-hint">For every repo, in ~/.config/lgtm/personas.</div>
       <div className="bots-list">

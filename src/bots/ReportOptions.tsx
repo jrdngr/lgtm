@@ -75,7 +75,7 @@ export function ReportOptions({ options, lone, onChange }: Props) {
         disabled={lone}
         title={
           lone
-            ? "Needs two or more personas"
+            ? "Needs two or more reviewers"
             : "Personas challenge each other's findings, then a synthesis rules"
         }
         onChange={(on) => onChange({ ...options, crossReview: on })}
