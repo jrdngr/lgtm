@@ -154,6 +154,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::WordWrap,
             events::SettingsChanged,
             events::OpenSettings,
+            events::OpenShortcuts,
             events::WorkingCopyStale,
             events::BotRunActivity,
             events::BotRunChanged,

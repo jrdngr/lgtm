@@ -4,7 +4,8 @@ use serde_json::Value;
 
 /// Arguments for a run that reads its prompt from stdin. It can read files, and with `edit`
 /// edit them and use the user's skills. It can't run commands, and the user's MCP servers
-/// stay off.
+/// stay off. Only the user's own settings load: `-p` skips Claude Code's trust prompt, so the
+/// checkout's `.claude/settings.json` (a PR author's, say) could otherwise run hooks.
 pub fn args<'a>(
     resume: Option<&'a str>,
     edit: bool,
@@ -18,6 +19,8 @@ pub fn args<'a>(
         "--verbose",
         "--include-partial-messages",
         "--strict-mcp-config",
+        "--setting-sources",
+        "user",
     ];
     let tools = if edit {
         "Read,Grep,Glob,Edit,Write,Skill"

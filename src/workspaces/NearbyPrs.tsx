@@ -14,7 +14,7 @@ interface Props {
   /** The workspace whose `@` the PRs are found from. */
   workspace: WorkspaceName;
   /** Called with the PR's workspace, and whether it's new and has a setup script. */
-  onOpened(workspace: string, setup: boolean): void;
+  onOpened(workspace: string): void;
   onError(message: string): void;
 }
 
@@ -85,7 +85,7 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
     if (r.status === "error") return onError(r.error);
     const api = dockOf(workspace);
     if (api) closePrPreview(api, pr.url);
-    onOpened(r.data.workspace, r.data.setup);
+    onOpened(r.data);
   }
 
   const refresh: CtxEntry = {

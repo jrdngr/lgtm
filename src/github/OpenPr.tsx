@@ -3,7 +3,7 @@ import { commands } from "../ipc";
 
 interface Props {
   /** Called with the PR's workspace, and whether it's new and has a setup script. */
-  onOpened(workspace: string, setup: boolean): void;
+  onOpened(workspace: string): void;
   onClose(): void;
   onError(message: string): void;
 }
@@ -21,7 +21,7 @@ export function OpenPr({ onOpened, onClose, onError }: Props) {
     setBusy(false);
     if (r.status === "error") return onError(r.error);
     setInput("");
-    onOpened(r.data.workspace, r.data.setup);
+    onOpened(r.data);
   }
 
   return (

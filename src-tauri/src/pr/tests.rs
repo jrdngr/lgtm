@@ -159,7 +159,7 @@ async fn checks_out_and_pulls_a_real_fork_pr() {
     );
     ctx.workspace_base = Some(dir.path().join("ws"));
     let pr = std::env::var("LGTM_SMOKE_PR").unwrap_or_else(|_| "11541".into());
-    let (name, _) = ctx.open_pr(&pr).await.unwrap();
+    let name = ctx.open_pr(&pr).await.unwrap();
     let record = ctx.pr_record(Some(&name)).unwrap().unwrap();
     eprintln!("head from {:?}", record.head_remote);
     let review = ctx

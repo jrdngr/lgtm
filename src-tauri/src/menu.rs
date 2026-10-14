@@ -1,17 +1,18 @@
 //! The app menu: the platform default plus Settings in the app menu, New Window and Open
-//! Repository in File, and Word Wrap and zoom in View.
+//! Repository in File, Word Wrap and zoom in View, and Keyboard Shortcuts in Help.
 
 use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event as _;
 
-use crate::events::{OpenSettings, SwitchRepo, WordWrap};
+use crate::events::{OpenSettings, OpenShortcuts, SwitchRepo, WordWrap};
 use crate::{repo, zoom};
 
 const NEW_WINDOW: &str = "new-window";
 const OPEN_REPO: &str = "open-repo";
 const WORD_WRAP: &str = "word-wrap";
 const SETTINGS: &str = "settings";
+const SHORTCUTS: &str = "shortcuts";
 const ZOOM_IN: &str = "zoom-in";
 const ZOOM_OUT: &str = "zoom-out";
 const ZOOM_RESET: &str = "zoom-reset";
@@ -65,6 +66,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 ])?;
                 app.manage(WordWrapItem(wrap));
             }
+            "Help" => sub.prepend(&MenuItem::with_id(
+                app,
+                SHORTCUTS,
+                "Keyboard Shortcuts",
+                true,
+                None::<&str>,
+            )?)?,
             _ => {}
         }
     }
@@ -77,6 +85,7 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
         OPEN_REPO => switch_repo(app),
         WORD_WRAP => word_wrap(app),
         SETTINGS => open_settings(app),
+        SHORTCUTS => open_shortcuts(app),
         ZOOM_IN => zoom::step(app, Some(1)),
         ZOOM_OUT => zoom::step(app, Some(-1)),
         ZOOM_RESET => zoom::step(app, None),
@@ -109,6 +118,14 @@ fn focused(app: &AppHandle) -> Option<tauri::WebviewWindow> {
 fn open_settings(app: &AppHandle) -> tauri::Result<()> {
     match focused(app) {
         Some(window) => Ok(OpenSettings {}.emit_to(app, window.label())?),
+        None => Ok(()),
+    }
+}
+
+/// Opens the Keyboard Shortcuts tab in the focused repo window.
+fn open_shortcuts(app: &AppHandle) -> tauri::Result<()> {
+    match focused(app) {
+        Some(window) => Ok(OpenShortcuts {}.emit_to(app, window.label())?),
         None => Ok(()),
     }
 }

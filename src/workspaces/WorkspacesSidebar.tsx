@@ -52,11 +52,11 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     onSelect(ws, r.data);
   }
 
-  async function prOpened(ws: string, setup: boolean) {
+  async function prOpened(ws: string) {
     setOpeningPr(false);
     setError(undefined);
     await Promise.all([reload(), reloadPr(ws)]);
-    onSelect(ws, setup);
+    onSelect(ws);
   }
 
   async function remove(ws: string) {

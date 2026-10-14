@@ -122,15 +122,16 @@ impl RepoCtx {
     }
 
     /// Checks out the PR `input` names (a number or URL) into workspace `pr-<N>`, or finds the
-    /// one already checked out. Returns the workspace and whether it has a setup script.
-    pub async fn open_pr(&self, input: &str) -> anyhow::Result<(String, bool)> {
+    /// one already checked out. Returns the workspace. Its `.lgtm/setup` never runs on its own:
+    /// it's the PR author's code.
+    pub async fn open_pr(&self, input: &str) -> anyhow::Result<String> {
         let (want, number) = remote::parse_pr(input)?;
         let (base, repo) = self.base_for(want.as_ref()).await?;
         let name = workspace_name(number);
         let listed = self.list_workspaces().await?;
         if listed.iter().any(|w| w.name.as_deref() == Some(&name)) {
             return match self.pr_record(Some(&name))? {
-                Some(pr) if pr.repo == repo => Ok((name, false)),
+                Some(pr) if pr.repo == repo => Ok(name),
                 Some(pr) => bail!("workspace {name} is already {}'s PR #{number}", pr.repo),
                 None => bail!("a workspace named {name} already exists"),
             };
@@ -139,7 +140,7 @@ impl RepoCtx {
         let fetched = fetch(&self.main.jj, &info, &base).await?;
         let added = fetched.added_remote.clone();
         let saved = async {
-            let setup = self.add_workspace(&name, &info.head_ref_oid).await?;
+            self.add_workspace(&name, &info.head_ref_oid).await?;
             let record = PrRecord {
                 workspace: name.clone(),
                 repo,
@@ -156,7 +157,7 @@ impl RepoCtx {
                 head: info.head_ref_oid,
             };
             self.store.lock().unwrap().save_pr(&record)?;
-            anyhow::Ok((name, setup))
+            anyhow::Ok(name)
         }
         .await;
         if saved.is_err() {

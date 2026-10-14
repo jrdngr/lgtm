@@ -23,6 +23,10 @@ pub struct SettingsChanged {
 #[derive(Clone, Serialize, Type, Event)]
 pub struct OpenSettings {}
 
+/// Help > Keyboard Shortcuts was chosen while this window had focus.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct OpenShortcuts {}
+
 /// View > Word Wrap was turned on or off.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct WordWrap {

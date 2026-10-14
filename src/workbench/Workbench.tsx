@@ -2,6 +2,7 @@ import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { onAnyReveal } from "../editor/reveal";
+import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
 import { showThread } from "../threads/focus";
@@ -55,6 +56,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useCloseGuard();
   useWordWrapMenu();
   useSettingsMenu(selected);
+  useShortcutsMenu(selected);
   useEffect(() => selectActivity(selected), [selected]);
 
   function select(name: WorkspaceName, setup = false) {

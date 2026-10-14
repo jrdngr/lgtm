@@ -14,6 +14,7 @@ import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
 import { GraphPanel } from "../graph/GraphPanel";
+import { ShortcutsPanel } from "../help/ShortcutsPanel";
 import { commands, unwrap } from "../ipc";
 import { QaTab } from "../qa/QaTab";
 import { WorkspaceReview } from "../review/IdleReview";
@@ -39,6 +40,7 @@ const components = {
   editor: EditorPanel,
   prPreview: PrPreview,
   settings: SettingsPanel,
+  shortcuts: ShortcutsPanel,
   threads: ThreadsPanel,
   runs: RunsPanel,
   qa: QaTab,

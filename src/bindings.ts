@@ -182,9 +182,9 @@ export const commands = {
 	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
 	/**
 	 *  Checks out the PR `input` names (a number or a URL) into its own workspace, or finds the
-	 *  one that has it.
+	 *  one that has it. Returns the workspace.
 	 */
-	openPr: (input: string) => typedError<OpenedPr, string>(__TAURI_INVOKE("open_pr", { input })),
+	openPr: (input: string) => typedError<string, string>(__TAURI_INVOKE("open_pr", { input })),
 	/**  The PR the workspace was checked out for, if any. */
 	prInfo: (workspace: string | null) => typedError<{
 	number: number,
@@ -262,6 +262,7 @@ export const events = {
 	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
+	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
@@ -845,11 +846,8 @@ export type NoteDto = {
 /**  lgtm > Settings… was chosen while this window had focus. */
 export type OpenSettings = Record<string, never>;
 
-export type OpenedPr = {
-	workspace: string,
-	/**  It's new and has a `.lgtm/setup` to run. */
-	setup: boolean,
-};
+/**  Help > Keyboard Shortcuts was chosen while this window had focus. */
+export type OpenShortcuts = Record<string, never>;
 
 export type Outcome = "kept" | "dropped" | "downgraded" | "upgraded";
 

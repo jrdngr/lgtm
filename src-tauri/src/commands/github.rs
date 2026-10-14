@@ -1,5 +1,3 @@
-use serde::Serialize;
-use specta::Type;
 use tauri::ipc::Channel;
 use tauri::{State, WebviewWindow};
 
@@ -10,21 +8,12 @@ use crate::pr::{DiscussionDto, Fixed, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto
 use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
-#[derive(Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct OpenedPr {
-    pub workspace: String,
-    /// It's new and has a `.lgtm/setup` to run.
-    pub setup: bool,
-}
-
 /// Checks out the PR `input` names (a number or a URL) into its own workspace, or finds the
-/// one that has it.
+/// one that has it. Returns the workspace.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<OpenedPr> {
-    let (workspace, setup) = repo(&window)?.open_pr(&input).await.map_err(err)?;
-    Ok(OpenedPr { workspace, setup })
+pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<String> {
+    repo(&window)?.open_pr(&input).await.map_err(err)
 }
 
 /// Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first.
