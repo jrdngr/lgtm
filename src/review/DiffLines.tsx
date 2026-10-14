@@ -15,6 +15,7 @@ import { SplitScroll } from "./SplitScroll";
 import type { Selection } from "./selection";
 import { type MarkIndex, type Progress, plural } from "./state";
 import { useKeepFile } from "./useKeepFile";
+import { useKeepScroll } from "./useKeepScroll";
 import { unifiedWidth } from "./width";
 
 const ROW_HEIGHT = 20;
@@ -140,6 +141,7 @@ export function DiffLines(props: Props) {
     return () => observer.disconnect();
   }, [scrollRef]);
 
+  useKeepScroll(scrollRef);
   const kept = useKeepFile(lines, virtualizer, scrollRef);
   props.keepFile.current = kept.keep;
 
