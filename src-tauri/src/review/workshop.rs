@@ -24,8 +24,8 @@ pub struct Ask {
 pub const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
 doesn't include, so its changes wouldn't show here. Review a revset that includes @ first.";
 
-const INSTRUCTIONS: &str = "Keep replies short. When you suggest a version of the comment, \
-put its full text in a fenced code block tagged `comment`.";
+const INSTRUCTIONS: &str = "Keep replies short. Suggest text for the comment only when I ask \
+for it, and then put its full text in a fenced code block tagged `comment`.";
 
 const EDIT: &str = "\n\nEdit the files directly and change only what's needed. Then say in a \
 sentence or two what you changed.";

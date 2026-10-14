@@ -10,9 +10,10 @@ import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
+
 import { isMac } from "../workbench/keys";
 import { AskBox, SAVE_KEY } from "./AskBox";
-import { cardItems, moreItems } from "./cardMenu";
+import { cardItems, moreItems, noteItems } from "./cardMenu";
 import { NEW_COMMENT } from "./model";
 import { StageStrip } from "./StageStrip";
 import { ThreadBlock } from "./ThreadBlock";
@@ -55,13 +56,21 @@ export function CommentBlock({ id, comment, c }: Props) {
   });
 
   const card = comment && { comment, c, agentsOff };
+  /** A note of yours, not a GitHub thread or draft. */
+  const note = !!comment && !gh && !thread;
+
+  /** Edits a note's text on a click, unless the click selected some of it. */
+  function editOnClick(comment: CommentDto) {
+    if (window.getSelection()?.isCollapsed === false) return;
+    c.edit(comment);
+  }
   /** Text fields keep their own menu. */
   const onContextMenu = (e: React.MouseEvent) => {
     if (!card || (e.target instanceof Element && e.target.closest("textarea, input"))) return;
     openMenu(e, cardItems(card));
   };
 
-  if (comment && done && !expanded && editing === undefined && !asking) {
+  if (comment && done && !expanded && editing === undefined && !c.running.has(id)) {
     const summary = gh ? lastPost(gh, viewer) : comment.body.split("\n")[0];
     return (
       <div
@@ -82,6 +91,11 @@ export function CommentBlock({ id, comment, c }: Props) {
           <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
           {gh && <span className="card-count">{gh.posts.length}</span>}
+          {!gh && comment.messages.length > 0 && (
+            <span className="card-count">
+              {comment.messages.length === 1 ? "1 message" : `${comment.messages.length} messages`}
+            </span>
+          )}
         </button>
       </div>
     );
@@ -177,46 +191,59 @@ export function CommentBlock({ id, comment, c }: Props) {
           </button>
         )}
         <span className="spacer" />
-        <span className={`card-actions${editing === undefined ? " reveal" : ""}`}>
-          {comment && editing === undefined && (!gh || comment.body) && (
-            <IconButton
-              icon="edit"
-              label={gh ? "Edit reply" : "Edit"}
-              onClick={() => c.edit(comment)}
-            />
-          )}
-          {comment && !thread && (
-            <IconButton
-              icon="check"
-              label={comment.done ? "Open again" : "Done"}
+        {note ? (
+          <span className="card-actions">
+            <button
+              type="button"
+              className="card-done"
               aria-pressed={comment.done}
               onClick={() => c.setDone(comment.id, !comment.done)}
-            />
-          )}
-          {!agentsOff && (
-            <IconButton
-              icon="sparkle"
-              label="Ask agent (a)"
-              aria-pressed={asking}
-              onClick={() => (asking ? c.closeAsk(id) : c.openAsk(id))}
-            />
-          )}
-          {comment && (
-            <IconButton icon="send" label="Send to terminal" onClick={() => c.send(comment)} />
-          )}
-          {card && <Menu items={moreItems(card)} />}
-        </span>
+            >
+              {comment.done ? "Open again" : "✓ Done"}
+            </button>
+            {card && <Menu items={noteItems(card)} />}
+          </span>
+        ) : (
+          <span className={`card-actions${editing === undefined ? " reveal" : ""}`}>
+            {comment && editing === undefined && comment.body && (
+              <IconButton
+                icon="edit"
+                label={gh ? "Edit reply" : "Edit"}
+                onClick={() => c.edit(comment)}
+              />
+            )}
+            {!agentsOff && (
+              <IconButton icon="sparkle" label="Ask agent (a)" onClick={() => c.openAsk(id)} />
+            )}
+            {comment && (
+              <IconButton icon="send" label="Send to terminal" onClick={() => c.send(comment)} />
+            )}
+            {card && <Menu items={moreItems(card)} />}
+          </span>
+        )}
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
       {gh && <GhThread link={gh} viewer={viewer} />}
-      {editing === undefined && !gh && (
-        <div className="post">
-          <Avatar name={viewer ?? "You"} />
-          <div className="post-body">
-            {comment?.body ? <Markdown>{comment.body}</Markdown> : <em>No text yet</em>}
+      {editing === undefined &&
+        !gh &&
+        comment &&
+        (note && !comment.body ? (
+          <button type="button" className="note-add" onClick={() => c.edit(comment)}>
+            Add note text…
+          </button>
+        ) : note ? (
+          // biome-ignore lint/a11y/useKeyWithClickEvents: e edits from the keyboard
+          <div className="note-text post-body" onClick={() => editOnClick(comment)}>
+            <Markdown>{comment.body}</Markdown>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="post">
+            <Avatar name={viewer ?? "You"} />
+            <div className="post-body">
+              {comment.body ? <Markdown>{comment.body}</Markdown> : <em>No text yet</em>}
+            </div>
+          </div>
+        ))}
       {editing !== undefined ? (
         <div className="card-foot editing">
           <textarea
@@ -261,7 +288,8 @@ export function CommentBlock({ id, comment, c }: Props) {
           <Workshop
             messages={comment?.messages ?? []}
             running={c.running.get(id)}
-            onUse={(t) => c.use(id, t)}
+            body={comment?.body}
+            onUse={(t) => (note ? c.saveSuggestion(id, t) : c.use(id, t))}
           />
           {!agentsOff && <AskBox id={id} body={body} c={c} inputRef={askRef} />}
         </div>

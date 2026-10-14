@@ -54,6 +54,19 @@ export function moreItems(card: Card): (MenuItem | false)[] {
   return [draftItem(card), !comment.github && deleteItem(card)];
 }
 
+/** The ⋯ menu of a note. */
+export function noteItems(card: Card): (MenuItem | false)[] {
+  const { comment, c } = card;
+  return [
+    { label: "Edit", onSelect: () => c.edit(comment) },
+    !card.agentsOff && { label: "Ask Agent", onSelect: () => c.openAsk(comment.id) },
+    { label: "Send to Terminal", onSelect: () => c.send(comment) },
+    { label: "Copy", disabled: !comment.body, onSelect: () => copy(comment.body) },
+    draftItem(card),
+    deleteItem(card),
+  ];
+}
+
 /** The right-click menu of a comment card: a note, or a GitHub thread or draft. */
 export function cardItems(card: Card): CtxEntry[] {
   const { comment, c } = card;

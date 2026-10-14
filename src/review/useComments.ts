@@ -188,8 +188,11 @@ export function useComments({
     const message = compose ? "" : (text ?? asks.get(id)?.trim() ?? "");
     const body = edits.get(id) ?? byId(id)?.body ?? "";
     if (!review || running.has(id) || !(compose || message || (change && body.trim()))) return;
-    const c = id === NEW_COMMENT ? await create(body) : byId(id);
+    // A note started for a change takes the request as its text.
+    const asText = id === NEW_COMMENT && change && !!message && !body.trim() && !draft?.github;
+    const c = id === NEW_COMMENT ? await create(asText ? message : body) : byId(id);
     if (!c) return;
+    if (asText) setEdits((m) => without(m, c.id));
     const cid = c.id;
     // A saved draft's block is a new one, so the ask box needs focus again.
     if (cid !== id) setFocus({ id: cid, field: "ask" });
@@ -210,7 +213,7 @@ export function useComments({
     const r = await commands.workshopComment(
       review.id,
       cid,
-      { message, draft: body, change, compose },
+      { message, draft: asText ? message : body, change, compose },
       channel,
     );
     endFrom(handle, r);
@@ -223,6 +226,12 @@ export function useComments({
   function use(id: number, text: string) {
     setEdits((m) => withEntry(m, id, text));
     setFocus({ id, field: "body" });
+  }
+
+  /** Saves an agent's suggestion as the note's text. */
+  async function saveSuggestion(id: number, text: string) {
+    if (!review) return;
+    if (await apply(commands.editComment(review.id, id, text))) setEdits((m) => without(m, id));
   }
 
   /** Saves the block's text when it's being edited. Resolves to the comment's id. */
@@ -366,6 +375,7 @@ export function useComments({
     agentKey,
     stop: commands.stopWorkshop,
     use,
+    saveSuggestion,
     send: sendComment,
     final,
     finish,

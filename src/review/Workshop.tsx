@@ -3,7 +3,14 @@ import { Busy } from "../ui/Busy";
 import { replyParts } from "./comments";
 import type { Running } from "./useComments";
 
-function AgentText({ text, onUse }: { text: string; onUse?(text: string): void }) {
+interface TextProps {
+  text: string;
+  /** The comment's saved text, to mark the suggestion it already is. */
+  body?: string;
+  onUse?(text: string): void;
+}
+
+function AgentText({ text, body, onUse }: TextProps) {
   return (
     <>
       {replyParts(text).map((p, i) =>
@@ -16,11 +23,14 @@ function AgentText({ text, onUse }: { text: string; onUse?(text: string): void }
           // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
           <div key={i} className="suggestion">
             <div className="msg-text">{p.text}</div>
-            {onUse && (
-              <button type="button" onClick={() => onUse(p.text)}>
-                Use this
-              </button>
-            )}
+            {onUse &&
+              (body?.trim() === p.text.trim() ? (
+                <span className="pill green">✓ Used</span>
+              ) : (
+                <button type="button" onClick={() => onUse(p.text)}>
+                  Use this
+                </button>
+              ))}
           </div>
         ),
       )}
@@ -33,13 +43,13 @@ function who(m: Message) {
   return m.change ? "You · change" : "You";
 }
 
-function Msg({ m, onUse }: { m: Message; onUse(text: string): void }) {
+function Msg({ m, body, onUse }: { m: Message; body?: string; onUse(text: string): void }) {
   const text = m.text || (m.change ? "Make the change this comment asks for." : "");
   return (
     <div className={`msg msg-${m.author}`}>
       <span className="msg-who">{who(m)}</span>
       {m.author === "agent" ? (
-        <AgentText text={text} onUse={onUse} />
+        <AgentText text={text} body={body} onUse={onUse} />
       ) : (
         <div className="msg-text">{text}</div>
       )}
@@ -50,17 +60,18 @@ function Msg({ m, onUse }: { m: Message; onUse(text: string): void }) {
 interface Props {
   messages: Message[];
   running?: Running;
+  body?: string;
   onUse(text: string): void;
 }
 
 /** A comment's conversation with the agent, including the exchange in flight. */
-export function Workshop({ messages, running, onUse }: Props) {
+export function Workshop({ messages, running, body, onUse }: Props) {
   if (!messages.length && !running) return null;
   return (
     <div className="workshop">
       {messages.map((m, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: messages are append-only
-        <Msg key={i} m={m} onUse={onUse} />
+        <Msg key={i} m={m} body={body} onUse={onUse} />
       ))}
       {running && (
         <>
