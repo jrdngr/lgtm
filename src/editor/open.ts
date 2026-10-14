@@ -1,5 +1,6 @@
 import type { DockviewApi } from "dockview-react";
 import { dockOf } from "../workbench/docks";
+import { inActivePane } from "../workbench/panels";
 import type { WorkspaceName } from "../workspaces/context";
 
 export interface EditorParams {
@@ -22,18 +23,12 @@ export function openFileIn(api: DockviewApi, path: string, line?: number) {
     open.api.updateParameters(params);
     return open.api.setActive();
   }
-  // Editors share a pane, opened right of the active one so what it came from stays in view.
-  const editor = api.panels.find((p) => p.view.contentComponent === "editor");
-  const active = api.activePanel;
-  const position = editor
-    ? { referencePanel: editor, direction: "within" as const }
-    : active && { referencePanel: active, direction: "right" as const };
   api.addPanel({
     id: editorId(path),
     component: "editor",
     title: baseName(path),
     params,
-    position: position || undefined,
+    position: inActivePane(api),
     // Hidden tabs keep their editor, so unsaved edits and undo history survive a tab switch.
     renderer: "always",
   });

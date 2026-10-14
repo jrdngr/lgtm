@@ -50,40 +50,38 @@ function addPanel(
   });
 }
 
-/** Opens a terminal, beside the active panel when `direction` is given. With `setup`, the
+/** Opens a terminal in the focused pane, or split beside it when `direction` is given. With `setup`, the
  * shell runs the workspace's `.lgtm/setup` first. */
 export function addTerminal(api: DockviewApi, direction?: "right" | "below", setup = false) {
   const active = api.activePanel;
-  const position = direction && active ? { referencePanel: active, direction } : undefined;
+  const position = direction && active ? { referencePanel: active, direction } : inActivePane(api);
   return addPanel(api, "terminal", setup ? { setup } : {}, position);
 }
 
-/** Beside the review, so jumping to code from the new pane keeps it in view. */
-function besideReview(api: DockviewApi): AddPanelOptions["position"] {
-  const review = api.panels.find(isReviewPanel);
-  return review ? { referencePanel: review, direction: "right" } : undefined;
+/** The focused pane, where every new tab opens. Panes split only when the user splits them. */
+export function inActivePane(api: DockviewApi): AddPanelOptions["position"] {
+  return api.activeGroup ? { referenceGroup: api.activeGroup } : undefined;
 }
 
 /** Shows a persona review's reports, in the pane it's already open in if there is one. */
 export function openReport(api: DockviewApi, run: number) {
   const open = api.getPanel(`report-${run}`);
   if (open) return open.api.setActive();
-  addPanel(api, "report", { run }, besideReview(api), `report-${run}`);
+  addPanel(api, "report", { run }, inActivePane(api), `report-${run}`);
 }
 
-/** Shows the symbol graph beside the review, in its pane if it's already open. */
+/** Shows the symbol graph, in its pane if it's already open. */
 export function openGraph(api: DockviewApi) {
   const open = api.getPanel("graph");
   if (open) return open.api.setActive();
-  addPanel(api, "graph", {}, besideReview(api), "graph");
+  addPanel(api, "graph", {}, inActivePane(api), "graph");
 }
 
-/** Shows the Q&A tab as a tab in the review's pane, or brings it forward. */
+/** Shows the Q&A tab, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");
   if (open) return open.api.setActive();
-  const review = api.panels.find(isReviewPanel);
-  addPanel(api, "qa", {}, review ? { referencePanel: review } : undefined, "qa");
+  addPanel(api, "qa", {}, inActivePane(api), "qa");
 }
 
 /** Tabs a dock has one of. */
@@ -109,14 +107,9 @@ export function splitGroup(
   api.addGroup({ referenceGroup: group, direction });
 }
 
-/** Opens a review pane on the workspace's revset, as a tab in the largest pane. */
+/** Opens a review tab on the workspace's revset in the focused pane. */
 export function openReviewTab(api: DockviewApi) {
-  const area = (g: DockviewGroupPanel) => g.width * g.height;
-  const largest = api.groups.reduce<DockviewGroupPanel | undefined>(
-    (best, g) => (!best || area(g) > area(best) ? g : best),
-    undefined,
-  );
-  return addPanel(api, "review", {}, largest ? { referenceGroup: largest } : undefined);
+  return addPanel(api, "review", {}, inActivePane(api));
 }
 
 /** A new workspace's main dock: a review. Its terminal opens in the bottom dock. */

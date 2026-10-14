@@ -1,4 +1,5 @@
 import type { DockviewApi } from "dockview-react";
+import { inActivePane } from "../workbench/panels";
 
 /** The one preview tab per dock, which each selected PR replaces. */
 const ID = "pr-preview";
@@ -10,7 +11,13 @@ export function openPrPreview(api: DockviewApi, pr: { number: number; url: strin
   const title = `PR #${pr.number}`;
   const open = api.getPanel(ID);
   if (!open) {
-    api.addPanel({ id: ID, component: "prPreview", title, params: { url: pr.url } });
+    api.addPanel({
+      id: ID,
+      component: "prPreview",
+      title,
+      params: { url: pr.url },
+      position: inActivePane(api),
+    });
     return;
   }
   if (urlOf(api) !== pr.url) open.api.updateParameters({ url: pr.url });
