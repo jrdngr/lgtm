@@ -10,7 +10,7 @@ import { agentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { openGraph } from "../workbench/panels";
 import { useWorkspace } from "../workspaces/context";
-import { marksChanged } from "../workspaces/useWorkspaces";
+import { progressChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
 import { commentNear, commentSlots } from "./comments";
@@ -184,7 +184,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
    * progress moved. */
   function edited(state: StateDto, review?: number) {
     setState(state, review);
-    marksChanged();
+    progressChanged();
   }
 
   function changeFilter(next: Filter) {

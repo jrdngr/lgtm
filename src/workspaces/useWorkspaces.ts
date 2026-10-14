@@ -10,8 +10,9 @@ const roots = new Map<string, string>();
 /** A workspace's directory, once the workspace list has loaded. */
 export const workspaceRoot = (name: WorkspaceName) => roots.get(workspaceKey(name));
 
-/** Tells the workspace list that marks changed, which no jj operation reports. */
-export function marksChanged() {
+/** Tells the workspace list that marks or a workspace's review revset changed, which no jj
+ * operation reports. */
+export function progressChanged() {
   for (const l of listeners) l();
 }
 

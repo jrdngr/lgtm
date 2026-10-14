@@ -3,7 +3,7 @@ import type { StateDto } from "../bindings";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
-import { marksChanged } from "../workspaces/useWorkspaces";
+import { progressChanged } from "../workspaces/useWorkspaces";
 import {
   type CurrentReview,
   currentReview,
@@ -62,7 +62,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
 
   function edited(state: StateDto, review?: number) {
     setState(state, review);
-    marksChanged();
+    progressChanged();
   }
   const editedRef = useRef(edited);
   editedRef.current = edited;

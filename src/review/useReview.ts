@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
+import { progressChanged } from "../workspaces/useWorkspaces";
 import { fileMoves, type Moves, movesFrom } from "./follow";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 
@@ -51,7 +52,10 @@ export function useReview(workspace: WorkspaceName) {
       return r.error;
     }
     opened.current = revset;
+    const moved = workspaceRevset(workspace) !== revset;
     setWorkspaceRevset(workspace, revset);
+    // The sidebar's progress counts the workspace's latest review.
+    if (moved) progressChanged();
     if (current.current) commands.closeReview(current.current.id);
     show({ review: r.data });
     return r.data;

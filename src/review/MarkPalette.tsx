@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MarkSlot } from "../bindings";
 import { saveSettings } from "../settings/store";
 import { IconButton } from "../ui/icons";
-import { marksChanged } from "../workspaces/useWorkspaces";
+import { progressChanged } from "../workspaces/useWorkspaces";
 import { type MarkSetup, markVar } from "./marks";
 import "./MarkPalette.css";
 
@@ -64,7 +64,7 @@ export function MarkPalette({ setup, place, onClose }: Props) {
     const failed = await saveSettings({ marks });
     setError(failed);
     // Done switches change workspace progress.
-    if (!failed) marksChanged();
+    if (!failed) progressChanged();
   }
 
   const update = (color: MarkSlot["color"], patch: Partial<MarkSlot>) =>
