@@ -8,7 +8,13 @@ import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { pathItems, run } from "../ui/pathMenu";
 import { dockReady } from "../workbench/docks";
-import { addTerminal, focusPanel, isReviewPanel, openReviewTab } from "../workbench/panels";
+import {
+  activate,
+  addTerminal,
+  focusPanel,
+  isReviewPanel,
+  openReviewTab,
+} from "../workbench/panels";
 import type { WorkspaceName } from "./context";
 
 /** The row's Delete, in its ⋯ menu and its right-click menu. The main workspace can't go. */
@@ -25,7 +31,7 @@ function reviewAt(workspace: WorkspaceName, api: DockviewApi) {
   setWorkspaceRevset(workspace, "@");
   const pane = api.panels.find(isReviewPanel);
   if (!pane) return openReviewTab(api);
-  pane.api.setActive();
+  activate(pane);
   targetOf(workspace)?.load("@");
 }
 

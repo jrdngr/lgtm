@@ -2,6 +2,7 @@ import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-rea
 import { confirmClose } from "../editor/unsaved";
 import { openMenu } from "../ui/contextMenu";
 import { useWorkspace } from "../workspaces/context";
+import { activate } from "./panels";
 import { tabMenu } from "./tabMenu";
 
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
@@ -20,7 +21,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
         const panel = containerApi.getPanel(api.id);
         if (!panel) return;
         // Active first, so the review tab's items act on its own review.
-        api.setActive();
+        activate(panel);
         const inBottom = !!e.currentTarget.closest(".bottom-panel");
         openMenu(e, tabMenu({ workspace, api: containerApi, panel, inBottom, close }));
       }}

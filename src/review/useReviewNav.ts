@@ -1,6 +1,7 @@
 import type { DockviewApi, DockviewPanelApi } from "dockview-react";
 import type { CommentDto, NoteDto } from "../bindings";
 import { openFileIn } from "../editor/open";
+import { activate } from "../workbench/panels";
 import {
   changeTargets,
   commentJumpTarget,
@@ -35,7 +36,8 @@ export function useReviewNav(n: Nav) {
   function jumpTo(target: JumpTarget) {
     n.place(target.cursor);
     n.setScrollTo({ line: target.top });
-    n.api.setActive();
+    const panel = n.containerApi.getPanel(n.api.id);
+    if (panel) activate(panel);
     n.focusRoot();
   }
 

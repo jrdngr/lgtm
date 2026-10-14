@@ -2,6 +2,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef } from "react";
 import { events } from "../bindings";
 import { dockOf } from "../workbench/docks";
+import { activate } from "../workbench/panels";
 import type { WorkspaceName } from "../workspaces/context";
 
 const ID = "shortcuts";
@@ -11,7 +12,7 @@ export function openShortcuts(workspace: WorkspaceName) {
   const api = dockOf(workspace);
   if (!api) return;
   const open = api.getPanel(ID);
-  if (open) return open.api.setActive();
+  if (open) return activate(open);
   const active = api.activePanel;
   api.addPanel({
     id: ID,

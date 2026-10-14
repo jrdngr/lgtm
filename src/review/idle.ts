@@ -1,5 +1,5 @@
 import { dockOf } from "../workbench/docks";
-import { isReviewPanel, openReviewTab } from "../workbench/panels";
+import { activate, isReviewPanel, openReviewTab } from "../workbench/panels";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { type CurrentReview, currentReview, onReviewChange } from "./current";
 
@@ -38,6 +38,6 @@ export function inReviewPane(workspace: WorkspaceName, f: (review: CurrentReview
   const timer = setTimeout(done, WAIT_MS);
   waiting.set(key, done);
   const pane = api.panels.find(isReviewPanel);
-  if (pane) pane.api.setActive();
+  if (pane) activate(pane);
   else openReviewTab(api);
 }

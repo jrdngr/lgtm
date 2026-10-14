@@ -3,6 +3,7 @@ import { commands, unwrap } from "../ipc";
 import { run } from "../ui/pathMenu";
 import { confirmAction, promptText } from "../ui/prompt";
 import { bottomDockOf, dockOf } from "../workbench/docks";
+import { activate } from "../workbench/panels";
 import type { WorkspaceName } from "../workspaces/context";
 import { baseName, type EditorParams, editorId, openFile } from "./open";
 import { isUnsaved } from "./unsaved";
@@ -14,7 +15,7 @@ export function openToSide(ws: WorkspaceName, path: string) {
   const api = dockOf(ws);
   if (!api) return;
   const open = api.getPanel(editorId(path));
-  if (open) return open.api.setActive();
+  if (open) return activate(open);
   const active = api.activePanel;
   const editor = active && isEditor(active.view.contentComponent) ? active : undefined;
   const beside = editor ?? api.panels.find((p) => isEditor(p.view.contentComponent)) ?? active;

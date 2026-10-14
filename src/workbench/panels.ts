@@ -23,10 +23,18 @@ export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === 
 
 export const kindTitle = (kind: PanelKind) => TITLES[kind];
 
+/** Makes `panel` and its pane active. Dockview re-attaches the content of a panel its pane
+ * already shows when that panel is set active, which resets the content's scroll, so for a
+ * shown panel only its pane is made active. */
+export function activate(panel: IDockviewPanel) {
+  if (panel.group.activePanel === panel) panel.group.api.setActive();
+  else panel.api.setActive();
+}
+
 /** Makes `panel` active and puts keyboard focus in it. */
 export function focusPanel(panel: IDockviewPanel | undefined) {
   if (!panel) return;
-  panel.api.setActive();
+  activate(panel);
   panel.view.content.element
     .querySelector<HTMLElement>("textarea, input, [contenteditable='true'], [tabindex]")
     ?.focus();
@@ -66,21 +74,21 @@ export function inActivePane(api: DockviewApi): AddPanelOptions["position"] {
 /** Shows a persona review's reports, in the pane it's already open in if there is one. */
 export function openReport(api: DockviewApi, run: number) {
   const open = api.getPanel(`report-${run}`);
-  if (open) return open.api.setActive();
+  if (open) return activate(open);
   addPanel(api, "report", { run }, inActivePane(api), `report-${run}`);
 }
 
 /** Shows the symbol graph, in its pane if it's already open. */
 export function openGraph(api: DockviewApi) {
   const open = api.getPanel("graph");
-  if (open) return open.api.setActive();
+  if (open) return activate(open);
   addPanel(api, "graph", {}, inActivePane(api), "graph");
 }
 
 /** Shows the Q&A tab, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");
-  if (open) return open.api.setActive();
+  if (open) return activate(open);
   addPanel(api, "qa", {}, inActivePane(api), "qa");
 }
 
@@ -93,7 +101,7 @@ export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: Pa
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;
   if (single) {
     single.api.moveTo({ group });
-    return single.api.setActive();
+    return activate(single);
   }
   addPanel(api, kind, {}, { referenceGroup: group }, SINGLE.includes(kind) ? kind : undefined);
 }

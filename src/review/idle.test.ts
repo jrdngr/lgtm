@@ -5,12 +5,17 @@ import { type CurrentReview, publishReview } from "./current";
 import { inReviewPane, markIdle } from "./idle";
 
 function fakeDock(workspace: string) {
-  const panels: { view: { contentComponent: string }; shown: number; api: object }[] = [];
+  const panels: {
+    view: { contentComponent: string };
+    shown: number;
+    api: object;
+    group: object;
+  }[] = [];
   const api = {
     panels,
     groups: [],
     addPanel(o: { component: string }) {
-      const p = { view: { contentComponent: o.component }, shown: 0, api: {} };
+      const p = { view: { contentComponent: o.component }, shown: 0, api: {}, group: {} };
       p.api = { setActive: () => p.shown++ };
       panels.push(p);
     },

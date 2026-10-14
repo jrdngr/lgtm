@@ -1,5 +1,5 @@
 import type { DockviewApi } from "dockview-react";
-import { inActivePane } from "../workbench/panels";
+import { activate, inActivePane } from "../workbench/panels";
 
 /** The one preview tab per dock, which each selected PR replaces. */
 const ID = "pr-preview";
@@ -22,7 +22,7 @@ export function openPrPreview(api: DockviewApi, pr: { number: number; url: strin
   }
   if (urlOf(api) !== pr.url) open.api.updateParameters({ url: pr.url });
   open.api.setTitle(title);
-  open.api.setActive();
+  activate(open);
 }
 
 /** Closes the preview tab if it shows `url`, once the PR has a workspace of its own. */

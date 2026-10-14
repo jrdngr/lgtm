@@ -139,3 +139,29 @@ describe("Reopening closed tabs", { timeout: 20_000 }, () => {
     expect(api.getPanel(first.id)?.params).toEqual(params);
   });
 });
+
+describe("Focusing a review pane", { timeout: 20_000 }, () => {
+  it("keeps the review's content attached, so its scroll stays put", async () => {
+    const { api, reviews } = await mount("f");
+    const [review] = reviews();
+    const terminal = api.addPanel({
+      id: "terminal",
+      component: "terminal",
+      position: { referencePanel: review, direction: "below" },
+    });
+    await act(() => terminal.api.setActive());
+    const content = review.view.content.element;
+    const detached: Node[] = [];
+    const observer = new MutationObserver((records) => {
+      for (const r of records) detached.push(...r.removedNodes);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    const { focusPanel } = await import("./panels");
+    await act(() => focusPanel(review));
+    await settle();
+    observer.disconnect();
+    expect(api.activePanel).toBe(review);
+    expect(detached).not.toContain(content);
+  });
+});

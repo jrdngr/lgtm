@@ -1,6 +1,6 @@
 import type { DockviewApi } from "dockview-react";
 import { dockOf } from "../workbench/docks";
-import { inActivePane } from "../workbench/panels";
+import { activate, inActivePane } from "../workbench/panels";
 import type { WorkspaceName } from "../workspaces/context";
 
 export interface EditorParams {
@@ -21,7 +21,7 @@ export function openFileIn(api: DockviewApi, path: string, line?: number) {
   const open = api.getPanel(editorId(path));
   if (open) {
     open.api.updateParameters(params);
-    return open.api.setActive();
+    return activate(open);
   }
   api.addPanel({
     id: editorId(path),

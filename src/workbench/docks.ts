@@ -2,6 +2,7 @@ import type { DockviewApi } from "dockview-react";
 import { flushSync } from "react-dom";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { bottom } from "./bottom";
+import { activate } from "./panels";
 
 export type DockSlot = "main" | "bottom";
 
@@ -61,6 +62,6 @@ export function revealPanel(workspace: WorkspaceName, id: string) {
     // Shown first, since a hidden dock can't lay out or focus the panel.
     flushSync(() => bottom.set({ open: true }));
   }
-  panel.api.setActive();
+  activate(panel);
   return panel;
 }

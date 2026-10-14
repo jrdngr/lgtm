@@ -4,8 +4,12 @@ import { bottom } from "../workbench/bottom";
 import { registerDock } from "../workbench/docks";
 import { openSettings } from "./open";
 
+/** A panel behind another tab in its pane. */
 const panel = () =>
-  ({ api: { setActive: vi.fn(), updateParameters: vi.fn() } }) as unknown as IDockviewPanel;
+  ({
+    api: { setActive: vi.fn(), updateParameters: vi.fn() },
+    group: { activePanel: undefined },
+  }) as unknown as IDockviewPanel;
 
 const dock = (panels: Record<string, IDockviewPanel>) =>
   ({ getPanel: (id: string) => panels[id], addPanel: vi.fn() }) as unknown as DockviewApi;
