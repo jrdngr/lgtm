@@ -14,9 +14,9 @@ export const stageName = (s: Stage) => STAGES.find(([k]) => k === s)?.[1] ?? s;
 
 export const VERDICTS: Record<TakeVerdict, [string, string]> = {
   agree: ["Agree", "green"],
-  agreeWithChanges: ["Agree, with changes", "blue"],
-  pushBack: ["Push back", "purple"],
-  needsYou: ["Needs you", "amber"],
+  change: ["Change", "blue"],
+  disagree: ["Disagree", "purple"],
+  decide: ["Decide", "amber"],
 };
 
 /** Threads by stage, in `STAGES` order, keeping the threads' own order. Empty stages are left

@@ -161,9 +161,9 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let verdict = match p.verdict {
             inputs::Verdict::Agree => TakeVerdict::Agree,
-            inputs::Verdict::AgreeWithChanges => TakeVerdict::AgreeWithChanges,
-            inputs::Verdict::PushBack => TakeVerdict::PushBack,
-            inputs::Verdict::NeedsYou => TakeVerdict::NeedsYou,
+            inputs::Verdict::Change => TakeVerdict::Change,
+            inputs::Verdict::Disagree => TakeVerdict::Disagree,
+            inputs::Verdict::Decide => TakeVerdict::Decide,
         };
         let take = Take {
             verdict,

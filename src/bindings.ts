@@ -1537,12 +1537,16 @@ export type Synthesis = {
 export type Take = {
 	verdict: TakeVerdict,
 	why: string,
-	/**  What the user has to decide, for `NeedsYou`. */
+	/**  What the user has to decide, for `Decide`. */
 	question: string | null,
 };
 
 /**  What the agent thinks of a thread's ask. */
-export type TakeVerdict = "agree" | "agreeWithChanges" | "pushBack" | "needsYou";
+export type TakeVerdict = "agree" | 
+/**  Agree, with a different fix than asked. */
+"change" | "disagree" | 
+/**  The user has a call to make. */
+"decide";
 
 export type ThreadDto = {
 	/**  Its comment's id. */

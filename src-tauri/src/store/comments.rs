@@ -309,7 +309,7 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::threads::Stage;
+    use crate::store::threads::{Stage, TakeVerdict};
 
     #[test]
     fn comments_round_trip() {
@@ -412,5 +412,27 @@ mod tests {
             )
             .unwrap();
         assert!(index);
+    }
+
+    #[test]
+    fn takes_saved_under_the_old_verdict_names_are_renamed() {
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch(SCHEMA).unwrap();
+        for (id, verdict) in [(1, "agreeWithChanges"), (2, "pushBack"), (3, "needsYou")] {
+            let thread = format!(
+                r#"{{"repo":"o/n","pr":3,"stage":"ready","take":{{"verdict":"{verdict}","why":"w","question":null}},"summary":""}}"#
+            );
+            db.execute(
+                r#"INSERT INTO comments VALUES (?, 'a.rs', '[]', 'b', '', '@', 0, 0, '{"messages":[]}', '', ?, 0)"#,
+                rusqlite::params![id, thread],
+            )
+            .unwrap();
+        }
+        let store = Store::init(db).unwrap();
+        let verdicts: Vec<TakeVerdict> = (1..=3)
+            .map(|id| store.comment(id).unwrap().unwrap().thread.unwrap().take.unwrap().verdict)
+            .collect();
+        use TakeVerdict::*;
+        assert_eq!(verdicts, [Change, Disagree, Decide]);
     }
 }

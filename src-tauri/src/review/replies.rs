@@ -14,7 +14,7 @@ use crate::prompts::{self, Prompt};
 use crate::store::{Author, Comment, Message, Stage, Take, TakeVerdict};
 use crate::workspace::Workspace;
 
-const VERDICTS: &str = r#"{ "enum": ["agree", "agreeWithChanges", "pushBack", "needsYou"] }"#;
+const VERDICTS: &str = r#"{ "enum": ["agree", "change", "disagree", "decide"] }"#;
 
 fn triage_schema() -> String {
     format!(
@@ -151,8 +151,8 @@ fn take(verdict: TakeVerdict, why: String, question: Option<String>) -> Take {
 fn triaged_stage(skip: bool, verdict: TakeVerdict, reply: bool) -> Stage {
     match (skip, verdict, reply) {
         (true, _, _) => Stage::Done,
-        (_, TakeVerdict::NeedsYou, _) => Stage::Decide,
-        (_, TakeVerdict::Agree, false) | (_, TakeVerdict::AgreeWithChanges, _) => Stage::ToFix,
+        (_, TakeVerdict::Decide, _) => Stage::Decide,
+        (_, TakeVerdict::Agree, false) | (_, TakeVerdict::Change, _) => Stage::ToFix,
         _ => Stage::Reply,
     }
 }
@@ -259,7 +259,7 @@ impl RepoCtx {
             "{context}\n\nYou're in the repository and can read any file. Don't edit files.\n\n\
              {rules}\n\nTriage each thread below. Return one result per thread with its id: \
              skip, a three to six word summary, your verdict and why, the reply (left out when \
-             I'd fix it exactly as asked), and for needsYou the question I have to answer.\n\n{}",
+             I'd fix it exactly as asked), and for decide the question I have to answer.\n\n{}",
             threads.join("\n\n---\n\n")
         );
         let schema = triage_schema();
@@ -516,12 +516,12 @@ mod tests {
     #[test]
     fn triage_sorts_threads_into_work() {
         use TakeVerdict::*;
-        assert_eq!(triaged_stage(true, PushBack, true), Stage::Done);
-        assert_eq!(triaged_stage(false, NeedsYou, true), Stage::Decide);
+        assert_eq!(triaged_stage(true, Disagree, true), Stage::Done);
+        assert_eq!(triaged_stage(false, Decide, true), Stage::Decide);
         assert_eq!(triaged_stage(false, Agree, false), Stage::ToFix);
-        assert_eq!(triaged_stage(false, AgreeWithChanges, true), Stage::ToFix);
+        assert_eq!(triaged_stage(false, Change, true), Stage::ToFix);
         assert_eq!(triaged_stage(false, Agree, true), Stage::Reply);
-        assert_eq!(triaged_stage(false, PushBack, true), Stage::Reply);
+        assert_eq!(triaged_stage(false, Disagree, true), Stage::Reply);
     }
 
     #[test]
@@ -549,7 +549,7 @@ mod tests {
         };
         let turn = |reply: Option<&str>| ChatTurn {
             message: "ok".into(),
-            verdict: Some(TakeVerdict::PushBack),
+            verdict: Some(TakeVerdict::Disagree),
             why: Some("2 is enough".into()),
             question: Some(" ".into()),
             reply: reply.map(String::from),

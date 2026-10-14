@@ -33,9 +33,11 @@ pub enum Stage {
 #[serde(rename_all = "camelCase")]
 pub enum TakeVerdict {
     Agree,
-    AgreeWithChanges,
-    PushBack,
-    NeedsYou,
+    /// Agree, with a different fix than asked.
+    Change,
+    Disagree,
+    /// The user has a call to make.
+    Decide,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -43,7 +45,7 @@ pub enum TakeVerdict {
 pub struct Take {
     pub verdict: TakeVerdict,
     pub why: String,
-    /// What the user has to decide, for `NeedsYou`.
+    /// What the user has to decide, for `Decide`.
     pub question: Option<String>,
 }
 

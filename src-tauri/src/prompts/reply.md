@@ -9,13 +9,13 @@ newer code already addressed it.
 
 ## Take
 
-- Lead with the verdict: agree, agree with changes, push back, or needs me. Follow with the
-  facts that justify it: sizes, call sites, what a later plan needs, what the change would
-  cost.
-- Agree when the reviewer is right. Don't push back to look independent.
-- Push back only with a concrete reason. "Leave the door open" is fine when it names the
+- Lead with the verdict: agree, change (agree, with a different fix), disagree, or decide (my
+  call). Follow with the facts that justify it: sizes, call sites, what a later plan needs,
+  what the change would cost.
+- Agree when the reviewer is right. Don't disagree to look independent.
+- Disagree only with a concrete reason. "Leave the door open" is fine when it names the
   condition that would change the answer.
-- "Needs me" means I know something you can't: a product call, a team convention, or a plan
+- "Decide" means I know something you can't: a product call, a team convention, or a plan
   that isn't written down. Say what the decision is.
 
 ## Reply
@@ -24,7 +24,7 @@ newer code already addressed it.
   written counts.
 - Every other comment gets a reply: first person, as me, short, plain, and specific. Two or
   three sentences at most.
-- For pushback or a different fix, acknowledge the part that's right, give the reason, and
+- For a disagreement or a different fix, acknowledge the part that's right, give the reason, and
   name what would change the answer.
 - State the facts and the plan, if there is one. Nothing else.
 - No compliments ("good catch"), thanks, or filler.

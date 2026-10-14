@@ -136,10 +136,11 @@ pub struct Findings {
 #[serde(rename_all = "camelCase")]
 pub enum Verdict {
     Agree,
-    AgreeWithChanges,
-    PushBack,
+    /// Agree, with a different fix than asked.
+    Change,
+    Disagree,
     /// The human has a call to make.
-    NeedsYou,
+    Decide,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -149,7 +150,7 @@ pub struct SetTake {
     pub verdict: Verdict,
     /// Why, leading with the facts that justify the verdict.
     pub why: String,
-    /// For needsYou: what the human has to decide.
+    /// For decide: what the human has to decide.
     pub question: Option<String>,
     /// The whole reply to post, in the human's voice. Leave it out to keep the current one.
     pub reply: Option<String>,

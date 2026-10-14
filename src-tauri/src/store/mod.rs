@@ -140,7 +140,19 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
     }
     migrate_autoincrement(db)?;
     migrate_mark_colors(db)?;
-    migrate_check_fingerprints(db)
+    migrate_check_fingerprints(db)?;
+    migrate_verdict_names(db)
+}
+
+/// Takes saved before the verdicts were renamed to agree, change, disagree and decide.
+fn migrate_verdict_names(db: &Connection) -> rusqlite::Result<()> {
+    db.execute_batch(
+        r#"UPDATE comments SET thread = replace(replace(replace(thread,
+             '"verdict":"agreeWithChanges"', '"verdict":"change"'),
+             '"verdict":"pushBack"', '"verdict":"disagree"'),
+             '"verdict":"needsYou"', '"verdict":"decide"')
+           WHERE thread LIKE '%"verdict":"%';"#,
+    )
 }
 
 /// Checks from before fingerprints were stored keep a null one.
