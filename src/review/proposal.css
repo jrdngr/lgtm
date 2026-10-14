@@ -85,6 +85,7 @@
   padding-right: 8px;
   color: var(--faint);
   text-align: right;
+  -webkit-user-select: none;
   user-select: none;
 }
 

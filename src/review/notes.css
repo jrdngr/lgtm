@@ -9,6 +9,7 @@
     system-ui,
     sans-serif;
   white-space: normal;
+  -webkit-user-select: text;
   user-select: text;
 }
 
