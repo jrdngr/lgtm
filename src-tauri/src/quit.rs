@@ -7,6 +7,7 @@ use std::sync::{Mutex, OnceLock};
 use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
 use objc2::{class, ffi, msg_send, sel};
 use tauri::{AppHandle, Manager};
+use tauri_plugin_window_state::AppHandleExt;
 
 use crate::agent::Runs;
 use crate::repo::{RepoWindows, START_LABEL};
@@ -91,6 +92,8 @@ fn ask_next() {
         }
     }
     *QUIT.lock().unwrap() = Some(Quit::Ending);
+    // Destroying a window skips the close that would record whether it's maximized.
+    app.save_window_state(crate::WINDOW_STATE).ok();
     let (windows, runs) = (app.state::<RepoWindows>(), app.state::<Runs>());
     for (label, window) in app.webview_windows() {
         // Destroying finishes later, so the runs stop here for `settle` to wait on.

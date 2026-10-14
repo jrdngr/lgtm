@@ -35,6 +35,7 @@ use std::path::Path;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
+use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use agent::Runs;
 use pty::Ptys;
@@ -200,6 +201,12 @@ fn adopt_login_shell_path() {
     }
 }
 
+/// What a window's saved state covers when it reopens.
+pub(crate) const WINDOW_STATE: StateFlags = StateFlags::SIZE
+    .union(StateFlags::POSITION)
+    .union(StateFlags::MAXIMIZED)
+    .union(StateFlags::FULLSCREEN);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -223,6 +230,12 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Each window reopens at the size and place it last had, per repo by its label.
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(WINDOW_STATE)
+                .build(),
+        )
         .menu(menu::build)
         .on_menu_event(menu::handle)
         .manage(Ptys::default())
@@ -243,6 +256,7 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
+                window.app_handle().save_window_state(WINDOW_STATE).ok();
                 window.state::<Ptys>().kill_window(window.label());
                 let runs = window.state::<Runs>();
                 window.state::<RepoWindows>().remove(window.label(), &runs);
