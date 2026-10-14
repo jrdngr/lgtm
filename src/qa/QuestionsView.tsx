@@ -52,9 +52,10 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const [showPrev, setShowPrev] = useState(false);
   const [deferring, setDeferring] = useState<string[]>();
   const rootRef = useRef<HTMLDivElement>(null);
-  const q = current(d, want);
   const next = head(d);
   const list = countable(d);
+  /** With nothing open, the last question shows for looking back. */
+  const q = current(d, want) ?? list.at(-1);
   const last = lastAction(d);
   /** An open question past the one to answer: it can only be looked at. */
   const ahead = q?.state === "open" && q.id !== next?.id;
@@ -86,6 +87,14 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     setSel(0);
     void options;
   }, [options]);
+
+  // Resolving the last open question goes on to Apply.
+  const done = !next && d.asked && !busy;
+  const wasDone = useRef(done);
+  useEffect(() => {
+    if (done && !wasDone.current) setView(ws, "apply");
+    wasDone.current = done;
+  }, [done, ws]);
 
   const focusRoot = () => rootRef.current?.focus({ preventScroll: true });
   useEffect(() => {
@@ -202,21 +211,14 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     e.stopPropagation();
   }
 
-  if (!d.queue.questions.length && d.asked && busy?.kind !== "ask")
-    return (
-      <div className="qa-card">
-        <h2>Nothing to decide</h2>
-        <button type="button" className="primary" onClick={() => setView(ws, "apply")}>
-          On to Apply
-        </button>
-      </div>
-    );
   if (!d.queue.questions.length)
     return (
       <div className="placeholder">
         {busy?.kind === "ask"
           ? "Questions show here once the agent has read the prompt"
-          : "No questions yet. Ask from the prompt first."}
+          : d.asked
+            ? "Nothing to decide"
+            : "No questions yet. Ask from the prompt first."}
       </div>
     );
 
@@ -228,12 +230,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
       <Rail questions={d.queue.questions} current={q} updating={updatingIds} onPick={show} />
       <div className="qq-main">
         {!q ? (
-          <div className="qa-card">
-            <h2>All resolved</h2>
-            <button type="button" className="primary" onClick={() => setView(ws, "apply")}>
-              On to Apply
-            </button>
-          </div>
+          <div className="placeholder">Nothing to decide</div>
         ) : (
           <>
             <div className="qq-top">
