@@ -325,6 +325,7 @@ export const events = {
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
+	workingCopyMoved: makeEvent<WorkingCopyMoved>("working-copy-moved"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
 };
 
@@ -1705,6 +1706,14 @@ export type WalkthroughDone = {
 /**  View > Word Wrap was turned on or off. */
 export type WordWrap = {
 	on: boolean,
+};
+
+/**
+ *  Something other than the app, like a terminal or an agent, moved a workspace's working
+ *  copy. `workspace` is `null` for the main one.
+ */
+export type WorkingCopyMoved = {
+	workspace: string | null,
 };
 
 /**

@@ -3,9 +3,12 @@
 use super::Jj;
 
 impl Jj {
+    /// Runs a write that can move `@`, and notes where `@` ends up as the app's own move.
     async fn write(&self, args: &[&str]) -> anyhow::Result<()> {
-        let _guard = self.writer.lock().await;
-        self.exec(args, false).await.map(drop)
+        let mut seen = self.writer.lock().await;
+        let done = self.exec(args, false).await.map(drop);
+        self.note_working_copy(&mut seen).await;
+        done
     }
 
     /// Puts `@` on a new commit on top of `rev`.

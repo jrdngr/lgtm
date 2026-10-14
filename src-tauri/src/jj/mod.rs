@@ -10,6 +10,7 @@ use tokio::sync::Mutex;
 
 mod diff;
 mod edit;
+mod follow;
 pub mod git;
 pub mod init;
 mod log;
@@ -66,7 +67,11 @@ fn parse_changes(out: &str) -> Vec<Change> {
                 conflict: parts.next()? == "1",
                 empty: parts.next()? == "1",
                 divergent: parts.next()? == "1",
-                bookmarks: parts.next()?.split_whitespace().map(str::to_string).collect(),
+                bookmarks: parts
+                    .next()?
+                    .split_whitespace()
+                    .map(str::to_string)
+                    .collect(),
                 description: parts.next().unwrap_or_default().to_string(),
             })
         })
@@ -75,14 +80,16 @@ fn parse_changes(out: &str) -> Vec<Change> {
 
 pub struct Jj {
     root: PathBuf,
-    writer: Mutex<()>,
+    /// Held while the app writes. Holds the working copy's change as of the app's last look,
+    /// so a move the app didn't make can be told apart.
+    writer: Mutex<Option<String>>,
 }
 
 impl Jj {
     pub fn new(root: &Path) -> Self {
         Self {
             root: root.to_path_buf(),
-            writer: Mutex::new(()),
+            writer: Mutex::new(None),
         }
     }
 
@@ -228,7 +235,8 @@ mod tests {
 
     #[test]
     fn parses_change_lines_with_tabs_in_descriptions() {
-        let got = parse_changes("abc\tc1\t2\t1\t0\t0\t1\ta b*\tfix: a\tb\nxyz\tc2\t1\t0\t1\t1\t0\t\t\n");
+        let got =
+            parse_changes("abc\tc1\t2\t1\t0\t0\t1\ta b*\tfix: a\tb\nxyz\tc2\t1\t0\t1\t1\t0\t\t\n");
         assert_eq!(got[0].description, "fix: a\tb");
         assert_eq!((got[0].unique, got[0].working_copy), (2, true));
         assert!(!got[0].conflict && got[1].conflict);

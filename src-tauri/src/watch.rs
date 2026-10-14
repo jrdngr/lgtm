@@ -24,6 +24,8 @@ pub enum Event {
     RepoChanged,
     /// The working copy became stale (with jj's message) or stopped being stale.
     Stale(Option<String>),
+    /// Something other than the app moved `@`.
+    WorkingCopyMoved,
 }
 
 /// Keeps watching until dropped.
@@ -134,6 +136,10 @@ async fn run(
     stale: Arc<Mutex<Option<String>>>,
     emit: impl Fn(Event),
 ) {
+    // Where `@` starts, so the first move is caught.
+    if let Err(e) = jj.moved_working_copy().await {
+        eprintln!("lgtm: read @: {e:#}");
+    }
     let mut snapshot_at: Option<Instant> = None;
     // When the edits the next snapshot waits on began.
     let mut edits_since: Option<Instant> = None;
@@ -159,6 +165,11 @@ async fn run(
                 if changed_at.is_some_and(|t| t <= now) {
                     changed_at = None;
                     emit(Event::RepoChanged);
+                    match jj.moved_working_copy().await {
+                        Ok(true) => emit(Event::WorkingCopyMoved),
+                        Ok(false) => {}
+                        Err(e) => eprintln!("lgtm: read @: {e:#}"),
+                    }
                 }
                 if snapshot_at.is_some_and(|t| t <= now) {
                     snapshot_at = None;
@@ -245,5 +256,42 @@ mod tests {
         std::fs::write(root.join("a.txt"), "hi\n").unwrap();
         let got = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
         assert_eq!(got.ok().flatten(), Some(Event::RepoChanged));
+    }
+
+    #[tokio::test]
+    async fn a_move_made_in_a_terminal_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let jj_cli = |args: &[&str]| {
+            let out = std::process::Command::new("jj")
+                .args(args)
+                .current_dir(&root)
+                .output()
+                .unwrap();
+            assert!(
+                out.status.success(),
+                "{}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+        };
+        jj_cli(&["git", "init"]);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let jj = Arc::new(Jj::new(&root));
+        let _watch = start(&root, jj, Arc::default(), move |e| {
+            tx.send(e).ok();
+        })
+        .unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        jj_cli(&["new"]);
+        let moved = async {
+            while let Some(e) = rx.recv().await {
+                if e == Event::WorkingCopyMoved {
+                    return true;
+                }
+            }
+            false
+        };
+        let got = tokio::time::timeout(Duration::from_secs(10), moved).await;
+        assert_eq!(got.ok(), Some(true));
     }
 }

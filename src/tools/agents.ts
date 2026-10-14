@@ -10,6 +10,7 @@ export const useAgentsOff = agents.use;
 /** Whether `gh` is missing or too old. GitHub features (PR workspaces, publishing) are off. */
 const github = flag();
 
+export const githubOff = github.get;
 export const useGithubOff = github.use;
 
 /** Turns agent and GitHub features off while `claude` or `gh` is among the tools with a

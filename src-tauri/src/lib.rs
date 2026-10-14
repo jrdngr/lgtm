@@ -167,6 +167,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         ])
         .events(collect_events![
             events::RepoChanged,
+            events::WorkingCopyMoved,
             events::SwitchRepo,
             events::WordWrap,
             events::SettingsChanged,

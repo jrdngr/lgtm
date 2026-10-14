@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_specta::Event as _;
 
 use crate::agent::Runs;
-use crate::events::{RepoChanged, WorkingCopyStale};
+use crate::events::{RepoChanged, WorkingCopyMoved, WorkingCopyStale};
 use crate::jj::Jj;
 use crate::review::{Emit, RepoCtx};
 use crate::store::Store;
@@ -131,6 +131,7 @@ fn emitter(app: &AppHandle, label: &str) -> Emit {
             watch::Event::Stale(message) => {
                 WorkingCopyStale { workspace, message }.emit_to(&app, &label)
             }
+            watch::Event::WorkingCopyMoved => WorkingCopyMoved { workspace }.emit_to(&app, &label),
         };
         sent.ok();
     })

@@ -8,6 +8,13 @@ use tauri_specta::Event;
 #[derive(Clone, Serialize, Type, Event)]
 pub struct RepoChanged {}
 
+/// Something other than the app, like a terminal or an agent, moved a workspace's working
+/// copy. `workspace` is `null` for the main one.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct WorkingCopyMoved {
+    pub workspace: Option<String>,
+}
+
 /// File > Open Repository in this window. The window swaps itself for the start window once
 /// unsaved edits are dealt with.
 #[derive(Clone, Serialize, Type, Event)]

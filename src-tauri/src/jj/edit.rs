@@ -69,16 +69,21 @@ impl Jj {
             JjAction::Undo { steps } | JjAction::Redo { steps } => *steps,
             _ => 1,
         };
-        let _guard = self.writer.lock().await;
-        for _ in 0..steps {
-            self.exec(&action.args(), false).await?;
+        let mut seen = self.writer.lock().await;
+        let done = async {
+            for _ in 0..steps {
+                self.exec(&action.args(), false).await?;
+            }
+            if let Some(parent) = parent {
+                // jj leaves `@` on a new empty commit. Moving to the parent abandons it.
+                self.exec(&["edit", &parent], false).await?;
+                return Ok(2);
+            }
+            Ok(steps)
         }
-        if let Some(parent) = parent {
-            // jj leaves `@` on a new empty commit. Moving to the parent abandons it.
-            self.exec(&["edit", &parent], false).await?;
-            return Ok(2);
-        }
-        Ok(steps)
+        .await;
+        self.note_working_copy(&mut seen).await;
+        done
     }
 }
 

@@ -5,6 +5,7 @@ import { onAnyReveal } from "../editor/reveal";
 import { confirmClose } from "../editor/unsaved";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
+import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { openRevisions } from "../review/target";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
@@ -61,6 +62,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   /** The dock with focus: the bottom one when focus is in it, else the main one. */
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
+  useFollowWorkingCopy();
+  useFollowWorkingCopy();
   useWordWrapMenu();
   useSettingsMenu(selected);
   useShortcutsMenu(selected);
