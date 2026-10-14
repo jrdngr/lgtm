@@ -29,6 +29,11 @@ pub struct Reply {
     pub stopped: bool,
 }
 
+/// Whether `run` failed because Claude Code has no record of the session it resumed.
+pub fn session_missing(e: &anyhow::Error) -> bool {
+    format!("{e:#}").contains("No conversation found")
+}
+
 /// Running agents by key, so they can be stopped. Clones share the same runs.
 #[derive(Clone, Default)]
 pub struct Runs(Arc<Mutex<HashMap<String, Entry>>>);
@@ -43,19 +48,20 @@ impl Runs {
         }
     }
 
-    /// Stops every run whose key starts with `prefix`.
-    pub fn stop_all(&self, prefix: &str) {
+    /// Stops every run whose key starts with `prefix`, returning whether there were any.
+    pub fn stop_all(&self, prefix: &str) -> bool {
         let mut map = self.0.lock().unwrap();
         let keys: Vec<String> = map
             .keys()
             .filter(|k| k.starts_with(prefix))
             .cloned()
             .collect();
-        for k in keys {
-            if let Some((_, tx)) = map.remove(&k) {
+        for k in &keys {
+            if let Some((_, tx)) = map.remove(k) {
                 tx.send(()).ok();
             }
         }
+        !keys.is_empty()
     }
 
     /// Records a run under `key`, so it can be stopped from now on, even before it starts.
@@ -146,14 +152,14 @@ pub async fn run_registered(
     task: Task<'_>,
     on: impl Fn(Progress),
 ) -> anyhow::Result<Reply> {
-    let stopped = |text| Reply {
+    let stopped = |text, session| Reply {
         text,
         structured: None,
-        session: None,
+        session,
         stopped: true,
     };
     if run.stop.try_recv().is_ok() {
-        return Ok(stopped(String::new()));
+        return Ok(stopped(String::new(), None));
     }
 
     let model = settings::get()
@@ -211,12 +217,14 @@ pub async fn run_registered(
     let mut lines = BufReader::new(child.stdout.take().context("no stdout")?).lines();
 
     let mut streamed = String::new();
+    // The session from the start of the run, so a stopped run can still be continued.
+    let mut session = None;
     loop {
         let line = tokio::select! {
             line = lines.next_line() => line?,
             _ = &mut run.stop => {
                 child.kill().await.ok();
-                return Ok(stopped(streamed));
+                return Ok(stopped(streamed, session));
             }
         };
         let Some(line) = line else { break };
@@ -231,6 +239,7 @@ pub async fn run_registered(
                 on(Progress::Text("\n\n".into()));
             }
             Line::Tool(t) => on(Progress::Tool(t)),
+            Line::Session(id) => session = Some(id),
             Line::Done { text, error, .. } if error => bail!("the agent failed: {text}"),
             Line::Done {
                 text,

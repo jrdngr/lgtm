@@ -120,7 +120,8 @@ impl Lgtm {
 
     #[tool(
         description = "Comment on lines of a file in the review. The comment shows in \
-        the review marked as from a terminal agent."
+        the review marked as from a terminal agent. It anchors to the changed lines in the \
+        range, so the range must include at least one changed line."
     )]
     async fn add_comment(&self, Parameters(p): Parameters<inputs::AddComment>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;

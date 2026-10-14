@@ -96,6 +96,9 @@ pub(super) fn extend(run: &mut BotRun, options: BotOptions) {
         let redo = [Step::Synthesis, Step::Minimal];
         run.done.retain(|s| !redo.contains(s));
         run.parts.retain(|p| !redo.contains(&p.step));
+        // The new synthesis renumbers its findings, so its ids no longer name the old ones.
+        run.dismissed.retain(|id| id.contains('#'));
+        run.synthesis += 1;
     } else if new.synthesize && !old.synthesize {
         run.done.retain(|s| *s != Step::Minimal);
         run.parts.retain(|p| p.step != Step::Minimal);
@@ -148,6 +151,7 @@ impl RepoCtx {
             created_at: now_ms() as f64,
             fixes: vec![],
             dismissed: vec![],
+            synthesis: 0,
             active: false,
         };
         run.id = self.store.lock().unwrap().add_bot_run(&run)?;

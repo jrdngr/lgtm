@@ -28,6 +28,7 @@ fn run(names: &[&str], options: BotOptions) -> BotRun {
         created_at: 1.0,
         fixes: vec![],
         dismissed: vec![],
+        synthesis: 0,
         active: false,
     }
 }
@@ -162,6 +163,29 @@ fn adding_cross_review_redoes_synthesis_and_minimal() {
 }
 
 #[test]
+fn redoing_synthesis_unsettles_its_old_findings_but_not_the_personas() {
+    let synthesize = BotOptions {
+        synthesize: true,
+        ..BotOptions::default()
+    };
+    let mut r = run(&["sec", "general"], synthesize);
+    r.dismissed = vec!["2".into(), "sec#1".into()];
+    r.fixes.push(Fix {
+        findings: vec!["1".into(), "general#1".into()],
+        status: Status::Done,
+        text: String::new(),
+        error: None,
+        created_at: 0.0,
+        synthesis: 0,
+    });
+    extend(&mut r, CROSS);
+    assert_eq!(r.finding_state("1"), "open");
+    assert_eq!(r.finding_state("2"), "open");
+    assert_eq!(r.finding_state("general#1"), "fixed");
+    assert_eq!(r.finding_state("sec#1"), "dismissed");
+}
+
+#[test]
 fn adding_synthesis_redoes_a_lone_personas_minimal_pick() {
     let minimal = BotOptions {
         minimal: true,
@@ -255,6 +279,7 @@ fn live_fixes_fill_text_and_show_stopped_once_gone() {
         text: String::new(),
         error: None,
         created_at: 0.0,
+        synthesis: 0,
     });
     live.begin_fix(7, 0);
     live.append_fix(7, 0, "a");

@@ -1,7 +1,8 @@
-//! The app menu: the platform default plus Settings in the app menu, New Window and Open
-//! Repository in File, Word Wrap and zoom in View, and Keyboard Shortcuts in Help.
+//! The app menu: the platform default plus Settings in the app menu, New Window, Open
+//! Repository and Close Window in File, Word Wrap and zoom in View, and Keyboard Shortcuts in
+//! Help. Close Window is on ⇧⌘W, leaving ⌘W to the webview, which closes the active tab.
 
-use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event as _;
 
@@ -10,6 +11,7 @@ use crate::{repo, zoom};
 
 const NEW_WINDOW: &str = "new-window";
 const OPEN_REPO: &str = "open-repo";
+const CLOSE_WINDOW: &str = "close-window";
 const WORD_WRAP: &str = "word-wrap";
 const SETTINGS: &str = "settings";
 const SHORTCUTS: &str = "shortcuts";
@@ -23,6 +25,7 @@ pub struct WordWrapItem<R: Runtime>(pub CheckMenuItem<R>);
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app)?;
     let app_name = app.package_info().name.clone();
+    let close_window = PredefinedMenuItem::close_window(app, None)?.text()?;
     for item in menu.items()? {
         let Some(sub) = item.as_submenu() else {
             continue;
@@ -36,17 +39,28 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 ],
                 1,
             )?,
-            "File" => sub.prepend_items(&[
-                &MenuItem::with_id(app, NEW_WINDOW, "New Window", true, Some("CmdOrCtrl+N"))?,
-                &MenuItem::with_id(
-                    app,
-                    OPEN_REPO,
-                    "Open Repository…",
-                    true,
-                    Some("CmdOrCtrl+O"),
-                )?,
-                &PredefinedMenuItem::separator(app)?,
-            ])?,
+            "File" => {
+                remove_predefined(sub, &close_window)?;
+                sub.prepend_items(&[
+                    &MenuItem::with_id(app, NEW_WINDOW, "New Window", true, Some("CmdOrCtrl+N"))?,
+                    &MenuItem::with_id(
+                        app,
+                        OPEN_REPO,
+                        "Open Repository…",
+                        true,
+                        Some("CmdOrCtrl+O"),
+                    )?,
+                    &PredefinedMenuItem::separator(app)?,
+                    &MenuItem::with_id(
+                        app,
+                        CLOSE_WINDOW,
+                        "Close Window",
+                        true,
+                        Some("CmdOrCtrl+Shift+W"),
+                    )?,
+                ])?
+            }
+            "Window" => remove_predefined(sub, &close_window)?,
             "View" => {
                 let wrap = CheckMenuItem::with_id(
                     app,
@@ -79,10 +93,23 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     Ok(menu)
 }
 
+/// Drops the submenu's predefined items titled `text`.
+fn remove_predefined<R: Runtime>(sub: &Submenu<R>, text: &str) -> tauri::Result<()> {
+    for item in sub.items()? {
+        if let Some(predefined) = item.as_predefined_menuitem()
+            && predefined.text()? == text
+        {
+            sub.remove(predefined)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn handle(app: &AppHandle, event: MenuEvent) {
     let result = match event.id().as_ref() {
         NEW_WINDOW => repo::open_start(app),
         OPEN_REPO => switch_repo(app),
+        CLOSE_WINDOW => close_window(app),
         WORD_WRAP => word_wrap(app),
         SETTINGS => open_settings(app),
         SHORTCUTS => open_shortcuts(app),
@@ -112,6 +139,18 @@ fn focused(app: &AppHandle) -> Option<tauri::WebviewWindow> {
     app.webview_windows()
         .into_values()
         .find(|w| w.label() != repo::START_LABEL && w.is_focused().unwrap_or(false))
+}
+
+/// Asks the focused window to close, which a repo window confirms first.
+fn close_window(app: &AppHandle) -> tauri::Result<()> {
+    let focused = app
+        .webview_windows()
+        .into_values()
+        .find(|w| w.is_focused().unwrap_or(false));
+    match focused {
+        Some(window) => window.close(),
+        None => Ok(()),
+    }
 }
 
 /// Opens the Settings tab in the focused repo window.

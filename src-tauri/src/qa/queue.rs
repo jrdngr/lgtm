@@ -309,7 +309,7 @@ impl Queue {
     }
 
     /// Applies what the answer to `after` does to the rest of the queue. Decided questions
-    /// are never dropped; ids the queue doesn't have are skipped.
+    /// are never dropped or rewritten; ids the queue doesn't have are skipped.
     pub fn apply(&mut self, after: &str, update: Update) {
         let mut before = vec![];
         for d in update.drop {
@@ -328,12 +328,11 @@ impl Queue {
             if r.id == after {
                 continue;
             }
-            let was = self.get(&r.id).cloned();
+            let Some(was) = self.get(&r.id).filter(|q| q.state == QState::Open).cloned() else {
+                continue;
+            };
             self.rewrite(r, after).ok();
-            if let Some(was) = was
-                && self.get(&was.id) != Some(&was)
-                && !before.iter().any(|b| b.id == was.id)
-            {
+            if self.get(&was.id) != Some(&was) && !before.iter().any(|b| b.id == was.id) {
                 before.push(was);
             }
         }
@@ -507,6 +506,32 @@ mod tests {
         assert_eq!(q.get("Q1").unwrap().state, QState::Open);
         assert_eq!(q.undo().as_deref(), Some("Q2"));
         assert_eq!(q.undo(), None);
+    }
+
+    #[test]
+    fn an_update_never_rewrites_a_decided_question() {
+        let mut q = Queue::default();
+        q.add_round(vec![new("a", false), new("b", false)]);
+        q.decide("Q1", pick(0, 1.0)).unwrap();
+        q.decide("Q2", pick(1, 2.0)).unwrap();
+        q.apply(
+            "Q2",
+            Update {
+                rewrite: vec![Rewrite {
+                    id: "Q1".into(),
+                    what: "new option".into(),
+                    subject: "a2".into(),
+                    context: vec![],
+                    options: vec![],
+                    why: String::new(),
+                }],
+                ..Update::default()
+            },
+        );
+        let a = q.get("Q1").unwrap();
+        assert_eq!(a.state, QState::Decided);
+        assert_eq!(a.answer, Some(pick(0, 1.0)));
+        assert_eq!(a.text.subject, "a");
     }
 
     #[test]

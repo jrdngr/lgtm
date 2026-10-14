@@ -102,6 +102,20 @@ describe("changedRows", () => {
     const lines = buildLines(files, layout({ mode: "split" }));
     expect(changedRows(files, lines, 0, lines.length - 1).map((a) => a.row)).toEqual([1, 3, 2, 5]);
   });
+
+  it("takes collapsed rows only when asked, leaving out rows the filter hides", () => {
+    const flagged = (_: number, row: number) => (row === 5 ? "red" : "unmarked");
+    const rowsOf = (lines: DisplayLine[], folded: boolean) =>
+      changedRows(files, lines, 0, lines.length - 1, folded).map((a) => a.row);
+    const file = buildLines(files, layout({ collapsedFiles: new Set(["a.rs"]) }));
+    expect(rowsOf(file, false)).toEqual([]);
+    expect(rowsOf(file, true)).toEqual([1, 2, 3, 5]);
+    const hunk = buildLines(
+      files,
+      layout({ collapsedHunks: new Set([hunkKey("a.rs", 0)]), filter: "red", rowState: flagged }),
+    );
+    expect(rowsOf(hunk, true)).toEqual([5]);
+  });
 });
 
 describe("jump targets", () => {

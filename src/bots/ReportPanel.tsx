@@ -8,7 +8,7 @@ import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
 import { FindingCard } from "./FindingCard";
-import { Fixes } from "./Fixes";
+import { covers, Fixes } from "./Fixes";
 import { finalFindings, findingsText, history, type Picked, report } from "./findings";
 import { runState } from "./personas";
 import { MinimalView, PersonaView, SynthesisView } from "./ReportViews";
@@ -158,7 +158,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const current = run;
   /** Covered by a Fix headless run that finished, or dismissed. */
   const stateOf = (id: string) =>
-    current.fixes?.some((x) => x.status === "done" && x.findings.includes(id))
+    current.fixes?.some((x) => x.status === "done" && covers(current, x, id))
       ? ("fixed" as const)
       : current.dismissed?.includes(id)
         ? ("dismissed" as const)

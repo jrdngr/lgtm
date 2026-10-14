@@ -2,11 +2,27 @@ import type { Report } from "./findings";
 import { Markdown } from "./Markdown";
 
 /** Links to findings by id, which scroll to their cards. */
-export function Refs({ ids, onGo }: { ids: string[]; onGo(id: string): void }) {
+export function Refs({
+  ids,
+  onGo,
+  gone,
+}: {
+  ids: string[];
+  onGo(id: string): void;
+  /** Ids whose finding no longer exists, shown but not linked. */
+  gone?(id: string): boolean;
+}) {
   return (
     <>
       {ids.map((id) => (
-        <button type="button" className="finding-ref" key={id} onClick={() => onGo(id)}>
+        <button
+          type="button"
+          className="finding-ref"
+          key={id}
+          disabled={gone?.(id)}
+          title={gone?.(id) ? "From an earlier synthesis" : undefined}
+          onClick={() => onGo(id)}
+        >
           {id.includes("#") ? id : `#${id}`}
         </button>
       ))}

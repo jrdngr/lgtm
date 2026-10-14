@@ -33,7 +33,7 @@ mod zoom;
 
 use std::path::Path;
 
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
 use agent::Runs;
@@ -52,6 +52,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::recent_repos,
             commands::repo::switch_repo,
             commands::repo::close_window,
+            commands::repo::keep_window,
             commands::repo::set_word_wrap,
             commands::repo::load_layout,
             commands::repo::save_layout,
@@ -68,6 +69,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::refresh_review,
             commands::review::log_graph,
             commands::review::trunk_bookmark,
+            commands::review::revset_commits,
             commands::review::jj_act,
             commands::review::mark_rows,
             commands::review::clear_file_marks,
@@ -79,6 +81,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::focus_review,
             commands::settings::get_settings,
             commands::settings::save_settings,
+            commands::settings::settings_load_error,
             commands::settings::claude_command,
             commands::settings::tool_status,
             commands::settings::prompt_files,
@@ -240,11 +243,35 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let WindowEvent::Destroyed = event {
                 window.state::<Ptys>().kill_window(window.label());
-                window.state::<RepoWindows>().remove(window.label());
+                let runs = window.state::<Runs>();
+                window.state::<RepoWindows>().remove(window.label(), &runs);
+                #[cfg(target_os = "macos")]
+                quit::closed(window.label());
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // The last window closed. Agent runs it stopped get to clean up first.
+            if let RunEvent::ExitRequested {
+                code: None, api, ..
+            } = &event
+            {
+                #[cfg(target_os = "macos")]
+                if quit::quitting() {
+                    // The quit ends the app itself.
+                    return api.prevent_exit();
+                }
+                if !app.state::<RepoWindows>().settled() {
+                    api.prevent_exit();
+                    let app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        app.state::<RepoWindows>().settle().await;
+                        app.exit(0);
+                    });
+                }
+            }
+        });
 }
 
 #[cfg(test)]

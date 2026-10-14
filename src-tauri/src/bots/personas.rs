@@ -208,7 +208,11 @@ pub fn is_persona_file(root: &Path, path: &Path) -> bool {
 /// Copies persona file `path` to `name` beside it, adding `.md` when `name` has no extension.
 /// Returns the copy's path.
 pub fn duplicate(root: &Path, path: &Path, name: &str) -> anyhow::Result<PathBuf> {
-    anyhow::ensure!(is_persona_file(root, path), "{} isn't a persona", path.display());
+    anyhow::ensure!(
+        is_persona_file(root, path),
+        "{} isn't a persona",
+        path.display()
+    );
     let name = name.trim();
     anyhow::ensure!(
         !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\']),

@@ -23,7 +23,13 @@ fn parse_log(out: &str) -> Vec<LogLine> {
         .map(|line| {
             let mut parts = line.splitn(6, '\x1f');
             let prefix = parts.next().unwrap_or_default();
-            let fields = (parts.next(), parts.next(), parts.next(), parts.next(), parts.next());
+            let fields = (
+                parts.next(),
+                parts.next(),
+                parts.next(),
+                parts.next(),
+                parts.next(),
+            );
             match fields {
                 (Some(commit), Some(change), Some(wc), Some(desc), Some(rest)) => LogLine {
                     text: format!("{prefix}{rest}"),

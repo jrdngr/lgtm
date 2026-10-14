@@ -23,6 +23,8 @@ interface Props {
 /** Cursor moves. Shifted keys extend the range from the anchor. */
 const MOVES: Record<string, number> = { j: 1, ArrowDown: 1, J: 1, k: -1, ArrowUp: -1, K: -1 };
 
+const UNRELATED = "Not one line of ancestry";
+
 /** Line index of each commit's first line, newest first, and the commit each line belongs to
  * (-1 before the first). */
 function layout(lines: LogLine[]) {
@@ -48,6 +50,8 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   const [steps, setSteps] = useState(1);
   const [busy, setBusy] = useState(false);
   const [trunk, setTrunk] = useState<string | null>(null);
+  /** The commit ids jj lists for a picked range. */
+  const [chain, setChain] = useState<{ revset: string; ids: Set<string> }>();
   const rootRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -86,6 +90,27 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     return newer === older ? newer : `${older}::${newer}`;
   }
   const picked = () => rangeOf(cursor, anchor);
+  const ranged = hi > lo ? picked() : undefined;
+
+  // The log can interleave branches, so a range holds only the commits `older::newer` lists.
+  useEffect(() => {
+    if (!ranged || !lines) return;
+    let live = true;
+    commands.revsetCommits(workspace, ranged).then((r) => {
+      if (live && r.status === "ok") setChain({ revset: ranged, ids: new Set(r.data) });
+    });
+    return () => {
+      live = false;
+    };
+  }, [workspace, ranged, lines]);
+  const inChain = ranged && chain?.revset === ranged ? chain.ids : undefined;
+  /** The range's ends aren't ancestor and descendant, so `older::newer` is empty. */
+  const unrelated = inChain?.size === 0;
+
+  function reviewPicked() {
+    if (unrelated) setError(UNRELATED);
+    else review(picked());
+  }
 
   /** Moves the cursor, and the anchor for a range, and shows the pick in the field. */
   function move(c: number, a?: number) {
@@ -98,7 +123,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   function reviewLabel() {
     if (typed.trim() === "@") return "Review @";
     if (typed !== picked()) return "Review revset";
-    if (hi > lo) return `Review ${hi - lo + 1} changes`;
+    if (hi > lo) return unrelated ? UNRELATED : `Review ${inChain?.size ?? hi - lo + 1} changes`;
     const line = lines?.[commits[lo]];
     return `Review ${line?.workingCopy ? "@" : line?.changeId}`;
   }
@@ -178,7 +203,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         case "Enter":
           // A focused button keeps its own Enter.
           if (e.target instanceof HTMLButtonElement) return;
-          review(picked());
+          reviewPicked();
           break;
         case "Escape":
           onClose();
@@ -226,7 +251,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
               spellCheck={false}
             />
           </label>
-          <button type="submit" className="primary">
+          <button type="submit" className="primary" disabled={unrelated && typed === ranged}>
             {reviewLabel()}
           </button>
         </form>
@@ -247,7 +272,8 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         <pre className="log-lines">
           {lines?.map((l, i) => {
             const c = owner[i];
-            const inRange = c >= lo && c <= hi;
+            const inRange =
+              c >= lo && c <= hi && (!inChain || inChain.has(lines[commits[c]].commitId ?? ""));
             const isCursor = c === cursor && !!l.commitId;
             return (
               <div
@@ -264,7 +290,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
               >
                 <AnsiText text={l.text} />
                 {isCursor && !busy && (
-                  <RevisionsPanelActions onReview={() => review(picked())} onKey={runKey} />
+                  <RevisionsPanelActions onReview={reviewPicked} onKey={runKey} />
                 )}
                 {"\n"}
               </div>

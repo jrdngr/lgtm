@@ -71,7 +71,11 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
       ) : (
         <section className="qa-card">
           <h2>
-            {open ? `${decided.length} decided, ${open} open` : `All ${decided.length} decided`}
+            {open
+              ? `${decided.length} decided, ${open} open`
+              : decided.length
+                ? `All ${decided.length} decided`
+                : "Nothing to decide"}
           </h2>
           <ul className="qa-decisions">
             {(all ? decided : decided.slice(0, SHOWN)).map((q) => (

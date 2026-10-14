@@ -7,7 +7,7 @@ import { commands } from "../ipc";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { ago, fullDate } from "../ui/time";
-import { dockOf } from "../workbench/docks";
+import { dockOf, revealPanel } from "../workbench/docks";
 import { openReport } from "../workbench/panels";
 import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 import { type AgentRun, clearFinished, KIND_NAMES, removeRun, useAgentRuns } from "./runs";
@@ -124,7 +124,7 @@ function BotRow({ run, workspace, onError, clear }: BotRowProps) {
   const outcome = state === "halted" ? "failed" : state;
   const open = () => {
     const api = dockOf(workspace);
-    if (api) openReport(api, run.id);
+    if (api && !revealPanel(workspace, `report-${run.id}`)) openReport(api, run.id);
   };
   const act = (f: () => Promise<{ status: string; error?: string }>) => () =>
     runAction(run, f, onError);

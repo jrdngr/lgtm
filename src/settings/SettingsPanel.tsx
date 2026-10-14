@@ -1,5 +1,6 @@
 import type { IDockviewPanelProps } from "dockview-react";
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { commands } from "../ipc";
 import { AgentSettings } from "./AgentSettings";
 import type { SettingsParams } from "./open";
 import { PromptSettings } from "./PromptSettings";
@@ -54,6 +55,12 @@ export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
   const settings = useSettings();
   const body = useRef<HTMLDivElement>(null);
   const { section, nonce } = params;
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // A save replaces the file that failed to load, so each change asks again.
+  useEffect(() => {
+    if (settings) commands.settingsLoadError().then(setLoadError);
+  }, [settings]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: each open (nonce) scrolls again
   useEffect(() => {
@@ -65,6 +72,12 @@ export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
     <div className="settings" ref={body}>
       <div className="settings-page">
         <h1>Settings</h1>
+        {loadError && (
+          <p className="settings-warn">
+            settings.toml couldn't be read, so the defaults are in use: {loadError}. The next change
+            here backs the file up to settings.toml.bak and replaces it.
+          </p>
+        )}
         {settings ? (
           <>
             <AgentSettings settings={settings} />

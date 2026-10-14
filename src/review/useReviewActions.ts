@@ -54,8 +54,11 @@ export function useReviewActions(d: Deps) {
 
   async function applyMark(color: MarkColor | null) {
     if (!review) return;
-    const rows = changedRows(files, lines, sel.start, sel.end);
-    if (rows.length === 0) return;
+    const rows = changedRows(files, lines, sel.start, sel.end, true);
+    if (rows.length === 0) {
+      setError("No changed rows in the selection.");
+      return;
+    }
     const line = lines[sel.start];
     const whole = sel.level === "file" && color !== null && color === d.primary;
     const check = whole && line ? [line.file] : [];

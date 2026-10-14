@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 use serde::Serialize;
 
 use super::comments::RowSpan;
@@ -111,6 +111,33 @@ pub struct AgentNote {
 }
 
 impl Review {
+    /// Where the nearest change is, when `rows` (from `rows_for`) fell back to it because no
+    /// changed row of `path` is in `start..=end`.
+    fn change_outside(&self, path: &str, start: u32, end: u32, rows: &[RowRef]) -> Option<String> {
+        let file = self.files.iter().find(|f| f.path == path)?;
+        let removed = file.status == FileStatus::Removed;
+        let line = |i: u32| {
+            let r = &file.rows[i as usize];
+            if removed { r.old_line } else { r.new_line }
+        };
+        let inside: Vec<u32> = (0..file.rows.len() as u32)
+            .filter(|&i| line(i).is_some_and(|l| start <= l && l <= end))
+            .collect();
+        if let (Some(&lo), Some(&hi)) = (inside.first(), inside.last())
+            && rows.iter().any(|r| lo <= r.row && r.row <= hi)
+        {
+            return None;
+        }
+        let row = rows.first()?.row;
+        Some(match line(row) {
+            Some(l) => format!("the nearest change is at line {l}"),
+            None => format!(
+                "the nearest change removes old line {}",
+                file.rows[row as usize].old_line.unwrap_or_default()
+            ),
+        })
+    }
+
     /// A row's state; `None` for rows that don't need review: context and replaced rows.
     /// A checked file's rows count as checked whatever their marks.
     pub(super) fn row_state(&self, fi: usize, row: usize) -> Option<RowState> {
@@ -316,9 +343,13 @@ impl RepoCtx {
     ) -> anyhow::Result<(u32, StateDto)> {
         let id = self.current_review(workspace)?;
         let state = self.comment_edit(id, |review, store| {
+            let (lo, hi) = (start.min(end), start.max(end));
             let rows = review
-                .rows_for(path, start.min(end), start.max(end))
+                .rows_for(path, lo, hi)
                 .with_context(|| format!("{path} isn't one of the review's changed files"))?;
+            if let Some(near) = review.change_outside(path, lo, hi, &rows) {
+                bail!("lines {lo}-{hi} of {path} have no changes in the diff; {near}");
+            }
             let (path, pins) = review.pins(store, &rows)?;
             let now = now_ms();
             store.add_comment(&Comment {

@@ -182,6 +182,7 @@ impl Review {
                     path: file.path.clone(),
                     old_hashes: hashes(Side::Old),
                     new_hashes: hashes(Side::New),
+                    fingerprint: Some(file.fingerprint),
                     review: self.label.clone(),
                     created_at: now_ms(),
                 });

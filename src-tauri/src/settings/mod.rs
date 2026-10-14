@@ -83,6 +83,8 @@ impl Models {
 }
 
 static CURRENT: RwLock<Option<Settings>> = RwLock::new(None);
+/// Why the file couldn't be read at startup, until a save replaces it.
+static LOAD_ERROR: RwLock<Option<String>> = RwLock::new(None);
 
 fn path() -> Option<PathBuf> {
     Some(config_dir()?.join(FILE))
@@ -123,9 +125,15 @@ pub fn load() {
         .unwrap_or(Ok(Settings::default()));
     let settings = settings.unwrap_or_else(|e| {
         eprintln!("lgtm: {e:#}");
+        *LOAD_ERROR.write().unwrap() = Some(format!("{e:#}"));
         Settings::default()
     });
     *CURRENT.write().unwrap() = Some(settings);
+}
+
+/// Why the file couldn't be read, while the defaults stand in for it.
+pub fn load_error() -> Option<String> {
+    LOAD_ERROR.read().unwrap().clone()
 }
 
 /// The current settings.
@@ -137,11 +145,22 @@ pub fn get() -> Settings {
 pub fn save(mut settings: Settings) -> anyhow::Result<()> {
     marks::normalize(&mut settings.marks);
     let path = path().context("no home directory")?;
-    std::fs::create_dir_all(path.parent().context("settings path has no parent")?)?;
-    std::fs::write(&path, toml::to_string(&settings)?)
-        .with_context(|| format!("write {}", path.display()))?;
+    write(&path, &settings, load_error().is_some())?;
+    *LOAD_ERROR.write().unwrap() = None;
     *CURRENT.write().unwrap() = Some(settings);
     Ok(())
+}
+
+/// Writes `settings` to `path`. With `backup`, copies the file there to `settings.toml.bak`
+/// first, so a file that couldn't be read isn't lost.
+fn write(path: &Path, settings: &Settings, backup: bool) -> anyhow::Result<()> {
+    std::fs::create_dir_all(path.parent().context("settings path has no parent")?)?;
+    if backup && path.exists() {
+        let bak = path.with_extension("toml.bak");
+        std::fs::copy(path, &bak).with_context(|| format!("back up to {}", bak.display()))?;
+    }
+    std::fs::write(path, toml::to_string(settings)?)
+        .with_context(|| format!("write {}", path.display()))
 }
 
 #[cfg(test)]
@@ -170,5 +189,16 @@ mod tests {
 
         std::fs::write(&file, "claud = \"cc\"\n").unwrap();
         assert!(load_from(&file).is_err());
+    }
+
+    #[test]
+    fn saving_over_a_file_that_failed_to_load_backs_it_up() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(FILE);
+        std::fs::write(&file, "claud = \"cc\"\n").unwrap();
+        write(&file, &Settings::default(), true).unwrap();
+        let bak = std::fs::read_to_string(dir.path().join("settings.toml.bak")).unwrap();
+        assert_eq!(bak, "claud = \"cc\"\n");
+        assert_eq!(load_from(&file).unwrap(), Settings::default());
     }
 }

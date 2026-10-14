@@ -108,6 +108,8 @@ pub struct ReviewFile {
     /// Each row's code, for text sent to agents.
     pub texts: Vec<String>,
     pub keyed: Vec<Keyed>,
+    /// See `fingerprint`.
+    pub fingerprint: i64,
     /// Matches a `skip` glob from the repo config.
     pub skipped: bool,
 }
@@ -216,6 +218,7 @@ pub fn build_file(
     };
     let file = ReviewFile {
         skipped: dto.skipped,
+        fingerprint: fingerprint(&d),
         texts: rows.clone().map(|r| r.text.clone()).collect(),
         status: d.status,
         path: d.path,
@@ -234,6 +237,18 @@ pub fn build_file(
         keyed,
     };
     (file, dto)
+}
+
+/// A hash of the parts of a file's diff that have no rows: its status, rename source, modes,
+/// and contents when binary. A check stays current only while this is unchanged.
+fn fingerprint(d: &FileDiff) -> i64 {
+    let blobs = d.binary.then_some(d.blobs.as_deref()).flatten();
+    let meta = format!(
+        "{:?} {:?} {} {} {:?}",
+        d.status, d.old_path, d.old_exec, d.new_exec, blobs
+    );
+    let digest = blake3::hash(meta.as_bytes());
+    i64::from_le_bytes(digest.as_bytes()[..8].try_into().unwrap())
 }
 
 fn key(

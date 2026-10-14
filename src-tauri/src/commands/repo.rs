@@ -40,10 +40,25 @@ pub(crate) fn set_word_wrap(app: AppHandle, on: bool) -> CmdResult<()> {
 }
 
 /// Closes this window without another close request, once the window has confirmed it.
+/// While quitting, it stays open until every window has.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn close_window(window: WebviewWindow) -> CmdResult<()> {
+    #[cfg(target_os = "macos")]
+    if crate::quit::confirmed(window.label()) {
+        return Ok(());
+    }
     window.destroy().map_err(|e| e.to_string())
+}
+
+/// The window cancelled its close, which stops a quit.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn keep_window(window: WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    crate::quit::cancelled(window.label());
+    #[cfg(not(target_os = "macos"))]
+    let _ = window;
 }
 
 /// The git repo containing `path` when it isn't a jj repo, so the start window can offer to init.
@@ -109,8 +124,12 @@ pub(crate) async fn check_tools() -> Vec<crate::tools::ToolProblem> {
 /// Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn mcp_status() -> CmdResult<crate::mcp::register::McpStatus> {
-    crate::mcp::register::status().map_err(err)
+pub(crate) async fn mcp_status() -> CmdResult<crate::mcp::register::McpStatus> {
+    // Resolving the Claude command can ask the login shell.
+    tokio::task::spawn_blocking(crate::mcp::register::status)
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(err)
 }
 
 /// Registers this app's `lgtm mcp` with Claude Code at user scope.

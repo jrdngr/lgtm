@@ -32,6 +32,8 @@ pub struct FileDiff {
     pub conflict: bool,
     pub old_exec: bool,
     pub new_exec: bool,
+    /// Abbreviated blob ids from the git `index` line, `old..new`.
+    pub blobs: Option<String>,
     pub hunks: Vec<Hunk>,
 }
 
@@ -142,6 +144,10 @@ fn file_diff(m: FileMeta, g: GitFileDiff) -> FileDiff {
         conflict: m.conflict,
         old_exec: m.source_exec,
         new_exec: m.target_exec,
+        blobs: g.extended.iter().find_map(|l| {
+            let ids = l.strip_prefix("index ")?;
+            Some(ids.split(' ').next().unwrap_or(ids).to_string())
+        }),
         hunks: g.hunks,
     }
 }

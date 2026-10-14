@@ -38,6 +38,14 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     assert_eq!(listed[0].lines.as_deref(), Some("3"));
 
     assert!(ctx.agent_comment(None, "nope.rs", 1, 1, "x").is_err());
+    let Err(err) = ctx.agent_comment(None, "a.rs", 1, 1, "x") else {
+        panic!("a comment on unchanged lines was added");
+    };
+    assert!(
+        err.to_string().contains("nearest change is at line 2"),
+        "{err}"
+    );
+    assert_eq!(ctx.agent_comments(None).unwrap().len(), 1);
 }
 
 #[tokio::test]

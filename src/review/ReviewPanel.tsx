@@ -120,7 +120,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, place } = s;
   const changedCount = useMemo(
-    () => changedRows(files, lines, sel.start, sel.end).length,
+    () => changedRows(files, lines, sel.start, sel.end, true).length,
     [files, lines, sel],
   );
   const closeMenu = () => setMenu(undefined);

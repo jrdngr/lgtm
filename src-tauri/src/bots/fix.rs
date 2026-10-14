@@ -21,6 +21,17 @@ pub struct Fix {
     pub text: String,
     pub error: Option<String>,
     pub created_at: f64,
+    /// The run's `synthesis` when it started. Its synthesis ids name that synthesis's findings.
+    #[serde(default)]
+    pub synthesis: u32,
+}
+
+impl Fix {
+    /// Whether it took finding `id` of a run whose synthesis is `synthesis`. A synthesis id
+    /// from an earlier synthesis names a finding that's gone.
+    pub fn covers(&self, synthesis: u32, id: &str) -> bool {
+        (id.contains('#') || self.synthesis == synthesis) && self.findings.iter().any(|f| f == id)
+    }
 }
 
 /// What the fix agent is told. `findings` are the picked findings as markdown.
@@ -45,7 +56,7 @@ impl BotRun {
         let fixed = self
             .fixes
             .iter()
-            .any(|f| f.status == Status::Done && f.findings.iter().any(|f| f == id));
+            .any(|f| f.status == Status::Done && f.covers(self.synthesis, id));
         if fixed {
             "fixed"
         } else if self.dismissed.iter().any(|d| d == id) {
@@ -99,6 +110,7 @@ impl RepoCtx {
                 text: String::new(),
                 error: None,
                 created_at: now_ms() as f64,
+                synthesis: run.synthesis,
             });
             let idx = run.fixes.len() - 1;
             self.bots.begin_fix(id, idx);

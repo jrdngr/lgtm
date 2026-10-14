@@ -33,9 +33,10 @@ On first run, lgtm offers to register itself as an MCP server with Claude Code, 
 ## Commands
 
 ```sh
-lgtm [repo]     # open a repo, or the repo picker
-lgtm gc [repo]  # remove leftover workspace directories and forget workspaces whose directory is gone
-lgtm mcp        # the MCP server Claude Code starts; you don't run it yourself
+lgtm [repo]               # open a repo, or the repo picker
+lgtm gc [--force] [repo]  # remove leftover workspace directories, forget workspaces whose directory is gone
+                          # (workspaces whose repo can't be found are kept unless --force)
+lgtm mcp                  # the MCP server Claude Code starts; you don't run it yourself
 ```
 
 ## Develop

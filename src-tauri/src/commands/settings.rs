@@ -15,6 +15,13 @@ pub(crate) fn get_settings() -> Settings {
     settings::get()
 }
 
+/// Why `settings.toml` couldn't be read, while the defaults stand in for it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn settings_load_error() -> Option<String> {
+    settings::load_error()
+}
+
 /// Saves the settings and tells every window.
 #[tauri::command]
 #[specta::specta]

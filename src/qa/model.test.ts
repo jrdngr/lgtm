@@ -31,6 +31,7 @@ function session(over: Partial<Session> = {}): Session {
     prompt: "Add templates",
     attach: [],
     queue: { effects: [], questions: [] },
+    asked: false,
     note: "",
     plan: null,
     applied: null,
@@ -51,6 +52,7 @@ describe("step", () => {
     );
     const decided = [question("Q1", "decided", 1, 0), question("Q2", "dropped")];
     expect(step(session({ queue: { effects: [], questions: decided } }))).toBe("apply");
+    expect(step(session({ asked: true }))).toBe("apply");
   });
 });
 

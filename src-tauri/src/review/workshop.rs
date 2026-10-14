@@ -27,9 +27,9 @@ put its full text in a fenced code block tagged `comment`.";
 const EDIT: &str = "\n\nEdit the files directly and change only what's needed. Then say in a \
 sentence or two what you changed.";
 
-/// One workshop turn. A change asks the agent to edit the code, as the message says or, when
-/// it's empty, as the comment says.
-fn prompt(review: &str, c: &Comment, ask: &Ask) -> String {
+/// One workshop turn, with the intro when it's `first` in its session. A change asks the agent
+/// to edit the code, as the message says or, when it's empty, as the comment says.
+fn prompt(review: &str, c: &Comment, ask: &Ask, first: bool) -> String {
     let (message, change) = (&ask.message, ask.change);
     let draft = if ask.draft.trim().is_empty() {
         "(empty)"
@@ -42,7 +42,7 @@ fn prompt(review: &str, c: &Comment, ask: &Ask) -> String {
         (true, false) => format!("Make this change: {message}{EDIT}"),
     };
     let turn = format!("Current draft of the comment:\n\n{draft}\n\n{ask}");
-    if c.workshop.session.is_some() {
+    if !first {
         return turn;
     }
     let thread = match &c.github {
@@ -91,26 +91,17 @@ impl RepoCtx {
         }
         // A change edits the working copy, which mustn't move under it.
         let _busy = ask.change.then(|| ws.claim()).transpose()?;
-        // A thread's chat works on its take and reply, under the reply rules.
-        let (thread, first) = {
+        let (thread, resume) = {
             let store = self.store.lock().unwrap();
             let c = store.comment(cid)?.context("the comment is gone")?;
-            (c.thread.is_some(), c.workshop.session.is_none())
+            (c.thread.is_some(), c.workshop.session)
         };
-        let intro = match thread && first {
-            true => {
-                let (_, context, rules) = self.replies_context(id).await?;
-                Some((context, rules))
-            }
-            false => None,
-        };
-        let (prompt, resume) = {
+        let prompt = self
+            .workshop_prompt(id, cid, &revset, ask, resume.is_none())
+            .await?;
+        {
             let store = self.store.lock().unwrap();
             let mut c = store.comment(cid)?.context("the comment is gone")?;
-            let prompt = match thread {
-                true => replies::chat_prompt(&c, ask, intro.as_ref()),
-                false => prompt(&revset, &c, ask),
-            };
             c.workshop.messages.push(Message {
                 author: Author::User,
                 text: ask.message.clone(),
@@ -118,30 +109,33 @@ impl RepoCtx {
                 updated: false,
             });
             store.set_workshop(cid, &c.workshop)?;
-            (prompt, c.workshop.session)
-        };
+        }
         let schema = thread.then(replies::chat_schema);
-        let reply = agent::run(
-            runs,
-            &self.workshop_key(comment),
-            agent::Task {
-                cwd: &ws.root,
-                prompt: &prompt,
-                resume: resume.as_deref(),
-                edit: ask.change,
-                schema: schema.as_deref(),
-                purpose: match thread {
-                    true => agent::Purpose::Replies,
-                    false => agent::Purpose::Ask,
-                },
+        let key = self.workshop_key(comment);
+        let task = |prompt, resume| agent::Task {
+            cwd: &ws.root,
+            prompt,
+            resume,
+            edit: ask.change,
+            schema: schema.as_deref(),
+            purpose: match thread {
+                true => agent::Purpose::Replies,
+                false => agent::Purpose::Ask,
             },
-            |p| {
-                if let agent::Progress::Text(t) = p {
-                    on_text(t)
-                }
-            },
-        )
-        .await;
+        };
+        let on = |p| {
+            if let agent::Progress::Text(t) = p {
+                on_text(t)
+            }
+        };
+        let mut reply = agent::run(runs, &key, task(&prompt, resume.as_deref()), &on).await;
+        // A session Claude Code no longer has starts over with the intro.
+        if resume.is_some() && reply.as_ref().err().is_some_and(agent::session_missing) {
+            reply = match self.workshop_prompt(id, cid, &revset, ask, true).await {
+                Ok(prompt) => agent::run(runs, &key, task(&prompt, None), &on).await,
+                Err(e) => Err(e),
+            };
+        }
         let text = match &reply {
             Ok(r) if r.stopped => format!("{} (stopped)", r.text.trim_end()),
             Ok(r) => r.text.clone(),
@@ -184,6 +178,39 @@ impl RepoCtx {
                 updated,
             });
             Ok(store.set_workshop(cid, &c.workshop)?)
+        })
+    }
+
+    /// The prompt for `ask` on comment `cid`. A thread's chat works on its take and reply,
+    /// under the reply rules.
+    async fn workshop_prompt(
+        &self,
+        id: u32,
+        cid: i64,
+        revset: &str,
+        ask: &Ask,
+        first: bool,
+    ) -> anyhow::Result<String> {
+        let thread = {
+            let store = self.store.lock().unwrap();
+            store
+                .comment(cid)?
+                .context("the comment is gone")?
+                .thread
+                .is_some()
+        };
+        let intro = match thread && first {
+            true => {
+                let (_, context, rules) = self.replies_context(id).await?;
+                Some((context, rules))
+            }
+            false => None,
+        };
+        let store = self.store.lock().unwrap();
+        let c = store.comment(cid)?.context("the comment is gone")?;
+        Ok(match thread {
+            true => replies::chat_prompt(&c, ask, intro.as_ref()),
+            false => prompt(revset, &c, ask, first),
         })
     }
 

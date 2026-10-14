@@ -1,7 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef } from "react";
 import { events } from "../bindings";
-import { dockOf } from "../workbench/docks";
+import { dockOf, revealPanel } from "../workbench/docks";
 import type { WorkspaceName } from "../workspaces/context";
 
 /** The Settings tab's sections, which panels can open it at. */
@@ -20,11 +20,8 @@ export function openSettings(workspace: WorkspaceName, section?: SettingsSection
   const api = dockOf(workspace);
   if (!api) return;
   const params: SettingsParams = { section, nonce: Date.now() };
-  const open = api.getPanel(ID);
-  if (open) {
-    open.api.updateParameters(params);
-    return open.api.setActive();
-  }
+  const open = revealPanel(workspace, ID);
+  if (open) return open.api.updateParameters(params);
   const active = api.activePanel;
   api.addPanel({
     id: ID,

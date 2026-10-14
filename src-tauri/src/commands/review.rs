@@ -51,6 +51,18 @@ pub(crate) async fn trunk_bookmark(
     ws.jj.trunk_bookmark().await.map_err(err)
 }
 
+/// The commit ids in `revset`, so the revisions panel can show what a range will review.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn revset_commits(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    revset: String,
+) -> CmdResult<Vec<String>> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    ws.jj.commit_ids(&revset).await.map_err(err)
+}
+
 /// Runs a revisions panel action in the workspace. Returns how many jj operations it took.
 #[tauri::command]
 #[specta::specta]

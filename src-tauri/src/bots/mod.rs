@@ -124,6 +124,9 @@ pub struct BotRun {
     /// Ids of findings the user dismissed.
     #[serde(default)]
     pub dismissed: Vec<String>,
+    /// Bumped each time synthesis is redone, which renumbers its findings.
+    #[serde(default)]
+    pub synthesis: u32,
     /// Whether it's running now. Only memory knows, so the stored value is ignored.
     #[serde(default)]
     pub active: bool,

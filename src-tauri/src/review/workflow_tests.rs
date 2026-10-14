@@ -55,6 +55,28 @@ async fn checked_file_unchecks_when_new_rows_arrive_and_they_turn_amber() {
 }
 
 #[tokio::test]
+async fn checked_file_unchecks_when_binary_contents_or_mode_change() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.sh", "echo a\n");
+    std::fs::write(d.join("img.bin"), b"\0one").unwrap();
+    jj(d, &["commit", "-m", "base"]);
+    write(d, "a.sh", "echo a\necho b\n");
+    std::fs::write(d.join("img.bin"), b"\0two").unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let paths: Vec<_> = review.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["a.sh", "img.bin"]);
+    let state = ctx.set_checked(review.id, &[0, 1], true).unwrap();
+    assert_eq!(state.checks, [CheckState::Checked; 2]);
+
+    std::fs::set_permissions(d.join("a.sh"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::write(d.join("img.bin"), b"\0three").unwrap();
+    let review = ctx.open(None, "@", false).await.unwrap();
+    assert_eq!(review.state.checks, [CheckState::ChangedSinceReviewed; 2]);
+}
+
+#[tokio::test]
 async fn whole_file_reviewed_marks_lines_and_checks_in_one_step() {
     let (dir, ctx) = repo();
     write(dir.path(), "a.go", "package a\n");

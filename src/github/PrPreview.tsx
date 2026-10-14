@@ -65,6 +65,11 @@ export function PrPreview({ params }: IDockviewPanelProps<{ url: string }>) {
               <PreviewThread key={t.link.thread} thread={t} where={t.path} />
             ))}
           </div>
+          {shown.diffError && (
+            <div className="review-error">
+              Diff unavailable, threads are listed above: {shown.diffError}
+            </div>
+          )}
           {shown.files.map((f) => (
             <PreviewFile key={f.path} file={f} />
           ))}

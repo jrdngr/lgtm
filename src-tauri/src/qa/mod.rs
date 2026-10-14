@@ -72,6 +72,9 @@ pub struct Session {
     pub attach: Vec<String>,
     #[serde(default)]
     pub queue: Queue,
+    /// The agent has turned the prompt into questions, even when it found none.
+    #[serde(default)]
+    pub asked: bool,
     /// Anything the user adds for the write.
     #[serde(default)]
     pub note: String,
@@ -155,6 +158,7 @@ impl RepoCtx {
             prompt: prompt.to_string(),
             attach,
             queue: Queue::default(),
+            asked: false,
             note: String::new(),
             plan: None,
             applied: None,

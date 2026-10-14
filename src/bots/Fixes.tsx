@@ -1,9 +1,16 @@
-import type { BotRun } from "../bindings";
+import type { BotRun, Fix } from "../bindings";
 import { commands } from "../ipc";
 import { Refs } from "./Closing";
 import { Markdown } from "./Markdown";
 
 const STATUS = { running: "Fixing…", done: "Done", failed: "Failed", stopped: "Stopped" };
+
+/** Whether `fix` took finding `id`. A synthesis id from an earlier synthesis names a finding
+ * that's gone. */
+export function covers(run: BotRun, fix: Fix, id: string) {
+  const current = id.includes("#") || (fix.synthesis ?? 0) === (run.synthesis ?? 0);
+  return current && fix.findings.includes(id);
+}
 
 /** Headless fixes of picked findings, newest first, each with the findings it took and the
  * agent's reply as it streams. */
@@ -15,7 +22,7 @@ export function Fixes({ run, onGo }: { run: BotRun; onGo(id: string): void }) {
         <section key={i} className={`bots-fix bots-fix-${f.status}`}>
           <div className="bots-fix-head">
             <span className="bots-fix-status">{STATUS[f.status]}</span>
-            <Refs ids={f.findings} onGo={onGo} />
+            <Refs ids={f.findings} onGo={onGo} gone={(id) => !covers(run, f, id)} />
             <span className="spacer" />
             {f.status === "running" && (
               <button type="button" onClick={() => commands.stopFix(run.id, i)}>

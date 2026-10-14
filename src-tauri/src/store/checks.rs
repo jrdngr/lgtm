@@ -11,11 +11,14 @@ pub struct FileCheck {
     /// Line hashes of the file's removed and added rows when it was checked.
     pub old_hashes: Vec<i64>,
     pub new_hashes: Vec<i64>,
+    /// The file's `ReviewFile::fingerprint` when it was checked. `None` on checks stored
+    /// before fingerprints were, which match any.
+    pub fingerprint: Option<i64>,
     pub review: String,
     pub created_at: i64,
 }
 
-const COLUMNS: &str = "id, path, old_hashes, new_hashes, review, created_at";
+const COLUMNS: &str = "id, path, old_hashes, new_hashes, review, created_at, fingerprint";
 
 fn row_to_check(r: &rusqlite::Row) -> rusqlite::Result<FileCheck> {
     Ok(FileCheck {
@@ -25,13 +28,14 @@ fn row_to_check(r: &rusqlite::Row) -> rusqlite::Result<FileCheck> {
         new_hashes: from_blob(&r.get::<_, Vec<u8>>(3)?),
         review: r.get(4)?,
         created_at: r.get(5)?,
+        fingerprint: r.get(6)?,
     })
 }
 
 pub(super) fn insert(tx: &Transaction, c: &FileCheck) -> rusqlite::Result<FileCheck> {
     tx.execute(
-        "INSERT INTO file_checks (id, path, old_hashes, new_hashes, review, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO file_checks (id, path, old_hashes, new_hashes, review, created_at, fingerprint)
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
         params![
             (c.id != 0).then_some(c.id),
             c.path,
@@ -39,6 +43,7 @@ pub(super) fn insert(tx: &Transaction, c: &FileCheck) -> rusqlite::Result<FileCh
             to_blob(&c.new_hashes),
             c.review,
             c.created_at,
+            c.fingerprint,
         ],
     )?;
     Ok(FileCheck {
@@ -70,6 +75,7 @@ mod tests {
             path: "a.rs".into(),
             old_hashes: vec![1],
             new_hashes: vec![2, 3],
+            fingerprint: Some(4),
             review: "r".into(),
             created_at: 5,
         };

@@ -3,7 +3,7 @@ import type { Fixed, ThreadDto, Verdict } from "../bindings";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { remembered } from "../workbench/remembered";
-import { canSend, planText, sendPlan } from "./stages";
+import { canSend, count, planText, sendPlan } from "./stages";
 
 const FIXED: [Fixed, string][] = [
   ["leave", "Leave as is"],
@@ -120,7 +120,12 @@ export function SendBox({ review, threads, repo, own, onSent, confirm }: Props) 
       {note && <div className="submit-note">{note}</div>}
       {confirming ? (
         <div className="send-confirm">
-          <span>{planText(plan) || (says ? "Your verdict" : "Nothing")} goes out.</span>
+          <span>
+            {planText(plan) || (says ? "Your verdict" : "Nothing")} goes out
+            {plan.fixed > 0
+              ? `; ${count(plan.fixed, "fixed thread moves", "fixed threads move")} to Done.`
+              : "."}
+          </span>
           <span className="spacer" />
           <button type="button" className="quiet" onClick={() => setConfirming(false)}>
             Cancel

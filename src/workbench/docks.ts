@@ -1,5 +1,7 @@
 import type { DockviewApi } from "dockview-react";
+import { flushSync } from "react-dom";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { bottom } from "./bottom";
 
 export type DockSlot = "main" | "bottom";
 
@@ -37,8 +39,28 @@ export function dockReady(workspace: WorkspaceName): Promise<DockviewApi> {
 
 export const bottomDockOf = (workspace: WorkspaceName) => docks.bottom.get(workspaceKey(workspace));
 
+/** The panel `id` in the workspace's main dock, or else its bottom dock. */
+const panelIn = (workspace: WorkspaceName, id: string) =>
+  dockOf(workspace)?.getPanel(id) ?? bottomDockOf(workspace)?.getPanel(id);
+
 /** Whether the panel `id` is in one of the workspace's docks, or the main dock isn't up yet. */
 export function inDock(workspace: WorkspaceName, id: string) {
-  const api = dockOf(workspace);
-  return !api || !!api.getPanel(id) || !!bottomDockOf(workspace)?.getPanel(id);
+  return !dockOf(workspace) || !!panelIn(workspace, id);
+}
+
+/** Whether the panel `id` is in one of the workspace's docks. */
+export const hasPanel = (workspace: WorkspaceName, id: string) => !!panelIn(workspace, id);
+
+/** Brings the panel `id` forward in whichever of the workspace's docks has it, showing the
+ * bottom panel when it's there. Returns the panel, or undefined when neither dock has it. */
+export function revealPanel(workspace: WorkspaceName, id: string) {
+  let panel = dockOf(workspace)?.getPanel(id);
+  if (!panel) {
+    panel = bottomDockOf(workspace)?.getPanel(id);
+    if (!panel) return undefined;
+    // Shown first, since a hidden dock can't lay out or focus the panel.
+    flushSync(() => bottom.set({ open: true }));
+  }
+  panel.api.setActive();
+  return panel;
 }

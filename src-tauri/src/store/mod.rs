@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS file_checks (
     old_hashes BLOB NOT NULL,
     new_hashes BLOB NOT NULL,
     review TEXT NOT NULL,
-    created_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    fingerprint INTEGER
 );
 CREATE INDEX IF NOT EXISTS file_checks_path ON file_checks (path);
 CREATE TABLE IF NOT EXISTS sessions (
@@ -138,7 +139,21 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
         )?;
     }
     migrate_autoincrement(db)?;
-    migrate_mark_colors(db)
+    migrate_mark_colors(db)?;
+    migrate_check_fingerprints(db)
+}
+
+/// Checks from before fingerprints were stored keep a null one.
+fn migrate_check_fingerprints(db: &Connection) -> rusqlite::Result<()> {
+    let has_fingerprint: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('file_checks') WHERE name = 'fingerprint'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_fingerprint {
+        db.execute_batch("ALTER TABLE file_checks ADD COLUMN fingerprint INTEGER;")?;
+    }
+    Ok(())
 }
 
 /// Marks were once reviewed, skipped or flagged; those are now the colors they were drawn in.
@@ -210,6 +225,16 @@ impl Store {
         qa::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
+    }
+
+    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions and review sessions, so a new
+    /// workspace with its name starts empty.
+    pub fn forget_workspace(&mut self, name: &str) -> rusqlite::Result<()> {
+        let tx = self.db.transaction()?;
+        for table in ["bot_runs", "qa_sessions", "sessions"] {
+            tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
+        }
+        tx.commit()
     }
 
     /// Applies `edit` in one transaction. Added rows keep their ids when they have one (redo)

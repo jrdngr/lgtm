@@ -173,6 +173,35 @@ fn decisions(s: &Session) -> String {
         .join("\n")
 }
 
+/// The decisions for a turn that lists them, saying so when there are none.
+fn decided_list(s: &Session) -> String {
+    let d = decisions(s);
+    if d.is_empty() {
+        "- None: nothing needed deciding.".into()
+    } else {
+        d
+    }
+}
+
+/// The questions still open, as a paragraph telling the agent to leave them out of `what`.
+fn still_open(s: &Session, what: &str) -> String {
+    let open = s
+        .queue
+        .questions
+        .iter()
+        .filter(|q| q.state == QState::Open)
+        .map(|q| format!("- {} ({})", q.id, q.text.subject))
+        .collect::<Vec<_>>();
+    if open.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "These are still open; leave them out of the {what}:\n\n{}\n\n",
+            open.join("\n")
+        )
+    }
+}
+
 /// The files the user asked the agent to read first, as a line after the prompt.
 fn read_first(s: &Session) -> String {
     if s.attach.is_empty() {
@@ -200,11 +229,6 @@ fn context(s: &Session, with_decisions: bool) -> String {
         s.prompt.trim(),
         read_first(s)
     )
-}
-
-/// Whether `run` failed because Claude Code has no record of the session it resumed.
-fn session_missing(e: &anyhow::Error) -> bool {
-    format!("{e:#}").contains("No conversation found")
 }
 
 /// The plan as text, with the user's comments on it.
@@ -308,7 +332,7 @@ impl RepoCtx {
         )
         .await;
         // A session Claude Code no longer has starts over with the intro.
-        if session.is_some() && reply.as_ref().err().is_some_and(session_missing) {
+        if session.is_some() && reply.as_ref().err().is_some_and(agent::session_missing) {
             let prompt = first()?;
             reply = agent::run(runs, &key, task(&prompt), &on).await;
         }
@@ -365,6 +389,7 @@ impl RepoCtx {
                 }
                 s.queue = queue::Queue::default();
                 s.queue.add_round(questions);
+                s.asked = true;
                 s.plan = None;
                 s.sent = None;
                 s.applied = None;
@@ -448,9 +473,10 @@ impl RepoCtx {
             ),
             _ => (
                 format!(
-                    "Every question is decided:\n\n{}\n\n{}Plan the write by the planning \
+                    "These are decided:\n\n{}\n\n{}{}Plan the write by the planning \
                      rules. Don't edit files yet.",
-                    decisions(&s),
+                    decided_list(&s),
+                    still_open(&s, "plan"),
                     note_line(&s.note)
                 ),
                 true,
@@ -502,8 +528,9 @@ impl RepoCtx {
             .unwrap_or_default();
         let turn = format!(
             "Apply it now: write the changes the prompt and these decisions call for, by the \
-             applying rules.\n\n{}\n\n{}{plan}",
-            decisions(&s),
+             applying rules.\n\n{}\n\n{}{}{plan}",
+            decided_list(&s),
+            still_open(&s, "write"),
             note_line(&s.note)
         );
         let files = std::sync::Mutex::new(Vec::<String>::new());

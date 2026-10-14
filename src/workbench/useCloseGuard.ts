@@ -13,6 +13,7 @@ export function useCloseGuard() {
         // Closed by the backend once confirmed, which needs no window permission.
         e.preventDefault();
         if (await confirmAll()) await commands.closeWindow();
+        else await commands.keepWindow();
       }),
       events.switchRepo(win).listen(async () => {
         if (await confirmAll()) await commands.switchRepo();

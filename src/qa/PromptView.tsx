@@ -24,7 +24,7 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   const [path, setPath] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const locked = !!busy || !!d?.archived;
-  const asked = !!d?.queue.questions.length;
+  const asked = d?.asked || !!d?.queue.questions.length;
 
   useEffect(() => ref.current?.focus(), []);
 

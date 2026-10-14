@@ -363,6 +363,12 @@ kbd {
 }
 
 .toolbar .repo {
+  /* Ends before the centered revision field, which starts at 25%. */
+  min-width: 0;
+  max-width: calc(25% - 48px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 600;
   margin-right: 8px;
 }

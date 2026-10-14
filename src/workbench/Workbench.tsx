@@ -2,6 +2,7 @@ import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { onAnyReveal } from "../editor/reveal";
+import { confirmClose } from "../editor/unsaved";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
@@ -14,7 +15,7 @@ import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { BottomPanel } from "./BottomPanel";
 import { bottom } from "./bottom";
-import { bottomDockOf, dockOf } from "./docks";
+import { bottomDockOf, dockOf, revealPanel } from "./docks";
 import { bottomKey, chord } from "./keys";
 import { addTerminal, focusPanel, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
@@ -35,6 +36,10 @@ const shortcuts: Partial<Record<string, (api: DockviewApi) => void>> = {
   "Mod+]": (api) => api.moveToNext({ includePanel: true }),
   "Mod+[": (api) => api.moveToPrevious({ includePanel: true }),
 };
+
+/** Chords CodeMirror binds (select next occurrence, indent, delete line), left to it while an
+ * editor has focus. */
+const editorKeys = new Set(["Mod+D", "Mod+]", "Mod+[", "Mod+Shift+K"]);
 
 interface Mounted {
   name: WorkspaceName;
@@ -129,7 +134,14 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   useEffect(() => onAnyReveal(() => showView("right", "repo")));
 
+  /** Closes the focused dock's active tab, asking first about unsaved edits. */
+  async function closeTab() {
+    const panel = api()?.activePanel;
+    if (panel && (await confirmClose(selected, panel.id))) panel.api.close();
+  }
+
   const panelKeys: Partial<Record<string, () => void>> = {
+    "Mod+W": () => void closeTab(),
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
@@ -157,7 +169,9 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
-      const run = keyRef.current?.(bottomKey(e) ?? chord(e) ?? "");
+      const key = bottomKey(e) ?? chord(e) ?? "";
+      if (editorKeys.has(key) && (e.target as Element).closest?.(".cm-editor")) return;
+      const run = keyRef.current?.(key);
       if (!run) return;
       e.preventDefault();
       e.stopPropagation();
@@ -241,7 +255,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             state={sides.right}
             onChange={(right) => updateSide("right", () => right)}
             bodyRef={rightBody}
-            onOpenReport={(run) => withApi((a) => openReport(a, run.id))()}
+            onOpenReport={(run) => {
+              if (!revealPanel(selected, `report-${run.id}`))
+                withApi((a) => openReport(a, run.id))();
+            }}
             onHide={() => toggle("right")}
           />
         </WorkspaceContext.Provider>

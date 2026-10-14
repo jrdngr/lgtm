@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { dockOf } from "../workbench/docks";
+import { dockOf, hasPanel, revealPanel } from "../workbench/docks";
 import { openThreads } from "../workbench/panels";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
@@ -9,7 +9,7 @@ const listeners = new Map<string, Set<Listener>>();
 const waiting = new Map<string, number>();
 
 /** Whether the workspace has a Threads tab open. */
-export const threadsOpen = (workspace: WorkspaceName) => !!dockOf(workspace)?.getPanel("threads");
+export const threadsOpen = (workspace: WorkspaceName) => hasPanel(workspace, "threads");
 
 /** Opens the workspace's Threads tab, or brings it forward, with thread `id` focused. */
 export function showThread(workspace: WorkspaceName, id?: number) {
@@ -21,7 +21,7 @@ export function showThread(workspace: WorkspaceName, id?: number) {
     if (ls?.size) for (const l of ls) l(id);
     else waiting.set(key, id);
   }
-  openThreads(api);
+  if (!revealPanel(workspace, "threads")) openThreads(api);
 }
 
 /** Calls `onFocus` when something asks the Threads tab to focus a thread. */

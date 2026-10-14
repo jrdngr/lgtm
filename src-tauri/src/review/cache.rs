@@ -37,8 +37,8 @@ pub fn key(sides: &Sides, interdiff: bool, d: &FileDiff, config: &Config) -> Key
     field(config.source.as_bytes());
     field(
         format!(
-            "{:?} {} {} {} {}",
-            d.status, d.binary, d.conflict, d.old_exec, d.new_exec
+            "{:?} {} {} {} {} {:?}",
+            d.status, d.binary, d.conflict, d.old_exec, d.new_exec, d.blobs
         )
         .as_bytes(),
     );

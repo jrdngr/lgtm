@@ -38,6 +38,7 @@ impl RepoCtx {
             created_at: now_ms() as f64,
             fixes: vec![],
             dismissed: vec![],
+            synthesis: 0,
             active: false,
         };
         run.id = self.store.lock().unwrap().add_bot_run(&run)?;

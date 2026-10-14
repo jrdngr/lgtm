@@ -11,7 +11,7 @@ use crate::anchor::{self, Candidate, MarkRef, Side};
 use crate::diff::FileStatus;
 use crate::store::{FileCheck, Mark, Store};
 
-/// A file's check and whether it still covers every changed row.
+/// A file's check and whether it still covers every changed row and the file's fingerprint.
 #[derive(Clone)]
 pub struct MatchedCheck {
     pub check: FileCheck,
@@ -234,7 +234,8 @@ fn match_check(file: &ReviewFile, checks: &[FileCheck]) -> Option<MatchedCheck> 
         .filter(|c| c.path == file.path || Some(&c.path) == file.old_path.as_ref())
         .max_by_key(|c| (c.created_at, c.id))?;
     Some(MatchedCheck {
-        current: file.keyed.iter().all(|k| check_covers(check, k)),
+        current: file.keyed.iter().all(|k| check_covers(check, k))
+            && check.fingerprint.is_none_or(|f| f == file.fingerprint),
         check: check.clone(),
     })
 }

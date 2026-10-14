@@ -20,7 +20,7 @@ export const countable = (d: Session) => d.queue.questions.filter((q) => q.state
 
 /** Where the session is: the first step with something left to do. */
 export function step(d: Session): Step {
-  if (!d.queue.questions.length) return "prompt";
+  if (!d.asked && !d.queue.questions.length) return "prompt";
   if (openQuestions(d).length) return "questions";
   return "apply";
 }

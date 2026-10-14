@@ -58,8 +58,11 @@ pub struct PrPreviewDto {
     /// Conversation comments and review summaries, oldest first.
     pub posts: Vec<PostDto>,
     pub files: Vec<PreviewFileDto>,
-    /// Threads whose line isn't on the diff, like outdated ones.
+    /// Threads whose line isn't on the diff, like outdated ones. All of them when the diff
+    /// couldn't be had.
     pub elsewhere: Vec<PreviewThreadDto>,
+    /// Why `files` is empty when GitHub wouldn't give the diff, as for PRs over its size limits.
+    pub diff_error: Option<String>,
 }
 
 /// A file's path and, when it moved, where from. Deleted files keep their old path.
@@ -160,11 +163,20 @@ impl RepoCtx {
                 .2
             }
         };
-        let (info, d, diff) = tokio::try_join!(
-            github::pr::info(&repo, number),
-            github::threads::discussion(&repo, number),
+        let (meta, diff) = tokio::join!(
+            async {
+                tokio::try_join!(
+                    github::pr::info(&repo, number),
+                    github::threads::discussion(&repo, number),
+                )
+            },
             gh::pr_diff(&repo, number),
-        )?;
+        );
+        let (info, d) = meta?;
+        let (diff, diff_error) = match diff.and_then(|d| parse_git(&d)) {
+            Ok(diff) => (diff, None),
+            Err(e) => (Vec::new(), Some(format!("{e:#}"))),
+        };
         let name = repo.to_string();
         let threads = d
             .threads
@@ -172,7 +184,7 @@ impl RepoCtx {
             .map(|t| pulled(t, &name, number, &d.viewer))
             .filter(|t| !t.link.posts.is_empty())
             .collect();
-        let (files, elsewhere) = layout(parse_git(&diff)?, threads);
+        let (files, elsewhere) = layout(diff, threads);
         Ok(PrPreviewDto {
             number,
             repo: name,
@@ -185,6 +197,7 @@ impl RepoCtx {
             posts: posts(d.comments, d.reviews),
             files,
             elsewhere,
+            diff_error,
         })
     }
 }

@@ -20,8 +20,13 @@ export const commands = {
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
 	/**  Swaps this window for the start window. */
 	switchRepo: () => typedError<null, string>(__TAURI_INVOKE("switch_repo")),
-	/**  Closes this window without another close request, once the window has confirmed it. */
+	/**
+	 *  Closes this window without another close request, once the window has confirmed it.
+	 *  While quitting, it stays open until every window has.
+	 */
 	closeWindow: () => typedError<null, string>(__TAURI_INVOKE("close_window")),
+	/**  The window cancelled its close, which stops a quit. */
+	keepWindow: () => __TAURI_INVOKE<void>("keep_window"),
 	/**  Shows the window's saved Word Wrap setting as View > Word Wrap's check. */
 	setWordWrap: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_word_wrap", { on })),
 	loadLayout: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("load_layout", { workspace })),
@@ -63,6 +68,8 @@ export const commands = {
 	 *  presets. `None` when trunk has no bookmark.
 	 */
 	trunkBookmark: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("trunk_bookmark", { workspace })),
+	/**  The commit ids in `revset`, so the revisions panel can show what a range will review. */
+	revsetCommits: (workspace: string | null, revset: string) => typedError<string[], string>(__TAURI_INVOKE("revset_commits", { workspace, revset })),
 	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**
@@ -84,6 +91,8 @@ export const commands = {
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
 	/**  Saves the settings and tells every window. */
 	saveSettings: (settings: Settings) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
+	/**  Why `settings.toml` couldn't be read, while the defaults stand in for it. */
+	settingsLoadError: () => __TAURI_INVOKE<string | null>("settings_load_error"),
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
 	claudeCommand: (refresh: boolean) => typedError<ClaudeCommand, string>(__TAURI_INVOKE("claude_command", { refresh })),
 	toolStatus: () => __TAURI_INVOKE<ToolStatus[]>("tool_status"),
@@ -384,6 +393,8 @@ export type BotRun = {
 	fixes?: Fix[],
 	/**  Ids of findings the user dismissed. */
 	dismissed?: string[],
+	/**  Bumped each time synthesis is redone, which renumbers its findings. */
+	synthesis?: number,
 	/**  Whether it's running now. Only memory knows, so the stored value is ignored. */
 	active?: boolean,
 };
@@ -594,6 +605,8 @@ export type Fix = {
 	text: string,
 	error: string | null,
 	createdAt: number | null,
+	/**  The run's `synthesis` when it started. Its synthesis ids name that synthesis's findings. */
+	synthesis?: number,
 };
 
 /**  What happens to a ready thread with no reply: one that was fixed as asked. */
@@ -963,8 +976,13 @@ export type PrPreviewDto = {
 	/**  Conversation comments and review summaries, oldest first. */
 	posts: PostDto[],
 	files: PreviewFileDto[],
-	/**  Threads whose line isn't on the diff, like outdated ones. */
+	/**
+	 *  Threads whose line isn't on the diff, like outdated ones. All of them when the diff
+	 *  couldn't be had.
+	 */
 	elsewhere: PreviewThreadDto[],
+	/**  Why `files` is empty when GitHub wouldn't give the diff, as for PRs over its size limits. */
+	diffError: string | null,
 };
 
 export type PreviewFileDto = {
@@ -1238,6 +1256,8 @@ export type Session_Deserialize = {
 	/**  Paths the agent reads first, relative to the workspace root. */
 	attach?: string[],
 	queue?: Queue_Deserialize,
+	/**  The agent has turned the prompt into questions, even when it found none. */
+	asked?: boolean,
 	/**  Anything the user adds for the write. */
 	note?: string,
 	plan?: Plan | null,
@@ -1259,6 +1279,8 @@ export type Session_Serialize = {
 	/**  Paths the agent reads first, relative to the workspace root. */
 	attach: string[],
 	queue: Queue_Serialize,
+	/**  The agent has turned the prompt into questions, even when it found none. */
+	asked: boolean,
 	/**  Anything the user adds for the write. */
 	note: string,
 	plan: Plan | null,

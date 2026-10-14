@@ -151,6 +151,15 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     e.stopPropagation();
   }
 
+  if (!d.queue.questions.length && d.asked && busy?.kind !== "ask")
+    return (
+      <div className="qa-card">
+        <h2>Nothing to decide</h2>
+        <button type="button" className="primary" onClick={() => setView(ws, "apply")}>
+          On to Apply
+        </button>
+      </div>
+    );
   if (!d.queue.questions.length)
     return (
       <div className="placeholder">

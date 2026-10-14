@@ -1,4 +1,4 @@
-//! Workspaces. New ones live under `~/.local/share/lgtm/ws/<repo>/<workspace>`.
+//! Workspaces. New ones live under `~/.local/share/lgtm/ws/<repo>-<hash>/<workspace>`.
 
 pub mod gc;
 
@@ -88,14 +88,16 @@ pub fn under(path: &Path, base: &Path) -> bool {
 }
 
 impl RepoCtx {
-    /// The directory new workspaces of this repo go in.
+    /// The directory new workspaces of this repo go in, named for the repo plus a hash of its
+    /// path so same-named repos don't share it.
     fn workspace_dir(&self) -> anyhow::Result<PathBuf> {
         let name = self.root.file_name().context("repo root has no name")?;
+        let hash = blake3::hash(canon(&self.root).as_os_str().as_encoded_bytes()).to_hex();
         Ok(self
             .workspace_base
             .as_ref()
             .context("no home directory")?
-            .join(slug(&name.to_string_lossy())))
+            .join(format!("{}-{}", slug(&name.to_string_lossy()), &hash[..8])))
     }
 
     /// The workspace named `name`, `None` meaning the main one.
@@ -178,6 +180,8 @@ impl RepoCtx {
         }
         std::fs::create_dir_all(path.parent().unwrap())?;
         self.main.jj.workspace_add(name, &path, rev).await?;
+        // A workspace of this name forgotten some other way (`lgtm gc`, jj) left its history.
+        self.store.lock().unwrap().forget_workspace(name)?;
         self.list_workspaces().await?;
         Ok(path.join(SETUP).is_file())
     }
@@ -198,6 +202,9 @@ impl RepoCtx {
         // The workspace is forgotten already, so its PR goes even if its directory stays.
         for problem in self.forget_pr(name).await {
             eprintln!("lgtm: cleaning up after {name}: {problem}");
+        }
+        if let Err(e) = self.store.lock().unwrap().forget_workspace(name) {
+            eprintln!("lgtm: cleaning up after {name}: {e:#}");
         }
         if ours && ws.root.is_dir() {
             std::fs::remove_dir_all(&ws.root)

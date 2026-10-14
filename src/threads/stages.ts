@@ -76,7 +76,7 @@ export function sendPlan(threads: ThreadDto[], fixedAction: Fixed): SendPlan {
   };
 }
 
-const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+export const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** What a send does, as a short list: "3 replies, 1 new comment, resolve 2". */
 export function planText(p: SendPlan): string {

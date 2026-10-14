@@ -47,11 +47,11 @@ Notes from building M2:
 - Send a selection or comment to a terminal pane's prompt.
 
 Notes from building M3:
-- New workspaces go in `$XDG_DATA_HOME/lgtm/ws/<repo>/<workspace>`, falling back to `~/.local/share`. Names are limited to letters, digits, `.`, `_` and `-`.
+- New workspaces go in `$XDG_DATA_HOME/lgtm/ws/<repo>-<hash>/<workspace>`, falling back to `~/.local/share`. `<hash>` comes from the repo's path, so same-named repos don't collide. Names are limited to letters, digits, `.`, `_` and `-`.
 - `.lgtm/setup` runs in the new workspace's first terminal, so its output is visible, then the shell takes over. Terminals get `LGTM_ROOT` (the main workspace) and `LGTM_WORKSPACE`.
 - Each workspace mounts its own dock and saves its own layout. Docks of unselected workspaces stay mounted but hidden, so their terminals keep running.
 - Deleting a workspace forgets it and deletes its directory only when lgtm created it. Its commits stay.
-- `lgtm gc [repo]` removes workspace directories whose workspace was forgotten or whose repo is gone, and forgets workspaces whose directory is gone.
+- `lgtm gc [--force] [repo]` removes workspace directories whose workspace was forgotten, and forgets workspaces whose directory is gone. A workspace whose repo can't be found (moved, or on an unmounted volume) is kept unless `--force`.
 - Review sessions record their workspace. Marks made outside the main workspace record `<revset> in <workspace>` as their review.
 - The sidebar's progress is for the workspace's latest reviewed revset, or `@`.
 - Send to agent pastes into the workspace's last focused terminal, and only when its program has bracketed paste on, so a shell never runs the pasted lines. Comments come with M4.

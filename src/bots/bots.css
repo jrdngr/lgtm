@@ -705,6 +705,10 @@
   font-size: var(--fs-xs);
 }
 
+.finding-ref:disabled {
+  text-decoration: line-through;
+}
+
 /* The picked findings' actions, floating over the bottom so picking doesn't shift the list. */
 .bots-picked {
   position: absolute;

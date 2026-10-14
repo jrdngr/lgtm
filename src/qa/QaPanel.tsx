@@ -12,7 +12,7 @@ import "./qa.css";
 function status(d: Session) {
   const open = openQuestions(d).length;
   const all = countable(d).length;
-  if (!all) return "Not asked yet";
+  if (!all && !d.asked) return "Not asked yet";
   if (open) return `${all - open} of ${all} decided`;
   if (d.sent != null) return "Sent to a terminal";
   if (d.plan) return "Planned";

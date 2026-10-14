@@ -83,7 +83,7 @@ async fn gc_removes_forgotten_workspace_dirs_and_forgets_missing_ones() {
     let stray = base.path().join("other/stray");
     std::fs::create_dir_all(&stray).unwrap();
 
-    let log = gc::run(base.path(), &[dir.path().to_path_buf()]);
+    let log = gc::run(base.path(), &[dir.path().to_path_buf()], false);
     assert_eq!(log.len(), 3, "{log:#?}");
     assert!(dir_of("kept").exists());
     assert!(!dir_of("forgotten").exists());
@@ -97,4 +97,83 @@ async fn gc_removes_forgotten_workspace_dirs_and_forgets_missing_ones() {
         .collect();
     assert_eq!(names.len(), 2, "{names:?}");
     assert!(names.contains(&"kept".to_string()));
+}
+
+#[tokio::test]
+async fn gc_keeps_a_workspace_whose_repo_moved_unless_forced() {
+    let parent = tempfile::tempdir().unwrap();
+    let (dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    ctx.create_workspace("t1").await.unwrap();
+    let ws = ctx.workspace(Some("t1")).await.unwrap().root.clone();
+    std::fs::rename(dir.path(), parent.path().join("moved")).unwrap();
+
+    let log = gc::run(base.path(), &[], false);
+    assert!(ws.is_dir(), "{log:#?}");
+    gc::run(base.path(), &[], true);
+    assert!(!ws.exists());
+}
+
+#[tokio::test]
+async fn same_named_repos_can_have_same_named_workspaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = tempfile::tempdir().unwrap();
+    for parent in ["work", "oss"] {
+        let root = dir.path().join(parent).join("app");
+        std::fs::create_dir_all(&root).unwrap();
+        let init = std::process::Command::new("jj")
+            .args(["git", "init"])
+            .arg(&root)
+            .output()
+            .unwrap();
+        assert!(init.status.success());
+        let mut ctx = RepoCtx::new(
+            root.clone(),
+            Jj::new(&root),
+            crate::store::Store::in_memory(),
+        );
+        ctx.workspace_base = Some(base.path().to_path_buf());
+        ctx.create_workspace("fix").await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn a_recreated_workspace_starts_without_the_old_ones_history() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    ctx.create_workspace("t1").await.unwrap();
+    {
+        let store = ctx.store.lock().unwrap();
+        store.save_qa_session("t1", "q1", "{}").unwrap();
+        store.start_session("@", "t1", "@-", 0).unwrap();
+    }
+    ctx.delete_workspace("t1", || ()).await.unwrap();
+    ctx.create_workspace("t1").await.unwrap();
+
+    let store = ctx.store.lock().unwrap();
+    assert!(store.qa_sessions("t1").unwrap().is_empty());
+    assert_eq!(store.last_revset("t1").unwrap(), None);
+}
+
+#[tokio::test]
+async fn adding_a_taken_name_keeps_the_live_workspaces_history() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    let elsewhere = tempfile::tempdir().unwrap();
+    let t1 = elsewhere.path().join("t1");
+    ctx.main.jj.workspace_add("t1", &t1, "@").await.unwrap();
+    ctx.store
+        .lock()
+        .unwrap()
+        .save_qa_session("t1", "q1", "{}")
+        .unwrap();
+
+    assert!(ctx.create_workspace("t1").await.is_err());
+    assert_eq!(
+        ctx.store.lock().unwrap().qa_sessions("t1").unwrap().len(),
+        1
+    );
 }

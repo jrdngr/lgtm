@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use anyhow::{Context, ensure};
 use serde::Serialize;
 use specta::Type;
-use tokio::process::Command;
+
+use crate::settings;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -63,12 +64,15 @@ fn setup_in(config: &str, exe: &str) -> McpSetup {
 
 pub fn status() -> anyhow::Result<McpStatus> {
     let exe = exe()?;
+    let claude = settings::claude::status()
+        .resolved
+        .unwrap_or_else(|| "claude".into());
     let config = claude_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .unwrap_or_default();
     Ok(McpStatus {
         setup: setup_in(&config, &exe),
-        command: format!("claude mcp add -s user lgtm -- '{exe}' mcp"),
+        command: format!("{claude} mcp add -s user lgtm -- '{exe}' mcp"),
     })
 }
 
@@ -76,12 +80,12 @@ pub fn status() -> anyhow::Result<McpStatus> {
 pub async fn register() -> anyhow::Result<()> {
     let exe = exe()?;
     // Fails when there's nothing to remove, which is fine.
-    Command::new("claude")
+    settings::claude::command()?
         .args(["mcp", "remove", "-s", "user", "lgtm"])
         .output()
         .await
-        .context("couldn't run `claude`")?;
-    let out = Command::new("claude")
+        .context("couldn't run Claude Code")?;
+    let out = settings::claude::command()?
         .args(["mcp", "add", "-s", "user", "lgtm", "--", &exe, "mcp"])
         .output()
         .await?;

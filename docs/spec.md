@@ -48,7 +48,7 @@ Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, b
 
 ### Workspaces
 
-- New workspaces (`jj workspace add`) go under `~/.local/share/lgtm/ws/<repo>/<workspace>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace is listed too.
+- New workspaces (`jj workspace add`) go under `~/.local/share/lgtm/ws/<repo>-<hash>/<workspace>`. The path has no spaces, so Makefiles and shell tools work. The repo's main workspace is listed too.
 - "New workspace" runs `jj workspace add -r trunk()`, then opens a terminal there that runs the repo's `.lgtm/setup` script if present.
 - The sidebar switches between workspaces. Each has its own panes and layout. Switching hides the other workspaces' panes; their terminals keep running.
 - The default review target is `@`. The review bar shows the target as jj colors it. The revisions panel shows `jj log` as the user has it configured. Picking one commit or a range, or typing a revset, sets the review. It also edits a commit, adds a new one before or after it, squashes it into its parent, and undoes or redoes, and the review follows `@`.
@@ -152,7 +152,7 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 - File status is separate from line marks. Checking never changes line marks, and unchecking restores them exactly.
 - Other colors on a whole-file selection apply to its lines. Files have no status but checked, and other colors never collapse a file.
 - When every changed line in a file is done, its checkbox gets an accent ring. It is never checked automatically.
-- Checking stores the anchors of the file's changed rows at that moment. If later changes bring in rows outside that set, the file unchecks itself, expands, and its header shows "changed since reviewed". The new rows are amber. A rebase that doesn't change the code keeps it checked.
+- Checking stores the anchors of the file's changed rows at that moment. It also stores the file's status, rename source, exec bits, and binary contents. If later changes bring in rows outside that set or change any of those, the file unchecks itself, expands, and its header shows "changed since reviewed". New rows are amber. A rebase that doesn't change the code keeps it checked.
 - Files matching `skip` globs in `.lgtm/config.toml` (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
 - Any file can be collapsed or expanded with its collapse button regardless of status.
 

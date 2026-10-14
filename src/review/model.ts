@@ -6,8 +6,9 @@ export type ViewMode = "unified" | "split";
 
 /** One line of the rendered review. */
 export type DisplayLine =
-  | { kind: "file"; file: number }
-  | { kind: "hunk"; file: number; hunk: number }
+  /** `folded`: the rows a collapse hides that would otherwise show. */
+  | { kind: "file"; file: number; folded?: number[] }
+  | { kind: "hunk"; file: number; hunk: number; folded?: number[] }
   | {
       kind: "rows";
       file: number;
@@ -81,9 +82,14 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
       needsReview(f.rows[r]) && rowMatches(rowState(file, r), filter, done);
     // A change's removed rows show with its added rows.
     const shown = (r: number) => filter === "all" || matches(r) || addedMatch(f.rows, r, matches);
+    const shownIn = (from: number, to: number) =>
+      Array.from({ length: to - from }, (_, i) => from + i).filter(shown);
     if (filter !== "all" && !f.rows.some((_, r) => shown(r))) return;
+    if (layout.collapsedFiles.has(f.dto.path)) {
+      out.push({ kind: "file", file, folded: shownIn(0, f.rows.length) });
+      return;
+    }
     out.push({ kind: "file", file });
-    if (layout.collapsedFiles.has(f.dto.path)) return;
     for (const comment of layout.comments?.get(fileSlot(file)) ?? [])
       out.push({ kind: "comment", file, hunk: -1, comment });
     for (const note of layout.notes?.get(fileSlot(file)) ?? [])
@@ -96,8 +102,11 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
       let any = false;
       for (let r = hunkStart; r < end && !any; r++) any = shown(r);
       if (!any && filter !== "all") return;
+      if (layout.collapsedHunks.has(hunkKey(f.dto.path, hunk))) {
+        out.push({ kind: "hunk", file, hunk, folded: shownIn(hunkStart, end) });
+        return;
+      }
       out.push({ kind: "hunk", file, hunk });
-      if (layout.collapsedHunks.has(hunkKey(f.dto.path, hunk))) return;
       // Alternate runs of shown rows and gaps.
       let r = hunkStart;
       while (r < end) {
@@ -270,18 +279,21 @@ export interface Addr {
   row: number;
 }
 
-/** Changed rows on display lines `start..=end`, in display order. */
+/** Changed rows on display lines `start..=end`, in display order. `folded` also takes the rows
+ * collapsed under a file or hunk header. */
 export function changedRows(
   files: FlatFile[],
   lines: DisplayLine[],
   start: number,
   end: number,
+  folded = false,
 ): Addr[] {
   const out: Addr[] = [];
   for (let i = start; i <= end; i++) {
     const line = lines[i];
-    if (line?.kind !== "rows") continue;
-    for (const row of line.rows) {
+    const rows =
+      line?.kind === "rows" ? line.rows : folded && line && "folded" in line ? line.folded : [];
+    for (const row of rows ?? []) {
       if (files[line.file].rows[row].kind !== "context") out.push({ file: line.file, row });
     }
   }

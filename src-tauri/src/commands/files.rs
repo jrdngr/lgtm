@@ -80,7 +80,9 @@ fn confined(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 }
 
 /// Kinds of file that `open` runs rather than shows, which a checked-out PR could carry.
-const RUNNABLE: [&str; 7] = ["app", "command", "terminal", "tool", "workflow", "pkg", "scpt"];
+const RUNNABLE: [&str; 7] = [
+    "app", "command", "terminal", "tool", "workflow", "pkg", "scpt",
+];
 
 /// Makes an empty file, or a folder when `dir`.
 #[tauri::command]
@@ -142,7 +144,9 @@ pub(crate) async fn reveal_path(
         .and_then(|e| e.to_str())
         .is_some_and(|e| RUNNABLE.contains(&e.to_ascii_lowercase().as_str()));
     if open && runs {
-        return Err(format!("{path} would run as a program; use Reveal in Finder instead"));
+        return Err(format!(
+            "{path} would run as a program; use Reveal in Finder instead"
+        ));
     }
     let mut cmd = tokio::process::Command::new("open");
     if !open {

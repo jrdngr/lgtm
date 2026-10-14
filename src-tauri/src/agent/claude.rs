@@ -58,6 +58,8 @@ pub enum Line {
     TextStart,
     /// A tool call, summed up like "Read src/a.rs".
     Tool(String),
+    /// The run's session, given as it starts.
+    Session(String),
     /// The run finished. `text` is the final reply, or the error.
     Done {
         text: String,
@@ -113,6 +115,10 @@ pub fn parse(line: &str) -> Line {
                 structured: v.get("structured_output").filter(|s| !s.is_null()).cloned(),
             }
         }
+        Some("system") if str_at("/subtype") == Some("init") => match str_at("/session_id") {
+            Some(id) => Line::Session(id.to_string()),
+            None => Line::Other,
+        },
         _ => Line::Other,
     }
 }
@@ -159,7 +165,8 @@ mod tests {
         assert_eq!(parse(tool), Line::Tool("Read src/a.rs".into()));
         let failed = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["boom"],"session_id":"s1"}"#;
         assert!(matches!(parse(failed), Line::Done { error: true, text, .. } if text == "boom"));
-        assert_eq!(parse(r#"{"type":"system","subtype":"init"}"#), Line::Other);
+        let init = r#"{"type":"system","subtype":"init","session_id":"s1","tools":[]}"#;
+        assert_eq!(parse(init), Line::Session("s1".into()));
         assert_eq!(parse("not json"), Line::Other);
     }
 }

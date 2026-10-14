@@ -9,14 +9,7 @@ use super::{same_path, under};
 use crate::jj::workspace::{
     bookmark_delete_blocking, bookmarks_blocking, forget_blocking, workspaces_blocking,
 };
-
-/// The main workspace root of the repo a workspace directory belongs to, from the path in its
-/// `.jj/repo` file. `None` when it isn't a workspace or its repo is gone.
-fn main_root(dir: &Path) -> Option<PathBuf> {
-    let link = std::fs::read_to_string(dir.join(".jj/repo")).ok()?;
-    let store = dir.join(".jj").join(link.trim()).canonicalize().ok()?;
-    Some(store.parent()?.parent()?.to_path_buf())
-}
+use crate::repo::main_root;
 
 fn remove(dir: &Path, why: &str, log: &mut Vec<String>) {
     match std::fs::remove_dir_all(dir) {
@@ -55,14 +48,24 @@ fn clean_prs(root: &Path, log: &mut Vec<String>) {
 }
 
 /// Cleans up `base` (laid out `<repo>/<workspace>`). `repos` are main workspace roots to check
-/// for forgotten directories as well as the ones found under `base`. Returns what it did.
-pub fn run(base: &Path, repos: &[PathBuf]) -> Vec<String> {
+/// for forgotten directories as well as the ones found under `base`. A workspace whose repo
+/// can't be found (moved, or on an unmounted volume) is kept unless `force`. Returns what it did.
+pub fn run(base: &Path, repos: &[PathBuf], force: bool) -> Vec<String> {
     let mut log = Vec::new();
     let mut roots: BTreeSet<PathBuf> = repos.iter().cloned().collect();
     for repo_dir in subdirs(base) {
         for dir in subdirs(&repo_dir) {
             let Some(root) = main_root(&dir) else {
-                remove(&dir, "its repo is gone", &mut log);
+                if !dir.join(".jj").exists() {
+                    remove(&dir, "it isn't a workspace", &mut log);
+                } else if force {
+                    remove(&dir, "its repo can't be found", &mut log);
+                } else {
+                    log.push(format!(
+                        "skipped {}: its repo can't be found (--force removes it)",
+                        dir.display()
+                    ));
+                }
                 continue;
             };
             match workspaces_blocking(&root) {
@@ -107,20 +110,23 @@ pub fn run(base: &Path, repos: &[PathBuf]) -> Vec<String> {
     log
 }
 
-/// Entry point for `lgtm gc [repo]`. Also checks the repo containing the current directory.
+/// Entry point for `lgtm gc [--force] [repo]`. Also checks the repo containing the current
+/// directory.
 pub fn main(args: &[String]) -> i32 {
     let Some(base) = super::ws_base() else {
         eprintln!("lgtm gc: no home directory");
         return 1;
     };
     let cwd = std::env::current_dir().unwrap_or_default();
+    let force = args.iter().any(|a| a == "--force");
     let repos: Vec<PathBuf> = args
         .iter()
+        .filter(|a| *a != "--force")
         .map(|a| cwd.join(a))
         .chain([cwd.clone()])
         .filter_map(|p| crate::repo::find_root(&p))
         .collect();
-    let log = run(&base, &repos);
+    let log = run(&base, &repos, force);
     if log.is_empty() {
         println!("lgtm gc: nothing to clean up in {}", base.display());
     }
