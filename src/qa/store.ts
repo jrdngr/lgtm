@@ -51,7 +51,7 @@ const watchers = new Map<string, { count: number; stop(): void }>();
 
 const BUSY_NAMES: Record<BusyKind, string> = {
   ask: "Building the questions",
-  answer: "Updating the open questions",
+  answer: "Updating dependent questions",
   discuss: "Discussing",
   reask: "Rewriting the question",
   plan: "Writing the plan",

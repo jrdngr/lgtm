@@ -25,6 +25,23 @@ export function step(d: Session): Step {
   return "apply";
 }
 
+/** Whether `q` is a subquestion of `parent`, like Q4a of Q4. */
+export const isSubOf = (q: string, parent: string) =>
+  q.startsWith(parent) && /^[a-z]$/.test(q.slice(parent.length));
+
+/** The open and decided questions an answer to `id` can change: the ones that list it, and
+ * its subquestions. */
+export const dependents = (d: Session, id: string) =>
+  d.queue.questions.filter(
+    (q) =>
+      q.id !== id &&
+      (q.state === "open" || q.state === "decided") &&
+      (q.depends.includes(id) || isSubOf(q.id, id)),
+  );
+
+/** The question to answer next: the first open one. Later ones can only be looked at. */
+export const head = (d: Session) => d.queue.questions.find((q) => q.state === "open");
+
 /** The question to show: `want` when it's still in the queue, else the first open one. */
 export function current(d: Session, want: string | undefined): Question | undefined {
   const qs = d.queue.questions;
@@ -32,7 +49,7 @@ export function current(d: Session, want: string | undefined): Question | undefi
   return wanted ?? qs.find((q) => q.state === "open");
 }
 
-/** The question decided most recently, for the ✅ line. */
+/** The question decided most recently, for undo. */
 export function lastDecided(d: Session): Question | undefined {
   let best: Question | undefined;
   for (const q of d.queue.questions) {
@@ -42,7 +59,16 @@ export function lastDecided(d: Session): Question | undefined {
   return best;
 }
 
-/** An answer in a few words, for the rail and the ✅ line. */
+/** What undo takes back: the latest decision or defer. */
+export function lastAction(d: Session): { id: string; defer: boolean } | undefined {
+  const decided = lastDecided(d);
+  const deferral = d.queue.deferrals.at(-1);
+  const at = decided?.answer?.at ?? -1;
+  if (deferral && (deferral.at ?? 0) > at) return { id: deferral.id, defer: true };
+  return decided && { id: decided.id, defer: false };
+}
+
+/** An answer in a few words. */
 export function answerLabel(q: Question): string {
   const a = q.answer;
   if (!a) return "";
@@ -80,6 +106,11 @@ export const decisionsText = (d: Session) =>
  * the plan. */
 export function applyText(d: Session): string {
   const parts = [d.prompt.trim(), `Decisions:\n${decisionsText(d)}`];
+  const deferred = d.queue.questions.filter((q) => q.state === "deferred");
+  if (deferred.length)
+    parts.push(
+      `Deferred, leave unimplemented: ${deferred.map((q) => `${q.id} (${q.text.subject})`).join(", ")}`,
+    );
   if (d.note.trim()) parts.push(`Also: ${d.note.trim()}`);
   if (d.plan) {
     const files = d.plan.files.map((f) => `- ${f.path} (${f.change}): ${f.edits.join("; ")}`);

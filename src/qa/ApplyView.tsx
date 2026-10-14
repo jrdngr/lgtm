@@ -32,6 +32,7 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
   const locked = !!busy || d.archived;
   const decided = d.queue.questions.filter((q) => q.state === "decided");
   const open = openQuestions(d).length;
+  const deferred = d.queue.questions.filter((q) => q.state === "deferred");
   const running = busy?.kind === "apply" || busy?.kind === "plan";
 
   useEffect(() => setNote(d.note), [d.note]);
@@ -84,6 +85,11 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
               </li>
             ))}
           </ul>
+          {deferred.length > 0 && (
+            <p className="faint">
+              Deferred, left unimplemented: {deferred.map((q) => q.id).join(", ")}
+            </p>
+          )}
           {decided.length > SHOWN && (
             <button type="button" className="quiet" onClick={() => setAll(!all)}>
               {all ? "Fewer ▴" : `${decided.length - SHOWN} more ▸`}

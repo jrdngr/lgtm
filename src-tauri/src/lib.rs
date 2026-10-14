@@ -147,6 +147,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::qa::apply_answer,
             commands::qa::discuss_question,
             commands::qa::reask_question,
+            commands::qa::defer_preview,
             commands::qa::write_plan,
             commands::qa::apply_qa,
             commands::qa::stop_qa,

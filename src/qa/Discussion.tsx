@@ -47,7 +47,7 @@ export function Discussion({ q, streaming, busy, onSend, onReask, onClose }: Pro
           {shownReply(streaming) ? (
             <MarkdownView text={shownReply(streaming)} />
           ) : (
-            <span className="faint">Thinking…</span>
+            <span className="qq-thinking">Thinking…</span>
           )}
         </div>
       )}

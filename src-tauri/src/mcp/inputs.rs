@@ -190,6 +190,13 @@ pub struct QaQuestion {
     /// Files you read to build the question.
     #[serde(default)]
     pub sources: Vec<String>,
+    /// Ids of questions whose answers could change this one; leave it empty when none could.
+    /// Questions in this call are numbered in the order given, on from the session's last
+    /// number (Q1, Q2, ... in a new session), with subquestions lettered under the question
+    /// before them (Q2a, Q2b). lgtm moves each question after the ones it depends on, so
+    /// the returned ids can differ.
+    #[serde(default)]
+    pub depends: Vec<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

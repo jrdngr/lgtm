@@ -1,7 +1,7 @@
 import type { AnswerInput, SessionEdit } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
-import type { Session } from "./model";
+import { dependents, type Session } from "./model";
 import { act, removeSession, runStep, selectSession, setError, setView } from "./store";
 
 /** Decides question `id`, then has the agent update the questions still open. */
@@ -12,10 +12,31 @@ export async function decide(ws: WorkspaceName, d: Session, id: string, answer: 
   return true;
 }
 
-/** Has the agent update the questions still open after `id` was decided. */
+/** Each session's last queued update, so updates run one at a time in one conversation. */
+const updates = new Map<string, Promise<unknown>>();
+
+/** Has the agent update the questions that depend on `id` after it was decided. Nothing runs
+ * when none do. Updates queue behind the one running. */
 export function updateAfter(ws: WorkspaceName, d: Session, id: string) {
-  return runStep(ws, d.id, { kind: "answer", about: id, subject: `${d.title}: after ${id}` }, () =>
-    commands.applyAnswer(ws, d.id, id),
+  if (!dependents(d, id).length) return;
+  const run = () =>
+    runStep(ws, d.id, { kind: "answer", about: id, subject: `${d.title}: after ${id}` }, () =>
+      commands.applyAnswer(ws, d.id, id),
+    );
+  const next = (updates.get(d.id) ?? Promise.resolve()).then(run, run);
+  updates.set(d.id, next);
+  return next;
+}
+
+/** Asks the agent to explain option `option` of question `id`, in its discussion. */
+export function explain(ws: WorkspaceName, d: Session, id: string, option: number) {
+  const q = d.queue.questions.find((x) => x.id === id);
+  const label = q?.text.options[option]?.label ?? "";
+  return discuss(
+    ws,
+    d,
+    id,
+    `Explain option ${option + 1} (${label}) in more detail: what it means here, how the context bears on it, and what it costs. Don't decide anything.`,
   );
 }
 

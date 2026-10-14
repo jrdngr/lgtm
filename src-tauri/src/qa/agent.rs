@@ -1,6 +1,7 @@
 //! The agent steps of a Q&A session: building the questions from the prompt, applying each
-//! answer to the open questions, writing a plan, and applying the decisions to the repo.
-//! Discussing a question is in `discuss`. Every step continues one conversation per session.
+//! answer to the questions that depend on it, writing a plan, and applying the decisions to
+//! the repo. Discussing a question is in `discuss`. Every step continues one conversation per
+//! session.
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -38,9 +39,10 @@ fn new_question() -> String {
       "properties": {{
         "sub": {{ "type": "boolean" }},
         {},
-        "sources": {{ "type": "array", "items": {{ "type": "string" }} }}
+        "sources": {{ "type": "array", "items": {{ "type": "string" }} }},
+        "depends": {{ "type": "array", "items": {{ "type": "string" }} }}
       }},
-      "required": ["sub", "subject", "context", "options", "why", "sources"],
+      "required": ["sub", "subject", "context", "options", "why", "sources", "depends"],
       "additionalProperties": false
     }}"#,
         question_props()
@@ -199,6 +201,22 @@ fn still_open(s: &Session, what: &str) -> String {
             "These are still open; leave them out of the {what}:\n\n{}\n\n",
             open.join("\n")
         )
+    }
+}
+
+/// The deferred questions, as a paragraph telling the agent to leave them unimplemented.
+fn deferred(s: &Session) -> String {
+    let put_off = s
+        .queue
+        .questions
+        .iter()
+        .filter(|q| q.state == QState::Deferred)
+        .map(|q| format!("{} ({})", q.id, q.text.subject))
+        .collect::<Vec<_>>();
+    if put_off.is_empty() {
+        String::new()
+    } else {
+        format!("Deferred, leave unimplemented: {}\n\n", put_off.join(", "))
     }
 }
 
@@ -398,7 +416,8 @@ impl RepoCtx {
         self.qa_session(ws, id)
     }
 
-    /// Applies the answer to `qid` to the open questions: drops, rewrites and new ones.
+    /// Applies the answer to `qid` to the questions that depend on it: drops, rewrites and
+    /// new ones. Skips the agent when nothing depends on it.
     pub async fn apply_answer(
         &self,
         ws: &Workspace,
@@ -408,23 +427,32 @@ impl RepoCtx {
     ) -> anyhow::Result<Session> {
         let q = self.qa_session(ws, id)?.queue;
         let answered = q.get(qid).with_context(|| format!("no question {qid}"))?;
-        let open: Vec<String> = q
-            .questions
-            .iter()
-            .filter(|o| o.state == QState::Open && o.id != qid)
-            .map(queue::question_text)
-            .collect();
-        if open.is_empty() {
+        let dependents = q.dependents(qid);
+        if dependents.is_empty() {
             return self.qa_session(ws, id);
         }
+        let listed: Vec<String> = dependents
+            .iter()
+            .map(|d| match d.state {
+                QState::Decided => format!(
+                    "Decided ({}):\n\n{}",
+                    queue::answer_text(d),
+                    queue::question_text(d)
+                ),
+                _ => format!("Open:\n\n{}", queue::question_text(d)),
+            })
+            .collect();
         let turn = format!(
-            "I answered {qid} ({}): {}.\n\nApply that to the open questions below. Drop the \
-             ones it settles, with why in a few words (\"settled by {qid}\"). Rewrite the ones \
-             it reshapes, saying in a few words what changed. Add any new decision it raises. \
-             Leave out questions it doesn't affect.\n\n{}",
+            "I answered {qid} ({}): {}.\n\nApply that to the questions below, which depend on \
+             it. Drop the open ones it settles, with why in a few words (\"settled by {qid}\"). \
+             Rewrite the ones it reshapes, saying in a few words what changed. Rewrite a decided \
+             one only if this answer means I have to answer it again. Add any new decision it \
+             raises, with its depends; new questions number on from Q{}. Leave out questions it \
+             doesn't change.\n\n{}",
             answered.text.subject,
             queue::answer_text(answered),
-            open.join("\n\n---\n\n")
+            q.last_number(),
+            listed.join("\n\n---\n\n")
         );
         let reply = self
             .qa_step(
@@ -472,10 +500,11 @@ impl RepoCtx {
             ),
             _ => (
                 format!(
-                    "These are decided:\n\n{}\n\n{}{}Plan the write by the planning \
+                    "These are decided:\n\n{}\n\n{}{}{}Plan the write by the planning \
                      rules. Don't edit files yet.",
                     decided_list(&s),
                     still_open(&s, "plan"),
+                    deferred(&s),
                     note_line(&s.note)
                 ),
                 true,
@@ -527,9 +556,10 @@ impl RepoCtx {
             .unwrap_or_default();
         let turn = format!(
             "Apply it now: write the changes the prompt and these decisions call for, by the \
-             applying rules.\n\n{}\n\n{}{}{plan}",
+             applying rules.\n\n{}\n\n{}{}{}{plan}",
             decided_list(&s),
             still_open(&s, "write"),
+            deferred(&s),
             note_line(&s.note)
         );
         let files = std::sync::Mutex::new(Vec::<String>::new());

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { QState } from "../bindings";
-import { applyText, current, type Question, qqText, type Session, shownReply, step } from "./model";
+import {
+  applyText,
+  current,
+  dependents,
+  lastAction,
+  type Question,
+  qqText,
+  type Session,
+  shownReply,
+  step,
+} from "./model";
 
 function question(id: string, state: QState, round = 1, option: number | null = null): Question {
   return {
@@ -16,6 +26,7 @@ function question(id: string, state: QState, round = 1, option: number | null = 
       why: "It's simplest.",
     },
     sources: [],
+    depends: [],
     state,
     answer: state === "decided" ? { option, note: null, other: null, at: 1 } : null,
     dropped: null,
@@ -30,7 +41,7 @@ function session(over: Partial<Session> = {}): Session {
     title: "T",
     prompt: "Add templates",
     attach: [],
-    queue: { effects: [], questions: [] },
+    queue: { effects: [], deferrals: [], questions: [] },
     asked: false,
     note: "",
     plan: null,
@@ -47,11 +58,13 @@ function session(over: Partial<Session> = {}): Session {
 describe("step", () => {
   it("goes from the prompt through questions to Apply", () => {
     expect(step(session())).toBe("prompt");
-    expect(step(session({ queue: { effects: [], questions: [question("Q1", "open")] } }))).toBe(
-      "questions",
-    );
+    expect(
+      step(session({ queue: { effects: [], deferrals: [], questions: [question("Q1", "open")] } })),
+    ).toBe("questions");
     const decided = [question("Q1", "decided", 1, 0), question("Q2", "dropped")];
-    expect(step(session({ queue: { effects: [], questions: decided } }))).toBe("apply");
+    expect(step(session({ queue: { effects: [], deferrals: [], questions: decided } }))).toBe(
+      "apply",
+    );
     expect(step(session({ asked: true }))).toBe("apply");
   });
 });
@@ -60,6 +73,7 @@ describe("current", () => {
   const d = session({
     queue: {
       effects: [],
+      deferrals: [],
       questions: [
         question("Q1", "decided", 1, 0),
         question("Q2", "dropped"),
@@ -102,7 +116,11 @@ describe("qqText", () => {
 describe("applyText", () => {
   it("carries the decisions, the note, the plan and its comments", () => {
     const d = session({
-      queue: { effects: [], questions: [question("Q1", "decided", 1, 1), question("Q2", "open")] },
+      queue: {
+        effects: [],
+        deferrals: [],
+        questions: [question("Q1", "decided", 1, 1), question("Q2", "open")],
+      },
       note: " Keep it small ",
       plan: {
         files: [{ path: "a.rs", change: "edit", edits: ["Load", "Save"], decisions: ["Q1"] }],
@@ -128,5 +146,33 @@ describe("shownReply", () => {
     expect(shownReply("Fair.\n<rew")).toBe("Fair.\n");
     expect(shownReply("Going with 2.\n<deci")).toBe("Going with 2.\n");
     expect(shownReply("a < b")).toBe("a < b");
+  });
+});
+
+describe("dependents", () => {
+  it("are the open and decided questions that list it, and its subquestions", () => {
+    const listing = (q: Question, ...depends: string[]) => ({ ...q, depends });
+    const questions = [
+      question("Q1", "decided", 1, 0),
+      question("Q1a", "open"),
+      listing(question("Q2", "open"), "Q1"),
+      listing(question("Q3", "decided", 1, 1), "Q1"),
+      listing(question("Q4", "dropped"), "Q1"),
+      listing(question("Q5", "deferred"), "Q1"),
+      question("Q11", "open"),
+    ];
+    const d = session({ queue: { effects: [], deferrals: [], questions } });
+    expect(dependents(d, "Q1").map((q) => q.id)).toEqual(["Q1a", "Q2", "Q3"]);
+  });
+});
+
+describe("lastAction", () => {
+  it("is whichever came last of a decision and a defer", () => {
+    const questions = [question("Q1", "decided", 1, 0), question("Q2", "deferred")];
+    const deferral = { id: "Q2", ids: ["Q2"], at: 5 };
+    const d = (at: number) =>
+      session({ queue: { effects: [], deferrals: [{ ...deferral, at }], questions } });
+    expect(lastAction(d(5))).toEqual({ id: "Q2", defer: true });
+    expect(lastAction(d(0.5))).toEqual({ id: "Q1", defer: false });
   });
 });

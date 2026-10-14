@@ -256,6 +256,8 @@ export const commands = {
 	discussQuestion: (workspace: string | null, session: string, id: string, message: string, onText: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("discuss_question", { workspace, session, id, message, onText })),
 	/**  Rewrites a question after its discussion. */
 	reaskQuestion: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, session, id })),
+	/**  The open questions deferring question `id` would also defer. */
+	deferPreview: (workspace: string | null, session: string, id: string) => typedError<string[], string>(__TAURI_INVOKE("defer_preview", { workspace, session, id })),
 	/**  Plans the write, or revises the plan with the comments on it. */
 	writePlan: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("write_plan", { workspace, session, onTool })),
 	/**  Writes the decisions into the workspace's @. */
@@ -432,14 +434,11 @@ export type Challenge = {
 	argument: string,
 };
 
-/**  A rewrite the user hasn't looked at yet. */
-export type Change = {
-	/**  What it was rewritten after: a question id, or "discussion". */
-	after: string,
-	/**  What changed, in a few words. */
-	what: string,
-	previous: QText,
-};
+/**
+ *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
+ *  yet.
+ */
+export type Change = Change_Serialize | Change_Deserialize;
 
 export type ChangeDto = {
 	changeId: string,
@@ -454,6 +453,34 @@ export type ChangeDto = {
 	empty: boolean,
 	description: string,
 	since: Since,
+};
+
+/**
+ *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
+ *  yet.
+ */
+export type Change_Deserialize = {
+	/**  What it was rewritten after: a question id, or "discussion". */
+	after: string,
+	/**  What changed, in a few words. */
+	what: string,
+	previous: QText,
+	/**  The answer it had before it reopened. */
+	answer?: Answer_Deserialize | null,
+};
+
+/**
+ *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
+ *  yet.
+ */
+export type Change_Serialize = {
+	/**  What it was rewritten after: a question id, or "discussion". */
+	after: string,
+	/**  What changed, in a few words. */
+	what: string,
+	previous: QText,
+	/**  The answer it had before it reopened. */
+	answer: Answer_Serialize | null,
 };
 
 export type CheckState = "unchecked" | "checked" | 
@@ -512,6 +539,14 @@ export type DefaultPersona = {
 	name: string,
 	description: string,
 	installed: Installed,
+};
+
+/**  The questions one defer put off: `id` and the open questions that depend on it. */
+export type Deferral = {
+	id: string,
+	ids: string[],
+	/**  When, in ms, so undo takes the latest of decisions and defers. */
+	at: number | null,
 };
 
 export type DiscussionDto = {
@@ -1033,7 +1068,9 @@ export type PromptInfo = {
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
-export type QState = "open" | "decided" | "dropped";
+export type QState = "open" | "decided" | 
+/**  Put off: resolved for the queue, and left out of the write. */
+"deferred" | "dropped";
 
 /**  What a question says. The first option is always the recommendation. */
 export type QText = {
@@ -1059,11 +1096,16 @@ export type QaQuestion_Deserialize = {
 	text: QText,
 	/**  Files the agent read to build it. */
 	sources?: string[],
+	/**
+	 *  Ids of questions whose answers could change this one. A subquestion also depends on
+	 *  its parent without listing it.
+	 */
+	depends?: string[],
 	state: QState,
 	answer?: Answer_Deserialize | null,
 	/**  Why it was dropped, like "settled by Q3". */
 	dropped?: string | null,
-	change?: Change | null,
+	change?: Change_Deserialize | null,
 	/**  A discussion that isn't a decision. */
 	discussion?: Turn[],
 };
@@ -1075,11 +1117,16 @@ export type QaQuestion_Serialize = {
 	text: QText,
 	/**  Files the agent read to build it. */
 	sources: string[],
+	/**
+	 *  Ids of questions whose answers could change this one. A subquestion also depends on
+	 *  its parent without listing it.
+	 */
+	depends: string[],
 	state: QState,
 	answer: Answer_Serialize | null,
 	/**  Why it was dropped, like "settled by Q3". */
 	dropped: string | null,
-	change: Change | null,
+	change: Change_Serialize | null,
 	/**  A discussion that isn't a decision. */
 	discussion: Turn[],
 };
@@ -1091,10 +1138,10 @@ export type Question = {
 
 /**  What can happen to a question without the agent. */
 export type QuestionAct = { kind: "decide"; id: string; answer: AnswerInput } | 
-/**  Reopens the last decision. */
+/**  Takes back the last decision or defer. */
 { kind: "undo" } | 
-/**  Moves it to the end of the queue. */
-{ kind: "later"; id: string } | 
+/**  Puts it off, with the open questions that depend on it. */
+{ kind: "defer"; id: string } | 
 /**  Opens a decided question to answer it again. */
 { kind: "reopen"; id: string } | 
 /**  The user saw what a rewrite changed. */
@@ -1106,12 +1153,16 @@ export type Queue_Deserialize = {
 	questions: QaQuestion_Deserialize[],
 	/**  What each answer's update did to the other questions, so undo can put them back. */
 	effects?: Effect_Deserialize[],
+	/**  Each defer, so undo can take it back in one step. */
+	deferrals?: Deferral[],
 };
 
 export type Queue_Serialize = {
 	questions: QaQuestion_Serialize[],
 	/**  What each answer's update did to the other questions, so undo can put them back. */
 	effects: Effect_Serialize[],
+	/**  Each defer, so undo can take it back in one step. */
+	deferrals: Deferral[],
 };
 
 export type QuickWin = {

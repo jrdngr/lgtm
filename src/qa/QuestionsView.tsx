@@ -4,12 +4,27 @@ import { commands } from "../ipc";
 import { GrowingText } from "../ui/GrowingText";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
-import { decide as decideQuestion, discuss as discussQuestion } from "./actions";
+import {
+  decide as decideQuestion,
+  discuss as discussQuestion,
+  explain as explainOption,
+} from "./actions";
+import { DeferModal } from "./DeferModal";
+import { Deps } from "./Deps";
 import { Discussion } from "./Discussion";
-import { answerLabel, countable, current, lastDecided, type Question, type Session } from "./model";
+import {
+  answerLabel,
+  countable,
+  current,
+  dependents,
+  head,
+  lastAction,
+  type Question,
+  type Session,
+} from "./model";
 import { QuestionCard } from "./QuestionCard";
 import { Rail } from "./Rail";
-import { act, type Busy, runStep, setView } from "./store";
+import { act, type Busy, runStep, setError, setView } from "./store";
 
 const isEditable = (t: EventTarget) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
@@ -25,8 +40,9 @@ interface Props {
   focusKey: number;
 }
 
-/** The session's open questions, one at a time in the qqueue template. Number keys pick an
- * option, ↵ decides it, and the agent then updates the questions still open. */
+/** The session's questions, one at a time in the qqueue template. The first open one is
+ * answered; later ones can be looked at with [ ]. Number keys pick an option, ↵ decides it,
+ * and the agent then updates the questions that depend on it. */
 export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const [want, setWant] = useState<string>();
   const [sel, setSel] = useState(0);
@@ -34,14 +50,23 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   const [note, setNote] = useState("");
   const [other, setOther] = useState("");
   const [showPrev, setShowPrev] = useState(false);
+  const [deferring, setDeferring] = useState<string[]>();
   const rootRef = useRef<HTMLDivElement>(null);
   const q = current(d, want);
-  const wanted = d.queue.questions.find((x) => x.id === want);
+  const next = head(d);
   const list = countable(d);
-  const prev = lastDecided(d);
-  /** The agent is changing the queue: answers wait for it. */
-  const locked = !!busy || d.archived;
-  const updating = busy?.kind === "answer" || busy?.kind === "reask";
+  const last = lastAction(d);
+  /** An open question past the one to answer: it can only be looked at. */
+  const ahead = q?.state === "open" && q.id !== next?.id;
+  /** The questions the running update may change, which wait for it. */
+  const updating = busy?.kind === "answer" && busy.about ? dependents(d, busy.about) : [];
+  const updatingIds = updating.map((x) => x.id);
+  /** Answers wait for an agent step, except while it updates other questions. */
+  const locked =
+    d.archived || (!!busy && (busy.kind !== "answer" || (!!q && updatingIds.includes(q.id))));
+  /** Another agent step can't start in the same conversation. */
+  const agentBusy = !!busy || d.archived;
+  const canAnswer = q?.state === "open" && !ahead && !locked;
 
   // Each question starts on its recommendation, with nothing being written.
   const qid = q?.id;
@@ -51,6 +76,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     setNote("");
     setOther("");
     setShowPrev(false);
+    setDeferring(undefined);
     void qid;
   }, [qid]);
 
@@ -68,8 +94,13 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
 
   const id = d.id;
 
+  function show(target: string | undefined) {
+    setWant(target);
+    focusRoot();
+  }
+
   async function decide(option: number | null, withNote?: string, otherText?: string) {
-    if (!q || locked || q.state !== "open") return;
+    if (!q || !canAnswer) return;
     const answer = { option, note: withNote?.trim() || null, other: otherText?.trim() || null };
     if (!(await decideQuestion(ws, d, q.id, answer))) return;
     setWant(undefined);
@@ -82,15 +113,30 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   }
 
   async function undo() {
-    if (!prev || locked) return;
+    if (!last || agentBusy) return;
     const r = await quick({ kind: "undo" });
-    if (r.status === "ok") setWant(prev.id);
+    if (r.status === "ok") setWant(last.id);
+  }
+
+  async function askDefer() {
+    if (!q || !canAnswer) return;
+    const r = await commands.deferPreview(ws, id, q.id);
+    if (r.status === "error") setError(ws, r.error);
+    else setDeferring(r.data);
+  }
+
+  async function defer() {
+    if (!q) return;
+    setDeferring(undefined);
+    await quick({ kind: "defer", id: q.id });
+    setWant(undefined);
+    focusRoot();
   }
 
   function browse(dir: 1 | -1) {
     const i = q ? list.findIndex((x) => x.id === q.id) : list.length;
-    const next = list[Math.min(Math.max(i + dir, 0), list.length - 1)];
-    if (next) setWant(next.id);
+    const to = list[Math.min(Math.max(i + dir, 0), list.length - 1)];
+    if (to) setWant(to.id);
   }
 
   async function discuss(message: string) {
@@ -98,6 +144,12 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     setWant(undefined);
     setMode(undefined);
     focusRoot();
+  }
+
+  function explain(option: number) {
+    if (!q || agentBusy) return;
+    setMode("discuss");
+    explainOption(ws, d, q.id, option);
   }
 
   function reask() {
@@ -111,30 +163,29 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   }
 
   function onKey(e: React.KeyboardEvent) {
-    if (isEditable(e.target) || !q) return;
+    if (isEditable(e.target) || !q || deferring) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod || e.altKey) return;
-    const isOpen = q.state === "open";
     // ↵ on a focused button or summary activates it rather than deciding.
     const onControl =
       e.target !== e.currentTarget && !!(e.target as Element).closest("button, summary, a");
     const n = Number(e.key);
-    if (n >= 1 && n <= q.text.options.length && isOpen && !locked) setSel(n - 1);
-    else if (e.key === "Enter" && isOpen && !onControl)
+    const canTalk = !ahead && q.state !== "dropped" && q.state !== "deferred";
+    if (n >= 1 && n <= q.text.options.length && canAnswer) setSel(n - 1);
+    else if (e.key === "Enter" && canAnswer && !onControl)
       decide(sel, mode === "note" ? note : undefined);
-    else if (e.key === "n" && isOpen && !locked) setMode("note");
-    else if (e.key === "o" && isOpen && !locked) setMode("other");
-    else if (e.key === "d") setMode("discuss");
-    else if (e.key === "s" && isOpen && !locked) {
-      quick({ kind: "later", id: q.id });
-      setWant(undefined);
-    } else if (e.key === "u" && prev && !locked) undo();
-    else if (e.key === "r" && q.state === "decided" && !locked) quick({ kind: "reopen", id: q.id });
+    else if (e.key === "n" && canAnswer) setMode("note");
+    else if (e.key === "o" && canAnswer) setMode("other");
+    else if (e.key === "d" && canTalk) setMode("discuss");
+    else if (e.key === "s" && canAnswer) askDefer();
+    else if (e.key === "u" && last && !agentBusy) undo();
+    else if (e.key === "r" && q.state === "decided" && !agentBusy)
+      quick({ kind: "reopen", id: q.id });
     else if (e.key === "p" && q.change) setShowPrev(!showPrev);
-    else if ((e.key === "j" || e.key === "ArrowDown") && isOpen && !locked)
+    else if ((e.key === "j" || e.key === "ArrowDown") && canAnswer)
       setSel(Math.min(sel + 1, q.text.options.length - 1));
-    else if ((e.key === "k" || e.key === "ArrowUp") && isOpen && !locked)
-      setSel(Math.max(sel - 1, 0));
+    else if ((e.key === "k" || e.key === "ArrowUp") && canAnswer) setSel(Math.max(sel - 1, 0));
+    else if (e.key === "Escape" && q.id !== next?.id && next) show(undefined);
     else if (e.key === "]") browse(1);
     else if (e.key === "[") browse(-1);
     else return;
@@ -170,84 +221,62 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     );
 
   const index = q ? list.findIndex((x) => x.id === q.id) : -1;
-  const hints: [string, string][] = [];
-  if (q?.state === "open" && !locked) {
-    const n = q.text.options.length;
-    hints.push(
-      [n > 1 ? `1–${n} ↑↓` : "1", "select"],
-      ["↵", "decide"],
-      ["n", "note"],
-      ["o", "other"],
-    );
-  }
-  if (q) hints.push(["d", "discuss"]);
-  if (q?.state === "open" && !locked) hints.push(["s", "later"]);
-  if (q?.state === "decided" && !locked) hints.push(["r", "change answer"]);
-  if (prev && !locked) hints.push(["u", "undo"]);
-  if (q?.change) hints.push(["p", showPrev ? "hide previous" : "show previous"]);
-  if (list.length > 1) hints.push(["[ ]", "browse"]);
+  const undoLabel = last && (last.defer ? "Undo defer" : `Undo ${last.id}`);
 
   return (
     <div ref={rootRef} className="qq" tabIndex={-1} onKeyDown={onKey}>
-      <Rail
-        questions={d.queue.questions}
-        current={q?.id}
-        updating={updating}
-        onPick={(id) => {
-          setWant(id);
-          focusRoot();
-        }}
-      />
+      <Rail questions={d.queue.questions} current={q} updating={updatingIds} onPick={show} />
       <div className="qq-main">
         {!q ? (
           <div className="qa-card">
-            <h2>All decided</h2>
+            <h2>All resolved</h2>
             <button type="button" className="primary" onClick={() => setView(ws, "apply")}>
               On to Apply
             </button>
           </div>
         ) : (
           <>
-            {prev && prev.id !== q.id && (
-              <div className="qq-prev">
-                ✅ {prev.id}: {answerLabel(prev)}
-              </div>
-            )}
-            {wanted?.state === "dropped" && (
-              <div className="qq-bar dropped">
-                {wanted.id} dropped: {wanted.dropped}
-              </div>
-            )}
-            <div className="qq-count">
-              Question {index + 1} of {list.length}
-              <span className="qq-dots">
-                {list.map((x) => (
-                  <span
-                    key={x.id}
-                    className={`qq-dot ${x.state}${x.id === q.id ? " current" : ""}`}
-                  />
-                ))}
+            <div className="qq-top">
+              <span className="qq-count">
+                Question {index + 1} of {list.length}
+                <span className="qq-dots">
+                  {list.map((x) => (
+                    <span key={x.id} className={dotClass(x, q, updatingIds)} />
+                  ))}
+                </span>
               </span>
             </div>
-            {updating && busy?.about && (
+            {ahead && next && <div className="qq-bar view">Blocked by {next.id}</div>}
+            {q.state === "deferred" && <div className="qq-bar deferred">Deferred</div>}
+            {updating.length > 0 && (
               <div className="qq-bar updating">
                 <span className="qa-spin" />
-                {busy.kind === "reask"
-                  ? `Rewriting ${busy.about} after your discussion`
-                  : `Updating the open questions after your answer to ${busy.about}`}
+                Updating {updatingIds.join(", ")}
               </div>
             )}
-            {q.change && !updating && (
-              <div className="qq-bar changed">
-                Changed after {q.change.after === "discussion" ? "your discussion" : q.change.after}
-                : {q.change.what}
-                <span className="spacer" />
-                <button type="button" className="quiet" onClick={() => setShowPrev(!showPrev)}>
+            {busy?.kind === "reask" && busy.about === q.id && (
+              <div className="qq-bar updating">
+                <span className="qa-spin" />
+                Rewriting {q.id}
+              </div>
+            )}
+            {q.change && q.state === "open" && (
+              <div className="qq-bar reopened">
+                <span>↺</span>
+                <span className="grow">
+                  Reopened after{" "}
+                  {q.change.after === "discussion" ? "discussion" : `${q.change.after} answer`}
+                </span>
+                <button
+                  type="button"
+                  className="qq-btn ghost"
+                  onClick={() => setShowPrev(!showPrev)}
+                >
                   {showPrev ? "Hide previous" : "Show previous"} <kbd>p</kbd>
                 </button>
                 <button
                   type="button"
-                  className="quiet"
+                  className="qq-btn ghost"
                   onClick={() => quick({ kind: "seen", id: q.id })}
                 >
                   Got it
@@ -256,12 +285,11 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
             )}
             {q.state === "decided" && (
               <div className="qq-bar decided">
-                Decided: {answerLabel(q)}
-                <span className="spacer" />
+                <span className="grow">Decided: {answerLabel(q)}</span>
                 <button
                   type="button"
-                  className="quiet"
-                  disabled={locked}
+                  className="qq-btn ghost"
+                  disabled={agentBusy}
                   onClick={() => quick({ kind: "reopen", id: q.id })}
                 >
                   Change answer <kbd>r</kbd>
@@ -271,13 +299,17 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
             <QuestionCard
               id={q.id}
               text={q.text}
-              before={q.change?.previous}
-              selected={q.state === "open" ? sel : undefined}
+              before={q.state === "open" ? q.change?.previous : undefined}
+              was={q.state === "open" ? q.change?.answer : undefined}
+              selected={canAnswer ? sel : undefined}
               decided={q.answer?.option}
-              locked={locked || q.state !== "open"}
-              className={updating && q.state === "open" ? "locked" : undefined}
+              locked={!canAnswer}
+              className={updatingIds.includes(q.id) ? "locked" : undefined}
               onSelect={setSel}
               onDecide={(i) => decide(i)}
+              onExplain={!ahead && !agentBusy && q.state !== "dropped" ? explain : undefined}
+              deps={<Deps d={d} q={q} onPick={show} />}
+              sources={<Sources ws={ws} q={q} />}
               under={(i) =>
                 mode === "note" &&
                 i === sel && (
@@ -305,43 +337,11 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
                 onKeyDown={(e) => onInputKey(e, () => other.trim() && decide(null, "", other))}
               />
             )}
-            {q.state === "open" && (
-              <div className="qq-actions">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={locked}
-                  onClick={() => decide(sel, mode === "note" ? note : undefined)}
-                >
-                  {sel === 0 ? "Take Recommended" : `Go with ${sel + 1}`} <kbd>↵</kbd>
-                </button>
-                <button type="button" disabled={locked} onClick={() => setMode("note")}>
-                  Note
-                </button>
-                <button type="button" disabled={locked} onClick={() => setMode("other")}>
-                  Other
-                </button>
-                <button type="button" onClick={() => setMode("discuss")}>
-                  Discuss
-                </button>
-                <button
-                  type="button"
-                  className="quiet"
-                  disabled={locked}
-                  onClick={() => {
-                    quick({ kind: "later", id: q.id });
-                    setWant(undefined);
-                  }}
-                >
-                  Later
-                </button>
-              </div>
-            )}
-            {mode === "discuss" && (
+            {mode === "discuss" && !ahead && (
               <Discussion
                 key={q.id}
                 q={q}
-                busy={!!busy}
+                busy={agentBusy}
                 streaming={busy?.kind === "discuss" ? streams[`${id}:${q.id}`] : undefined}
                 onSend={discuss}
                 onReask={reask}
@@ -351,14 +351,87 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
                 }}
               />
             )}
-            <Sources ws={ws} q={q} />
-            <div className="qq-hints">
-              {hints.map(([k, label]) => (
-                <span key={label}>
-                  <kbd>{k}</kbd> {label}
-                </span>
-              ))}
-            </div>
+            {ahead && next ? (
+              <div className="qq-actions">
+                <button type="button" className="qq-btn primary" onClick={() => show(undefined)}>
+                  Back to {next.id} <kbd>esc</kbd>
+                </button>
+                <span className="spacer" />
+                <Browse label="look around" />
+              </div>
+            ) : (
+              <div className="qq-actions">
+                {q.state === "open" && (
+                  <>
+                    <button
+                      type="button"
+                      className="qq-btn primary"
+                      disabled={!canAnswer}
+                      onClick={() => decide(sel, mode === "note" ? note : undefined)}
+                    >
+                      {sel === 0 ? "Take recommended" : `Go with ${sel + 1}`} <kbd>↵</kbd>
+                    </button>
+                    <span className="qq-group">
+                      <button
+                        type="button"
+                        className="qq-btn"
+                        disabled={!canAnswer}
+                        onClick={() => setMode("note")}
+                      >
+                        Add note <kbd>n</kbd>
+                      </button>
+                      <button
+                        type="button"
+                        className="qq-btn"
+                        disabled={!canAnswer}
+                        onClick={() => setMode("other")}
+                      >
+                        Other answer <kbd>o</kbd>
+                      </button>
+                    </span>
+                  </>
+                )}
+                {q.state !== "dropped" && q.state !== "deferred" && (
+                  <button type="button" className="qq-btn" onClick={() => setMode("discuss")}>
+                    Discuss <kbd>d</kbd>
+                  </button>
+                )}
+                {q.state === "open" && (
+                  <button
+                    type="button"
+                    className="qq-btn ghost"
+                    disabled={!canAnswer}
+                    onClick={askDefer}
+                  >
+                    Defer <kbd>s</kbd>
+                  </button>
+                )}
+                <span className="spacer" />
+                {undoLabel && (
+                  <button
+                    type="button"
+                    className="qq-btn ghost"
+                    disabled={agentBusy}
+                    onClick={undo}
+                  >
+                    {undoLabel} <kbd>u</kbd>
+                  </button>
+                )}
+                {list.length > 1 && <Browse label="look ahead" />}
+              </div>
+            )}
+            {deferring && (
+              <DeferModal
+                d={d}
+                q={q}
+                with={deferring}
+                onConfirm={defer}
+                onCancel={() => {
+                  setDeferring(undefined);
+                  focusRoot();
+                }}
+              />
+            )}
           </>
         )}
       </div>
@@ -366,16 +439,38 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
   );
 }
 
+function dotClass(x: Question, q: Question, updating: string[]) {
+  const state =
+    x.change && x.state === "open"
+      ? "reopened"
+      : x.state === "decided"
+        ? "decided"
+        : x.state === "deferred"
+          ? "deferred"
+          : "";
+  return ["qq-dot", state, x.id === q.id && "current", updating.includes(x.id) && "updating"]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function Browse({ label }: { label: string }) {
+  return (
+    <span className="qq-browse">
+      <kbd>[</kbd>
+      <kbd>]</kbd> {label}
+    </span>
+  );
+}
+
 function Sources({ ws, q }: { ws: WorkspaceName; q: Question }) {
   if (!q.sources.length) return null;
   return (
-    <details className="qq-sources">
-      <summary>Sources ({q.sources.length})</summary>
+    <div className="qq-sources">
       {q.sources.map((s) => (
-        <button key={s} type="button" className="quiet" onClick={() => openFile(ws, s)}>
+        <button key={s} type="button" onClick={() => openFile(ws, s)}>
           {s}
         </button>
       ))}
-    </details>
+    </div>
   );
 }

@@ -371,8 +371,8 @@ impl Lgtm {
     #[tool(
         description = "Ask the human questions through lgtm's Q&A. They show one at a time in \
         the Q&A tab, in the qqueue format: context bullets, options with the recommended one \
-        first, and why. Returns the session and the new questions' ids; read the decisions \
-        later with qa_answers."
+        first, and why. Returns the session and the new questions' ids in the order given; \
+        read the decisions later with qa_answers."
     )]
     async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
@@ -401,6 +401,7 @@ impl Lgtm {
                     .collect(),
                 why: q.why,
                 sources: q.sources,
+                depends: q.depends,
             })
             .collect();
         let ids = ctx
@@ -413,7 +414,7 @@ impl Lgtm {
         .emit_to(&self.app, &label)
         .ok();
         Ok(format!(
-            "Queued {} in session {id}. The human answers them in lgtm.",
+            "Queued {} (in the order given) in session {id}. The human answers them in lgtm.",
             ids.join(", ")
         ))
     }
@@ -433,6 +434,7 @@ impl Lgtm {
                     "subject": q.text.subject,
                     "answer": match q.state {
                         QState::Dropped => format!("dropped: {}", q.dropped.as_deref().unwrap_or("")),
+                        QState::Deferred => "deferred".into(),
                         _ => answer_text(q),
                     },
                 })

@@ -126,10 +126,10 @@ pub enum QuestionAct {
         id: String,
         answer: AnswerInput,
     },
-    /// Reopens the last decision.
+    /// Takes back the last decision or defer.
     Undo,
-    /// Moves it to the end of the queue.
-    Later {
+    /// Puts it off, with the open questions that depend on it.
+    Defer {
         id: String,
     },
     /// Opens a decided question to answer it again.
@@ -168,13 +168,27 @@ pub(crate) async fn act_on_question(
                 q.undo();
                 Ok(())
             }
-            QuestionAct::Later { id } => q.later(&id),
+            QuestionAct::Defer { id } => q.defer(&id, crate::review::now_ms() as f64).map(|_| ()),
             QuestionAct::Reopen { id } => q.reopen(&id),
             QuestionAct::Seen { id } => q.seen(&id),
         }
     })
     .map_err(err)?;
     ctx.qa_session(&ws, &session).map_err(err)
+}
+
+/// The open questions deferring question `id` would also defer.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn defer_preview(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    session: String,
+    id: String,
+) -> CmdResult<Vec<String>> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let s = repo(&window)?.qa_session(&ws, &session).map_err(err)?;
+    Ok(s.queue.defer_preview(&id))
 }
 
 /// Has the agent turn the session's prompt into questions.

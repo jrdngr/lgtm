@@ -124,7 +124,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
           ]}
         />
       </header>
-      {d && busy && (
+      {d && busy && busy.kind !== "answer" && (
         <div className="qa-busy">
           <span className="qa-spin" />
           <span>

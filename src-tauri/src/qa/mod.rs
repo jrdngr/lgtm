@@ -4,6 +4,7 @@
 
 pub mod agent;
 mod discuss;
+mod order;
 pub mod queue;
 
 use anyhow::Context;

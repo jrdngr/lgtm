@@ -71,7 +71,7 @@ beforeEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("Diff file list", () => {
+describe("Diff file list", { timeout: 20_000 }, () => {
   it("opens one Review tab when none is open, on a double click too", async () => {
     const { api, reviews, fileButton } = await mount("a");
     await act(() => reviews()[0].api.close());

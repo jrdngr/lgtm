@@ -1,9 +1,13 @@
 //! A Q&A session's question queue: questions in ask order, each built the qqueue way (context,
-//! options with the recommendation first, the reason for it), and what was decided. Answers
-//! reshape the open questions through updates from the agent.
+//! options with the recommendation first, the reason for it), what it depends on, and what
+//! was decided. Answers reshape the questions that depend on them through updates from the
+//! agent.
 
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+
+use super::order::{self, is_sub};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +33,8 @@ pub struct QText {
 pub enum QState {
     Open,
     Decided,
+    /// Put off: resolved for the queue, and left out of the write.
+    Deferred,
     Dropped,
 }
 
@@ -46,8 +52,9 @@ pub struct Answer {
     pub at: f64,
 }
 
-/// A rewrite the user hasn't looked at yet.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+/// A rewrite of a decided question, which opened it again, that the user hasn't looked at
+/// yet.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Change {
     /// What it was rewritten after: a question id, or "discussion".
@@ -55,6 +62,9 @@ pub struct Change {
     /// What changed, in a few words.
     pub what: String,
     pub previous: QText,
+    /// The answer it had before it reopened.
+    #[serde(default)]
+    pub answer: Option<Answer>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -74,6 +84,10 @@ pub struct QaQuestion {
     /// Files the agent read to build it.
     #[serde(default)]
     pub sources: Vec<String>,
+    /// Ids of questions whose answers could change this one. A subquestion also depends on
+    /// its parent without listing it.
+    #[serde(default)]
+    pub depends: Vec<String>,
     pub state: QState,
     #[serde(default)]
     pub answer: Option<Answer>,
@@ -94,6 +108,19 @@ pub struct Queue {
     /// What each answer's update did to the other questions, so undo can put them back.
     #[serde(default)]
     pub effects: Vec<Effect>,
+    /// Each defer, so undo can take it back in one step.
+    #[serde(default)]
+    pub deferrals: Vec<Deferral>,
+}
+
+/// The questions one defer put off: `id` and the open questions that depend on it.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Deferral {
+    pub id: String,
+    pub ids: Vec<String>,
+    /// When, in ms, so undo takes the latest of decisions and defers.
+    pub at: f64,
 }
 
 /// The questions an update after `after` dropped or rewrote, as they were, and the ones it
@@ -107,6 +134,7 @@ pub struct Effect {
 }
 
 /// A question from the agent. A subquestion belongs to the top-level question before it.
+/// `depends` uses the ids the batch would get in the order given.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct NewQuestion {
     #[serde(default)]
@@ -117,6 +145,8 @@ pub struct NewQuestion {
     pub why: String,
     #[serde(default)]
     pub sources: Vec<String>,
+    #[serde(default)]
+    pub depends: Vec<String>,
 }
 
 impl NewQuestion {
@@ -157,15 +187,6 @@ pub struct Update {
     pub add: Vec<NewQuestion>,
 }
 
-fn number(id: &str) -> u32 {
-    id.trim_start_matches('Q')
-        .chars()
-        .take_while(char::is_ascii_digit)
-        .collect::<String>()
-        .parse()
-        .unwrap_or(0)
-}
-
 impl Queue {
     pub fn get(&self, id: &str) -> Option<&QaQuestion> {
         self.questions.iter().find(|q| q.id == id)
@@ -182,34 +203,29 @@ impl Queue {
         self.questions.iter().map(|q| q.round).max().unwrap_or(0)
     }
 
-    /// Appends questions in `round`, numbering on from the last one.
-    fn push(&mut self, new: Vec<NewQuestion>, round: u32) -> Vec<String> {
-        let mut top = self
-            .questions
+    /// The number of the last question, which new ones number on from.
+    pub fn last_number(&self) -> u32 {
+        self.questions
             .iter()
-            .map(|q| number(&q.id))
+            .map(|q| order::number(&q.id))
             .max()
-            .unwrap_or(0);
-        let mut parent: Option<(u32, u8)> = None;
-        let mut ids = vec![];
-        for n in new {
-            let id = match (n.sub, parent) {
-                (true, Some((p, letter))) => {
-                    parent = Some((p, letter + 1));
-                    format!("Q{p}{}", (b'a' + letter) as char)
-                }
-                _ => {
-                    top += 1;
-                    parent = Some((top, 0));
-                    format!("Q{top}")
-                }
-            };
-            ids.push(id.clone());
+            .unwrap_or(0)
+    }
+
+    /// Appends questions in `round`, numbering on from the last one and putting each after
+    /// the ones it depends on. Returns their ids in the order given.
+    fn push(&mut self, new: Vec<NewQuestion>, round: u32) -> Vec<String> {
+        let placed = order::place(new, self.last_number(), |id| self.get(id).is_some());
+        let mut ids = vec![String::new(); placed.len()];
+        for p in placed {
+            ids[p.index] = p.id.clone();
+            let n = p.question;
             self.questions.push(QaQuestion {
-                id,
+                id: p.id,
                 round,
                 text: n.text(),
                 sources: n.sources,
+                depends: n.depends,
                 state: QState::Open,
                 answer: None,
                 dropped: None,
@@ -218,6 +234,16 @@ impl Queue {
             });
         }
         ids
+    }
+
+    /// The questions an answer to `id` could change: ones that depend on it and its
+    /// subquestions, open or decided.
+    pub fn dependents(&self, id: &str) -> Vec<&QaQuestion> {
+        self.questions
+            .iter()
+            .filter(|q| q.id != id && matches!(q.state, QState::Open | QState::Decided))
+            .filter(|q| q.depends.iter().any(|d| d == id) || is_sub(&q.id, id))
+            .collect()
     }
 
     /// Starts a new round of questions, after a draft, revision or comments.
@@ -242,20 +268,63 @@ impl Queue {
         Ok(())
     }
 
-    /// Reopens the last decision and undoes what it did to the other questions. Returns its
-    /// id.
+    /// The open questions deferring `id` would also defer: those that depend on it, and
+    /// on them in turn.
+    pub fn defer_preview(&self, id: &str) -> Vec<String> {
+        let mut out: Vec<String> = vec![];
+        let mut next = vec![id.to_string()];
+        while let Some(at) = next.pop() {
+            for d in self.dependents(&at) {
+                if d.state == QState::Open && d.id != id && !out.contains(&d.id) {
+                    out.push(d.id.clone());
+                    next.push(d.id.clone());
+                }
+            }
+        }
+        out.sort_by_key(|d| self.questions.iter().position(|q| &q.id == d));
+        out
+    }
+
+    /// Defers an open question and the open questions that depend on it. Returns their ids.
+    pub fn defer(&mut self, id: &str, at: f64) -> anyhow::Result<Vec<String>> {
+        let q = self.get(id).with_context(|| format!("no question {id}"))?;
+        anyhow::ensure!(q.state == QState::Open, "{id} isn't open");
+        let mut ids = vec![id.to_string()];
+        ids.extend(self.defer_preview(id));
+        for q in self.questions.iter_mut().filter(|q| ids.contains(&q.id)) {
+            q.state = QState::Deferred;
+        }
+        self.deferrals.push(Deferral {
+            id: id.to_string(),
+            ids: ids.clone(),
+            at,
+        });
+        Ok(ids)
+    }
+
+    /// Takes back the last decision or defer, and what it did to the other questions.
+    /// Returns the id it was on.
     pub fn undo(&mut self) -> Option<String> {
-        let last = self
+        let decided = self
             .questions
-            .iter_mut()
-            .filter(|q| q.state == QState::Decided)
-            .max_by(|a, b| {
-                let at = |q: &QaQuestion| q.answer.as_ref().map_or(0.0, |a| a.at);
-                at(a).total_cmp(&at(b))
-            })?;
-        last.state = QState::Open;
-        last.answer = None;
-        let id = last.id.clone();
+            .iter()
+            .filter_map(|q| Some((q.answer.as_ref()?.at, q)))
+            .filter(|(_, q)| q.state == QState::Decided)
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .map(|(at, q)| (at, q.id.clone()));
+        if let Some(d) = self
+            .deferrals
+            .pop_if(|d| decided.as_ref().is_none_or(|(at, _)| d.at > *at))
+        {
+            for q in self.questions.iter_mut().filter(|q| d.ids.contains(&q.id)) {
+                if q.state == QState::Deferred {
+                    q.state = QState::Open;
+                }
+            }
+            return Some(d.id);
+        }
+        let (_, id) = decided?;
+        self.reopen(&id).ok()?;
         self.revert(&id);
         Some(id)
     }
@@ -268,19 +337,8 @@ impl Queue {
         Ok(())
     }
 
-    /// Moves a question to the end of the queue.
-    pub fn later(&mut self, id: &str) -> anyhow::Result<()> {
-        let i = self
-            .questions
-            .iter()
-            .position(|q| q.id == id)
-            .ok_or_else(|| anyhow::anyhow!("no question {id}"))?;
-        let q = self.questions.remove(i);
-        self.questions.push(q);
-        Ok(())
-    }
-
-    /// Rewrites a question, keeping what it said before. A decided one opens again.
+    /// Rewrites a question. A decided one opens again, keeping what it said before as a
+    /// change; an open one changes quietly.
     fn rewrite(&mut self, r: Rewrite, after: &str) -> anyhow::Result<()> {
         let q = self.get_mut(&r.id)?;
         if q.state == QState::Dropped {
@@ -295,21 +353,28 @@ impl Queue {
         if text == q.text {
             return Ok(());
         }
-        // A second rewrite before it's seen still compares with what the user last saw.
-        let previous = q.change.take().map_or(q.text.clone(), |c| c.previous);
+        if q.state == QState::Decided {
+            // A second rewrite before it's seen still compares with what the user last saw.
+            let (previous, answer) = match q.change.take() {
+                Some(c) => (c.previous, c.answer),
+                None => (q.text.clone(), q.answer.take()),
+            };
+            q.state = QState::Open;
+            q.answer = None;
+            q.change = Some(Change {
+                after: after.to_string(),
+                what: r.what,
+                previous,
+                answer,
+            });
+        }
         q.text = text;
-        q.state = QState::Open;
-        q.answer = None;
-        q.change = Some(Change {
-            after: after.to_string(),
-            what: r.what,
-            previous,
-        });
         Ok(())
     }
 
     /// Applies what the answer to `after` does to the rest of the queue. Decided questions
-    /// are never dropped or rewritten; ids the queue doesn't have are skipped.
+    /// are never dropped, and rewritten only when they depend on `after`; ids the queue
+    /// doesn't have are skipped.
     pub fn apply(&mut self, after: &str, update: Update) {
         let mut before = vec![];
         for d in update.drop {
@@ -328,7 +393,12 @@ impl Queue {
             if r.id == after {
                 continue;
             }
-            let Some(was) = self.get(&r.id).filter(|q| q.state == QState::Open).cloned() else {
+            let reopens = self.dependents(after).iter().any(|q| q.id == r.id);
+            let Some(was) = self
+                .get(&r.id)
+                .filter(|q| q.state == QState::Open || reopens)
+                .cloned()
+            else {
                 continue;
             };
             self.rewrite(r, after).ok();
@@ -357,7 +427,8 @@ impl Queue {
     }
 
     /// Puts back what the update after `id` did: dropped questions return, rewritten ones
-    /// still open get their old text, and added ones nobody has decided or discussed go.
+    /// still open get their old text and any answer they had, and added ones nobody has
+    /// decided or discussed go.
     fn revert(&mut self, id: &str) {
         let Some(i) = self.effects.iter().position(|e| e.after == id) else {
             return;
@@ -443,211 +514,5 @@ pub fn question_text(q: &QaQuestion) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn new(subject: &str, sub: bool) -> NewQuestion {
-        NewQuestion {
-            sub,
-            subject: subject.into(),
-            context: vec!["c".into()],
-            options: vec![
-                Choice {
-                    label: "yes".into(),
-                    bullets: vec![],
-                },
-                Choice {
-                    label: "no".into(),
-                    bullets: vec![],
-                },
-            ],
-            why: "because".into(),
-            sources: vec![],
-        }
-    }
-
-    fn pick(option: u32, at: f64) -> Answer {
-        Answer {
-            option: Some(option),
-            note: None,
-            other: None,
-            at,
-        }
-    }
-
-    fn ids(q: &Queue) -> Vec<&str> {
-        q.questions.iter().map(|q| q.id.as_str()).collect()
-    }
-
-    #[test]
-    fn subquestions_number_under_their_parent_and_rounds_continue() {
-        let mut q = Queue::default();
-        q.add_round(vec![
-            new("a", false),
-            new("b", false),
-            new("b1", true),
-            new("b2", true),
-        ]);
-        assert_eq!(ids(&q), ["Q1", "Q2", "Q2a", "Q2b"]);
-        q.add_round(vec![new("c", true), new("d", false)]);
-        // A subquestion with no parent in its batch starts a new number.
-        assert_eq!(ids(&q)[4..], ["Q3", "Q4"]);
-        assert_eq!(q.get("Q4").unwrap().round, 2);
-    }
-
-    #[test]
-    fn undo_reopens_the_latest_decision() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("a", false), new("b", false)]);
-        q.decide("Q2", pick(1, 5.0)).unwrap();
-        q.decide("Q1", pick(0, 9.0)).unwrap();
-        assert!(q.decide("Q1", pick(2, 10.0)).is_err());
-        assert_eq!(q.undo().as_deref(), Some("Q1"));
-        assert_eq!(q.get("Q1").unwrap().state, QState::Open);
-        assert_eq!(q.undo().as_deref(), Some("Q2"));
-        assert_eq!(q.undo(), None);
-    }
-
-    #[test]
-    fn an_update_never_rewrites_a_decided_question() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("a", false), new("b", false)]);
-        q.decide("Q1", pick(0, 1.0)).unwrap();
-        q.decide("Q2", pick(1, 2.0)).unwrap();
-        q.apply(
-            "Q2",
-            Update {
-                rewrite: vec![Rewrite {
-                    id: "Q1".into(),
-                    what: "new option".into(),
-                    subject: "a2".into(),
-                    context: vec![],
-                    options: vec![],
-                    why: String::new(),
-                }],
-                ..Update::default()
-            },
-        );
-        let a = q.get("Q1").unwrap();
-        assert_eq!(a.state, QState::Decided);
-        assert_eq!(a.answer, Some(pick(0, 1.0)));
-        assert_eq!(a.text.subject, "a");
-    }
-
-    #[test]
-    fn an_update_drops_rewrites_and_adds_without_touching_decisions() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("a", false), new("b", false), new("c", false)]);
-        q.decide("Q1", pick(0, 1.0)).unwrap();
-        let rw = |id: &str, subject: &str| Rewrite {
-            id: id.into(),
-            what: "new option".into(),
-            subject: subject.into(),
-            context: vec![],
-            options: vec![],
-            why: String::new(),
-        };
-        q.apply(
-            "Q1",
-            Update {
-                drop: vec![
-                    Drop {
-                        id: "Q2".into(),
-                        why: "settled by Q1".into(),
-                    },
-                    Drop {
-                        id: "Q1".into(),
-                        why: "self".into(),
-                    },
-                ],
-                rewrite: vec![rw("Q3", "c2"), rw("Q9", "nope")],
-                add: vec![new("d", false)],
-            },
-        );
-        assert_eq!(q.get("Q1").unwrap().state, QState::Decided);
-        assert_eq!(
-            q.get("Q2").unwrap().dropped.as_deref(),
-            Some("settled by Q1")
-        );
-        let c = q.get("Q3").unwrap();
-        assert_eq!(c.text.subject, "c2");
-        assert_eq!(c.change.as_ref().unwrap().previous.subject, "c");
-        assert_eq!(ids(&q), ["Q1", "Q2", "Q3", "Q4"]);
-        assert_eq!(q.open_count(), 2);
-
-        // A second rewrite keeps the text the user last saw as the previous one.
-        q.apply(
-            "Q1",
-            Update {
-                rewrite: vec![rw("Q3", "c3")],
-                ..Update::default()
-            },
-        );
-        assert_eq!(
-            q.get("Q3")
-                .unwrap()
-                .change
-                .as_ref()
-                .unwrap()
-                .previous
-                .subject,
-            "c"
-        );
-
-        // Undoing Q1 puts back everything its updates did, and drops the question they added.
-        assert_eq!(q.undo().as_deref(), Some("Q1"));
-        assert_eq!(ids(&q), ["Q1", "Q2", "Q3"]);
-        assert_eq!(q.get("Q2").unwrap().state, QState::Open);
-        assert_eq!(q.get("Q3").unwrap().text.subject, "c");
-        assert!(q.get("Q3").unwrap().change.is_none());
-        assert!(q.effects.is_empty());
-    }
-
-    #[test]
-    fn rewriting_a_decided_question_asks_it_again() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("a", false), new("b", false)]);
-        q.decide("Q2", pick(1, 1.0)).unwrap();
-        q.reask(Rewrite {
-            id: "Q2".into(),
-            what: "narrowed".into(),
-            subject: "b?".into(),
-            context: vec![],
-            options: vec![],
-            why: String::new(),
-        })
-        .unwrap();
-        let b = q.get("Q2").unwrap();
-        assert_eq!((b.state, b.answer.is_none()), (QState::Open, true));
-        assert_eq!(b.change.as_ref().unwrap().after, "discussion");
-    }
-
-    #[test]
-    fn later_moves_a_question_to_the_end() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("a", false), new("b", false), new("c", false)]);
-        q.later("Q1").unwrap();
-        assert_eq!(ids(&q), ["Q2", "Q3", "Q1"]);
-    }
-
-    #[test]
-    fn the_text_follows_the_qqueue_template() {
-        let mut q = Queue::default();
-        q.add_round(vec![new("Where files live", false)]);
-        q.decide(
-            "Q1",
-            Answer {
-                note: Some("keep it simple".into()),
-                ..pick(1, 1.0)
-            },
-        )
-        .unwrap();
-        let first = q.get("Q1").unwrap();
-        assert_eq!(answer_text(first), "option 2: no (note: keep it simple)");
-        assert_eq!(
-            question_text(first),
-            "Q1 — Where files live\n\nContext:\n\n- c\n\nOptions:\n\n1. yes (recommended)\n\
-             2. no\n\nRecommendation: option 1. because"
-        );
-    }
-}
+#[path = "queue_tests.rs"]
+mod tests;
