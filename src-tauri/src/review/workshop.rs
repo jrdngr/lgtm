@@ -16,6 +16,9 @@ pub struct Ask {
     pub draft: String,
     /// Have the agent edit the working copy.
     pub change: bool,
+    /// Ask for a first take and reply, with no message of the user's.
+    #[serde(default)]
+    pub compose: bool,
 }
 
 pub const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
@@ -107,6 +110,8 @@ impl RepoCtx {
                 text: ask.message.clone(),
                 change: ask.change,
                 updated: false,
+                compose: ask.compose,
+                before: None,
             });
             store.set_workshop(cid, &c.workshop)?;
         }
@@ -159,23 +164,26 @@ impl RepoCtx {
             if let Some(s) = session {
                 c.workshop.session = Some(s);
             }
-            let (text, updated) = match turn {
+            let (text, updated, replaced) = match turn {
                 Some(turn) => {
                     let before = c.body.clone();
                     let (message, updated) = replies::apply_chat(&mut c, turn);
-                    if c.body != before {
+                    let replaced = c.body != before;
+                    if replaced {
                         store.set_comment_body(cid, &c.body, super::now_ms())?;
                     }
                     store.set_thread(cid, &c.thread)?;
-                    (message, updated)
+                    (message, updated, replaced.then_some(before))
                 }
-                None => (text, false),
+                None => (text, false, None),
             };
             c.workshop.messages.push(Message {
                 author: Author::Agent,
                 text,
                 change: false,
                 updated,
+                compose: false,
+                before: replaced,
             });
             Ok(store.set_workshop(cid, &c.workshop)?)
         })

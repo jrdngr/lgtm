@@ -13,6 +13,8 @@ import { type FlatFile, NEW_COMMENT } from "./model";
 export interface Running {
   ask: string;
   change: boolean;
+  /** A first take and reply, asked for with no message. */
+  compose?: boolean;
   reply: string;
 }
 
@@ -170,17 +172,17 @@ export function useComments({
 
   /** Sends the block's workshop message, saving a draft first so the exchange has a home.
    * A change with no message asks for what the comment says. */
-  async function ask(id: number, change: boolean) {
-    const message = asks.get(id)?.trim() ?? "";
+  async function ask(id: number, change: boolean, compose = false) {
+    const message = compose ? "" : (asks.get(id)?.trim() ?? "");
     const body = edits.get(id) ?? byId(id)?.body ?? "";
-    if (!review || running.has(id) || !(message || (change && body.trim()))) return;
+    if (!review || running.has(id) || !(compose || message || (change && body.trim()))) return;
     const c = id === NEW_COMMENT ? await create(body) : byId(id);
     if (!c) return;
     const cid = c.id;
     // A saved draft's block is a new one, so the ask box needs focus again.
     if (cid !== id) setFocus({ id: cid, field: "ask" });
-    setAsks((m) => without(m, cid));
-    setRunning((m) => withEntry(m, cid, { ask: message, change, reply: "" }));
+    if (!compose) setAsks((m) => without(m, cid));
+    setRunning((m) => withEntry(m, cid, { ask: message, change, compose, reply: "" }));
     const handle = startRun(workspace, {
       kind: change ? "change" : c.thread ? "reply" : "ask",
       subject: c.path || "Comment",
@@ -196,7 +198,7 @@ export function useComments({
     const r = await commands.workshopComment(
       review.id,
       cid,
-      { message, draft: body, change },
+      { message, draft: body, change, compose },
       channel,
     );
     endFrom(handle, r);
@@ -244,6 +246,18 @@ export function useComments({
     if (review) await apply(commands.draftFromNote(review.id, id));
   }
 
+  /** Has the agent write a thread's first take and reply. */
+  const compose = (id: number) => ask(id, false, true);
+
+  /** The `a` key on a block: drafts a thread's reply when it has neither take nor reply, and
+   * otherwise puts the cursor in the ask box. */
+  function agentKey(id: number) {
+    const c = byId(id);
+    if (c?.github && c.thread && !c.thread.take && !c.body.trim() && !running.has(id)) {
+      compose(id);
+    } else openAsk(id);
+  }
+
   /** Shows the block's ask box with the cursor in it. */
   function openAsk(id: number) {
     setAskOpen((s) => new Set(s).add(id));
@@ -276,6 +290,8 @@ export function useComments({
     edit: (c: CommentDto) => use(c.id, c.body),
     remove,
     ask,
+    compose,
+    agentKey,
     stop: commands.stopWorkshop,
     use,
     send: sendComment,

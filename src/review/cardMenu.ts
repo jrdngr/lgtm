@@ -1,17 +1,14 @@
 import type { CommentDto } from "../bindings";
-import { showThread } from "../threads/focus";
 import { STAGES } from "../threads/stages";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { openUrl } from "../ui/pathMenu";
 import { confirmAction } from "../ui/prompt";
-import type { WorkspaceName } from "../workspaces/context";
 import type { Comments } from "./useComments";
 
 interface Card {
   comment: CommentDto;
   c: Comments;
-  workspace: WorkspaceName;
   agentsOff: boolean;
 }
 
@@ -54,23 +51,17 @@ function deleteItem({ comment, c }: Card): MenuItem {
 /** The ⋯ menu of a comment card. */
 export function moreItems(card: Card): (MenuItem | false)[] {
   const { comment } = card;
-  return [
-    ...(comment.thread ? stageItems(card) : [])
-      .filter((s) => !s.checked)
-      .map((s) => ({ label: `Move to ${s.label}`, onSelect: s.onSelect })),
-    draftItem(card),
-    !comment.github && deleteItem(card),
-  ];
+  return [draftItem(card), !comment.github && deleteItem(card)];
 }
 
 /** The right-click menu of a comment card: a note, or a GitHub thread or draft. */
 export function cardItems(card: Card): CtxEntry[] {
-  const { comment, c, workspace } = card;
+  const { comment, c } = card;
   const gh = comment.github;
   const ask = !card.agentsOff && {
     label: "Ask the Agent",
     keys: "a",
-    onSelect: () => c.openAsk(comment.id),
+    onSelect: () => c.agentKey(comment.id),
   };
   const send = { label: "Send to Terminal", onSelect: () => c.send(comment) };
   if (!comment.thread) {
@@ -99,7 +90,6 @@ export function cardItems(card: Card): CtxEntry[] {
     ask,
     send,
     "-",
-    { label: "Open in Threads", onSelect: () => showThread(workspace, comment.id) },
     gh && { label: "Open on GitHub", onSelect: () => openUrl(gh.url) },
     gh && { label: "Copy Link", onSelect: () => copy(gh.url) },
     "-",

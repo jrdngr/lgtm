@@ -13,10 +13,11 @@ interface Props {
   body: string;
   c: Comments;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  placeholder?: string;
 }
 
 /** The box under a comment that asks the agent about it, or tells it what to change. */
-export function AskBox({ id, body, c, inputRef }: Props) {
+export function AskBox({ id, body, c, inputRef, placeholder }: Props) {
   const running = c.running.get(id);
   const asked = !!c.asks.get(id)?.trim();
 
@@ -37,7 +38,7 @@ export function AskBox({ id, body, c, inputRef }: Props) {
         className="ask-input"
         rows={1}
         value={c.asks.get(id) ?? ""}
-        placeholder={`Ask the agent (↵), or tell it what to change (${SAVE_KEY})`}
+        placeholder={placeholder ?? `Ask the agent (↵), or tell it what to change (${SAVE_KEY})`}
         onChange={(e) => c.setAsk(id, e.target.value)}
         onKeyDown={onKey}
       />
@@ -48,7 +49,7 @@ export function AskBox({ id, body, c, inputRef }: Props) {
       ) : (
         <>
           <button type="button" onClick={() => c.ask(id, false)} disabled={!asked}>
-            Ask
+            Ask <kbd>↵</kbd>
           </button>
           <button
             type="button"
@@ -60,7 +61,7 @@ export function AskBox({ id, body, c, inputRef }: Props) {
                 : NOT_AT_WORKING_COPY
             }
           >
-            Change
+            Change <kbd>{SAVE_KEY}</kbd>
           </button>
         </>
       )}

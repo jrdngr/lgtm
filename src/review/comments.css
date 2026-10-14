@@ -486,3 +486,347 @@ button.group-head.fold {
 button.group-head.fold:hover {
   color: var(--fg);
 }
+
+/* A GitHub thread: violet edge, its stages in the bar, and the reply workflow under it. */
+.thread-block {
+  border-left: 3px solid var(--github);
+}
+
+.thread-block > .card-bar::before {
+  display: none;
+}
+
+.thread-block .card-source {
+  color: var(--muted);
+}
+
+.thread-block .card-source b {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.card-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 8px;
+  font-size: var(--fs-sm);
+}
+
+.comment-block .stage-strip {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.comment-block .stage-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 9px;
+  border: none;
+  border-right: 1px solid var(--hair);
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-xs);
+  line-height: 20px;
+  color: var(--muted);
+}
+
+.comment-block .stage-strip button:last-child {
+  border-right: none;
+}
+
+.comment-block .stage-strip button:hover:not(.on) {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.comment-block .stage-strip i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.comment-block .stage-strip [data-stage="new"] i,
+.comment-block .stage-strip [data-stage="decide"] i {
+  color: var(--amber);
+}
+
+.comment-block .stage-strip [data-stage="toFix"] i {
+  color: var(--accent);
+}
+
+.comment-block .stage-strip [data-stage="reply"] i {
+  color: var(--github);
+}
+
+.comment-block .stage-strip [data-stage="ready"] i {
+  color: var(--added);
+}
+
+.comment-block .stage-strip [data-stage="done"] i {
+  color: var(--muted);
+}
+
+.comment-block .stage-strip button.on {
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.comment-block .stage-strip button.on i {
+  opacity: 1;
+}
+
+.comment-block .stage-strip button.on[data-stage="new"],
+.comment-block .stage-strip button.on[data-stage="decide"] {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
+}
+
+.comment-block .stage-strip button.on[data-stage="toFix"] {
+  color: var(--accent);
+  background: rgb(79 140 201 / 16%);
+}
+
+.comment-block .stage-strip button.on[data-stage="reply"] {
+  color: var(--github);
+  background: rgb(163 113 247 / 14%);
+}
+
+.comment-block .stage-strip button.on[data-stage="ready"] {
+  color: var(--added);
+  background: rgb(63 185 80 / 14%);
+}
+
+.thread-block .flow {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--hair);
+  background: var(--bg);
+  border-radius: 0 0 6px 0;
+}
+
+.thread-block .flow-sec {
+  display: grid;
+  gap: 6px;
+}
+
+.thread-block .flow-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.thread-block .flow-ver {
+  margin-left: -4px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.thread-block .flow-link,
+.thread-block .flow-up {
+  padding: 0;
+  border: none;
+  background: none;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.thread-block .flow-link {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+
+.thread-block .flow-link:hover:not(:disabled) {
+  background: none;
+  color: var(--fg);
+}
+
+.thread-block .flow-take,
+.thread-block .flow-draft-text {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.thread-block .flow-take {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--hair);
+}
+
+.thread-block .flow-take p,
+.thread-block .flow-changes {
+  margin: 0;
+}
+
+.thread-block .flow-question {
+  color: var(--amber);
+}
+
+.thread-block .flow-draft-text {
+  border: 1px solid rgb(163 113 247 / 14%);
+  transition: box-shadow 0.3s;
+}
+
+.thread-block .flow-draft-text.final {
+  border-color: rgb(63 185 80 / 40%);
+}
+
+.thread-block .flow-draft-text.fresh {
+  box-shadow: 0 0 0 2px rgb(163 113 247 / 30%);
+}
+
+.thread-block .flow-draft-text > :first-child {
+  margin-top: 0;
+}
+
+.thread-block .flow-draft-text > :last-child {
+  margin-bottom: 0;
+}
+
+.thread-block .flow-changes {
+  white-space: pre-wrap;
+}
+
+.thread-block .flow-ins {
+  border-radius: 2px;
+  background: rgb(63 185 80 / 18%);
+}
+
+.thread-block .flow-del {
+  border-radius: 2px;
+  background: rgb(248 81 73 / 18%);
+  text-decoration: line-through;
+}
+
+.thread-block .flow-none {
+  color: var(--faint);
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-buttons,
+.thread-block .flow-start {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-buttons button,
+.thread-block .flow-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-draft {
+  border-color: var(--github);
+  background: var(--github);
+  color: #fff;
+  font-weight: 600;
+}
+
+.thread-block .flow-draft:hover:not(:disabled) {
+  border-color: var(--github);
+  background: var(--github);
+  filter: brightness(1.1);
+}
+
+.thread-block .flow-buttons button.flow-final {
+  border-color: var(--added);
+  background: var(--added);
+  color: #0b1f10;
+  font-weight: 600;
+}
+
+.thread-block .flow-buttons button.flow-final:hover:not(:disabled) {
+  background: var(--added);
+  filter: brightness(1.1);
+}
+
+.thread-block button.flow-draft kbd,
+.thread-block button.flow-final kbd {
+  color: inherit;
+  border-color: rgb(255 255 255 / 35%);
+  opacity: 0.8;
+}
+
+.thread-block .flow-chat {
+  display: grid;
+  gap: 8px;
+}
+
+.thread-block .flow-msg {
+  display: grid;
+  gap: 2px;
+  font-size: var(--fs-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.thread-block .flow-msg.agent > span:nth-child(2) {
+  color: var(--muted);
+}
+
+.thread-block .flow-who {
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.thread-block .flow-up {
+  justify-self: start;
+  margin-top: 3px;
+  font-size: var(--fs-xs);
+  color: var(--github);
+}
+
+.thread-block .flow-up:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.thread-block .flow .ask {
+  margin-top: 0;
+  align-items: center;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.thread-block .flow .ask-input {
+  border: none;
+  background: none;
+  padding: 2px 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thread-block .flow-draft-text {
+    transition: none;
+  }
+}
+
+/* Claude Code's color for a turn in progress. */
+.flow-thinking {
+  color: rgb(215 119 87);
+}

@@ -365,6 +365,8 @@ impl RepoCtx {
                     text: format!("Fix: {}", r.note),
                     change: false,
                     updated: false,
+                    compose: false,
+                    before: None,
                 });
                 store.set_workshop(c.id, &c.workshop)?;
             }
@@ -431,6 +433,11 @@ impl RepoCtx {
 pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String)>) -> String {
     const EDIT: &str = "Edit the files directly and change only what's needed.";
     let asked = match (ask.change, ask.message.trim().is_empty()) {
+        _ if ask.compose => {
+            "Write my take and a reply for this thread. Return the verdict, why, and the whole \
+             reply."
+                .to_string()
+        }
         (false, _) => ask.message.clone(),
         (true, true) => format!("Make the change this thread asks for. {EDIT}"),
         (true, false) => format!("Make this change: {} {EDIT}", ask.message.trim()),

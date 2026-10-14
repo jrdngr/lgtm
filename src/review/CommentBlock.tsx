@@ -2,20 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import type { CommentDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { GhThread, lastPost } from "../github/GhThread";
-import { Avatar, Post } from "../github/Post";
+import { Avatar } from "../github/Post";
 import { viewerLogin } from "../github/people";
-import { showThread } from "../threads/focus";
-import { ReplyHead, StagePill, TakePill } from "../threads/ThreadBits";
+import { TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
 import { isMac } from "../workbench/keys";
-import { useWorkspace } from "../workspaces/context";
 import { AskBox, SAVE_KEY } from "./AskBox";
 import { cardItems, moreItems } from "./cardMenu";
 import { NEW_COMMENT } from "./model";
+import { StageStrip } from "./StageStrip";
+import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
 import { Workshop } from "./Workshop";
 import "./comments.css";
@@ -34,7 +34,6 @@ export function CommentBlock({ id, comment, c }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
   const agentsOff = useAgentsOff();
-  const workspace = useWorkspace();
   const [expanded, setExpanded] = useState(false);
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
@@ -55,7 +54,7 @@ export function CommentBlock({ id, comment, c }: Props) {
     c.focused();
   });
 
-  const card = comment && { comment, c, workspace, agentsOff };
+  const card = comment && { comment, c, agentsOff };
   /** Text fields keep their own menu. */
   const onContextMenu = (e: React.MouseEvent) => {
     if (!card || (e.target instanceof Element && e.target.closest("textarea, input"))) return;
@@ -85,6 +84,21 @@ export function CommentBlock({ id, comment, c }: Props) {
           {gh && <span className="card-count">{gh.posts.length}</span>}
         </button>
       </div>
+    );
+  }
+
+  if (comment && gh && thread) {
+    return (
+      <ThreadBlock
+        comment={comment}
+        c={c}
+        agentsOff={agentsOff}
+        done={!!done}
+        onFold={() => setExpanded(false)}
+        onContextMenu={onContextMenu}
+        bodyRef={bodyRef}
+        askRef={askRef}
+      />
     );
   }
 
@@ -139,14 +153,6 @@ export function CommentBlock({ id, comment, c }: Props) {
         <span className="card-source" title={comment ? `Review: ${comment.review}` : undefined}>
           {source}
         </span>
-        {gh && (
-          <>
-            <span className="faint">·</span>
-            <span>
-              {gh.posts.length} {gh.posts.length === 1 ? "post" : "posts"}
-            </span>
-          </>
-        )}
         {!gh && when ? (
           <>
             <span className="faint">·</span>
@@ -156,7 +162,7 @@ export function CommentBlock({ id, comment, c }: Props) {
           </>
         ) : null}
         {thread && <TakePill take={thread.take} />}
-        {thread && <StagePill state={thread} />}
+        {thread && <StageStrip stage={thread.stage} onPick={(st) => c.setStage(id, st)} />}
         {gh?.resolved && <span className="pill green">✓ Resolved</span>}
         {gh?.outdated && <span className="pill">Outdated</span>}
         {changed && (
@@ -187,13 +193,6 @@ export function CommentBlock({ id, comment, c }: Props) {
               onClick={() => c.setDone(comment.id, !comment.done)}
             />
           )}
-          {comment && thread && (
-            <IconButton
-              icon="comments"
-              label="Open in the Threads tab"
-              onClick={() => showThread(workspace, comment.id)}
-            />
-          )}
           {!agentsOff && (
             <IconButton
               icon="sparkle"
@@ -210,12 +209,6 @@ export function CommentBlock({ id, comment, c }: Props) {
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
       {gh && <GhThread link={gh} viewer={viewer} />}
-      {editing === undefined && gh && thread && comment?.body && (
-        <>
-          <ReplyHead state={thread} />
-          <Post author={viewer ?? "You"} name="You" body={comment.body} />
-        </>
-      )}
       {editing === undefined && !gh && (
         <div className="post">
           <Avatar name={viewer ?? "You"} />

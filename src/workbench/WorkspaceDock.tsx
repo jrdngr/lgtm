@@ -21,7 +21,6 @@ import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
-import { ThreadsPanel } from "../threads/ThreadsPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
 import { trackClosed } from "./closedTabs";
@@ -42,11 +41,12 @@ const components = {
   prPreview: PrPreview,
   settings: SettingsPanel,
   shortcuts: ShortcutsPanel,
-  threads: ThreadsPanel,
   runs: RunsPanel,
   qa: QaTab,
-  // Restores layouts from earlier builds, whose Tasks, Files and Design panels are then closed.
+  // Restores layouts from earlier builds, whose Tasks, Files, Design and Threads panels are then
+  // closed.
   tasks: () => null,
+  threads: () => null,
   files: () => null,
   design: () => null,
 };

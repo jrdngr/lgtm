@@ -6,7 +6,6 @@ import { confirmClose } from "../editor/unsaved";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
-import { showThread } from "../threads/focus";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
@@ -152,7 +151,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+P": () => showView("right", "pr"),
     "Mod+Shift+T": () => reopenClosed(selected),
-    "Mod+Shift+J": () => showThread(selected),
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),

@@ -5,14 +5,13 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph" | "threads" | "runs" | "qa";
+export type PanelKind = "review" | "terminal" | "report" | "graph" | "runs" | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
   report: "Reviewers",
   graph: "Graph",
-  threads: "Threads",
   runs: "Agent runs",
   qa: "Q&A",
 };
@@ -79,13 +78,6 @@ export function openGraph(api: DockviewApi) {
   addPanel(api, "graph", {}, besideReview(api), "graph");
 }
 
-/** Shows the Threads tab beside the review, in its pane if it's already open. */
-export function openThreads(api: DockviewApi) {
-  const open = api.getPanel("threads");
-  if (open) return open.api.setActive();
-  addPanel(api, "threads", {}, besideReview(api), "threads");
-}
-
 /** Shows the Q&A tab as a tab in the review's pane, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");
@@ -132,12 +124,12 @@ export function defaultLayout(api: DockviewApi) {
   addPanel(api, "review");
 }
 
-/** Drops panels earlier builds kept in the grid (Tasks, Files, Design) and panes that belonged to
- * other workspaces. */
+/** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads) and panes that
+ * belonged to other workspaces. */
 export function dropStalePanels(api: DockviewApi) {
   for (const p of [...api.panels]) {
     const task = (p.params as { task?: unknown } | undefined)?.task;
-    const moved = ["tasks", "files", "design"].includes(p.view.contentComponent);
+    const moved = ["tasks", "files", "design", "threads"].includes(p.view.contentComponent);
     if (moved || typeof task === "string") p.api.close();
   }
 }

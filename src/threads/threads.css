@@ -44,18 +44,56 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  width: 100%;
   padding: 8px 10px 2px;
-  border: none;
-  background: none;
-  text-align: left;
   font-size: var(--fs-xs);
   color: var(--muted);
+}
+
+.stage-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
 }
 
-.stage-head:hover {
+.stage-toggle:hover {
   color: var(--fg);
+}
+
+.stage-act {
+  padding: 1px 7px;
+  font-size: var(--fs-xs);
+}
+
+.stage-count {
+  min-width: 14px;
+  text-align: right;
+  font-family: var(--mono);
+}
+
+.pr-head-btn {
+  padding: 1px 8px;
+  font-size: var(--fs-xs);
+}
+
+.pr-head-btn.triage {
+  border-color: transparent;
+  background: rgb(139 92 246);
+  color: white;
+}
+
+.pr-head-btn.triage:hover:not(:disabled) {
+  background: rgb(124 77 230);
+}
+
+.pr-head-btn kbd {
+  color: inherit;
+  opacity: 0.8;
 }
 
 .stage-head .chevron {
@@ -88,7 +126,7 @@
   background: var(--hover);
 }
 
-.thread-row[aria-expanded="true"] {
+.thread-row[aria-current="true"] {
   background: var(--selection);
 }
 
@@ -105,44 +143,6 @@
   gap: 6px;
   font: var(--fs-xs) var(--mono);
   color: var(--muted);
-}
-
-/* A thread opened in a list. */
-.thread-card {
-  margin: 2px 8px 8px 16px;
-  border: 1px solid var(--hair);
-  border-left: 2px solid var(--github);
-  border-radius: 4px;
-  background: var(--panel);
-  user-select: text;
-}
-
-.thread-card-bar {
-  display: flex;
-  align-items: center;
-  padding: 0 2px;
-}
-
-.thread-card > .post:first-of-type {
-  padding-top: 0;
-}
-
-.thread-question {
-  margin: 6px 10px 0;
-  font-size: var(--fs-sm);
-}
-
-.thread-reply {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 8px 10px;
-}
-
-.thread-reply .comment-input {
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .send-fixed {
@@ -163,180 +163,6 @@
   gap: 6px;
 }
 
-/* The Threads tab. */
-.threads {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  outline: none;
-  background: var(--bg);
-}
-
-.threads-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 6px 0 12px;
-  border-bottom: 1px solid var(--hair);
-  font-size: var(--fs-sm);
-}
-
-.threads-title {
-  font-weight: 600;
-}
-
-.threads-pr-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-}
-
-.threads-head .faint {
-  color: var(--faint);
-  white-space: nowrap;
-}
-
-.threads-bar {
-  padding: 0 12px 6px;
-  border-bottom: 1px solid var(--hair);
-}
-
-.threads-list {
-  flex: 1;
-  overflow: auto;
-  padding-bottom: 12px;
-}
-
-.threads-section-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 28px;
-  padding: 0 8px 0 12px;
-  background: var(--bg);
-  font-size: var(--fs-sm);
-}
-
-.threads-section-head .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-}
-
-.threads-section-head .faint {
-  color: var(--faint);
-}
-
-.threads-section-head button {
-  padding: 1px 8px;
-  font-size: var(--fs-xs);
-}
-
-.threads-row {
-  display: grid;
-  grid-template-columns: 14px minmax(120px, 2fr) auto minmax(0, 3fr) auto;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  height: 26px;
-  padding: 0 12px 0 24px;
-  border: none;
-  border-radius: 0;
-  background: none;
-  text-align: left;
-  font-size: var(--fs-sm);
-}
-
-.threads-row:hover:not(:disabled) {
-  background: var(--hover);
-}
-
-.threads-row[aria-current="true"] {
-  background: var(--selection);
-}
-
-.threads-summary,
-.threads-latest {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.threads-latest {
-  color: var(--muted);
-}
-
-.threads-where {
-  font: var(--fs-xs) var(--mono);
-  color: var(--muted);
-}
-
-/* The focused thread: what's unanswered and the code beside the take, reply and chat. */
-.focused-thread {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 12px;
-  margin: 2px 12px 10px 24px;
-  padding: 8px 10px 10px;
-  border: 1px solid var(--hair);
-  border-left: 2px solid var(--github);
-  border-radius: 4px;
-  background: var(--panel);
-  user-select: text;
-}
-
-.focused-left > .post {
-  padding-left: 0;
-  padding-right: 0;
-}
-
-.focused-left .earlier {
-  padding: 0;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-
-.focused-code {
-  margin-top: 8px;
-}
-
-.focused-code pre {
-  margin: 4px 0 0;
-  padding: 6px 8px;
-  overflow: auto;
-  max-height: 240px;
-  border-radius: 4px;
-  background: var(--bg);
-  font: var(--fs-xs) var(--mono);
-}
-
-.focused-right {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.focused-right .reply-head {
-  padding: 0;
-}
-
-.focused-right .comment-input {
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.focused-take {
-  font-size: var(--fs-sm);
-}
-
 .threads-run {
   display: flex;
   align-items: center;
@@ -348,18 +174,5 @@
 }
 
 .threads-run .spinner {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 2px solid rgb(79 140 201 / 30%);
-  border-top-color: var(--accent);
-  animation: threads-spin 0.8s linear infinite;
-}
-
-@keyframes threads-spin {
-  to {
-    rotate: 360deg;
-  }
+  color: var(--accent);
 }

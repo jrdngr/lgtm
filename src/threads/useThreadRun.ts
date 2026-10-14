@@ -4,7 +4,6 @@ import { endFrom, startRun } from "../agents/runs";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
-import { showThread } from "./focus";
 
 export type RunKind = "triage" | "fix";
 
@@ -22,7 +21,6 @@ export function useThreadRun(review: CurrentReview | undefined, onError: (e: str
       subject: kind === "triage" ? "PR threads" : "Threads to fix",
       stop: () => commands.stopThreadRun(id),
       retry: () => start(kind),
-      open: () => showThread(workspace),
     });
     const channel = new Channel<string>();
     channel.onmessage = (activity) => {

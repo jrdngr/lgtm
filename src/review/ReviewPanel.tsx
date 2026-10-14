@@ -296,7 +296,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
 
   function askAgent() {
     const id = commentNear(lines, cursor);
-    if (id !== undefined && !agentsOff()) c.openAsk(id);
+    if (id !== undefined && !agentsOff()) c.agentKey(id);
   }
 
   const onKeyDown = useReviewKeys({

@@ -4,7 +4,6 @@ import { commands, unwrap } from "../ipc";
 import { currentReview } from "../review/current";
 import { setWorkspaceRevset } from "../review/revset";
 import { targetOf } from "../review/target";
-import { showThread } from "../threads/focus";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { pathItems, run } from "../ui/pathMenu";
@@ -54,9 +53,7 @@ export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): 
     { label: "Open Workspace", onSelect: open },
     "-",
     { label: "New Terminal Here", onSelect: inIt((api) => focusPanel(addTerminal(api))) },
-    pr
-      ? { label: "Open Threads", keys: "⇧⌘J", onSelect: inIt(() => showThread(ws)) }
-      : { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
+    !pr && { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
     "-",
     ...(pr
       ? [

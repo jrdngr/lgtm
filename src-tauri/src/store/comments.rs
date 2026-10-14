@@ -66,6 +66,13 @@ pub struct Message {
     /// An agent message that rewrote its thread's take or reply.
     #[serde(default)]
     pub updated: bool,
+    /// A user message that asked for a first take and reply, shown as nothing but the agent's
+    /// answer.
+    #[serde(default)]
+    pub compose: bool,
+    /// The reply an agent message replaced, empty for a first one.
+    #[serde(default)]
+    pub before: Option<String>,
 }
 
 /// The agent conversation inside a comment block.
@@ -341,6 +348,8 @@ mod tests {
                 text: "hi".into(),
                 change: false,
                 updated: false,
+                compose: false,
+                before: None,
             }],
         };
         store.set_workshop(c.id, &workshop).unwrap();

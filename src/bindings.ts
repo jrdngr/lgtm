@@ -365,6 +365,8 @@ export type Ask = {
 	draft: string,
 	/**  Have the agent edit the working copy. */
 	change: boolean,
+	/**  Ask for a first take and reply, with no message of the user's. */
+	compose?: boolean,
 };
 
 export type Author = "user" | "agent";
@@ -866,6 +868,13 @@ export type Message = {
 	change?: boolean,
 	/**  An agent message that rewrote its thread's take or reply. */
 	updated?: boolean,
+	/**
+	 *  A user message that asked for a first take and reply, shown as nothing but the agent's
+	 *  answer.
+	 */
+	compose?: boolean,
+	/**  The reply an agent message replaced, empty for a first one. */
+	before?: string | null,
 };
 
 export type Minimal = {

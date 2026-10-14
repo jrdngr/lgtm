@@ -388,6 +388,8 @@ impl RepoCtx {
                 text: text.to_string(),
                 change: false,
                 updated: false,
+                compose: false,
+                before: None,
             });
             Ok(store.set_workshop(c.id, &c.workshop)?)
         })?;
