@@ -48,6 +48,10 @@ pub struct ChangeDto {
     pub conflict: bool,
     /// Whether it changes no files.
     pub empty: bool,
+    /// Whether other visible commits share its change id.
+    pub divergent: bool,
+    /// Its local bookmarks, each ending in `*` when the remote lacks it or is behind.
+    pub bookmarks: Vec<String>,
     pub description: String,
     pub since: Since,
 }
@@ -67,6 +71,8 @@ fn dto(c: Change, since: Since) -> ChangeDto {
         working_copy: c.working_copy,
         conflict: c.conflict,
         empty: c.empty,
+        divergent: c.divergent,
+        bookmarks: c.bookmarks,
         description: c.description,
         since,
     }
@@ -121,6 +127,8 @@ pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Res
                     working_copy: false,
                     conflict: false,
                     empty: false,
+                    divergent: false,
+                    bookmarks: vec![],
                     description: String::new(),
                 })
                 .collect()

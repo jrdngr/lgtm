@@ -510,6 +510,10 @@ export type ChangeDto = {
 	conflict: boolean,
 	/**  Whether it changes no files. */
 	empty: boolean,
+	/**  Whether other visible commits share its change id. */
+	divergent: boolean,
+	/**  Its local bookmarks, each ending in `*` when the remote lacks it or is behind. */
+	bookmarks: string[],
 	description: string,
 	since: Since,
 };

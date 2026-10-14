@@ -218,6 +218,14 @@ mod tests {
         commit("five", "five");
         push("five");
 
+        // A bookmark the remote lacks, or that moved past it, is marked unpushed.
+        let marks = async |rev: &str| ctx.main.jj.changes(rev).await.unwrap()[0].bookmarks.clone();
+        assert_eq!(marks("one").await, ["one"]);
+        assert_eq!(marks("local-only").await, ["local-only*"]);
+        jj(d, &["bookmark", "set", "one", "-r", "local-only"]);
+        assert_eq!(marks("local-only").await, ["local-only*", "one*"]);
+        jj(d, &["bookmark", "set", "one", "-r", "one@origin", "--allow-backwards"]);
+
         // From the middle of the stack: `three` is on @, `one` two below, `four` and `five`
         // above. `main` is trunk and `local-only` was never pushed.
         jj(d, &["edit", "three"]);
