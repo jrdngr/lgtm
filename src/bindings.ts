@@ -240,6 +240,8 @@ export const commands = {
 	 *  `summary`. `fixed` says what happens to ready threads with no reply.
 	 */
 	sendThreads: (review: number, fixed: Fixed, verdict: Verdict, summary: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_threads", { review, fixed, verdict, summary })),
+	/**  Sends one ready thread to GitHub. */
+	sendThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("send_thread", { review, comment })),
 	/**  The PR's conversation: comments and review summaries. */
 	prDiscussion: (workspace: string | null) => typedError<DiscussionDto, string>(__TAURI_INVOKE("pr_discussion", { workspace })),
 	/**  Posts to the PR's conversation right away. */

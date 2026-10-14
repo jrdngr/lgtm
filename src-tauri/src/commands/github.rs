@@ -115,6 +115,20 @@ pub(crate) async fn send_threads(
         .map_err(err)
 }
 
+/// Sends one ready thread to GitHub.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn send_thread(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .send_thread(review, comment)
+        .await
+        .map_err(err)
+}
+
 /// The PR's conversation: comments and review summaries.
 #[tauri::command]
 #[specta::specta]

@@ -2,6 +2,7 @@
 //! so reviewers get one notification; replies to comments on the PR itself post as PR comments
 //! that quote what they answer.
 
+use anyhow::Context;
 use serde::Deserialize;
 use specta::Type;
 
@@ -73,15 +74,7 @@ impl RepoCtx {
             .into_iter()
             .filter(|c| c.thread.as_ref().is_some_and(|t| t.stage == Stage::Ready))
             .collect();
-        let drafts = ready
-            .iter()
-            .any(|c| c.github.is_none() && !c.body.trim().is_empty());
-        anyhow::ensure!(
-            !drafts || self.shows_whole(id, &pr.revset())?,
-            "open the whole PR ({}) in the Combined view to send new comments, where GitHub's \
-             lines match",
-            pr.revset()
-        );
+        self.check_lines(id, &pr, &ready)?;
         let mut reviewed = false;
         for c in &ready {
             match self.send_one(id, &pr, c, fixed).await {
@@ -97,6 +90,47 @@ impl RepoCtx {
         if reviewed || say || github::publish::has_pending(&pr.id).await? {
             github::publish::submit(&pr.id, &pr.head, verdict, summary).await?;
         }
+        self.pull_sent(id).await
+    }
+
+    /// Sends one ready thread, submitting the review its reply goes into, and pulls the PR's
+    /// threads again.
+    pub async fn send_thread(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
+        let ws = self.review_workspace(id)?;
+        let pr = self.need_pr(ws.name.as_deref())?;
+        let c = self
+            .store
+            .lock()
+            .unwrap()
+            .comment(comment as i64)?
+            .context("the thread is gone")?;
+        anyhow::ensure!(
+            c.thread.as_ref().is_some_and(|t| t.stage == Stage::Ready),
+            "make the reply final first"
+        );
+        self.check_lines(id, &pr, std::slice::from_ref(&c))?;
+        if self.send_one(id, &pr, &c, Fixed::Leave).await? {
+            github::publish::submit(&pr.id, &pr.head, Verdict::Comment, "").await?;
+        }
+        self.pull_sent(id).await
+    }
+
+    /// New comments go on GitHub's lines, so they need the whole PR in view.
+    fn check_lines(&self, id: u32, pr: &PrRecord, threads: &[Comment]) -> anyhow::Result<()> {
+        let drafts = threads
+            .iter()
+            .any(|c| c.github.is_none() && !c.body.trim().is_empty());
+        anyhow::ensure!(
+            !drafts || self.shows_whole(id, &pr.revset())?,
+            "open the whole PR ({}) in the Combined view to send new comments, where GitHub's \
+             lines match",
+            pr.revset()
+        );
+        Ok(())
+    }
+
+    /// The state after sending, with the PR's threads pulled again.
+    async fn pull_sent(&self, id: u32) -> anyhow::Result<StateDto> {
         match self.pull_pr_comments(id).await {
             Ok(state) => Ok(state),
             // It's sent either way, so show that.

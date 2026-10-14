@@ -116,10 +116,17 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
               {final ? (
                 <>
                   <span className="pill green">✓ Final</span>
-                  <span className="faint">Sends with Send to GitHub in the PR sidebar</span>
                   <span className="spacer" />
                   <button type="button" onClick={() => c.edit(comment)}>
                     Edit <kbd>e</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    className="flow-final"
+                    disabled={c.sending.has(id)}
+                    onClick={() => c.sendOne(id)}
+                  >
+                    {c.sending.has(id) ? <Busy>Sending…</Busy> : "Send to GitHub"}
                   </button>
                 </>
               ) : (

@@ -138,6 +138,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::github::refetch_pr,
             commands::github::pull_pr_comments,
             commands::github::send_threads,
+            commands::github::send_thread,
             commands::github::pr_discussion,
             commands::github::reply_pr,
             commands::github::resolve_conflict,

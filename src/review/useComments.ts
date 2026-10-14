@@ -91,6 +91,8 @@ export function useComments({
   const [confirming, setConfirming] = useState<number>();
   /** Threads whose proposed changes are being written. */
   const [applying, setApplying] = useState<ReadonlySet<number>>(new Set());
+  /** Threads being sent to GitHub. */
+  const [sending, setSending] = useState<ReadonlySet<number>>(new Set());
   /** Blocks whose ask box was opened. It also shows while a block has a conversation. */
   const [askOpen, setAskOpen] = useState<ReadonlySet<number>>(new Set());
   /** The text box that should take focus when its block next renders. */
@@ -281,6 +283,14 @@ export function useComments({
     );
   }
 
+  /** Sends a final thread to GitHub on its own. */
+  async function sendOne(id: number) {
+    if (!review) return;
+    setSending((s) => new Set(s).add(id));
+    await apply(commands.sendThread(review.id, id));
+    setSending((s) => withoutId(s, id));
+  }
+
   async function setStage(id: number, stage: Stage) {
     if (review) await apply(commands.setThreadStage(review.id, id, stage));
   }
@@ -359,6 +369,8 @@ export function useComments({
     applying,
     discard,
     applyByAgent,
+    sending,
+    sendOne,
     setStage,
     reset,
     setDone,
