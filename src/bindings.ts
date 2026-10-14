@@ -450,6 +450,8 @@ export type ChangeDto = {
 	workingCopy: boolean,
 	/**  Whether it has unresolved conflicts. */
 	conflict: boolean,
+	/**  Whether it changes no files. */
+	empty: boolean,
 	description: string,
 	since: Since,
 };

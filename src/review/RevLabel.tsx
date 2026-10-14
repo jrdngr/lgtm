@@ -18,7 +18,7 @@ function Id({ id, unique, length }: { id: string; unique: number; length: number
 
 function Desc({ change }: { change: ChangeDto }) {
   return (
-    <span className={change.description ? "rev-desc" : "rev-desc empty"}>
+    <span className={change.description || change.empty ? "rev-desc" : "rev-desc empty"}>
       {change.description || "no description"}
     </span>
   );

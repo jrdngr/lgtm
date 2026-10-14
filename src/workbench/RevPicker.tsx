@@ -17,7 +17,7 @@ function hover({ revset, changes, stale }: ReviewTarget) {
 
 /** What the workspace reviews, in the header, whether or not a review pane is open. Opens
  * the revisions panel to pick another revset or change commits; `@` in a review opens it
- * too. Amber warns of a change with no description or a stale working copy. */
+ * too. Amber warns of a change with edits but no description, or a stale working copy. */
 export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
   const target = useReviewTarget(workspace);
   const [open, setOpen] = useState(false);
@@ -44,7 +44,7 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
 
   const loading = !target || (target.loading && target.changes.length === 0);
   const head = target?.changes.at(-1);
-  const warn = !loading && (target?.stale || (head && !head.description));
+  const warn = !loading && (target?.stale || (head && !head.empty && !head.description));
 
   useLayoutEffect(() => {
     if (!loading && ref.current) width.current = ref.current.offsetWidth;

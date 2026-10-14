@@ -38,23 +38,26 @@ pub struct Change {
     pub working_copy: bool,
     /// Whether it has unresolved conflicts.
     pub conflict: bool,
+    /// Whether it changes no files.
+    pub empty: bool,
     pub description: String,
 }
 
 const CHANGE_TEMPLATE: &str = r#"change_id.short(12) ++ "\t" ++ commit_id ++ "\t"
   ++ change_id.shortest().prefix().len() ++ "\t" ++ if(current_working_copy, "1", "0") ++ "\t"
-  ++ if(conflict, "1", "0") ++ "\t" ++ description.first_line() ++ "\n""#;
+  ++ if(conflict, "1", "0") ++ "\t" ++ if(empty, "1", "0") ++ "\t" ++ description.first_line() ++ "\n""#;
 
 fn parse_changes(out: &str) -> Vec<Change> {
     out.lines()
         .filter_map(|l| {
-            let mut parts = l.splitn(6, '\t');
+            let mut parts = l.splitn(7, '\t');
             Some(Change {
                 change_id: parts.next()?.to_string(),
                 commit_id: parts.next()?.to_string(),
                 unique: parts.next()?.parse().ok()?,
                 working_copy: parts.next()? == "1",
                 conflict: parts.next()? == "1",
+                empty: parts.next()? == "1",
                 description: parts.next().unwrap_or_default().to_string(),
             })
         })
@@ -216,10 +219,11 @@ mod tests {
 
     #[test]
     fn parses_change_lines_with_tabs_in_descriptions() {
-        let got = parse_changes("abc\tc1\t2\t1\t0\tfix: a\tb\nxyz\tc2\t1\t0\t1\t\n");
+        let got = parse_changes("abc\tc1\t2\t1\t0\t0\tfix: a\tb\nxyz\tc2\t1\t0\t1\t1\t\n");
         assert_eq!(got[0].description, "fix: a\tb");
         assert_eq!((got[0].unique, got[0].working_copy), (2, true));
         assert!(!got[0].conflict && got[1].conflict);
+        assert!(!got[0].empty && got[1].empty);
         assert_eq!(
             (got[1].change_id.as_str(), got[1].description.as_str()),
             ("xyz", "")

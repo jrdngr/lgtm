@@ -46,6 +46,8 @@ pub struct ChangeDto {
     pub working_copy: bool,
     /// Whether it has unresolved conflicts.
     pub conflict: bool,
+    /// Whether it changes no files.
+    pub empty: bool,
     pub description: String,
     pub since: Since,
 }
@@ -64,6 +66,7 @@ fn dto(c: Change, since: Since) -> ChangeDto {
         unique: c.unique,
         working_copy: c.working_copy,
         conflict: c.conflict,
+        empty: c.empty,
         description: c.description,
         since,
     }
@@ -117,6 +120,7 @@ pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Res
                     unique: 0,
                     working_copy: false,
                     conflict: false,
+                    empty: false,
                     description: String::new(),
                 })
                 .collect()
