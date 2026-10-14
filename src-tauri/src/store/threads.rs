@@ -85,6 +85,9 @@ pub struct ThreadState {
     /// Code changes the agent's reply promises, by file.
     #[serde(default)]
     pub proposal: Vec<Proposed>,
+    /// A reply the agent suggests after reviewing the current one.
+    #[serde(default)]
+    pub suggestion: Option<String>,
 }
 
 impl ThreadState {
@@ -96,6 +99,7 @@ impl ThreadState {
             take: None,
             summary: String::new(),
             proposal: vec![],
+            suggestion: None,
         }
     }
 

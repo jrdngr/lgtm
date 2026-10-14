@@ -283,6 +283,11 @@ export function useComments({
     );
   }
 
+  /** Makes the suggested reply the thread's reply with `apply`, or drops it. */
+  async function settleSuggestion(id: number, accept: boolean) {
+    if (review) await apply(commands.settleSuggestion(review.id, id, accept));
+  }
+
   /** Sends a final thread to GitHub on its own. */
   async function sendOne(id: number) {
     if (!review) return;
@@ -371,6 +376,7 @@ export function useComments({
     applyByAgent,
     sending,
     sendOne,
+    settleSuggestion,
     setStage,
     reset,
     setDone,

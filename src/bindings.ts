@@ -128,6 +128,8 @@ export const commands = {
 	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
 	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
 	resetThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
+	/**  Makes a thread's suggested reply its reply with `apply`, or drops it. */
+	settleSuggestion: (review: number, comment: number, apply: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("settle_suggestion", { review, comment, apply })),
 	/**  Writes a thread's proposed code changes to the working copy. */
 	applyProposal: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("apply_proposal", { review, comment })),
 	/**  Drops a thread's proposed change to `path`, or all of them without one. */
@@ -1581,6 +1583,8 @@ export type ThreadState = {
 	summary: string,
 	/**  Code changes the agent's reply promises, by file. */
 	proposal?: Proposed[],
+	/**  A reply the agent suggests after reviewing the current one. */
+	suggestion?: string | null,
 };
 
 /**  A tool that's missing or too old. */

@@ -125,7 +125,7 @@ struct List<T> {
 }
 
 /// One chat turn's answer: what to say, and the take and reply when they change.
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(super) struct ChatTurn {
     pub message: String,
     pub verdict: Option<TakeVerdict>,
@@ -421,7 +421,7 @@ impl RepoCtx {
                 edits: None,
             };
             let before = c.body.clone();
-            apply_chat(&mut c, turn);
+            apply_chat(&mut c, turn, false);
             if c.body != before {
                 store.set_comment_body(c.id, &c.body, super::now_ms())?;
             }
@@ -489,7 +489,9 @@ pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String
 
 /// Applies a chat turn to its thread: a new take and reply replace the old ones. Returns the
 /// message to show and whether anything was updated.
-pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn) -> (String, bool) {
+/// Applies a chat turn to its thread. With `suggest`, a new reply is kept as the thread's
+/// suggestion instead of replacing the reply.
+pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn, suggest: bool) -> (String, bool) {
     let Some(t) = c.thread.as_mut() else {
         return (turn.message, false);
     };
@@ -498,9 +500,11 @@ pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn) -> (String, bool) {
         t.take = Some(take(verdict, why, turn.question));
         updated = true;
     }
-    if let Some(reply) = turn.reply.filter(|r| !r.trim().is_empty())
-        && reply != c.body
-    {
+    let reply = turn.reply.filter(|r| !r.trim().is_empty() && *r != c.body);
+    if suggest {
+        updated |= reply.is_some() || t.suggestion.is_some();
+        t.suggestion = reply;
+    } else if let Some(reply) = reply {
         c.body = reply;
         t.stage = super::threads::after_edit(t.stage, c.github.is_none(), &c.body);
         updated = true;
@@ -555,7 +559,10 @@ mod tests {
             reply: reply.map(String::from),
             edits: None,
         };
-        assert_eq!(apply_chat(&mut c, turn(Some("new"))), ("ok".into(), true));
+        assert_eq!(
+            apply_chat(&mut c, turn(Some("new")), false),
+            ("ok".into(), true)
+        );
         let t = c.thread.as_ref().unwrap();
         assert_eq!(c.body, "new");
         assert_eq!(t.take.as_ref().unwrap().question, None);
@@ -564,7 +571,19 @@ mod tests {
         // Saying nothing new about the reply leaves it.
         let mut quiet = turn(None);
         quiet.verdict = None;
-        assert_eq!(apply_chat(&mut c, quiet), ("ok".into(), false));
+        assert_eq!(
+            apply_chat(&mut c, quiet.clone(), false),
+            ("ok".into(), false)
+        );
         assert_eq!(c.body, "new");
+        // A review suggests its reply, and a later one that keeps the reply drops it.
+        apply_chat(&mut c, turn(Some("newer")), true);
+        assert_eq!(c.body, "new");
+        assert_eq!(
+            c.thread.as_ref().unwrap().suggestion.as_deref(),
+            Some("newer")
+        );
+        apply_chat(&mut c, quiet, true);
+        assert_eq!(c.thread.as_ref().unwrap().suggestion, None);
     }
 }

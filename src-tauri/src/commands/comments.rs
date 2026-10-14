@@ -48,6 +48,20 @@ pub(crate) fn reset_thread(
     repo(&window)?.reset_thread(review, comment).map_err(err)
 }
 
+/// Makes a thread's suggested reply its reply with `apply`, or drops it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn settle_suggestion(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+    apply: bool,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .settle_suggestion(review, comment, apply)
+        .map_err(err)
+}
+
 /// Marks a note done, or open again.
 #[tauri::command]
 #[specta::specta]

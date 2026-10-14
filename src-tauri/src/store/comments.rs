@@ -430,7 +430,17 @@ mod tests {
         }
         let store = Store::init(db).unwrap();
         let verdicts: Vec<TakeVerdict> = (1..=3)
-            .map(|id| store.comment(id).unwrap().unwrap().thread.unwrap().take.unwrap().verdict)
+            .map(|id| {
+                store
+                    .comment(id)
+                    .unwrap()
+                    .unwrap()
+                    .thread
+                    .unwrap()
+                    .take
+                    .unwrap()
+                    .verdict
+            })
             .collect();
         use TakeVerdict::*;
         assert_eq!(verdicts, [Change, Disagree, Decide]);

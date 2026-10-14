@@ -6,8 +6,8 @@ import { Busy } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { AskBox } from "./AskBox";
 import { ProposalSection } from "./ProposalSection";
+import { SuggestedReply } from "./SuggestedReply";
 import type { Comments } from "./useComments";
-import { wordDiff } from "./wordDiff";
 
 interface Props {
   comment: CommentDto;
@@ -31,7 +31,6 @@ function versions(messages: Message[]) {
  * take, the reply draft, and the conversation that refines it. */
 export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
   const draftRef = useRef<HTMLDivElement>(null);
-  const [changes, setChanges] = useState(false);
   const [flash, setFlash] = useState(false);
   const id = comment.id;
   const take = comment.thread?.take;
@@ -40,8 +39,7 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
   const final = comment.thread?.stage === "ready";
   const made = versions(comment.messages);
   const version = made.size;
-  const last = [...made.keys()].at(-1);
-  const before = last === undefined ? undefined : comment.messages[last].before;
+  const suggestion = comment.thread?.suggestion;
   const started = !!take || !!body.trim() || comment.messages.length > 0 || !!running;
 
   function showDraft() {
@@ -91,23 +89,13 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
           <section className="flow-sec">
             <h4 className="flow-h">
               Reply <span className="flow-ver">{versionText}</span>
-              <span className="spacer" />
-              {version > 1 && before && !final && (
-                <button type="button" className="flow-link" onClick={() => setChanges(!changes)}>
-                  {changes ? "Hide changes" : "Show changes"}
-                </button>
-              )}
             </h4>
             {body.trim() ? (
               <div
                 ref={draftRef}
                 className={`flow-draft-text${final ? " final" : ""}${flash ? " fresh" : ""}`}
               >
-                {changes && before ? (
-                  <Changes before={before} after={body} />
-                ) : (
-                  <Markdown>{body}</Markdown>
-                )}
+                <Markdown>{body}</Markdown>
               </div>
             ) : (
               <div className="flow-none">No reply</div>
@@ -155,6 +143,9 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
             </div>
           </section>
         ))}
+      {!editor && !final && suggestion && (
+        <SuggestedReply id={id} body={body} suggestion={suggestion} c={c} />
+      )}
       {!final && (comment.messages.length > 0 || running) && (
         <section className="flow-sec">
           {(take || body.trim()) && <h4 className="flow-h">Agent</h4>}
@@ -182,19 +173,6 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
       )}
       <ProposalSection comment={comment} c={c} />
     </div>
-  );
-}
-
-function Changes({ before, after }: { before: string; after: string }) {
-  return (
-    <p className="flow-changes">
-      {wordDiff(before, after).map((p, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
-        <span key={i} className={p.kind === "same" ? undefined : `flow-${p.kind}`}>
-          {p.text}
-        </span>
-      ))}
-    </p>
   );
 }
 

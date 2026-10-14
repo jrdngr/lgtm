@@ -160,6 +160,8 @@ impl RepoCtx {
             .filter(|_| !ask.change)
             .map(|edits| proposal::build(&ws.root, &edits));
         let session = reply.ok().and_then(|r| r.session);
+        // Review of a reply suggests a new one rather than replacing it.
+        let review_reply = ask.compose && !ask.draft.trim().is_empty();
         if ask.change {
             // Pick up the edits now rather than waiting on the watcher.
             ws.snapshot().await.ok();
@@ -173,7 +175,8 @@ impl RepoCtx {
             let (text, updated, replaced) = match turn {
                 Some(turn) => {
                     let before = c.body.clone();
-                    let (mut message, mut updated) = replies::apply_chat(&mut c, turn);
+                    let (mut message, mut updated) =
+                        replies::apply_chat(&mut c, turn, review_reply);
                     if let (Some((files, problems)), Some(t)) = (proposed, c.thread.as_mut()) {
                         updated |= t.proposal != files;
                         t.proposal = files;
