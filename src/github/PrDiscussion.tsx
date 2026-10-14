@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Busy } from "../ui/Busy";
 import { prOpen } from "../workbench/subviews";
 import { PrPosts } from "./PrPosts";
 import { verdicts } from "./people";
@@ -55,7 +56,7 @@ export function PrDiscussion({ discussion, viewer }: { discussion: Discussion; v
               onChange={(e) => setReply(e.target.value)}
             />
             <button type="button" onClick={send} disabled={busy || !reply.trim()}>
-              {busy ? "Posting…" : "Post"}
+              {busy ? <Busy>Posting…</Busy> : "Post"}
             </button>
           </div>
         </>

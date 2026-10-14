@@ -3,6 +3,7 @@ import { commands, errorText, unwrap } from "../ipc";
 import { useAgentsOff } from "./agents";
 import { refreshMcpStatus, useMcpStatus } from "./mcp";
 import "./tools.css";
+import { Busy } from "../ui/Busy";
 
 const NEVER = "lgtm:mcp-offer:never";
 
@@ -76,7 +77,7 @@ export function McpOffer() {
       {error && <span className="error">{error}</span>}
       <span className="spacer" />
       <button type="button" onClick={register} disabled={state === "working"}>
-        {state === "working" ? "Setting up…" : "Set up"}
+        {state === "working" ? <Busy>Setting up…</Busy> : "Set up"}
       </button>
       <button type="button" onClick={() => setHidden(true)}>
         Not now

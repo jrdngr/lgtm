@@ -1,3 +1,4 @@
+import { Busy } from "../ui/Busy";
 import type { PrReview } from "./usePrReview";
 
 function moved(p: PrReview) {
@@ -18,7 +19,7 @@ export function PrNote({ p }: { p: PrReview }) {
   return (
     <div className={`review-note${what ? " warn" : ""}`}>
       {p.busy ? (
-        `${p.busy}…`
+        <Busy>{p.busy}…</Busy>
       ) : (
         <>
           PR #{p.pr.number} {what ?? `is ${closed}`}

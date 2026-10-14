@@ -3,6 +3,7 @@ import type { ToolProblem } from "../bindings";
 import { commands } from "../ipc";
 import { setToolProblems } from "./agents";
 import "./tools.css";
+import { Busy } from "../ui/Busy";
 
 const NEEDED_BY: Record<string, string> = {
   claude: "Reviewers and comment agents",
@@ -57,7 +58,7 @@ export function ToolCheck({ children }: { children: ReactNode }) {
         </ul>
         <div className="tool-check-actions">
           <button type="button" onClick={check} disabled={checking}>
-            {checking ? "Checking…" : "Check again"}
+            {checking ? <Busy>Checking…</Busy> : "Check again"}
           </button>
           {!blocking && (
             <button type="button" onClick={() => setDismissed(true)}>

@@ -3,6 +3,7 @@ import type { NearbyPrDto, NearbyPrsDto } from "../bindings";
 import { closePrPreview, openPrPreview } from "../github/preview";
 import { type CommandResult, commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
+import { Busy } from "../ui/Busy";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
@@ -113,7 +114,13 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
     <div className="nearby-prs" onContextMenu={(e) => openMenu(e, [refresh])}>
       <SectionHeader
         title="On this stack"
-        meta={opening !== undefined ? `Fetching #${opening}…` : loading ? "Loading…" : undefined}
+        meta={
+          opening !== undefined ? (
+            <Busy>Fetching #{opening}…</Busy>
+          ) : loading ? (
+            <Busy>Loading…</Busy>
+          ) : undefined
+        }
       >
         <IconButton
           icon="sync"

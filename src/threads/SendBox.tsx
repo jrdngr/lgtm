@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Fixed, ThreadDto, Verdict } from "../bindings";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
+import { Busy } from "../ui/Busy";
 import { remembered } from "../workbench/remembered";
 import { canSend, count, planText, sendPlan } from "./stages";
 
@@ -131,7 +132,7 @@ export function SendBox({ review, threads, repo, own, onSent, confirm }: Props) 
             Cancel
           </button>
           <button type="button" className="primary" onClick={send} disabled={busy || !any}>
-            {busy ? "Sending…" : "Send"}
+            {busy ? <Busy>Sending…</Busy> : "Send"}
           </button>
         </div>
       ) : (

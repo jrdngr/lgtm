@@ -1,5 +1,6 @@
 import type { BotRun, Fix } from "../bindings";
 import { commands } from "../ipc";
+import { Busy } from "../ui/Busy";
 import { Refs } from "./Closing";
 import { Markdown } from "./Markdown";
 
@@ -21,7 +22,9 @@ export function Fixes({ run, onGo }: { run: BotRun; onGo(id: string): void }) {
       {fixes.map(({ f, i }) => (
         <section key={i} className={`bots-fix bots-fix-${f.status}`}>
           <div className="bots-fix-head">
-            <span className="bots-fix-status">{STATUS[f.status]}</span>
+            <span className="bots-fix-status">
+              {f.status === "running" ? <Busy>{STATUS.running}</Busy> : STATUS[f.status]}
+            </span>
             <Refs ids={f.findings} onGo={onGo} gone={(id) => !covers(run, f, id)} />
             <span className="spacer" />
             {f.status === "running" && (
@@ -31,7 +34,7 @@ export function Fixes({ run, onGo }: { run: BotRun; onGo(id: string): void }) {
             )}
           </div>
           {f.error && <div className="bots-error">{f.error}</div>}
-          {f.text ? <Markdown>{f.text}</Markdown> : f.status === "running" && <em>Working…</em>}
+          {f.text ? <Markdown>{f.text}</Markdown> : f.status === "running" && <Busy>Working…</Busy>}
         </section>
       ))}
     </>

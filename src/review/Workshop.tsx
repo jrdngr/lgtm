@@ -1,4 +1,5 @@
 import type { Message } from "../bindings";
+import { Busy } from "../ui/Busy";
 import { replyParts } from "./comments";
 import type { Running } from "./useComments";
 
@@ -69,7 +70,7 @@ export function Workshop({ messages, running, onUse }: Props) {
             {running.reply ? (
               <AgentText text={running.reply} />
             ) : (
-              <em>{running.change ? "Changing the code…" : "Thinking…"}</em>
+              <Busy>{running.change ? "Changing the code…" : "Thinking…"}</Busy>
             )}
           </div>
         </>

@@ -3,6 +3,7 @@ import type { McpStatus, ToolStatus } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
 import { setToolProblems } from "../tools/agents";
 import { refreshMcpStatus, useMcpStatus } from "../tools/mcp";
+import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
 import { Section } from "./SettingsPanel";
 import { useSettings } from "./store";
@@ -52,7 +53,7 @@ function Mcp() {
       <td className="settings-tool-action">
         {status && status.setup !== "registered" && (
           <button type="button" onClick={register} disabled={busy}>
-            {busy ? "Registering…" : "Register"}
+            {busy ? <Busy>Registering…</Busy> : "Register"}
           </button>
         )}
       </td>

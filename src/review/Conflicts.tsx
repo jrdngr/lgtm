@@ -4,6 +4,7 @@ import { startRun } from "../agents/runs";
 import type { ChangeDto, ResolveDto } from "../bindings";
 import { commands } from "../ipc";
 import { useAgentsOff } from "../tools/agents";
+import { Busy } from "../ui/Busy";
 import type { WorkspaceName } from "../workspaces/context";
 
 interface Run {
@@ -81,7 +82,7 @@ export function Conflicts({ workspace, changes, send, onDone }: Props) {
       {run && (
         <div className="review-note resolve-run">
           <div>
-            {running ? `Resolving ${run.change}…` : `${run.change}: ${outcome(run)}`}
+            {running ? <Busy>Resolving {run.change}…</Busy> : `${run.change}: ${outcome(run)}`}
             {running ? (
               <button type="button" onClick={() => commands.stopResolve(workspace)}>
                 Stop

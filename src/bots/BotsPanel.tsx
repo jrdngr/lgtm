@@ -15,6 +15,7 @@ import { ReportOptions } from "./ReportOptions";
 import { RunList } from "./RunList";
 import { seedRun } from "./runs";
 import "./bots.css";
+import { Busy } from "../ui/Busy";
 
 const STORE_KEY = "lgtm.bots";
 
@@ -164,11 +165,13 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
         onClick={start}
         title="Run each persona headless with claude -p"
       >
-        {starting
-          ? "Starting…"
-          : n
-            ? `Run ${n} ${n === 1 ? "reviewer" : "reviewers"}`
-            : "Run reviewers"}
+        {starting ? (
+          <Busy>Starting…</Busy>
+        ) : n ? (
+          `Run ${n} ${n === 1 ? "reviewer" : "reviewers"}`
+        ) : (
+          "Run reviewers"
+        )}
         <small>{blocked ?? <>on {review?.revset}</>}</small>
       </button>
       {error && <div className="bots-error">{error}</div>}

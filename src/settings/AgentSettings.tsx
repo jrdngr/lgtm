@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ClaudeCommand, Models, Settings } from "../bindings";
 import { commands } from "../ipc";
+import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
 import { Row, Section } from "./SettingsPanel";
 import { saveSettings } from "./store";
@@ -79,7 +80,7 @@ function Resolved({ setting }: { setting: string }) {
   return (
     <div className="settings-resolved">
       {!cmd ? (
-        <span className="faint">Resolving…</span>
+        <Busy className="faint">Resolving…</Busy>
       ) : cmd.error ? (
         <span className="error">{cmd.error}</span>
       ) : cmd.viaShell ? (

@@ -9,6 +9,7 @@ import { useWorkspace } from "../workspaces/context";
 import { nodeDone, nodeLabel, nodeRisk, STATUS_SIGN, showNode } from "./nodes";
 import { useGraph } from "./useGraph";
 import "./SymbolsPanel.css";
+import { Busy } from "../ui/Busy";
 
 /** Callers of each node, by id. */
 function callersOf(graph: GraphDto) {
@@ -71,7 +72,9 @@ export function SymbolsPanel() {
   if (loading || !graph)
     return (
       <Shell>
-        <Empty>Finding symbols…</Empty>
+        <Empty>
+          <Busy>Finding symbols…</Busy>
+        </Empty>
       </Shell>
     );
   const changed = graph.nodes.filter((n) => n.status !== "caller");
