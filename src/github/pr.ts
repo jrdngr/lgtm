@@ -13,18 +13,23 @@ const subscribe = (l: () => void) => {
   return () => listeners.delete(l);
 };
 
-/** The workspace's PR, loading it the first time. */
-export function prOf(workspace: WorkspaceName): Promise<PrDto | null> {
+/** The workspace's PR, loading it the first time. A failed load is tried again `retries`
+ * more times, a second apart. */
+export function prOf(workspace: WorkspaceName, retries = 5): Promise<PrDto | null> {
   const key = workspaceKey(workspace);
   if (prs.has(key)) return Promise.resolve(prs.get(key) ?? null);
   let p = loading.get(key);
   if (!p) {
     p = commands.prInfo(workspace).then((r) => {
-      const pr = r.status === "ok" ? r.data : null;
-      prs.set(key, pr);
       loading.delete(key);
+      // A failure, as before the window's repo is set, isn't remembered as no PR.
+      if (r.status === "error") {
+        if (retries > 0) window.setTimeout(() => prOf(workspace, retries - 1), 1000);
+        return null;
+      }
+      prs.set(key, r.data);
       for (const l of listeners) l();
-      return pr;
+      return r.data;
     });
     loading.set(key, p);
   }

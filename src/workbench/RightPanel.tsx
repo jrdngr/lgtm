@@ -13,7 +13,6 @@ import { NotesPanel } from "../review/NotesPanel";
 import { WalkthroughPanel } from "../review/WalkthroughPanel";
 import { PrPanel } from "../threads/PrPanel";
 import { needsYou } from "../threads/stages";
-import { useGithubOff } from "../tools/agents";
 import { useWorkspace, workspaceKey } from "../workspaces/context";
 import { SidePanel, type SideState } from "./SidePanel";
 
@@ -37,7 +36,6 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
   const review = useCurrentReview(workspace);
   const runs = useRuns(workspace);
   const pr = usePr(workspace);
-  const githubOff = useGithubOff();
   const qa = useQa(workspace);
   return (
     <SidePanel
@@ -48,7 +46,7 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
         { id: "changes", title: "Changes", icon: "gitTree", render: () => <FilesPanel /> },
         { id: "symbols", title: "Symbols", icon: "symbols", render: () => <SymbolsPanel /> },
         { id: "comments", title: "Notes", icon: "comments", render: () => <NotesPanel /> },
-        ...(pr && !githubOff
+        ...(pr
           ? [
               {
                 id: "pr",
