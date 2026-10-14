@@ -639,8 +639,7 @@ button.group-head.fold:hover {
   color: var(--muted);
 }
 
-.thread-block .flow-link,
-.thread-block .flow-up {
+.thread-block .flow-link {
   padding: 0;
   border: none;
   background: none;
@@ -774,40 +773,6 @@ button.group-head.fold:hover {
   opacity: 0.8;
 }
 
-.thread-block .flow-chat {
-  display: grid;
-  gap: 8px;
-}
-
-.thread-block .flow-msg {
-  display: grid;
-  gap: 2px;
-  font-size: var(--fs-sm);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.thread-block .flow-msg.agent > span:nth-child(2) {
-  color: var(--muted);
-}
-
-.thread-block .flow-who {
-  font-size: var(--fs-xs);
-  color: var(--faint);
-}
-
-.thread-block .flow-up {
-  justify-self: start;
-  margin-top: 3px;
-  font-size: var(--fs-xs);
-  color: var(--github);
-}
-
-.thread-block .flow-up:hover:not(:disabled) {
-  background: none;
-  text-decoration: underline;
-}
-
 .thread-block .flow .ask {
   margin-top: 0;
   align-items: center;
@@ -882,4 +847,108 @@ button.group-head.fold:hover {
 .note-text {
   padding: 8px 10px;
   cursor: text;
+}
+
+.thread-block .flow-chat {
+  display: grid;
+}
+
+.thread-block .flow-turn {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--hair);
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-turn:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.thread-block .flow-who {
+  padding-top: 1px;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+.thread-block .flow-turn.agent .flow-who {
+  color: var(--accent);
+}
+
+.thread-block .flow-said {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.thread-block .flow-said p {
+  margin: 0;
+}
+
+.thread-block .flow-turn.you p {
+  white-space: pre-wrap;
+}
+
+.thread-block .flow-event {
+  justify-self: start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.thread-block .flow-event::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.thread-block .flow-event.reply {
+  cursor: pointer;
+}
+
+.thread-block .flow-event.reply:hover:not(:disabled) {
+  background: none;
+  text-decoration: underline;
+}
+
+.thread-block .flow-event.reply::before {
+  background: var(--github);
+}
+
+.thread-block .flow-event.code::before {
+  background: var(--mark-yellow);
+}
+
+.thread-block .flow-said code {
+  font: 11.5px var(--mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--hover);
+}
+
+.thread-block .flow-said pre {
+  margin: 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.thread-block .flow-said pre code {
+  padding: 0;
+  background: none;
+}
+
+.thread-block .flow-said :is(ul, ol) {
+  margin: 0;
+  padding-left: 18px;
 }

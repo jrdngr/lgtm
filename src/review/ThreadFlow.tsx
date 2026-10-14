@@ -185,8 +185,20 @@ interface ChatProps {
   onShow(): void;
 }
 
+/** One turn of the conversation: who spoke, in a column of its own, and what they said. */
+function Turn({ who, children }: { who: "you" | "agent"; children: React.ReactNode }) {
+  return (
+    <div className={`flow-turn ${who}`}>
+      <span className="flow-who">{who === "you" ? "You" : "Agent"}</span>
+      <div className="flow-said">{children}</div>
+    </div>
+  );
+}
+
 /** The thread's conversation with the agent. A Draft reply shows only as the agent's answer. */
 function Chat({ messages, made, running, reviewing, onShow }: ChatProps) {
+  const asked = (text: string, change?: boolean) =>
+    text || (change ? "Make the change this comment asks for." : "");
   return (
     <div className="flow-chat">
       {messages.map((m, i) => {
@@ -194,38 +206,32 @@ function Chat({ messages, made, running, reviewing, onShow }: ChatProps) {
           if (m.compose) return null;
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: messages are append-only
-            <div key={i} className="flow-msg you">
-              <span className="flow-who">You</span>
-              <span>{m.text || (m.change ? "Make the change this comment asks for." : "")}</span>
-            </div>
+            <Turn key={i} who="you">
+              <p>{asked(m.text, m.change)}</p>
+            </Turn>
           );
         }
-        const v = made.get(i);
         const changed = !!messages[i - 1]?.change;
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: messages are append-only
-          <div key={i} className="flow-msg agent">
-            <span className="flow-who">{changed ? "Agent · changed the code" : "Agent"}</span>
-            <span>{m.text}</span>
-            {v !== undefined && (
-              <button type="button" className="flow-up" onClick={onShow}>
-                ↑ Reply v{v}
+          <Turn key={i} who="agent">
+            <Markdown>{m.text}</Markdown>
+            {made.has(i) && (
+              <button type="button" className="flow-event reply" onClick={onShow}>
+                Reply updated
               </button>
             )}
-          </div>
+            {changed && <span className="flow-event code">Code changed</span>}
+          </Turn>
         );
       })}
       {running && !running.compose && (
-        <div className="flow-msg you">
-          <span className="flow-who">You</span>
-          <span>
-            {running.ask || (running.change ? "Make the change this comment asks for." : "")}
-          </span>
-        </div>
+        <Turn who="you">
+          <p>{asked(running.ask, running.change)}</p>
+        </Turn>
       )}
       {running && (
-        <div className="flow-msg agent">
-          <span className="flow-who">Agent</span>
+        <Turn who="agent">
           <Busy className={`flow-thinking${running.compose ? " compose" : ""}`}>
             {running.compose
               ? reviewing
@@ -235,7 +241,7 @@ function Chat({ messages, made, running, reviewing, onShow }: ChatProps) {
                 ? "Changing the code…"
                 : "Thinking…"}
           </Busy>
-        </div>
+        </Turn>
       )}
     </div>
   );
