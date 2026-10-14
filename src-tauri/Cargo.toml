@@ -3,6 +3,7 @@ name = "lgtm"
 version = "0.1.0"
 description = "Desktop code review for agentic development"
 edition = "2024"
+license = "MIT"
 
 [lib]
 name = "lgtm_lib"
