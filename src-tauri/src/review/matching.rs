@@ -196,11 +196,44 @@ pub(super) fn pools<'a>(
 /// An anchor's commit and path, and the file index and side it's remapped onto.
 type RemapKey = (String, String, usize, Side);
 
+/// Line-diff maps from the file an anchor was taken on to a current file side: lines kept
+/// unchanged, and lines edited in place.
+struct LineMaps {
+    exact: HashMap<u32, u32>,
+    edited: HashMap<u32, Vec<u32>>,
+}
+
 /// Line-diff remaps from the file an anchor was taken on to a current file side, cached.
 #[derive(Default)]
-pub(super) struct Remaps(HashMap<RemapKey, Option<HashMap<u32, u32>>>);
+pub(super) struct Remaps(HashMap<RemapKey, Option<LineMaps>>);
 
 impl Remaps {
+    fn maps(
+        &mut self,
+        store: &Store,
+        commit: &str,
+        path: &str,
+        rows: &SideRows,
+    ) -> Option<&LineMaps> {
+        let key = (
+            commit.to_string(),
+            path.to_string(),
+            rows.file_idx,
+            rows.side,
+        );
+        self.0
+            .entry(key)
+            .or_insert_with(|| {
+                let old = store.line_hashes(commit, path).ok()??;
+                let new = &rows.current.index.as_ref()?.hashes;
+                Some(LineMaps {
+                    exact: anchor::remap_lines(&old, new),
+                    edited: anchor::follow_edits(&old, new),
+                })
+            })
+            .as_ref()
+    }
+
     /// The row an exact remap of `line` lands on, if it's a changed row of `rows`.
     pub fn row(
         &mut self,
@@ -210,20 +243,31 @@ impl Remaps {
         line: u32,
         rows: &SideRows,
     ) -> Option<usize> {
-        let key = (
-            commit.to_string(),
-            path.to_string(),
-            rows.file_idx,
-            rows.side,
-        );
-        let map = self.0.entry(key).or_insert_with(|| {
-            let old = store.line_hashes(commit, path).ok()??;
-            Some(anchor::remap_lines(
-                &old,
-                &rows.current.index.as_ref()?.hashes,
-            ))
-        });
-        rows.row_by_line.get(map.as_ref()?.get(&line)?).copied()
+        let line = self.maps(store, commit, path, rows)?.exact.get(&line)?;
+        rows.row_by_line.get(line).copied()
+    }
+
+    /// The candidates of `rows` that replaced `line` when it was edited, nearest to its
+    /// place in the edit first.
+    pub fn edited<'r>(
+        &mut self,
+        store: &Store,
+        commit: &str,
+        path: &str,
+        line: u32,
+        rows: &'r SideRows,
+    ) -> Vec<&'r Candidate> {
+        let Some(lines) = self
+            .maps(store, commit, path, rows)
+            .and_then(|m| m.edited.get(&line))
+        else {
+            return vec![];
+        };
+        lines
+            .iter()
+            .filter_map(|l| rows.row_by_line.get(l))
+            .filter_map(|&row| rows.candidates.iter().find(|c| c.id == row))
+            .collect()
     }
 }
 

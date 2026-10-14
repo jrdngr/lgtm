@@ -91,3 +91,27 @@ async fn threads_land_on_their_lines_through_working_copy_edits() {
     let other = ctx.open(None, "@", false).await.unwrap();
     assert!(other.state.comments.is_empty());
 }
+
+#[tokio::test]
+async fn a_thread_stays_on_its_line_when_the_working_copy_edits_it() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    let head = "fn old_name() {\n    one();\n}\n\nfn other() {}\n";
+    write(&ws.root, "a.rs", head);
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let texts = HashMap::from([("a.rs".to_string(), head.to_string())]);
+    ctx.add_threads(review.id, vec![thread("T1", Some(1))], &texts, "PR #1")
+        .unwrap();
+
+    // Renaming the function, with a new function added just above it, edits the thread's line.
+    write(
+        &ws.root,
+        "a.rs",
+        "fn helper() {}\n\nfn new_name() {\n    one();\n}\n\nfn other() {}\n",
+    );
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let c = &review.state.comments[0];
+    let span = c.rows.expect("the thread keeps its rows");
+    assert_eq!(row_text(&review, c.file, span.end), "fn new_name() {");
+}

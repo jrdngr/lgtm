@@ -143,7 +143,7 @@ fn overlap(a: &[i64], b: &[i64]) -> usize {
 
 /// `2*above + below`, the numerator of `(2*above + below) / (3*window)`. Above counts
 /// double because it usually holds the enclosing scope.
-fn score(anchor: &Anchor, c: &Candidate) -> usize {
+pub fn score(anchor: &Anchor, c: &Candidate) -> usize {
     2 * overlap(&anchor.above, &c.above) + overlap(&anchor.below, &c.below)
 }
 
@@ -203,6 +203,29 @@ pub fn remap_lines(old: &[i64], new: &[i64]) -> HashMap<u32, u32> {
         {
             for i in 0..len {
                 map.insert((old_index + i) as u32 + 1, (new_index + i) as u32 + 1);
+            }
+        }
+    }
+    map
+}
+
+/// Maps 1-based lines of `old` that a line diff replaces to the lines of their replacement,
+/// nearest to the same offset first.
+pub fn follow_edits(old: &[i64], new: &[i64]) -> HashMap<u32, Vec<u32>> {
+    let mut map = HashMap::new();
+    for op in similar::capture_diff_slices(similar::Algorithm::Myers, old, new) {
+        if let similar::DiffOp::Replace {
+            old_index,
+            old_len,
+            new_index,
+            new_len,
+        } = op
+        {
+            for i in 0..old_len {
+                let mut lines: Vec<usize> = (0..new_len).collect();
+                lines.sort_by_key(|&j| j.abs_diff(i));
+                let lines = lines.iter().map(|j| (new_index + j) as u32 + 1).collect();
+                map.insert((old_index + i) as u32 + 1, lines);
             }
         }
     }

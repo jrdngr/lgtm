@@ -122,35 +122,48 @@ impl Review {
     }
 
     /// The changed row a pin matches best, trying the files whose path pools hold its path:
-    /// its own, or else `path`, its comment's.
+    /// its own, or else `path`, its comment's. A pin whose line was edited lands on a line that
+    /// replaced it and shares some of its context.
     fn locate(&self, store: &Store, remaps: &mut Remaps, path: &str, pin: &Pin) -> Option<RowRef> {
         let path = pin.path.as_deref().unwrap_or(path);
         let removed = self.removed_paths();
         let anchor = pin.anchor(path);
-        for (file_idx, file) in self.files.iter().enumerate() {
-            let Some(rows) = SideRows::new(file_idx, file, pin.side) else {
-                continue;
-            };
-            if !pools(file, pin.side, &removed)
-                .iter()
-                .any(|p| p.contains(&path))
-            {
-                continue;
-            }
+        let sides: Vec<SideRows> = self
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| {
+                pools(f, pin.side, &removed)
+                    .iter()
+                    .any(|p| p.contains(&path))
+            })
+            .filter_map(|(i, f)| SideRows::new(i, f, pin.side))
+            .collect();
+        for rows in &sides {
             let mark = MarkRef {
                 id: 0,
                 anchor: &anchor,
                 created_at: 0,
-                remap: remaps.row(store, &pin.commit, path, pin.line, &rows),
+                remap: remaps.row(store, &pin.commit, path, pin.line, rows),
             };
             if let Some((&row, _)) = anchor::match_marks(&[mark], &rows.candidates, self.cfg)
                 .iter()
                 .next()
             {
-                return Some(RowRef::new(file_idx, row as u32));
+                return Some(RowRef::new(rows.file_idx, row as u32));
             }
         }
-        None
+        // The line was edited: take the line that replaced it whose context fits best, if any
+        // of its context is still there.
+        sides.iter().find_map(|rows| {
+            let edited = remaps.edited(store, &pin.commit, path, pin.line, rows);
+            let (score, best) = edited
+                .iter()
+                .rev()
+                .map(|c| (anchor::score(&anchor, c), c))
+                .max_by_key(|(s, _)| *s)?;
+            (score > 0).then(|| RowRef::new(rows.file_idx, best.id as u32))
+        })
     }
 
     /// Pins for the first and last of `rows` that can be anchored, all in the last one's file.

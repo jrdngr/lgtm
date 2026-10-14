@@ -190,6 +190,7 @@ Marks and comments are content-addressed diff lines, independent of commit IDs, 
   2. Duplicates are scored by `(2*above + below) / (3*window)` and matched one-to-one at >= 0.5. Above counts double because it usually holds the enclosing scope.
   3. Ties are broken by remapping: line-diff the file at the batch's commit against the current file. An exact remap wins unless another copy scores higher.
 - Removed lines use the old side of the file the same way.
+- A comment whose line was edited (no hash match) lands on a line the remap's line diff replaced it with, the one whose context scores highest, when at least one context hash still matches. Marks don't: their lines turn amber.
 - Renames: `jj diff --git` reports them up to about 50% changed. Above that, match unmarked added lines against marks on deleted paths in the same review.
 - Window size and threshold live in config. Defaults are window 2 and threshold 0.5. Replaying 150 commits of jj and Flask history (`anchor_eval`), 99.3% of marks landed on the right line and 0.02% on a wrong one.
 
