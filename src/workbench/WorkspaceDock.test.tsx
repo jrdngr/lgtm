@@ -46,6 +46,7 @@ async function mount(workspace: string) {
   const { WorkspaceContext } = await import("../workspaces/context");
   const { dockOf } = await import("./docks");
   const { isReviewPanel } = await import("./panels");
+  const { reopenClosed } = await import("./closedTabs");
   const el = document.createElement("div");
   document.body.append(el);
   await act(() =>
@@ -64,7 +65,7 @@ async function mount(workspace: string) {
     [...el.querySelectorAll<HTMLButtonElement>(".file-tree li button")].find(
       (b) => b.title === name,
     );
-  return { el, api, reviews, fileButton };
+  return { el, api, reviews, fileButton, reopen: () => reopenClosed(workspace) };
 }
 
 beforeEach(() => {
@@ -112,5 +113,29 @@ describe("Diff file list", { timeout: 20_000 }, () => {
     await settle();
     expect(reviews()).toEqual([second]);
     expect(second.api.isVisible).toBe(true);
+  });
+});
+
+describe("Reopening closed tabs", { timeout: 20_000 }, () => {
+  it("reopens closed tabs latest first, with their params", async () => {
+    const { api, reviews, reopen } = await mount("r");
+    const first = reviews()[0];
+    const params = first.params;
+    api.addPanel({ id: "second", component: "review", params: { ...params, revset: "@-" } });
+    await settle();
+    await act(() => first.api.close());
+    await act(() => api.getPanel("second")?.api.close());
+    await settle();
+    expect(reviews()).toHaveLength(0);
+
+    await act(() => reopen());
+    expect(reviews().map((p) => [p.id, p.params?.revset])).toEqual([["second", "@-"]]);
+    await act(() => reopen());
+    expect(
+      reviews()
+        .map((p) => p.id)
+        .sort(),
+    ).toEqual([first.id, "second"].sort());
+    expect(api.getPanel(first.id)?.params).toEqual(params);
   });
 });

@@ -143,7 +143,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
     { label: "Copy PR URL", onSelect: () => copy(pr.url) },
     { label: "Copy Branch Name", onSelect: () => copy(pr.headRef) },
     "-",
-    { label: "Open Threads", keys: "⇧⌘T", onSelect: () => showThread(workspace) },
+    { label: "Open Threads", keys: "⇧⌘J", onSelect: () => showThread(workspace) },
     sending && { label: "Send Ready to GitHub…", onSelect: () => setConfirm((n) => n + 1) },
   ]);
   return (
@@ -180,7 +180,7 @@ function Header({ threads = true }: { threads?: boolean }) {
       {threads && (
         <IconButton
           icon="comments"
-          label="Open the Threads tab (⌘⇧T)"
+          label="Open the Threads tab (⌘⇧J)"
           onClick={() => showThread(workspace)}
         />
       )}

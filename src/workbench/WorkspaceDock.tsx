@@ -24,6 +24,7 @@ import { TerminalPanel } from "../terminal/TerminalPanel";
 import { ThreadsPanel } from "../threads/ThreadsPanel";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
+import { trackClosed } from "./closedTabs";
 import { isMoving, takeTabsFrom } from "./crossDock";
 import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
@@ -123,6 +124,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     api.onDidRemovePanel(panes);
     api.onDidLayoutChange(save);
     takeTabsFrom(api, () => latest.current.bottom, workspace);
+    trackClosed(workspace, api, "main");
     registerDock(workspace, api);
   }
 
@@ -151,6 +153,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     });
     api.onDidLayoutChange(save);
     takeTabsFrom(api, () => latest.current.main, workspace);
+    trackClosed(workspace, api, "bottom");
     registerDock(workspace, api, "bottom");
   }
 

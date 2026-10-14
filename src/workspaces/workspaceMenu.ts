@@ -55,7 +55,7 @@ export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): 
     "-",
     { label: "New Terminal Here", onSelect: inIt((api) => focusPanel(addTerminal(api))) },
     pr
-      ? { label: "Open Threads", keys: "⇧⌘T", onSelect: inIt(() => showThread(ws)) }
+      ? { label: "Open Threads", keys: "⇧⌘J", onSelect: inIt(() => showThread(ws)) }
       : { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
     "-",
     ...(pr

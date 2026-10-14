@@ -15,6 +15,7 @@ import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { BottomPanel } from "./BottomPanel";
 import { bottom } from "./bottom";
+import { reopenClosed } from "./closedTabs";
 import { bottomDockOf, dockOf, revealPanel } from "./docks";
 import { bottomKey, chord } from "./keys";
 import { addTerminal, focusPanel, openReport } from "./panels";
@@ -150,7 +151,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+P": () => showView("right", "pr"),
-    "Mod+Shift+T": () => showThread(selected),
+    "Mod+Shift+T": () => reopenClosed(selected),
+    "Mod+Shift+J": () => showThread(selected),
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
