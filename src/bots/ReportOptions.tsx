@@ -48,7 +48,8 @@ interface Props {
   onChange(o: BotOptions): void;
 }
 
-/** The report to make (Raw, Synthesis or Minimal), and whether personas cross-review first. */
+/** The report to make (Raw, Synthesis or Minimal), and whether personas cross-review first.
+ * Adversarial shows only with cross-review on. */
 export function ReportOptions({ options, lone, onChange }: Props) {
   const report = reportOf(options);
   const cross = options.crossReview && !lone;
@@ -81,16 +82,17 @@ export function ReportOptions({ options, lone, onChange }: Props) {
       >
         Cross-review
       </Switch>
-      <div className="bots-sub">
-        <Switch
-          on={cross && options.adversarial}
-          disabled={!cross}
-          title="Cross-review argues against every medium and higher finding"
-          onChange={(on) => onChange({ ...options, adversarial: on })}
-        >
-          Adversarial
-        </Switch>
-      </div>
+      {cross && (
+        <div className="bots-sub">
+          <Switch
+            on={options.adversarial}
+            title="Cross-review argues against every medium and higher finding"
+            onChange={(on) => onChange({ ...options, adversarial: on })}
+          >
+            Adversarial
+          </Switch>
+        </div>
+      )}
     </div>
   );
 }
