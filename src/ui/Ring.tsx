@@ -12,14 +12,14 @@ interface Props {
 /** How much of something is reviewed: a small filling ring, or a green check once it's all
  * done. */
 export function Ring({ done, title, percent }: Props) {
-  const pct = Math.round(done * 100);
-  if (pct >= 100) {
+  if (done >= 1) {
     return (
       <span className="ring-wrap done" title={title}>
         <Icon name="check" size={13} />
       </span>
     );
   }
+  const pct = Math.floor(done * 100);
   return (
     <span className="ring-wrap" title={title}>
       {percent && <span className="ring-pct">{pct}%</span>}

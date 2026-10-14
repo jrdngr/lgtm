@@ -53,7 +53,8 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
         out.push(FileEntry {
             name: entry.file_name().to_string_lossy().into_owned(),
             path: rel.to_string_lossy().replace('\\', "/"),
-            dir: entry.file_type().is_some_and(|t| t.is_dir()),
+            // Follows symlinks, so a link to a directory opens like one.
+            dir: entry.path().is_dir(),
         });
     }
     out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.cmp(&b.name)));
@@ -103,6 +104,27 @@ mod tests {
         };
         assert_eq!(names(""), ["src", ".gitignore", "b.txt"]);
         assert_eq!(names("src"), ["src/main.rs"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn lists_a_symlinked_directory_as_a_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("shared")).unwrap();
+        std::fs::write(root.join("shared/a.md"), "").unwrap();
+        std::os::unix::fs::symlink("shared", root.join("docs")).unwrap();
+        let docs = list(root, "")
+            .unwrap()
+            .into_iter()
+            .find(|e| e.name == "docs");
+        assert!(docs.unwrap().dir);
+        let inside: Vec<_> = list(root, "docs")
+            .unwrap()
+            .into_iter()
+            .map(|e| e.path)
+            .collect();
+        assert_eq!(inside, ["docs/a.md"]);
     }
 
     #[test]

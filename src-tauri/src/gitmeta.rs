@@ -81,9 +81,22 @@ pub fn meta_from_git(g: &GitFileDiff) -> FileMeta {
     }
     // A mode-only change has no `---`/`+++` lines: split the header itself.
     let fallback = || {
-        let h = &g.header;
-        h.find(" b/")
-            .map_or_else(|| h.clone(), |i| h[i + 3..].to_string())
+        let h = g.header.as_str();
+        if h.ends_with('"')
+            && let Some(i) = h.rfind(" \"b/")
+        {
+            return side_path(&h[i + 1..]).unwrap_or_default();
+        }
+        // Without a rename both sides are the same path, so `a/<p> b/<p>` splits in the middle.
+        let n = h.len().saturating_sub(5) / 2;
+        if h.get(2 + n..n + 5) == Some(" b/")
+            && let (Some(a), Some(b)) = (h.get(2..2 + n), h.get(n + 5..))
+            && a == b
+        {
+            return b.to_string();
+        }
+        h.rfind(" b/")
+            .map_or_else(|| h.to_string(), |i| h[i + 3..].to_string())
     };
     let path = target.or_else(|| source.clone()).unwrap_or_else(fallback);
     FileMeta {
@@ -119,6 +132,9 @@ index 1..0
 diff --git a/run.sh b/run.sh
 old mode 100644
 new mode 100755
+diff --git a/my b/x.sh b/my b/x.sh
+old mode 100644
+new mode 100755
 diff --git \"a/\\303\\251.txt\" \"b/\\303\\251.txt\"
 new file mode 100644
 index 0..1
@@ -138,6 +154,7 @@ index 0..1
                 (FileStatus::Renamed, "old.rs", "new.rs", false),
                 (FileStatus::Removed, "gone.txt", "gone.txt", false),
                 (FileStatus::Modified, "run.sh", "run.sh", true),
+                (FileStatus::Modified, "my b/x.sh", "my b/x.sh", true),
                 (FileStatus::Added, "é.txt", "é.txt", false),
             ]
         );

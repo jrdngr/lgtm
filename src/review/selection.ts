@@ -47,6 +47,7 @@ export function fileSelection(files: FlatFile[], lines: DisplayLine[], file: num
  * file, review. Functions are left out where the parse has errors. */
 export function units(files: FlatFile[], lines: DisplayLine[], i: number): Selection[] {
   const line = lines[i];
+  if (!line) return [];
   const out: Selection[] = [];
   if (line.kind === "rows") {
     // In split view the new side decides, since that's the code under review.

@@ -647,9 +647,12 @@ kbd {
 }
 
 .section-meta {
+  min-width: 0;
   font-size: var(--fs-xs);
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ring-wrap {

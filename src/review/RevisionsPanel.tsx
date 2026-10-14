@@ -153,6 +153,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
       if (e.key === "Escape") rootRef.current?.focus();
       return;
     }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
     const d = MOVES[e.key];
     if (d) {
@@ -163,6 +164,8 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     } else {
       switch (e.key) {
         case "Enter":
+          // A focused button keeps its own Enter.
+          if (e.target instanceof HTMLButtonElement) return;
           review(picked());
           break;
         case "Escape":

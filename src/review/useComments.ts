@@ -47,8 +47,8 @@ interface Deps {
   files: FlatFile[];
   /** Where rows went when `files` last changed. */
   moves: Moves | undefined;
-  /** Shows a new state after a comment changed. */
-  onState(state: StateDto): void;
+  /** Shows a new state after a comment on `review` changed. */
+  onState(state: StateDto, review?: number): void;
   onError(message: string): void;
   /** Pastes text into one of the workspace's terminals, then calls `onSent`. */
   send(text: string, onSent: () => void): void;
@@ -103,12 +103,13 @@ export function useComments({
   }, [files, moves]);
 
   async function apply(result: Promise<CommandResult<StateDto>>): Promise<StateDto | undefined> {
+    const id = review?.id;
     const r = await result;
     if (r.status === "error") {
       onError(r.error);
       return undefined;
     }
-    onState(r.data);
+    onState(r.data, id);
     return r.data;
   }
 
@@ -120,21 +121,22 @@ export function useComments({
     setFocus({ id: NEW_COMMENT, field });
   }
 
-  /** Saves the draft and returns its new id. */
-  async function create(body: string): Promise<number | undefined> {
+  /** Saves the draft and returns the new comment. */
+  async function create(body: string): Promise<CommentDto | undefined> {
     if (!review || !draft) return undefined;
     const before = new Set(comments.map((c) => c.id));
     const rows = draft.rows.map((row) => ({ file: draft.file, row }));
     const state = await apply(
       commands.addComment(review.id, rows, body, draft.snippet, !!draft.github),
     );
-    const id = state?.comments.find((c) => !before.has(c.id))?.id;
-    if (id === undefined) return undefined;
+    const saved = state?.comments.find((c) => !before.has(c.id));
+    if (!saved) return undefined;
+    const id = saved.id;
     setDraft(undefined);
     setEdits((m) => moved(m, NEW_COMMENT, id));
     setAsks((m) => moved(m, NEW_COMMENT, id));
     setAskOpen((s) => (s.has(NEW_COMMENT) ? withoutId(s, NEW_COMMENT).add(id) : s));
-    return id;
+    return saved;
   }
 
   async function save(id: number) {
@@ -142,7 +144,7 @@ export function useComments({
     const body = edits.get(id) ?? "";
     const saved =
       id === NEW_COMMENT
-        ? await create(body)
+        ? (await create(body))?.id
         : (await apply(commands.editComment(review.id, id, body))) && id;
     if (saved === undefined) return;
     setEdits((m) => without(m, saved));
@@ -172,16 +174,16 @@ export function useComments({
     const message = asks.get(id)?.trim() ?? "";
     const body = edits.get(id) ?? byId(id)?.body ?? "";
     if (!review || running.has(id) || !(message || (change && body.trim()))) return;
-    const cid = id === NEW_COMMENT ? await create(body) : id;
-    if (cid === undefined) return;
+    const c = id === NEW_COMMENT ? await create(body) : byId(id);
+    if (!c) return;
+    const cid = c.id;
     // A saved draft's block is a new one, so the ask box needs focus again.
     if (cid !== id) setFocus({ id: cid, field: "ask" });
     setAsks((m) => without(m, cid));
     setRunning((m) => withEntry(m, cid, { ask: message, change, reply: "" }));
-    const c = byId(cid);
     const handle = startRun(workspace, {
-      kind: change ? "change" : c?.thread ? "reply" : "ask",
-      subject: c?.path || "Comment",
+      kind: change ? "change" : c.thread ? "reply" : "ask",
+      subject: c.path || "Comment",
       stop: () => commands.stopWorkshop(cid),
       open: () => currentReview(workspace)?.jumpToComment(cid),
     });
@@ -200,7 +202,7 @@ export function useComments({
     endFrom(handle, r);
     await apply(Promise.resolve(r));
     setRunning((m) => without(m, cid));
-    if (change) onChanged();
+    if (change && r.status === "ok") onChanged();
   }
 
   /** Puts an agent's suggestion in the body for the user to check and save. */
@@ -215,7 +217,7 @@ export function useComments({
     if (!review || editing === undefined) return id;
     const cid =
       id === NEW_COMMENT
-        ? await create(editing)
+        ? (await create(editing))?.id
         : (await apply(commands.editComment(review.id, id, editing))) && id;
     if (cid === undefined) return undefined;
     setEdits((m) => without(m, cid));

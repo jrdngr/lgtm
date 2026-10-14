@@ -12,10 +12,13 @@ export function marksChanged() {
 }
 
 /** The repo's workspaces and each one's review progress, kept current as the repo changes.
- * Reloads requested while one runs coalesce into one more, a second later. */
+ * Reloads requested while one runs coalesce into one more, a second later. `error` is the
+ * last action's failure, set with `setError` and kept across reloads, or else the last
+ * reload's. */
 export function useWorkspaces() {
   const [workspaces, setWorkspaces] = useState<WorkspaceDto[]>();
   const [progress, setProgress] = useState<ReadonlyMap<string, ProgressDto>>(new Map());
+  const [loadError, setLoadError] = useState<string>();
   const [error, setError] = useState<string>();
   const busy = useRef(false);
   const again = useRef(false);
@@ -29,7 +32,7 @@ export function useWorkspaces() {
     try {
       const list = await unwrap(commands.listWorkspaces());
       setWorkspaces(list);
-      setError(undefined);
+      setLoadError(undefined);
       const entries = await Promise.all(
         list.map(async (w) => {
           const r = await commands.workspaceProgress(w.name);
@@ -38,7 +41,7 @@ export function useWorkspaces() {
       );
       setProgress(new Map(entries.filter((e) => e !== undefined)));
     } catch (e) {
-      setError(errorText(e));
+      setLoadError(errorText(e));
     } finally {
       busy.current = false;
     }
@@ -62,5 +65,7 @@ export function useWorkspaces() {
   }, []);
   useRepoChanged(() => reloadRef.current());
 
-  return { workspaces, progress, error, setError, reload };
+  return { workspaces, progress, error: error ?? loadError, setError, reload };
 }
+
+export type Workspaces = ReturnType<typeof useWorkspaces>;

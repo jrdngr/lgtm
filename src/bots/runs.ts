@@ -7,6 +7,8 @@ import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 /** Persona review runs the window has seen, kept current by the backend's events. */
 const runs = new Map<number, BotRun>();
+/** Runs the backend no longer has, so a pane can tell them from runs still loading. */
+const gone = new Set<number>();
 const listeners = new Set<() => void>();
 /** The latest fetch per run, so an older snapshot that resolves late is dropped. */
 const latest = new Map<number, number>();
@@ -35,6 +37,7 @@ function reportRun(run: BotRun) {
 
 function put(run: BotRun) {
   runs.set(run.id, run);
+  gone.delete(run.id);
   reportRun(run);
   changed();
 }
@@ -45,7 +48,12 @@ export async function refreshRun(id: number) {
   const r = await commands.botRun(id);
   if (latest.get(id) !== seq) return;
   if (r.status === "ok") put(r.data);
-  else if (runs.delete(id)) changed();
+  else forgetRun(id);
+}
+
+/** Stores a run the window hasn't seen yet, such as one just started. */
+export function seedRun(run: BotRun) {
+  if (!runs.has(run.id)) put(run);
 }
 
 /** Runs a command on `run`, reports its error or that there's none, and refreshes the run. */
@@ -86,7 +94,9 @@ function setFixText(id: number, fix: number, text: string) {
 }
 
 export function forgetRun(id: number) {
-  if (runs.delete(id)) changed();
+  runs.delete(id);
+  gone.add(id);
+  changed();
 }
 
 let listening = false;
@@ -126,10 +136,11 @@ export function useRuns(workspace: WorkspaceName): BotRun[] {
   );
 }
 
-export function useRun(id: number): BotRun | undefined {
+/** The run, `undefined` while it loads, or `null` once the backend doesn't have it. */
+export function useRun(id: number): BotRun | null | undefined {
   useVersion();
   useEffect(() => {
     if (!runs.has(id)) refreshRun(id);
   }, [id]);
-  return runs.get(id);
+  return runs.get(id) ?? (gone.has(id) ? null : undefined);
 }

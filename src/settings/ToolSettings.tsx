@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { McpStatus, ToolStatus } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
+import { setToolProblems } from "../tools/agents";
+import { refreshMcpStatus, useMcpStatus } from "../tools/mcp";
 import { IconButton } from "../ui/icons";
 import { Section } from "./SettingsPanel";
 import { useSettings } from "./store";
@@ -13,11 +15,11 @@ const MCP_TEXT: Record<McpStatus["setup"], string> = {
 
 /** Claude Code's `lgtm` MCP server: its registration and a button to (re)register it. */
 function Mcp() {
-  const [status, setStatus] = useState<McpStatus>();
+  const status = useMcpStatus();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const load = useCallback(() => {
-    unwrap(commands.mcpStatus()).then(setStatus, (e) => setError(errorText(e)));
+    refreshMcpStatus().catch((e) => setError(errorText(e)));
   }, []);
   useEffect(load, [load]);
 
@@ -67,7 +69,9 @@ export function ToolSettings() {
 
   const check = useCallback(async () => {
     setBusy(true);
-    setTools(await commands.toolStatus());
+    const found = await commands.toolStatus();
+    setTools(found);
+    setToolProblems(found.filter((t) => t.problem).map((t) => t.tool));
     setBusy(false);
   }, []);
   // biome-ignore lint/correctness/useExhaustiveDependencies: recheck when the command changes

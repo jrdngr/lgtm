@@ -14,6 +14,8 @@ use tokio::time::{Instant, sleep_until};
 use crate::jj::Jj;
 
 const SNAPSHOT_DEBOUNCE: Duration = Duration::from_millis(300);
+/// The longest a run of edits holds off a snapshot.
+const SNAPSHOT_MAX_WAIT: Duration = Duration::from_secs(2);
 const CHANGE_DEBOUNCE: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -133,6 +135,8 @@ async fn run(
     emit: impl Fn(Event),
 ) {
     let mut snapshot_at: Option<Instant> = None;
+    // When the edits the next snapshot waits on began.
+    let mut edits_since: Option<Instant> = None;
     let mut changed_at: Option<Instant> = None;
     loop {
         let next = snapshot_at.into_iter().chain(changed_at).min();
@@ -144,7 +148,11 @@ async fn run(
                     changed_at.get_or_insert(Instant::now() + CHANGE_DEBOUNCE);
                     snapshot_at.get_or_insert(Instant::now() + SNAPSHOT_DEBOUNCE);
                 }
-                Some(Ping::Edit) => snapshot_at = Some(Instant::now() + SNAPSHOT_DEBOUNCE),
+                Some(Ping::Edit) => {
+                    let now = Instant::now();
+                    let first = *edits_since.get_or_insert(now);
+                    snapshot_at = Some((now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT));
+                }
             },
             _ = sleep_until(next.unwrap_or_else(Instant::now)), if next.is_some() => {
                 let now = Instant::now();
@@ -154,6 +162,7 @@ async fn run(
                 }
                 if snapshot_at.is_some_and(|t| t <= now) {
                     snapshot_at = None;
+                    edits_since = None;
                     let now_stale = match jj.snapshot_or_stale().await {
                         Ok(now_stale) => now_stale,
                         Err(e) => {

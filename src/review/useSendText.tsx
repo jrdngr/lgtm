@@ -45,12 +45,16 @@ export function useSendText(
     if (!report || !error) setError(error);
     report?.(error ? { error } : { terminal: terminal?.title ?? "" });
     if (!error) onSent?.();
+    return error;
   }
 
   const picker = picking && (
     <TerminalPicker
       terminals={picking.terminals}
-      onPick={(id) => sendTo(picking.text, id, picking.onSent, picking.report)}
+      onPick={(id) => {
+        // A failed send leaves focus on the closed picker, so hand it back.
+        if (sendTo(picking.text, id, picking.onSent, picking.report)) focusRoot();
+      }}
       onClose={() => {
         setPicking(undefined);
         focusRoot();

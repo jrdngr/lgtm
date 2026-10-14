@@ -81,8 +81,16 @@ pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Res
             removed: vec![],
         });
     };
-    let evologs =
-        futures::future::try_join_all(changes.iter().map(|c| jj.evolog(&c.commit_id))).await?;
+    // Bounded, since each evolog is a jj process with its own pipes.
+    let limit = tokio::sync::Semaphore::new(8);
+    let evologs = futures::future::try_join_all(changes.iter().map(|c| {
+        let limit = &limit;
+        async move {
+            let _permit = limit.acquire().await?;
+            jj.evolog(&c.commit_id).await
+        }
+    }))
+    .await?;
     let mut preds: Vec<Vec<String>> = evologs
         .iter()
         .map(|evolog| {

@@ -67,6 +67,48 @@ fn markdown_sections_nest_and_run_to_the_next_heading_of_their_level() {
 }
 
 #[test]
+fn markdown_setext_heading_names_its_section_without_the_newline() {
+    let src = "Title\n=====\n\ntext\n\n# B\n";
+    assert_eq!(
+        symbols("a.md", src),
+        [("Title".into(), 1, 5), ("B".into(), 6, 6)]
+    );
+}
+
+#[test]
+fn rust_impls_are_named_by_their_base_type() {
+    let src = "impl<T> a::Foo<T> {}\nimpl Bar<u8> {}\nimpl X for &Baz {}\nimpl dyn Any + Send {}\nimpl T for ! {}\n";
+    let names: Vec<String> = symbols("a.rs", src).into_iter().map(|s| s.0).collect();
+    assert_eq!(names, ["Foo", "Bar", "&Baz", "dyn Any + Send", "!"]);
+}
+
+#[test]
+fn go_grouped_types_are_separate_symbols() {
+    let src = "// Doc.\ntype S struct{}\n\ntype (\n\tA struct{}\n\t// B docs.\n\tB = int\n)\n";
+    assert_eq!(
+        symbols("a.go", src),
+        [("S".into(), 1, 2), ("A".into(), 5, 5), ("B".into(), 6, 7)]
+    );
+}
+
+#[test]
+fn languages_match_extensions_and_fence_tags_in_any_case() {
+    assert!(parse("README.MD", "# A\n").is_some());
+    let src = "```Rust\nfn f() {}\n```\n";
+    let keyword = Some(
+        HIGHLIGHT_NAMES
+            .iter()
+            .position(|h| *h == "keyword")
+            .unwrap() as u8,
+    );
+    assert!(
+        highlight_file("a.md", src)[1]
+            .iter()
+            .any(|s| s.0 == keyword)
+    );
+}
+
+#[test]
 fn config_files_outline_their_nested_keys_and_tables() {
     let json = "{\n  \"name\": \"x\",\n  \"scripts\": {\n    \"a\": \"b\"\n  }\n}\n";
     assert_eq!(symbols("package.json", json), [("scripts".into(), 3, 5)]);
@@ -173,6 +215,12 @@ fn markdown_highlights_inline_text_and_fenced_code_by_language() {
     assert!(has(0, "tag"), "{:?}", lines[0]);
     assert!(has(2, "string") && has(2, "keyword"), "{:?}", lines[2]);
     assert!(has(5, "keyword"), "{:?}", lines[5]);
+}
+
+#[test]
+fn rendered_fence_highlights_by_grammar_name() {
+    assert!(!highlight_file("code.rust", "fn main() {}")[0].is_empty());
+    assert!(!highlight_file("code.python", "def f(): pass")[0].is_empty());
 }
 
 #[test]

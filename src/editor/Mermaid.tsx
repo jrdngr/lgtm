@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 let ready: Promise<typeof import("mermaid").default> | undefined;
 
@@ -14,15 +14,15 @@ function mermaid() {
 /** A Mermaid diagram, or its source with the error when it doesn't parse. */
 export function Mermaid({ text }: { text: string }) {
   const id = `mermaid-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const ref = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>();
   const [error, setError] = useState<string>();
   useEffect(() => {
     let live = true;
     mermaid()
       .then((m) => m.render(id, text))
-      .then(({ svg }) => {
-        if (!live || !ref.current) return;
-        ref.current.innerHTML = svg;
+      .then((out) => {
+        if (!live) return;
+        setSvg(out.svg);
         setError(undefined);
       })
       .catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
@@ -37,5 +37,6 @@ export function Mermaid({ text }: { text: string }) {
         <pre>{text}</pre>
       </div>
     );
-  return <div ref={ref} className="mermaid-diagram" />;
+  // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered by mermaid with securityLevel "strict"
+  return <div className="mermaid-diagram" dangerouslySetInnerHTML={{ __html: svg ?? "" }} />;
 }

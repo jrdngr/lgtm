@@ -45,7 +45,7 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
 
   function addPath() {
     const p = path.trim();
-    if (!p || attach.includes(p)) return;
+    if (locked || !p || attach.includes(p)) return;
     const next = [...attach, p];
     setAttach(next);
     setPath("");
@@ -69,31 +69,34 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
         ref={ref}
         className="qa-prompt-text"
         value={prompt}
-        readOnly={!!d?.archived}
+        readOnly={locked}
         onChange={(e) => setPrompt(e.target.value)}
-        onBlur={() => d && save()}
+        onBlur={() => d && !locked && save()}
       />
       <div className="qq-label">Read first</div>
       <div className="qa-attach">
         {attach.map((a) => (
           <span key={a} className="qa-chip">
             {a}
-            <button
-              type="button"
-              className="quiet"
-              aria-label={`Remove ${a}`}
-              onClick={() => {
-                const next = attach.filter((x) => x !== a);
-                setAttach(next);
-                if (d) save(next);
-              }}
-            >
-              ×
-            </button>
+            {!locked && (
+              <button
+                type="button"
+                className="quiet"
+                aria-label={`Remove ${a}`}
+                onClick={() => {
+                  const next = attach.filter((x) => x !== a);
+                  setAttach(next);
+                  if (d) save(next);
+                }}
+              >
+                ×
+              </button>
+            )}
           </span>
         ))}
         <input
           value={path}
+          disabled={locked}
           placeholder="A file or folder in the repo, then ↵"
           onChange={(e) => setPath(e.target.value)}
           onKeyDown={(e) => {

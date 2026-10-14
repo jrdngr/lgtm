@@ -6,7 +6,7 @@ use anyhow::ensure;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use super::{BotRun, Notify, Status, run_prefix};
+use super::{BotRun, Notify, Status};
 use crate::agent::{self, Progress, Runs};
 use crate::review::{NOT_AT_WORKING_COPY, RepoCtx, now_ms};
 
@@ -33,8 +33,27 @@ fn prompt(revset: &str, findings: &str) -> String {
     )
 }
 
+/// Outside `run_prefix`, so stopping a run leaves its fixes running.
 pub(super) fn fix_key(run: u32, fix: usize) -> String {
-    format!("{}fix-{fix}", run_prefix(run))
+    format!("bots-fix-{run}-{fix}")
+}
+
+impl BotRun {
+    /// Whether finding `id` is "fixed" by a finished fix, "dismissed", or "open", as the
+    /// Reviewers tab settles it.
+    pub fn finding_state(&self, id: &str) -> &'static str {
+        let fixed = self
+            .fixes
+            .iter()
+            .any(|f| f.status == Status::Done && f.findings.iter().any(|f| f == id));
+        if fixed {
+            "fixed"
+        } else if self.dismissed.iter().any(|d| d == id) {
+            "dismissed"
+        } else {
+            "open"
+        }
+    }
 }
 
 impl RepoCtx {
@@ -124,6 +143,7 @@ impl RepoCtx {
                     }
                     Err(e) => {
                         fix.status = Status::Failed;
+                        fix.text = self.bots.append_fix(id, idx, "");
                         fix.error = Some(format!("{e:#}"));
                     }
                 }

@@ -62,8 +62,10 @@ impl RepoCtx {
         runs: &Runs,
         on_tool: impl Fn(String),
     ) -> anyhow::Result<Option<(StateDto, usize)>> {
+        // Held for the whole run, so the notes save even if the review closes meanwhile.
+        let review = self.review(id)?;
+        let run = runs.register(&self.agent_key(&run_key(id)))?;
         let (ws, revset, from, to) = {
-            let review = self.review(id)?;
             let r = review.lock().unwrap();
             (r.ws.clone(), r.revset.clone(), r.from.clone(), r.to.clone())
         };
@@ -81,7 +83,7 @@ impl RepoCtx {
             schema: Some(SCHEMA),
             purpose: agent::Purpose::Walkthrough,
         };
-        let reply = agent::run(runs, &self.agent_key(&run_key(id)), task, |p| {
+        let reply = agent::run_registered(run, task, |p| {
             if let Progress::Tool(t) = p {
                 on_tool(t)
             }
@@ -96,7 +98,7 @@ impl RepoCtx {
                 .context("the agent didn't return a walkthrough")?,
         )
         .context("the agent's walkthrough doesn't match the format")?;
-        self.save_notes(id, &reply.notes, Source::Headless)
+        self.save_notes_to(&review, &reply.notes, Source::Headless)
             .map(Some)
     }
 

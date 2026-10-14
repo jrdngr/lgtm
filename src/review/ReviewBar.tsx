@@ -58,6 +58,8 @@ interface Props {
   /** Marks the selection with a color. */
   onMark(color: MarkColor): void;
   onReset(): void;
+  /** Hands focus back to the review once the reset confirm closes. */
+  onDone(): void;
   walkthrough?: WalkthroughRun;
 }
 
@@ -146,7 +148,7 @@ export function ReviewBar(props: Props) {
         onFilter={props.onFilter}
       />
       {review && <ProgressBar progress={props.progress} setup={props.setup} />}
-      <ResetMenu disabled={!review} onReset={props.onReset} />
+      <ResetMenu disabled={!review} onReset={props.onReset} onDone={props.onDone} />
     </div>
   );
 }
@@ -179,8 +181,13 @@ function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSe
 }
 
 /** The ⋯ menu holding Reset, which asks inline before clearing every mark. */
-function ResetMenu({ disabled, onReset }: { disabled: boolean; onReset(): void }) {
+function ResetMenu(props: { disabled: boolean; onReset(): void; onDone(): void }) {
+  const { disabled, onReset } = props;
   const [confirming, setConfirming] = useState(false);
+  const close = () => {
+    setConfirming(false);
+    props.onDone();
+  };
   if (confirming && !disabled) {
     return (
       <span
@@ -188,7 +195,7 @@ function ResetMenu({ disabled, onReset }: { disabled: boolean; onReset(): void }
         onKeyDown={(e) => {
           if (e.key !== "Escape") return;
           e.stopPropagation();
-          setConfirming(false);
+          close();
         }}
       >
         Clear every mark in this review?
@@ -196,18 +203,13 @@ function ResetMenu({ disabled, onReset }: { disabled: boolean; onReset(): void }
           type="button"
           className="danger"
           onClick={() => {
-            setConfirming(false);
+            close();
             onReset();
           }}
         >
           Reset
         </button>
-        <button
-          type="button"
-          className="quiet"
-          ref={(b) => b?.focus()}
-          onClick={() => setConfirming(false)}
-        >
+        <button type="button" className="quiet" ref={(b) => b?.focus()} onClick={close}>
           Cancel
         </button>
       </span>

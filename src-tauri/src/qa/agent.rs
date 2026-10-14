@@ -155,6 +155,11 @@ pub(super) struct Step {
     pub schema: Option<String>,
     /// Starts a new conversation instead of continuing the session's.
     pub fresh: bool,
+    /// The turn to send instead when a new conversation starts, for a `turn` that leans on
+    /// earlier ones.
+    pub restart: Option<String>,
+    /// `turn` lists the decisions, so a new conversation's context leaves them out.
+    pub decided: bool,
 }
 
 /// Every decision, a line each, for the plan and the write.
@@ -166,6 +171,40 @@ fn decisions(s: &Session) -> String {
         .map(|q| format!("- {} ({}): {}", q.id, q.text.subject, queue::answer_text(q)))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// The files the user asked the agent to read first, as a line after the prompt.
+fn read_first(s: &Session) -> String {
+    if s.attach.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nRead these first: {}", s.attach.join(", "))
+    }
+}
+
+/// What a conversation that starts partway through the session needs to know, with the
+/// decisions unless the turn has them.
+fn context(s: &Session, with_decisions: bool) -> String {
+    let decided = if with_decisions {
+        decisions(s)
+    } else {
+        String::new()
+    };
+    let decided = if decided.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nDecided so far:\n\n{decided}")
+    };
+    format!(
+        "Here's what I want:\n\n{}{}{decided}",
+        s.prompt.trim(),
+        read_first(s)
+    )
+}
+
+/// Whether `run` failed because Claude Code has no record of the session it resumed.
+fn session_missing(e: &anyhow::Error) -> bool {
+    format!("{e:#}").contains("No conversation found")
 }
 
 /// The plan as text, with the user's comments on it.
@@ -233,17 +272,20 @@ impl RepoCtx {
         step: Step,
         on: impl Fn(Progress),
     ) -> anyhow::Result<agent::Reply> {
-        let session = if step.fresh {
-            None
-        } else {
-            self.qa_session(ws, id)?.agent
-        };
-        let first = |turn: &str| -> anyhow::Result<String> {
-            Ok(format!("{}\n\n{turn}", self.qa_intro(ws)?))
+        let s = self.qa_session(ws, id)?;
+        let session = if step.fresh { None } else { s.agent.clone() };
+        let first = || -> anyhow::Result<String> {
+            let intro = self.qa_intro(ws)?;
+            let turn = step.restart.as_ref().unwrap_or(&step.turn);
+            Ok(if step.fresh {
+                format!("{intro}\n\n{turn}")
+            } else {
+                format!("{intro}\n\n{}\n\n{turn}", context(&s, !step.decided))
+            })
         };
         let prompt = match session {
             Some(_) => step.turn.clone(),
-            None => first(&step.turn)?,
+            None => first()?,
         };
         let key = self.qa_key(ws, id);
         let _busy = if step.edit { Some(ws.claim()?) } else { None };
@@ -266,8 +308,8 @@ impl RepoCtx {
         )
         .await;
         // A session Claude Code no longer has starts over with the intro.
-        if session.is_some() && reply.as_ref().is_err() {
-            let prompt = first(&step.turn)?;
+        if session.is_some() && reply.as_ref().err().is_some_and(session_missing) {
+            let prompt = first()?;
             reply = agent::run(runs, &key, task(&prompt), &on).await;
         }
         if step.edit {
@@ -292,16 +334,12 @@ impl RepoCtx {
         on_tool: impl Fn(String),
     ) -> anyhow::Result<Session> {
         let s = self.qa_session(ws, id)?;
-        let read_first = if s.attach.is_empty() {
-            String::new()
-        } else {
-            format!("\n\nRead these first: {}", s.attach.join(", "))
-        };
         let turn = format!(
-            "Here's what I want:\n\n{}{read_first}\n\nRead whatever in the repo it touches. \
+            "Here's what I want:\n\n{}{}\n\nRead whatever in the repo it touches. \
              Then return a short title for it and every question I need to answer before you \
              write it, in the order to ask them.",
-            s.prompt.trim()
+            s.prompt.trim(),
+            read_first(&s)
         );
         let reply = self
             .qa_step(
@@ -313,6 +351,8 @@ impl RepoCtx {
                     edit: false,
                     schema: Some(ask_schema()),
                     fresh: true,
+                    restart: None,
+                    decided: false,
                 },
                 tool_only(on_tool),
             )
@@ -326,6 +366,8 @@ impl RepoCtx {
                 s.queue = queue::Queue::default();
                 s.queue.add_round(questions);
                 s.plan = None;
+                s.sent = None;
+                s.applied = None;
                 Ok(())
             })?;
         }
@@ -370,6 +412,8 @@ impl RepoCtx {
                     edit: false,
                     schema: Some(update_schema()),
                     fresh: false,
+                    restart: None,
+                    decided: false,
                 },
                 |_| {},
             )
@@ -394,16 +438,22 @@ impl RepoCtx {
         on_tool: impl Fn(String),
     ) -> anyhow::Result<Session> {
         let s = self.qa_session(ws, id)?;
-        let turn = match &s.plan {
-            Some(plan) if !plan.comments.is_empty() => format!(
-                "Revise your plan with my comments. Don't edit files yet.\n\n{}",
-                plan_text(plan)
+        let (turn, decided) = match &s.plan {
+            Some(plan) if !plan.comments.is_empty() => (
+                format!(
+                    "Revise your plan with my comments. Don't edit files yet.\n\n{}",
+                    plan_text(plan)
+                ),
+                false,
             ),
-            _ => format!(
-                "Every question is decided:\n\n{}\n\n{}Plan the write by the planning rules. \
-                 Don't edit files yet.",
-                decisions(&s),
-                note_line(&s.note)
+            _ => (
+                format!(
+                    "Every question is decided:\n\n{}\n\n{}Plan the write by the planning \
+                     rules. Don't edit files yet.",
+                    decisions(&s),
+                    note_line(&s.note)
+                ),
+                true,
             ),
         };
         let reply = self
@@ -416,6 +466,8 @@ impl RepoCtx {
                     edit: false,
                     schema: Some(PLAN_SCHEMA.into()),
                     fresh: false,
+                    restart: None,
+                    decided,
                 },
                 tool_only(on_tool),
             )
@@ -465,6 +517,8 @@ impl RepoCtx {
                     edit: true,
                     schema: None,
                     fresh: false,
+                    restart: None,
+                    decided: true,
                 },
                 |p| {
                     if let Progress::Tool(t) = p {

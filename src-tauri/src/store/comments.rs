@@ -127,7 +127,7 @@ pub struct Comment {
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS comments (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     path TEXT NOT NULL,
     pins TEXT NOT NULL,
     body TEXT NOT NULL,
@@ -374,5 +374,34 @@ mod tests {
 
         store.delete_comment(c.id).unwrap();
         assert_eq!(store.comment(c.id).unwrap(), None);
+    }
+
+    #[test]
+    fn old_comment_tables_stop_reusing_deleted_ids() {
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        let old = SCHEMA
+            .replace(" AUTOINCREMENT", "")
+            .replace(",\n    github TEXT NOT NULL DEFAULT '',\n    thread TEXT NOT NULL DEFAULT '',\n    done INTEGER NOT NULL DEFAULT 0", "");
+        db.execute_batch(&old).unwrap();
+        db.execute_batch(
+            r#"INSERT INTO comments VALUES (1, 'a.rs', '[]', 'one', '', '@', 0, 0, '{"messages":[]}'),
+                                           (2, 'a.rs', '[]', 'two', '', '@', 0, 0, '{"messages":[]}');"#,
+        )
+        .unwrap();
+        let store = Store::init(db).unwrap();
+        let mut c = store.comment(2).unwrap().unwrap();
+        assert_eq!(c.body, "two");
+        store.delete_comment(2).unwrap();
+        c.body = "three".into();
+        assert_eq!(store.add_comment(&c).unwrap(), 3);
+        let index: bool = store
+            .db
+            .query_row(
+                "SELECT COUNT(*) > 0 FROM sqlite_master WHERE name = 'comments_path'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(index);
     }
 }

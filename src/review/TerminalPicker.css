@@ -15,3 +15,7 @@
   color: var(--muted);
   font-size: 11px;
 }
+
+.picker-note + .picker-note {
+  margin-left: 0;
+}

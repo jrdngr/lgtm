@@ -13,7 +13,20 @@ impl RepoCtx {
             let store = self.store.lock().unwrap();
             let pr = store.pr(name).ok().flatten();
             store.delete_pr(name).ok();
-            (pr, store.prs().unwrap_or_default())
+            let mut others = store.prs().unwrap_or_default();
+            // Another PR still fetching from the remote lgtm added takes it over, so it goes
+            // with the last of them.
+            if let Some(r) = pr.as_ref().and_then(|p| p.added_remote.as_ref())
+                && let Some(o) = others
+                    .iter_mut()
+                    .find(|o| o.head_remote.as_ref() == Some(r) && o.added_remote.is_none())
+            {
+                o.added_remote = Some(r.clone());
+                if let Err(e) = store.save_pr(o) {
+                    problems.push(format!("{e:#}"));
+                }
+            }
+            (pr, others)
         };
         let Some(pr) = pr else {
             return problems;

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlanComment, PlanFile } from "../bindings";
 import { Inline } from "../bots/Markdown";
 import { openFile } from "../editor/open";
@@ -19,12 +19,34 @@ interface Props {
   onApply(): void;
 }
 
+/** Matches `.qa-pop` in qa.css. */
+const POP_WIDTH = 320;
+
 /** Where the write would go, file by file. Selecting text comments on it; Revise sends the
  * comments back to the agent. */
 export function PlanView({ ws, d, busy, onApply }: Props) {
   const [pop, setPop] = useState<{ quote: string; top: number; left: number }>();
   const [body, setBody] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const open = pop !== undefined;
+
+  // The popover stays where it opened, so it closes rather than drift from its text.
+  useEffect(() => {
+    if (!open) return;
+    const shut = () => setPop(undefined);
+    // The comment input scrolls sideways as it fills, which isn't the view moving.
+    const onScroll = (e: Event) => {
+      if (!popRef.current?.contains(e.target as Node)) shut();
+    };
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", shut);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", shut);
+    };
+  }, [open]);
+
   const plan = d.plan;
   if (!plan) return null;
   const comments = plan.comments ?? [];
@@ -46,7 +68,8 @@ export function PlanView({ ws, d, busy, onApply }: Props) {
     const quote = sel?.toString().trim();
     if (!sel || !quote || !ref.current?.contains(sel.anchorNode)) return;
     const r = sel.getRangeAt(0).getBoundingClientRect();
-    setPop({ quote, top: r.bottom + 4, left: r.left });
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - POP_WIDTH - 8));
+    setPop({ quote, top: r.bottom + 4, left });
     setBody("");
   }
 
@@ -116,7 +139,7 @@ export function PlanView({ ws, d, busy, onApply }: Props) {
       ))}
       {loose.map(comment)}
       {pop && (
-        <div className="qa-pop" style={{ top: pop.top, left: pop.left }}>
+        <div ref={popRef} className="qa-pop" style={{ top: pop.top, left: pop.left }}>
           <input
             // biome-ignore lint/a11y/noAutofocus: the comment is what the selection asked for
             autoFocus

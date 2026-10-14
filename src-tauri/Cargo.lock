@@ -2144,6 +2144,7 @@ dependencies = [
  "futures",
  "globset",
  "ignore",
+ "libc",
  "notify",
  "objc2",
  "portable-pty",

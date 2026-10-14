@@ -125,6 +125,10 @@ async fn version(name: &str) -> Option<String> {
 
 /// Every tool, found or not.
 pub async fn status() -> Vec<ToolStatus> {
+    // The Claude command may have been installed or changed in the shell since it resolved.
+    tokio::task::spawn_blocking(settings::claude::refresh)
+        .await
+        .ok();
     let mut found = Vec::new();
     for tool in &TOOLS {
         let out = version(tool.name).await;

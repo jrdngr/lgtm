@@ -322,6 +322,17 @@ p.qq-changed {
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+.qq-option.qq-changed {
+  background: rgb(210 153 34 / 10%);
+  box-shadow: inset 3px 0 var(--amber);
+}
+
+.qq-option.qq-changed.selected {
+  box-shadow:
+    inset 3px 0 var(--amber),
+    0 0 0 1px var(--accent);
+}
+
 .qq-option.decided {
   border-color: var(--accent);
 }

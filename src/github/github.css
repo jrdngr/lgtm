@@ -242,7 +242,13 @@
 }
 
 .preview-row {
-  height: 20px;
+  min-height: 20px;
+}
+
+/* No sideways scroll here, so long lines wrap. */
+.preview-file .cell {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .preview-hunk {

@@ -268,22 +268,29 @@ impl RepoCtx {
         let ws = self.workspace(workspace).await?;
         ws.snapshot().await?;
         let label = ws.label(revset);
-        let (prev, session, seen) = {
+        let (prev, resumed, seen) = {
             let store = self.store.lock().unwrap();
             match store.last_session(&label)? {
-                Some(last) if resume => {
-                    (store.session_before(&label, last.id)?, last.id, last.seen)
-                }
-                prev => (
-                    prev,
-                    store.start_session(&label, ws.key(), revset, now_ms())?,
-                    vec![],
+                Some(last) if resume => (
+                    store.session_before(&label, last.id)?,
+                    Some(last.id),
+                    last.seen,
                 ),
+                prev => (prev, None, vec![]),
             }
         };
         let loaded = self
             .load(&ws, revset, &View::Combined, prev.as_ref())
             .await?;
+        // Started only once the load succeeds, so a revset that fails leaves no session.
+        let session = match resumed {
+            Some(id) => id,
+            None => self
+                .store
+                .lock()
+                .unwrap()
+                .start_session(&label, ws.key(), revset, now_ms())?,
+        };
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let mut review = Review::new(ws, revset, label, loaded.cfg);
         review.baseline = prev
@@ -352,6 +359,7 @@ impl RepoCtx {
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         anyhow::ensure!(review.load_gen == load_gen, SUPERSEDED);
+        review.view = loaded.dto.view.clone();
         let store = self.store.lock().unwrap();
         let (review, moves) = review.swap_in(&store, loaded, id)?;
         Ok(RefreshDto { review, moves })

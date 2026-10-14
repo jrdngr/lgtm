@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { IconButton } from "./icons";
 
 export interface MenuItem {
@@ -16,7 +17,8 @@ interface Props {
   className?: string;
 }
 
-/** Where the list sits: fixed to the window, so a scrolling side panel can't clip it. */
+/** Where the list sits: fixed to the window and portaled to the body, so a scrolling side panel
+ * or a transformed ancestor can't clip or shift it. */
 interface Place {
   right: number;
   top?: number;
@@ -41,13 +43,15 @@ export function Menu({ items, label = "More actions", className }: Props) {
   const open = place !== undefined;
   const close = () => setPlace(undefined);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const shown = items.filter((i): i is MenuItem => !!i);
 
   useEffect(() => {
     if (!open) return;
     const shut = () => setPlace(undefined);
+    const inside = (e: Event) => [ref, listRef].some((r) => r.current?.contains(e.target as Node));
     const away = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) shut();
+      if (!inside(e)) shut();
     };
     const esc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -56,7 +60,7 @@ export function Menu({ items, label = "More actions", className }: Props) {
     };
     // The list stays where it opened, so it closes rather than drift from its button.
     const scrolled = (e: Event) => {
-      if (!ref.current?.contains(e.target as Node)) shut();
+      if (!inside(e)) shut();
     };
     window.addEventListener("pointerdown", away, true);
     window.addEventListener("keydown", esc, true);
@@ -84,27 +88,29 @@ export function Menu({ items, label = "More actions", className }: Props) {
           setPlace(open ? undefined : placeBy(e.currentTarget));
         }}
       />
-      {open && (
-        <div className="menu-list" role="menu" style={place}>
-          {shown.map((item) => (
-            <button
-              type="button"
-              role="menuitem"
-              key={item.label}
-              className={item.danger ? "danger" : undefined}
-              disabled={item.disabled}
-              title={item.title}
-              onClick={(e) => {
-                e.stopPropagation();
-                close();
-                item.onSelect();
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div className="menu-list" role="menu" style={place} ref={listRef}>
+            {shown.map((item) => (
+              <button
+                type="button"
+                role="menuitem"
+                key={item.label}
+                className={item.danger ? "danger" : undefined}
+                disabled={item.disabled}
+                title={item.title}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  close();
+                  item.onSelect();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

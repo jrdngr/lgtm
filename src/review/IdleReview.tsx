@@ -60,8 +60,8 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
     startRevset(workspace).then(load);
   }, []);
 
-  function edited(state: StateDto) {
-    setState(state);
+  function edited(state: StateDto, review?: number) {
+    setState(state, review);
     marksChanged();
   }
   const editedRef = useRef(edited);
@@ -96,7 +96,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       comments: review.state.comments,
       notes: review.state.notes,
       threads: review.state.threads,
-      apply: (state) => editedRef.current(state),
+      apply: (state, review) => editedRef.current(state, review),
       jump: (file) => inPane((r) => r.jump(file)),
       jumpToComment: (id) => inPane((r) => r.jumpToComment(id)),
       jumpToRow: (file, row) => inPane((r) => r.jumpToRow(file, row)),

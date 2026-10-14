@@ -67,7 +67,7 @@ export function SymbolsPanel() {
         {[...byPath].map(([path, nodes]) => (
           <section key={path}>
             <div className="symbol-file" title={path}>
-              {path}
+              <bdi dir="ltr">{path}</bdi>
             </div>
             <ul>
               {nodes.map((n) => {
@@ -93,7 +93,7 @@ export function SymbolsPanel() {
                       {done === 1 ? (
                         <span className="pill green">✓</span>
                       ) : (
-                        <span className="pill">{Math.round(done * 100)}%</span>
+                        <span className="pill">{Math.floor(done * 100)}%</span>
                       )}
                     </button>
                   </li>

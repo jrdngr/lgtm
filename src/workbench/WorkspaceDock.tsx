@@ -42,9 +42,10 @@ const components = {
   threads: ThreadsPanel,
   runs: RunsPanel,
   qa: QaTab,
-  // Restores layouts from earlier builds, whose Tasks and Files panels are then closed.
+  // Restores layouts from earlier builds, whose Tasks, Files and Design panels are then closed.
   tasks: () => null,
   files: () => null,
+  design: () => null,
 };
 
 interface Props {

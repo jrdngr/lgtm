@@ -31,6 +31,15 @@ impl RepoCtx {
     ) -> anyhow::Result<Loaded> {
         let config = Config::load(&ws.root)?;
         let stack = views::stack(&ws.jj, revset, prev).await?;
+        // A view of a change that left the revset falls back to the whole review.
+        let view = match view {
+            View::Change { change } | View::SinceLast { change }
+                if !stack.changes.iter().any(|c| c.change_id == *change) =>
+            {
+                &View::Combined
+            }
+            view => view,
+        };
         let spec = views::spec(&ws.jj, revset, view, &stack).await?;
         let diffs = spec.diff(&ws.jj).await?;
         let sides = spec.sides();

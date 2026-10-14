@@ -72,7 +72,9 @@ export const setError = (ws: WorkspaceName, error?: string) => set(ws, (s) => ({
 /** Shows session `id` in the tab, on the step it's at. */
 export function selectSession(ws: WorkspaceName, id: string) {
   set(ws, (s) =>
-    s.current === id && !s.fresh ? s : { ...s, current: id, fresh: false, view: undefined },
+    s.current === id && !s.fresh
+      ? s
+      : { ...s, current: id, fresh: false, view: undefined, error: undefined },
   );
 }
 
@@ -91,17 +93,17 @@ export function applySession(ws: WorkspaceName, d: Session) {
   });
 }
 
-export function removeSession(ws: WorkspaceName, id: string) {
-  set(ws, (s) => ({
-    ...s,
-    sessions: s.sessions.filter((x) => x.id !== id),
-    current: s.current === id ? undefined : s.current,
-  }));
-}
-
 /** The session to show when none is picked: the newest active one. */
 const fallback = (sessions: Session[]) =>
   [...sessions].reverse().find((d) => !d.archived)?.id ?? sessions.at(-1)?.id;
+
+export function removeSession(ws: WorkspaceName, id: string) {
+  set(ws, (s) => {
+    const sessions = s.sessions.filter((x) => x.id !== id);
+    if (s.current !== id) return { ...s, sessions };
+    return { ...s, sessions, current: fallback(sessions), view: undefined };
+  });
+}
 
 export async function loadSessions(ws: WorkspaceName) {
   const r = await commands.listQa(ws);

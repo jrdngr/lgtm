@@ -24,8 +24,9 @@ export interface CurrentReview {
   notes: NoteDto[];
   /** In a PR workspace, every thread and draft on the PR. */
   threads: ThreadDto[];
-  /** Shows a new state, after a side view changed comments or threads. */
-  apply(state: StateDto): void;
+  /** Shows a new state, after a side view changed comments or threads. With `review`, only
+   * while that review is still the one shown. */
+  apply(state: StateDto, review?: number): void;
   /** Starts an agent writing the review's walkthrough. */
   runWalkthrough(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */

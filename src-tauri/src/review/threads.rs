@@ -69,7 +69,7 @@ fn order(t: &ThreadDto) -> (bool, String, u32, String) {
 
 impl Review {
     /// The PR the review's workspace was checked out for, as `(repo, number)`.
-    fn pr(&self, store: &Store) -> anyhow::Result<Option<(String, u32)>> {
+    pub(super) fn pr(&self, store: &Store) -> anyhow::Result<Option<(String, u32)>> {
         let Some(name) = &self.ws.name else {
             return Ok(None);
         };

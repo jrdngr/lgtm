@@ -114,6 +114,12 @@ impl Jj {
         String::from_utf8(self.exec(args, true).await?).context("jj output is not UTF-8")
     }
 
+    /// Reads file contents jj passes through as raw bytes, so a non-UTF-8 file shows U+FFFD
+    /// instead of failing the read.
+    async fn read_lossy(&self, args: &[&str]) -> anyhow::Result<String> {
+        Ok(String::from_utf8_lossy(&self.exec(args, true).await?).into_owned())
+    }
+
     /// Snapshots the working copy. Fails with an error that `is_stale` recognizes when the
     /// working copy is stale.
     pub async fn snapshot(&self) -> anyhow::Result<()> {

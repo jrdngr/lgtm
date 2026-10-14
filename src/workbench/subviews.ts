@@ -13,7 +13,7 @@ function savedSub(key: string): unknown {
 }
 
 /** Right panel views from older builds, by the view that shows them now. */
-const MOVED: Record<string, string> = { files: "changes", bots: "reviewers" };
+const MOVED: Record<string, string> = { files: "changes", bots: "reviewers", design: "qa" };
 
 /** The right panel view for a view id saved by any build. Older builds nested Files and
  * Symbols under "diff", and Walkthrough and Reviewers under "reports", each remembering the

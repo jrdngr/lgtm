@@ -84,7 +84,11 @@ export function MarkPalette({ setup, place, onClose }: Props) {
           }}
           onDrop={(e) => {
             e.preventDefault();
-            if (dragging !== undefined && dragging !== i) save(moved(setup.slots, dragging, i));
+            if (dragging !== undefined && dragging !== i) {
+              // Rows index the shown colors, which hidden ones can sit among in `slots`.
+              const at = (row: number) => setup.slots.indexOf(shown[row]);
+              save(moved(setup.slots, at(dragging), at(i)));
+            }
             setDragging(undefined);
           }}
         >

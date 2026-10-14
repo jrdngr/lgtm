@@ -154,10 +154,18 @@ export function QaTab({ api }: IDockviewPanelProps) {
           <PromptView key={d?.id} ws={ws} d={d} busy={busy} onSend={(t) => sendText(t)} />
         )}
         {d && view === "questions" && (
-          <QuestionsView ws={ws} d={d} busy={busy} streams={state.streams} focusKey={focusKey} />
+          <QuestionsView
+            key={d.id}
+            ws={ws}
+            d={d}
+            busy={busy}
+            streams={state.streams}
+            focusKey={focusKey}
+          />
         )}
         {d && view === "apply" && (
           <ApplyView
+            key={d.id}
             ws={ws}
             d={d}
             busy={busy}

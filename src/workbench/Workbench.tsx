@@ -1,12 +1,13 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { RepoInfo } from "../ipc";
+import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
 import { showThread } from "../threads/focus";
 import { McpOffer } from "../tools/McpOffer";
 import { selectActivity } from "../workspaces/activity";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { BottomPanel } from "./BottomPanel";
 import { bottom } from "./bottom";
@@ -65,6 +66,24 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     if (selected === name) select(null);
     setMounted((m) => m.filter((d) => d.name !== name));
   }
+
+  const workspaces = useWorkspaces();
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  // The selected workspace, remembered from last time or forgotten from a terminal, may be
+  // gone. A list fetched before it was created can lack it too, so a fresh one confirms.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: check each list as it loads
+  useEffect(() => {
+    const name = selectedRef.current;
+    const list = workspaces.workspaces;
+    if (name === null || !list || list.some((w) => w.name === name)) return;
+    unwrap(commands.listWorkspaces()).then(
+      (fresh) => {
+        if (selectedRef.current === name && !fresh.some((w) => w.name === name)) forget(name);
+      },
+      () => {},
+    );
+  }, [workspaces.workspaces]);
 
   function setSides(update: (s: Sides) => Sides) {
     setSidesState((s) => {
@@ -186,10 +205,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
               icon: "folder",
               render: () => (
                 <WorkspacesSidebar
+                  list={workspaces}
                   selected={selected}
                   onSelect={select}
                   onDeleted={forget}
-                  onMissing={() => select(null)}
                 />
               ),
             },

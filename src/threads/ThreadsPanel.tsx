@@ -9,7 +9,7 @@ import { useDiscussion } from "../github/useDiscussion";
 import { type CommandResult, commands } from "../ipc";
 import { type CurrentReview, useCurrentReview } from "../review/current";
 import { openSettings } from "../settings/open";
-import { useAgentsOff } from "../tools/agents";
+import { useAgentsOff, useGithubOff } from "../tools/agents";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { isMac } from "../workbench/keys";
@@ -68,6 +68,7 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
   const chat = useThreadChat(review, setError);
   const runner = useThreadRun(review, setError);
   const agentsOff = useAgentsOff();
+  const githubOff = useGithubOff();
   const [focus, setFocus] = useState<number>();
   const [showDone, setShowDone] = useState(false);
   const [confirm, setConfirm] = useState(0);
@@ -77,7 +78,7 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
   const threads = review.threads;
   const groups = byStage(threads);
   const visible = groups.flatMap(([s, ts]) => (s === "done" && !showDone ? [] : ts));
-  const current = threads.find((t) => t.id === focus) ?? visible[0];
+  const current = visible.find((t) => t.id === focus) ?? visible[0];
   const open = threads.filter((t) => t.state.stage !== "done").length;
 
   const onFocusRequest = useCallback((id: number) => {
@@ -130,12 +131,17 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
     else if (!current) return;
     else if (e.key === "f") stage(current, "toFix");
     else if (e.key === "r") {
-      stage(current, "reply");
-      askRef.current?.focus();
+      // The thread remounts under Reply, so the ask box to focus is the new one.
+      setFocus(current.id);
+      stage(current, "reply").then(() => requestAnimationFrame(() => askRef.current?.focus()));
     } else if (e.key === "e") replyRef.current?.focus();
     else if (e.key === "y") stage(current, "ready");
-    else if (e.key === "d") stage(current, "done");
-    else if (e.key === "o" && current.placed) review.jumpToComment(current.id);
+    else if (e.key === "d") {
+      // The cursor moves on, since Done is usually folded.
+      const i = visible.indexOf(current);
+      setFocus((visible[i + 1] ?? visible[i - 1])?.id);
+      stage(current, "done");
+    } else if (e.key === "o" && current.placed) review.jumpToComment(current.id);
     else return;
     e.preventDefault();
   }
@@ -164,14 +170,16 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
             ✦ Triage {fresh} new
           </button>
         )}
-        <IconButton
-          icon="sync"
-          label="Sync with GitHub"
-          onClick={() => {
-            review.refetchPr();
-            discussion.load();
-          }}
-        />
+        {!githubOff && (
+          <IconButton
+            icon="sync"
+            label="Sync with GitHub"
+            onClick={() => {
+              review.refetchPr();
+              discussion.load();
+            }}
+          />
+        )}
         <Menu
           items={[
             { label: showDone ? "Hide done" : "Show done", onSelect: () => setShowDone(!showDone) },
@@ -240,7 +248,11 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
                 {s === "toFix" && (
                   <button
                     type="button"
-                    onClick={() => review.send(toFix.map(threadText).join("\n\n---\n\n"))}
+                    onClick={() =>
+                      review.send(toFix.map(threadText).join("\n\n---\n\n"), undefined, (o) =>
+                        setError("error" in o ? o.error : undefined),
+                      )
+                    }
                     title="Paste these threads into a terminal's prompt"
                   >
                     Send to terminal
@@ -276,14 +288,16 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
           );
         })}
       </div>
-      <SendBox
-        review={review}
-        threads={threads}
-        repo={pr.repo}
-        own={!!viewer && pr.author === viewer}
-        onSent={discussion.load}
-        confirm={confirm}
-      />
+      {!githubOff && (
+        <SendBox
+          review={review}
+          threads={threads}
+          repo={pr.repo}
+          own={!!viewer && pr.author === viewer}
+          onSent={discussion.load}
+          confirm={confirm}
+        />
+      )}
     </div>
   );
 }

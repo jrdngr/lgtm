@@ -46,6 +46,22 @@ export function activeTour(review: number, notes: NoteDto[]) {
   return { ...tour, notes: tour.notes.filter((n) => !s.hidden.includes(n.category)) };
 }
 
+/** Hides `hidden`, keeping each tour on its note. A tour whose note gets hidden loses its
+ * place. */
+export function setHidden(review: number, notes: NoteDto[], hidden: Category[]) {
+  const s = tourState(review);
+  const shown = (h: Category[]) => (n: NoteDto) => !h.includes(n.category);
+  const at = { ...s.at };
+  for (const t of tours(notes)) {
+    if (at[t.id] === undefined) continue;
+    const note = t.notes.filter(shown(s.hidden))[at[t.id]];
+    const i = note ? t.notes.filter(shown(hidden)).indexOf(note) : -1;
+    if (i < 0) delete at[t.id];
+    else at[t.id] = i;
+  }
+  setTourState(review, { hidden, at });
+}
+
 /** Moves to step `index` of tour `id` and returns its note. */
 export function goToStep(review: number, notes: NoteDto[], id: string, index: number) {
   const s = tourState(review);

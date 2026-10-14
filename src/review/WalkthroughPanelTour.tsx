@@ -4,7 +4,7 @@ import { rowLabel } from "./comments";
 import type { CurrentReview } from "./current";
 import { LevelPill, NoteIcon } from "./NoteIcon";
 import { CATEGORIES, CATEGORY_ORDER, flowLabel, tours } from "./notes";
-import { activeTour, goToStep, setTourState, stepTour, useTourState } from "./tour";
+import { activeTour, goToStep, setHidden, setTourState, stepTour, useTourState } from "./tour";
 
 const SOURCE = { headless: "the walkthrough", terminal: "a terminal agent" } as const;
 
@@ -26,9 +26,11 @@ export function WalkthroughTour({ review }: { review: CurrentReview }) {
     if (note) showNote(review, note);
   };
   const toggle = (c: NoteDto["category"]) =>
-    setTourState(review.id, {
-      hidden: state.hidden.includes(c) ? state.hidden.filter((h) => h !== c) : [...state.hidden, c],
-    });
+    setHidden(
+      review.id,
+      notes,
+      state.hidden.includes(c) ? state.hidden.filter((h) => h !== c) : [...state.hidden, c],
+    );
   const counts = new Map<NoteDto["category"], number>();
   for (const n of all.find((t) => t.id === tour.id)?.notes ?? []) {
     counts.set(n.category, (counts.get(n.category) ?? 0) + 1);

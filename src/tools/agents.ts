@@ -4,12 +4,17 @@ import { flag } from "./flag";
  * features (persona reviews, comment workshopping) are off then. */
 const agents = flag();
 
-export const setAgentsOff = agents.set;
 export const agentsOff = agents.get;
 export const useAgentsOff = agents.use;
 
 /** Whether `gh` is missing or too old. GitHub features (PR workspaces, publishing) are off. */
 const github = flag();
 
-export const setGithubOff = github.set;
 export const useGithubOff = github.use;
+
+/** Turns agent and GitHub features off while `claude` or `gh` is among the tools with a
+ * problem, and back on once it isn't. */
+export function setToolProblems(tools: string[]) {
+  agents.set(tools.includes("claude"));
+  github.set(tools.includes("gh"));
+}

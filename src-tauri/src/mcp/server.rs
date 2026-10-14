@@ -2,7 +2,7 @@
 //! workspace. Agents read everything and add comments, walkthrough notes and findings, but can't mark
 //! code reviewed: that's the human's record.
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -43,6 +43,26 @@ pub struct Lgtm {
 
 fn json(value: &impl Serialize) -> Out {
     serde_json::to_string_pretty(value).map_err(|e| e.to_string())
+}
+
+/// `path`, absolute or relative, as the workspace-relative path the review shows it by.
+fn workspace_path(root: &Path, path: &str) -> anyhow::Result<String> {
+    let p = Path::new(path);
+    let rel = if p.is_absolute() {
+        p.strip_prefix(root)
+            .with_context(|| format!("{path} isn't in the workspace"))?
+    } else {
+        p
+    };
+    let rel: PathBuf = rel
+        .components()
+        .filter(|c| !matches!(c, Component::CurDir))
+        .collect();
+    let rel = rel
+        .to_str()
+        .with_context(|| format!("{path} isn't UTF-8"))?;
+    crate::files::resolve(root, rel)?;
+    Ok(rel.to_string())
 }
 
 fn failed(e: anyhow::Error) -> String {
@@ -229,7 +249,8 @@ impl Lgtm {
 
     #[tool(
         description = "Findings from the latest Reviewers run in this workspace: the \
-        synthesis when there is one, otherwise each reviewer's own."
+        synthesis when there is one, otherwise each reviewer's own. Each has a state: open, or \
+        fixed or dismissed by the human, which are settled and to be left alone."
     )]
     async fn list_findings(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
@@ -251,7 +272,13 @@ impl Lgtm {
                 .flatten()
                 .collect()
         });
-        json(&serde_json::json!({ "revset": run.revset, "findings": findings }))
+        let mut listed = Vec::new();
+        for f in &findings {
+            let mut value = serde_json::to_value(f).map_err(|e| e.to_string())?;
+            value["state"] = run.finding_state(&f.id).into();
+            listed.push(value);
+        }
+        json(&serde_json::json!({ "revset": run.revset, "findings": listed }))
     }
 
     #[tool(
@@ -278,10 +305,12 @@ impl Lgtm {
         changes it, otherwise in an editor tab."
     )]
     async fn show(&self, Parameters(p): Parameters<inputs::Show>) -> Out {
-        let (label, _) = self.repo().map_err(failed)?;
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let path = workspace_path(&ws.root, &p.path).map_err(failed)?;
         AgentShow {
             workspace: self.hello.workspace.clone(),
-            path: p.path,
+            path,
             line: p.line,
         }
         .emit_to(&self.app, &label)
@@ -419,5 +448,20 @@ impl ServerHandler for Lgtm {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
             .with_instructions(INSTRUCTIONS)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn show_takes_paths_the_way_agents_write_them() {
+        let root = Path::new("/repo");
+        assert_eq!(workspace_path(root, "/repo/src/a.rs").unwrap(), "src/a.rs");
+        assert_eq!(workspace_path(root, "./src/a.rs").unwrap(), "src/a.rs");
+        assert_eq!(workspace_path(root, "src/a.rs").unwrap(), "src/a.rs");
+        assert!(workspace_path(root, "/other/a.rs").is_err());
+        assert!(workspace_path(root, "../a.rs").is_err());
     }
 }

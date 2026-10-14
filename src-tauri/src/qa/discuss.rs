@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use super::Session;
 use super::agent::{Step, parse, rewrite};
-use super::queue::{self, Answer, QState, Rewrite, Turn};
+use super::queue::{self, Answer, QState, QaQuestion, Rewrite, Turn};
 use crate::agent::{Progress, Runs};
 use crate::review::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
@@ -23,6 +23,15 @@ fn rules(qid: &str) -> String {
          null, else null}} between <decide> and </decide>. Don't ask me new questions here: \
          after I decide, you update the open questions and add new ones there."
     )
+}
+
+/// The question's discussion, a paragraph a turn.
+fn talk(q: &QaQuestion) -> String {
+    q.discussion
+        .iter()
+        .map(|t| format!("{}: {}", if t.you { "Me" } else { "You" }, t.text))
+        .collect::<Vec<_>>()
+        .join("\n\n")
 }
 
 /// A decision made in a discussion. `option` counts from 1.
@@ -81,27 +90,30 @@ impl RepoCtx {
         runs: &Runs,
         on_text: impl Fn(String),
     ) -> anyhow::Result<Session> {
-        let q = self.qa_session(ws, id)?.queue;
-        let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
-        let turn = if question.discussion.is_empty() {
-            format!(
-                "Let's discuss this question. It's a discussion: answer briefly. {}\n\n{}\n\n\
-                 {message}",
-                rules(qid),
-                queue::question_text(question)
-            )
+        let s = self.qa_session(ws, id)?;
+        let question = s
+            .queue
+            .get(qid)
+            .with_context(|| format!("no question {qid}"))?;
+        let so_far = if question.discussion.is_empty() {
+            String::new()
         } else {
-            format!("About {qid}: {message}\n\n({})", rules(qid))
+            format!("Our discussion so far:\n\n{}\n\n", talk(question))
         };
-        self.edit_qa(ws, id, |s| {
-            s.queue.discuss(
-                qid,
-                Turn {
-                    you: true,
-                    text: message.to_string(),
-                },
+        let opening = format!(
+            "Let's discuss this question. It's a discussion: answer briefly. {}\n\n{}\n\n\
+             {so_far}{message}",
+            rules(qid),
+            queue::question_text(question)
+        );
+        let (turn, restart) = if question.discussion.is_empty() {
+            (opening, None)
+        } else {
+            (
+                format!("About {qid}: {message}\n\n({})", rules(qid)),
+                Some(opening),
             )
-        })?;
+        };
         let reply = self
             .qa_step(
                 ws,
@@ -112,6 +124,8 @@ impl RepoCtx {
                     edit: false,
                     schema: None,
                     fresh: false,
+                    restart,
+                    decided: false,
                 },
                 |p| {
                     if let Progress::Text(t) = p {
@@ -120,15 +134,27 @@ impl RepoCtx {
                 },
             )
             .await?;
+        if reply.stopped {
+            return self.qa_session(ws, id);
+        }
         let parsed = split(&reply.text);
         self.edit_qa(ws, id, |s| {
             s.queue.discuss(
                 qid,
                 Turn {
-                    you: false,
-                    text: parsed.text.to_string(),
+                    you: true,
+                    text: message.to_string(),
                 },
             )?;
+            if !parsed.text.is_empty() {
+                s.queue.discuss(
+                    qid,
+                    Turn {
+                        you: false,
+                        text: parsed.text.to_string(),
+                    },
+                )?;
+            }
             if let Some(mut r) = parsed.rewrite {
                 r.id = qid.to_string();
                 s.queue.reask(r)?;
@@ -164,9 +190,13 @@ impl RepoCtx {
         qid: &str,
         runs: &Runs,
     ) -> anyhow::Result<Session> {
+        let q = self.qa_session(ws, id)?.queue;
+        let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
         let turn = format!(
             "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
-             id. Say in a few words what changed."
+             id. Say in a few words what changed.\n\n{}\n\nOur discussion:\n\n{}",
+            queue::question_text(question),
+            talk(question)
         );
         let reply = self
             .qa_step(
@@ -178,6 +208,8 @@ impl RepoCtx {
                     edit: false,
                     schema: Some(rewrite()),
                     fresh: false,
+                    restart: None,
+                    decided: false,
                 },
                 |_| {},
             )

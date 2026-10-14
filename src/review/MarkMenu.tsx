@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import type { MarkColor } from "../bindings";
 import { colorForKey, type MarkSetup, markVar } from "./marks";
 import { plural } from "./state";
@@ -34,7 +35,24 @@ interface Props {
   onClose(): void;
 }
 
+/** Shifts the menu back inside its pane when it would run past the bottom or right edge. */
+function useKeptInside(x: number, y: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState({ left: x, top: y });
+  useLayoutEffect(() => {
+    const menu = ref.current;
+    const pane = menu?.offsetParent;
+    if (!menu || !pane) return setPlace({ left: x, top: y });
+    setPlace({
+      left: Math.max(0, Math.min(x, pane.clientWidth - menu.offsetWidth)),
+      top: Math.max(0, Math.min(y, pane.clientHeight - menu.offsetHeight)),
+    });
+  }, [x, y]);
+  return { ref, place };
+}
+
 export function MarkMenu({ x, y, changed, setup, onPick, onClose }: Props) {
+  const { ref, place } = useKeptInside(x, y);
   return (
     <>
       <div
@@ -42,7 +60,7 @@ export function MarkMenu({ x, y, changed, setup, onPick, onClose }: Props) {
         onMouseDown={onClose}
         onContextMenu={(e) => e.preventDefault()}
       />
-      <div className="mark-menu" style={{ left: x, top: y }}>
+      <div className="mark-menu" ref={ref} style={place}>
         <div className="menu-count">
           {changed} changed {plural(changed)}
         </div>

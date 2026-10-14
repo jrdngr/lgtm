@@ -46,9 +46,15 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
     select(lineSelection(i), i);
   }
 
-  function move(dir: 1 | -1, extend: boolean) {
+  /** Selects a whole unit, with the cursor and anchor at its start. */
+  function selectUnit(next: Selection) {
+    setAnchor(next.start);
+    select(next, next.start);
+  }
+
+  function move(dir: 1 | -1, extend: boolean, from = anchor) {
     const next = nextRowLine(lines, cursor, dir);
-    if (extend) select(rangeSelection(anchor, next), next);
+    if (extend) select(rangeSelection(from, next), next);
     else place(next);
   }
 
@@ -68,8 +74,9 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
 
   /** Extends the selection one row, from the cursor unless it's already a range. */
   function extend(dir: 1 | -1) {
-    if (!extending && sel.level !== "range") setAnchor(cursor);
-    move(dir, true);
+    const from = !extending && sel.level !== "range" ? cursor : anchor;
+    setAnchor(from);
+    move(dir, true, from);
   }
 
   function toggleExtend() {
@@ -89,6 +96,7 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
     anchor,
     extending,
     select,
+    selectUnit,
     place,
     move,
     grow,

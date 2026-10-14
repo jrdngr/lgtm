@@ -114,7 +114,7 @@
 .editor-rendered {
   flex: 1;
   min-height: 0;
-  display: flex;
+  overflow: auto;
   outline: none;
 }
 

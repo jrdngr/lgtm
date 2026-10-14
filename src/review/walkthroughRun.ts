@@ -53,7 +53,7 @@ export async function runWalkthrough(
   }
   onState(r.data.state);
   const n = r.data.state.notes.length;
-  const skipped = r.data.skipped ? `, ${r.data.skipped} outside the review left out` : "";
+  const skipped = r.data.skipped ? `, ${r.data.skipped} left out` : "";
   const note = `${n} ${n === 1 ? "note" : "notes"}${skipped}`;
   handle.end("done", note);
   set(review, { running: false, note });

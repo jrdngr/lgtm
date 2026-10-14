@@ -6,6 +6,7 @@ mod claude;
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, bail};
@@ -30,11 +31,14 @@ pub struct Reply {
 
 /// Running agents by key, so they can be stopped. Clones share the same runs.
 #[derive(Clone, Default)]
-pub struct Runs(Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>);
+pub struct Runs(Arc<Mutex<HashMap<String, Entry>>>);
+
+/// A run's id and the sender that stops it.
+type Entry = (u64, oneshot::Sender<()>);
 
 impl Runs {
     pub fn stop(&self, key: &str) {
-        if let Some(tx) = self.0.lock().unwrap().remove(key) {
+        if let Some((_, tx)) = self.0.lock().unwrap().remove(key) {
             tx.send(()).ok();
         }
     }
@@ -48,30 +52,59 @@ impl Runs {
             .cloned()
             .collect();
         for k in keys {
-            if let Some(tx) = map.remove(&k) {
+            if let Some((_, tx)) = map.remove(&k) {
                 tx.send(()).ok();
             }
         }
     }
 
-    /// Records a run under `key`. The receiver fires when it's stopped.
-    fn register(&self, key: &str) -> anyhow::Result<(Registered<'_>, oneshot::Receiver<()>)> {
-        let (tx, rx) = oneshot::channel();
+    /// Records a run under `key`, so it can be stopped from now on, even before it starts.
+    pub fn register(&self, key: &str) -> anyhow::Result<Registered<'_>> {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let (tx, stop) = oneshot::channel();
         let mut map = self.0.lock().unwrap();
         if map.contains_key(key) {
             bail!("the agent is already working on this");
         }
-        map.insert(key.to_string(), tx);
-        Ok((Registered(self, key.to_string()), rx))
+        map.insert(key.to_string(), (id, tx));
+        Ok(Registered {
+            runs: self,
+            key: key.to_string(),
+            id,
+            stop,
+        })
     }
 }
 
-/// Removes a run's entry however the run ends.
-struct Registered<'a>(&'a Runs, String);
+/// A registered run. `stop` fires when it's stopped, and the entry goes however it ends.
+pub struct Registered<'a> {
+    runs: &'a Runs,
+    key: String,
+    id: u64,
+    stop: oneshot::Receiver<()>,
+}
 
 impl Drop for Registered<'_> {
+    /// Leaves the entry alone when it belongs to a newer run under the same key.
     fn drop(&mut self) {
-        self.0.0.lock().unwrap().remove(&self.1);
+        let mut map = self.runs.0.lock().unwrap();
+        if map.get(&self.key).is_some_and(|(id, _)| *id == self.id) {
+            map.remove(&self.key);
+        }
+    }
+}
+
+/// The run's process group, which holds the agent even when a shell function starts it.
+/// It's killed however the run ends.
+struct Group(Option<u32>);
+
+impl Drop for Group {
+    fn drop(&mut self) {
+        if let Some(pid) = self.0 {
+            // SAFETY: killpg takes no pointers. The group is the run's own, from setsid.
+            unsafe { libc::killpg(pid as libc::pid_t, libc::SIGKILL) };
+        }
     }
 }
 
@@ -104,13 +137,31 @@ pub async fn run(
     task: Task<'_>,
     on: impl Fn(Progress),
 ) -> anyhow::Result<Reply> {
-    let (_registered, mut stop) = runs.register(key)?;
+    run_registered(runs.register(key)?, task, on).await
+}
+
+/// Like `run`, for a run registered ahead of the work that sets it up.
+pub async fn run_registered(
+    mut run: Registered<'_>,
+    task: Task<'_>,
+    on: impl Fn(Progress),
+) -> anyhow::Result<Reply> {
+    let stopped = |text| Reply {
+        text,
+        structured: None,
+        session: None,
+        stopped: true,
+    };
+    if run.stop.try_recv().is_ok() {
+        return Ok(stopped(String::new()));
+    }
 
     let model = settings::get()
         .models
         .for_purpose(task.purpose)
         .map(String::from);
-    let mut child = settings::claude::command()?
+    let mut command = settings::claude::command()?;
+    command
         .args(claude::args(
             task.resume,
             task.edit,
@@ -121,22 +172,51 @@ pub async fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .kill_on_drop(true)
+        .kill_on_drop(true);
+    // A new session, so the agent has its own process group and no controlling terminal. A
+    // login shell left on the app's terminal in a background group would stop itself on it.
+    // SAFETY: setsid is async-signal-safe and touches no memory.
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+    let mut child = command
         .spawn()
         .context("couldn't start Claude Code. Check the Claude command in Settings.")?;
-    let mut stdin = child.stdin.take().context("no stdin")?;
-    stdin.write_all(task.prompt.as_bytes()).await?;
-    drop(stdin);
+    let _group = Group(child.id());
     let mut stderr = child.stderr.take().context("no stderr")?;
+    // Read as it comes, so an agent that logs a lot never blocks on a full pipe.
+    let stderr = tokio::spawn(async move {
+        let mut err = String::new();
+        stderr.read_to_string(&mut err).await.ok();
+        err
+    });
+    let mut stdin = child.stdin.take().context("no stdin")?;
+    let wrote = stdin.write_all(task.prompt.as_bytes()).await;
+    drop(stdin);
+    if let Err(e) = wrote {
+        let status = child.wait().await?;
+        let err = stderr.await.unwrap_or_default();
+        let why = if err.trim().is_empty() {
+            e.to_string()
+        } else {
+            err.trim().to_string()
+        };
+        bail!("the agent exited ({status}) before reading the prompt: {why}");
+    }
     let mut lines = BufReader::new(child.stdout.take().context("no stdout")?).lines();
 
     let mut streamed = String::new();
     loop {
         let line = tokio::select! {
             line = lines.next_line() => line?,
-            _ = &mut stop => {
+            _ = &mut run.stop => {
                 child.kill().await.ok();
-                return Ok(Reply { text: streamed, structured: None, session: None, stopped: true });
+                return Ok(stopped(streamed));
             }
         };
         let Some(line) = line else { break };
@@ -144,6 +224,11 @@ pub async fn run(
             Line::Text(t) => {
                 streamed.push_str(&t);
                 on(Progress::Text(t));
+            }
+            // Text after a tool call starts a new paragraph rather than running on.
+            Line::TextStart if !streamed.is_empty() && !streamed.ends_with('\n') => {
+                streamed.push_str("\n\n");
+                on(Progress::Text("\n\n".into()));
             }
             Line::Tool(t) => on(Progress::Tool(t)),
             Line::Done { text, error, .. } if error => bail!("the agent failed: {text}"),
@@ -161,12 +246,11 @@ pub async fn run(
                     stopped: false,
                 });
             }
-            Line::Other => {}
+            Line::TextStart | Line::Other => {}
         }
     }
     let status = child.wait().await?;
-    let mut err = String::new();
-    stderr.read_to_string(&mut err).await.ok();
+    let err = stderr.await.unwrap_or_default();
     bail!(
         "the agent exited ({status}) without replying: {}",
         err.trim()
@@ -176,6 +260,17 @@ pub async fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_stopped_run_ending_late_leaves_the_restarted_run_stoppable() {
+        let runs = Runs::default();
+        let old = runs.register("k").unwrap();
+        runs.stop("k");
+        let mut new = runs.register("k").unwrap();
+        drop(old);
+        runs.stop("k");
+        assert!(new.stop.try_recv().is_ok());
+    }
 
     /// Runs the real `claude`, so it's skipped unless asked for with `--ignored`.
     #[tokio::test]

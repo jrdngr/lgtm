@@ -43,8 +43,8 @@ export function FocusedThread(p: Props) {
     review.apply(got.data);
   }
 
-  async function save() {
-    if (text !== t.body) await apply(commands.editComment(review.id, t.id, text));
+  async function save(next = text) {
+    if (next !== t.body) await apply(commands.editComment(review.id, t.id, next));
   }
 
   async function send(change: boolean) {
@@ -53,6 +53,12 @@ export function FocusedThread(p: Props) {
     setAsk("");
     await save();
     if (!(await chat.ask(t.id, message, text, change))) setAsk(message);
+  }
+
+  /** A suggested reply is saved right away, since keys can stage the thread before a blur. */
+  function use(reply: string) {
+    setText(reply);
+    save(reply);
   }
 
   const mod = (e: React.KeyboardEvent) => (isMac ? e.metaKey : e.ctrlKey);
@@ -121,10 +127,10 @@ export function FocusedThread(p: Props) {
           value={text}
           placeholder={draft ? "Write a comment for GitHub" : "Write a reply (e)"}
           onChange={(e) => setText(e.target.value)}
-          onBlur={save}
+          onBlur={() => save()}
           onKeyDown={onReplyKey}
         />
-        <Workshop messages={t.messages} running={running} onUse={setText} />
+        <Workshop messages={t.messages} running={running} onUse={use} />
         <div className="ask">
           <textarea
             ref={p.askRef}

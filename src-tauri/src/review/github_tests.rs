@@ -29,13 +29,44 @@ fn thread(id: &str, line: Option<u32>) -> PulledThread {
     }
 }
 
+/// A workspace checked out for PR o/r#1.
+async fn pr_workspace(
+    ctx: &mut RepoCtx,
+    base: &std::path::Path,
+) -> Arc<crate::workspace::Workspace> {
+    ctx.workspace_base = Some(base.to_path_buf());
+    ctx.create_workspace("pr1").await.unwrap();
+    let record = crate::pr::PrRecord {
+        workspace: "pr1".into(),
+        repo: crate::github::GhRepo {
+            owner: "o".into(),
+            name: "r".into(),
+        },
+        number: 1,
+        id: String::new(),
+        title: String::new(),
+        url: String::new(),
+        author: String::new(),
+        base_ref: "main".into(),
+        base_remote: "origin".into(),
+        head_ref: String::new(),
+        head_remote: None,
+        added_remote: None,
+        head: String::new(),
+    };
+    ctx.store.lock().unwrap().save_pr(&record).unwrap();
+    ctx.workspace(Some("pr1")).await.unwrap()
+}
+
 #[tokio::test]
 async fn threads_land_on_their_lines_through_working_copy_edits() {
-    let (dir, ctx) = repo();
+    let (dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
     let head = "fn a() {\n    one();\n    two();\n}\n";
     // The working copy dropped a line above the code the PR head has.
-    write(dir.path(), "a.rs", "    one();\n    two();\n}\n");
-    let review = ctx.open(None, "@", false).await.unwrap();
+    write(&ws.root, "a.rs", "    one();\n    two();\n}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let texts = HashMap::from([("a.rs".to_string(), head.to_string())]);
     let threads = vec![thread("T1", Some(3)), thread("T2", None)];
     let state = ctx
@@ -54,4 +85,9 @@ async fn threads_land_on_their_lines_through_working_copy_edits() {
         .add_threads(review.id, vec![thread("T1", Some(3))], &texts, "PR #1")
         .unwrap();
     assert_eq!(state.comments.len(), 2);
+
+    // Another workspace's review of the same code doesn't show the PR's threads.
+    write(dir.path(), "a.rs", "    one();\n    two();\n}\n");
+    let other = ctx.open(None, "@", false).await.unwrap();
+    assert!(other.state.comments.is_empty());
 }

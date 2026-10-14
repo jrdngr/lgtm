@@ -115,13 +115,17 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod || e.altKey) return;
     const isOpen = q.state === "open";
+    // ↵ on a focused button or summary activates it rather than deciding.
+    const onControl =
+      e.target !== e.currentTarget && !!(e.target as Element).closest("button, summary, a");
     const n = Number(e.key);
     if (n >= 1 && n <= q.text.options.length && isOpen && !locked) setSel(n - 1);
-    else if (e.key === "Enter" && isOpen) decide(sel);
+    else if (e.key === "Enter" && isOpen && !onControl)
+      decide(sel, mode === "note" ? note : undefined);
     else if (e.key === "n" && isOpen && !locked) setMode("note");
     else if (e.key === "o" && isOpen && !locked) setMode("other");
     else if (e.key === "d") setMode("discuss");
-    else if (e.key === "s" && isOpen) {
+    else if (e.key === "s" && isOpen && !locked) {
       quick({ kind: "later", id: q.id });
       setWant(undefined);
     } else if (e.key === "u" && prev && !locked) undo();
@@ -168,7 +172,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     );
   }
   if (q) hints.push(["d", "discuss"]);
-  if (q?.state === "open") hints.push(["s", "later"]);
+  if (q?.state === "open" && !locked) hints.push(["s", "later"]);
   if (q?.state === "decided" && !locked) hints.push(["r", "change answer"]);
   if (prev && !locked) hints.push(["u", "undo"]);
   if (q?.change) hints.push(["p", showPrev ? "hide previous" : "show previous"]);
@@ -314,6 +318,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
                 <button
                   type="button"
                   className="quiet"
+                  disabled={locked}
                   onClick={() => {
                     quick({ kind: "later", id: q.id });
                     setWant(undefined);

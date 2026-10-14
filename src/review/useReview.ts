@@ -83,9 +83,10 @@ export function useReview(workspace: WorkspaceName) {
     }
   }
 
-  function setState(state: StateDto) {
+  /** Shows `state`, unless it's for review `id` and another review was loaded since. */
+  function setState(state: StateDto, id?: number) {
     setLoaded((l) => {
-      if (!l) return l;
+      if (!l || (id !== undefined && l.review.id !== id)) return l;
       const review = { ...l.review, state };
       current.current = review;
       return { review };
@@ -112,6 +113,8 @@ export function useReview(workspace: WorkspaceName) {
       changed.then((un) => un());
       staleSub.then((un) => un());
       stateSub.then((un) => un());
+      // An open still in flight closes its review when it lands.
+      opens.current++;
       if (current.current) commands.closeReview(current.current.id);
     };
   }, [workspace]);

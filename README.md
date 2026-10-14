@@ -31,8 +31,12 @@ A built app takes a repo path as its argument: `lgtm /path/to/repo`. A second la
 | ⌃\` | Bottom panel: show it and focus it (with a new terminal when it's empty), or hide it when it has focus |
 | ⌃⇧\` | New terminal in the bottom panel |
 | ⌘T | New terminal tab, in the pane grid or bottom panel, whichever has focus |
+| ⌘] / ⌘[ | Next / previous pane, including the bottom panel |
+| ⇧⌘V | In a Markdown editor tab, switch between the editor and the rendered view |
 | ⌘D | Split terminal right |
 | ⌘⇧D | Split terminal down |
+| ⌘B / ⌥⌘B | Show or hide the left / right panel |
+| ⌘⇧K | Show the Workspaces sidebar |
 | ⌘⇧E | Show the Changes tab (reopens the right panel if closed) |
 | ⌘⇧Y | Show the Symbols tab |
 | ⌘⇧R | Show the Files tab |
@@ -59,6 +63,7 @@ In a review pane:
 | `c` | Write a note on the selection |
 | `C` | Write a draft for GitHub on the selection (PR workspaces) |
 | `a` | Ask the agent about the note or thread at the cursor |
+| `o` | Open the file at the cursor in an editor tab, at that line |
 | `x` | Check or uncheck the file under the cursor |
 | `za` | Collapse or expand the hunk, or the file on its header |
 | `g` | Open the symbol graph |

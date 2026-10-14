@@ -6,7 +6,25 @@ pub(super) const RUST_SYMBOLS: &str = r#"
 (enum_item name: (type_identifier) @name) @symbol
 (union_item name: (type_identifier) @name) @symbol
 (trait_item name: (type_identifier) @name) @symbol
-(impl_item type: (_) @name) @symbol
+(impl_item type: [
+  (type_identifier) @name
+  (scoped_type_identifier name: (type_identifier) @name)
+  (generic_type type: [
+    (type_identifier) @name
+    (scoped_type_identifier name: (type_identifier) @name)
+  ])
+  (reference_type) @name
+  (pointer_type) @name
+  (tuple_type) @name
+  (unit_type) @name
+  (array_type) @name
+  (function_type) @name
+  (dynamic_type) @name
+  (primitive_type) @name
+  (bounded_type) @name
+  (never_type) @name
+  (macro_invocation) @name
+]) @symbol
 (mod_item name: (identifier) @name) @symbol
 (macro_definition name: (identifier) @name) @symbol
 "#;
@@ -36,7 +54,15 @@ pub(super) const TS_SYMBOLS: &str = r#"
 pub(super) const GO_SYMBOLS: &str = r#"
 (function_declaration name: (identifier) @name) @symbol
 (method_declaration name: (field_identifier) @name) @symbol
-(type_declaration (type_spec name: (type_identifier) @name)) @symbol
+((type_declaration [
+  (type_spec name: (type_identifier) @name)
+  (type_alias name: (type_identifier) @name)
+]) @symbol
+  (#not-match? @symbol "^type\\s*\\("))
+(type_declaration "(" [
+  (type_spec name: (type_identifier) @name)
+  (type_alias name: (type_identifier) @name)
+] @symbol)
 "#;
 
 pub(super) const SWIFT_SYMBOLS: &str = r#"
@@ -98,9 +124,11 @@ pub(super) const SHELL_SYMBOLS: &str = r#"
 "#;
 
 /// Sections, keyed by their heading. A section runs to the next heading of its level or above.
+/// The grammar only opens sections at ATX headings, so a setext heading names a section only
+/// when it starts one, like a document's leading title.
 pub(super) const MD_SYMBOLS: &str = r#"
 (section (atx_heading heading_content: (inline) @name)) @symbol
-(section (setext_heading heading_content: (paragraph) @name)) @symbol
+(section . (setext_heading heading_content: (paragraph (inline) @name))) @symbol
 "#;
 
 /// Keys holding an object or array. Keys with plain values would bury the outline.

@@ -88,7 +88,7 @@ pub struct Keyed {
 }
 
 /// A row's kind and line numbers, enough to find it again after the diff changes.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub struct RowPos {
     pub kind: RowKind,
     pub old_line: Option<u32>,

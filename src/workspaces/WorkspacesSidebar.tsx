@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
@@ -8,22 +8,22 @@ import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type WorkspaceName, workspaceKey } from "./context";
 import { NearbyPrs } from "./NearbyPrs";
-import { useWorkspaces } from "./useWorkspaces";
+import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
 
 interface Props {
+  /** The repo's workspaces, from `useWorkspaces`. */
+  list: Workspaces;
   selected: WorkspaceName;
   /** `setup` is set for a new workspace whose first terminal runs `.lgtm/setup`. */
   onSelect(name: WorkspaceName, setup?: boolean): void;
   onDeleted(name: string): void;
-  /** The selected workspace isn't in the repo any more. */
-  onMissing(): void;
 }
 
-/** The repo's jj workspaces with review progress. Click one to switch to it. */
-export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: Props) {
-  const { workspaces, progress, error, setError, reload } = useWorkspaces();
+/** The repo's workspaces with review progress. Click one to switch to it. */
+export function WorkspacesSidebar({ list, selected, onSelect, onDeleted }: Props) {
+  const { workspaces, progress, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
   const [openingPr, setOpeningPr] = useState(false);
   const githubOff = useGithubOff();
@@ -31,19 +31,12 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string>();
 
-  // A workspace remembered from last time may have been forgotten since.
-  const checked = useRef(false);
-  useEffect(() => {
-    if (!workspaces || checked.current) return;
-    checked.current = true;
-    if (!workspaces.some((w) => w.name === selected)) onMissing();
-  }, [workspaces, selected, onMissing]);
-
   async function create(e: React.FormEvent) {
     e.preventDefault();
     const ws = name.trim();
     if (!ws) return;
     setBusy(true);
+    setError(undefined);
     const r = await commands.createWorkspace(ws);
     setBusy(false);
     if (r.status === "error") {
@@ -66,9 +59,10 @@ export function WorkspacesSidebar({ selected, onSelect, onDeleted, onMissing }: 
   async function remove(ws: string) {
     setConfirming(undefined);
     if (!(await confirmWorkspace(ws))) return;
-    onDeleted(ws);
+    setError(undefined);
     const r = await commands.deleteWorkspace(ws);
     if (r.status === "error") setError(r.error);
+    else onDeleted(ws);
     reload();
   }
 

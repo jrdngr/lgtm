@@ -51,6 +51,8 @@ pub fn args<'a>(
 pub enum Line {
     /// A piece of the reply as it streams.
     Text(String),
+    /// A block of text starts, as each assistant message does.
+    TextStart,
     /// A tool call, summed up like "Read src/a.rs".
     Tool(String),
     /// The run finished. `text` is the final reply, or the error.
@@ -75,6 +77,12 @@ pub fn parse(line: &str) -> Line {
                 && str_at("/event/delta/type") == Some("text_delta") =>
         {
             Line::Text(str_at("/event/delta/text").unwrap_or_default().to_string())
+        }
+        Some("stream_event")
+            if str_at("/event/type") == Some("content_block_start")
+                && str_at("/event/content_block/type") == Some("text") =>
+        {
+            Line::TextStart
         }
         Some("assistant") => v
             .pointer("/message/content")
@@ -130,6 +138,8 @@ mod tests {
     fn parses_deltas_and_the_result() {
         let delta = r#"{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hi "}},"session_id":"s"}"#;
         assert_eq!(parse(delta), Line::Text("hi ".into()));
+        let start = r#"{"type":"stream_event","event":{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}},"session_id":"s"}"#;
+        assert_eq!(parse(start), Line::TextStart);
         let done = r#"{"type":"result","subtype":"success","is_error":false,"result":"hi there","session_id":"s1"}"#;
         assert_eq!(
             parse(done),

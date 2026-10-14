@@ -47,26 +47,36 @@ export function boxStats(
   return out;
 }
 
-/** The first symbol in a box, in the box or deeper. */
-function firstNode(graph: GraphDto, tree: Tree, box: Box): GraphNode | undefined {
-  if (box.own.length > 0) return graph.nodes[box.own[0]];
+/** The first symbol in a box that passes `keep`, in the box or deeper. */
+function firstNode(
+  graph: GraphDto,
+  tree: Tree,
+  box: Box,
+  keep: (n: number) => boolean,
+): GraphNode | undefined {
+  const own = box.own.find(keep);
+  if (own !== undefined) return graph.nodes[own];
   for (const c of box.children) {
     const child = tree.boxes.get(c);
-    const n = child && firstNode(graph, tree, child);
+    const n = child && firstNode(graph, tree, child, keep);
     if (n) return n;
   }
   return undefined;
 }
 
-/** Shows a box's code: a file from its top, or a symbol or group's first symbol. */
+/** Shows a box's code: a file from its top, or a symbol or group's first shown symbol,
+ * changed ones first. */
 export function jumpToBox(
   review: CurrentReview,
   graph: GraphDto,
   tree: Tree,
   box: Box,
+  present: boolean[],
   workspace: WorkspaceName,
 ) {
-  const n = firstNode(graph, tree, box);
+  const n =
+    firstNode(graph, tree, box, (i) => present[i] && graph.nodes[i].hop === 0) ??
+    firstNode(graph, tree, box, (i) => present[i]);
   if (!n || box.kind === "folder") return;
   if (box.kind !== "file") return showNode(review, n, workspace);
   if (n.file === null) openFile(workspace, n.path);

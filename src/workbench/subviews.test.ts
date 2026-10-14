@@ -9,5 +9,6 @@ test("old nested tabs open the view they last showed", () => {
   expect(movedView("reports", saved({ "lgtm:side:reports": "reviewers" }))).toBe("reviewers");
   expect(movedView("bots", saved({}))).toBe("reviewers");
   expect(movedView("files", saved({}))).toBe("changes");
+  expect(movedView("design", saved({}))).toBe("qa");
   expect(movedView("repo", saved({}))).toBe("repo");
 });

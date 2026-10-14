@@ -172,7 +172,7 @@ async fn checks_out_and_pulls_a_real_fork_pr() {
     assert_eq!(d.pr.number, record.number);
     assert!(!ctx.pr_head(Some(&name)).await.unwrap().moved);
     ctx.refetch_pr(Some(&name), Some(review.id)).await.unwrap();
-    ctx.delete_workspace(&name).await.unwrap();
+    ctx.delete_workspace(&name, || ()).await.unwrap();
     assert!(
         ctx.main
             .jj

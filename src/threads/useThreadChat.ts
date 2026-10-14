@@ -49,7 +49,7 @@ export function useThreadChat(review: CurrentReview | undefined, onError: (e: st
       onError(r.error);
       return false;
     }
-    review.apply(r.data);
+    review.apply(r.data, review.id);
     return true;
   }
 

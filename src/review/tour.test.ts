@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { NoteDto } from "../bindings";
-import { currentNote, setTourState, stepTour } from "./tour";
+import { currentNote, setHidden, setTourState, stepTour } from "./tour";
 
 const note = (id: number, extra: Partial<NoteDto> = {}): NoteDto => ({
   id,
@@ -32,4 +32,20 @@ test("each tour keeps its own place, and hidden categories are skipped", () => {
   setTourState(review, { active: "reading", hidden: ["question"] });
   expect(currentNote(review, notes)?.id).toBe(1);
   expect(stepTour(review, notes, 1)?.id).toBe(3);
+});
+
+test("hiding a category keeps the tour on its note, or drops its place when that's hidden", () => {
+  const notes = [note(0, { category: "question" }), note(1), note(2, { category: "question" })];
+  const review = 8;
+  stepTour(review, notes, 1);
+  stepTour(review, notes, 1);
+
+  setHidden(review, notes, ["question"]);
+  expect(currentNote(review, notes)?.id).toBe(1);
+  setHidden(review, notes, []);
+  expect(currentNote(review, notes)?.id).toBe(1);
+
+  stepTour(review, notes, 1);
+  setHidden(review, notes, ["question"]);
+  expect(currentNote(review, notes)).toBeUndefined();
 });

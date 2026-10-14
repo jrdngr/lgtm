@@ -1,6 +1,7 @@
 //! Comments on a review: placing them on rows, and adding, editing, and deleting them.
 
 use std::collections::HashSet;
+use std::sync::Mutex;
 
 use anyhow::Context;
 use serde::Serialize;
@@ -46,9 +47,17 @@ pub struct CommentDto {
 impl Review {
     pub(super) fn rematch_comments(&mut self, store: &Store) -> anyhow::Result<()> {
         let comments = store.comments_for_paths(&self.paths())?;
+        let pr = self.pr(store)?;
+        // GitHub threads and drafts show only in their own PR's workspace.
+        let ours = |c: &Comment| {
+            c.thread
+                .as_ref()
+                .is_none_or(|t| pr.as_ref().is_some_and(|(r, n)| t.repo == *r && t.pr == *n))
+        };
         let mut remaps = Remaps::default();
         self.comments = comments
             .into_iter()
+            .filter(ours)
             .filter_map(|c| self.place(store, &mut remaps, c))
             .collect();
         self.comments.sort_by_key(|c| {
@@ -150,6 +159,17 @@ impl Review {
         store: &Store,
         rows: &[RowRef],
     ) -> anyhow::Result<(String, Vec<Pin>)> {
+        self.try_pins(store, rows)?
+            .context("these rows can't hold a comment")
+    }
+
+    /// Like [`Self::pins`], but `None` when none of `rows` can be anchored, as removed rows
+    /// of an interdiff can't.
+    pub(super) fn try_pins(
+        &self,
+        store: &Store,
+        rows: &[RowRef],
+    ) -> anyhow::Result<Option<(String, Vec<Pin>)>> {
         let wanted: HashSet<RowRef> = rows.iter().copied().collect();
         let file_idx = rows.last().context("nothing to comment on")?.file;
         let file = self.files.get(file_idx as usize).context("no such file")?;
@@ -170,9 +190,11 @@ impl Review {
         if pins.len() > 2 {
             pins.drain(1..pins.len() - 1);
         }
-        let last = pins.last().context("these rows can't hold a comment")?;
+        let Some(last) = pins.last() else {
+            return Ok(None);
+        };
         let path = last.path.clone().unwrap_or_default();
-        Ok((path, pins))
+        Ok(Some((path, pins)))
     }
 }
 
@@ -182,7 +204,16 @@ impl RepoCtx {
         id: u32,
         f: impl FnOnce(&Review, &Store) -> anyhow::Result<()>,
     ) -> anyhow::Result<StateDto> {
-        let review = self.review(id)?;
+        self.comment_edit_on(&*self.review(id)?, f)
+    }
+
+    /// [`Self::comment_edit`] on a review held since before a long run, which makes the edit
+    /// even when the review was closed in the meantime.
+    pub(super) fn comment_edit_on(
+        &self,
+        review: &Mutex<Review>,
+        f: impl FnOnce(&Review, &Store) -> anyhow::Result<()>,
+    ) -> anyhow::Result<StateDto> {
         let mut review = review.lock().unwrap();
         let store = self.store.lock().unwrap();
         f(&review, &store)?;

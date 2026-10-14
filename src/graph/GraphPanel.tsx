@@ -31,6 +31,7 @@ import "./graph.css";
 
 const nodeTypes = { box: BoxNode, open: OpenBoxNode };
 
+/** The last finished layout, kept while the next one runs so the canvas stays up. */
 function usePlaced(scene: Scene) {
   const [placed, setPlaced] = useState<{ scene: Scene; placed: Placed }>();
   useEffect(() => {
@@ -40,7 +41,7 @@ function usePlaced(scene: Scene) {
       live = false;
     };
   }, [scene]);
-  return placed?.scene === scene ? placed.placed : undefined;
+  return placed;
 }
 
 function useScene(graph: GraphDto, tree: Tree, view: View) {
@@ -76,13 +77,13 @@ interface FlowProps {
 }
 
 function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
-  const { scene, present, shown, next } = useScene(graph, tree, view);
-  const placed = usePlaced(scene);
+  const { scene: wanted, present, shown, next } = useScene(graph, tree, view);
+  const { scene, placed } = usePlaced(wanted) ?? {};
   const flow = useReactFlow();
   const [hover, setHover] = useState<string>();
   const [selected, setSelected] = useState<string>();
   const nodes = useMemo(() => {
-    if (!placed) return [];
+    if (!scene || !placed) return [];
     const stats = boxStats(review, graph, tree, present);
     const out: Node[] = [];
     for (const id of scene.visible) {
@@ -124,11 +125,14 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
     }
     return out;
   }, [review, graph, tree, view, setView, scene, placed, present, shown, next, selected]);
-  // Fit when the boxes change, not on every progress update.
+  // Fit when the boxes change, not on every progress update. A box can unmount under the
+  // pointer without a mouse leave, so hover starts over.
   useEffect(() => {
-    if (placed) requestAnimationFrame(() => flow.fitView({ padding: 0.1 }));
+    if (!placed) return;
+    setHover(undefined);
+    requestAnimationFrame(() => flow.fitView({ padding: 0.1 }));
   }, [placed, flow]);
-  if (!placed) return <div className="placeholder">Laying out…</div>;
+  if (!scene || !placed) return <div className="placeholder">Laying out…</div>;
   return (
     <ReactFlow
       nodes={nodes}
@@ -140,7 +144,9 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
       onNodeClick={(e, n) => {
         const { box, expandable } = n.data as BoxData;
         setSelected(n.id);
-        if (isMac ? e.metaKey : e.ctrlKey) return jumpToBox(review, graph, tree, box, workspace);
+        if (isMac ? e.metaKey : e.ctrlKey) {
+          return jumpToBox(review, graph, tree, box, present, workspace);
+        }
         if (expandable) {
           const expanded = new Set(view.expanded);
           if (!expanded.delete(box.id)) expanded.add(box.id);

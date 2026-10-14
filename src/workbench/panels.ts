@@ -133,12 +133,12 @@ export function defaultLayout(api: DockviewApi, setup = false) {
   addTerminal(api, "below", setup);
 }
 
-/** Drops panels earlier builds kept in the grid (Tasks, Files) and panes that belonged to
+/** Drops panels earlier builds kept in the grid (Tasks, Files, Design) and panes that belonged to
  * other workspaces. */
 export function dropStalePanels(api: DockviewApi) {
   for (const p of [...api.panels]) {
     const task = (p.params as { task?: unknown } | undefined)?.task;
-    const moved = ["tasks", "files"].includes(p.view.contentComponent);
+    const moved = ["tasks", "files", "design"].includes(p.view.contentComponent);
     if (moved || typeof task === "string") p.api.close();
   }
 }

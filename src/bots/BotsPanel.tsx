@@ -13,6 +13,7 @@ import { PersonaList } from "./PersonaList";
 import { usePersonas } from "./personas";
 import { ReportOptions } from "./ReportOptions";
 import { RunList } from "./RunList";
+import { seedRun } from "./runs";
 import "./bots.css";
 
 const STORE_KEY = "lgtm.bots";
@@ -124,6 +125,7 @@ function Setup({ personas, onOpen }: SetupProps) {
     setStarting(false);
     if (r.status === "error") return setError(r.error);
     setError(undefined);
+    seedRun(r.data);
     onOpen(r.data);
   }
 

@@ -46,7 +46,13 @@ fn hashes(text: &str, path: &str) -> Vec<i64> {
 impl Review {
     /// The changed rows of `path` with `side` lines in `start..=end`, or the nearest changed
     /// row when there are none.
-    fn rows_on_side(&self, path: &str, side: Side, start: u32, end: u32) -> Option<Vec<RowRef>> {
+    pub(super) fn rows_on_side(
+        &self,
+        path: &str,
+        side: Side,
+        start: u32,
+        end: u32,
+    ) -> Option<Vec<RowRef>> {
         let fi = self.files.iter().position(|f| f.path == path)?;
         let rows = &self.files[fi].rows;
         let line = |i: usize| match side {

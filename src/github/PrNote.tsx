@@ -4,7 +4,8 @@ function moved(p: PrReview) {
   const h = p.head;
   if (!h?.moved) return undefined;
   if (h.rewritten) return "was force-pushed on GitHub";
-  return `has ${h.ahead || "new"} new ${h.ahead === 1 ? "commit" : "commits"} on GitHub`;
+  if (!h.ahead) return "has new commits on GitHub";
+  return `has ${h.ahead} new ${h.ahead === 1 ? "commit" : "commits"} on GitHub`;
 }
 
 /** Under the review bar in a PR workspace: what's running, and whether the PR moved on

@@ -7,4 +7,11 @@ describe("columns", () => {
     expect(columns("ab\tx")).toBe(5);
     expect(columns("abcd\tx")).toBe(9);
   });
+
+  it("counts wide characters as two columns", () => {
+    expect(columns("漢字")).toBe(4);
+    expect(columns("ｘ😀")).toBe(4);
+    expect(columns("漢\tx")).toBe(5);
+    expect(columns("aé→")).toBe(3);
+  });
 });

@@ -91,8 +91,13 @@
   overflow: hidden;
   font-size: var(--fs-sm);
   font-weight: 600;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bots-persona-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bots-personas li.off .bots-persona-name {

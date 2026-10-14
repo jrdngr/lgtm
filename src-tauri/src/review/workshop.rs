@@ -80,8 +80,9 @@ impl RepoCtx {
         on_text: impl Fn(String),
     ) -> anyhow::Result<StateDto> {
         let cid = comment as i64;
+        // Held for the whole run, so the reply saves even if the review closes meanwhile.
+        let review = self.review(id)?;
         let (ws, revset) = {
-            let review = self.review(id)?;
             let review = review.lock().unwrap();
             (review.ws.clone(), review.revset.clone())
         };
@@ -159,7 +160,7 @@ impl RepoCtx {
             ws.snapshot().await.ok();
         }
         // Re-read the comment, since an agent may have replied on it during the run.
-        self.comment_edit(id, |_, store| {
+        self.comment_edit_on(&review, |_, store| {
             let mut c = store.comment(cid)?.context("the comment is gone")?;
             if let Some(s) = session {
                 c.workshop.session = Some(s);

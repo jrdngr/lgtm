@@ -236,6 +236,7 @@ impl RepoCtx {
         if new.is_empty() {
             return self.comment_edit(id, |_, _| Ok(()));
         }
+        let run = runs.register(&self.agent_key(&format!("triage-{id}")))?;
         let (ws, context, rules) = self.replies_context(id).await?;
         let threads: Vec<String> = new.iter().map(thread_text).collect();
         let prompt = format!(
@@ -246,9 +247,8 @@ impl RepoCtx {
             threads.join("\n\n---\n\n")
         );
         let schema = triage_schema();
-        let reply = agent::run(
-            runs,
-            &self.agent_key(&format!("triage-{id}")),
+        let reply = agent::run_registered(
+            run,
             agent::Task {
                 cwd: &ws.root,
                 prompt: &prompt,
@@ -302,6 +302,7 @@ impl RepoCtx {
     ) -> anyhow::Result<StateDto> {
         let to_fix = self.threads_at(id, Stage::ToFix)?;
         anyhow::ensure!(!to_fix.is_empty(), "no threads to fix");
+        let run = runs.register(&self.agent_key(&format!("fix-threads-{id}")))?;
         let (ws, context, rules) = self.replies_context(id).await?;
         let revset = self.review(id)?.lock().unwrap().revset.clone();
         anyhow::ensure!(
@@ -318,9 +319,8 @@ impl RepoCtx {
              what you did, and when it differs, a reply saying what changed and why.\n\n{}",
             threads.join("\n\n---\n\n")
         );
-        let reply = agent::run(
-            runs,
-            &self.agent_key(&format!("fix-threads-{id}")),
+        let reply = agent::run_registered(
+            run,
             agent::Task {
                 cwd: &ws.root,
                 prompt: &prompt,

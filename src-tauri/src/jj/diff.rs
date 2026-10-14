@@ -55,7 +55,7 @@ impl Jj {
                 to: to.clone(),
             }),
             _ => {
-                self.read(&["diff", "--stat", "-r", revset]).await?;
+                self.read_lossy(&["diff", "--stat", "-r", revset]).await?;
                 bail!(
                     "revset `{revset}` has {} heads and {} bases; a review needs one of each",
                     heads.len(),
@@ -68,7 +68,7 @@ impl Jj {
     pub async fn diff(&self, range: &Range) -> anyhow::Result<Vec<FileDiff>> {
         let meta_args = Self::range_args(range, &["-T", diff::META_TEMPLATE]);
         let git_args = Self::range_args(range, &["--git"]);
-        let (meta, git) = tokio::try_join!(self.read(&meta_args), self.read(&git_args))?;
+        let (meta, git) = tokio::try_join!(self.read(&meta_args), self.read_lossy(&git_args))?;
         join(diff::parse_meta(&meta)?, diff::parse_git(&git)?)
     }
 
@@ -82,11 +82,11 @@ impl Jj {
 
     /// The range's diff as `jj diff --git` prints it.
     pub async fn git_diff(&self, range: &Range) -> anyhow::Result<String> {
-        self.read(&Self::range_args(range, &["--git"])).await
+        self.read_lossy(&Self::range_args(range, &["--git"])).await
     }
 
     pub async fn diff_stat(&self, range: &Range) -> anyhow::Result<String> {
-        self.read(&Self::range_args(range, &["--stat"])).await
+        self.read_lossy(&Self::range_args(range, &["--stat"])).await
     }
 
     /// Each commit in the range, oldest first: its short change id and full description.
@@ -108,7 +108,7 @@ impl Jj {
     /// compared with `to`.
     pub async fn interdiff(&self, from: &str, to: &str) -> anyhow::Result<Vec<FileDiff>> {
         let git = self
-            .read(&["interdiff", "--from", from, "--to", to, "--git"])
+            .read_lossy(&["interdiff", "--from", from, "--to", to, "--git"])
             .await?;
         Ok(diff::parse_git(&git)?
             .into_iter()
@@ -123,7 +123,7 @@ fn join(meta: Vec<FileMeta>, git: Vec<GitFileDiff>) -> anyhow::Result<Vec<FileDi
         git.into_iter().map(|g| (g.header.clone(), g)).collect();
     meta.into_iter()
         .map(|m| {
-            let header = format!("{} {}", git_path("a/", &m.source), git_path("b/", &m.path));
+            let header = format!("a/{} b/{}", m.source, m.path);
             let g = git
                 .remove(&header)
                 .with_context(|| format!("no git diff for `{header}`"))?;
@@ -146,44 +146,11 @@ fn file_diff(m: FileMeta, g: GitFileDiff) -> FileDiff {
     }
 }
 
-/// A path as git writes it in a `diff --git` header: C-quoted when it holds control
-/// characters, quotes, backslashes, or non-ASCII bytes.
-fn git_path(prefix: &str, path: &str) -> String {
-    let full = format!("{prefix}{path}");
-    if !full
-        .bytes()
-        .any(|b| !(0x20..0x7f).contains(&b) || b == b'"' || b == b'\\')
-    {
-        return full;
-    }
-    let mut out = String::from("\"");
-    for b in full.bytes() {
-        match b {
-            b'"' => out.push_str("\\\""),
-            b'\\' => out.push_str("\\\\"),
-            b'\t' => out.push_str("\\t"),
-            b'\n' => out.push_str("\\n"),
-            0x20..0x7f => out.push(b as char),
-            _ => out.push_str(&format!("\\{b:03o}")),
-        }
-    }
-    out.push('"');
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn git_path_quotes_like_git() {
-        assert_eq!(git_path("a/", "src/main.rs"), "a/src/main.rs");
-        assert_eq!(git_path("a/", "with space"), "a/with space");
-        assert_eq!(git_path("b/", "é\"x"), r#""b/\303\251\"x""#);
-    }
-
-    #[tokio::test]
-    async fn stat_paths_are_repo_relative() {
+    fn init() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let ok = std::process::Command::new("jj")
             .args(["git", "init"])
@@ -191,6 +158,26 @@ mod tests {
             .output()
             .unwrap();
         assert!(ok.status.success());
+        dir
+    }
+
+    #[tokio::test]
+    async fn diffs_unusual_names_and_non_utf8_content() {
+        let dir = init();
+        std::fs::write(dir.path().join("üni"), b"caf\xe9\n").unwrap();
+        std::fs::write(dir.path().join("quo\"te"), "x\n").unwrap();
+        let jj = Jj::new(dir.path());
+        jj.snapshot().await.unwrap();
+        let mut files = jj.diff(&jj.resolve("@").await.unwrap()).await.unwrap();
+        files.sort_by(|a, b| a.path.cmp(&b.path));
+        let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["quo\"te", "üni"]);
+        assert!(files.iter().all(|f| !f.hunks.is_empty()));
+    }
+
+    #[tokio::test]
+    async fn stat_paths_are_repo_relative() {
+        let dir = init();
         std::fs::create_dir(dir.path().join("src")).unwrap();
         std::fs::write(dir.path().join("src/a.rs"), "x\n").unwrap();
         let jj = Jj::new(dir.path());

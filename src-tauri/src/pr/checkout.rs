@@ -46,14 +46,31 @@ pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result
         }
         (None, _) => None,
     };
+    match fetch_head(jj, info, base, head_remote).await {
+        Ok(head_remote) => Ok(Fetched {
+            head_remote,
+            added_remote,
+        }),
+        Err(e) => {
+            drop_remote(jj, added_remote.as_deref()).await;
+            Err(e)
+        }
+    }
+}
+
+/// Fetches the PR's head from `head_remote`, or from `pull/N/head` when that doesn't have it.
+/// Returns the remote it came from.
+async fn fetch_head(
+    jj: &Jj,
+    info: &PrInfo,
+    base: &Base,
+    head_remote: Option<String>,
+) -> anyhow::Result<Option<String>> {
     if let Some(r) = &head_remote {
         // A deleted branch fails here, and the fallback below covers it.
         jj.fetch(r, &[&info.head_ref_name]).await.ok();
         if jj.has_commit(&info.head_ref_oid).await {
-            return Ok(Fetched {
-                head_remote,
-                added_remote,
-            });
+            return Ok(head_remote);
         }
     }
     let refspec = format!(
@@ -69,10 +86,14 @@ pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result
             info.head_ref_oid
         );
     }
-    Ok(Fetched {
-        head_remote: None,
-        added_remote,
-    })
+    Ok(None)
+}
+
+/// Removes a fork remote a failed checkout added, so a retry adds and owns it again.
+async fn drop_remote(jj: &Jj, added: Option<&str>) {
+    if let Some(r) = added {
+        jj.remote_remove(r).await.ok();
+    }
 }
 
 impl RepoCtx {
@@ -116,23 +137,31 @@ impl RepoCtx {
         }
         let info = github::pr::info(&repo, number).await?;
         let fetched = fetch(&self.main.jj, &info, &base).await?;
-        let setup = self.add_workspace(&name, &info.head_ref_oid).await?;
-        let record = PrRecord {
-            workspace: name.clone(),
-            repo,
-            number,
-            id: info.id,
-            title: info.title,
-            url: info.url,
-            author: github::login(&info.author),
-            base_ref: info.base_ref_name,
-            base_remote: base.remote,
-            head_ref: info.head_ref_name,
-            head_remote: fetched.head_remote,
-            added_remote: fetched.added_remote,
-            head: info.head_ref_oid,
-        };
-        self.store.lock().unwrap().save_pr(&record)?;
-        Ok((name, setup))
+        let added = fetched.added_remote.clone();
+        let saved = async {
+            let setup = self.add_workspace(&name, &info.head_ref_oid).await?;
+            let record = PrRecord {
+                workspace: name.clone(),
+                repo,
+                number,
+                id: info.id,
+                title: info.title,
+                url: info.url,
+                author: github::login(&info.author),
+                base_ref: info.base_ref_name,
+                base_remote: base.remote,
+                head_ref: info.head_ref_name,
+                head_remote: fetched.head_remote,
+                added_remote: fetched.added_remote,
+                head: info.head_ref_oid,
+            };
+            self.store.lock().unwrap().save_pr(&record)?;
+            anyhow::Ok((name, setup))
+        }
+        .await;
+        if saved.is_err() {
+            drop_remote(&self.main.jj, added.as_deref()).await;
+        }
+        saved
     }
 }

@@ -80,10 +80,19 @@ pub(super) fn injected(name: &str) -> Option<&'static HighlightConfiguration> {
     if name == "markdown_inline" {
         return Some(&MD_INLINE);
     }
+    lang_named(name).map(|l| &l.highlight)
+}
+
+/// The language a name stands for, in any case, as an extension (`rs`) or a grammar name
+/// (`rust`).
+pub(super) fn lang_named(name: &str) -> Option<&'static Lang> {
+    let name = name.to_ascii_lowercase();
     let by_ext = lang_key(&format!("x.{name}")).and_then(|k| LANGS.get(k));
-    by_ext
-        .or_else(|| LANGS.values().find(|l| l.highlight.language_name == name))
-        .map(|l| &l.highlight)
+    by_ext.or_else(|| {
+        LANGS
+            .values()
+            .find(|l| l.highlight.language_name == name.as_str())
+    })
 }
 
 /// Languages by key, built once.
@@ -308,8 +317,8 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         }
         _ => {}
     }
-    let ext = name.rsplit_once('.').map(|(_, e)| e)?;
-    Some(match ext {
+    let ext = name.rsplit_once('.')?.1.to_ascii_lowercase();
+    Some(match ext.as_str() {
         "rs" => "rs",
         "py" | "pyi" => "py",
         "ts" | "mts" | "cts" => "ts",

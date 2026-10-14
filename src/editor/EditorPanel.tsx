@@ -32,6 +32,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   const [error, setError] = useState<string>();
   /** The text shown rendered, for markdown, or undefined while editing. */
   const [rendered, setRendered] = useState<string>();
+  const renderedRef = useRef<HTMLDivElement>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
 
@@ -91,7 +92,9 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   useEffect(() => () => setUnsaved(workspace, api.id, undefined), [api, workspace]);
 
   useEffect(() => {
-    const sub = api.onDidActiveChange((e) => e.isActive && view?.focus());
+    const sub = api.onDidActiveChange((e) => {
+      if (e.isActive) (renderedRef.current ?? view)?.focus();
+    });
     return () => sub.dispose();
   }, [api, view]);
 
@@ -102,6 +105,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
     saved.current = v.state.doc;
     setDirty(false);
     setOnDisk(undefined);
+    setError(undefined);
   }
 
   async function save(): Promise<boolean> {
@@ -134,8 +138,10 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
 
   function toggleRendered() {
     if (!view) return;
-    if (rendered === undefined) setRendered(view.state.sliceDoc());
-    else {
+    if (rendered === undefined) {
+      setRendered(view.state.sliceDoc());
+      requestAnimationFrame(() => renderedRef.current?.focus());
+    } else {
       setRendered(undefined);
       requestAnimationFrame(() => view.focus());
     }
@@ -182,7 +188,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
       )}
       {rendered !== undefined && (
         // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
-        <div className="editor-rendered" tabIndex={0}>
+        <div className="editor-rendered" ref={renderedRef} tabIndex={0}>
           <MarkdownView text={rendered} />
         </div>
       )}

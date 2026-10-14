@@ -86,6 +86,16 @@ fn ask_shell(shell: &str, name: &str) -> anyhow::Result<String> {
         .unwrap_or_default())
 }
 
+/// `word` with a leading `~` swapped for the home directory, as the shell would.
+fn expand_home(word: &str) -> String {
+    match (word.strip_prefix('~'), std::env::var("HOME")) {
+        (Some(rest), Ok(home)) if rest.is_empty() || rest.starts_with('/') => {
+            format!("{home}{rest}")
+        }
+        _ => word.to_string(),
+    }
+}
+
 fn resolve_with(
     setting: &str,
     shell: &str,
@@ -96,6 +106,7 @@ fn resolve_with(
     let Some((first, rest)) = words.split_first() else {
         bail!("the Claude command is empty");
     };
+    let first = &expand_home(first);
     let direct = |program: &str, before: &[String]| Resolved {
         program: program.to_string(),
         args: before.iter().chain(rest).cloned().collect(),
@@ -223,6 +234,16 @@ mod tests {
 
         // An alias to something that isn't on PATH, like another alias, needs the shell too.
         assert!(resolve("cc", "alias cc='uc claude'").unwrap().via_shell);
+
+        let home = std::env::var("HOME").unwrap();
+        let installed = format!("{home}/.local/bin/claude");
+        let tilde = resolve_with(
+            "~/.local/bin/claude",
+            "/bin/zsh",
+            |n| n == installed,
+            shell(""),
+        );
+        assert_eq!(tilde.unwrap().program, installed);
 
         assert!(resolve("cc", "").is_err());
         assert!(resolve("  ", "").is_err());

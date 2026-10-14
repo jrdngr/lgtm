@@ -165,20 +165,23 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     return () => sub.dispose();
   }, [api, focusRoot]);
 
-  /** Shows marks after an edit, and tells the workspace list its progress moved. */
-  function edited(state: StateDto) {
-    setState(state);
+  /** Shows marks after an edit to `review`, if given, and tells the workspace list its
+   * progress moved. */
+  function edited(state: StateDto, review?: number) {
+    setState(state, review);
     marksChanged();
   }
 
   function changeFilter(next: Filter) {
     setFilter(next);
     fold.clearRevealed();
+    focusRoot();
   }
 
   function changeView(view: View) {
     fold.clearRevealed();
     refresh(view);
+    focusRoot();
   }
 
   const { jump, jumpToComment, jumpToRow, stepNote, stepHunk, stepFile, showLine } = useReviewNav({
@@ -216,7 +219,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   function runWalkthroughNow() {
     if (!review) return;
     if (agentsOff()) return setError("Walkthrough needs Claude Code, which is turned off.");
-    runWalkthrough(workspace, review.id, revset, edited);
+    const id = review.id;
+    runWalkthrough(workspace, id, revset, (state) => edited(state, id));
   }
 
   function openInEditor() {
@@ -325,6 +329,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         filter={filter}
         onFilter={changeFilter}
         progress={total}
+        onDone={focusRoot}
         setup={setup}
         onMark={a.applyMark}
         onReset={a.resetMarks}

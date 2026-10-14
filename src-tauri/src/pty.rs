@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::Context;
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize, native_pty_system};
@@ -39,8 +40,8 @@ pub struct Ptys {
 }
 
 impl Ptys {
-    /// Starts `command` (or the login shell) in a new PTY. `on_event` runs on a reader thread
-    /// and gets output followed by one `Exit`.
+    /// Starts `command` (or the login shell) in a new PTY. `on_event` runs on background
+    /// threads and gets output followed by one `Exit`.
     pub fn spawn(
         &self,
         owner: Owner,
@@ -97,18 +98,33 @@ impl Ptys {
         );
 
         let sessions = Arc::clone(&self.sessions);
+        // Output and the exit go through here. The exit takes it, so no output follows it.
+        let on_event = Arc::new(Mutex::new(Some(on_event)));
+        let emit = Arc::clone(&on_event);
+        let (drained_tx, drained) = channel::<()>();
         std::thread::spawn(move || {
             let mut buf = vec![0u8; 64 * 1024];
             let mut carry = Vec::new();
             // Linux reports EIO instead of EOF once the child exits.
             while let Ok(n @ 1..) = reader.read(&mut buf) {
-                on_event(PtyEvent::Data {
-                    data: decode_utf8(&mut carry, &buf[..n]),
-                });
+                let data = decode_utf8(&mut carry, &buf[..n]);
+                match emit.lock().unwrap().as_ref() {
+                    Some(on) => on(PtyEvent::Data { data }),
+                    None => break,
+                }
             }
+            drained_tx.send(()).ok();
+        });
+        // Reads only end once every process holding the terminal closes it, and a background
+        // job can outlive the child. So the exit comes from the child, after a moment for the
+        // rest of its output.
+        std::thread::spawn(move || {
             let code = child.wait().map(|s| s.exit_code()).unwrap_or(1);
+            drained.recv_timeout(Duration::from_millis(500)).ok();
             sessions.lock().unwrap().remove(&id);
-            on_event(PtyEvent::Exit { code });
+            if let Some(on) = on_event.lock().unwrap().take() {
+                on(PtyEvent::Exit { code });
+            }
         });
         Ok(id)
     }
@@ -208,7 +224,6 @@ fn decode_utf8(carry: &mut Vec<u8>, chunk: &[u8]) -> String {
 mod tests {
     use super::*;
     use std::sync::mpsc;
-    use std::time::Duration;
 
     #[test]
     fn decode_holds_split_character_until_complete() {
@@ -262,6 +277,13 @@ mod tests {
         assert_eq!(out, "hello");
         assert_eq!(code, 3);
         assert!(ptys.sessions.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn exit_arrives_while_a_background_job_holds_the_terminal() {
+        let ptys = Ptys::default();
+        let (_, code) = run(&ptys, &["sh", "-c", "sleep 20 & exit 0"]);
+        assert_eq!(code, 0);
     }
 
     #[test]

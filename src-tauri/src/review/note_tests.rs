@@ -134,3 +134,66 @@ async fn notes_keep_the_agents_order_and_only_important_ones_have_a_level() {
     );
     assert_eq!(state.notes[0].flow.as_ref().unwrap().flow, "Startup");
 }
+
+fn numbered(lines: impl IntoIterator<Item = String>) -> String {
+    lines.into_iter().map(|l| l + "\n").collect()
+}
+
+#[tokio::test]
+async fn ranges_match_new_side_lines_only() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let base: Vec<String> = (1..=20).map(|i| format!("line {i}")).collect();
+    write(d, "a.rs", &numbered(base.clone()));
+    jj(d, &["commit", "-m", "base"]);
+    // Five lines added after line 1 (new lines 2-6), and old line 12 removed.
+    let mut new = base.clone();
+    new.remove(11);
+    for i in (1..=5).rev() {
+        new.insert(1, format!("add {i}"));
+    }
+    write(d, "a.rs", &numbered(new));
+    let review = ctx.open(None, "@", false).await.unwrap();
+
+    let (state, _) = ctx
+        .save_notes(review.id, &[input("a.rs", 6, 12)], Source::Headless)
+        .unwrap();
+    let rows = state.notes[0].rows.unwrap();
+    assert_eq!(rows.start, rows.end);
+    let row = review.files[0]
+        .hunks
+        .iter()
+        .flat_map(|h| &h.rows)
+        .nth(rows.start as usize)
+        .unwrap();
+    assert_eq!(row.text, "add 5");
+}
+
+#[tokio::test]
+async fn notes_on_rows_that_cant_be_anchored_are_skipped() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let base: Vec<String> = (1..=20).map(|i| format!("line {i}")).collect();
+    write(d, "a.rs", &numbered(base.clone()));
+    jj(d, &["commit", "-m", "base"]);
+    let mut first = base.clone();
+    first.insert(15, "X".into());
+    write(d, "a.rs", &numbered(first));
+    ctx.open(None, "@", false).await.unwrap();
+
+    // Next session X is gone and line 5 changed, so the interdiff removes X.
+    let mut second = base.clone();
+    second[4] = "five".into();
+    write(d, "a.rs", &numbered(second));
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let change = review.changes[0].change_id.clone();
+    let view = View::SinceLast { change };
+    let inter = ctx.refresh(review.id, Some(view)).await.unwrap().review;
+    assert!(inter.interdiff);
+
+    let inputs = [input("a.rs", 14, 17), input("a.rs", 5, 5)];
+    let (state, skipped) = ctx
+        .save_notes(review.id, &inputs, Source::Headless)
+        .unwrap();
+    assert_eq!((skipped, state.notes.len()), (1, 1));
+}

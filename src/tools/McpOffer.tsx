@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import type { McpStatus } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
 import { useAgentsOff } from "./agents";
+import { refreshMcpStatus, useMcpStatus } from "./mcp";
 import "./tools.css";
 
 const NEVER = "lgtm:mcp-offer:never";
@@ -18,17 +18,19 @@ function askedNever() {
  * can read the review and add to it. Shown until it's set up or turned down. */
 export function McpOffer() {
   const agentsOff = useAgentsOff();
-  const [status, setStatus] = useState<McpStatus>();
+  const status = useMcpStatus();
   const [hidden, setHidden] = useState(askedNever);
   const [state, setState] = useState<"idle" | "working" | "done">("idle");
   const [error, setError] = useState<string>();
 
   useEffect(() => {
     if (hidden || agentsOff) return;
-    unwrap(commands.mcpStatus()).then(setStatus, () => {});
+    refreshMcpStatus().catch(() => {});
   }, [hidden, agentsOff]);
 
-  if (hidden || agentsOff || status?.setup !== "missing") return null;
+  if (hidden || agentsOff) return null;
+  // Registering here keeps the banner up to say so; registering from Settings hides it.
+  if (state !== "done" && status?.setup !== "missing") return null;
 
   async function register() {
     setState("working");
@@ -36,6 +38,7 @@ export function McpOffer() {
     try {
       await unwrap(commands.registerMcp());
       setState("done");
+      refreshMcpStatus().catch(() => {});
     } catch (e) {
       setState("idle");
       setError(errorText(e));
@@ -66,7 +69,7 @@ export function McpOffer() {
   }
   return (
     <div className="mcp-offer">
-      <span title={status.command}>
+      <span title={status?.command}>
         Let Claude Code in lgtm's terminals read this review and add comments, walkthrough notes and
         findings? This registers lgtm as an MCP server for your user.
       </span>

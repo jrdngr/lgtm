@@ -44,9 +44,29 @@ async fn a_workspace_has_its_own_working_copy_and_progress() {
     assert_eq!((main.done, main.changed), (0, 1));
 
     let root = ws.root.clone();
-    ctx.delete_workspace("t1").await.unwrap();
+    ctx.delete_workspace("t1", || ()).await.unwrap();
     assert!(!root.exists());
     assert_eq!(ctx.list_workspaces().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_busy_workspace_refuses_delete_before_touching_anything() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    ctx.create_workspace("t1").await.unwrap();
+    let ws = ctx.workspace(Some("t1")).await.unwrap();
+    let busy = ws.claim().unwrap();
+
+    let mut claimed = false;
+    assert!(ctx.delete_workspace("t1", || claimed = true).await.is_err());
+    assert!(!claimed);
+    assert!(ws.root.is_dir());
+    assert_eq!(ctx.list_workspaces().await.unwrap().len(), 2);
+
+    drop(busy);
+    ctx.delete_workspace("t1", || claimed = true).await.unwrap();
+    assert!(claimed);
 }
 
 #[tokio::test]

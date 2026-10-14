@@ -55,6 +55,9 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const [picked, setPicked] = useState<View>();
   const [persona, setPersona] = useState<string>();
   const [open, setOpen] = useState<Set<string>>(new Set());
+  /** The last jump, numbered so each one opens the fold it lands in. `id` is set only when
+   * the target was already fixed or dismissed, so a card settled later doesn't open its fold. */
+  const [jump, setJump] = useState<{ id?: string; n: number }>();
   /** Findings picked to send to the agent, by id. */
   const [checked, setChecked] = useState<Map<string, Picked>>(new Map());
   const workspace = useWorkspace();
@@ -63,7 +66,11 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<{ error: boolean; text: string }>();
   const root = useRef<HTMLDivElement>(null);
-  if (!run) return <div className="placeholder">This review run is gone</div>;
+  if (!run) {
+    return (
+      <div className="placeholder">{run === null ? "This review run is gone" : "Loading…"}</div>
+    );
+  }
   const r = report(run);
   const views: View[] = [
     ...(r.minimal ? (["minimal"] as const) : []),
@@ -90,6 +97,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   // Within this pane, since every run's synthesis numbers its findings from 1.
   const go = (id: string) => {
     setOpen(new Set(open).add(id));
+    setJump({ id: stateOf(id) ? id : undefined, n: (jump?.n ?? 0) + 1 });
     requestAnimationFrame(() =>
       root.current
         ?.querySelector(`[data-finding="${CSS.escape(id)}"]`)
@@ -113,7 +121,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
 
   const checkAll = (shown: Picked[]) => {
     const next = new Map(checked);
-    for (const x of shown) next.set(x.f.id ?? "", x);
+    for (const x of shown) if (!stateOf(x.f.id ?? "")) next.set(x.f.id ?? "", x);
     setChecked(next);
   };
 
@@ -192,7 +200,12 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
       <>
         {rest.map(([f, s]) => card(f, s))}
         {settled.length > 0 && (
-          <SettledFold count={settled.length}>{settled.map(([f, s]) => card(f, s))}</SettledFold>
+          <SettledFold
+            count={settled.length}
+            reveal={jump?.id && settled.some(([f]) => f.id === jump.id) ? jump.n : undefined}
+          >
+            {settled.map(([f, s]) => card(f, s))}
+          </SettledFold>
         )}
       </>
     );

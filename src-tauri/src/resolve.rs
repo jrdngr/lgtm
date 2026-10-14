@@ -54,6 +54,7 @@ impl RepoCtx {
     ) -> anyhow::Result<ResolveDto> {
         let ws = self.workspace(workspace).await?;
         let _busy = ws.claim()?;
+        let run = runs.register(&self.agent_key(&key(workspace)))?;
         let jj = &ws.jj;
         ws.snapshot().await?;
         let target = jj.changes(change).await?;
@@ -73,7 +74,7 @@ impl RepoCtx {
             schema: None,
             purpose: agent::Purpose::Ask,
         };
-        let reply = agent::run(runs, &self.agent_key(&key(workspace)), task, |p| {
+        let reply = agent::run_registered(run, task, |p| {
             if let Progress::Text(t) = p {
                 on_text(t)
             }

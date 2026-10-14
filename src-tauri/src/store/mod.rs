@@ -159,10 +159,11 @@ fn migrate_mark_colors(db: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-/// Marks and checks once reused a deleted row's id, which undo history still refers to.
+/// Marks, checks and comments once reused a deleted row's id, which undo history and
+/// running agents still refer to.
 /// SQLite can't add AUTOINCREMENT in place, so the tables are rebuilt.
 fn migrate_autoincrement(db: &Connection) -> rusqlite::Result<()> {
-    for table in ["marks", "file_checks"] {
+    for table in ["marks", "file_checks", "comments"] {
         let sql: String = db.query_row(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
             [table],
@@ -182,7 +183,8 @@ fn migrate_autoincrement(db: &Connection) -> rusqlite::Result<()> {
         ))?;
     }
     // Brings back the indexes dropped with the old tables.
-    db.execute_batch(SCHEMA)
+    db.execute_batch(SCHEMA)?;
+    comments::create_table(db)
 }
 
 impl Store {

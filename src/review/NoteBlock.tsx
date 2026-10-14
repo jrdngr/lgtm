@@ -12,6 +12,8 @@ interface Props {
   current: boolean;
   /** Where it is in its flow, like "Login 2/5". */
   flowLabel?: string;
+  /** What the note was kept as, when one of the review's comments is its text. */
+  kept?: "note" | "draft";
   /** Keeps the note as one of yours, or with `draft`, as a draft for the PR. Resolves to
    * whether it worked. */
   onComment(note: NoteDto, draft: boolean): Promise<boolean>;
@@ -19,8 +21,14 @@ interface Props {
 }
 
 /** A walkthrough note under its code. */
-export function NoteBlock({ note, current, flowLabel, onComment, canDraft }: Props) {
-  const [kept, setKept] = useState<"note" | "draft">();
+export function NoteBlock({ note, current, flowLabel, kept, onComment, canDraft }: Props) {
+  /** A keep is being saved, so a second click can't add it twice. */
+  const [saving, setSaving] = useState(false);
+  const keep = async (draft: boolean) => {
+    setSaving(true);
+    await onComment(note, draft);
+    setSaving(false);
+  };
   const { label } = CATEGORIES[note.category];
   return (
     <div
@@ -41,15 +49,15 @@ export function NoteBlock({ note, current, flowLabel, onComment, canDraft }: Pro
             <IconButton
               icon="comments"
               label="Keep as note"
-              disabled={!note.rows}
-              onClick={async () => (await onComment(note, false)) && setKept("note")}
+              disabled={!note.rows || saving}
+              onClick={() => keep(false)}
             />
             {canDraft && (
               <IconButton
                 icon="pr"
                 label="Draft PR comment"
-                disabled={!note.rows}
-                onClick={async () => (await onComment(note, true)) && setKept("draft")}
+                disabled={!note.rows || saving}
+                onClick={() => keep(true)}
               />
             )}
           </span>

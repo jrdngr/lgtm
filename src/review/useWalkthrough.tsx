@@ -31,6 +31,14 @@ export function useWalkthrough(
     [notes, tour.inline, tour.hidden],
   );
   const current = review ? currentNote(review.id, notes) : undefined;
+  const comments = review?.state.comments;
+
+  /** What `n` was kept as: a comment on its file with its text, a draft when on GitHub. */
+  function kept(n: NoteDto) {
+    const text = noteCommentText(n);
+    const c = comments?.find((c) => c.file === n.file && c.body === text);
+    return c && (c.thread ? "draft" : "note");
+  }
 
   function comment(n: NoteDto, draft: boolean) {
     const f = files[n.file];
@@ -49,6 +57,7 @@ export function useWalkthrough(
         note={n}
         current={current?.id === id}
         flowLabel={flowLabel(n, notes)}
+        kept={kept(n)}
         onComment={comment}
         canDraft={canDraft}
       />

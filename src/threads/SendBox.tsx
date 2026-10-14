@@ -58,8 +58,12 @@ export function SendBox({ review, threads, repo, own, onSent, confirm }: Props) 
   const ready = threads.filter((t) => t.state.stage === "ready").length;
   const says = !own && (verdict !== "comment" || !!summary.trim());
   const any = canSend(plan) || says;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only ⌘↵ opens the list, not `any` changing
   useEffect(() => {
-    if (confirm) setConfirming(true);
+    if (confirm && any) {
+      setNote(undefined);
+      setConfirming(true);
+    }
   }, [confirm]);
   const label = own ? "Send to GitHub" : (VERDICTS.find(([v]) => v === verdict)?.[1] ?? "");
 
@@ -121,7 +125,7 @@ export function SendBox({ review, threads, repo, own, onSent, confirm }: Props) 
           <button type="button" className="quiet" onClick={() => setConfirming(false)}>
             Cancel
           </button>
-          <button type="button" className="primary" onClick={send} disabled={busy}>
+          <button type="button" className="primary" onClick={send} disabled={busy || !any}>
             {busy ? "Sending…" : "Send"}
           </button>
         </div>

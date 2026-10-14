@@ -229,11 +229,19 @@ async fn reapplying_same_state_is_a_no_op_and_reset_removes_review_marks() {
 }
 
 #[tokio::test]
-async fn review_with_two_heads_is_rejected() {
+async fn review_with_two_heads_is_rejected_without_a_session() {
     let (dir, ctx) = repo();
     let d = dir.path();
     jj(d, &["new", "root()", "-m", "a"]);
     jj(d, &["new", "root()", "-m", "b"]);
+    ctx.open(None, "@", false).await.unwrap();
     let err = ctx.open(None, "root()+", false).await.err().unwrap();
     assert!(format!("{err:#}").contains("2 heads"), "{err:#}");
+    let store = ctx.store.lock().unwrap();
+    assert_eq!(
+        store.last_revset(ctx.main.key()).unwrap().as_deref(),
+        Some("@")
+    );
+    let label = ctx.main.label("root()+");
+    assert_eq!(store.last_session(&label).unwrap(), None);
 }

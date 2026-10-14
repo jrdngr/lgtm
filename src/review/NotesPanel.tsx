@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
@@ -12,8 +13,13 @@ export function NotesPanel() {
   const review = useCurrentReview(workspace);
   const notes = (review?.comments ?? []).filter((c) => !c.thread);
   const open = notes.filter((c) => !c.done);
+  const [error, setError] = useState<string>();
   const sendOpen = () =>
-    review?.send(open.map((c) => commentText(review.files, c)).join("\n\n---\n\n"));
+    review?.send(
+      open.map((c) => commentText(review.files, c)).join("\n\n---\n\n"),
+      undefined,
+      (o) => setError("error" in o ? o.error : undefined),
+    );
 
   return (
     <div className="comments-view">
@@ -29,6 +35,7 @@ export function NotesPanel() {
           ]}
         />
       </SectionHeader>
+      {error && <div className="review-error">{error}</div>}
       <div className="comments-scroll">
         {review ? <NoteList review={review} notes={notes} /> : <Empty>No review open</Empty>}
       </div>

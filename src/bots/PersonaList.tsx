@@ -24,7 +24,7 @@ export function PersonaList({ personas, picked, onToggle }: Props) {
             <label>
               <input type="checkbox" checked={on} onChange={() => onToggle(p.name)} />
               <span className="bots-persona-name">
-                {p.name}
+                <span className="bots-persona-text">{p.name}</span>
                 {p.scope === "repo" && <span className="pill">repo</span>}
               </span>
             </label>
@@ -40,7 +40,9 @@ export function PersonaList({ personas, picked, onToggle }: Props) {
       })}
       {personas.broken.map((b) => (
         <li key={b.path} className="bots-broken">
-          <span className="bots-persona-name">{b.path.split("/").pop()}</span>
+          <span className="bots-persona-name">
+            <span className="bots-persona-text">{b.path.split("/").pop()}</span>
+          </span>
           <IconButton icon="edit" label={`Edit ${b.path}`} onClick={() => edit(b.path)} />
           <span className="bots-persona-desc">Can't read it: {b.error}</span>
         </li>

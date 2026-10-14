@@ -36,6 +36,18 @@ pub fn map_rows(before: &[ReviewFile], after: &[ReviewFile]) -> Vec<RowMove> {
             continue;
         };
         let a = &after[ai];
+        // A side loaded without contents has no line hashes to diff, so rows map only
+        // when the file's diff is unchanged.
+        let contentless = [&b.old, &b.new, &a.old, &a.new]
+            .iter()
+            .any(|s| s.commit.is_some() && s.index.is_none());
+        if contentless && b.rows == a.rows && b.texts == a.texts {
+            out.extend((0..b.rows.len() as u32).map(|row| RowMove {
+                from: RowRef::new(bi, row),
+                to: RowRef::new(ai, row),
+            }));
+            continue;
+        }
         let old_map = line_map(&b.old, &a.old);
         let new_map = line_map(&b.new, &a.new);
         let mut old_rows = HashMap::new();

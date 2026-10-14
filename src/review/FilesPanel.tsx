@@ -115,7 +115,7 @@ export function FilesPanel() {
     );
   }
   const p = tree.progress;
-  const pct = p.changed ? Math.round((p.done / p.changed) * 100) : 100;
+  const pct = p.changed ? Math.floor((p.done / p.changed) * 100) : 100;
   const filter = filterLabel(review.filter, setup);
   const anyClosed = closed.size > 0;
   return (

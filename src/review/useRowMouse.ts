@@ -72,12 +72,10 @@ export function useRowMouse(d: Deps): LineHandlers {
       if (root) d.setMenu({ x: e.clientX - root.left, y: e.clientY - root.top });
     },
     onFileClick(file: number) {
-      const f = fileSelection(files, lines, file);
-      select(f, f.start);
+      s.selectUnit(fileSelection(files, lines, file));
     },
     onHunkClick(file: number, hunk: number) {
-      const h = hunkSelection(lines, file, hunk);
-      select(h, h.start);
+      s.selectUnit(hunkSelection(lines, file, hunk));
     },
     onToggleHunk: d.toggleHunk,
     onToggleFile: d.toggleFile,

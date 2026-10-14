@@ -7,7 +7,7 @@ export function Refs({ ids, onGo }: { ids: string[]; onGo(id: string): void }) {
     <>
       {ids.map((id) => (
         <button type="button" className="finding-ref" key={id} onClick={() => onGo(id)}>
-          #{id}
+          {id.includes("#") ? id : `#${id}`}
         </button>
       ))}
     </>

@@ -87,8 +87,8 @@ impl RepoCtx {
             match self.send_one(id, &pr, c, fixed).await {
                 Ok(in_review) => reviewed |= in_review,
                 Err(e) if reviewed => anyhow::bail!(
-                    "{e:#}. What went out before it is in your pending review on GitHub: send \
-                     again to submit it"
+                    "{e:#}. What went out before it is in your pending review on GitHub: fix \
+                     this thread or move it out of Ready, then send again to submit the review"
                 ),
                 Err(e) => return Err(e),
             }

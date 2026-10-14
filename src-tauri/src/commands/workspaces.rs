@@ -28,11 +28,14 @@ pub(crate) async fn delete_workspace(
     ptys: State<'_, Ptys>,
     name: String,
 ) -> CmdResult<()> {
-    ptys.kill_owner(&Owner {
+    let owner = Owner {
         window: window.label().to_string(),
         workspace: Some(name.clone()),
-    });
-    repo(&window)?.delete_workspace(&name).await.map_err(err)?;
+    };
+    repo(&window)?
+        .delete_workspace(&name, || ptys.kill_owner(&owner))
+        .await
+        .map_err(err)?;
     layout::remove(&layout_path(&window, Some(&name))?).map_err(|e| e.to_string())
 }
 

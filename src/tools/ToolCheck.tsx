@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import type { ToolProblem } from "../bindings";
 import { commands } from "../ipc";
-import { setAgentsOff, setGithubOff } from "./agents";
+import { setToolProblems } from "./agents";
 import "./tools.css";
 
 const NEEDED_BY: Record<string, string> = {
@@ -30,8 +30,7 @@ export function ToolCheck({ children }: { children: ReactNode }) {
     const found = await commands.checkTools();
     setChecking(false);
     setProblems(found);
-    setAgentsOff(found.some((p) => p.tool === "claude"));
-    setGithubOff(found.some((p) => p.tool === "gh"));
+    setToolProblems(found.map((p) => p.tool));
   }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: check once at startup

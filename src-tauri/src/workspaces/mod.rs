@@ -183,9 +183,12 @@ impl RepoCtx {
     }
 
     /// Forgets the workspace and, when lgtm created it, deletes its directory. The
-    /// workspace's commits stay in the repo.
-    pub async fn delete_workspace(&self, name: &str) -> anyhow::Result<()> {
+    /// workspace's commits stay in the repo. `claimed` runs once nothing else is changing
+    /// the workspace, before anything is removed.
+    pub async fn delete_workspace(&self, name: &str, claimed: impl FnOnce()) -> anyhow::Result<()> {
         let ws = self.workspace(Some(name)).await?;
+        let _busy = ws.claim()?;
+        claimed();
         self.main.jj.workspace_forget(name).await?;
         self.workspaces.lock().unwrap().remove(name);
         let ours = self

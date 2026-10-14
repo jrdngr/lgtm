@@ -73,7 +73,13 @@ export function RunList({ workspace, onOpen, onError }: Props) {
                   <Menu
                     label="Run actions"
                     items={[
-                      !run.active && { label: "Delete", danger: true, onSelect: () => remove(run) },
+                      // The backend won't delete a run while it or one of its fixes runs.
+                      !run.active &&
+                        !run.fixes?.some((f) => f.status === "running") && {
+                          label: "Delete",
+                          danger: true,
+                          onSelect: () => remove(run),
+                        },
                     ]}
                   />
                 </span>

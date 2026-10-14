@@ -14,13 +14,17 @@ pub fn main() -> i32 {
         .enable_all()
         .build()
         .expect("tokio runtime");
-    match rt.block_on(run()) {
+    let code = match rt.block_on(run()) {
         Ok(()) => 0,
         Err(e) => {
             eprintln!("lgtm mcp: {e:#}");
             1
         }
-    }
+    };
+    // Tokio's stdin read can't be cancelled, so waiting on it would keep the bridge running
+    // after the app quits, until Claude Code writes again.
+    rt.shutdown_background();
+    code
 }
 
 async fn run() -> anyhow::Result<()> {

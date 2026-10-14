@@ -110,7 +110,11 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
             <button
               type="button"
               className="workspace-open"
-              onClick={() => preview(pr)}
+              onClick={(e) => {
+                // WebKit doesn't focus a clicked button, and Enter on it opens the PR.
+                e.currentTarget.focus();
+                preview(pr);
+              }}
               onDoubleClick={() => open(pr)}
               onKeyDown={(e) => {
                 if (e.key !== "Enter") return;

@@ -206,6 +206,26 @@ async fn per_change_and_since_last_session_views() {
 }
 
 #[tokio::test]
+async fn view_of_a_change_that_left_the_revset_falls_back_to_combined() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.txt", "one\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let change = review.changes[0].change_id.clone();
+    let view = View::Change { change };
+    ctx.refresh(review.id, Some(view)).await.unwrap();
+
+    jj(d, &["new"]);
+    write(d, "b.txt", "two\n");
+    ctx.main.snapshot().await.unwrap();
+    let refreshed = ctx.refresh(review.id, None).await.unwrap().review;
+    assert_eq!(refreshed.view, View::Combined);
+    let paths: Vec<_> = refreshed.files.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["b.txt"]);
+    assert!(ctx.shows_whole(review.id, "@").unwrap());
+}
+
+#[tokio::test]
 async fn refresh_maps_rows_to_where_the_code_moved() {
     let (dir, ctx) = repo();
     let d = dir.path();
@@ -229,6 +249,41 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
     );
     // Undo history survives the refresh.
     assert!(ctx.undo(review.id).unwrap().marks.is_empty());
+}
+
+#[tokio::test]
+async fn refresh_keeps_rows_of_files_loaded_without_contents() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let big: String = (0..400_000).map(|i| format!("line {i}\n")).collect();
+    assert!(big.len() > 4 << 20);
+    jj(
+        d,
+        &[
+            "config",
+            "set",
+            "--repo",
+            "snapshot.max-new-file-size",
+            "8MiB",
+        ],
+    );
+    write(d, "a.txt", &big);
+    jj(d, &["commit", "-m", "base"]);
+    write(d, "a.txt", &big.replacen("line 7\n", "line seven\n", 1));
+    write(d, "b.rs", "fn b() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let a = review.files.iter().position(|f| f.path == "a.txt").unwrap();
+
+    write(d, "b.rs", "fn b2() {}\n");
+    ctx.main.snapshot().await.unwrap();
+    let refreshed = ctx.refresh(review.id, None).await.unwrap();
+    let moved: Vec<_> = refreshed
+        .moves
+        .iter()
+        .filter(|m| m.from.file == a as u32)
+        .collect();
+    assert_eq!(moved.len(), refreshed.review.files[a].hunks[0].rows.len());
+    assert!(moved.iter().all(|m| m.from == m.to));
 }
 
 #[tokio::test]

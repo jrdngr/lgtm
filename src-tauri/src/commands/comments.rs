@@ -79,10 +79,13 @@ pub(crate) fn edit_comment(
 #[specta::specta]
 pub(crate) fn delete_comment(
     window: WebviewWindow,
+    runs: State<'_, Runs>,
     review: u32,
     comment: u32,
 ) -> CmdResult<StateDto> {
-    repo(&window)?.delete_comment(review, comment).map_err(err)
+    let repo = repo(&window)?;
+    repo.stop_workshop(comment, &runs);
+    repo.delete_comment(review, comment).map_err(err)
 }
 
 /// Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
