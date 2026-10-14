@@ -95,7 +95,7 @@ fn context(revset: &str, span: &str, commits: &str, stat: &str, diff: &str) -> S
 }
 
 /// A code fence longer than any run of backticks in `text`.
-fn fence(text: &str) -> String {
+pub(crate) fn fence(text: &str) -> String {
     let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     "`".repeat(longest.max(2) + 1)
 }

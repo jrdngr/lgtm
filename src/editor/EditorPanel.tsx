@@ -9,6 +9,7 @@ import { isMac } from "../workbench/keys";
 import { wordWrap } from "../workbench/wordWrap";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
+import type { Reload } from "./AgentBox";
 import { minimalChange } from "./change";
 import { editorMenu, placeAt } from "./editorMenu";
 import { MarkdownView } from "./MarkdownView";
@@ -16,6 +17,7 @@ import { baseName, type EditorParams } from "./open";
 import { emitSaved } from "./saved";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
+import { useAgentBox } from "./useAgentBox";
 import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
@@ -130,15 +132,20 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   }
   saveRef.current = save;
 
-  async function sync() {
-    if (!view || !saved.current) return;
+  async function sync(): Promise<Reload> {
+    if (!view || !saved.current) return "same";
     // A file that went away keeps its editor, to save elsewhere by copying.
     const text = await unwrap(commands.readFile(workspace, path)).catch(() => undefined);
-    if (text === undefined || view.state.toText(text).eq(saved.current)) return;
-    if (view.state.doc.eq(saved.current)) load(view, text);
-    else setOnDisk(text);
+    if (text === undefined || view.state.toText(text).eq(saved.current)) return "same";
+    if (view.state.doc.eq(saved.current)) {
+      load(view, text);
+      return "loaded";
+    }
+    setOnDisk(text);
+    return "held";
   }
   useRepoChanged(sync);
+  const agent = useAgentBox(workspace, path, view, sync, () => api.setActive());
 
   function toggleRendered() {
     if (!view) return;
@@ -153,6 +160,10 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
 
   function onKeyDown(e: React.KeyboardEvent) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (e.key === "Escape" && agent.isOpen && !e.defaultPrevented) {
+      e.preventDefault();
+      agent.close();
+    }
     if (mod && e.shiftKey && e.key.toLowerCase() === "v" && isMarkdown(path)) {
       e.preventDefault();
       toggleRendered();
@@ -171,6 +182,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         dirty,
         save: () => void save(),
         sendText: (text) => sendText(text, () => view.focus()),
+        askAgent: agent.open,
         toggleRendered: isMarkdown(path) ? toggleRendered : undefined,
       }),
     );
@@ -219,6 +231,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         hidden={rendered !== undefined}
         onContextMenu={onContextMenu}
       />
+      {agent.portal}
       {picker}
     </div>
   );

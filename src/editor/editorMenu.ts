@@ -16,6 +16,8 @@ interface Deps {
   save(): void;
   /** Pastes text into one of the workspace's terminals. */
   sendText(text: string): void;
+  /** Opens the agent box under the selection, to ask about it or to change it. */
+  askAgent(change: boolean): void;
   /** Set for markdown, which can show rendered. */
   toggleRendered?: () => void;
 }
@@ -84,6 +86,8 @@ export function editorMenu(d: Deps): CtxEntry[] {
     { label: "Select All", keys: "⌘A", onSelect: after(() => selectAll(v)) },
     "-",
     { label: "Send to Terminal", onSelect: () => d.sendText(locatedSelection(v, path)) },
+    { label: "Ask Agent", onSelect: () => d.askAgent(false) },
+    { label: "Change with Agent", onSelect: () => d.askAgent(true) },
     "-",
     { label: "Copy Path and Line", onSelect: () => copy(pathAndLine(v, path)) },
     { label: "Reveal in Files", onSelect: () => revealInFiles(d.workspace, path) },

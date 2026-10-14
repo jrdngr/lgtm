@@ -24,6 +24,7 @@ pub use output::Output;
 pub use personas::Persona;
 pub use pipeline::{Event, Notify};
 pub use prompts::describe;
+pub(crate) use prompts::fence;
 
 /// What a run does past the personas' own reviews.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]

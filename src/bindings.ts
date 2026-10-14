@@ -182,6 +182,12 @@ export const commands = {
 	newPersona: (name: string) => typedError<string, string>(__TAURI_INVOKE("new_persona", { name })),
 	/**  Copies a persona file beside itself as `name`. Returns the copy's path. */
 	duplicatePersona: (path: string, name: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_persona", { path, name })),
+	/**
+	 *  Sends `ask` about lines selected in an editor tab to the agent under `key`, which edits the
+	 *  working copy when it asks for a change. Streams the reply's text through `on_text`.
+	 */
+	askSelection: (workspace: string | null, key: string, ask: SelectionAsk, onText: Channel<string>) => typedError<SelectionReply, string>(__TAURI_INVOKE("ask_selection", { workspace, key, ask, onText })),
+	stopSelectionAsk: (key: string) => typedError<null, string>(__TAURI_INVOKE("stop_selection_ask", { key })),
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
@@ -1391,6 +1397,31 @@ export type Ruling = {
 	outcome: Outcome,
 	severity: Severity | null,
 	reason: string,
+};
+
+/**  Lines of a file as selected in its tab, numbered from 1. */
+export type SelectedLines = {
+	path: string,
+	start: number,
+	end: number,
+	text: string,
+};
+
+/**  One message to the agent of an editor tab's agent box. */
+export type SelectionAsk = {
+	lines: SelectedLines,
+	message: string,
+	/**  Have the agent edit the working copy. */
+	change: boolean,
+	/**  The box's session, to continue. */
+	session: string | null,
+};
+
+export type SelectionReply = {
+	text: string,
+	session: string | null,
+	/**  Stopped by the user. `text` is what had streamed so far. */
+	stopped: boolean,
 };
 
 export type Session = Session_Serialize | Session_Deserialize;

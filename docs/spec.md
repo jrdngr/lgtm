@@ -12,7 +12,7 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 - Every major view is a tab that can be docked into custom splits. Each workspace has its own layout, remembered per repo.
 - Workspaces and the file tree are views in side panels left and right of the pane grid. Keys show and hide each side panel and jump to each view.
 - Keybinds cover navigation and marking.
-- A basic file tree and file editor with syntax highlighting.
+- A basic file tree and file editor with syntax highlighting. Right-clicking a selection can ask the agent about it or have it change the code, in a box under the selection that keeps the conversation until it closes. Change edits the working copy and the tab reloads.
 - Full terminal support with arbitrary splits. The user runs their agent here.
 
 ## 2. Comments
