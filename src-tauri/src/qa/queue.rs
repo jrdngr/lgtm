@@ -210,6 +210,10 @@ pub struct Rewrite {
     pub context: Vec<String>,
     pub options: Vec<Choice>,
     pub why: String,
+    /// For a question with an auto answer: why option 1 is still obvious, which keeps it.
+    /// Empty opens it.
+    #[serde(default)]
+    pub auto: Option<String>,
 }
 
 /// What an answer does to the rest of the queue.
@@ -423,8 +427,9 @@ impl Queue {
         Ok(())
     }
 
-    /// Rewrites a question. A decided one opens again, keeping what it said before as a
-    /// change; an open one changes quietly.
+    /// Rewrites a question. An auto answer stays when the rewrite keeps `auto`, and otherwise
+    /// opens as a plain question. Any other decided one opens again, keeping what it said
+    /// before as a change; an open one changes quietly.
     fn rewrite(&mut self, r: Rewrite, after: &str) -> anyhow::Result<()> {
         let q = self.get_mut(&r.id)?;
         if q.state == QState::Dropped {
@@ -439,7 +444,17 @@ impl Queue {
         if text == q.text {
             return Ok(());
         }
-        if q.state == QState::Decided {
+        if let Some(a) = q.answer.as_mut().filter(|a| a.is_auto())
+            && q.state == QState::Decided
+        {
+            match r.auto.as_deref().map(str::trim).filter(|w| !w.is_empty()) {
+                Some(why) => a.auto = Some(why.to_string()),
+                None => {
+                    q.state = QState::Open;
+                    q.answer = None;
+                }
+            }
+        } else if q.state == QState::Decided {
             // A second rewrite before it's seen still compares with what the user last saw.
             let (previous, answer) = match q.change.take() {
                 Some(c) => (c.previous, c.answer),
@@ -513,8 +528,8 @@ impl Queue {
     }
 
     /// Puts back what the update after `id` did: dropped questions return, rewritten ones
-    /// still open get their old text and any answer they had, and added ones nobody has
-    /// decided or discussed go.
+    /// still open or auto-answered get their old text and any answer they had, and added
+    /// ones nobody has decided or discussed go.
     fn revert(&mut self, id: &str) {
         let Some(i) = self.effects.iter().position(|e| e.after == id) else {
             return;
@@ -522,7 +537,7 @@ impl Queue {
         let effect = self.effects.remove(i);
         for was in effect.before {
             if let Some(q) = self.questions.iter_mut().find(|q| q.id == was.id)
-                && q.state != QState::Decided
+                && (q.state != QState::Decided || q.answer.as_ref().is_some_and(Answer::is_auto))
             {
                 let discussion = std::mem::take(&mut q.discussion);
                 *q = QaQuestion { discussion, ..was };

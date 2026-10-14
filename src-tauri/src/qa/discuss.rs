@@ -5,25 +5,35 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use super::Session;
-use super::agent::{Step, parse, rewrite};
+use super::agent::{REAUTO_RULE, Step, parse, rewrite};
 use super::queue::{Answer, QState, QaQuestion, Rewrite, Turn};
 use super::text;
 use crate::agent::{Progress, Runs};
 use crate::review::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
 
-/// How a discussion reply acts on question `qid`.
-fn rules(qid: &str) -> String {
+/// How a discussion reply acts on question `q`.
+fn rules(q: &QaQuestion) -> String {
+    let qid = &q.id;
+    let auto = if is_auto(q) {
+        format!(", and auto. {qid} is auto-answered. {REAUTO_RULE}")
+    } else {
+        ".".into()
+    };
     format!(
         "If this changes {qid}'s context, options or recommendation, end your reply with the \
-         rewritten question by the same rules, as JSON with the fields id, what (what changed, \
-         in a few words), subject, context, options and why, between <rewrite> and \
-         </rewrite>. If I pick an option or otherwise settle {qid}, end your reply with \
+         rewritten question by the same rules, between <rewrite> and </rewrite>, as JSON with \
+         the fields id, what (what changed, in a few words), subject, context, options, why\
+         {auto} If I pick an option or otherwise settle {qid}, end your reply with \
          {{\"option\": the option's number from 1, or null for an answer outside them, \
          \"note\": what I added to it or null, \"other\": my answer in my words when option is \
          null, else null}} between <decide> and </decide>. Don't ask me new questions here: \
          after I decide, you update the open questions and add new ones there."
     )
+}
+
+fn is_auto(q: &QaQuestion) -> bool {
+    q.state == QState::Decided && q.answer.as_ref().is_some_and(Answer::is_auto)
 }
 
 /// The question's discussion, a paragraph a turn.
@@ -104,14 +114,14 @@ impl RepoCtx {
         let opening = format!(
             "Let's discuss this question. It's a discussion: answer briefly. {}\n\n{}\n\n\
              {so_far}{message}",
-            rules(qid),
+            rules(question),
             text::question_text(question)
         );
         let (turn, restart) = if question.discussion.is_empty() {
             (opening, None)
         } else {
             (
-                format!("About {qid}: {message}\n\n({})", rules(qid)),
+                format!("About {qid}: {message}\n\n({})", rules(question)),
                 Some(opening),
             )
         };
@@ -194,9 +204,15 @@ impl RepoCtx {
     ) -> anyhow::Result<Session> {
         let q = self.qa_session(ws, id)?.queue;
         let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
+        let auto = is_auto(question);
+        let rule = if auto {
+            format!(" {qid} is auto-answered. {REAUTO_RULE}")
+        } else {
+            String::new()
+        };
         let turn = format!(
             "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
-             id. Say in a few words what changed.\n\n{}\n\nOur discussion:\n\n{}",
+             id. Say in a few words what changed.{rule}\n\n{}\n\nOur discussion:\n\n{}",
             text::question_text(question),
             talk(question)
         );
@@ -208,7 +224,7 @@ impl RepoCtx {
                 Step {
                     turn,
                     edit: false,
-                    schema: Some(rewrite()),
+                    schema: Some(rewrite(auto)),
                     fresh: false,
                     restart: None,
                     decided: false,

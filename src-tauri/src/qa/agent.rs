@@ -59,16 +59,22 @@ fn new_question(auto: bool) -> String {
     )
 }
 
-pub(super) fn rewrite() -> String {
+/// A rewritten question, with `auto` for keeping an auto answer when it may have one.
+pub(super) fn rewrite(auto: bool) -> String {
+    let (prop, req) = if auto {
+        (r#", "auto": { "type": "string" }"#, r#", "auto""#)
+    } else {
+        ("", "")
+    };
     format!(
         r#"{{
       "type": "object",
       "properties": {{
         "id": {{ "type": "string" }},
         "what": {{ "type": "string" }},
-        {}
+        {}{prop}
       }},
-      "required": ["id", "what", "subject", "context", "options", "why"],
+      "required": ["id", "what", "subject", "context", "options", "why"{req}],
       "additionalProperties": false
     }}"#,
         question_props()
@@ -95,7 +101,7 @@ fn update_schema() -> String {
   "required": ["drop", "rewrite", "add"],
   "additionalProperties": false
 }}"#,
-        rewrite(),
+        rewrite(true),
         new_question(false)
     )
 }
@@ -118,6 +124,11 @@ fn ask_schema(auto: bool) -> String {
 const AUTO_RULE: &str = "Answer the obvious questions yourself: when option 1 is clearly right \
 and the other options are non-starters, still write the question in full, and set `auto` to \
 why, in a short line. Leave `auto` empty for every question I should decide.";
+
+/// How a rewrite keeps or gives up an auto answer.
+pub(super) const REAUTO_RULE: &str = "When you rewrite an auto-answered question, set `auto` to \
+why option 1 is still obvious if it is, in a short line, or leave it empty so I decide it. \
+Leave `auto` empty for every other question.";
 
 const PLAN_SCHEMA: &str = r#"{
   "type": "object",
@@ -453,6 +464,16 @@ impl RepoCtx {
         let listed: Vec<String> = dependents
             .iter()
             .map(|d| match d.state {
+                QState::Decided if d.answer.as_ref().is_some_and(queue::Answer::is_auto) => {
+                    format!(
+                        "Auto-answered ({}):\n\n{}",
+                        d.answer
+                            .as_ref()
+                            .and_then(|a| a.auto.as_deref())
+                            .unwrap_or(""),
+                        text::question_text(d)
+                    )
+                }
                 QState::Decided => format!(
                     "Decided ({}):\n\n{}",
                     text::answer_text(d),
@@ -465,9 +486,10 @@ impl RepoCtx {
             "I answered {qid} ({}): {}.\n\nApply that to the questions below, which depend on \
              it. Drop the open ones it settles, with why in a few words (\"settled by {qid}\"). \
              Rewrite the ones it reshapes, saying in a few words what changed. Rewrite a decided \
-             one only if this answer means I have to answer it again. Add any new decision it \
-             raises, with its depends; new questions number on from Q{}. Leave out questions it \
-             doesn't change.\n\n{}",
+             one only if this answer means I have to answer it again; rewrite an auto-answered \
+             one if this answer reshapes it. {REAUTO_RULE} Add any new decision it raises, with \
+             its depends; new questions number on from Q{}. Leave out questions it doesn't \
+             change.\n\n{}",
             answered.text.subject,
             text::answer_text(answered),
             q.last_number(),
@@ -655,7 +677,8 @@ mod tests {
             ask_schema(true),
             ask_schema(false),
             update_schema(),
-            rewrite(),
+            rewrite(true),
+            rewrite(false),
             PLAN_SCHEMA.into(),
         ] {
             serde_json::from_str::<serde_json::Value>(&s).unwrap();

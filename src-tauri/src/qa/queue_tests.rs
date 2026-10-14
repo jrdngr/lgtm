@@ -40,6 +40,7 @@ fn rw(id: &str, subject: &str) -> Rewrite {
         context: vec![],
         options: vec![],
         why: String::new(),
+        auto: None,
     }
 }
 
@@ -306,5 +307,83 @@ fn reopening_an_auto_answer_marks_it_and_undo_puts_it_back() {
         (QState::Decided, true, true)
     );
     assert_eq!(q.undo().as_deref(), Some("Q2"));
+    assert_eq!(q.undo(), None);
+}
+
+/// Q1 to answer, and Q2, auto-answered, depending on it.
+fn auto_after_answer() -> Queue {
+    let mut q = Queue::default();
+    q.add_round(vec![
+        new("a", false),
+        NewQuestion {
+            depends: vec!["Q1".into()],
+            ..auto("b", "obvious")
+        },
+    ]);
+    q.decide("Q1", pick(0, 1.0)).unwrap();
+    q
+}
+
+fn auto_why(q: &Queue, id: &str) -> Option<String> {
+    let q = q.get(id).unwrap();
+    q.answer.as_ref().and_then(|a| a.auto.clone())
+}
+
+#[test]
+fn a_rewrite_that_keeps_auto_keeps_the_auto_answer() {
+    let mut q = auto_after_answer();
+    q.apply(
+        "Q1",
+        Update {
+            rewrite: vec![Rewrite {
+                auto: Some(" still obvious ".into()),
+                ..rw("Q2", "b2")
+            }],
+            ..Update::default()
+        },
+    );
+    let b = q.get("Q2").unwrap();
+    assert_eq!((b.state, b.text.subject.as_str()), (QState::Decided, "b2"));
+    assert_eq!(auto_why(&q, "Q2").as_deref(), Some("still obvious"));
+    assert!(b.change.is_none());
+
+    // Undoing Q1 puts Q2 back as it was.
+    assert_eq!(q.undo().as_deref(), Some("Q1"));
+    assert_eq!(q.get("Q2").unwrap().text.subject, "b");
+    assert_eq!(auto_why(&q, "Q2").as_deref(), Some("obvious"));
+}
+
+#[test]
+fn a_rewrite_without_auto_opens_the_question_plainly() {
+    let mut q = auto_after_answer();
+    q.apply(
+        "Q1",
+        Update {
+            rewrite: vec![Rewrite {
+                auto: Some(" ".into()),
+                ..rw("Q2", "b2")
+            }],
+            ..Update::default()
+        },
+    );
+    let b = q.get("Q2").unwrap();
+    assert_eq!(
+        (b.state, &b.answer, &b.change),
+        (QState::Open, &None, &None)
+    );
+
+    // The user's answer to Q2 undoes first, then Q1's, which brings the auto answer back.
+    let mine = Answer {
+        option: None,
+        other: Some("mine".into()),
+        ..pick(0, 2.0)
+    };
+    q.decide("Q2", mine).unwrap();
+    assert_eq!(q.undo().as_deref(), Some("Q2"));
+    assert_eq!(q.get("Q2").unwrap().state, QState::Open);
+    assert_eq!(q.undo().as_deref(), Some("Q1"));
+    let b = q.get("Q2").unwrap();
+    assert_eq!((b.state, b.text.subject.as_str()), (QState::Decided, "b"));
+    assert_eq!(auto_why(&q, "Q2").as_deref(), Some("obvious"));
     assert_eq!(q.undo(), None);
 }
