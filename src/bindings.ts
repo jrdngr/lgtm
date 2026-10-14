@@ -248,8 +248,11 @@ export const commands = {
 	editQa: (workspace: string | null, id: string, edit: SessionEdit) => typedError<Session_Serialize, string>(__TAURI_INVOKE("edit_qa", { workspace, id, edit })),
 	deleteQa: (workspace: string | null, id: string) => typedError<null, string>(__TAURI_INVOKE("delete_qa", { workspace, id })),
 	actOnQuestion: (workspace: string | null, session: string, act: QuestionAct) => typedError<Session_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, session, act })),
-	/**  Has the agent turn the session's prompt into questions. */
-	askQa: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("ask_qa", { workspace, session, onTool })),
+	/**
+	 *  Has the agent turn the session's prompt into questions, answering the obvious ones
+	 *  itself when `auto` is on.
+	 */
+	askQa: (workspace: string | null, session: string, auto: boolean, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("ask_qa", { workspace, session, auto, onTool })),
 	/**  Applies the answer to question `id` to the rest of the queue. */
 	applyAnswer: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, session, id })),
 	/**  A discussion turn on a question, streaming the agent's reply through `on_text`. */
@@ -325,6 +328,11 @@ export type Answer_Deserialize = {
 	other?: string | null,
 	/**  When it was decided, in ms, so the last decision can be undone. */
 	at: number | null,
+	/**
+	 *  Why the agent answered it itself, with option 1, when it did. Auto answers come with
+	 *  the questions, so undo leaves them.
+	 */
+	auto?: string | null,
 };
 
 export type Answer_Serialize = {
@@ -335,6 +343,11 @@ export type Answer_Serialize = {
 	other?: string | null,
 	/**  When it was decided, in ms, so the last decision can be undone. */
 	at: number | null,
+	/**
+	 *  Why the agent answered it itself, with option 1, when it did. Auto answers come with
+	 *  the questions, so undo leaves them.
+	 */
+	auto?: string | null,
 };
 
 /**  What Apply did. */
@@ -435,8 +448,8 @@ export type Challenge = {
 };
 
 /**
- *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
- *  yet.
+ *  A rewrite of a decided question, which opened it again, or an auto answer the user
+ *  reopened, that the user hasn't looked at yet.
  */
 export type Change = Change_Serialize | Change_Deserialize;
 
@@ -456,11 +469,14 @@ export type ChangeDto = {
 };
 
 /**
- *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
- *  yet.
+ *  A rewrite of a decided question, which opened it again, or an auto answer the user
+ *  reopened, that the user hasn't looked at yet.
  */
 export type Change_Deserialize = {
-	/**  What it was rewritten after: a question id, or "discussion". */
+	/**
+	 *  What it was rewritten after: a question id, "discussion", or "auto" for a reopened
+	 *  auto answer.
+	 */
 	after: string,
 	/**  What changed, in a few words. */
 	what: string,
@@ -470,11 +486,14 @@ export type Change_Deserialize = {
 };
 
 /**
- *  A rewrite of a decided question, which opened it again, that the user hasn't looked at
- *  yet.
+ *  A rewrite of a decided question, which opened it again, or an auto answer the user
+ *  reopened, that the user hasn't looked at yet.
  */
 export type Change_Serialize = {
-	/**  What it was rewritten after: a question id, or "discussion". */
+	/**
+	 *  What it was rewritten after: a question id, "discussion", or "auto" for a reopened
+	 *  auto answer.
+	 */
 	after: string,
 	/**  What changed, in a few words. */
 	what: string,
@@ -1187,6 +1206,8 @@ export type Queue_Deserialize = {
 	effects?: Effect_Deserialize[],
 	/**  Each defer, so undo can take it back in one step. */
 	deferrals?: Deferral[],
+	/**  Each auto answer the user reopened, so undo can put it back. */
+	reopens?: Reopen_Deserialize[],
 };
 
 export type Queue_Serialize = {
@@ -1195,6 +1216,8 @@ export type Queue_Serialize = {
 	effects: Effect_Serialize[],
 	/**  Each defer, so undo can take it back in one step. */
 	deferrals: Deferral[],
+	/**  Each auto answer the user reopened, so undo can put it back. */
+	reopens: Reopen_Serialize[],
 };
 
 export type QuickWin = {
@@ -1213,6 +1236,20 @@ export type RefreshDto = {
 	review: ReviewDto,
 	/**  Where rows of the review as it was went. */
 	moves: RowMove[],
+};
+
+export type Reopen = Reopen_Serialize | Reopen_Deserialize;
+
+export type Reopen_Deserialize = {
+	id: string,
+	answer: Answer_Deserialize,
+	at: number | null,
+};
+
+export type Reopen_Serialize = {
+	id: string,
+	answer: Answer_Serialize,
+	at: number | null,
 };
 
 /**  A jj operation landed in the window's repo, so reviews may be out of date. */

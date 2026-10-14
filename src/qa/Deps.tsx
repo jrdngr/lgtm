@@ -1,10 +1,14 @@
-import { answerLabel, dependents, type Question, type Session } from "./model";
+import { answerLabel, dependents, isAuto, type Question, type Session } from "./model";
 
 function Chip({ q, kind, onPick }: { q: Question; kind: string; onPick(id: string): void }) {
   const done = q.state === "decided";
   return (
     <button type="button" className={`qq-dep ${kind}`} onClick={() => onPick(q.id)}>
-      <span className={`qq-dep-state ${done ? "done" : ""}`}>{done ? "✓" : "○"}</span>
+      <span
+        className={["qq-dep-state", done && "done", isAuto(q) && "auto"].filter(Boolean).join(" ")}
+      >
+        {done ? "✓" : "○"}
+      </span>
       <code>{q.id}</code>
       {q.text.subject}
       {done && <span className="qq-dep-answer"> · {answerLabel(q)}</span>}

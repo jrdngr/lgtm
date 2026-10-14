@@ -6,6 +6,7 @@ pub mod agent;
 mod discuss;
 mod order;
 pub mod queue;
+pub mod text;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};

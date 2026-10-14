@@ -1,4 +1,4 @@
-import { isSubOf, type Question } from "./model";
+import { isAuto, isSubOf, type Question } from "./model";
 
 const isSub = (q: Question) => /[a-z]$/.test(q.id);
 
@@ -19,10 +19,11 @@ interface Props {
   onPick(id: string): void;
 }
 
-/** Every question in queue order, subquestions indented, with what the shown one depends on
- * and what depends on it. */
+/** Every question in queue order, subquestions indented, auto answers badged, with what the
+ * shown one depends on and what depends on it. */
 export function Rail({ questions, current, updating, onPick }: Props) {
   const needs = current?.depends ?? [];
+  const anyAuto = questions.some(isAuto);
   const feeds = (q: Question) =>
     !!current && (q.depends.includes(current.id) || isSubOf(q.id, current.id));
   return (
@@ -35,6 +36,7 @@ export function Rail({ questions, current, updating, onPick }: Props) {
           className={[
             "qq-rail-row",
             q.state,
+            isAuto(q) && "auto",
             q.change && q.state === "open" && "reopened",
             isSub(q) && "sub",
             q.id === current?.id && "current",
@@ -47,9 +49,11 @@ export function Rail({ questions, current, updating, onPick }: Props) {
           title={
             q.dropped
               ? `Dropped: ${q.dropped}`
-              : q.depends.length
-                ? `Depends on ${q.depends.join(", ")}`
-                : undefined
+              : isAuto(q)
+                ? `Auto-answered: ${q.answer?.auto}`
+                : q.depends.length
+                  ? `Depends on ${q.depends.join(", ")}`
+                  : undefined
           }
           disabled={q.state === "dropped"}
           onClick={() => onPick(q.id)}
@@ -57,18 +61,35 @@ export function Rail({ questions, current, updating, onPick }: Props) {
           <span className="qq-rail-mark">{mark(q)}</span>
           <span className="qq-rail-id">{q.id}</span>
           <span className="qq-rail-subject">{q.text.subject}</span>
+          {isAuto(q) ? (
+            <span className="qq-rail-auto" title="Auto-answered">
+              A
+            </span>
+          ) : (
+            <span />
+          )}
         </button>
       ))}
-      {current && (
+      {(current || anyAuto) && (
         <div className="qq-rail-legend">
-          <span>
-            <i className="needs" />
-            {current.id} depends on
-          </span>
-          <span>
-            <i className="feeds" />
-            depends on {current.id}
-          </span>
+          {anyAuto && (
+            <span>
+              <i className="auto" />
+              auto-answered
+            </span>
+          )}
+          {current && (
+            <>
+              <span>
+                <i className="needs" />
+                {current.id} depends on
+              </span>
+              <span>
+                <i className="feeds" />
+                depends on {current.id}
+              </span>
+            </>
+          )}
         </div>
       )}
     </nav>

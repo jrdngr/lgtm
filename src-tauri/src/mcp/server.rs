@@ -17,7 +17,8 @@ use tauri_specta::Event as _;
 use super::{Hello, inputs};
 use crate::bots::output::Output;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, QaChanged, ReviewStateChanged};
-use crate::qa::queue::{Choice, NewQuestion, QState, answer_text};
+use crate::qa::queue::{Choice, NewQuestion, QState};
+use crate::qa::text::answer_text;
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
@@ -371,7 +372,8 @@ impl Lgtm {
     #[tool(
         description = "Ask the human questions through lgtm's Q&A. They show one at a time in \
         the Q&A tab, in the qqueue format: context bullets, options with the recommended one \
-        first, and why. Returns the session and the new questions' ids in the order given; \
+        first, and why. A question with `auto` is answered with option 1 and skipped unless the \
+        human reopens it. Returns the session and the new questions' ids in the order given; \
         read the decisions later with qa_answers."
     )]
     async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
@@ -406,6 +408,7 @@ impl Lgtm {
                 why: q.why,
                 sources: q.sources,
                 depends: q.depends,
+                auto: q.auto,
             })
             .collect();
         let ids = ctx
@@ -441,6 +444,7 @@ impl Lgtm {
                         QState::Deferred => "deferred".into(),
                         _ => answer_text(q),
                     },
+                    "auto": q.answer.as_ref().is_some_and(|a| a.is_auto()),
                 })
             })
             .collect();

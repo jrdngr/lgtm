@@ -6,7 +6,8 @@ use serde::Deserialize;
 
 use super::Session;
 use super::agent::{Step, parse, rewrite};
-use super::queue::{self, Answer, QState, QaQuestion, Rewrite, Turn};
+use super::queue::{Answer, QState, QaQuestion, Rewrite, Turn};
+use super::text;
 use crate::agent::{Progress, Runs};
 use crate::review::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
@@ -104,7 +105,7 @@ impl RepoCtx {
             "Let's discuss this question. It's a discussion: answer briefly. {}\n\n{}\n\n\
              {so_far}{message}",
             rules(qid),
-            queue::question_text(question)
+            text::question_text(question)
         );
         let (turn, restart) = if question.discussion.is_empty() {
             (opening, None)
@@ -172,6 +173,7 @@ impl RepoCtx {
                             note: d.note.filter(|n| !n.trim().is_empty()),
                             other: d.other.filter(|o| !o.trim().is_empty()),
                             at: now_ms() as f64,
+                            auto: None,
                         },
                     )
                     .inspect_err(|e| eprintln!("lgtm: discussion decide: {e:#}"))
@@ -195,7 +197,7 @@ impl RepoCtx {
         let turn = format!(
             "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
              id. Say in a few words what changed.\n\n{}\n\nOur discussion:\n\n{}",
-            queue::question_text(question),
+            text::question_text(question),
             talk(question)
         );
         let reply = self

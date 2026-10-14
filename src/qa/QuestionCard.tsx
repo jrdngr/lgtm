@@ -14,6 +14,8 @@ interface Props {
   selected?: number;
   /** The option it was decided with. */
   decided?: number | null;
+  /** The agent decided it, so the answer shows as its own. */
+  auto?: boolean;
   /** Options can't be picked. */
   locked?: boolean;
   onSelect?(option: number): void;
@@ -40,7 +42,17 @@ const TAGS = [
 
 /** A question in the qqueue template: subject, context, options with the recommended one
  * first, and the recommendation. */
-export function QuestionCard({ id, text, before, was, selected, decided, locked, ...p }: Props) {
+export function QuestionCard({
+  id,
+  text,
+  before,
+  was,
+  selected,
+  decided,
+  auto,
+  locked,
+  ...p
+}: Props) {
   const changed = (now: unknown, then: unknown) => !!before && !same(now, then);
   const wasLabel = was?.option != null && before ? before.options[was.option]?.label : undefined;
   return (
@@ -73,7 +85,7 @@ export function QuestionCard({ id, text, before, was, selected, decided, locked,
                 className={[
                   "qq-option",
                   selected === i && "selected",
-                  decided === i && "decided",
+                  decided === i && (auto ? "auto" : "decided"),
                   changed(o, before?.options[i]) && "qq-changed",
                   (locked || !p.onSelect) && "readonly",
                 ]
@@ -90,8 +102,17 @@ export function QuestionCard({ id, text, before, was, selected, decided, locked,
                       <Inline>{o.label}</Inline>
                     </b>
                     {i === 0 && <span className="pill rec">recommended</span>}
-                    {decided === i && <span className="pill yours">your answer</span>}
-                    {wasLabel === o.label && <span className="pill was">your answer before</span>}
+                    {decided === i &&
+                      (auto ? (
+                        <span className="pill auto">auto-answer</span>
+                      ) : (
+                        <span className="pill yours">your answer</span>
+                      ))}
+                    {wasLabel === o.label && (
+                      <span className="pill was">
+                        {was?.auto ? "auto-answer before" : "your answer before"}
+                      </span>
+                    )}
                   </span>
                   {o.means && (
                     <span className="qq-means">

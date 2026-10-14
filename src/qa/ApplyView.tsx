@@ -5,12 +5,9 @@ import { openFile } from "../editor/open";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { apply, edit, writePlan } from "./actions";
-import { answerLabel, applyText, openQuestions, type Session } from "./model";
+import { answerLabel, applyText, isAuto, openQuestions, type Session } from "./model";
 import { PlanView } from "./PlanView";
 import type { Busy } from "./store";
-
-/** Decisions listed before the rest fold under "n more". */
-const SHOWN = 3;
 
 interface Props {
   ws: WorkspaceName;
@@ -23,10 +20,9 @@ interface Props {
   onSend(text: string): void;
 }
 
-/** The last step: the decisions, then writing them into @ straight away, through a plan, or
- * from a terminal. */
+/** The last step: the decisions, auto answers tagged, then writing them into @ straight
+ * away, through a plan, or from a terminal. */
 export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
-  const [all, setAll] = useState(false);
   const [note, setNote] = useState(d.note);
   const rootRef = useRef<HTMLDivElement>(null);
   const locked = !!busy || d.archived;
@@ -70,40 +66,40 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
       {d.plan && !d.applied ? (
         <PlanView ws={ws} d={d} busy={busy} onApply={go} />
       ) : (
-        <section className="qa-card">
-          <h2>
-            {open
-              ? `${decided.length} decided, ${open} open`
-              : decided.length
-                ? `All ${decided.length} decided`
-                : "Nothing to decide"}
-          </h2>
-          <ul className="qa-decisions">
-            {(all ? decided : decided.slice(0, SHOWN)).map((q) => (
-              <li key={q.id}>
-                <b>{q.id}</b> <Inline>{answerLabel(q)}</Inline>
-              </li>
-            ))}
-          </ul>
+        <section className="qq qa-form">
+          <span className="qq-label">Decisions</span>
+          {decided.length > 0 && (
+            <ul className="qa-decisions">
+              {decided.map((q) => (
+                <li key={q.id}>
+                  <code>{q.id}</code>
+                  <span>
+                    {q.text.subject}{" "}
+                    <span className="qa-answer">
+                      · <Inline>{answerLabel(q)}</Inline>
+                    </span>
+                  </span>
+                  {isAuto(q) ? <span className="pill auto">auto</span> : <span />}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!decided.length && !open && <p className="faint">Nothing to decide</p>}
+          {open > 0 && <p className="faint">{open} still open</p>}
           {deferred.length > 0 && (
             <p className="faint">
               Deferred, left unimplemented: {deferred.map((q) => q.id).join(", ")}
             </p>
           )}
-          {decided.length > SHOWN && (
-            <button type="button" className="quiet" onClick={() => setAll(!all)}>
-              {all ? "Fewer ▴" : `${decided.length - SHOWN} more ▸`}
-            </button>
-          )}
           {!d.archived && (
             <>
               <label className="qq-label" htmlFor="qa-note">
-                Anything to add for the write? (optional)
+                Anything else
               </label>
               <textarea
                 id="qa-note"
-                className="qq-input"
-                rows={2}
+                className="qa-field qa-note"
+                placeholder="Extra context for the agent"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 onBlur={saveNote}
@@ -111,17 +107,18 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
               <div className="qq-actions">
                 <button
                   type="button"
+                  className="qq-btn"
                   disabled={!!busy}
                   onClick={() => onSend(applyText({ ...d, note }))}
                 >
                   Send to terminal
                 </button>
-                <span className="spacer" />
-                <button type="button" disabled={locked} onClick={plan}>
-                  Write plan <kbd>p</kbd>
+                <button type="button" className="qq-btn" disabled={locked} onClick={plan}>
+                  Plan first
                 </button>
-                <button type="button" className="primary" disabled={locked} onClick={go}>
-                  Apply to @ <kbd>⌘↵</kbd>
+                <span className="spacer" />
+                <button type="button" className="qq-btn primary" disabled={locked} onClick={go}>
+                  Apply <kbd>⌘↵</kbd>
                 </button>
               </div>
             </>

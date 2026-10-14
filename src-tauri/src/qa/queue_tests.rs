@@ -21,6 +21,7 @@ fn new(subject: &str, sub: bool) -> NewQuestion {
         why: "because".into(),
         sources: vec![],
         depends: vec![],
+        auto: None,
     }
 }
 
@@ -48,6 +49,7 @@ fn pick(option: u32, at: f64) -> Answer {
         note: None,
         other: None,
         at,
+        auto: None,
     }
 }
 
@@ -250,23 +252,59 @@ fn a_defer_cascades_through_open_dependents_and_undoes_in_one_step() {
     assert_eq!(q.undo().as_deref(), Some("Q6"));
 }
 
+fn auto(subject: &str, why: &str) -> NewQuestion {
+    NewQuestion {
+        auto: Some(why.into()),
+        ..new(subject, false)
+    }
+}
+
 #[test]
-fn the_text_follows_the_qqueue_template() {
+fn auto_answers_come_decided_and_undo_leaves_them() {
     let mut q = Queue::default();
-    q.add_round(vec![new("Where files live", false)]);
-    q.decide(
-        "Q1",
-        Answer {
-            note: Some("keep it simple".into()),
-            ..pick(1, 1.0)
-        },
-    )
-    .unwrap();
-    let first = q.get("Q1").unwrap();
-    assert_eq!(answer_text(first), "option 2: no (note: keep it simple)");
+    q.add_round(vec![
+        auto("a", "settings are TOML"),
+        after("b", &["Q1"]),
+        auto("c", " "),
+    ]);
+    let a = q.get("Q1").unwrap();
+    assert_eq!(a.state, QState::Decided);
+    let answer = a.answer.as_ref().unwrap();
     assert_eq!(
-        question_text(first),
-        "Q1 — Where files live\n\nContext:\n\n- c\n\nOptions:\n\n1. yes (recommended)\n   do it\n\
-         \x20  - Pro: simple\n   - Risk: breaks old files\n2. no\n\nRecommendation: option 1. because"
+        (answer.option, answer.auto.as_deref()),
+        (Some(0), Some("settings are TOML"))
     );
+    // A blank reason asks the question.
+    assert_eq!(q.get("Q3").unwrap().state, QState::Open);
+    assert_eq!(q.dependents("Q1")[0].id, "Q2");
+    assert_eq!(q.undo(), None);
+}
+
+#[test]
+fn reopening_an_auto_answer_marks_it_and_undo_puts_it_back() {
+    let mut q = Queue::default();
+    q.add_round(vec![auto("a", "obvious"), new("b", false)]);
+    q.decide("Q2", pick(0, 1.0)).unwrap();
+    q.change_answer("Q1", 2.0).unwrap();
+    let a = q.get("Q1").unwrap();
+    let change = a.change.as_ref().unwrap();
+    assert_eq!((a.state, change.after.as_str()), (QState::Open, "auto"));
+    assert!(change.answer.as_ref().unwrap().is_auto());
+
+    // The user's own answer undoes first, then the reopen, then the earlier decision.
+    q.decide("Q1", pick(1, 3.0)).unwrap();
+    assert_eq!(q.undo().as_deref(), Some("Q1"));
+    assert_eq!(q.get("Q1").unwrap().state, QState::Open);
+    assert_eq!(q.undo().as_deref(), Some("Q1"));
+    let a = q.get("Q1").unwrap();
+    assert_eq!(
+        (
+            a.state,
+            a.answer.as_ref().unwrap().is_auto(),
+            a.change.is_none()
+        ),
+        (QState::Decided, true, true)
+    );
+    assert_eq!(q.undo().as_deref(), Some("Q2"));
+    assert_eq!(q.undo(), None);
 }

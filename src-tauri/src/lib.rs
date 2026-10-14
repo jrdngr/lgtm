@@ -34,8 +34,8 @@ mod zoom;
 use std::path::Path;
 
 use tauri::{Manager, RunEvent, WindowEvent};
-use tauri_specta::{collect_commands, collect_events};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
+use tauri_specta::{collect_commands, collect_events};
 
 use agent::Runs;
 use pty::Ptys;

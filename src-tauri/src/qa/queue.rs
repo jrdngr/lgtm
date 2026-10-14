@@ -61,14 +61,25 @@ pub struct Answer {
     pub other: Option<String>,
     /// When it was decided, in ms, so the last decision can be undone.
     pub at: f64,
+    /// Why the agent answered it itself, with option 1, when it did. Auto answers come with
+    /// the questions, so undo leaves them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto: Option<String>,
 }
 
-/// A rewrite of a decided question, which opened it again, that the user hasn't looked at
-/// yet.
+impl Answer {
+    pub fn is_auto(&self) -> bool {
+        self.auto.is_some()
+    }
+}
+
+/// A rewrite of a decided question, which opened it again, or an auto answer the user
+/// reopened, that the user hasn't looked at yet.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Change {
-    /// What it was rewritten after: a question id, or "discussion".
+    /// What it was rewritten after: a question id, "discussion", or "auto" for a reopened
+    /// auto answer.
     pub after: String,
     /// What changed, in a few words.
     pub what: String,
@@ -122,6 +133,17 @@ pub struct Queue {
     /// Each defer, so undo can take it back in one step.
     #[serde(default)]
     pub deferrals: Vec<Deferral>,
+    /// Each auto answer the user reopened, so undo can put it back.
+    #[serde(default)]
+    pub reopens: Vec<Reopen>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Reopen {
+    pub id: String,
+    pub answer: Answer,
+    pub at: f64,
 }
 
 /// The questions one defer put off: `id` and the open questions that depend on it.
@@ -158,6 +180,9 @@ pub struct NewQuestion {
     pub sources: Vec<String>,
     #[serde(default)]
     pub depends: Vec<String>,
+    /// Why option 1 is obvious, when the agent answers it itself. Empty means ask.
+    #[serde(default)]
+    pub auto: Option<String>,
 }
 
 impl NewQuestion {
@@ -231,14 +256,25 @@ impl Queue {
         for p in placed {
             ids[p.index] = p.id.clone();
             let n = p.question;
+            let auto = n.auto.clone().filter(|w| !w.trim().is_empty());
             self.questions.push(QaQuestion {
                 id: p.id,
                 round,
                 text: n.text(),
                 sources: n.sources,
                 depends: n.depends,
-                state: QState::Open,
-                answer: None,
+                state: if auto.is_some() {
+                    QState::Decided
+                } else {
+                    QState::Open
+                },
+                answer: auto.map(|why| Answer {
+                    option: Some(0),
+                    note: None,
+                    other: None,
+                    at: 0.0,
+                    auto: Some(why.trim().to_string()),
+                }),
                 dropped: None,
                 change: None,
                 discussion: vec![],
@@ -313,20 +349,24 @@ impl Queue {
         Ok(ids)
     }
 
-    /// Takes back the last decision or defer, and what it did to the other questions.
-    /// Returns the id it was on.
+    /// Takes back the last decision, defer or reopened auto answer, and what it did to the
+    /// other questions. Returns the id it was on.
     pub fn undo(&mut self) -> Option<String> {
         let decided = self
             .questions
             .iter()
-            .filter_map(|q| Some((q.answer.as_ref()?.at, q)))
-            .filter(|(_, q)| q.state == QState::Decided)
+            .filter(|q| q.state == QState::Decided)
+            .filter_map(|q| Some((q.answer.as_ref().filter(|a| !a.is_auto())?.at, q)))
             .max_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(at, q)| (at, q.id.clone()));
-        if let Some(d) = self
-            .deferrals
-            .pop_if(|d| decided.as_ref().is_none_or(|(at, _)| d.at > *at))
-        {
+        let deferred = self.deferrals.last().map(|d| d.at);
+        let reopened = self.reopens.last().map(|r| r.at);
+        let latest = [decided.as_ref().map(|d| d.0), deferred, reopened]
+            .into_iter()
+            .flatten()
+            .max_by(f64::total_cmp)?;
+        if deferred == Some(latest) {
+            let d = self.deferrals.pop()?;
             for q in self.questions.iter_mut().filter(|q| d.ids.contains(&q.id)) {
                 if q.state == QState::Deferred {
                     q.state = QState::Open;
@@ -334,17 +374,52 @@ impl Queue {
             }
             return Some(d.id);
         }
+        if reopened == Some(latest) {
+            let r = self.reopens.pop()?;
+            if let Ok(q) = self.get_mut(&r.id)
+                && q.state == QState::Open
+            {
+                q.state = QState::Decided;
+                q.answer = Some(r.answer);
+                q.change = None;
+            }
+            return Some(r.id);
+        }
         let (_, id) = decided?;
         self.reopen(&id).ok()?;
         self.revert(&id);
         Some(id)
     }
 
-    /// Reopens a decided question so it can be answered again.
-    pub fn reopen(&mut self, id: &str) -> anyhow::Result<()> {
+    fn reopen(&mut self, id: &str) -> anyhow::Result<()> {
         let q = self.get_mut(id)?;
         q.state = QState::Open;
         q.answer = None;
+        Ok(())
+    }
+
+    /// Opens a decided question so the user can answer it again. A reopened auto answer
+    /// shows as a change, and undo can put it back.
+    pub fn change_answer(&mut self, id: &str, at: f64) -> anyhow::Result<()> {
+        let q = self.get_mut(id)?;
+        anyhow::ensure!(q.state == QState::Decided, "{id} isn't decided");
+        let auto = q.answer.clone().filter(Answer::is_auto);
+        if let Some(a) = &auto {
+            q.change = Some(Change {
+                after: "auto".into(),
+                what: a.auto.clone().unwrap_or_default(),
+                previous: q.text.clone(),
+                answer: auto.clone(),
+            });
+        }
+        self.reopen(id)?;
+        if let Some(answer) = auto {
+            self.reopens.push(Reopen {
+                id: id.to_string(),
+                answer,
+                at,
+            });
+        }
         Ok(())
     }
 
@@ -480,57 +555,6 @@ impl Queue {
             .filter(|q| q.state == QState::Open)
             .count()
     }
-}
-
-/// An answer in words, for the agent and for copying.
-pub fn answer_text(q: &QaQuestion) -> String {
-    let Some(a) = &q.answer else {
-        return "not decided".into();
-    };
-    let mut out = match (a.option, &a.other) {
-        (Some(o), _) => {
-            let label = q
-                .text
-                .options
-                .get(o as usize)
-                .map_or("", |c| c.label.as_str());
-            format!("option {}: {label}", o + 1)
-        }
-        (None, Some(other)) => format!("none of the options: {other}"),
-        (None, None) => "none of the options".into(),
-    };
-    if let Some(note) = a.note.as_deref().filter(|n| !n.trim().is_empty()) {
-        out.push_str(&format!(" (note: {})", note.trim()));
-    }
-    out
-}
-
-/// A question in the qqueue template, as plain text.
-pub fn question_text(q: &QaQuestion) -> String {
-    let t = &q.text;
-    let mut out = format!("{} — {}\n\nContext:\n\n", q.id, t.subject);
-    for c in &t.context {
-        out.push_str(&format!("- {c}\n"));
-    }
-    out.push_str("\nOptions:\n\n");
-    for (i, o) in t.options.iter().enumerate() {
-        let rec = if i == 0 { " (recommended)" } else { "" };
-        out.push_str(&format!("{}. {}{rec}\n", i + 1, o.label));
-        if !o.means.is_empty() {
-            out.push_str(&format!("   {}\n", o.means));
-        }
-        let tagged = [("Pro", &o.pros), ("Con", &o.cons), ("Risk", &o.risks)];
-        for (tag, items) in tagged {
-            for b in items {
-                out.push_str(&format!("   - {tag}: {b}\n"));
-            }
-        }
-        for b in &o.bullets {
-            out.push_str(&format!("   - {b}\n"));
-        }
-    }
-    out.push_str(&format!("\nRecommendation: option 1. {}", t.why));
-    out
 }
 
 #[cfg(test)]

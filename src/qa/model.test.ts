@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { QState } from "../bindings";
 import {
   applyText,
+  countable,
   current,
   dependents,
+  head,
   lastAction,
   type Question,
   qqText,
@@ -41,7 +43,7 @@ function session(over: Partial<Session> = {}): Session {
     title: "T",
     prompt: "Add templates",
     attach: [],
-    queue: { effects: [], deferrals: [], questions: [] },
+    queue: { effects: [], deferrals: [], reopens: [], questions: [] },
     asked: false,
     note: "",
     plan: null,
@@ -59,12 +61,16 @@ describe("step", () => {
   it("goes from the prompt through questions to Apply", () => {
     expect(step(session())).toBe("prompt");
     expect(
-      step(session({ queue: { effects: [], deferrals: [], questions: [question("Q1", "open")] } })),
+      step(
+        session({
+          queue: { effects: [], deferrals: [], reopens: [], questions: [question("Q1", "open")] },
+        }),
+      ),
     ).toBe("questions");
     const decided = [question("Q1", "decided", 1, 0), question("Q2", "dropped")];
-    expect(step(session({ queue: { effects: [], deferrals: [], questions: decided } }))).toBe(
-      "apply",
-    );
+    expect(
+      step(session({ queue: { effects: [], deferrals: [], reopens: [], questions: decided } })),
+    ).toBe("apply");
     expect(step(session({ asked: true }))).toBe("apply");
   });
 });
@@ -74,6 +80,7 @@ describe("current", () => {
     queue: {
       effects: [],
       deferrals: [],
+      reopens: [],
       questions: [
         question("Q1", "decided", 1, 0),
         question("Q2", "dropped"),
@@ -121,6 +128,7 @@ describe("applyText", () => {
       queue: {
         effects: [],
         deferrals: [],
+        reopens: [],
         questions: [question("Q1", "decided", 1, 1), question("Q2", "open")],
       },
       note: " Keep it small ",
@@ -163,18 +171,34 @@ describe("dependents", () => {
       listing(question("Q5", "deferred"), "Q1"),
       question("Q11", "open"),
     ];
-    const d = session({ queue: { effects: [], deferrals: [], questions } });
+    const d = session({ queue: { effects: [], deferrals: [], reopens: [], questions } });
     expect(dependents(d, "Q1").map((q) => q.id)).toEqual(["Q1a", "Q2", "Q3"]);
   });
 });
 
 describe("lastAction", () => {
-  it("is whichever came last of a decision and a defer", () => {
+  const autoAnswer = { option: 0, note: null, other: null, at: 0, auto: "Obvious" };
+  const auto = (q: Question): Question => ({ ...q, answer: autoAnswer });
+
+  it("is whichever came last of a decision, a defer and a reopened auto answer", () => {
     const questions = [question("Q1", "decided", 1, 0), question("Q2", "deferred")];
     const deferral = { id: "Q2", ids: ["Q2"], at: 5 };
     const d = (at: number) =>
-      session({ queue: { effects: [], deferrals: [{ ...deferral, at }], questions } });
-    expect(lastAction(d(5))).toEqual({ id: "Q2", defer: true });
-    expect(lastAction(d(0.5))).toEqual({ id: "Q1", defer: false });
+      session({ queue: { effects: [], deferrals: [{ ...deferral, at }], reopens: [], questions } });
+    expect(lastAction(d(5))).toEqual({ id: "Q2", kind: "defer" });
+    expect(lastAction(d(0.5))).toEqual({ id: "Q1", kind: "decision" });
+    const reopen = { id: "Q3", answer: autoAnswer, at: 9 };
+    const reopened = session({
+      queue: { effects: [], deferrals: [{ ...deferral, at: 5 }], reopens: [reopen], questions },
+    });
+    expect(lastAction(reopened)).toEqual({ id: "Q3", kind: "reopen" });
+  });
+
+  it("leaves auto answers, which aren't the user's", () => {
+    const questions = [auto(question("Q1", "decided", 1, 0)), question("Q2", "open")];
+    const d = session({ queue: { effects: [], deferrals: [], reopens: [], questions } });
+    expect(lastAction(d)).toBeUndefined();
+    expect(countable(d).map((q) => q.id)).toEqual(["Q2"]);
+    expect(head(d)?.id).toBe("Q2");
   });
 });

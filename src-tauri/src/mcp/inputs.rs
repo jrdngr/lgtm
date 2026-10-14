@@ -206,6 +206,9 @@ pub struct QaQuestion {
     /// the returned ids can differ.
     #[serde(default)]
     pub depends: Vec<String>,
+    /// Only when option 1 is obvious and the other options are non-starters: why, in a short
+    /// line. lgtm records option 1 as the answer, and the human can reopen it.
+    pub auto: Option<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

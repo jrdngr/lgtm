@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
-import { ask, savePrompt } from "./actions";
+import { ask, autoAnswer, savePrompt } from "./actions";
 import type { Session } from "./model";
 import type { Busy } from "./store";
 
@@ -14,11 +14,13 @@ interface Props {
 }
 
 /** The terminal prompt for asking through an agent the user drives. */
-const terminalText = (id: string, prompt: string) =>
-  `${prompt.trim()}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.`;
+const terminalText = (id: string, prompt: string, auto: boolean) =>
+  `${prompt.trim()}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
 
-/** What the session is for and files the agent reads first, then asking. */
+/** What the session is for, files the agent reads first and whether it answers the obvious
+ * questions itself, then asking. */
 export function PromptView({ ws, d, busy, onSend }: Props) {
+  const auto = autoAnswer.use();
   const [prompt, setPrompt] = useState(d?.prompt ?? "");
   const [attach, setAttach] = useState(d?.attach ?? []);
   const [path, setPath] = useState("");
@@ -40,7 +42,7 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   async function send() {
     if (!prompt.trim()) return;
     const id = await save();
-    if (id) onSend(terminalText(id, prompt));
+    if (id) onSend(terminalText(id, prompt, auto));
   }
 
   function addPath() {
@@ -60,28 +62,27 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   }
 
   return (
-    <div className="qa-prompt" onKeyDown={onKey}>
+    <div className="qq qa-form qa-prompt" onKeyDown={onKey}>
       <label className="qq-label" htmlFor="qa-prompt">
         Prompt
       </label>
       <textarea
         id="qa-prompt"
         ref={ref}
-        className="qa-prompt-text"
+        className="qa-field qa-prompt-text"
         value={prompt}
         readOnly={locked}
         onChange={(e) => setPrompt(e.target.value)}
         onBlur={() => d && !locked && save()}
       />
       <div className="qq-label">Read first</div>
-      <div className="qa-attach">
+      <div className="qa-field qa-attach">
         {attach.map((a) => (
           <span key={a} className="qa-chip">
             {a}
             {!locked && (
               <button
                 type="button"
-                className="quiet"
                 aria-label={`Remove ${a}`}
                 onClick={() => {
                   const next = attach.filter((x) => x !== a);
@@ -107,13 +108,31 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
           }}
         />
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={auto}
+        className="qa-field qa-toggle"
+        onClick={() => autoAnswer.set(!auto)}
+      >
+        <span className="qa-switch" />
+        <span>
+          <b>Auto-answer obvious questions</b>
+          <small>When the other options are non-starters</small>
+        </span>
+      </button>
       <div className="qq-actions">
-        <button type="button" disabled={!prompt.trim()} onClick={send}>
+        <button type="button" className="qq-btn" disabled={!prompt.trim()} onClick={send}>
           Send to terminal
         </button>
         <span className="spacer" />
         {asked && <span className="faint">Asking again replaces the questions and answers</span>}
-        <button type="button" className="primary" disabled={locked || !prompt.trim()} onClick={go}>
+        <button
+          type="button"
+          className="qq-btn primary"
+          disabled={locked || !prompt.trim()}
+          onClick={go}
+        >
           {asked ? "Ask again" : "Ask me"} <kbd>⌘↵</kbd>
         </button>
       </div>

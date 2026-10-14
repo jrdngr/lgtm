@@ -1,5 +1,6 @@
 import type { AnswerInput, SessionEdit } from "../bindings";
 import { commands } from "../ipc";
+import { remembered } from "../workbench/remembered";
 import type { WorkspaceName } from "../workspaces/context";
 import { dependents, type Session } from "./model";
 import { act, removeSession, runStep, selectSession, setError, setView } from "./store";
@@ -75,10 +76,14 @@ export async function savePrompt(
   return r.data.id;
 }
 
+/** Whether asking has the agent answer the obvious questions itself. */
+export const autoAnswer = remembered("lgtm:qa:autoAnswer", true, [true, false]);
+
 /** Has the agent build the session's questions from its prompt. */
 export function ask(ws: WorkspaceName, id: string, title: string) {
   setView(ws, "questions");
-  return runStep(ws, id, { kind: "ask", subject: title }, (ch) => commands.askQa(ws, id, ch));
+  const auto = autoAnswer.get();
+  return runStep(ws, id, { kind: "ask", subject: title }, (ch) => commands.askQa(ws, id, auto, ch));
 }
 
 export function writePlan(ws: WorkspaceName, d: Session) {

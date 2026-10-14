@@ -162,6 +162,7 @@ pub(crate) async fn act_on_question(
                     note: answer.note.filter(|n| !n.trim().is_empty()),
                     other: answer.other.filter(|o| !o.trim().is_empty()),
                     at: crate::review::now_ms() as f64,
+                    auto: None,
                 },
             ),
             QuestionAct::Undo => {
@@ -169,7 +170,7 @@ pub(crate) async fn act_on_question(
                 Ok(())
             }
             QuestionAct::Defer { id } => q.defer(&id, crate::review::now_ms() as f64).map(|_| ()),
-            QuestionAct::Reopen { id } => q.reopen(&id),
+            QuestionAct::Reopen { id } => q.change_answer(&id, crate::review::now_ms() as f64),
             QuestionAct::Seen { id } => q.seen(&id),
         }
     })
@@ -191,7 +192,8 @@ pub(crate) async fn defer_preview(
     Ok(s.queue.defer_preview(&id))
 }
 
-/// Has the agent turn the session's prompt into questions.
+/// Has the agent turn the session's prompt into questions, answering the obvious ones
+/// itself when `auto` is on.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn ask_qa(
@@ -199,11 +201,12 @@ pub(crate) async fn ask_qa(
     runs: State<'_, Runs>,
     workspace: Option<String>,
     session: String,
+    auto: bool,
     on_tool: Channel<String>,
 ) -> CmdResult<Session> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     repo(&window)?
-        .ask_qa(&ws, &session, &runs, |t| {
+        .ask_qa(&ws, &session, auto, &runs, |t| {
             on_tool.send(t).ok();
         })
         .await

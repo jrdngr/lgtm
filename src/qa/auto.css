@@ -1,0 +1,76 @@
+/* Auto answers: cyan, apart from green (the user's) and violet (deferred) */
+
+.qq-rail-row.auto {
+  color: var(--muted);
+}
+
+.qq-rail-row.auto .qq-rail-mark {
+  color: var(--qq-cyan);
+}
+
+.qq-rail-auto {
+  margin-left: 4px;
+  padding: 0 3px;
+  font: 600 9px var(--mono);
+  color: var(--qq-cyan);
+  border: 1px solid rgb(57 197 207 / 45%);
+  border-radius: 3px;
+}
+
+.qq-rail-legend i.auto {
+  background: var(--qq-cyan);
+}
+
+.qq-dep-state.auto {
+  color: var(--qq-cyan);
+}
+
+.qq-bar.auto {
+  color: var(--qq-cyan);
+  background: var(--qq-cyan-soft);
+}
+
+.qq-bar.auto .why {
+  color: var(--fg);
+}
+
+.qq .pill.auto {
+  color: var(--qq-cyan);
+  background: var(--qq-cyan-soft);
+}
+
+.qq .qq-option.auto {
+  border-color: var(--qq-cyan);
+  background: var(--qq-cyan-soft);
+}
+
+.qq-option.auto .qq-num {
+  color: #0b1d1f;
+  background: var(--qq-cyan);
+  border-color: var(--qq-cyan);
+}
+
+.qq .qq-btn.cyan {
+  color: var(--qq-cyan);
+  border-color: rgb(57 197 207 / 50%);
+}
+
+.qq-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: var(--fs-sm);
+  color: var(--qq-cyan);
+  background: var(--qq-cyan-soft);
+  border-radius: 6px;
+}
+
+.qq-summary .grow {
+  flex: 1;
+}
+
+.qq .qq-summary .qq-btn {
+  height: 24px;
+}

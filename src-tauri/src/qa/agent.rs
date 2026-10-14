@@ -7,6 +7,7 @@ use anyhow::Context;
 use serde::Deserialize;
 
 use super::queue::{self, NewQuestion, QState, Update};
+use super::text;
 use super::{Applied, Plan, PlanFile, Session};
 use crate::agent::{self, Progress, Runs};
 use crate::prompts::{self, Prompt};
@@ -35,7 +36,13 @@ fn question_props() -> String {
     )
 }
 
-fn new_question() -> String {
+/// A new question, with `auto` for the agent's own answer when it may give one.
+fn new_question(auto: bool) -> String {
+    let (prop, req) = if auto {
+        (r#", "auto": { "type": "string" }"#, r#", "auto""#)
+    } else {
+        ("", "")
+    };
     format!(
         r#"{{
       "type": "object",
@@ -43,9 +50,9 @@ fn new_question() -> String {
         "sub": {{ "type": "boolean" }},
         {},
         "sources": {{ "type": "array", "items": {{ "type": "string" }} }},
-        "depends": {{ "type": "array", "items": {{ "type": "string" }} }}
+        "depends": {{ "type": "array", "items": {{ "type": "string" }} }}{prop}
       }},
-      "required": ["sub", "subject", "context", "options", "why", "sources", "depends"],
+      "required": ["sub", "subject", "context", "options", "why", "sources", "depends"{req}],
       "additionalProperties": false
     }}"#,
         question_props()
@@ -89,11 +96,11 @@ fn update_schema() -> String {
   "additionalProperties": false
 }}"#,
         rewrite(),
-        new_question()
+        new_question(false)
     )
 }
 
-fn ask_schema() -> String {
+fn ask_schema(auto: bool) -> String {
     format!(
         r#"{{
   "type": "object",
@@ -104,9 +111,13 @@ fn ask_schema() -> String {
   "required": ["title", "questions"],
   "additionalProperties": false
 }}"#,
-        new_question()
+        new_question(auto)
     )
 }
+
+const AUTO_RULE: &str = "Answer the obvious questions yourself: when option 1 is clearly right \
+and the other options are non-starters, still write the question in full, and set `auto` to \
+why, in a short line. Leave `auto` empty for every question I should decide.";
 
 const PLAN_SCHEMA: &str = r#"{
   "type": "object",
@@ -173,7 +184,7 @@ fn decisions(s: &Session) -> String {
         .questions
         .iter()
         .filter(|q| q.state == QState::Decided)
-        .map(|q| format!("- {} ({}): {}", q.id, q.text.subject, queue::answer_text(q)))
+        .map(|q| format!("- {} ({}): {}", q.id, q.text.subject, text::answer_text(q)))
         .collect::<Vec<_>>()
         .join("\n")
 }
@@ -369,22 +380,27 @@ impl RepoCtx {
         Ok(reply)
     }
 
-    /// Has the agent turn the prompt into questions. Replaces the queue.
+    /// Has the agent turn the prompt into questions, answering the obvious ones itself when
+    /// `auto` is on. Replaces the queue.
     pub async fn ask_qa(
         &self,
         ws: &Workspace,
         id: &str,
+        auto: bool,
         runs: &Runs,
         on_tool: impl Fn(String),
     ) -> anyhow::Result<Session> {
         let s = self.qa_session(ws, id)?;
-        let turn = format!(
+        let mut turn = format!(
             "Here's what I want:\n\n{}{}\n\nRead whatever in the repo it touches. \
              Then return a short title for it and every question I need to answer before you \
              write it, in the order to ask them.",
             s.prompt.trim(),
             read_first(&s)
         );
+        if auto {
+            turn.push_str(&format!("\n\n{AUTO_RULE}"));
+        }
         let reply = self
             .qa_step(
                 ws,
@@ -393,7 +409,7 @@ impl RepoCtx {
                 Step {
                     turn,
                     edit: false,
-                    schema: Some(ask_schema()),
+                    schema: Some(ask_schema(auto)),
                     fresh: true,
                     restart: None,
                     decided: false,
@@ -439,10 +455,10 @@ impl RepoCtx {
             .map(|d| match d.state {
                 QState::Decided => format!(
                     "Decided ({}):\n\n{}",
-                    queue::answer_text(d),
-                    queue::question_text(d)
+                    text::answer_text(d),
+                    text::question_text(d)
                 ),
-                _ => format!("Open:\n\n{}", queue::question_text(d)),
+                _ => format!("Open:\n\n{}", text::question_text(d)),
             })
             .collect();
         let turn = format!(
@@ -453,7 +469,7 @@ impl RepoCtx {
              raises, with its depends; new questions number on from Q{}. Leave out questions it \
              doesn't change.\n\n{}",
             answered.text.subject,
-            queue::answer_text(answered),
+            text::answer_text(answered),
             q.last_number(),
             listed.join("\n\n---\n\n")
         );
@@ -635,7 +651,13 @@ mod tests {
 
     #[test]
     fn the_schemas_are_json() {
-        for s in [ask_schema(), update_schema(), rewrite(), PLAN_SCHEMA.into()] {
+        for s in [
+            ask_schema(true),
+            ask_schema(false),
+            update_schema(),
+            rewrite(),
+            PLAN_SCHEMA.into(),
+        ] {
             serde_json::from_str::<serde_json::Value>(&s).unwrap();
         }
     }

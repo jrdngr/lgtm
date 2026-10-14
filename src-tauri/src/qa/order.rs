@@ -126,6 +126,7 @@ mod tests {
             why: String::new(),
             sources: vec![],
             depends: depends.iter().map(|d| d.to_string()).collect(),
+            auto: None,
         }
     }
 

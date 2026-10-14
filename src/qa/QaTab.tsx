@@ -24,6 +24,8 @@ import { PromptView } from "./PromptView";
 import { QuestionsView } from "./QuestionsView";
 import { busyName, setError, setView, useQa } from "./store";
 import "./qa.css";
+import "./auto.css";
+import "./forms.css";
 
 /** Where the session is, each step marked done, current or to come. Steps up to the
  * session's own can be gone back to. */
@@ -102,7 +104,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
             },
             d && {
               label: "Copy decisions",
-              disabled: !prev,
+              disabled: !d.queue.questions.some((x) => x.state === "decided"),
               onSelect: () => copy(decisionsText(d)),
             },
             d && {

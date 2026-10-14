@@ -15,8 +15,16 @@ export const STEP_NAMES: Record<Step, string> = {
 
 export const openQuestions = (d: Session) => d.queue.questions.filter((q) => q.state === "open");
 
-/** Questions that count toward "N of M": open and decided, never dropped. */
-export const countable = (d: Session) => d.queue.questions.filter((q) => q.state !== "dropped");
+/** Whether the agent answered `q` itself. */
+export const isAuto = (q: Question) => q.state === "decided" && !!q.answer?.auto;
+
+export const autoAnswered = (d: Session) => d.queue.questions.filter(isAuto);
+
+/** Questions that can be browsed: every one but the dropped. */
+export const browsable = (d: Session) => d.queue.questions.filter((q) => q.state !== "dropped");
+
+/** Questions that count toward "N of M": the browsable ones left to the user. */
+export const countable = (d: Session) => browsable(d).filter((q) => !isAuto(q));
 
 /** Where the session is: the first step with something left to do. */
 export function step(d: Session): Step {
@@ -49,23 +57,31 @@ export function current(d: Session, want: string | undefined): Question | undefi
   return wanted ?? qs.find((q) => q.state === "open");
 }
 
-/** The question decided most recently, for undo. */
+/** The question the user decided most recently, for undo. */
 export function lastDecided(d: Session): Question | undefined {
   let best: Question | undefined;
   for (const q of d.queue.questions) {
-    if (q.state !== "decided") continue;
+    if (q.state !== "decided" || isAuto(q)) continue;
     if (!best || (q.answer?.at ?? 0) > (best.answer?.at ?? 0)) best = q;
   }
   return best;
 }
 
-/** What undo takes back: the latest decision or defer. */
-export function lastAction(d: Session): { id: string; defer: boolean } | undefined {
+export type UndoKind = "decision" | "defer" | "reopen";
+
+/** What undo takes back: the latest decision, defer or reopened auto answer. */
+export function lastAction(d: Session): { id: string; kind: UndoKind } | undefined {
   const decided = lastDecided(d);
   const deferral = d.queue.deferrals.at(-1);
-  const at = decided?.answer?.at ?? -1;
-  if (deferral && (deferral.at ?? 0) > at) return { id: deferral.id, defer: true };
-  return decided && { id: decided.id, defer: false };
+  const reopen = d.queue.reopens.at(-1);
+  const all = [
+    decided && { id: decided.id, kind: "decision" as UndoKind, at: decided.answer?.at ?? 0 },
+    deferral && { id: deferral.id, kind: "defer" as UndoKind, at: deferral.at ?? 0 },
+    reopen && { id: reopen.id, kind: "reopen" as UndoKind, at: reopen.at ?? 0 },
+  ];
+  let best: { id: string; kind: UndoKind; at: number } | undefined;
+  for (const x of all) if (x && (!best || x.at > best.at)) best = x;
+  return best && { id: best.id, kind: best.kind };
 }
 
 /** An answer in a few words. */
