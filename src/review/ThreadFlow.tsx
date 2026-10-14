@@ -132,7 +132,12 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
                     {body.trim() ? "Edit" : "Write reply"} <kbd>e</kbd>
                   </button>
                   {!agentsOff && (
-                    <button type="button" disabled={!!running} onClick={() => c.compose(id)}>
+                    <button
+                      type="button"
+                      className="flow-draft"
+                      disabled={!!running}
+                      onClick={() => c.compose(id)}
+                    >
                       <Icon name="sparkle" size={13} />
                       Review
                     </button>
@@ -145,7 +150,13 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
       {!final && (comment.messages.length > 0 || running) && (
         <section className="flow-sec">
           {(take || body.trim()) && <h4 className="flow-h">Agent</h4>}
-          <Chat messages={comment.messages} made={made} running={running} onShow={showDraft} />
+          <Chat
+            messages={comment.messages}
+            made={made}
+            running={running}
+            reviewing={!!body.trim()}
+            onShow={showDraft}
+          />
         </section>
       )}
       {!final && !agentsOff && (
@@ -182,11 +193,13 @@ interface ChatProps {
   messages: Message[];
   made: Map<number, number>;
   running: ReturnType<Comments["running"]["get"]>;
+  /** A compose run reviews the reply there is rather than drafting a first one. */
+  reviewing: boolean;
   onShow(): void;
 }
 
 /** The thread's conversation with the agent. A Draft reply shows only as the agent's answer. */
-function Chat({ messages, made, running, onShow }: ChatProps) {
+function Chat({ messages, made, running, reviewing, onShow }: ChatProps) {
   return (
     <div className="flow-chat">
       {messages.map((m, i) => {
@@ -226,9 +239,11 @@ function Chat({ messages, made, running, onShow }: ChatProps) {
       {running && (
         <div className="flow-msg agent">
           <span className="flow-who">Agent</span>
-          <Busy className="flow-thinking">
+          <Busy className={`flow-thinking${running.compose ? " compose" : ""}`}>
             {running.compose
-              ? "Drafting a reply…"
+              ? reviewing
+                ? "Reviewing reply…"
+                : "Drafting a reply…"
               : running.change
                 ? "Changing the code…"
                 : "Thinking…"}

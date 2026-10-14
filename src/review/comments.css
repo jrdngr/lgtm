@@ -739,14 +739,16 @@ button.group-head.fold:hover {
   font-size: var(--fs-sm);
 }
 
-.thread-block .flow-draft {
+.thread-block .flow-draft,
+.thread-block .flow-buttons button.flow-draft {
   border-color: var(--github);
   background: var(--github);
   color: #fff;
   font-weight: 600;
 }
 
-.thread-block .flow-draft:hover:not(:disabled) {
+.thread-block .flow-draft:hover:not(:disabled),
+.thread-block .flow-buttons button.flow-draft:hover:not(:disabled) {
   border-color: var(--github);
   background: var(--github);
   filter: brightness(1.1);
@@ -829,4 +831,8 @@ button.group-head.fold:hover {
 /* Claude Code's color for a turn in progress. */
 .flow-thinking {
   color: rgb(215 119 87);
+}
+
+.flow-thinking.compose {
+  color: var(--github);
 }
