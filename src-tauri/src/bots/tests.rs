@@ -23,6 +23,7 @@ fn run(names: &[&str], options: BotOptions) -> BotRun {
         to: "b".into(),
         personas: names.iter().map(|n| persona(n)).collect(),
         options: options.normalized(names.len()),
+        context: String::new(),
         parts: vec![],
         done: vec![],
         created_at: 1.0,
@@ -322,7 +323,15 @@ async fn personas_review_cross_review_and_synthesize_a_real_change() {
     let notify: Notify = Arc::new(|_| {});
     let run = ctx
         .clone()
-        .start_bots(None, "@", &defaults, options, Runs::default(), notify)
+        .start_bots(
+            None,
+            "@",
+            &defaults,
+            options,
+            String::new(),
+            Runs::default(),
+            notify,
+        )
         .await
         .unwrap();
     while ctx.bots.is_active(run.id) {

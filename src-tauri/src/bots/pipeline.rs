@@ -131,6 +131,7 @@ impl RepoCtx {
         revset: &str,
         personas: &[String],
         options: BotOptions,
+        context: String,
         runs: Runs,
         notify: Notify,
     ) -> anyhow::Result<BotRun> {
@@ -145,6 +146,7 @@ impl RepoCtx {
             from: range.from,
             to: range.to,
             options: options.normalized(personas.len()),
+            context,
             personas,
             parts: vec![],
             done: vec![],

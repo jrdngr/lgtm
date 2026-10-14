@@ -40,9 +40,14 @@ pub struct Target {
 
 impl Target {
     pub async fn load(ws: &Workspace, run: &BotRun) -> anyhow::Result<Self> {
-        Ok(Self {
-            context: describe(ws, &run.revset, run.from.clone(), run.to.clone()).await?,
-        })
+        let mut context = describe(ws, &run.revset, run.from.clone(), run.to.clone()).await?;
+        if !run.context.trim().is_empty() {
+            context = format!(
+                "{context}\n\nWhat I want you to know about this change:\n\n{}",
+                run.context.trim()
+            );
+        }
+        Ok(Self { context })
     }
 }
 

@@ -269,6 +269,27 @@
   padding-left: 32px;
 }
 
+/* Context for the reviewers: grows to five lines, then scrolls. */
+.bots-context {
+  box-sizing: border-box;
+  display: block;
+  width: calc(100% - 20px);
+  margin: 0 10px 6px;
+  padding: 4px 6px;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  line-height: 18px;
+}
+
+.bots-context:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .bots-run-button {
   display: flex;
   align-items: center;

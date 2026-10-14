@@ -4,6 +4,7 @@ import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useAgentsOff } from "../tools/agents";
 import { Busy } from "../ui/Busy";
+import { GrowingText } from "../ui/GrowingText";
 import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -106,6 +107,7 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
   const [picks, setPicksState] = useState(loadPicks);
   const [error, setError] = useState<string>();
   const [starting, setStarting] = useState(false);
+  const [context, setContext] = useState("");
   const { unpicked, favorites, options } = picks;
 
   function setPicks(next: Picks) {
@@ -128,7 +130,7 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
   async function start() {
     if (!review) return;
     setStarting(true);
-    const r = await commands.startBots(workspace, review.revset, picked, options);
+    const r = await commands.startBots(workspace, review.revset, picked, options, context);
     setStarting(false);
     if (r.status === "error") return setError(r.error);
     setError(undefined);
@@ -188,6 +190,16 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
         options={options}
         lone={n < 2}
         onChange={(o) => setPicks({ ...picks, options: o })}
+      />
+      <div className="bots-section">
+        <span className="bots-label">Context</span>
+      </div>
+      <GrowingText
+        className="bots-context"
+        value={context}
+        maxLines={5}
+        placeholder="What the reviewers should know about this change"
+        onChange={(e) => setContext(e.target.value)}
       />
       <button
         type="button"

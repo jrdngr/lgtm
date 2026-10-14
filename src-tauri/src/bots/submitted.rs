@@ -29,6 +29,7 @@ impl RepoCtx {
                 profile: String::new(),
             }],
             options: BotOptions::default(),
+            context: String::new(),
             parts: vec![Part {
                 status: Status::Done,
                 output: Some(output),

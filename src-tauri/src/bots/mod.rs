@@ -114,6 +114,9 @@ pub struct BotRun {
     pub to: String,
     pub personas: Vec<Persona>,
     pub options: BotOptions,
+    /// What the user told the reviewers about the change.
+    #[serde(default)]
+    pub context: String,
     pub parts: Vec<Part>,
     /// Steps whose parts all finished.
     pub done: Vec<Step>,

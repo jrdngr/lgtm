@@ -44,6 +44,7 @@ pub(crate) async fn start_bots(
     revset: String,
     personas: Vec<String>,
     options: BotOptions,
+    context: String,
 ) -> CmdResult<BotRun> {
     repo(&window)?
         .start_bots(
@@ -51,6 +52,7 @@ pub(crate) async fn start_bots(
             &revset,
             &personas,
             options,
+            context,
             runs.inner().clone(),
             notify(&window),
         )

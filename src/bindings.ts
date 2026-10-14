@@ -156,7 +156,7 @@ export const commands = {
 	/**  Stops the review's triage or fix run. */
 	stopThreadRun: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_thread_run", { review })),
 	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
-	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options })),
+	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions, context: string) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options, context })),
 	/**  Adds `options` to a finished or halted run and runs what it's missing. */
 	continueBots: (run: number, options: BotOptions) => typedError<null, string>(__TAURI_INVOKE("continue_bots", { run, options })),
 	stopBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("stop_bots", { run })),
@@ -412,6 +412,8 @@ export type BotRun = {
 	to: string,
 	personas: Persona[],
 	options: BotOptions,
+	/**  What the user told the reviewers about the change. */
+	context?: string,
 	parts: Part[],
 	/**  Steps whose parts all finished. */
 	done: Step[],
