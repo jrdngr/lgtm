@@ -25,7 +25,9 @@ pub(super) fn mentioning(
     if names.is_empty() {
         return vec![];
     }
+    // Only the workspace's own ignore files: its repo may ignore the folder it sits in.
     let walk = ignore::WalkBuilder::new(root)
+        .parents(false)
         .require_git(false)
         .filter_entry(|e| e.file_name() != ".jj")
         .build();

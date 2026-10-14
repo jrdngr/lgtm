@@ -32,21 +32,35 @@ pub fn resolve(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
 }
 
 /// The entries of directory `dir` (empty for the root), directories first, skipping what
-/// `.gitignore` files ignore.
+/// `.gitignore` files in the workspace ignore. Ignore files above the root don't count, so a
+/// workspace inside its repo's ignored `.workspaces/` still lists. The walk starts at the root
+/// and follows only the way to `dir`, so ignore files between the two still apply.
 pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
     let path = if dir.is_empty() {
         root.to_path_buf()
     } else {
         resolve(root, dir)?
     };
-    let walk = ignore::WalkBuilder::new(&path)
-        .max_depth(Some(1))
+    let depth = Path::new(dir).components().count() + 1;
+    let target = path.clone();
+    let walk = ignore::WalkBuilder::new(root)
+        .max_depth(Some(depth))
         .hidden(false)
+        .parents(false)
         .require_git(false)
-        .filter_entry(|e| e.file_name() != ".jj" && e.file_name() != ".git")
+        .follow_links(true)
+        .filter_entry(move |e| {
+            let p = e.path();
+            e.file_name() != ".jj"
+                && e.file_name() != ".git"
+                && (target.starts_with(p) || p.parent() == Some(target.as_path()))
+        })
         .build();
     let mut out = Vec::new();
-    for entry in walk.flatten().filter(|e| e.depth() == 1) {
+    for entry in walk.flatten() {
+        if entry.path().parent() != Some(path.as_path()) {
+            continue;
+        }
         let Ok(rel) = entry.path().strip_prefix(root) else {
             continue;
         };
@@ -162,6 +176,28 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_eq!(names(""), ["src", ".gitignore", "b.txt"]);
+        assert_eq!(names("src"), ["src/main.rs"]);
+    }
+
+    #[test]
+    fn lists_a_workspace_its_repo_ignores() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = dir.path();
+        let root = repo.join(".workspaces/ws");
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(repo.join(".gitignore"), ".workspaces/**\n").unwrap();
+        std::fs::write(root.join(".gitignore"), "*.log\n").unwrap();
+        for f in ["src/main.rs", "src/debug.log"] {
+            std::fs::write(root.join(f), "").unwrap();
+        }
+        let names = |dir| {
+            list(&root, dir)
+                .unwrap()
+                .into_iter()
+                .map(|e| e.path)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(""), ["src", ".gitignore"]);
         assert_eq!(names("src"), ["src/main.rs"]);
     }
 
