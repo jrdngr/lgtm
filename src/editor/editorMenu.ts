@@ -14,6 +14,8 @@ interface Deps {
   path: string;
   dirty: boolean;
   save(): void;
+  /** Pastes text into one of the workspace's terminals. */
+  sendText(text: string): void;
   /** Set for markdown, which can show rendered. */
   toggleRendered?: () => void;
 }
@@ -41,6 +43,14 @@ function pathAndLine(v: EditorView, path: string): string {
   const { from, to } = v.state.selection.main;
   const [a, b] = [v.state.doc.lineAt(from).number, v.state.doc.lineAt(to).number];
   return `${path}:${a === b ? a : `${a}-${b}`}`;
+}
+
+/** The selection under its `path:line` or `path:start-end`, or just the cursor's `path:line`
+ * when nothing is selected. */
+export function locatedSelection(v: EditorView, path: string): string {
+  const where = pathAndLine(v, path);
+  const text = selected(v);
+  return text ? `${where}\n\`\`\`\n${text}\n\`\`\`` : where;
 }
 
 /** The right-click menu of an editor tab's text. */
@@ -72,6 +82,8 @@ export function editorMenu(d: Deps): CtxEntry[] {
     { label: "Copy", keys: "⌘C", disabled: empty, onSelect: after(() => copy(selected(v))) },
     { label: "Paste", keys: "⌘V", onSelect: after(() => paste(v)) },
     { label: "Select All", keys: "⌘A", onSelect: after(() => selectAll(v)) },
+    "-",
+    { label: "Send to Terminal", onSelect: () => d.sendText(locatedSelection(v, path)) },
     "-",
     { label: "Copy Path and Line", onSelect: () => copy(pathAndLine(v, path)) },
     { label: "Reveal in Files", onSelect: () => revealInFiles(d.workspace, path) },

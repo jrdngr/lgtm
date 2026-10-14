@@ -3,6 +3,7 @@ import { EditorView } from "@codemirror/view";
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { commands, errorText, unwrap } from "../ipc";
+import { useSendText } from "../review/useSendText";
 import { openMenu } from "../ui/contextMenu";
 import { isMac } from "../workbench/keys";
 import { wordWrap } from "../workbench/wordWrap";
@@ -37,6 +38,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
   const renderedRef = useRef<HTMLDivElement>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
+  const { sendText, picker } = useSendText(workspace, setError, () => view?.focus());
 
   useEffect(() => {
     let live = true;
@@ -168,6 +170,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         path,
         dirty,
         save: () => void save(),
+        sendText: (text) => sendText(text, () => view.focus()),
         toggleRendered: isMarkdown(path) ? toggleRendered : undefined,
       }),
     );
@@ -216,6 +219,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         hidden={rendered !== undefined}
         onContextMenu={onContextMenu}
       />
+      {picker}
     </div>
   );
 }
