@@ -63,8 +63,3 @@ export function colorForKey(setup: MarkSetup, key: string): MarkColor | undefine
 
 /** The CSS color of a mark. */
 export const markVar = (c: MarkColor) => `var(--mark-${c})`;
-
-const LIGHT: MarkColor[] = ["orange", "cyan", "yellow", "tan"];
-
-/** Text color that reads on a mark color's fill. */
-export const markInk = (c: MarkColor) => (LIGHT.includes(c) ? "#1e1e1e" : "#fff");

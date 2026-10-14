@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { MarkColor } from "../bindings";
 import { IconButton } from "../ui/icons";
 import { MarkPalette } from "./MarkPalette";
-import { type MarkSetup, markInk, markVar } from "./marks";
+import { type MarkSetup, markVar } from "./marks";
 import "./MarkBar.css";
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
 }
 
 /** The mark colors in use, in key order: labeled ones as a box with the label, the rest as a
- * square. Clicking one marks the selection and right-clicking filters to it. The + opens the
+ * square, each striped in its color and checked when it counts as done. Clicking one marks the selection and right-clicking filters to it. The + opens the
  * palette. */
 export function MarkBar({ setup, onMark, onFilter }: Props) {
   const [place, setPlace] = useState<{ top: number; right: number }>();
@@ -25,8 +25,8 @@ export function MarkBar({ setup, onMark, onFilter }: Props) {
           <button
             type="button"
             key={s.color}
-            className={`mark-chip${label ? "" : " square"}`}
-            style={{ background: markVar(s.color), color: markInk(s.color) }}
+            className={`mark-chip${label ? "" : " square"}${s.done ? " done" : ""}`}
+            style={{ borderLeftColor: markVar(s.color) }}
             title={`${label || s.color}: press ${i + 1} to mark the selection. Right-click to show only these rows`}
             disabled={!onMark}
             onMouseDown={(e) => e.preventDefault()}
