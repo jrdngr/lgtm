@@ -119,6 +119,12 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
           </button>
         )}
         <span className="spacer" />
+        <IconButton
+          icon="retry"
+          label="Reset: clear the take, reply and agent chat"
+          disabled={c.running.has(id)}
+          onClick={() => c.reset(id)}
+        />
         <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
         <button type="button" className="card-send" onClick={() => c.send(comment)}>
           <Icon name="send" size={13} />

@@ -135,6 +135,19 @@ impl RepoCtx {
         })
     }
 
+    /// Clears a GitHub thread's take, reply and agent conversation, and puts it back where a
+    /// freshly pulled thread starts.
+    pub fn reset_thread(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
+        self.comment_edit(id, |_, store| {
+            let cid = comment as i64;
+            let c = store.comment(cid)?.context("the thread is gone")?;
+            let link = c.github.context("only GitHub threads reset")?;
+            store.set_comment_body(cid, "", now_ms())?;
+            store.set_workshop(cid, &Workshop::default())?;
+            Ok(store.set_thread(cid, &Some(ThreadState::from_link(&link)))?)
+        })
+    }
+
     /// Marks a note done, or open again.
     pub fn set_note_done(&self, id: u32, comment: u32, done: bool) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |_, store| {

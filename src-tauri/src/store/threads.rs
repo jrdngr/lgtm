@@ -72,7 +72,7 @@ impl ThreadState {
     }
 
     /// The state of a thread pulled before threads had one.
-    pub(super) fn from_link(link: &GhLink) -> Self {
+    pub(crate) fn from_link(link: &GhLink) -> Self {
         let stage = if link.resolved {
             Stage::Done
         } else {

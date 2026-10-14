@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { endFrom, startRun } from "../agents/runs";
 import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
+import { confirmAction } from "../ui/prompt";
 import { useWorkspace } from "../workspaces/context";
 import { commentText, type Draft, followDraft } from "./comments";
 import { currentReview } from "./current";
@@ -237,6 +238,15 @@ export function useComments({
     if (review) await apply(commands.setThreadStage(review.id, id, stage));
   }
 
+  /** Clears a GitHub thread's take, reply and agent conversation, after asking. */
+  async function reset(id: number) {
+    if (!review) return;
+    if (!(await confirmAction("Reset this thread? Its take, reply and agent chat go.", "Reset")))
+      return;
+    setEdits((m) => without(m, id));
+    await apply(commands.resetThread(review.id, id));
+  }
+
   async function setDone(id: number, done: boolean) {
     if (review) await apply(commands.setNoteDone(review.id, id, done));
   }
@@ -297,6 +307,7 @@ export function useComments({
     send: sendComment,
     final,
     setStage,
+    reset,
     setDone,
     draftFromNote,
     /** Whether the block's ask box shows: opened, or holding a conversation. */

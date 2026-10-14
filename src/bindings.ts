@@ -126,6 +126,8 @@ export const commands = {
 	addComment: (review: number, rows: RowRef[], body: string, snippet: string, draft: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet, draft })),
 	/**  Moves a thread to `stage`. */
 	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
+	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
+	resetThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
 	/**  Marks a note done, or open again. */
 	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
 	/**  Starts a GitHub draft on a note's code, with its text. */

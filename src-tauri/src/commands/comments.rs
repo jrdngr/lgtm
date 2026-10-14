@@ -37,6 +37,17 @@ pub(crate) fn set_thread_stage(
         .map_err(err)
 }
 
+/// Clears a GitHub thread's take, reply and agent conversation, as if it were new.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn reset_thread(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+) -> CmdResult<StateDto> {
+    repo(&window)?.reset_thread(review, comment).map_err(err)
+}
+
 /// Marks a note done, or open again.
 #[tauri::command]
 #[specta::specta]
