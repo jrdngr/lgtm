@@ -14,6 +14,7 @@ import {
 import { SplitScroll } from "./SplitScroll";
 import type { Selection } from "./selection";
 import { type MarkIndex, type Progress, plural } from "./state";
+import { useKeepFile } from "./useKeepFile";
 import { unifiedWidth } from "./width";
 
 const ROW_HEIGHT = 20;
@@ -72,6 +73,8 @@ interface Props extends LineHandlers {
   scrollRef: RefObject<HTMLDivElement | null>;
   /** Scrolls this line to the top whenever a new object is passed. */
   scrollTo?: { line: number };
+  /** Set to a function that keeps a file's header in place through its next collapse. */
+  keepFile: RefObject<((file: number) => void) | undefined>;
   onBackgroundMouseDown(): void;
   onClearFile(file: number): void;
   onFileMenu(e: React.MouseEvent, file: number): void;
@@ -137,9 +140,12 @@ export function DiffLines(props: Props) {
     return () => observer.disconnect();
   }, [scrollRef]);
 
+  const kept = useKeepFile(lines, virtualizer, scrollRef);
+  props.keepFile.current = kept.keep;
+
   useEffect(() => {
-    virtualizer.scrollToIndex(cursor, { align: "auto" });
-  }, [cursor, virtualizer]);
+    if (!kept.holding.current) virtualizer.scrollToIndex(cursor, { align: "auto" });
+  }, [cursor, virtualizer, kept.holding]);
 
   // After the cursor effect, so a jump wins over its scroll.
   useEffect(() => {

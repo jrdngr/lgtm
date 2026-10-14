@@ -63,6 +63,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [menu, setMenu] = useState<{ x: number; y: number }>();
   const [scrollTo, setScrollTo] = useState<{ line: number }>();
+  const keepFile = useRef<(file: number) => void>(undefined);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -132,7 +133,11 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     c,
     setError,
     edited,
-    followChecks: fold.followChecks,
+    followChecks(checked) {
+      // A file checked or unchecked on its own keeps its header in place as it folds.
+      if (checked.length === 1) keepFile.current?.(checked[0]);
+      fold.followChecks(checked);
+    },
     sendText,
     closeMenu,
     primary: setup.primary,
@@ -394,6 +399,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           collapsedHunks={collapsedHunks}
           scrollRef={scrollRef}
           scrollTo={scrollTo}
+          keepFile={keepFile}
           onBackgroundMouseDown={() => place(cursor)}
           onClearFile={a.clearFile}
           onFileMenu={openFileMenu}
