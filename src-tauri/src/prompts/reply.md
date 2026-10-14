@@ -26,7 +26,8 @@ newer code already addressed it.
   three sentences at most.
 - For pushback or a different fix, acknowledge the part that's right, give the reason, and
   name what would change the answer.
-- Don't thank or praise the reviewer.
+- State the facts and the plan, if there is one. Nothing else.
+- No compliments ("good catch"), thanks, or filler.
 - No agent-speak: no em-dashes, no inflated words, no hedging.
 
 ## Skip
