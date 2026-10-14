@@ -51,7 +51,7 @@ just dev         # hot reload; shows the repo picker
 just go          # jj git fetch, jj new main@origin, then just dev
 just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
 just build       # release binary and .app
-just run [repo]  # run the release build
+just run [repo]  # run the built .app (with its Dock icon)
 just gc [repo]   # lgtm gc with the release build
 ```
 

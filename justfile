@@ -17,9 +17,10 @@ test:
 build:
     pnpm tauri build --bundles app
 
-# Run the release binary from `just build`, optionally on a repo
+# Run the app bundle from `just build`, optionally on a repo. Launching the
+# binary inside the .app gives it the bundle's Dock icon.
 run *repo:
-    src-tauri/target/release/lgtm {{ repo }}
+    src-tauri/target/release/bundle/macos/lgtm.app/Contents/MacOS/lgtm {{ repo }}
 
 # Clean up workspaces left behind (see `lgtm gc`)
 gc *repo:
