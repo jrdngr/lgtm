@@ -16,6 +16,14 @@ export function createTerminal(container: HTMLElement) {
   const fit = new FitAddon();
   term.loadAddon(fit);
   term.open(container);
+  // Shift+Enter sends Esc+Enter, the newline key in Claude Code, as its /terminal-setup does
+  // for VS Code. xterm would send a plain Enter.
+  term.attachCustomKeyEventHandler((e) => {
+    const shiftEnter = e.key === "Enter" && e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey;
+    if (!shiftEnter) return true;
+    if (e.type === "keydown") term.input("\x1b\r");
+    return false;
+  });
 
   try {
     const webgl = new WebglAddon();
