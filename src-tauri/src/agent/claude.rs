@@ -2,8 +2,9 @@
 
 use serde_json::Value;
 
-/// Arguments for a run that reads its prompt from stdin. It can read files, and edit them
-/// too with `edit`. Nothing else is available, and the user's MCP servers stay off.
+/// Arguments for a run that reads its prompt from stdin. It can read files, and with `edit`
+/// edit them and use the user's skills. It can't run commands, and the user's MCP servers
+/// stay off.
 pub fn args<'a>(
     resume: Option<&'a str>,
     edit: bool,
@@ -19,14 +20,19 @@ pub fn args<'a>(
         "--strict-mcp-config",
     ];
     let tools = if edit {
-        "Read,Grep,Glob,Edit,Write"
+        "Read,Grep,Glob,Edit,Write,Skill"
     } else {
         "Read,Grep,Glob"
     };
     args.extend(["--tools", tools]);
     if edit {
-        // A headless run can't ask, so edits in the workspace are allowed up front.
-        args.extend(["--permission-mode", "acceptEdits"]);
+        // A headless run can't ask, so edits in the workspace and skills are allowed up front.
+        args.extend([
+            "--permission-mode",
+            "acceptEdits",
+            "--allowedTools",
+            "Skill",
+        ]);
     }
     if let Some(id) = resume {
         args.extend(["--resume", id]);
