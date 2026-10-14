@@ -133,10 +133,11 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     const saved = await load();
     if (latest.current.bottom !== api) return;
     restoreLayout(api, saved.bottom);
-    // A new workspace opens the panel on a terminal, and an open panel never comes up empty.
+    // A new repo opens the panel on a terminal and a new workspace hides it, with a terminal
+    // ready in it. An open panel never comes up empty.
     const fresh = !saved.main && !saved.bottom;
     if (api.panels.length === 0 && (fresh || (shown.current && bottom.get().open))) {
-      if (fresh && shown.current) flushSync(() => bottom.set({ open: true }));
+      if (fresh && shown.current) flushSync(() => bottom.set({ open: workspace === null }));
       addTerminal(api, undefined, setup);
     }
     // Closing the last tab hides the panel, while dragging it to the main dock leaves the panel
