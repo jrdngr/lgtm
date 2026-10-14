@@ -5,6 +5,7 @@ import { onAnyReveal } from "../editor/reveal";
 import { confirmClose } from "../editor/unsaved";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
+import { openRevisions } from "../review/target";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost } from "../ui/prompt";
@@ -154,6 +155,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+H": () => showView("right", "walkthrough"),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
+    "Mod+J": () => openRevisions(selected),
     toggle: () => toggleBottom(),
     terminal: () => toggleBottom(true),
   };

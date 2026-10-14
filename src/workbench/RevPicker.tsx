@@ -12,7 +12,7 @@ import "../review/ReviewBar.css";
 function hover({ revset, changes, stale }: ReviewTarget) {
   const n = changes.length;
   const count = `${n} change${n === 1 ? "" : "s"}`;
-  return `${revset} · ${count}${stale ? " · working copy is stale" : ""}\nRevisions (@)`;
+  return `${revset} · ${count}${stale ? " · working copy is stale" : ""}\nRevisions (⌘J)`;
 }
 
 /** What the workspace reviews, in the header, whether or not a review pane is open. Opens
@@ -68,14 +68,14 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
           revsetMenu({ workspace, target, trunk, openRevisions: () => setOpen(true) }),
         )}
         style={loading ? { width: width.current } : undefined}
-        title={loading || !target ? "Revisions (@)" : hover(target)}
+        title={loading || !target ? "Revisions (⌘J)" : hover(target)}
       >
         {loading || !target ? (
           <span className="rev-shimmer" />
         ) : (
           <RevLabel revset={target.revset} changes={target.changes} />
         )}
-        <kbd>@</kbd>
+        <kbd>⌘J</kbd>
       </button>
       {open && target && (
         <RevisionsPanel

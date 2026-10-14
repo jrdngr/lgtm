@@ -22,7 +22,6 @@ import { buildLines, changedRows, type DisplayLine, symbolMarkers, type ViewMode
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
 import { type Filter, filterLabel, plural, sumProgress } from "./state";
-import { openRevisions } from "./target";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
@@ -314,7 +313,6 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     startComment: a.startComment,
     startDraft: () => a.startComment("body", true),
     askAgent,
-    openRevisions: () => openRevisions(workspace),
     openGraph: () => openGraph(containerApi),
     openInEditor,
     runWalkthrough: runWalkthroughNow,

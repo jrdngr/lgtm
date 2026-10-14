@@ -24,7 +24,6 @@ interface Ctx {
   startDraft(): void;
   /** Opens the agent box of the comment at the cursor. */
   askAgent(): void;
-  openRevisions(): void;
   openGraph(): void;
   openInEditor(): void;
   runWalkthrough(): void;
@@ -146,9 +145,6 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "a":
         if (!e.repeat) ctx.askAgent();
-        break;
-      case "@":
-        ctx.openRevisions();
         break;
       case "g":
         ctx.openGraph();

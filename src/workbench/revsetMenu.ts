@@ -46,7 +46,7 @@ export function revsetMenu({ workspace, target, trunk, openRevisions }: Picker):
     );
   };
   return [
-    { label: "Open Revisions", keys: "@", disabled: !target, onSelect: openRevisions },
+    { label: "Open Revisions", keys: "⌘J", disabled: !target, onSelect: openRevisions },
     {
       label: "Open Review Tab",
       onSelect: () => {
