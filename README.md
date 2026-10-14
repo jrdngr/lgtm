@@ -2,7 +2,9 @@
 
 Desktop code review for agentic development, built on jj.
 
-I made lgtm for my own use, so it's built around the tools I use: jj, gh, and Claude Code. If you want it to work some other way, fork it. You're welcome to file issues and feature requests, but I may never read them. I don't take pull requests, because I already spend too much of my day reading them. Open an issue instead and hope I point Claude at it.
+This software is made for my personal use. If you don't want to use jj, gh, or Claude Code, fork it. You're welcome to file issues and feature requests, but I may or may not ever look at them. Please don't open pull requests; I already spend too much time reading them. You're better off filing an issue and hoping I tell Claude to read my issues.
+
+This program may or may not be safe to run. Use it at your own risk.
 
 lgtm runs on macOS. Help › Keyboard Shortcuts lists every shortcut.
 
