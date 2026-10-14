@@ -4,7 +4,7 @@ import { commands, unwrap } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { guideAt, indent, toggled } from "../review/tree";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
-import { openDefault, pathItems } from "../ui/pathMenu";
+import { pathItems } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
@@ -201,7 +201,6 @@ export function RepoTree() {
     return [
       { label: "Open", onSelect: () => openFile(workspace, p) },
       { label: "Open to the Side", onSelect: () => openToSide(workspace, p) },
-      { label: "Open in Default App", onSelect: () => openDefault(workspace, p) },
       "-",
       ...edits,
       "-",

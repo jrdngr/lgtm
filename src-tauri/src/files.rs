@@ -98,6 +98,21 @@ pub fn confine(root: &Path, path: &Path) -> anyhow::Result<()> {
     bail!("{} isn't in the workspace", path.display())
 }
 
+/// Like `confine`, but `path` itself, when it's a symlink, must also land inside `root`. For
+/// reading and writing a file's contents.
+pub fn contain(root: &Path, path: &Path) -> anyhow::Result<()> {
+    if path.symlink_metadata().is_err() {
+        return confine(root, path);
+    }
+    let real = path
+        .canonicalize()
+        .with_context(|| format!("{} leads nowhere", path.display()))?;
+    if !real.starts_with(root.canonicalize()?) {
+        bail!("{} leads outside the workspace", path.display());
+    }
+    Ok(())
+}
+
 /// Makes an empty file, or a folder when `dir`, failing when something is already there.
 pub fn create(path: &Path, name: &str, dir: bool) -> anyhow::Result<()> {
     if path.exists() {
@@ -203,6 +218,23 @@ mod tests {
         assert!(confine(root, &root.join("link/new/x")).is_err());
         confine(root, &root.join("link")).unwrap();
         confine(root, &root.join("new/x")).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn contains_files_that_link_outside() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(outside.path().join("rc"), "").unwrap();
+        std::fs::write(root.join("a.md"), "").unwrap();
+        std::os::unix::fs::symlink(outside.path().join("rc"), root.join("notes.md")).unwrap();
+        std::os::unix::fs::symlink("a.md", root.join("b.md")).unwrap();
+        std::os::unix::fs::symlink("gone", root.join("dangling.md")).unwrap();
+        assert!(contain(root, &root.join("notes.md")).is_err());
+        assert!(contain(root, &root.join("dangling.md")).is_err());
+        contain(root, &root.join("b.md")).unwrap();
+        contain(root, &root.join("new.md")).unwrap();
     }
 
     #[test]

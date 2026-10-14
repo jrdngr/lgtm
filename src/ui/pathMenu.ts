@@ -37,7 +37,4 @@ export function pathItems(
 /** Opens a web page in the browser. */
 export const openUrl = (url: string) => run(unwrap(commands.openUrl(url)));
 
-export const reveal = (ws: WorkspaceName, rel: string) =>
-  run(unwrap(commands.revealPath(ws, rel, false)));
-export const openDefault = (ws: WorkspaceName, rel: string) =>
-  run(unwrap(commands.revealPath(ws, rel, true)));
+export const reveal = (ws: WorkspaceName, rel: string) => run(unwrap(commands.revealPath(ws, rel)));

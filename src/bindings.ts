@@ -185,8 +185,8 @@ export const commands = {
 	renamePath: (workspace: string | null, from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { workspace, from, to })),
 	/**  Moves a file or folder to the Trash, then snapshots. */
 	trashPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { workspace, path })),
-	/**  Shows a path in Finder, or opens it in its default app. `""` is the workspace's root. */
-	revealPath: (workspace: string | null, path: string, open: boolean) => typedError<null, string>(__TAURI_INVOKE("reveal_path", { workspace, path, open })),
+	/**  Shows a path in Finder. `""` is the workspace's root. */
+	revealPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("reveal_path", { workspace, path })),
 	/**  Highlight segments per line, empty when `path` has no grammar. */
 	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
 	/**

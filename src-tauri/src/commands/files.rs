@@ -42,7 +42,7 @@ pub(crate) async fn read_file(
     path: String,
 ) -> CmdResult<String> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    files::read(&locate(&ws, &path)?, &path).map_err(err)
+    files::read(&contained(&ws, &path)?, &path).map_err(err)
 }
 
 /// Saves a file, then snapshots the working copy so reviews of `@` pick it up.
@@ -55,7 +55,7 @@ pub(crate) async fn save_file(
     text: String,
 ) -> CmdResult<()> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    files::write(&locate(&ws, &path)?, &path, &text).map_err(err)?;
+    files::write(&contained(&ws, &path)?, &path, &text).map_err(err)?;
     ws.snapshot().await.map_err(err)
 }
 
@@ -79,10 +79,15 @@ fn confined(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     Ok(abs)
 }
 
-/// Kinds of file that `open` runs rather than shows, which a checked-out PR could carry.
-const RUNNABLE: [&str; 7] = [
-    "app", "command", "terminal", "tool", "workflow", "pkg", "scpt",
-];
+/// Like `confined`, but a symlinked file can't lead out of the workspace either.
+fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
+    if Path::new(path).is_absolute() {
+        return locate(ws, path);
+    }
+    let abs = files::resolve(&ws.root, path).map_err(err)?;
+    files::contain(&ws.root, &abs).map_err(err)?;
+    Ok(abs)
+}
 
 /// Makes an empty file, or a folder when `dir`.
 #[tauri::command]
@@ -128,31 +133,22 @@ pub(crate) async fn trash_path(
     ws.snapshot().await.map_err(err)
 }
 
-/// Shows a path in Finder, or opens it in its default app. `""` is the workspace's root.
+/// Shows a path in Finder. `""` is the workspace's root.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn reveal_path(
     window: WebviewWindow,
     workspace: Option<String>,
     path: String,
-    open: bool,
 ) -> CmdResult<()> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let abs = locate(&ws, &path)?;
-    let runs = abs
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| RUNNABLE.contains(&e.to_ascii_lowercase().as_str()));
-    if open && runs {
-        return Err(format!(
-            "{path} would run as a program; use Reveal in Finder instead"
-        ));
-    }
-    let mut cmd = tokio::process::Command::new("open");
-    if !open {
-        cmd.arg("-R");
-    }
-    let status = cmd.arg(&abs).status().await.map_err(|e| e.to_string())?;
+    let status = tokio::process::Command::new("open")
+        .arg("-R")
+        .arg(&abs)
+        .status()
+        .await
+        .map_err(|e| e.to_string())?;
     if !status.success() {
         return Err(format!("can't open {}", abs.display()));
     }

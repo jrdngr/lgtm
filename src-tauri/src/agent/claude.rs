@@ -2,6 +2,11 @@
 
 use serde_json::Value;
 
+/// Files an editing run may not touch: ones that run or steer agents without the user
+/// choosing to, so text from a stranger's PR can't plant them.
+const PROTECTED: &str = "Edit(**/.claude/**),Edit(**/.mcp.json),Edit(**/CLAUDE.md),\
+    Edit(**/AGENTS.md),Edit(**/.envrc),Edit(**/.git/**),Edit(**/.jj/**),Edit(**/.lgtm/**)";
+
 /// Arguments for a run that reads its prompt from stdin. It can read files, and with `edit`
 /// edit them and use the user's skills. It can't run commands, and the user's MCP servers
 /// stay off. Only the user's own settings load: `-p` skips Claude Code's trust prompt, so the
@@ -35,6 +40,8 @@ pub fn args<'a>(
             "acceptEdits",
             "--allowedTools",
             "Skill",
+            "--disallowedTools",
+            PROTECTED,
         ]);
     }
     if let Some(id) = resume {
