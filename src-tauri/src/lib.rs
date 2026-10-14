@@ -12,6 +12,7 @@ mod jj;
 mod layout;
 mod mcp;
 mod menu;
+mod placement;
 mod pr;
 mod prompts;
 mod pty;
@@ -34,10 +35,10 @@ mod zoom;
 use std::path::Path;
 
 use tauri::{Manager, RunEvent, WindowEvent};
-use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 use tauri_specta::{collect_commands, collect_events};
 
 use agent::Runs;
+use placement::Placements;
 use pty::Ptys;
 use repo::RepoWindows;
 
@@ -206,12 +207,6 @@ fn adopt_login_shell_path() {
     }
 }
 
-/// What a window's saved state covers when it reopens.
-pub(crate) const WINDOW_STATE: StateFlags = StateFlags::SIZE
-    .union(StateFlags::POSITION)
-    .union(StateFlags::MAXIMIZED)
-    .union(StateFlags::FULLSCREEN);
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -235,12 +230,6 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        // Each window reopens at the size and place it last had, per repo by its label.
-        .plugin(
-            tauri_plugin_window_state::Builder::new()
-                .with_state_flags(WINDOW_STATE)
-                .build(),
-        )
         .menu(menu::build)
         .on_menu_event(menu::handle)
         .manage(Ptys::default())
@@ -249,6 +238,7 @@ pub fn run() {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            app.manage(Placements::load(app.handle()));
             #[cfg(target_os = "macos")]
             quit::intercept(app.handle());
             match repo::data_dir(app) {
@@ -259,15 +249,19 @@ pub fn run() {
             repo::open_from_args(app.handle(), &args, &cwd);
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let WindowEvent::Destroyed = event {
-                window.app_handle().save_window_state(WINDOW_STATE).ok();
+        .on_window_event(|window, event| match event {
+            WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                window.state::<Placements>().record(window);
+            }
+            WindowEvent::Destroyed => {
+                window.state::<Placements>().save();
                 window.state::<Ptys>().kill_window(window.label());
                 let runs = window.state::<Runs>();
                 window.state::<RepoWindows>().remove(window.label(), &runs);
                 #[cfg(target_os = "macos")]
                 quit::closed(window.label());
             }
+            _ => {}
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

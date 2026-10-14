@@ -171,11 +171,12 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
         eprintln!("lgtm: save recent repos: {e}");
     }
-    let window = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
+    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title(name(&root))
         .inner_size(1400.0, 900.0)
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
-        .disable_drag_drop_handler()
+        .disable_drag_drop_handler();
+    let window = crate::placement::place(app, &label, builder)
         .build()
         .map_err(|e| e.to_string())?;
     crate::zoom::apply(&window);
@@ -193,9 +194,10 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(START_LABEL) {
         return window.set_focus();
     }
-    WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
+    let builder = WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
         .title("lgtm")
-        .inner_size(480.0, 420.0)
+        .inner_size(480.0, 420.0);
+    crate::placement::place(app, START_LABEL, builder)
         .build()
         .map(|window| crate::zoom::apply(&window))
 }
