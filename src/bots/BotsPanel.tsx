@@ -40,15 +40,14 @@ function loadPicks(): Picks {
 /** Runs personas on the current review, and lists the workspace's runs. The side panel mounts
  * it each time it's shown, so persona files are read again then. */
 export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
-  const workspace = useWorkspace();
-  const loaded = usePersonas(workspace);
+  const loaded = usePersonas();
   const [adding, setAdding] = useState(false);
   const [installing, setInstalling] = useState(false);
   const none = loaded.personas?.personas.length === 0 && loaded.personas.broken.length === 0;
 
   let body: React.ReactNode;
   if (!loaded.personas) {
-    body = loaded.error && <div className="bots-error">Couldn't read personas: {loaded.error}</div>;
+    body = null;
   } else if (installing || none) {
     body = (
       <>

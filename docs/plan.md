@@ -95,8 +95,8 @@ Notes from building M4.5:
 - Findings link to code and can become comments.
 
 Notes from building M5:
-- Personas are markdown files: `description` and `off_lens` front matter, and the profile as the body. The file name is the persona's name. Global ones are in `$XDG_CONFIG_HOME/lgtm/personas` (falling back to `~/.config`), a repo's in `.lgtm/personas`, and a repo persona hides a global one of the same name. Files that can't be read are listed with why.
-- Nothing is built in. The Reviewers view offers to install the seven defaults (the wee-bots personas) globally or into the repo, all picked, except ones whose file was edited, which say so and start unpicked. Installing again restores the originals. A repo install adds files to `@`.
+- Personas are markdown files: `description` and `off_lens` front matter, and the profile as the body. The file name is the persona's name. They're in `$XDG_CONFIG_HOME/lgtm/personas` (falling back to `~/.config`), never in the repo, so a change under review can't rewrite its own reviewers. Files that can't be read are listed with why.
+- Nothing is built in. The Reviewers view offers to install the seven defaults (the wee-bots personas), all picked, except ones whose file was edited, which say so and start unpicked. Installing again restores the originals.
 - The view rereads persona files each time it's shown. Edit opens a persona's file in the default editor, and New writes a starter file and opens it.
 - A run copies its personas when it starts, so retries and later steps use them as they were.
 - The rubric, the prompts and the steps belong to the app. Every step runs `claude -p --json-schema` with its own schema, and the result is stored as structured data: a persona's findings, challenges, rebuttals, the synthesis, and the minimal pick. A reply that doesn't match fails the part.
@@ -142,7 +142,7 @@ Notes from building M7:
 - Markdown files have a Rendered/Editor toggle in the editor's path bar (⇧⌘V). The rendered view is read-only, shows unsaved edits, and follows reloads from disk. It renders GitHub's extensions (tables, task lists), colors fenced code with the same tree-sitter highlighting, shows links as text (following one would navigate the window away), and doesn't render raw HTML. Opening the file at a line switches back to the editor.
 - ⌘S saves, then snapshots the workspace's working copy, so reviews of `@` update right away. Only files that exist can be saved.
 - When the file changes on disk, an editor with no unsaved edits loads it in place, keeping the cursor. With unsaved edits a bar offers Load theirs or Keep mine. A dirty tab's title starts with ●. Closing a tab drops unsaved edits.
-- Edit and New in the Reviewers view open persona files in the editor, global ones too: the editor opens absolute paths only for persona files. Saving one rereads the personas.
+- Edit and New in the Reviewers view open persona files in the editor: the editor opens absolute paths only for persona files. Saving one rereads the personas.
 - Opening at a line: `o` in a review opens the cursor's file at its new-side line. Graph and Symbols callers outside the review, and finding locations not in the open review, open in the editor. The MCP `show` tool opens files the review doesn't change in the editor, and so does any `show` while the workspace has no review pane.
 
 ## M8: GitHub

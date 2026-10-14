@@ -271,21 +271,20 @@ fn written(tool: &str, root: &std::path::Path) -> Option<String> {
     Some(rel)
 }
 
+/// The opening of the session's conversation: where things are and the rules.
+fn qa_intro() -> anyhow::Result<String> {
+    let qq = prompts::load(Prompt::Qq)?;
+    let write = prompts::load(Prompt::QaWrite)?;
+    Ok(format!(
+        "We're working through the decisions for a change to this repository, one question at \
+         a time, before you write it. You're in the repository and can read any file. Don't \
+         edit files until I ask you to apply. You can't run commands.\n\n{qq}\n\n{write}"
+    ))
+}
+
 impl RepoCtx {
     fn qa_key(&self, ws: &Workspace, id: &str) -> String {
         self.agent_key(&format!("qa-{}-{id}", ws.name.as_deref().unwrap_or("")))
-    }
-
-    /// The opening of the session's conversation: where things are and the rules.
-    fn qa_intro(&self, ws: &Workspace) -> anyhow::Result<String> {
-        let qq = prompts::load(Prompt::Qq, &ws.root)?;
-        let write = prompts::load(Prompt::QaWrite, &ws.root)?;
-        Ok(format!(
-            "We're working through the decisions for a change to this repository, one \
-             question at a time, before you write it. You're in the repository and can read \
-             any file. Don't edit files until I ask you to apply. You can't run commands.\n\n\
-             {qq}\n\n{write}"
-        ))
     }
 
     pub(super) async fn qa_step(
@@ -299,7 +298,7 @@ impl RepoCtx {
         let s = self.qa_session(ws, id)?;
         let session = if step.fresh { None } else { s.agent.clone() };
         let first = || -> anyhow::Result<String> {
-            let intro = self.qa_intro(ws)?;
+            let intro = qa_intro()?;
             let turn = step.restart.as_ref().unwrap_or(&step.turn);
             Ok(if step.fresh {
                 format!("{intro}\n\n{turn}")

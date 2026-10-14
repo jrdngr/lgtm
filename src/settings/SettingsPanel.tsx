@@ -50,7 +50,7 @@ export function Row({
   );
 }
 
-/** App settings, saved to `~/.config/lgtm/settings.toml`, and the repo's prompt files. */
+/** App settings, saved to `~/.config/lgtm/settings.toml`, and the prompt files. */
 export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
   const settings = useSettings();
   const body = useRef<HTMLDivElement>(null);

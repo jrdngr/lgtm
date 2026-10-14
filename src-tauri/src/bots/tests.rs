@@ -303,7 +303,10 @@ async fn personas_review_cross_review_and_synthesize_a_real_change() {
 
     let (dir, ctx) = repo();
     let defaults = ["security-bot".to_string(), "simplicity-bot".to_string()];
-    super::install::install(dir.path(), &defaults, personas::Scope::Repo).unwrap();
+    let config = tempfile::tempdir().unwrap();
+    // SAFETY: `--ignored` runs this apart from the other test that sets XDG_CONFIG_HOME.
+    unsafe { std::env::set_var("XDG_CONFIG_HOME", config.path()) };
+    super::install::install(&defaults).unwrap();
     write(
         dir.path(),
         "login.py",

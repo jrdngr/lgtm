@@ -1,4 +1,4 @@
-//! The default personas, which ship only as templates for the installer, and where each is
+//! The default personas, which ship only as templates for the installer, and whether each is
 //! installed. An installed file that matches any text lgtm has shipped is the user's to update;
 //! one that matches none holds their edits.
 
@@ -8,7 +8,7 @@ use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
 
-use super::personas::{Scope, dir, global_dir, parse, repo_dir};
+use super::personas::{dir, parse};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -26,8 +26,7 @@ pub enum Installed {
 pub struct DefaultPersona {
     pub name: String,
     pub description: String,
-    pub global: Installed,
-    pub repo: Installed,
+    pub installed: Installed,
 }
 
 struct Template {
@@ -97,9 +96,8 @@ fn installed(dir: Option<&Path>, d: &Template) -> Installed {
     classify(d.text, d.shipped, text.as_deref())
 }
 
-pub fn defaults(root: &Path) -> Vec<DefaultPersona> {
-    let global = global_dir();
-    let repo = repo_dir(root);
+pub fn defaults() -> Vec<DefaultPersona> {
+    let dir = dir().ok();
     DEFAULTS
         .iter()
         .map(|d| DefaultPersona {
@@ -107,15 +105,14 @@ pub fn defaults(root: &Path) -> Vec<DefaultPersona> {
             description: parse(d.name, d.text)
                 .map(|p| p.description)
                 .unwrap_or_default(),
-            global: installed(global.as_deref(), d),
-            repo: installed(Some(&repo), d),
+            installed: installed(dir.as_deref(), d),
         })
         .collect()
 }
 
-/// Writes the named default personas into `scope`'s directory, replacing what's there.
-pub fn install(root: &Path, names: &[String], scope: Scope) -> anyhow::Result<()> {
-    let dir = dir(scope, root)?;
+/// Writes the named default personas, replacing what's there.
+pub fn install(names: &[String]) -> anyhow::Result<()> {
+    let dir = dir()?;
     std::fs::create_dir_all(&dir)?;
     for name in names {
         let d = DEFAULTS

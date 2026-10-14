@@ -57,7 +57,7 @@ Debug builds regenerate `src/bindings.ts` from the Rust commands. `cargo test` f
 
 ## Config
 
-App settings are in `~/.config/lgtm/settings.toml` (lgtm › Settings…, ⌘,). Reviewer personas and prompt overrides go in `~/.config/lgtm/`, or in the repo's `.lgtm/`.
+App settings are in `~/.config/lgtm/settings.toml` (lgtm › Settings…, ⌘,). Reviewer personas and prompt overrides go in `~/.config/lgtm/`.
 
 Optional, in the repo at `.lgtm/config.toml`:
 

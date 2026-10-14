@@ -2,24 +2,20 @@ import { useCallback, useEffect, useState } from "react";
 import type { BotOptions, BotRun, Part, Personas, Step } from "../bindings";
 import { onSaved } from "../editor/saved";
 import { commands } from "../ipc";
-import type { WorkspaceName } from "../workspaces/context";
 
-/** The workspace's persona files, read again whenever `reload` is called or a markdown file
- * is saved in the editor. */
-export function usePersonas(workspace: WorkspaceName) {
+/** The persona files, read again whenever `reload` is called or a markdown file is saved in
+ * the editor. */
+export function usePersonas() {
   const [personas, setPersonas] = useState<Personas>();
-  const [error, setError] = useState<string>();
   const reload = useCallback(async () => {
-    const r = await commands.listPersonas(workspace);
-    if (r.status === "ok") setPersonas(r.data);
-    setError(r.status === "error" ? r.error : undefined);
-  }, [workspace]);
+    setPersonas(await commands.listPersonas());
+  }, []);
   useEffect(() => {
     reload();
     // An edited persona's description or lens may have changed.
     return onSaved((path) => path.endsWith(".md") && reload());
   }, [reload]);
-  return { personas, error, reload };
+  return { personas, reload };
 }
 
 /** Steps a run's options call for, in order. */

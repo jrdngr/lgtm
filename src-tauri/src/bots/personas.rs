@@ -1,6 +1,6 @@
 //! Personas: markdown files with a `description` and `off_lens` front matter, and the profile
-//! as the body. Global ones live in the user's config dir, and a repo's in `.lgtm/personas`,
-//! where they override global ones of the same name.
+//! as the body. They live only in the user's config dir, so a change under review can't rewrite
+//! its own reviewers.
 
 use std::path::{Path, PathBuf};
 
@@ -19,19 +19,11 @@ pub struct Persona {
     pub profile: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum Scope {
-    Global,
-    Repo,
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PersonaFile {
     #[serde(flatten)]
     pub persona: Persona,
-    pub scope: Scope,
     pub path: String,
 }
 
@@ -53,20 +45,9 @@ pub fn config_dir() -> Option<PathBuf> {
     Some(config.join("lgtm"))
 }
 
-/// Global personas: `personas` in the config dir.
-pub fn global_dir() -> Option<PathBuf> {
-    Some(config_dir()?.join("personas"))
-}
-
-pub fn repo_dir(root: &Path) -> PathBuf {
-    root.join(".lgtm").join("personas")
-}
-
-pub(super) fn dir(scope: Scope, root: &Path) -> anyhow::Result<PathBuf> {
-    match scope {
-        Scope::Global => global_dir().context("no home directory"),
-        Scope::Repo => Ok(repo_dir(root)),
-    }
+/// The personas: `personas` in the config dir.
+pub fn dir() -> anyhow::Result<PathBuf> {
+    Ok(config_dir().context("no home directory")?.join("personas"))
 }
 
 /// Parses a persona file. Front matter is optional; without it the persona reports off-lens
@@ -103,7 +84,7 @@ pub fn parse(name: &str, text: &str) -> anyhow::Result<Persona> {
     Ok(persona)
 }
 
-fn read_dir(dir: &Path, scope: Scope) -> Vec<(PersonaFile, Option<String>)> {
+fn read_dir(dir: &Path) -> Vec<(PersonaFile, Option<String>)> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return vec![];
     };
@@ -119,14 +100,7 @@ fn read_dir(dir: &Path, scope: Scope) -> Vec<(PersonaFile, Option<String>)> {
                 Err(e) => (parse(&name, "").ok()?, Some(format!("{e:#}"))),
             };
             let path = path.to_string_lossy().into_owned();
-            Some((
-                PersonaFile {
-                    persona,
-                    scope,
-                    path,
-                },
-                error,
-            ))
+            Some((PersonaFile { persona, path }, error))
         })
         .collect()
 }
@@ -140,25 +114,22 @@ pub struct Broken {
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Type)]
 pub struct Personas {
-    /// By name. A repo persona hides a global one of the same name.
+    /// By name.
     pub personas: Vec<PersonaFile>,
     pub broken: Vec<Broken>,
 }
 
-pub fn load(root: &Path) -> Personas {
-    let global = global_dir().map_or_else(Vec::new, |d| read_dir(&d, Scope::Global));
-    let repo = read_dir(&repo_dir(root), Scope::Repo);
+pub fn load() -> Personas {
+    let files = dir().map_or_else(|_| Vec::new(), |d| read_dir(&d));
     let mut out = Personas::default();
-    for (file, error) in global.into_iter().chain(repo) {
-        if let Some(error) = error {
-            out.broken.push(Broken {
+    for (file, error) in files {
+        match error {
+            Some(error) => out.broken.push(Broken {
                 path: file.path,
                 error,
-            });
-            continue;
+            }),
+            None => out.personas.push(file),
         }
-        out.personas.retain(|p| p.persona.name != file.persona.name);
-        out.personas.push(file);
     }
     out.personas
         .sort_by(|a, b| a.persona.name.cmp(&b.persona.name));
@@ -175,12 +146,12 @@ fn valid_name(name: &str) -> bool {
 }
 
 /// Writes a starter file for a new persona and returns its path.
-pub fn create(root: &Path, name: &str, scope: Scope) -> anyhow::Result<PathBuf> {
+pub fn create(name: &str) -> anyhow::Result<PathBuf> {
     ensure!(
         valid_name(name),
         "persona names use letters, digits, `.`, `_` and `-`"
     );
-    let dir = dir(scope, root)?;
+    let dir = dir()?;
     std::fs::create_dir_all(&dir)?;
     let path = dir.join(format!("{name}.md"));
     ensure!(
@@ -197,22 +168,17 @@ pub fn is_plain_file(path: &Path) -> bool {
 }
 
 /// Whether `path` is a persona file, the only files the app opens for editing. Symlinks aren't,
-/// so a repo can't have Edit open some other file by its own type.
-pub fn is_persona_file(root: &Path, path: &Path) -> bool {
-    let in_dir = |d: &Path| path.parent() == Some(d);
+/// so Edit can't be pointed at some other file through one.
+pub fn is_persona_file(path: &Path) -> bool {
     path.extension().is_some_and(|e| e == "md")
         && is_plain_file(path)
-        && (in_dir(&repo_dir(root)) || global_dir().is_some_and(|d| in_dir(&d)))
+        && dir().is_ok_and(|d| path.parent() == Some(&d))
 }
 
 /// Copies persona file `path` to `name` beside it, adding `.md` when `name` has no extension.
 /// Returns the copy's path.
-pub fn duplicate(root: &Path, path: &Path, name: &str) -> anyhow::Result<PathBuf> {
-    anyhow::ensure!(
-        is_persona_file(root, path),
-        "{} isn't a persona",
-        path.display()
-    );
+pub fn duplicate(path: &Path, name: &str) -> anyhow::Result<PathBuf> {
+    anyhow::ensure!(is_persona_file(path), "{} isn't a persona", path.display());
     let name = name.trim();
     anyhow::ensure!(
         !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\']),
@@ -250,52 +216,49 @@ mod tests {
     }
 
     #[test]
-    fn repo_personas_override_and_installs_track_edits() {
-        let repo = tempfile::tempdir().unwrap();
+    fn installs_track_edits_and_only_plain_files_in_the_dir_are_personas() {
         let config = tempfile::tempdir().unwrap();
         // SAFETY: no other test reads XDG_CONFIG_HOME.
         unsafe { std::env::set_var("XDG_CONFIG_HOME", config.path()) };
-        let root = repo.path();
-        install(
-            root,
-            &["security-bot".into(), "general-bot".into()],
-            Scope::Global,
+        install(&["security-bot".into(), "general-bot".into()]).unwrap();
+        let dir = dir().unwrap();
+        std::fs::write(
+            dir.join("security-bot.md"),
+            "---\ndescription: mine\n---\nbody",
         )
         .unwrap();
-        install(root, &["security-bot".into()], Scope::Repo).unwrap();
-        let path = repo_dir(root).join("security-bot.md");
-        std::fs::write(&path, "---\ndescription: mine\n---\nbody").unwrap();
-        std::fs::write(repo_dir(root).join("bad.md"), "---\nnope\n---").unwrap();
+        std::fs::write(dir.join("bad.md"), "---\nnope\n---").unwrap();
 
-        let loaded = load(root);
+        let loaded = load();
         let names: Vec<_> = loaded
             .personas
             .iter()
             .map(|p| p.persona.name.as_str())
             .collect();
         assert_eq!(names, ["general-bot", "security-bot"]);
-        assert_eq!(loaded.personas[1].scope, Scope::Repo);
         assert_eq!(loaded.personas[1].persona.description, "mine");
         assert_eq!(loaded.broken.len(), 1);
 
-        let sec = defaults(root)
+        let sec = defaults()
             .into_iter()
             .find(|d| d.name == "security-bot")
             .unwrap();
-        assert_eq!((sec.global, sec.repo), (Installed::Yes, Installed::Changed));
+        assert_eq!(sec.installed, Installed::Changed);
 
-        let made = create(root, "docs-bot", Scope::Repo).unwrap();
-        assert!(is_persona_file(root, &made));
-        assert!(create(root, "docs-bot", Scope::Repo).is_err());
-        assert!(create(root, "../x", Scope::Repo).is_err());
-        assert!(!is_persona_file(root, &root.join("README.md")));
+        let made = create("docs-bot").unwrap();
+        assert!(is_persona_file(&made));
+        assert!(create("docs-bot").is_err());
+        assert!(create("../x").is_err());
+        let outside = config.path().join("x.md");
+        std::fs::write(&outside, "").unwrap();
+        assert!(!is_persona_file(&outside));
 
         #[cfg(unix)]
         {
-            let link = repo_dir(root).join("link.md");
-            std::fs::write(root.join("run.command"), "").unwrap();
-            std::os::unix::fs::symlink(root.join("run.command"), &link).unwrap();
-            assert!(!is_persona_file(root, &link));
+            let link = dir.join("link.md");
+            std::fs::write(config.path().join("run.command"), "").unwrap();
+            std::os::unix::fs::symlink(config.path().join("run.command"), &link).unwrap();
+            assert!(!is_persona_file(&link));
         }
     }
 }

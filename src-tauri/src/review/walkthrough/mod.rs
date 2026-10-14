@@ -69,7 +69,7 @@ impl RepoCtx {
             let r = review.lock().unwrap();
             (r.ws.clone(), r.revset.clone(), r.from.clone(), r.to.clone())
         };
-        let instructions = crate::prompts::load(crate::prompts::Prompt::Walkthrough, &ws.root)?;
+        let instructions = crate::prompts::load(crate::prompts::Prompt::Walkthrough)?;
         let context = crate::bots::describe(&ws, &revset, from, to).await?;
         let prompt = format!(
             "{context}\n\nYou're in the repository and can read any file. Don't edit files.\n\n\

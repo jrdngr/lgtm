@@ -96,15 +96,15 @@ export const commands = {
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
 	claudeCommand: (refresh: boolean) => typedError<ClaudeCommand, string>(__TAURI_INVOKE("claude_command", { refresh })),
 	toolStatus: () => __TAURI_INVOKE<ToolStatus[]>("tool_status"),
-	/**  Each prompt and which of its files the window's repo uses. */
-	promptFiles: (workspace: string | null) => typedError<PromptInfo[], string>(__TAURI_INVOKE("prompt_files", { workspace })),
+	/**  Each prompt and whether its file is in use. */
+	promptFiles: () => __TAURI_INVOKE<PromptInfo[]>("prompt_files"),
 	/**
-	 *  The path of `scope`'s prompt file, to open in the editor. Writes the built-in prompt there
-	 *  first when there's no file yet.
+	 *  The path of the prompt's file, to open in the editor. Writes the built-in prompt there first
+	 *  when there's no file yet.
 	 */
-	editPrompt: (workspace: string | null, prompt: Prompt, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("edit_prompt", { workspace, prompt, scope })),
-	/**  Deletes `scope`'s prompt file. */
-	removePrompt: (workspace: string | null, prompt: Prompt, scope: Scope) => typedError<null, string>(__TAURI_INVOKE("remove_prompt", { workspace, prompt, scope })),
+	editPrompt: (prompt: Prompt) => typedError<string, string>(__TAURI_INVOKE("edit_prompt", { prompt })),
+	/**  Deletes the prompt's file. */
+	removePrompt: (prompt: Prompt) => typedError<null, string>(__TAURI_INVOKE("remove_prompt", { prompt })),
 	/**  Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code. */
 	mcpStatus: () => typedError<McpStatus, string>(__TAURI_INVOKE("mcp_status")),
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
@@ -164,16 +164,16 @@ export const commands = {
 	/**  Dismisses findings of a run, or with `dismissed` false, brings them back. */
 	dismissFindings: (run: number, findings: string[], dismissed: boolean) => typedError<BotRun, string>(__TAURI_INVOKE("dismiss_findings", { run, findings, dismissed })),
 	stopFix: (run: number, fix: number) => typedError<null, string>(__TAURI_INVOKE("stop_fix", { run, fix })),
-	/**  The personas a review in the workspace can use, and files that couldn't be read. */
-	listPersonas: (workspace: string | null) => typedError<Personas, string>(__TAURI_INVOKE("list_personas", { workspace })),
-	/**  The default personas, and where each is installed. */
-	defaultPersonas: (workspace: string | null) => typedError<DefaultPersona[], string>(__TAURI_INVOKE("default_personas", { workspace })),
-	/**  Writes the named default personas globally or into the workspace's repo. */
-	installPersonas: (workspace: string | null, names: string[], scope: Scope) => typedError<null, string>(__TAURI_INVOKE("install_personas", { workspace, names, scope })),
+	/**  The personas a review can use, and files that couldn't be read. */
+	listPersonas: () => __TAURI_INVOKE<Personas>("list_personas"),
+	/**  The default personas, and whether each is installed. */
+	defaultPersonas: () => __TAURI_INVOKE<DefaultPersona[]>("default_personas"),
+	/**  Writes the named default personas. */
+	installPersonas: (names: string[]) => typedError<null, string>(__TAURI_INVOKE("install_personas", { names })),
 	/**  Writes a starter file for a new persona. Returns its path, to open in the editor. */
-	newPersona: (workspace: string | null, name: string, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("new_persona", { workspace, name, scope })),
+	newPersona: (name: string) => typedError<string, string>(__TAURI_INVOKE("new_persona", { name })),
 	/**  Copies a persona file beside itself as `name`. Returns the copy's path. */
-	duplicatePersona: (workspace: string | null, path: string, name: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_persona", { workspace, path, name })),
+	duplicatePersona: (path: string, name: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_persona", { path, name })),
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
@@ -509,8 +509,7 @@ export type CommentDto = {
 export type DefaultPersona = {
 	name: string,
 	description: string,
-	global: Installed,
-	repo: Installed,
+	installed: Installed,
 };
 
 export type DiscussionDto = {
@@ -899,12 +898,11 @@ export type Persona = {
 };
 
 export type PersonaFile = {
-	scope: Scope,
 	path: string,
 } & Persona;
 
 export type Personas = {
-	/**  By name. A repo persona hides a global one of the same name. */
+	/**  By name. */
 	personas: PersonaFile[],
 	broken: Broken[],
 };
@@ -1022,15 +1020,13 @@ export type Prompt = "walkthrough" |
 /**  How Q&A plans and writes its result. */
 "qaWrite";
 
-/**  A prompt and its files, for the Settings tab. */
+/**  A prompt and its file, for the Settings tab. */
 export type PromptInfo = {
 	prompt: Prompt,
-	/**  The file in use, `None` for the built-in prompt. */
-	inUse: Scope | null,
-	global: string | null,
-	repo: string,
-	globalExists: boolean,
-	repoExists: boolean,
+	/**  `None` without a home directory. */
+	path: string | null,
+	/**  Whether the file is used over the built-in prompt. */
+	exists: boolean,
 };
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
@@ -1235,8 +1231,6 @@ export type Ruling = {
 	severity: Severity | null,
 	reason: string,
 };
-
-export type Scope = "global" | "repo";
 
 export type Session = Session_Serialize | Session_Deserialize;
 

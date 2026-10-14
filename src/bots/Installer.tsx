@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import type { DefaultPersona, Installed, Scope } from "../bindings";
+import type { DefaultPersona, Installed } from "../bindings";
 import { commands } from "../ipc";
-import { useWorkspace } from "../workspaces/context";
 
 const STATE: Record<Installed, string> = {
   no: "",
@@ -10,26 +9,21 @@ const STATE: Record<Installed, string> = {
   changed: "edited, will replace your edits",
 };
 
-/** Installs the default personas globally or into the repo. Also updates older versions and
+/** Installs the default personas into ~/.config/lgtm/personas. Also updates older versions and
  * restores edited ones. */
 export function Installer({ onDone }: { onDone(): void }) {
-  const workspace = useWorkspace();
   const [defaults, setDefaults] = useState<DefaultPersona[]>([]);
-  const [scope, setScope] = useState<Scope>("global");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    commands.defaultPersonas(workspace).then((r) => {
-      if (r.status === "ok") setDefaults(r.data);
-      else setError(r.error);
-    });
-  }, [workspace]);
+    commands.defaultPersonas().then(setDefaults);
+  }, []);
 
   // Edited files start unchecked, so restoring one is deliberate.
   useEffect(() => {
-    setPicked(new Set(defaults.filter((d) => d[scope] !== "changed").map((d) => d.name)));
-  }, [defaults, scope]);
+    setPicked(new Set(defaults.filter((d) => d.installed !== "changed").map((d) => d.name)));
+  }, [defaults]);
 
   function toggle(name: string) {
     const next = new Set(picked);
@@ -38,7 +32,7 @@ export function Installer({ onDone }: { onDone(): void }) {
   }
 
   async function install() {
-    const r = await commands.installPersonas(workspace, [...picked], scope);
+    const r = await commands.installPersonas([...picked]);
     if (r.status === "error") return setError(r.error);
     onDone();
   }
@@ -48,26 +42,16 @@ export function Installer({ onDone }: { onDone(): void }) {
       <div className="bots-section">
         <span className="bots-label">Install default personas</span>
       </div>
-      <div className="bots-scope">
-        {(["global", "repo"] as const).map((s) => (
-          <label key={s}>
-            <input type="radio" checked={scope === s} onChange={() => setScope(s)} />
-            {s === "global" ? "Global" : "This repo"}
-          </label>
-        ))}
-      </div>
-      <div className="bots-hint">
-        {scope === "global"
-          ? "For every repo, in ~/.config/lgtm/personas."
-          : "In .lgtm/personas, which adds them to the working copy (@)."}
-      </div>
+      <div className="bots-hint">For every repo, in ~/.config/lgtm/personas.</div>
       <div className="bots-list">
         {defaults.map((d) => (
           <label key={d.name} title={d.description}>
             <input type="checkbox" checked={picked.has(d.name)} onChange={() => toggle(d.name)} />
             {d.name}
-            {d[scope] !== "no" && (
-              <span className={`bots-installed bots-installed-${d[scope]}`}>{STATE[d[scope]]}</span>
+            {d.installed !== "no" && (
+              <span className={`bots-installed bots-installed-${d.installed}`}>
+                {STATE[d.installed]}
+              </span>
             )}
           </label>
         ))}

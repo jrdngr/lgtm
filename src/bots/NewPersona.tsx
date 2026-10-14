@@ -1,18 +1,16 @@
 import { useState } from "react";
-import type { Scope } from "../bindings";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
 import { useWorkspace } from "../workspaces/context";
 
-/** The name and scope of a new persona. Creating it opens its starter file to edit. */
+/** The name of a new persona. Creating it opens its starter file to edit. */
 export function NewPersona({ onClose, onCreated }: { onClose(): void; onCreated(): void }) {
   const workspace = useWorkspace();
   const [name, setName] = useState("");
-  const [scope, setScope] = useState<Scope>("global");
   const [error, setError] = useState<string>();
 
   async function add() {
-    const r = await commands.newPersona(workspace, name.trim(), scope);
+    const r = await commands.newPersona(name.trim());
     if (r.status === "error") return setError(r.error);
     onCreated();
     openFile(workspace, r.data);
@@ -35,10 +33,6 @@ export function NewPersona({ onClose, onCreated }: { onClose(): void; onCreated(
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Escape" && onClose()}
         />
-        <select value={scope} onChange={(e) => setScope(e.target.value as Scope)}>
-          <option value="global">Global</option>
-          <option value="repo">Repo</option>
-        </select>
         <button type="submit" disabled={!name.trim()}>
           Create
         </button>

@@ -176,13 +176,6 @@
   min-width: 0;
 }
 
-.settings-prompt-scope {
-  width: 72px;
-  flex: none;
-  color: var(--muted);
-  font-size: var(--fs-sm);
-}
-
 .settings-prompt-file .settings-path {
   flex: 1;
   min-width: 0;

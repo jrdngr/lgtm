@@ -22,13 +22,13 @@ pub(crate) async fn list_files(
 }
 
 /// A workspace-relative path, or an absolute one only for persona and prompt files,
-/// which can live outside the repo.
+/// which live outside the repo.
 fn locate(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     let abs = Path::new(path);
     if !abs.is_absolute() {
         return files::resolve(&ws.root, path).map_err(err);
     }
-    if !personas::is_persona_file(&ws.root, abs) && !prompts::is_prompt_file(&ws.root, abs) {
+    if !personas::is_persona_file(abs) && !prompts::is_prompt_file(abs) {
         return Err(format!("{path} isn't in the workspace"));
     }
     Ok(abs.to_path_buf())

@@ -200,7 +200,7 @@ impl RepoCtx {
         let pr = self
             .pr_record(ws.name.as_deref())?
             .context("this workspace isn't a PR's")?;
-        let rules = prompts::load(Prompt::Reply, &ws.root)?;
+        let rules = prompts::load(Prompt::Reply)?;
         let change = crate::bots::describe(&ws, &revset, from, to).await?;
         let context = format!(
             "You're working on review comments on PR #{} ({}) by {}.\n\n{change}",

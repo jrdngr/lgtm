@@ -6,7 +6,7 @@ use tauri_specta::Event as _;
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
 use crate::bots::install::{self, DefaultPersona};
-use crate::bots::personas::{self, Personas, Scope};
+use crate::bots::personas::{self, Personas};
 use crate::bots::{BotOptions, BotRun, Event, Notify};
 use crate::events::{BotFixText, BotRunActivity, BotRunChanged};
 
@@ -127,66 +127,40 @@ pub(crate) fn bot_run(window: WebviewWindow, run: u32) -> CmdResult<BotRun> {
     repo(&window)?.bot_run(run).map_err(err)
 }
 
-/// The personas a review in the workspace can use, and files that couldn't be read.
+/// The personas a review can use, and files that couldn't be read.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn list_personas(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Personas> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    Ok(personas::load(&ws.root))
+pub(crate) fn list_personas() -> Personas {
+    personas::load()
 }
 
-/// The default personas, and where each is installed.
+/// The default personas, and whether each is installed.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn default_personas(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Vec<DefaultPersona>> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    Ok(install::defaults(&ws.root))
+pub(crate) fn default_personas() -> Vec<DefaultPersona> {
+    install::defaults()
 }
 
-/// Writes the named default personas globally or into the workspace's repo.
+/// Writes the named default personas.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn install_personas(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    names: Vec<String>,
-    scope: Scope,
-) -> CmdResult<()> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    install::install(&ws.root, &names, scope).map_err(err)
+pub(crate) fn install_personas(names: Vec<String>) -> CmdResult<()> {
+    install::install(&names).map_err(err)
 }
 
 /// Writes a starter file for a new persona. Returns its path, to open in the editor.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn new_persona(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    name: String,
-    scope: Scope,
-) -> CmdResult<String> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let path = personas::create(&ws.root, &name, scope).map_err(err)?;
+pub(crate) fn new_persona(name: String) -> CmdResult<String> {
+    let path = personas::create(&name).map_err(err)?;
     Ok(path.to_string_lossy().into_owned())
 }
 
 /// Copies a persona file beside itself as `name`. Returns the copy's path.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn duplicate_persona(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    path: String,
-    name: String,
-) -> CmdResult<String> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let to = personas::duplicate(&ws.root, std::path::Path::new(&path), &name).map_err(err)?;
+pub(crate) fn duplicate_persona(path: String, name: String) -> CmdResult<String> {
+    let to = personas::duplicate(std::path::Path::new(&path), &name).map_err(err)?;
     Ok(to.to_string_lossy().into_owned())
 }
 

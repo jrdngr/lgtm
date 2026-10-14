@@ -1,8 +1,7 @@
-use tauri::{AppHandle, WebviewWindow};
+use tauri::AppHandle;
 use tauri_specta::Event as _;
 
 use super::{CmdResult, err};
-use crate::bots::personas::Scope;
 use crate::events::SettingsChanged;
 use crate::prompts::{self, Prompt, PromptInfo};
 use crate::settings::claude::{self, ClaudeCommand};
@@ -58,41 +57,25 @@ pub(crate) async fn tool_status() -> Vec<ToolStatus> {
     tools::status().await
 }
 
-/// Each prompt and which of its files the window's repo uses.
+/// Each prompt and whether its file is in use.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn prompt_files(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Vec<PromptInfo>> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    Ok(prompts::infos(&ws.root))
+pub(crate) fn prompt_files() -> Vec<PromptInfo> {
+    prompts::infos()
 }
 
-/// The path of `scope`'s prompt file, to open in the editor. Writes the built-in prompt there
-/// first when there's no file yet.
+/// The path of the prompt's file, to open in the editor. Writes the built-in prompt there first
+/// when there's no file yet.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn edit_prompt(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    prompt: Prompt,
-    scope: Scope,
-) -> CmdResult<String> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let path = prompts::edit(prompt, &ws.root, scope).map_err(err)?;
+pub(crate) fn edit_prompt(prompt: Prompt) -> CmdResult<String> {
+    let path = prompts::edit(prompt).map_err(err)?;
     Ok(path.to_string_lossy().into_owned())
 }
 
-/// Deletes `scope`'s prompt file.
+/// Deletes the prompt's file.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn remove_prompt(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    prompt: Prompt,
-    scope: Scope,
-) -> CmdResult<()> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    prompts::remove(prompt, &ws.root, scope).map_err(err)
+pub(crate) fn remove_prompt(prompt: Prompt) -> CmdResult<()> {
+    prompts::remove(prompt).map_err(err)
 }

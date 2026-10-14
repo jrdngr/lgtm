@@ -22,7 +22,7 @@ async function duplicate(ws: WorkspaceName, path: string) {
   const suggested = dot > 0 ? `${file.slice(0, dot)}-copy${file.slice(dot)}` : `${file}-copy`;
   const name = await promptText("Duplicate Persona", { value: suggested, action: "Duplicate" });
   if (!name) return false;
-  openFile(ws, await unwrap(commands.duplicatePersona(ws, path, name)));
+  openFile(ws, await unwrap(commands.duplicatePersona(path, name)));
   return true;
 }
 
@@ -63,7 +63,6 @@ export function PersonaList({ personas, picked, onToggle, onChanged }: Props) {
               <input type="checkbox" checked={on} onChange={() => onToggle(p.name)} />
               <span className="bots-persona-name">
                 <span className="bots-persona-text">{p.name}</span>
-                {p.scope === "repo" && <span className="pill">repo</span>}
               </span>
             </label>
             <IconButton

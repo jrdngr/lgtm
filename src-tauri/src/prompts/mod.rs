@@ -1,5 +1,5 @@
-//! Agent prompts the user can edit: a markdown file in the repo's `.lgtm`, else in the config
-//! dir, else the built-in default. The result format each agent returns stays fixed in code.
+//! Agent prompts the user can edit: a markdown file in the config dir, else the built-in
+//! default. The result format each agent returns stays fixed in code.
 
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,7 @@ use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::bots::personas::{Scope, config_dir, is_plain_file};
+use crate::bots::personas::{config_dir, is_plain_file};
 
 /// An editable prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -49,41 +49,28 @@ impl Prompt {
     }
 }
 
-/// A prompt and its files, for the Settings tab.
+/// A prompt and its file, for the Settings tab.
 #[derive(Clone, Debug, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct PromptInfo {
     pub prompt: Prompt,
-    /// The file in use, `None` for the built-in prompt.
-    pub in_use: Option<Scope>,
-    pub global: Option<String>,
-    pub repo: String,
-    pub global_exists: bool,
-    pub repo_exists: bool,
+    /// `None` without a home directory.
+    pub path: Option<String>,
+    /// Whether the file is used over the built-in prompt.
+    pub exists: bool,
 }
 
-/// Where `scope`'s file goes. `config` is lgtm's config dir.
-fn path(
-    prompt: Prompt,
-    root: &Path,
-    config: Option<&Path>,
-    scope: Scope,
-) -> anyhow::Result<PathBuf> {
-    match scope {
-        Scope::Global => Ok(config.context("no home directory")?.join(prompt.file())),
-        Scope::Repo => Ok(root.join(".lgtm").join(prompt.file())),
-    }
+/// Where the prompt's file goes. `config` is lgtm's config dir.
+fn path(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<PathBuf> {
+    Ok(config.context("no home directory")?.join(prompt.file()))
 }
 
-fn find(prompt: Prompt, root: &Path, config: Option<&Path>) -> Option<(Scope, PathBuf)> {
-    [Scope::Repo, Scope::Global].into_iter().find_map(|scope| {
-        let path = path(prompt, root, config, scope).ok()?;
-        is_plain_file(&path).then_some((scope, path))
-    })
+fn find(prompt: Prompt, config: Option<&Path>) -> Option<PathBuf> {
+    path(prompt, config).ok().filter(|p| is_plain_file(p))
 }
 
-fn load_in(prompt: Prompt, root: &Path, config: Option<&Path>) -> anyhow::Result<String> {
-    let Some((_, path)) = find(prompt, root, config) else {
+fn load_in(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<String> {
+    let Some(path) = find(prompt, config) else {
         return Ok(prompt.default_text().to_string());
     };
     let text = std::fs::read_to_string(&path)
@@ -97,39 +84,31 @@ fn load_in(prompt: Prompt, root: &Path, config: Option<&Path>) -> anyhow::Result
 }
 
 /// The prompt to give the agent.
-pub fn load(prompt: Prompt, root: &Path) -> anyhow::Result<String> {
-    load_in(prompt, root, config_dir().as_deref())
+pub fn load(prompt: Prompt) -> anyhow::Result<String> {
+    load_in(prompt, config_dir().as_deref())
 }
 
-fn info_in(prompt: Prompt, root: &Path, config: Option<&Path>) -> PromptInfo {
-    let global = path(prompt, root, config, Scope::Global).ok();
-    let repo = root.join(".lgtm").join(prompt.file());
+fn info_in(prompt: Prompt, config: Option<&Path>) -> PromptInfo {
     PromptInfo {
         prompt,
-        in_use: find(prompt, root, config).map(|(scope, _)| scope),
-        global_exists: global.as_deref().is_some_and(is_plain_file),
-        repo_exists: is_plain_file(&repo),
-        global: global.map(|p| p.to_string_lossy().into_owned()),
-        repo: repo.to_string_lossy().into_owned(),
+        path: path(prompt, config)
+            .ok()
+            .map(|p| p.to_string_lossy().into_owned()),
+        exists: find(prompt, config).is_some(),
     }
 }
 
-/// Every prompt and which of its files is in use.
-pub fn infos(root: &Path) -> Vec<PromptInfo> {
+/// Every prompt and whether its file is in use.
+pub fn infos() -> Vec<PromptInfo> {
     let config = config_dir();
     Prompt::ALL
         .into_iter()
-        .map(|p| info_in(p, root, config.as_deref()))
+        .map(|p| info_in(p, config.as_deref()))
         .collect()
 }
 
-fn edit_in(
-    prompt: Prompt,
-    root: &Path,
-    config: Option<&Path>,
-    scope: Scope,
-) -> anyhow::Result<PathBuf> {
-    let path = path(prompt, root, config, scope)?;
+fn edit_in(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<PathBuf> {
+    let path = path(prompt, config)?;
     if !path.exists() {
         std::fs::create_dir_all(path.parent().context("prompt path has no parent")?)?;
         std::fs::write(&path, prompt.default_text())?;
@@ -137,41 +116,34 @@ fn edit_in(
     Ok(path)
 }
 
-/// `scope`'s prompt file, written from the default first when there isn't one.
-pub fn edit(prompt: Prompt, root: &Path, scope: Scope) -> anyhow::Result<PathBuf> {
-    edit_in(prompt, root, config_dir().as_deref(), scope)
+/// The prompt's file, written from the default first when there isn't one.
+pub fn edit(prompt: Prompt) -> anyhow::Result<PathBuf> {
+    edit_in(prompt, config_dir().as_deref())
 }
 
-fn remove_in(
-    prompt: Prompt,
-    root: &Path,
-    config: Option<&Path>,
-    scope: Scope,
-) -> anyhow::Result<()> {
-    let path = path(prompt, root, config, scope)?;
+fn remove_in(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<()> {
+    let path = path(prompt, config)?;
     if is_plain_file(&path) {
         std::fs::remove_file(&path).with_context(|| format!("remove {}", path.display()))?;
     }
     Ok(())
 }
 
-/// Deletes `scope`'s prompt file, so the next one down is used.
-pub fn remove(prompt: Prompt, root: &Path, scope: Scope) -> anyhow::Result<()> {
-    remove_in(prompt, root, config_dir().as_deref(), scope)
+/// Deletes the prompt's file, so the built-in prompt is used.
+pub fn remove(prompt: Prompt) -> anyhow::Result<()> {
+    remove_in(prompt, config_dir().as_deref())
 }
 
-fn is_prompt_file_in(root: &Path, config: Option<&Path>, file: &Path) -> bool {
+fn is_prompt_file_in(config: Option<&Path>, file: &Path) -> bool {
     is_plain_file(file)
-        && Prompt::ALL.into_iter().any(|prompt| {
-            [Scope::Repo, Scope::Global]
-                .into_iter()
-                .any(|s| path(prompt, root, config, s).is_ok_and(|p| p == file))
-        })
+        && Prompt::ALL
+            .into_iter()
+            .any(|prompt| path(prompt, config).is_ok_and(|p| p == file))
 }
 
 /// Whether `file` is a prompt file, which the app opens for editing like a persona.
-pub fn is_prompt_file(root: &Path, file: &Path) -> bool {
-    is_prompt_file_in(root, config_dir().as_deref(), file)
+pub fn is_prompt_file(file: &Path) -> bool {
+    is_prompt_file_in(config_dir().as_deref(), file)
 }
 
 #[cfg(test)]
@@ -181,64 +153,47 @@ mod tests {
     const W: Prompt = Prompt::Walkthrough;
 
     #[test]
-    fn the_repo_prompt_wins_then_the_global_one_then_the_default() {
-        let repo = tempfile::tempdir().unwrap();
+    fn the_prompt_file_wins_over_the_default() {
         let config = tempfile::tempdir().unwrap();
-        let (root, config) = (repo.path(), Some(config.path()));
-        assert_eq!(load_in(W, root, config).unwrap(), W.default_text());
+        let config = Some(config.path());
+        assert_eq!(load_in(W, config).unwrap(), W.default_text());
 
-        let global = edit_in(W, root, config, Scope::Global).unwrap();
-        std::fs::write(&global, "global").unwrap();
-        assert_eq!(load_in(W, root, config).unwrap(), "global");
-
-        let local = edit_in(W, root, config, Scope::Repo).unwrap();
-        assert_eq!(std::fs::read_to_string(&local).unwrap(), W.default_text());
-        std::fs::write(&local, "repo").unwrap();
-        assert_eq!(load_in(W, root, config).unwrap(), "repo");
-        assert_eq!(info_in(W, root, config).in_use, Some(Scope::Repo));
+        let file = edit_in(W, config).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), W.default_text());
+        std::fs::write(&file, "mine").unwrap();
+        assert_eq!(load_in(W, config).unwrap(), "mine");
+        assert!(info_in(W, config).exists);
 
         // Opening it again keeps the edits.
-        edit_in(W, root, config, Scope::Repo).unwrap();
-        assert_eq!(load_in(W, root, config).unwrap(), "repo");
+        edit_in(W, config).unwrap();
+        assert_eq!(load_in(W, config).unwrap(), "mine");
 
-        std::fs::write(&local, "\n").unwrap();
-        assert!(load_in(W, root, config).is_err());
+        std::fs::write(&file, "\n").unwrap();
+        assert!(load_in(W, config).is_err());
 
-        // Removing the repo file falls back to the global one, then the default.
-        remove_in(W, root, config, Scope::Repo).unwrap();
-        assert_eq!(load_in(W, root, config).unwrap(), "global");
-        remove_in(W, root, config, Scope::Global).unwrap();
-        let info = info_in(W, root, config);
-        assert_eq!(
-            (info.in_use, info.global_exists, info.repo_exists),
-            (None, false, false)
-        );
+        remove_in(W, config).unwrap();
+        assert_eq!(load_in(W, config).unwrap(), W.default_text());
+        assert!(!info_in(W, config).exists);
     }
 
     #[test]
     fn only_prompt_files_open_for_editing() {
-        let repo = tempfile::tempdir().unwrap();
-        let config = tempfile::tempdir().unwrap();
-        let (root, config) = (repo.path(), Some(config.path()));
-        let local = edit_in(W, root, config, Scope::Repo).unwrap();
-        let global = edit_in(W, root, config, Scope::Global).unwrap();
-        assert!(is_prompt_file_in(root, config, &local));
-        assert!(is_prompt_file_in(root, config, &global));
-        std::fs::write(root.join("walkthrough.md"), "").unwrap();
-        assert!(!is_prompt_file_in(
-            root,
-            config,
-            &root.join("walkthrough.md")
-        ));
+        let dir = tempfile::tempdir().unwrap();
+        let config = Some(dir.path());
+        let file = edit_in(W, config).unwrap();
+        assert!(is_prompt_file_in(config, &file));
+        let other = dir.path().join("notes.md");
+        std::fs::write(&other, "").unwrap();
+        assert!(!is_prompt_file_in(config, &other));
 
         #[cfg(unix)]
         {
-            std::fs::remove_file(&local).unwrap();
-            std::fs::write(root.join("run.command"), "").unwrap();
-            std::os::unix::fs::symlink(root.join("run.command"), &local).unwrap();
-            assert!(!is_prompt_file_in(root, config, &local));
+            std::fs::remove_file(&file).unwrap();
+            std::fs::write(dir.path().join("run.command"), "").unwrap();
+            std::os::unix::fs::symlink(dir.path().join("run.command"), &file).unwrap();
+            assert!(!is_prompt_file_in(config, &file));
             // A symlinked prompt isn't used either.
-            assert_eq!(find(W, root, config).unwrap().0, Scope::Global);
+            assert_eq!(load_in(W, config).unwrap(), W.default_text());
         }
     }
 }

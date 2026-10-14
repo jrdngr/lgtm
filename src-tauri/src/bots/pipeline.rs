@@ -106,9 +106,9 @@ pub(super) fn extend(run: &mut BotRun, options: BotOptions) {
     run.options = new;
 }
 
-/// The named personas, as the workspace's persona files define them now.
-fn pick(root: &std::path::Path, names: &[String]) -> anyhow::Result<Vec<Persona>> {
-    let found = personas::load(root).personas;
+/// The named personas, as their files define them now.
+fn pick(names: &[String]) -> anyhow::Result<Vec<Persona>> {
+    let found = personas::load().personas;
     let mut picked = Vec::new();
     for name in names {
         let p = found
@@ -135,7 +135,7 @@ impl RepoCtx {
         notify: Notify,
     ) -> anyhow::Result<BotRun> {
         let ws = self.workspace(workspace).await?;
-        let personas = pick(&ws.root, personas)?;
+        let personas = pick(personas)?;
         ws.snapshot().await?;
         let range = ws.jj.resolve(revset).await?;
         let mut run = BotRun {
