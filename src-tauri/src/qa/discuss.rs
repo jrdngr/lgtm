@@ -232,7 +232,7 @@ mod tests {
         assert_eq!(split(" Sure. ").text, "Sure.");
         let reply = "Adding C and going with it.\n\n<rewrite>\n```json\n{\"id\":\"Q2\",\
                      \"what\":\"added C\",\"subject\":\"s\",\"context\":[],\"options\":[{\"label\":\
-                     \"C\",\"bullets\":[]}],\"why\":\"w\"}\n```\n</rewrite>\n<decide>{\"option\":1,\
+                     \"C\",\"means\":\"m\",\"pros\":[],\"cons\":[],\"risks\":[]}],\"why\":\"w\"}\n```\n</rewrite>\n<decide>{\"option\":1,\
                      \"note\":\"keep it small\",\"other\":null}</decide>";
         let p = split(reply);
         assert_eq!(p.text, "Adding C and going with it.");

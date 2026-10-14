@@ -396,7 +396,11 @@ impl Lgtm {
                     .into_iter()
                     .map(|o| Choice {
                         label: o.label,
-                        bullets: o.bullets,
+                        means: o.means,
+                        pros: o.pros,
+                        cons: o.cons,
+                        risks: o.risks,
+                        bullets: vec![],
                     })
                     .collect(),
                 why: q.why,

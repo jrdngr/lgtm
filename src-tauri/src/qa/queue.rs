@@ -13,7 +13,18 @@ use super::order::{self, is_sub};
 #[serde(rename_all = "camelCase")]
 pub struct Choice {
     pub label: String,
-    /// What it means and what it costs.
+    /// What it means, in a line.
+    #[serde(default)]
+    pub means: String,
+    #[serde(default)]
+    pub pros: Vec<String>,
+    #[serde(default)]
+    pub cons: Vec<String>,
+    /// Downsides worse than a con.
+    #[serde(default)]
+    pub risks: Vec<String>,
+    /// What it means and what it costs, from sessions before pros and cons.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bullets: Vec<String>,
 }
 
@@ -505,6 +516,15 @@ pub fn question_text(q: &QaQuestion) -> String {
     for (i, o) in t.options.iter().enumerate() {
         let rec = if i == 0 { " (recommended)" } else { "" };
         out.push_str(&format!("{}. {}{rec}\n", i + 1, o.label));
+        if !o.means.is_empty() {
+            out.push_str(&format!("   {}\n", o.means));
+        }
+        let tagged = [("Pro", &o.pros), ("Con", &o.cons), ("Risk", &o.risks)];
+        for (tag, items) in tagged {
+            for b in items {
+                out.push_str(&format!("   - {tag}: {b}\n"));
+            }
+        }
         for b in &o.bullets {
             out.push_str(&format!("   - {b}\n"));
         }

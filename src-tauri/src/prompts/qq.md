@@ -31,7 +31,10 @@ gather the context, think through real alternatives, and give each option its co
 - `options`: the recommended choice first, always. Then real alternatives: each one has an
   advantage over the others. Don't pad the list. When two approaches have opposite pros and
   cons, offer both. One option is fine when the real question is "confirm or object".
-- Each option has 1-3 bullets: what it means, and what it costs.
+- Each option has `means`: what it is, in one line. Then its tradeoffs, labeled: `pros`
+  (what it gets you), `cons` (what it costs), and `risks` (downsides worse than a con: what
+  could go badly wrong). A short line each, usually 1-3 in all. Leave a list empty rather
+  than pad it.
 - `why`: one or two lines on why option 1 is recommended.
 
 ## Style

@@ -17,9 +17,12 @@ const CHOICE: &str = r#"{
   "type": "object",
   "properties": {
     "label": { "type": "string" },
-    "bullets": { "type": "array", "items": { "type": "string" } }
+    "means": { "type": "string" },
+    "pros": { "type": "array", "items": { "type": "string" } },
+    "cons": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } }
   },
-  "required": ["label", "bullets"],
+  "required": ["label", "means", "pros", "cons", "risks"],
   "additionalProperties": false
 }"#;
 

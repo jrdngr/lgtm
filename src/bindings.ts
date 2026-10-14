@@ -464,7 +464,7 @@ export type Change_Deserialize = {
 	after: string,
 	/**  What changed, in a few words. */
 	what: string,
-	previous: QText,
+	previous: QText_Deserialize,
 	/**  The answer it had before it reopened. */
 	answer?: Answer_Deserialize | null,
 };
@@ -478,7 +478,7 @@ export type Change_Serialize = {
 	after: string,
 	/**  What changed, in a few words. */
 	what: string,
-	previous: QText,
+	previous: QText_Serialize,
 	/**  The answer it had before it reopened. */
 	answer: Answer_Serialize | null,
 };
@@ -487,10 +487,30 @@ export type CheckState = "unchecked" | "checked" |
 /**  Was checked, but the file now has changed rows the check didn't cover. */
 "changedSinceReviewed";
 
-export type Choice = {
+export type Choice = Choice_Serialize | Choice_Deserialize;
+
+export type Choice_Deserialize = {
 	label: string,
-	/**  What it means and what it costs. */
-	bullets: string[],
+	/**  What it means, in a line. */
+	means?: string,
+	pros?: string[],
+	cons?: string[],
+	/**  Downsides worse than a con. */
+	risks?: string[],
+	/**  What it means and what it costs, from sessions before pros and cons. */
+	bullets?: string[],
+};
+
+export type Choice_Serialize = {
+	label: string,
+	/**  What it means, in a line. */
+	means: string,
+	pros: string[],
+	cons: string[],
+	/**  Downsides worse than a con. */
+	risks: string[],
+	/**  What it means and what it costs, from sessions before pros and cons. */
+	bullets?: string[],
 };
 
 /**  How the `claude` setting resolved, for the Settings tab. */
@@ -1073,10 +1093,22 @@ export type QState = "open" | "decided" |
 "deferred" | "dropped";
 
 /**  What a question says. The first option is always the recommendation. */
-export type QText = {
+export type QText = QText_Serialize | QText_Deserialize;
+
+/**  What a question says. The first option is always the recommendation. */
+export type QText_Deserialize = {
 	subject: string,
 	context: string[],
-	options: Choice[],
+	options: Choice_Deserialize[],
+	/**  Why option 1 is recommended. */
+	why: string,
+};
+
+/**  What a question says. The first option is always the recommendation. */
+export type QText_Serialize = {
+	subject: string,
+	context: string[],
+	options: Choice_Serialize[],
 	/**  Why option 1 is recommended. */
 	why: string,
 };
@@ -1093,7 +1125,7 @@ export type QaQuestion_Deserialize = {
 	/**  `Q4`, or `Q4a` for a subquestion. */
 	id: string,
 	round: number,
-	text: QText,
+	text: QText_Deserialize,
 	/**  Files the agent read to build it. */
 	sources?: string[],
 	/**
@@ -1114,7 +1146,7 @@ export type QaQuestion_Serialize = {
 	/**  `Q4`, or `Q4a` for a subquestion. */
 	id: string,
 	round: number,
-	text: QText,
+	text: QText_Serialize,
 	/**  Files the agent read to build it. */
 	sources: string[],
 	/**

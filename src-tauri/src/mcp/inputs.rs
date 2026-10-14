@@ -170,8 +170,17 @@ pub struct QaSession {
 #[derive(Deserialize, JsonSchema)]
 pub struct QaChoice {
     pub label: String,
-    /// 1-3 bullets: what it means, and what it costs.
-    pub bullets: Vec<String>,
+    /// What it means, in a line.
+    pub means: String,
+    /// What it gets you, a short line each.
+    #[serde(default)]
+    pub pros: Vec<String>,
+    /// What it costs, a short line each.
+    #[serde(default)]
+    pub cons: Vec<String>,
+    /// Downsides worse than a con: what could go badly wrong.
+    #[serde(default)]
+    pub risks: Vec<String>,
 }
 
 #[derive(Deserialize, JsonSchema)]

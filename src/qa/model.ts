@@ -89,7 +89,11 @@ export function qqText(q: Question, previous?: Question): string {
   lines.push("", "Options:", "");
   t.options.forEach((o, i) => {
     lines.push(`${i + 1}. ${o.label}${i === 0 ? " (recommended)" : ""}`);
-    for (const b of o.bullets) lines.push(`   - ${b}`);
+    if (o.means) lines.push(`   ${o.means}`);
+    for (const b of o.pros) lines.push(`   - Pro: ${b}`);
+    for (const b of o.cons) lines.push(`   - Con: ${b}`);
+    for (const b of o.risks) lines.push(`   - Risk: ${b}`);
+    for (const b of o.bullets ?? []) lines.push(`   - ${b}`);
   });
   lines.push("", `Recommendation: option 1. ${t.why}`);
   return lines.join("\n");

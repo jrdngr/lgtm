@@ -31,6 +31,13 @@ interface Props {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+/** An option's labeled tradeoffs, in the order they show. */
+const TAGS = [
+  ["Pro", "pros"],
+  ["Con", "cons"],
+  ["Risk", "risks"],
+] as const;
+
 /** A question in the qqueue template: subject, context, options with the recommended one
  * first, and the recommendation. */
 export function QuestionCard({ id, text, before, was, selected, decided, locked, ...p }: Props) {
@@ -86,13 +93,32 @@ export function QuestionCard({ id, text, before, was, selected, decided, locked,
                     {decided === i && <span className="pill yours">your answer</span>}
                     {wasLabel === o.label && <span className="pill was">your answer before</span>}
                   </span>
-                  <ul>
-                    {o.bullets.map((b) => (
-                      <li key={b}>
-                        <Inline>{b}</Inline>
-                      </li>
-                    ))}
+                  {o.means && (
+                    <span className="qq-means">
+                      <Inline>{o.means}</Inline>
+                    </span>
+                  )}
+                  <ul className="qq-tradeoffs">
+                    {TAGS.flatMap(([tag, key]) =>
+                      (o[key] ?? []).map((b) => (
+                        <li key={`${tag}${b}`}>
+                          <span className={`qq-tag ${key}`}>{tag}</span>
+                          <span>
+                            <Inline>{b}</Inline>
+                          </span>
+                        </li>
+                      )),
+                    )}
                   </ul>
+                  {!!o.bullets?.length && (
+                    <ul>
+                      {o.bullets.map((b) => (
+                        <li key={b}>
+                          <Inline>{b}</Inline>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </span>
               </button>
               {p.onExplain && (

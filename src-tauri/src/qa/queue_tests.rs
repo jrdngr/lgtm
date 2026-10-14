@@ -8,11 +8,14 @@ fn new(subject: &str, sub: bool) -> NewQuestion {
         options: vec![
             Choice {
                 label: "yes".into(),
-                bullets: vec![],
+                means: "do it".into(),
+                pros: vec!["simple".into()],
+                risks: vec!["breaks old files".into()],
+                ..Choice::default()
             },
             Choice {
                 label: "no".into(),
-                bullets: vec![],
+                ..Choice::default()
             },
         ],
         why: "because".into(),
@@ -263,7 +266,7 @@ fn the_text_follows_the_qqueue_template() {
     assert_eq!(answer_text(first), "option 2: no (note: keep it simple)");
     assert_eq!(
         question_text(first),
-        "Q1 — Where files live\n\nContext:\n\n- c\n\nOptions:\n\n1. yes (recommended)\n\
-         2. no\n\nRecommendation: option 1. because"
+        "Q1 — Where files live\n\nContext:\n\n- c\n\nOptions:\n\n1. yes (recommended)\n   do it\n\
+         \x20  - Pro: simple\n   - Risk: breaks old files\n2. no\n\nRecommendation: option 1. because"
     );
 }

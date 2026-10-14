@@ -638,6 +638,56 @@
   color: var(--muted);
 }
 
+.qq-means {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.qq-option-body ul.qq-tradeoffs {
+  gap: 3px;
+  margin-top: 6px;
+  padding: 0;
+  list-style: none;
+  color: var(--fg);
+}
+
+.qq-tradeoffs:empty {
+  display: none;
+}
+
+.qq-tradeoffs li {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.qq-tag {
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-transform: uppercase;
+  border-radius: 3px;
+}
+
+.qq-tag.pros {
+  color: var(--added);
+  background: var(--qq-green-soft);
+}
+
+.qq-tag.cons {
+  color: var(--mark-orange);
+  background: rgb(240 136 62 / 13%);
+}
+
+.qq-tag.risks {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
 .qq .pill {
   padding: 1px 6px;
   font-size: 10px;
