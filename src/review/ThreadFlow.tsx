@@ -5,6 +5,7 @@ import { TakePill } from "../threads/ThreadBits";
 import { Busy } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { AskBox } from "./AskBox";
+import { ProposalSection } from "./ProposalSection";
 import type { Comments } from "./useComments";
 import { wordDiff } from "./wordDiff";
 
@@ -172,6 +173,7 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
           }
         />
       )}
+      <ProposalSection comment={comment} c={c} />
     </div>
   );
 }

@@ -1,13 +1,14 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { endFrom, startRun } from "../agents/runs";
-import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
+import type { CommentDto, Proposed, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { confirmAction } from "../ui/prompt";
 import { useWorkspace } from "../workspaces/context";
 import { commentText, type Draft, followDraft } from "./comments";
 import { currentReview } from "./current";
 import type { Moves } from "./follow";
+import { lineDiff } from "./lineDiff";
 import { type FlatFile, NEW_COMMENT } from "./model";
 
 /** A workshop exchange in flight: what was asked and the reply so far. */
@@ -20,6 +21,10 @@ export interface Running {
 }
 
 const NONE: CommentDto[] = [];
+
+/** Whether a thread has proposed changes still to write. */
+const proposed = (c: CommentDto | undefined) =>
+  !!c?.thread?.proposal?.some((p) => p.state === "proposed");
 
 const without = <V>(m: ReadonlyMap<number, V>, id: number) => {
   const next = new Map(m);
@@ -82,6 +87,10 @@ export function useComments({
   /** Unsent workshop messages, by comment id. */
   const [asks, setAsks] = useState<ReadonlyMap<number, string>>(new Map());
   const [running, setRunning] = useState<ReadonlyMap<number, Running>>(new Map());
+  /** The thread whose Final waits on whether to write its proposed changes. */
+  const [confirming, setConfirming] = useState<number>();
+  /** Threads whose proposed changes are being written. */
+  const [applying, setApplying] = useState<ReadonlySet<number>>(new Set());
   /** Blocks whose ask box was opened. It also shows while a block has a conversation. */
   const [askOpen, setAskOpen] = useState<ReadonlySet<number>>(new Set());
   /** The text box that should take focus when its block next renders. */
@@ -173,8 +182,8 @@ export function useComments({
 
   /** Sends the block's workshop message, saving a draft first so the exchange has a home.
    * A change with no message asks for what the comment says. */
-  async function ask(id: number, change: boolean, compose = false) {
-    const message = compose ? "" : (asks.get(id)?.trim() ?? "");
+  async function ask(id: number, change: boolean, compose = false, text?: string) {
+    const message = compose ? "" : (text ?? asks.get(id)?.trim() ?? "");
     const body = edits.get(id) ?? byId(id)?.body ?? "";
     if (!review || running.has(id) || !(compose || message || (change && body.trim()))) return;
     const c = id === NEW_COMMENT ? await create(body) : byId(id);
@@ -182,7 +191,7 @@ export function useComments({
     const cid = c.id;
     // A saved draft's block is a new one, so the ask box needs focus again.
     if (cid !== id) setFocus({ id: cid, field: "ask" });
-    if (!compose) setAsks((m) => without(m, cid));
+    if (!compose && text === undefined) setAsks((m) => without(m, cid));
     setRunning((m) => withEntry(m, cid, { ask: message, change, compose, reply: "" }));
     const handle = startRun(workspace, {
       kind: change ? "change" : c.thread ? "reply" : "ask",
@@ -227,11 +236,49 @@ export function useComments({
     return cid;
   }
 
-  /** Saves the thread's reply as final, which makes it ready to send. */
+  /** Saves the thread's reply as final, which makes it ready to send. With proposed code
+   * changes it asks first whether to write them. */
   async function final(id: number) {
+    if (proposed(byId(id))) return setConfirming(id);
+    await finish(id, false);
+  }
+
+  /** Makes the reply final, first writing the proposed changes with `write`, or dropping
+   * them. */
+  async function finish(id: number, write: boolean) {
+    setConfirming(undefined);
     const cid = await saveEdit(id);
-    if (review && cid !== undefined) await apply(commands.setThreadStage(review.id, cid, "ready"));
+    if (!review || cid === undefined) return onDone();
+    if (proposed(byId(cid))) {
+      if (write) {
+        setApplying((s) => new Set(s).add(cid));
+        const ok = await apply(commands.applyProposal(review.id, cid));
+        setApplying((s) => withoutId(s, cid));
+        if (ok) onChanged();
+      } else await apply(commands.discardProposal(review.id, cid, null));
+    }
+    await apply(commands.setThreadStage(review.id, cid, "ready"));
     onDone();
+  }
+
+  /** Drops the proposed change to `path`. */
+  async function discard(id: number, path: string) {
+    if (review) await apply(commands.discardProposal(review.id, id, path));
+  }
+
+  /** Has the agent make a proposed change that went stale, then drops the proposal. */
+  async function applyByAgent(id: number, p: Proposed) {
+    if (!review) return;
+    const diff = lineDiff(p.before, p.after)
+      .map((h) => h.map((l) => `${{ ctx: " ", add: "+", del: "-" }[l.kind]}${l.text}`).join("\n"))
+      .join("\n...\n");
+    await discard(id, p.path);
+    await ask(
+      id,
+      true,
+      false,
+      `Make this change to ${p.path}, which changed since you proposed it:\n\n\`\`\`diff\n${diff}\n\`\`\``,
+    );
   }
 
   async function setStage(id: number, stage: Stage) {
@@ -306,6 +353,12 @@ export function useComments({
     use,
     send: sendComment,
     final,
+    finish,
+    confirming,
+    cancelFinal: () => setConfirming(undefined),
+    applying,
+    discard,
+    applyByAgent,
     setStage,
     reset,
     setDone,

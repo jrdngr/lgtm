@@ -4,7 +4,7 @@ use anyhow::Context;
 use serde::Deserialize;
 use specta::Type;
 
-use super::{RepoCtx, StateDto, replies};
+use super::{RepoCtx, StateDto, proposal, replies};
 use crate::agent::{self, Runs};
 use crate::store::{Author, Comment, GhLink, Message};
 
@@ -146,13 +146,19 @@ impl RepoCtx {
             Ok(r) => r.text.clone(),
             Err(e) => format!("{e:#}"),
         };
-        let turn: Option<replies::ChatTurn> = match &reply {
+        let mut turn: Option<replies::ChatTurn> = match &reply {
             Ok(r) if !r.stopped => r
                 .structured
                 .clone()
                 .and_then(|v| serde_json::from_value(v).ok()),
             _ => None,
         };
+        // Edits from a turn that can't write files become the thread's proposal.
+        let proposed = turn
+            .as_mut()
+            .and_then(|t| t.edits.take())
+            .filter(|_| !ask.change)
+            .map(|edits| proposal::build(&ws.root, &edits));
         let session = reply.ok().and_then(|r| r.session);
         if ask.change {
             // Pick up the edits now rather than waiting on the watcher.
@@ -167,7 +173,14 @@ impl RepoCtx {
             let (text, updated, replaced) = match turn {
                 Some(turn) => {
                     let before = c.body.clone();
-                    let (message, updated) = replies::apply_chat(&mut c, turn);
+                    let (mut message, mut updated) = replies::apply_chat(&mut c, turn);
+                    if let (Some((files, problems)), Some(t)) = (proposed, c.thread.as_mut()) {
+                        updated |= t.proposal != files;
+                        t.proposal = files;
+                        for p in problems {
+                            message = format!("{message}\n\n{p}");
+                        }
+                    }
                     let replaced = c.body != before;
                     if replaced {
                         store.set_comment_body(cid, &c.body, super::now_ms())?;

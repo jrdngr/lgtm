@@ -1,0 +1,157 @@
+/* Proposed code changes under a thread, and the dialog that writes them. */
+
+.pd-file {
+  overflow: hidden;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.pd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 2px 6px 2px 10px;
+  font-size: var(--fs-sm);
+}
+
+.pd-file:has(.pd-body) .pd-head {
+  border-bottom: 1px solid var(--hair);
+}
+
+.pd-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+
+.pd-chev {
+  width: 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.pd-path {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--fs-sm) var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pd-dir {
+  color: var(--muted);
+}
+
+.pd-count {
+  font: var(--fs-xs) var(--mono);
+}
+
+.pd-a {
+  color: var(--added);
+}
+
+.pd-d {
+  color: var(--error);
+}
+
+.pd-body {
+  overflow-x: auto;
+  font: 12px / 19px var(--mono);
+}
+
+.pd-line {
+  display: grid;
+  grid-template-columns: 40px 16px 1fr;
+  white-space: pre;
+}
+
+.pd-line.add {
+  background: var(--add);
+}
+
+.pd-line.del {
+  background: var(--del);
+}
+
+.pd-no {
+  padding-right: 8px;
+  color: var(--faint);
+  text-align: right;
+  user-select: none;
+}
+
+.pd-line.add .pd-sign {
+  color: var(--added);
+}
+
+.pd-line.del .pd-sign {
+  color: var(--error);
+}
+
+.pd-gap {
+  padding-left: 48px;
+  color: var(--faint);
+}
+
+.pd-warn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 6px;
+  background: rgb(210 153 34 / 14%);
+  color: var(--amber);
+  font-size: var(--fs-sm);
+}
+
+.thread-block .pd-head button,
+.thread-block .pd-warn button {
+  padding: 1px 8px;
+  font-size: var(--fs-xs);
+}
+
+.apply-dialog {
+  width: min(600px, 92vw);
+  max-height: 70vh;
+}
+
+.apply-dialog h3 {
+  margin: 0;
+  font-size: var(--fs);
+}
+
+.apply-dialog p {
+  margin: 0;
+}
+
+.apply-files {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.apply-dialog .apply-go {
+  border-color: var(--added);
+  background: var(--added);
+  color: #0b1f10;
+  font-weight: 600;
+}
+
+.apply-dialog .apply-go:hover:not(:disabled) {
+  background: var(--added);
+  filter: brightness(1.1);
+}
+
+.apply-dialog kbd {
+  color: inherit;
+}

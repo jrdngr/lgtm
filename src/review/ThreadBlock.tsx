@@ -5,6 +5,7 @@ import { viewerLogin } from "../github/people";
 import { Icon, IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
+import { ApplyDialog } from "./ApplyDialog";
 import { SAVE_KEY } from "./AskBox";
 import { StageStrip } from "./StageStrip";
 import { ThreadFlow } from "./ThreadFlow";
@@ -133,6 +134,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
       <GhThread link={gh} viewer={viewer} />
+      {c.confirming === id && <ApplyDialog comment={comment} c={c} />}
       <ThreadFlow
         comment={comment}
         c={c}

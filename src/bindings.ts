@@ -128,6 +128,10 @@ export const commands = {
 	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
 	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
 	resetThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
+	/**  Writes a thread's proposed code changes to the working copy. */
+	applyProposal: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("apply_proposal", { review, comment })),
+	/**  Drops a thread's proposed change to `path`, or all of them without one. */
+	discardProposal: (review: number, comment: number, path: string | null) => typedError<StateDto, string>(__TAURI_INVOKE("discard_proposal", { review, comment, path })),
 	/**  Marks a note done, or open again. */
 	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
 	/**  Starts a GitHub draft on a note's code, with its text. */
@@ -1116,6 +1120,24 @@ export type PromptInfo = {
 	exists: boolean,
 };
 
+/**
+ *  A change to one file the agent proposed in a thread's chat, written once the reply is
+ *  final. `before` is empty for a new file.
+ */
+export type Proposed = {
+	/**  Relative to the workspace root. */
+	path: string,
+	before: string,
+	after: string,
+	state: ProposedState,
+};
+
+/**
+ *  Where a proposed file change is: waiting for the reply to go final, written, or not
+ *  written because the file changed after it was proposed.
+ */
+export type ProposedState = "proposed" | "applied" | "stale";
+
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
 export type QState = "open" | "decided" | 
@@ -1551,6 +1573,8 @@ export type ThreadState = {
 	take: Take | null,
 	/**  A few words on what the thread asks, from triage. */
 	summary: string,
+	/**  Code changes the agent's reply promises, by file. */
+	proposal?: Proposed[],
 };
 
 /**  A tool that's missing or too old. */

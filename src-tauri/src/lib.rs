@@ -95,6 +95,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::add_comment,
             commands::comments::set_thread_stage,
             commands::comments::reset_thread,
+            commands::comments::apply_proposal,
+            commands::comments::discard_proposal,
             commands::comments::set_note_done,
             commands::comments::draft_from_note,
             commands::comments::edit_comment,

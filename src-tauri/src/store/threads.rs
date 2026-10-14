@@ -47,6 +47,28 @@ pub struct Take {
     pub question: Option<String>,
 }
 
+/// Where a proposed file change is: waiting for the reply to go final, written, or not
+/// written because the file changed after it was proposed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum ProposedState {
+    Proposed,
+    Applied,
+    Stale,
+}
+
+/// A change to one file the agent proposed in a thread's chat, written once the reply is
+/// final. `before` is empty for a new file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Proposed {
+    /// Relative to the workspace root.
+    pub path: String,
+    pub before: String,
+    pub after: String,
+    pub state: ProposedState,
+}
+
 /// A thread's place in the workflow, kept across syncs and restarts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +80,9 @@ pub struct ThreadState {
     pub take: Option<Take>,
     /// A few words on what the thread asks, from triage.
     pub summary: String,
+    /// Code changes the agent's reply promises, by file.
+    #[serde(default)]
+    pub proposal: Vec<Proposed>,
 }
 
 impl ThreadState {
@@ -68,6 +93,7 @@ impl ThreadState {
             stage,
             take: None,
             summary: String::new(),
+            proposal: vec![],
         }
     }
 

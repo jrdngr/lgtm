@@ -119,6 +119,34 @@ pub(crate) async fn workshop_comment(
         .map_err(err)
 }
 
+/// Writes a thread's proposed code changes to the working copy.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn apply_proposal(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .apply_proposal(review, comment)
+        .await
+        .map_err(err)
+}
+
+/// Drops a thread's proposed change to `path`, or all of them without one.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn discard_proposal(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+    path: Option<String>,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .discard_proposal(review, comment, path)
+        .map_err(err)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn stop_workshop(

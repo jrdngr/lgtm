@@ -78,7 +78,20 @@ pub(super) fn chat_schema() -> String {
     "verdict": {VERDICTS},
     "why": {{ "type": "string" }},
     "question": {{ "type": "string" }},
-    "reply": {{ "type": "string" }}
+    "reply": {{ "type": "string" }},
+    "edits": {{
+      "type": "array",
+      "items": {{
+        "type": "object",
+        "properties": {{
+          "path": {{ "type": "string" }},
+          "old": {{ "type": "string" }},
+          "new": {{ "type": "string" }}
+        }},
+        "required": ["path", "old", "new"],
+        "additionalProperties": false
+      }}
+    }}
   }},
   "required": ["message"],
   "additionalProperties": false
@@ -119,6 +132,9 @@ pub(super) struct ChatTurn {
     pub why: Option<String>,
     pub question: Option<String>,
     pub reply: Option<String>,
+    /// The code changes the reply promises, replacing any proposed before.
+    #[serde(default)]
+    pub edits: Option<Vec<super::proposal::EditDto>>,
 }
 
 fn take(verdict: TakeVerdict, why: String, question: Option<String>) -> Take {
@@ -402,6 +418,7 @@ impl RepoCtx {
                 why: Some(take.why),
                 question: take.question,
                 reply,
+                edits: None,
             };
             let before = c.body.clone();
             apply_chat(&mut c, turn);
@@ -430,6 +447,13 @@ impl RepoCtx {
 }
 
 /// A chat turn on a thread. The first carries the change, the rules, and the thread.
+/// How a turn that can't edit files offers the code changes its reply promises.
+const PROPOSE: &str = "\n\nYou can't edit files in this turn. When the reply promises a code \
+change, return it in `edits` as exact replacements: `path` from the repository root, `old` \
+copied exactly from the file and unique in it (empty for a new file), and `new`. They're \
+written when I make the reply final. Return `edits` only when the proposed changes should \
+change; it replaces the ones before, and an empty list drops them.";
+
 pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String)>) -> String {
     const EDIT: &str = "Edit the files directly and change only what's needed.";
     let asked = match (ask.change, ask.message.trim().is_empty()) {
@@ -450,7 +474,8 @@ pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String
     let turn = format!(
         "My reply draft now:\n\n{draft}\n\n{asked}\n\nAnswer in `message`, briefly. When the \
          reply should change, also return the whole new reply. Return a new verdict and why only \
-         when your view of the thread itself changes, never to describe edits to the reply."
+         when your view of the thread itself changes, never to describe edits to the reply.{}",
+        if ask.change { "" } else { PROPOSE }
     );
     match intro {
         None => turn,
@@ -528,6 +553,7 @@ mod tests {
             why: Some("2 is enough".into()),
             question: Some(" ".into()),
             reply: reply.map(String::from),
+            edits: None,
         };
         assert_eq!(apply_chat(&mut c, turn(Some("new"))), ("ok".into(), true));
         let t = c.thread.as_ref().unwrap();
