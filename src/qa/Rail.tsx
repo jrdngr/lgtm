@@ -49,7 +49,7 @@ export function Rail({ questions, current, updating, onPick }: Props) {
               ? `Dropped: ${q.dropped}`
               : q.depends.length
                 ? `Depends on ${q.depends.join(", ")}`
-                : "Independent"
+                : undefined
           }
           disabled={q.state === "dropped"}
           onClick={() => onPick(q.id)}

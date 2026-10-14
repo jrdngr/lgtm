@@ -17,12 +17,7 @@ export function Deps({ d, q, onPick }: { d: Session; q: Question; onPick(id: str
   const byId = (id: string) => d.queue.questions.find((x) => x.id === id);
   const needs = q.depends.map(byId).filter((x): x is Question => !!x && x.state !== "dropped");
   const feeds = dependents(d, q.id);
-  if (!needs.length && !feeds.length)
-    return (
-      <div className="qq-deps">
-        <span className="qq-deps-label">Independent</span>
-      </div>
-    );
+  if (!needs.length && !feeds.length) return null;
   return (
     <div className="qq-deps">
       {needs.length > 0 && <span className="qq-deps-label">Depends on</span>}
