@@ -81,6 +81,50 @@ pub fn write(path: &Path, name: &str, text: &str) -> anyhow::Result<()> {
     std::fs::write(path, text).with_context(|| format!("can't save {name}"))
 }
 
+/// Fails when `path`'s folder resolves outside `root` through a symlink, so creating, moving
+/// or trashing can't reach past the workspace. `path` itself may be a symlink.
+pub fn confine(root: &Path, path: &Path) -> anyhow::Result<()> {
+    let root = root.canonicalize()?;
+    let mut dir = path.parent();
+    while let Some(d) = dir {
+        if let Ok(real) = d.canonicalize() {
+            if !real.starts_with(&root) {
+                bail!("{} leads outside the workspace", path.display());
+            }
+            return Ok(());
+        }
+        dir = d.parent();
+    }
+    bail!("{} isn't in the workspace", path.display())
+}
+
+/// Makes an empty file, or a folder when `dir`, failing when something is already there.
+pub fn create(path: &Path, name: &str, dir: bool) -> anyhow::Result<()> {
+    if path.exists() {
+        bail!("{name} already exists");
+    }
+    let made = if dir {
+        std::fs::create_dir_all(path)
+    } else {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).with_context(|| format!("can't create {name}"))?;
+        }
+        std::fs::File::create_new(path).map(drop)
+    };
+    made.with_context(|| format!("can't create {name}"))
+}
+
+/// Moves `from` to `to`, failing when `to` is taken. Names are for errors.
+pub fn rename(from: &Path, to: &Path, to_name: &str) -> anyhow::Result<()> {
+    if to.exists() {
+        bail!("{to_name} already exists");
+    }
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("can't move to {to_name}"))?;
+    }
+    std::fs::rename(from, to).with_context(|| format!("can't move to {to_name}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,5 +190,30 @@ mod tests {
         assert_eq!(read(&a, "a.txt").unwrap(), "new");
         std::fs::write(root.join("bin"), [0xff, 0xfe]).unwrap();
         assert!(read(&root.join("bin"), "bin").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn confines_paths_behind_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::os::unix::fs::symlink(outside.path(), root.join("link")).unwrap();
+        assert!(confine(root, &root.join("link/x")).is_err());
+        assert!(confine(root, &root.join("link/new/x")).is_err());
+        confine(root, &root.join("link")).unwrap();
+        confine(root, &root.join("new/x")).unwrap();
+    }
+
+    #[test]
+    fn creates_and_renames_without_overwriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        create(&root.join("a/b.txt"), "a/b.txt", false).unwrap();
+        assert!(create(&root.join("a/b.txt"), "a/b.txt", false).is_err());
+        create(&root.join("c"), "c", true).unwrap();
+        assert!(rename(&root.join("a/b.txt"), &root.join("c"), "c").is_err());
+        rename(&root.join("a/b.txt"), &root.join("d/e.txt"), "d/e.txt").unwrap();
+        assert!(root.join("d/e.txt").is_file() && !root.join("a/b.txt").exists());
     }
 }

@@ -4,6 +4,7 @@ import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
 import { commands } from "../ipc";
 import { useGithubOff } from "../tools/agents";
+import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type WorkspaceName, workspaceKey } from "./context";
@@ -19,10 +20,12 @@ interface Props {
   /** `setup` is set for a new workspace whose first terminal runs `.lgtm/setup`. */
   onSelect(name: WorkspaceName, setup?: boolean): void;
   onDeleted(name: string): void;
+  /** Hides the left panel. */
+  onHide(): void;
 }
 
 /** The repo's workspaces with review progress. Click one to switch to it. */
-export function WorkspacesSidebar({ list, selected, onSelect, onDeleted }: Props) {
+export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide }: Props) {
   const { workspaces, progress, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
   const [openingPr, setOpeningPr] = useState(false);
@@ -66,8 +69,19 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted }: Props
     reload();
   }
 
+  /** The menu of the header and the space around the rows. Text fields keep their own. */
+  function menu(e: React.MouseEvent) {
+    if ((e.target as Element).closest("input, textarea")) return;
+    openMenu(e, [
+      { label: "New Workspace…", onSelect: () => setNaming(true) },
+      { label: "Review a GitHub PR…", disabled: githubOff, onSelect: () => setOpeningPr(true) },
+      "-",
+      { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide },
+    ]);
+  }
+
   return (
-    <div className="workspaces">
+    <div className="workspaces" onContextMenu={menu}>
       <SectionHeader title="Workspaces">
         <IconButton
           icon="pr"

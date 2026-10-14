@@ -205,6 +205,26 @@ pub fn is_persona_file(root: &Path, path: &Path) -> bool {
         && (in_dir(&repo_dir(root)) || global_dir().is_some_and(|d| in_dir(&d)))
 }
 
+/// Copies persona file `path` to `name` beside it, adding `.md` when `name` has no extension.
+/// Returns the copy's path.
+pub fn duplicate(root: &Path, path: &Path, name: &str) -> anyhow::Result<PathBuf> {
+    anyhow::ensure!(is_persona_file(root, path), "{} isn't a persona", path.display());
+    let name = name.trim();
+    anyhow::ensure!(
+        !name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\']),
+        "{name} isn't a file name"
+    );
+    let file = if Path::new(name).extension().is_some() {
+        name.to_string()
+    } else {
+        format!("{name}.md")
+    };
+    let to = path.with_file_name(file);
+    anyhow::ensure!(!to.exists(), "{} already exists", to.display());
+    std::fs::copy(path, &to)?;
+    Ok(to)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

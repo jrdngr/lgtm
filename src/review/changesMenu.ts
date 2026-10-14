@@ -1,0 +1,86 @@
+import type { MarkColor, StateDto } from "../bindings";
+import { openFile } from "../editor/open";
+import { type CommandResult, commands, unwrap } from "../ipc";
+import { type CtxEntry, copy } from "../ui/contextMenu";
+import { absolutePath, pathItems, run } from "../ui/pathMenu";
+import type { WorkspaceName } from "../workspaces/context";
+import type { CurrentReview } from "./current";
+import type { MarkSetup } from "./marks";
+import { dirPaths, type TreeDir } from "./tree";
+
+const apply = (review: CurrentReview, r: Promise<CommandResult<StateDto>>) =>
+  run(unwrap(r).then(review.apply));
+
+/** Marks every changed row of `file`. The first mark, when it counts as done, also checks
+ * the file, as marking a whole file in the review does. */
+function markFile(review: CurrentReview, setup: MarkSetup, file: number, color: MarkColor) {
+  const rows = review.files[file].rows.flatMap((r, row) =>
+    r.kind === "context" ? [] : [{ file, row }],
+  );
+  const check = color === setup.primary ? [file] : [];
+  apply(review, commands.markRows(review.id, rows, color, check));
+}
+
+export function fileMenu(
+  ws: WorkspaceName,
+  review: CurrentReview,
+  setup: MarkSetup,
+  file: number,
+): CtxEntry[] {
+  const { path, status } = review.files[file].dto;
+  const checked = review.checks[file] === "checked";
+  return [
+    { label: "Jump to File", onSelect: () => review.jump(file) },
+    {
+      label: "Check File",
+      keys: "x",
+      checked,
+      onSelect: () => apply(review, commands.setFilesChecked(review.id, [file], !checked)),
+    },
+    {
+      label: "Mark File With",
+      items: setup.shown.map((s, i) => ({
+        label: setup.label(s.color),
+        keys: `${i + 1}`,
+        onSelect: () => markFile(review, setup, file, s.color),
+      })),
+    },
+    {
+      label: "Clear Marks in File",
+      onSelect: () => apply(review, commands.clearFileMarks(review.id, file)),
+    },
+    "-",
+    status !== "removed" && { label: "Open File", onSelect: () => openFile(ws, path) },
+    ...(status === "removed" ? [] : pathItems(ws, path, { relative: false, files: true })),
+  ];
+}
+
+/** The review's files under `dir`. */
+function filesIn(dir: TreeDir): number[] {
+  return dir.children.flatMap((c) => (c.kind === "dir" ? filesIn(c) : [c.file]));
+}
+
+export function dirMenu(
+  ws: WorkspaceName,
+  review: CurrentReview,
+  dir: TreeDir,
+  closed: ReadonlySet<string>,
+  setClosed: (next: ReadonlySet<string>) => void,
+): CtxEntry[] {
+  const files = filesIn(dir);
+  const check = (on: boolean) => () =>
+    apply(review, commands.setFilesChecked(review.id, files, on));
+  const inside = [dir.path, ...dirPaths(dir)];
+  return [
+    { label: "Check All Files", onSelect: check(true) },
+    { label: "Uncheck All Files", onSelect: check(false) },
+    "-",
+    {
+      label: "Expand All",
+      onSelect: () => setClosed(new Set([...closed].filter((p) => !inside.includes(p)))),
+    },
+    { label: "Collapse All", onSelect: () => setClosed(new Set([...closed, ...inside])) },
+    "-",
+    { label: "Copy Path", onSelect: () => copy(absolutePath(ws, dir.path)) },
+  ];
+}

@@ -1,11 +1,13 @@
 import type { BotRun } from "../bindings";
 import { commands } from "../ipc";
+import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
+import { confirmAction } from "../ui/prompt";
 import { ago, fullDate } from "../ui/time";
 import type { WorkspaceName } from "../workspaces/context";
 import { finalFindings, report } from "./findings";
 import { runDetail, runState } from "./personas";
-import { RunControls } from "./RunControls";
+import { type Act, RunControls } from "./RunControls";
 import { forgetRun, runAction, useRuns } from "./runs";
 import { SevTag } from "./Severity";
 
@@ -39,6 +41,7 @@ export function RunList({ workspace, onOpen, onError }: Props) {
   const runs = useRuns(workspace);
 
   async function remove(run: BotRun) {
+    if (!(await confirmAction("Delete this run and its findings?", "Delete"))) return;
     const r = await commands.deleteBots(run.id);
     if (r.status === "error") return onError(r.error);
     forgetRun(run.id);
@@ -53,8 +56,30 @@ export function RunList({ workspace, onOpen, onError }: Props) {
       <ul className="bots-runs">
         {runs.map((run) => {
           const { state } = runState(run);
+          const act = (f: Parameters<Act>[0]) => runAction(run, f, onError);
+          // The backend won't delete a run while it or one of its fixes runs.
+          const del = !run.active &&
+            !run.fixes?.some((f) => f.status === "running") && {
+              label: "Delete Run…",
+              danger: true,
+              onSelect: () => remove(run),
+            };
+          const menu = contextMenu(() => [
+            { label: "Open Findings", onSelect: () => onOpen(run) },
+            {
+              label: "Stop",
+              disabled: !run.active,
+              onSelect: () => act(() => commands.stopBots(run.id)),
+            },
+            state === "halted" && {
+              label: "Retry",
+              onSelect: () => act(() => commands.continueBots(run.id, run.options)),
+            },
+            "-",
+            del,
+          ]);
           return (
-            <li key={run.id}>
+            <li key={run.id} onContextMenu={menu}>
               <button type="button" className="bots-run" onClick={() => onOpen(run)}>
                 <span className={`bots-dot bots-dot-${state}`} />
                 <span className="bots-run-title">
@@ -69,19 +94,8 @@ export function RunList({ workspace, onOpen, onError }: Props) {
               </button>
               <span className="bots-run-side">
                 <span className="bots-run-actions reveal">
-                  <RunControls run={run} act={(f) => runAction(run, f, onError)} />
-                  <Menu
-                    label="Run actions"
-                    items={[
-                      // The backend won't delete a run while it or one of its fixes runs.
-                      !run.active &&
-                        !run.fixes?.some((f) => f.status === "running") && {
-                          label: "Delete",
-                          danger: true,
-                          onSelect: () => remove(run),
-                        },
-                    ]}
-                  />
+                  <RunControls run={run} act={act} />
+                  <Menu label="Run actions" items={[del]} />
                 </span>
                 {run.createdAt !== null && (
                   <span className="bots-run-time" title={fullDate(run.createdAt)}>

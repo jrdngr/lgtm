@@ -3,6 +3,7 @@ import type { Finding } from "../bindings";
 import { openFile } from "../editor/open";
 import { useCurrentReview } from "../review/current";
 import { rowsText } from "../review/sendText";
+import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { useWorkspace } from "../workspaces/context";
 import { type Exchange, findingText, locationText, place } from "./findings";
@@ -76,6 +77,35 @@ export function FindingCard(props: Props) {
     }
   }
 
+  function openLocation(i: number) {
+    const at = placed[i];
+    if (at && review) review.jumpToRow(at.file, at.row);
+    else openFile(workspace, f.locations[i].path, f.locations[i].start ?? undefined);
+  }
+
+  const menu = contextMenu(() => [
+    { label: "Open Location", disabled: !f.locations.length, onSelect: () => openLocation(0) },
+    {
+      label: "Send to Terminal",
+      disabled: !review,
+      onSelect: () => onSend(findingText(f, source)),
+    },
+    { label: "Keep as Note", disabled: !first || !!kept, onSelect: () => keep(false) },
+    canDraft && {
+      label: "Draft PR Comment",
+      disabled: !first || !!kept,
+      onSelect: () => keep(true),
+    },
+    "-",
+    { label: "Select for Batch", checked, onSelect: onCheck },
+    { label: "Copy Finding", onSelect: () => copy(findingText(f, source)) },
+    "-",
+    state !== "fixed" && {
+      label: state === "dismissed" ? "Bring Back" : "Dismiss",
+      onSelect: () => onDismiss(state !== "dismissed"),
+    },
+  ]);
+
   const id = f.id?.includes("#") ? f.id : `#${f.id}`;
   const who = raisers
     ? raisers.map((r, i) => (
@@ -88,7 +118,7 @@ export function FindingCard(props: Props) {
     : `${source}${f.offLens ? " (off-lens)" : ""}`;
 
   return (
-    <div className={`finding${state ? " settled" : ""}`} data-finding={f.id}>
+    <div className={`finding${state ? " settled" : ""}`} data-finding={f.id} onContextMenu={menu}>
       <div className="finding-top">
         <input
           type="checkbox"
@@ -146,11 +176,7 @@ export function FindingCard(props: Props) {
             // biome-ignore lint/suspicious/noArrayIndexKey: a finding's locations never reorder
             key={i}
             title={placed[i] ? "Show in the review" : "Open in the editor"}
-            onClick={() => {
-              const at = placed[i];
-              if (at && review) review.jumpToRow(at.file, at.row);
-              else openFile(workspace, loc.path, loc.start ?? undefined);
-            }}
+            onClick={() => openLocation(i)}
           >
             {locationText(loc)}
           </button>

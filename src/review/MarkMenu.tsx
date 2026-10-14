@@ -4,12 +4,24 @@ import { colorForKey, type MarkSetup, markVar } from "./marks";
 import { plural } from "./state";
 import "./MarkMenu.css";
 
-export type MenuAction = MarkColor | "clear" | "comment" | "change" | "agent" | "copy";
+export type MenuAction =
+  | MarkColor
+  | "clear"
+  | "comment"
+  | "draft"
+  | "change"
+  | "agent"
+  | "copy"
+  | "location"
+  | "open"
+  | "collapse";
 
 const LETTERS: Record<string, MenuAction> = {
   c: "comment",
+  C: "draft",
   g: "change",
   a: "agent",
+  o: "open",
 };
 
 /** The menu item a key picks: a mark color's number, 0 to clear, or an action's letter. */
@@ -18,19 +30,17 @@ export function menuAction(key: string, setup: MarkSetup): MenuAction | undefine
   return colorForKey(setup, key) ?? LETTERS[key];
 }
 
-const ACTIONS: { action: MenuAction; key?: string; label: string }[] = [
-  { action: "clear", key: "0", label: "Clear mark" },
-  { action: "comment", key: "c", label: "Comment" },
-  { action: "change", key: "g", label: "Change with agent" },
-  { action: "agent", key: "a", label: "Send to agent" },
-  { action: "copy", label: "Copy" },
-];
+type Item = { action: MenuAction; key?: string; label: string } | "-";
 
 interface Props {
   x: number;
   y: number;
   changed: number;
   setup: MarkSetup;
+  /** Shows Draft PR Comment, in a PR workspace. */
+  canDraft: boolean;
+  /** Shows Collapse Hunk, when the cursor is in a hunk. */
+  inHunk: boolean;
   onPick(action: MenuAction): void;
   onClose(): void;
 }
@@ -51,8 +61,21 @@ function useKeptInside(x: number, y: number) {
   return { ref, place };
 }
 
-export function MarkMenu({ x, y, changed, setup, onPick, onClose }: Props) {
+export function MarkMenu({ x, y, changed, setup, canDraft, inHunk, onPick, onClose }: Props) {
   const { ref, place } = useKeptInside(x, y);
+  const items: Item[] = [
+    { action: "clear", key: "0", label: "Clear Mark" },
+    "-",
+    { action: "comment", key: "c", label: "Comment" },
+    ...(canDraft ? [{ action: "draft", key: "C", label: "Draft PR Comment" } as const] : []),
+    { action: "change", key: "g", label: "Change with Agent" },
+    { action: "agent", key: "a", label: "Send to Agent" },
+    "-",
+    { action: "copy", key: "⌘C", label: "Copy" },
+    { action: "location", label: "Copy with Location" },
+    { action: "open", key: "o", label: "Open File at Line" },
+    ...(inHunk ? [{ action: "collapse", key: "za", label: "Collapse Hunk" } as const] : []),
+  ];
   return (
     <>
       <div
@@ -71,12 +94,17 @@ export function MarkMenu({ x, y, changed, setup, onPick, onClose }: Props) {
             {setup.label(s.color)}
           </button>
         ))}
-        {ACTIONS.map((item) => (
-          <button type="button" key={item.action} onClick={() => onPick(item.action)}>
-            <span className="menu-key">{item.key ?? ""}</span>
-            {item.label}
-          </button>
-        ))}
+        {items.map((item, i) =>
+          item === "-" ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity
+            <hr key={i} className="menu-sep" />
+          ) : (
+            <button type="button" key={item.action} onClick={() => onPick(item.action)}>
+              <span className="menu-key">{item.key ?? ""}</span>
+              {item.label}
+            </button>
+          ),
+        )}
       </div>
     </>
   );

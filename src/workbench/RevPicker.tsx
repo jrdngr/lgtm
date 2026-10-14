@@ -1,8 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { commands } from "../ipc";
 import { RevisionsPanel } from "../review/RevisionsPanel";
 import { RevLabel } from "../review/RevLabel";
 import { onOpenRevisions, type ReviewTarget, useReviewTarget } from "../review/target";
+import { contextMenu } from "../ui/contextMenu";
 import type { WorkspaceName } from "../workspaces/context";
+import { revsetMenu } from "./revsetMenu";
 import "../review/ReviewBar.css";
 
 /** The full revset, its change count, and staleness, over the field. */
@@ -18,6 +21,7 @@ function hover({ revset, changes, stale }: ReviewTarget) {
 export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
   const target = useReviewTarget(workspace);
   const [open, setOpen] = useState(false);
+  const [trunk, setTrunk] = useState<string | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
   /** The field's width with a label in it, kept while the next review loads. */
   const width = useRef<number>(undefined);
@@ -29,6 +33,14 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
       }),
     [workspace],
   );
+
+  useEffect(() => {
+    let live = true;
+    commands.trunkBookmark(workspace).then((r) => live && r.status === "ok" && setTrunk(r.data));
+    return () => {
+      live = false;
+    };
+  }, [workspace]);
 
   const loading = !target || (target.loading && target.changes.length === 0);
   const head = target?.changes.at(-1);
@@ -52,6 +64,9 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
         disabled={!target}
         aria-busy={loading}
         onClick={() => setOpen(true)}
+        onContextMenu={contextMenu(() =>
+          revsetMenu({ workspace, target, trunk, openRevisions: () => setOpen(true) }),
+        )}
         style={loading ? { width: width.current } : undefined}
         title={loading || !target ? "Revisions (@)" : hover(target)}
       >

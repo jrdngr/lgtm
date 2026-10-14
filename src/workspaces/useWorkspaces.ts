@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProgressDto, WorkspaceDto } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
-import { workspaceKey } from "./context";
+import { type WorkspaceName, workspaceKey } from "./context";
 import { useRepoChanged } from "./useRepoChanged";
 
 const listeners = new Set<() => void>();
+const roots = new Map<string, string>();
+
+/** A workspace's directory, once the workspace list has loaded. */
+export const workspaceRoot = (name: WorkspaceName) => roots.get(workspaceKey(name));
 
 /** Tells the workspace list that marks changed, which no jj operation reports. */
 export function marksChanged() {
@@ -32,6 +36,7 @@ export function useWorkspaces() {
     try {
       const list = await unwrap(commands.listWorkspaces());
       setWorkspaces(list);
+      for (const w of list) roots.set(workspaceKey(w.name), w.root);
       setLoadError(undefined);
       const entries = await Promise.all(
         list.map(async (w) => {

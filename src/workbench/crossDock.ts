@@ -83,3 +83,18 @@ function move(
   });
   return added.group;
 }
+
+/** Moves `panel` from dock `from` into the active pane of `to`. Returns the moved panel, or
+ * undefined for an editor with unsaved edits, which stays put. */
+export function moveAcross(
+  panel: IDockviewPanel,
+  from: DockviewApi,
+  to: DockviewApi,
+  workspace: WorkspaceName,
+): IDockviewPanel | undefined {
+  if (isUnsaved(workspace, panel.id)) return undefined;
+  const group = to.activeGroup ?? to.groups[0] ?? to.addGroup();
+  move(panel, to, group, "center");
+  if (from.groups.length === 0) from.addGroup();
+  return to.getPanel(panel.id);
+}

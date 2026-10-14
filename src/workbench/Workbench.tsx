@@ -1,10 +1,12 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { onAnyReveal } from "../editor/reveal";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useSettingsMenu } from "../settings/open";
 import { showThread } from "../threads/focus";
 import { McpOffer } from "../tools/McpOffer";
+import { PromptHost } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { useWorkspaces } from "../workspaces/useWorkspaces";
@@ -123,6 +125,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     else focusPanel(dock.activePanel);
   }
 
+  useEffect(() => onAnyReveal(() => showView("right", "repo")));
+
   const panelKeys: Partial<Record<string, () => void>> = {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
@@ -192,6 +196,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         />
       </header>
       <McpOffer />
+      <PromptHost />
       <div className="workbench-body">
         <SidePanel
           side="left"
@@ -209,6 +214,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
                   selected={selected}
                   onSelect={select}
                   onDeleted={forget}
+                  onHide={() => toggle("left")}
                 />
               ),
             },
@@ -234,6 +240,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
             onChange={(right) => updateSide("right", () => right)}
             bodyRef={rightBody}
             onOpenReport={(run) => withApi((a) => openReport(a, run.id))()}
+            onHide={() => toggle("right")}
           />
         </WorkspaceContext.Provider>
       </div>

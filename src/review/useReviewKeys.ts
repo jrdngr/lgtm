@@ -50,16 +50,27 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
 
   return (e) => {
     if (isEditable(e.target)) return;
+    const mod = isMac ? e.metaKey : e.ctrlKey;
     if (ctx.menu) {
+      // Selected code text copies natively, as it does with the menu closed.
+      if (mod && e.key.toLowerCase() === "c" && window.getSelection()?.isCollapsed === false) {
+        ctx.closeMenu();
+        return;
+      }
       e.preventDefault();
+      const z = pendingZ.current;
+      pendingZ.current = false;
       if (e.key === "Escape") ctx.closeMenu();
+      else if (mod) {
+        if (e.key.toLowerCase() === "c") ctx.pick("copy");
+      } else if (e.key === "z") pendingZ.current = true;
+      else if (z && e.key === "a") ctx.pick("collapse");
       else {
         const action = menuAction(e.key, ctx.setup);
         if (action && !e.repeat) ctx.pick(action);
       }
       return;
     }
-    const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod) {
       const key = e.key.toLowerCase();
       if (key === "a") select(reviewSelection(lines));

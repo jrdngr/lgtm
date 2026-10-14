@@ -23,6 +23,13 @@ pub enum JjAction {
     Squash {
         rev: String,
     },
+    Describe {
+        rev: String,
+        message: String,
+    },
+    Abandon {
+        rev: String,
+    },
     /// Undo or redo the last `steps` operations, as many as the action being undone ran.
     Undo {
         steps: u32,
@@ -39,6 +46,8 @@ impl JjAction {
             JjAction::NewAfter { rev } => vec!["new", rev],
             JjAction::NewBefore { rev } => vec!["new", "--insert-before", rev],
             JjAction::Squash { rev } => vec!["squash", "--use-destination-message", "-r", rev],
+            JjAction::Describe { rev, message } => vec!["describe", rev, "-m", message],
+            JjAction::Abandon { rev } => vec!["abandon", rev],
             JjAction::Undo { .. } => vec!["undo"],
             JjAction::Redo { .. } => vec!["redo"],
         }

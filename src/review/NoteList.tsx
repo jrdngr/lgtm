@@ -1,8 +1,12 @@
-import { useState } from "react";
-import type { CommentDto } from "../bindings";
+import type { CommentDto, StateDto } from "../bindings";
 import { Inline } from "../bots/Markdown";
+import { type CommandResult, commands, unwrap } from "../ipc";
+import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
+import { run } from "../ui/pathMenu";
+import { confirmAction, promptText } from "../ui/prompt";
 import { Empty } from "../ui/SectionHeader";
+import { commentText } from "./comments";
 import type { CurrentReview } from "./current";
 import type { FlatFile } from "./model";
 
@@ -31,11 +35,55 @@ function byFile(comments: CommentDto[]): [string, CommentDto[]][] {
   return out;
 }
 
-function NoteItem({ c, review }: { c: CommentDto; review: CurrentReview }) {
+interface ItemProps {
+  c: CommentDto;
+  review: CurrentReview;
+  /** In a PR workspace, so a note can become a draft for GitHub. */
+  canDraft: boolean;
+}
+
+function noteMenu({ c, review, canDraft }: ItemProps): CtxEntry[] {
+  const apply = (r: Promise<CommandResult<StateDto>>) => run(unwrap(r).then(review.apply));
+  async function edit() {
+    const body = await promptText("Edit Note", { value: c.body, action: "Save", multiline: true });
+    if (body !== undefined && body !== c.body) apply(commands.editComment(review.id, c.id, body));
+  }
+  async function remove() {
+    if (await confirmAction("Delete this note?", "Delete")) {
+      apply(commands.deleteComment(review.id, c.id));
+    }
+  }
+  return [
+    { label: "Jump to Note", onSelect: () => review.jumpToComment(c.id) },
+    { label: "Edit", onSelect: edit },
+    {
+      label: "Done",
+      checked: c.done,
+      onSelect: () => apply(commands.setNoteDone(review.id, c.id, !c.done)),
+    },
+    { label: "Send to Terminal", onSelect: () => review.send(commentText(review.files, c)) },
+    canDraft && {
+      label: "Draft PR Comment",
+      onSelect: () => apply(commands.draftFromNote(review.id, c.id)),
+    },
+    "-",
+    { label: "Copy Text", onSelect: () => copy(c.body), disabled: !c.body },
+    "-",
+    { label: "Delete Note…", onSelect: remove },
+  ];
+}
+
+function NoteItem(props: ItemProps) {
+  const { c, review } = props;
   const line = lineOf(review.files, c);
   const agent = agentState(c);
   return (
-    <button type="button" className="comment-item" onClick={() => review.jumpToComment(c.id)}>
+    <button
+      type="button"
+      className="comment-item"
+      onClick={() => review.jumpToComment(c.id)}
+      onContextMenu={contextMenu(() => noteMenu(props))}
+    >
       <span className="item-icon">
         {agent && <Icon name={agent === "changed" ? "edit" : "sparkle"} />}
       </span>
@@ -50,10 +98,17 @@ function NoteItem({ c, review }: { c: CommentDto; review: CurrentReview }) {
   );
 }
 
+interface Props {
+  review: CurrentReview;
+  notes: CommentDto[];
+  canDraft: boolean;
+  showDone: boolean;
+  setShowDone(show: boolean): void;
+}
+
 /** The review's notes grouped by file, with done ones folded at the end. Click one to jump to
  * it. */
-export function NoteList({ review, notes }: { review: CurrentReview; notes: CommentDto[] }) {
-  const [showDone, setShowDone] = useState(false);
+export function NoteList({ review, notes, canDraft, showDone, setShowDone }: Props) {
   if (notes.length === 0) {
     return (
       <Empty>
@@ -73,7 +128,7 @@ export function NoteList({ review, notes }: { review: CurrentReview; notes: Comm
             <span>{group.length}</span>
           </div>
           {group.map((c) => (
-            <NoteItem key={c.id} c={c} review={review} />
+            <NoteItem key={c.id} c={c} review={review} canDraft={canDraft} />
           ))}
         </div>
       ))}
@@ -90,7 +145,8 @@ export function NoteList({ review, notes }: { review: CurrentReview; notes: Comm
             <span className="spacer" />
             <span>{done.length}</span>
           </button>
-          {showDone && done.map((c) => <NoteItem key={c.id} c={c} review={review} />)}
+          {showDone &&
+            done.map((c) => <NoteItem key={c.id} c={c} review={review} canDraft={canDraft} />)}
         </div>
       )}
     </>

@@ -26,6 +26,7 @@ interface Props {
   onChange(next: SideState): void;
   bodyRef: React.RefObject<HTMLDivElement | null>;
   onOpenReport(run: BotRun): void;
+  onHide(): void;
 }
 
 /** The right side panel: the review's changes and symbols, the repo's files, notes, the PR in a

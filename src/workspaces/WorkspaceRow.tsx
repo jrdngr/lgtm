@@ -1,10 +1,12 @@
 import type { ProgressDto, WorkspaceDto } from "../bindings";
 import { usePr } from "../github/pr";
 import { useMarkSetup } from "../review/marks";
+import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { Ring } from "../ui/Ring";
-import { useActivity } from "./activity";
+import { clearFinished, useActivity } from "./activity";
 import { doneShare, progressTitle } from "./progress";
+import { deleteItem, workspaceMenu } from "./workspaceMenu";
 
 /** Characters of a change id shown, its unique prefix included. */
 const ID_LENGTH = 4;
@@ -79,18 +81,26 @@ interface Props {
 /** One workspace: its PR or change, its agents, review progress, and a ⋯ menu on hover. */
 export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete }: Props) {
   const setup = useMarkSetup();
+  const pr = usePr(w.name);
+  const dot = useActivity(w.name)?.kind === "finished";
+  const menu = contextMenu(() =>
+    workspaceMenu({
+      w,
+      pr,
+      dot,
+      open: onSelect,
+      onDelete,
+      onClearDot: () => clearFinished(w.name),
+    }),
+  );
   return (
-    <li className={`workspace${selected ? " selected" : ""}`}>
+    <li className={`workspace${selected ? " selected" : ""}`} onContextMenu={menu}>
       <button type="button" className="workspace-open" onClick={onSelect} title={w.root}>
         <Lines w={w} />
       </button>
       <span className="workspace-side">
         {w.name !== null && (
-          <Menu
-            className="reveal"
-            label="Workspace actions"
-            items={[{ label: "Delete…", danger: true, onSelect: onDelete }]}
-          />
+          <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
         <ActivityMark w={w} />
         {p && p.changed > 0 && <Ring done={doneShare(p)} title={progressTitle(p, setup)} percent />}

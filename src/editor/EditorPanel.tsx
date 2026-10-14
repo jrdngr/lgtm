@@ -3,11 +3,13 @@ import { EditorView } from "@codemirror/view";
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { commands, errorText, unwrap } from "../ipc";
+import { openMenu } from "../ui/contextMenu";
 import { isMac } from "../workbench/keys";
 import { wordWrap } from "../workbench/wordWrap";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { minimalChange } from "./change";
+import { editorMenu, placeAt } from "./editorMenu";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { emitSaved } from "./saved";
@@ -155,6 +157,22 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
     }
   }
 
+  function onContextMenu(e: React.MouseEvent) {
+    if (!view) return;
+    placeAt(view, e);
+    openMenu(
+      e,
+      editorMenu({
+        view,
+        workspace,
+        path,
+        dirty,
+        save: () => void save(),
+        toggleRendered: isMarkdown(path) ? toggleRendered : undefined,
+      }),
+    );
+  }
+
   function keepMine() {
     if (!view || onDisk === undefined) return;
     saved.current = view.state.toText(onDisk);
@@ -192,7 +210,12 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
           <MarkdownView text={rendered} />
         </div>
       )}
-      <div className="editor-host" ref={host} hidden={rendered !== undefined} />
+      <div
+        className="editor-host"
+        ref={host}
+        hidden={rendered !== undefined}
+        onContextMenu={onContextMenu}
+      />
     </div>
   );
 }

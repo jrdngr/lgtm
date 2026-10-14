@@ -1,14 +1,16 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
+import { openMenu } from "../ui/contextMenu";
 import { bottom } from "../workbench/bottom";
 import { useWorkspace } from "../workspaces/context";
 import { registerTerminal, touchTerminal } from "./registry";
 import { openSession, releaseSession } from "./sessions";
+import { terminalMenu } from "./terminalMenu";
 
 type Params = { setup?: boolean };
 
-export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
+export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps<Params>) {
   const ref = useRef<HTMLDivElement>(null);
   const workspace = useWorkspace();
   const setup = useRef(params.setup ?? false);
@@ -37,6 +39,14 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
     });
     const onFocus = () => touchTerminal(api.id);
     term.textarea?.addEventListener("focus", onFocus);
+    const onMenu = (e: MouseEvent) => {
+      const panel = containerApi.getPanel(api.id);
+      if (!panel) return;
+      const inBottom = !!container.closest(".bottom-panel");
+      openMenu(e, terminalMenu({ term, workspace, api: containerApi, panel, inBottom }));
+    };
+    // Bubble phase, after xterm selects the word under the pointer, so Copy can take it.
+    container.addEventListener("contextmenu", onMenu);
 
     const sub = api.onDidActiveChange(({ isActive }) => isActive && term.focus());
     const observer = new ResizeObserver(session.refit);
@@ -46,11 +56,12 @@ export function TerminalPanel({ api, params }: IDockviewPanelProps<Params>) {
     return () => {
       unregister();
       term.textarea?.removeEventListener("focus", onFocus);
+      container.removeEventListener("contextmenu", onMenu);
       observer.disconnect();
       sub.dispose();
       releaseSession(api.id);
     };
-  }, [api, workspace]);
+  }, [api, containerApi, workspace]);
 
   return <div ref={ref} className="terminal" />;
 }

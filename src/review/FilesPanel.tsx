@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Ring } from "../ui/Ring";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
+import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { STATUS_LABEL } from "./FileHeader";
 import { MarkCounts } from "./MarkCounts";
@@ -19,6 +21,7 @@ interface TreeProps {
   setup: MarkSetup;
   closed: ReadonlySet<string>;
   onToggle(path: string): void;
+  menu(node: TreeNode): CtxEntry[];
 }
 
 function Children({ nodes, ...props }: TreeProps & { nodes: TreeNode[] }) {
@@ -31,8 +34,17 @@ function Children({ nodes, ...props }: TreeProps & { nodes: TreeNode[] }) {
   );
 }
 
-function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { node: TreeNode }) {
+function Node({
+  node,
+  depth,
+  review,
+  setup,
+  closed,
+  onToggle,
+  menu,
+}: TreeProps & { node: TreeNode }) {
   const pad = { paddingLeft: indent(depth) };
+  const onContextMenu = contextMenu(() => menu(node));
   const p = node.progress;
   if (node.kind === "file") {
     const dto = review.files[node.file].dto;
@@ -49,6 +61,7 @@ function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { no
           style={pad}
           className={cls.join(" ") || undefined}
           onClick={() => review.jump(node.file)}
+          onContextMenu={onContextMenu}
           title={dto.path}
         >
           <span className="chevron" />
@@ -69,6 +82,7 @@ function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { no
         style={pad}
         className="dir"
         onClick={() => onToggle(node.path)}
+        onContextMenu={onContextMenu}
         title={progressTitle(p, setup)}
       >
         <span className="chevron">{isClosed ? "▸" : "▾"}</span>
@@ -86,6 +100,7 @@ function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { no
           setup={setup}
           closed={closed}
           onToggle={onToggle}
+          menu={menu}
         />
       )}
     </li>
@@ -95,7 +110,8 @@ function Node({ node, depth, review, setup, closed, onToggle }: TreeProps & { no
 /** The current review's files as a tree with per-file progress, and per-folder counts on
  * hover. It follows the review pane's line filter. Click a file to jump to it. */
 export function FilesPanel() {
-  const review = useCurrentReview(useWorkspace());
+  const workspace = useWorkspace();
+  const review = useCurrentReview(workspace);
   const setup = useMarkSetup();
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const tree = useMemo(
@@ -150,6 +166,11 @@ export function FilesPanel() {
             setup={setup}
             closed={closed}
             onToggle={(path) => setClosed(toggled(closed, path))}
+            menu={(n) =>
+              n.kind === "file"
+                ? fileMenu(workspace, review, setup, n.file)
+                : dirMenu(workspace, review, n, closed, setClosed)
+            }
           />
         </div>
       )}

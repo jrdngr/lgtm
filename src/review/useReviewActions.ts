@@ -1,10 +1,11 @@
 import type { MarkColor, ReviewDto, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
+import { copy as copyText } from "../ui/contextMenu";
 import { NOT_AT_WORKING_COPY } from "./CommentBlock";
 import { draftFor } from "./comments";
 import type { MenuAction } from "./MarkMenu";
 import { changedRows, type DisplayLine, type FlatFile } from "./model";
-import { selectedRowText, selectionText } from "./sendText";
+import { locatedText, selectedRowText, selectionText } from "./sendText";
 import type { Comments } from "./useComments";
 import { clearTextSelection } from "./useRowMouse";
 import type { SelectionApi } from "./useSelection";
@@ -24,6 +25,10 @@ interface Deps {
   closeMenu(): void;
   /** The mark that also checks a whole-file selection. */
   primary: MarkColor | undefined;
+  /** Opens the cursor's file in the editor at its line. */
+  openInEditor(): void;
+  /** Collapses the cursor's hunk. */
+  collapseHunk(): void;
 }
 
 /** What the review does to its selection: mark, check, comment, copy, and send. */
@@ -67,6 +72,17 @@ export function useReviewActions(d: Deps) {
     );
   }
 
+  /** Marks every changed row of a file, whatever the filter shows. The primary mark also
+   * checks it. */
+  async function markFile(file: number, color: MarkColor) {
+    if (!review) return;
+    const rows = files[file].rows.flatMap((r, row) =>
+      r.kind === "context" ? [] : [{ file, row }],
+    );
+    const check = color === d.primary ? [file] : [];
+    settle(await commands.markRows(review.id, rows, color, check), (next) => applied(next, check));
+  }
+
   async function clearFile(file: number) {
     if (!review) return;
     settle(await commands.clearFileMarks(review.id, file), (next) => applied(next, [file]));
@@ -84,7 +100,12 @@ export function useReviewActions(d: Deps) {
 
   function copy() {
     const text = selectedRowText(files, lines, sel.start, sel.end);
-    if (text !== undefined) navigator.clipboard.writeText(text);
+    if (text !== undefined) copyText(text);
+  }
+
+  function copyLocated() {
+    const text = locatedText(files, lines, sel.start, sel.end);
+    if (text) copyText(text);
   }
 
   function sendSelection() {
@@ -112,6 +133,10 @@ export function useReviewActions(d: Deps) {
   function pick(action: MenuAction) {
     d.closeMenu();
     if (action === "copy") copy();
+    else if (action === "location") copyLocated();
+    else if (action === "draft") startComment("body", true);
+    else if (action === "open") d.openInEditor();
+    else if (action === "collapse") d.collapseHunk();
     else if (action === "agent") sendSelection();
     else if (action === "comment") startComment();
     else if (action === "change") {
@@ -120,5 +145,5 @@ export function useReviewActions(d: Deps) {
     } else applyMark(action === "clear" ? null : action);
   }
 
-  return { applyMark, setChecked, clearFile, step, resetMarks, copy, startComment, pick };
+  return { applyMark, setChecked, markFile, clearFile, step, resetMarks, copy, startComment, pick };
 }

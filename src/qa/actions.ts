@@ -72,6 +72,8 @@ export function apply(ws: WorkspaceName, d: Session) {
   );
 }
 
+export const archiveLabel = (d: Session) => (d.archived ? "Unarchive" : "Archive");
+
 export const edit = (ws: WorkspaceName, d: Session, e: SessionEdit) =>
   act(ws, commands.editQa(ws, d.id, e));
 

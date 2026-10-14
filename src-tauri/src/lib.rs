@@ -112,13 +112,19 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::default_personas,
             commands::bots::install_personas,
             commands::bots::new_persona,
+            commands::bots::duplicate_persona,
             commands::files::list_files,
             commands::files::read_file,
             commands::files::save_file,
+            commands::files::create_path,
+            commands::files::rename_path,
+            commands::files::trash_path,
+            commands::files::reveal_path,
             commands::files::highlight_text,
             commands::github::open_pr,
             commands::github::pr_info,
             commands::github::open_pr_page,
+            commands::github::open_url,
             commands::github::nearby_prs,
             commands::github::pr_preview,
             commands::github::pr_head,
@@ -211,6 +217,7 @@ pub fn run() {
             repo::open_from_args(app, argv.get(1..).unwrap_or_default(), Path::new(&cwd));
         }))
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .menu(menu::build)
         .on_menu_event(menu::handle)
         .manage(Ptys::default())

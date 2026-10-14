@@ -156,7 +156,7 @@ function AppliedCard({ ws, d }: { ws: WorkspaceName; d: Session }) {
       {d.archived && (
         <div className="qq-actions">
           <button type="button" onClick={() => edit(ws, d, { kind: "archive", archived: false })}>
-            Reopen
+            Unarchive
           </button>
         </div>
       )}

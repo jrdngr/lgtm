@@ -1,7 +1,10 @@
 import type { IDockviewHeaderActionsProps } from "dockview-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { openMenu } from "../ui/contextMenu";
+import { useWorkspace } from "../workspaces/context";
 import { addToGroup, KINDS, kindTitle, splitGroup } from "./panels";
+import { stripMenu } from "./tabMenu";
 import "../review/MarkMenu.css";
 import "./GroupActions.css";
 
@@ -9,9 +12,12 @@ import "./GroupActions.css";
 export function NewTab({ containerApi, group }: IDockviewHeaderActionsProps) {
   const [at, setAt] = useState<{ x: number; y: number }>();
   const close = () => setAt(undefined);
+  const ref = useRef<HTMLButtonElement>(null);
+  useStripMenu(ref, containerApi, group);
   return (
     <>
       <button
+        ref={ref}
         type="button"
         className="new-tab"
         title="New tab"
@@ -47,6 +53,29 @@ export function NewTab({ containerApi, group }: IDockviewHeaderActionsProps) {
         )}
     </>
   );
+}
+
+/** Gives the pane's header, outside its tabs, the strip menu. Dockview draws the header, so the
+ * listener goes on its element; it runs before a tab's own React handler, so tabs are left to
+ * that. */
+function useStripMenu(
+  inside: React.RefObject<HTMLElement | null>,
+  api: IDockviewHeaderActionsProps["containerApi"],
+  group: IDockviewHeaderActionsProps["group"],
+) {
+  const workspace = useWorkspace();
+  useEffect(() => {
+    const header = inside.current?.closest(".dv-tabs-and-actions-container");
+    if (!header) return;
+    const onMenu = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".dv-tab")) return;
+      const inBottom = !!target.closest(".bottom-panel");
+      openMenu(e as MouseEvent, stripMenu({ workspace, api, group, inBottom }));
+    };
+    header.addEventListener("contextmenu", onMenu);
+    return () => header.removeEventListener("contextmenu", onMenu);
+  }, [inside, api, group, workspace]);
 }
 
 /** Two rects side by side, or stacked. */

@@ -163,11 +163,21 @@ export const commands = {
 	installPersonas: (workspace: string | null, names: string[], scope: Scope) => typedError<null, string>(__TAURI_INVOKE("install_personas", { workspace, names, scope })),
 	/**  Writes a starter file for a new persona. Returns its path, to open in the editor. */
 	newPersona: (workspace: string | null, name: string, scope: Scope) => typedError<string, string>(__TAURI_INVOKE("new_persona", { workspace, name, scope })),
+	/**  Copies a persona file beside itself as `name`. Returns the copy's path. */
+	duplicatePersona: (workspace: string | null, path: string, name: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_persona", { workspace, path, name })),
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
 	/**  Saves a file, then snapshots the working copy so reviews of `@` pick it up. */
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
+	/**  Makes an empty file, or a folder when `dir`. */
+	createPath: (workspace: string | null, path: string, dir: boolean) => typedError<null, string>(__TAURI_INVOKE("create_path", { workspace, path, dir })),
+	/**  Renames or moves a file or folder, then snapshots so reviews of `@` pick it up. */
+	renamePath: (workspace: string | null, from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { workspace, from, to })),
+	/**  Moves a file or folder to the Trash, then snapshots. */
+	trashPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { workspace, path })),
+	/**  Shows a path in Finder, or opens it in its default app. `""` is the workspace's root. */
+	revealPath: (workspace: string | null, path: string, open: boolean) => typedError<null, string>(__TAURI_INVOKE("reveal_path", { workspace, path, open })),
 	/**  Highlight segments per line, empty when `path` has no grammar. */
 	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
 	/**
@@ -192,6 +202,8 @@ export const commands = {
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Opens the workspace's PR on GitHub in the browser. */
 	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
+	/**  Opens a web page in the default browser. */
+	openUrl: (url: string) => typedError<null, string>(__TAURI_INVOKE("open_url", { url })),
 	/**  Open PRs of the bookmarks pushed from the workspace's stack, nearest `@` first. */
 	nearbyPrs: (workspace: string | null) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace })),
 	/**
@@ -693,7 +705,7 @@ export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: 
  *  Squash into the parent, keeping the parent's description so no editor opens. Squashing
  *  `@` leaves `@` on the parent rather than on a new empty commit.
  */
-{ kind: "squash"; rev: string } | 
+{ kind: "squash"; rev: string } | { kind: "describe"; rev: string; message: string } | { kind: "abandon"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
 
@@ -712,6 +724,8 @@ export type LogLine = {
 	/**  Set on the first line of each commit. */
 	commitId: string | null,
 	changeId: string | null,
+	/**  The commit's whole description, on the first line of each commit. */
+	description: string | null,
 	/**  Whether this line starts the workspace's working-copy commit. */
 	workingCopy: boolean,
 };

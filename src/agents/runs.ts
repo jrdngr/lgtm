@@ -91,16 +91,21 @@ export function endFrom(handle: RunHandle, r: { status: string; error?: string }
   else handle.end("done", done);
 }
 
-export function clearFinished(workspace: WorkspaceName) {
+/** Drops the workspace's runs that `keep` turns down. */
+function prune(workspace: WorkspaceName, keep: (r: AgentRun) => boolean) {
   const key = workspaceKey(workspace);
   const list = byWorkspace.get(key);
   if (!list) return;
-  byWorkspace.set(
-    key,
-    list.filter((r) => r.outcome === "running"),
-  );
+  byWorkspace.set(key, list.filter(keep));
   for (const l of listeners) l();
 }
+
+export const clearFinished = (workspace: WorkspaceName) =>
+  prune(workspace, (r) => r.outcome === "running");
+
+/** Takes a finished run off the list. */
+export const removeRun = (workspace: WorkspaceName, id: number) =>
+  prune(workspace, (r) => r.id !== id || r.outcome === "running");
 
 function subscribe(l: () => void) {
   listeners.add(l);

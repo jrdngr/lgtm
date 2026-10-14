@@ -1,9 +1,15 @@
 import type { NoteDto } from "../bindings";
+import { usePr } from "../github/pr";
+import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon, IconButton } from "../ui/icons";
+import { run } from "../ui/pathMenu";
+import { useWorkspace } from "../workspaces/context";
 import { rowLabel } from "./comments";
 import type { CurrentReview } from "./current";
+import { noteCommentText } from "./NoteBlock";
 import { LevelPill, NoteIcon } from "./NoteIcon";
 import { CATEGORIES, CATEGORY_ORDER, flowLabel, tours } from "./notes";
+import { rowsText } from "./sendText";
 import { activeTour, goToStep, setHidden, setTourState, stepTour, useTourState } from "./tour";
 
 const SOURCE = { headless: "the walkthrough", terminal: "a terminal agent" } as const;
@@ -13,10 +19,20 @@ function showNote(review: CurrentReview, n: NoteDto) {
   else review.jump(n.file);
 }
 
+/** Keeps note `n` as one of yours on its changed rows, or with `draft`, as a draft for the PR. */
+function keep(review: CurrentReview, n: NoteDto, draft: boolean) {
+  const f = review.files[n.file];
+  if (!f || !n.rows) return;
+  const rows: number[] = [];
+  for (let r = n.rows.start; r <= n.rows.end; r++) if (f.rows[r]?.kind !== "context") rows.push(r);
+  run(review.commentOn(n.file, rows, noteCommentText(n), rowsText(f, rows), draft));
+}
+
 /** The tour card with its stepper, the category chips, and the tour's notes as a numbered
  * path: visited notes dimmed, the current one ringed. */
 export function WalkthroughTour({ review }: { review: CurrentReview }) {
   const state = useTourState(review.id);
+  const canDraft = !!usePr(useWorkspace());
   const { notes } = review;
   const all = tours(notes);
   const tour = activeTour(review.id, notes);
@@ -36,6 +52,24 @@ export function WalkthroughTour({ review }: { review: CurrentReview }) {
     counts.set(n.category, (counts.get(n.category) ?? 0) + 1);
   }
   const length = tour.notes.length;
+  const noteMenu = (n: NoteDto, i: number): CtxEntry[] => [
+    {
+      label: "Jump to Note",
+      onSelect: () => {
+        const note = goToStep(review.id, notes, tour.id, i);
+        if (note) showNote(review, note);
+      },
+    },
+    { label: "Keep as Note", disabled: !n.rows, onSelect: () => keep(review, n, false) },
+    canDraft && {
+      label: "Draft PR Comment",
+      disabled: !n.rows,
+      onSelect: () => keep(review, n, true),
+    },
+    { label: "Copy Text", onSelect: () => copy(noteCommentText(n)) },
+    "-",
+    { label: "Hide This Category", onSelect: () => toggle(n.category) },
+  ];
   return (
     <>
       <div className="note-tour">
@@ -113,6 +147,7 @@ export function WalkthroughTour({ review }: { review: CurrentReview }) {
                   const note = goToStep(review.id, notes, tour.id, i);
                   if (note) showNote(review, note);
                 }}
+                onContextMenu={contextMenu(() => noteMenu(n, i))}
                 title={`${n.path}, from ${SOURCE[n.source]}`}
               >
                 <span className="note-dot">

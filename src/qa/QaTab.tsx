@@ -4,10 +4,11 @@ import { commands } from "../ipc";
 import { useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
 import { useAgentsOff } from "../tools/agents";
+import { copy } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
 import { ApplyView } from "./ApplyView";
-import { edit, remove } from "./actions";
+import { archiveLabel, edit, remove } from "./actions";
 import {
   decisionsText,
   lastDecided,
@@ -97,15 +98,15 @@ export function QaTab({ api }: IDockviewPanelProps) {
           items={[
             q && {
               label: "Copy question as qq text",
-              onSelect: () => navigator.clipboard.writeText(qqText(q, prev)),
+              onSelect: () => copy(qqText(q, prev)),
             },
             d && {
               label: "Copy decisions",
               disabled: !prev,
-              onSelect: () => navigator.clipboard.writeText(decisionsText(d)),
+              onSelect: () => copy(decisionsText(d)),
             },
             d && {
-              label: d.archived ? "Reopen" : "Mark implemented",
+              label: archiveLabel(d),
               disabled: !!busy,
               onSelect: () => edit(ws, d, { kind: "archive", archived: !d.archived }),
             },
@@ -141,7 +142,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
           Sent to {d.sent || "a terminal"}
           <span className="spacer" />
           <button type="button" onClick={() => edit(ws, d, { kind: "archive", archived: true })}>
-            Mark implemented
+            Archive
           </button>
         </div>
       )}

@@ -7,6 +7,7 @@ import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
+import { openMenu } from "../ui/contextMenu";
 import { openGraph } from "../workbench/panels";
 import { useWorkspace } from "../workspaces/context";
 import { marksChanged } from "../workspaces/useWorkspaces";
@@ -14,9 +15,10 @@ import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
 import { commentNear, commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
+import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
 import { useMarkSetup } from "./marks";
-import { buildLines, changedRows, symbolMarkers, type ViewMode } from "./model";
+import { buildLines, changedRows, type DisplayLine, symbolMarkers, type ViewMode } from "./model";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
 import { type Filter, filterLabel, plural, sumProgress } from "./state";
@@ -39,6 +41,10 @@ import { runWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./review.css";
 
 const NO_CHANGES: ChangeDto[] = [];
+
+/** Whether a line belongs to a hunk that za can collapse. */
+const inHunk = (line: DisplayLine | undefined): line is Exclude<DisplayLine, { kind: "file" }> =>
+  !!line && line.kind !== "file" && line.hunk >= 0;
 
 /** Clicks on these keep their own focus instead of giving it to the review. */
 function keepsFocus(t: EventTarget) {
@@ -131,6 +137,11 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     sendText,
     closeMenu,
     primary: setup.primary,
+    openInEditor,
+    collapseHunk() {
+      const line = lines[cursor];
+      if (inHunk(line)) fold.toggleHunk(line.file, line.hunk);
+    },
   });
 
   /** Loads `target` as the review. Returns the error message when it fails. */
@@ -266,6 +277,23 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     });
   }
 
+  function openFileMenu(e: React.MouseEvent, file: number) {
+    const deps = {
+      workspace,
+      files,
+      checks: index.checks,
+      progress,
+      collapsedFiles,
+      setup,
+      toggleFile: fold.toggleFile,
+      setChecked: a.setChecked,
+      markFile: a.markFile,
+      clearFile: a.clearFile,
+      openFile: (path: string) => openFileIn(containerApi, path),
+    };
+    openMenu(e, fileMenu(deps, file));
+  }
+
   function askAgent() {
     const id = commentNear(lines, cursor);
     if (id !== undefined && !agentsOff()) c.openAsk(id);
@@ -370,6 +398,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           scrollTo={scrollTo}
           onBackgroundMouseDown={() => place(cursor)}
           onClearFile={a.clearFile}
+          onFileMenu={openFileMenu}
           renderComment={(id) => (
             <CommentBlock id={id} comment={c.comments.find((x) => x.id === id)} c={c} />
           )}
@@ -391,6 +420,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           y={menu.y}
           changed={changedCount}
           setup={setup}
+          canDraft={c.canDraft}
+          inHunk={inHunk(lines[cursor])}
           onPick={a.pick}
           onClose={closeMenu}
         />

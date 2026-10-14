@@ -181,3 +181,21 @@ pub(crate) fn stop_resolve(
     repo(&window)?.stop_resolve(workspace.as_deref(), &runs);
     Ok(())
 }
+
+/// Opens a web page in the default browser.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn open_url(url: String) -> CmdResult<()> {
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err(format!("{url} isn't a web address"));
+    }
+    let status = tokio::process::Command::new("open")
+        .arg(&url)
+        .status()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err(format!("can't open {url}"));
+    }
+    Ok(())
+}

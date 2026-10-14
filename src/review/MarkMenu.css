@@ -49,3 +49,13 @@
   margin-right: -4px;
   border-radius: 2px;
 }
+
+.menu-sep {
+  margin: 4px 2px;
+  border: none;
+  border-top: 1px solid var(--border);
+}
+
+.mark-menu .menu-key {
+  width: 18px;
+}

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { JjAction, LogLine } from "../bindings";
 import { commands } from "../ipc";
+import { openMenu } from "../ui/contextMenu";
 import type { WorkspaceName } from "../workspaces/context";
 import { AnsiText } from "./AnsiText";
 import { RevisionsPanelActions } from "./RevisionsPanelActions";
 import { RevisionsPanelFooter } from "./RevisionsPanelFooter";
+import { presets, REV_ACTIONS, reviewAfter, revRowMenu } from "./RevisionsPanelMenu";
 import "./RevisionsPanel.css";
 
 interface Props {
@@ -21,15 +23,6 @@ interface Props {
 /** Cursor moves. Shifted keys extend the range from the anchor. */
 const MOVES: Record<string, number> = { j: 1, ArrowDown: 1, J: 1, k: -1, ArrowUp: -1, K: -1 };
 
-/** Keys that act on the highlighted commit: the action, its label, and the revset to review
- * after it. */
-const REV_ACTIONS: Record<string, (rev: string) => [JjAction, string, string?]> = {
-  e: (rev) => [{ kind: "edit", rev }, `Editing ${rev}`, "@"],
-  n: (rev) => [{ kind: "newAfter", rev }, `New commit after ${rev}`, `${rev}::@`],
-  N: (rev) => [{ kind: "newBefore", rev }, `New commit before ${rev}`, `@::${rev}`],
-  s: (rev) => [{ kind: "squash", rev }, `Squashed ${rev}`],
-};
-
 /** Line index of each commit's first line, newest first, and the commit each line belongs to
  * (-1 before the first). */
 function layout(lines: LogLine[]) {
@@ -39,12 +32,6 @@ function layout(lines: LogLine[]) {
     return commits.length - 1;
   });
   return { commits, owner };
-}
-
-/** Revsets offered under the field: `@`, its parent, and everything since trunk, named by
- * trunk's bookmark when it has one. */
-function presets(trunk: string | null) {
-  return ["@", "@-", `${trunk ?? "trunk()"}..@`];
 }
 
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
@@ -134,9 +121,8 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
       if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
       await reload(changeAt(cursor));
       // Undo, redo and squash keep the review's revset unless it no longer resolves.
-      const failed = await onLoad(next ?? revset);
-      if (failed && !next) await onLoad("@");
-      else if (failed) setError(failed);
+      const failed = await reviewAfter(onLoad, revset, next);
+      if (failed) setError(failed);
     } finally {
       setBusy(false);
     }
@@ -145,6 +131,32 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   function runKey(key: string) {
     const rev = changeAt(cursor);
     if (rev) act(...REV_ACTIONS[key](rev));
+  }
+
+  const undo = () => act({ kind: "undo", steps }, "Undid the last action");
+  const redo = () => act({ kind: "redo", steps }, "Redid the action");
+
+  /** Moves the cursor to commit `c` unless it's in the range, then opens its menu. */
+  function rowMenu(e: React.MouseEvent, c: number) {
+    const line = lines?.[commits[c]];
+    if (!line?.changeId || !line.commitId) return;
+    const outside = c < lo || c > hi;
+    if (outside) move(c);
+    const commit = line.commitId;
+    openMenu(
+      e,
+      revRowMenu({
+        change: line.changeId,
+        commit,
+        description: line.description ?? undefined,
+        alone: outside || lo === hi,
+        busy,
+        review,
+        act: (a) => act(...a),
+        undo,
+        redo,
+      }),
+    );
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -176,10 +188,10 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
           inputRef.current?.select();
           break;
         case "u":
-          act({ kind: "undo", steps }, "Undid the last action");
+          undo();
           break;
         case "U":
-          act({ kind: "redo", steps }, "Redid the action");
+          redo();
           break;
         default:
           return;
@@ -243,10 +255,12 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
                 key={i}
                 className={`log-line${c >= 0 ? " pickable" : ""}${inRange ? " picked" : ""}${isCursor ? " cursor" : ""}`}
                 onMouseDown={(e) => {
-                  if (c < 0) return;
+                  // A right-click picks in the row's menu, keeping a range it's in.
+                  if (c < 0 || e.button !== 0) return;
                   move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
                 }}
                 onDoubleClick={() => review(changeAt(c))}
+                onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
               >
                 <AnsiText text={l.text} />
                 {isCursor && !busy && (

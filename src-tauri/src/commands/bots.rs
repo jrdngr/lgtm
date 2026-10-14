@@ -176,6 +176,20 @@ pub(crate) async fn new_persona(
     Ok(path.to_string_lossy().into_owned())
 }
 
+/// Copies a persona file beside itself as `name`. Returns the copy's path.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn duplicate_persona(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    path: String,
+    name: String,
+) -> CmdResult<String> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let to = personas::duplicate(&ws.root, std::path::Path::new(&path), &name).map_err(err)?;
+    Ok(to.to_string_lossy().into_owned())
+}
+
 /// Dismisses findings of a run, or with `dismissed` false, brings them back.
 #[tauri::command]
 #[specta::specta]

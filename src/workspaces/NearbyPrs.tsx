@@ -3,7 +3,9 @@ import type { NearbyPrDto, NearbyPrsDto } from "../bindings";
 import { closePrPreview, openPrPreview } from "../github/preview";
 import { type CommandResult, commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
+import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
+import { openUrl } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { dockOf } from "../workbench/docks";
 import type { WorkspaceName } from "./context";
@@ -86,8 +88,29 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
     onOpened(r.data.workspace, r.data.setup);
   }
 
+  const refresh: CtxEntry = {
+    label: "Refresh List",
+    disabled: loading || githubOff,
+    onSelect: load,
+  };
+
+  function prMenu(e: React.MouseEvent, pr: NearbyPrDto) {
+    setSelected(pr.number);
+    const busy = opening !== undefined;
+    openMenu(e, [
+      { label: "Preview", disabled: busy, onSelect: () => preview(pr) },
+      { label: "Review in Its Own Workspace", keys: "↵", disabled: busy, onSelect: () => open(pr) },
+      "-",
+      { label: "Open on GitHub", onSelect: () => openUrl(pr.url) },
+      { label: "Copy PR URL", onSelect: () => copy(pr.url) },
+      { label: "Copy Bookmark Name", onSelect: () => copy(pr.bookmark) },
+      "-",
+      refresh,
+    ]);
+  }
+
   return (
-    <div className="nearby-prs">
+    <div className="nearby-prs" onContextMenu={(e) => openMenu(e, [refresh])}>
       <SectionHeader
         title="On this stack"
         meta={opening !== undefined ? `Fetching #${opening}…` : loading ? "Loading…" : undefined}
@@ -106,7 +129,11 @@ export function NearbyPrs({ workspace, onOpened, onError }: Props) {
       )}
       <ul>
         {prs?.map((pr) => (
-          <li key={pr.number} className={`workspace${selected === pr.number ? " selected" : ""}`}>
+          <li
+            key={pr.number}
+            className={`workspace${selected === pr.number ? " selected" : ""}`}
+            onContextMenu={(e) => prMenu(e, pr)}
+          >
             <button
               type="button"
               className="workspace-open"

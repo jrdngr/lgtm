@@ -56,7 +56,7 @@ In a review pane:
 | `e` / `E` | Expand / shrink: line, function, hunk, file, review |
 | `1`–`9` | Mark with that color (the selection then collapses to the cursor) |
 | `0` | Clear the mark |
-| `m` or right-click | Mark menu: the colors on their numbers, `0` clear, `c` comment, `g` change, `a` send to agent |
+| `m` or right-click | Mark menu: the colors on their numbers, `0` clear, `c` comment, `C` draft PR comment (PR workspaces), `g` change, `a` send to agent, ⌘C copy, Copy with Location (`path:line` and the code), `o` open the file at the line, `za` collapse the hunk |
 | ⌘A | Select the whole review |
 | ⌘Z / ⇧⌘Z | Undo / redo mark changes |
 | ⌘C | Copy selected code text, or the selected rows when no text is selected |
@@ -75,7 +75,7 @@ In a review pane:
 
 The right panel has seven icon tabs, plus PR in a PR workspace. PR counts threads that need you (new or waiting on a decision), Walkthrough its notes, Reviewers its running reviews, and Q&A its open questions.
 
-- **Files** (⌘⇧R) shows the whole repo.
+- **Files** (⌘⇧R) shows the whole repo. Right-click a file or folder to open it to the side or in its default app, make a new file or folder, rename it, or move it to the Trash; an editor open on a renamed or trashed file closes, unless it has unsaved edits.
 - **Changes** (⌘⇧E) shows the review's files as a tree, with the rows done so far in its header. Each file has a ring filling as you review it, or a ✓ once done; hover it for the counts, or hover a folder to see its count. Done files dim, deleted ones are struck through, and a file changed since you checked it says **changed**. It follows the review's line filter. Click a file to jump to it.
 - **Symbols** (⌘⇧Y) lists the changed symbols by file, with how many unchanged callers use each and how much of it is done. With no Review tab open, clicking a file or symbol opens one on the current revset.
 - **Notes** (⌘⇧M) lists your notes by file, with done ones folded at the end. A row shows when the agent answered or changed the code. Its ⋯ menu sends the open notes to a terminal. Notes never leave your machine.
@@ -84,7 +84,7 @@ The right panel has seven icon tabs, plus PR in a PR workspace. PR counts thread
 - **Reviewers** (⌘⇧O) runs review personas.
 - **Q&A** (⌘⇧I) lists the workspace's active Q&A sessions with where they are; archived ones fold under **Archived**, and **+** starts one (see Q&A below).
 
-Notes and threads show under their code as cards: blue for a note, purple for a GitHub thread or draft. Their actions show on hover: ✎ edit, ✓ done (notes), ✦ ask the agent (or `a`), ↗ send to a terminal, and in ⋯: Move to a stage (threads), Draft PR comment from this (notes, in PR workspaces), and Delete (notes and drafts). The agent box stays open while there's a conversation with the agent. Done notes, and done or resolved threads, fold to one line; click to open one.
+Notes and threads show under their code as cards: blue for a note, purple for a GitHub thread or draft. Their actions show on hover: ✎ edit, ✓ done (notes), ✦ ask the agent (or `a`), ↗ send to a terminal, and in ⋯: Move to a stage (threads), Draft PR comment from this (notes, in PR workspaces), and Delete (notes and drafts), which asks first. The agent box stays open while there's a conversation with the agent. Done notes, and done or resolved threads, fold to one line; click to open one.
 
 Threads move through stages: **New** (synced, not triaged), **Decide** (needs your call), **To fix**, **Reply** (a reply is being written), **Ready** (the reply is final, or the fix needs none), and **Done**. Writing a reply moves a thread to Reply; **Final** moves it to Ready, and editing a final reply moves it back. A draft (`C`) is Ready once it has text. Sync keeps each thread's stage, brings one back to New when someone posts to it, and marks it Done when it's resolved. Comments on the PR from others come in as threads too, Done when you posted to the PR after them.
 
@@ -150,6 +150,15 @@ At startup LGTM checks for `jj` 0.40.0+ and `claude` 2.1.22+, and says how to in
 
 Mouse: click a row, drag or shift-click for a range, double-click for the function, triple-click for the hunk. Click a file header, hunk header, or ƒ marker to select that unit.
 
+Right-click menus: everything you can act on has a native menu, with the same actions as its ⋯ menu and its keys where it has them. Right-clicking an item acts on that item. Text fields get Cut, Copy, Paste and Select All; elsewhere there's no browser menu (debug builds keep it on ⌥-right-click). Highlights beyond the ⋯ menus:
+
+- Workspaces: New Terminal Here, Open Review on @, Copy Path, Reveal in Finder, Clear Activity Dot, and for PR workspaces Sync PR and Open PR on GitHub. On this stack PRs add Open on GitHub and Copy Bookmark Name.
+- The revset selector and the revisions list: copy the change id, commit id or description, **Describe…** (⌘↵ saves), **Abandon…**, and the Edit, New and Squash actions.
+- Tabs: Close Others, Close to the Right, Close All, Split, Move to Bottom Panel (or Move to Main Area), Save for editors, Rename… for terminals, and Reveal in Files or Finder for files. The space after the tabs has New Tab, Split and Close All Tabs in Pane.
+- Review file headers: Mark File With a color, Clear Marks in File, Reveal in Files. Changes rows and folders: Check or uncheck, Mark File With, Expand and Collapse All.
+- The editor: Copy Path and Line, Show Line in Review, Reveal in Files, Word Wrap. Terminals: Copy, Paste, Clear, split and move.
+- The graph, findings, Threads rows, Agent runs (Remove from List), Notes, PR threads (Open on GitHub), Walkthrough notes, personas (Duplicate…, Delete Persona…), Reviewers runs and Q&A sessions.
+
 **Agent runs** (a tab from any pane's **+** menu, in the main or bottom panel) lists every headless agent run in the workspace, newest first: Ask and Change, thread reply chats, Triage, Fix threads, Walkthrough, conflict Resolve, Q&A steps, and Reviewers. Each row shows its kind, what it's about, what it's doing or how it ended, and its age; hover for Stop while it runs, Retry after it failed or stopped, and ↗ to show what it worked on. **Clear finished** empties the list of everything but running runs. The list lasts until the window closes, except Reviewers runs, which are stored.
 
 ## Q&A
@@ -158,9 +167,9 @@ The **Q&A** tab (from a pane's **+** menu, or a session in the Q&A panel) works 
 
 - **Prompt:** what you want done, and files the agent reads first. **Ask me** (⌘↵) has a read-only headless `claude -p` turn the prompt into questions. **Send to terminal** pastes a prompt for Claude Code in a terminal, which asks you through lgtm's MCP tools instead.
 - **Questions:** one question at a time in the qqueue template: the last decision, "Question N of M", the subject, context, options with the recommended one first in green, and the recommendation. The rail lists every question: ✓ decided, ✎ changed, struck through when dropped, subquestions indented. After each decision the agent updates the questions still open: until it's done the next question is greyed and can't be answered, under a blue bar. A question it rewrote shows an amber bar with what changed; `p` shows what it said before. One it dropped says why.
-- **Apply:** the decisions and an optional note for the write. **Apply to @** (⌘↵) has the agent write the changes into the workspace's @ (Read, Grep, Glob, Edit and Write, plus your Claude Code skills, like one your CLAUDE.md says to run on what it writes; no shell commands), showing what it reads and writes, then its summary and the files it wrote. Nothing opens; review @ when you want. **Write plan** (`p`) first has it list the files it would create or edit and why, without writing; select text in the plan to comment, **Revise plan** (`r`) sends the comments back, and **Apply plan** (⌘↵) writes with it. **Send to terminal** pastes the same Apply prompt into a terminal instead; **Mark implemented** then archives the session.
+- **Apply:** the decisions and an optional note for the write. **Apply to @** (⌘↵) has the agent write the changes into the workspace's @ (Read, Grep, Glob, Edit and Write, plus your Claude Code skills, like one your CLAUDE.md says to run on what it writes; no shell commands), showing what it reads and writes, then its summary and the files it wrote. Nothing opens; review @ when you want. **Write plan** (`p`) first has it list the files it would create or edit and why, without writing; select text in the plan to comment, **Revise plan** (`r`) sends the comments back, and **Apply plan** (⌘↵) writes with it. **Send to terminal** pastes the same Apply prompt into a terminal instead; **Archive** then archives the session.
 
-A session that applied, or that you marked implemented, is archived: the panel folds it under **Archived**, it opens read-only, and **Reopen** makes it active again.
+A session that applied, or that you archived, is archived: the panel folds it under **Archived**, it opens read-only, and **Unarchive** makes it active again.
 
 In Questions:
 
@@ -178,7 +187,7 @@ In Questions:
 | ↑ / ↓ or `j` / `k` | Select the next / previous option |
 | `]` / `[` | Next / previous question |
 
-The tab's ⋯ copies the question as qq text or every decision, marks the session implemented or reopens it, deletes it, and opens the Q&A prompts. In terminals, the MCP server's `list_qa`, `qa_ask` and `qa_answers` let Claude Code ask you a session's questions in the tab (making a session when it has none) and read your answers.
+The tab's ⋯ copies the question as qq text or every decision, archives or unarchives the session, deletes it, and opens the Q&A prompts. In terminals, the MCP server's `list_qa`, `qa_ask` and `qa_answers` let Claude Code ask you a session's questions in the tab (making a session when it has none) and read your answers.
 
 ## Settings
 

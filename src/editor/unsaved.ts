@@ -27,6 +27,10 @@ export function setUnsaved(
 export const isUnsaved = (workspace: WorkspaceName, id: string) =>
   unsaved.has(keyOf(workspace, id));
 
+/** Saves panel `id`'s unsaved edits, if it has any. */
+export const saveEditor = (workspace: WorkspaceName, id: string) =>
+  unsaved.get(keyOf(workspace, id))?.save();
+
 /** Whether panel `id` may close: true when it has no unsaved edits, or the user saved or
  * discarded them. */
 export function confirmClose(workspace: WorkspaceName, id: string): Promise<boolean> {

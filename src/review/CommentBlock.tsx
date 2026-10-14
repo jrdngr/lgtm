@@ -5,15 +5,16 @@ import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar, Post } from "../github/Post";
 import { viewerLogin } from "../github/people";
 import { showThread } from "../threads/focus";
-import { STAGES } from "../threads/stages";
 import { ReplyHead, StagePill, TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
+import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
 import { isMac } from "../workbench/keys";
 import { useWorkspace } from "../workspaces/context";
 import { AskBox, SAVE_KEY } from "./AskBox";
+import { cardItems, moreItems } from "./cardMenu";
 import { NEW_COMMENT } from "./model";
 import type { Comments } from "./useComments";
 import { Workshop } from "./Workshop";
@@ -54,10 +55,20 @@ export function CommentBlock({ id, comment, c }: Props) {
     c.focused();
   });
 
+  const card = comment && { comment, c, workspace, agentsOff };
+  /** Text fields keep their own menu. */
+  const onContextMenu = (e: React.MouseEvent) => {
+    if (!card || (e.target instanceof Element && e.target.closest("textarea, input"))) return;
+    openMenu(e, cardItems(card));
+  };
+
   if (comment && done && !expanded && editing === undefined && !asking) {
     const summary = gh ? lastPost(gh, viewer) : comment.body.split("\n")[0];
     return (
-      <div className={`comment-block ${github ? "gh" : "mine"} resolved`}>
+      <div
+        className={`comment-block ${github ? "gh" : "mine"} resolved`}
+        onContextMenu={onContextMenu}
+      >
         <button
           type="button"
           className="card-bar collapsed"
@@ -107,15 +118,12 @@ export function CommentBlock({ id, comment, c }: Props) {
       Final
     </button>
   );
-  const stageItems = thread
-    ? STAGES.filter(([s]) => s !== thread.stage).map(([s, label]) => ({
-        label: `Move to ${label}`,
-        onSelect: () => c.setStage(id, s),
-      }))
-    : [];
 
   return (
-    <div className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}`}>
+    <div
+      className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}`}
+      onContextMenu={onContextMenu}
+    >
       <div className="card-bar">
         {done && (
           <button
@@ -197,20 +205,7 @@ export function CommentBlock({ id, comment, c }: Props) {
           {comment && (
             <IconButton icon="send" label="Send to terminal" onClick={() => c.send(comment)} />
           )}
-          {comment && (
-            <Menu
-              items={[
-                ...stageItems,
-                !thread &&
-                  c.canDraft && {
-                    label: "Draft PR comment from this",
-                    title: "Start a draft for GitHub on the same lines, with this note's text",
-                    onSelect: () => c.draftFromNote(comment.id),
-                  },
-                !gh && { label: "Delete", onSelect: () => c.remove(comment.id), danger: true },
-              ]}
-            />
-          )}
+          {card && <Menu items={moreItems(card)} />}
         </span>
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}

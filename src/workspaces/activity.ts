@@ -50,7 +50,13 @@ export function report(workspace: WorkspaceName, id: string, state: ActivityStat
 /** Marks `workspace` as the one shown, which clears what finished in it. */
 export function selectActivity(workspace: WorkspaceName) {
   selected = workspaceKey(workspace);
-  if (finished.delete(selected)) changed(selected);
+  clearFinished(workspace);
+}
+
+/** Clears the dot of what finished in `workspace`, without selecting it. */
+export function clearFinished(workspace: WorkspaceName) {
+  const key = workspaceKey(workspace);
+  if (finished.delete(key)) changed(key);
 }
 
 export function activity(workspace: WorkspaceName): Activity | undefined {

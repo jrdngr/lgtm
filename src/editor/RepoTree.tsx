@@ -3,11 +3,15 @@ import type { FileEntry } from "../bindings";
 import { commands, unwrap } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { guideAt, indent, toggled } from "../review/tree";
+import { type CtxEntry, contextMenu } from "../ui/contextMenu";
+import { openDefault, pathItems } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
 import { openFile } from "./open";
+import { onRevealInFiles } from "./reveal";
+import { create, foldersOf, openToSide, rename, trash } from "./treeActions";
 import "../review/FilesPanel.css";
 import "./tree.css";
 
@@ -43,12 +47,13 @@ function useListings(workspace: string | null, open: ReadonlySet<string>) {
   }, [shown, listings, load]);
 
   // Collapsed folders' listings go too, so reopening one lists it again.
-  useRepoChanged(() => {
+  const reload = () => {
     const keep = new Set(shown);
     setListings((m) => new Map([...m].filter(([d]) => keep.has(d))));
     load(shown);
-  });
-  return listings;
+  };
+  useRepoChanged(reload);
+  return { listings, reload };
 }
 
 interface DirProps {
@@ -59,6 +64,7 @@ interface DirProps {
   onToggle(dir: string): void;
   /** How the current review changes files and folders, by path. */
   decor: ReturnType<typeof decorate>;
+  menu(entry: FileEntry): CtxEntry[];
 }
 
 /** A name colored by how the review changes it, with the change's letter or, for a folder,
@@ -73,7 +79,7 @@ function Name({ name, decor, dir }: { name: string; decor?: Decor; dir?: boolean
   );
 }
 
-function Dir({ dir, depth, listings, open, onToggle, decor }: DirProps) {
+function Dir({ dir, depth, listings, open, onToggle, decor, menu }: DirProps) {
   const listing = listings.get(dir);
   const pad = { paddingLeft: indent(depth) };
   const workspace = useWorkspace();
@@ -95,12 +101,23 @@ function Dir({ dir, depth, listings, open, onToggle, decor }: DirProps) {
         <li key={e.path}>
           {e.dir ? (
             <>
-              <button type="button" style={pad} className="dir" onClick={() => onToggle(e.path)}>
+              <button
+                type="button"
+                style={pad}
+                className="dir"
+                data-path={e.path}
+                onClick={() => onToggle(e.path)}
+                onContextMenu={contextMenu(() => menu(e))}
+              >
                 <span className="chevron">{open.has(e.path) ? "▾" : "▸"}</span>
                 <Name name={e.name} decor={decor.byDir.get(e.path)} dir />
               </button>
               {open.has(e.path) && (
-                <Dir dir={e.path} depth={depth + 1} {...{ listings, open, onToggle, decor }} />
+                <Dir
+                  dir={e.path}
+                  depth={depth + 1}
+                  {...{ listings, open, onToggle, decor, menu }}
+                />
               )}
             </>
           ) : (
@@ -108,7 +125,9 @@ function Dir({ dir, depth, listings, open, onToggle, decor }: DirProps) {
               type="button"
               style={pad}
               title={e.path}
+              data-path={e.path}
               onClick={() => openFile(workspace, e.path)}
+              onContextMenu={contextMenu(() => menu(e))}
             >
               <span className="chevron" />
               <Name name={e.name} decor={decor.byFile.get(e.path)} />
@@ -127,13 +146,72 @@ export function RepoTree() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
-  const listings = useListings(workspace, open);
+  const { listings, reload } = useListings(workspace, open);
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
+
+  const body = useRef<HTMLDivElement>(null);
+  // Opens the folders holding a revealed file, then focuses its row once it's listed.
+  useEffect(
+    () =>
+      onRevealInFiles(workspace, (path) => {
+        setOpen((o) => new Set([...o, ...foldersOf(path)]));
+        let tries = 60;
+        const find = () => {
+          const row = body.current?.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`);
+          if (row) {
+            row.scrollIntoView({ block: "nearest" });
+            row.focus();
+          } else if (--tries > 0) requestAnimationFrame(find);
+        };
+        requestAnimationFrame(find);
+      }),
+    [workspace],
+  );
+
+  /** Lists the tree again with what holds `path` open, so a new or moved entry shows. */
+  const madeAt = (path: string) => {
+    setOpen((o) => new Set([...o, ...foldersOf(path)]));
+    reload();
+  };
+  const menu = (e: FileEntry): CtxEntry[] => {
+    const p = e.path;
+    const edits: CtxEntry[] = [
+      {
+        label: "New File…",
+        onSelect: () => create(workspace, e.dir ? p : (foldersOf(p).at(-1) ?? ""), false, madeAt),
+      },
+      e.dir && { label: "New Folder…", onSelect: () => create(workspace, p, true, madeAt) },
+      { label: "Rename…", onSelect: () => rename(workspace, p, madeAt) },
+      { label: "Move to Trash…", onSelect: () => trash(workspace, p, reload) },
+    ];
+    if (e.dir) {
+      return [
+        {
+          label: open.has(p) ? "Collapse" : "Expand",
+          onSelect: () => setOpen(toggled(open, p)),
+        },
+        { label: "Collapse All", onSelect: () => setOpen(new Set()), disabled: open.size === 0 },
+        "-",
+        ...edits,
+        "-",
+        ...pathItems(workspace, p),
+      ];
+    }
+    return [
+      { label: "Open", onSelect: () => openFile(workspace, p) },
+      { label: "Open to the Side", onSelect: () => openToSide(workspace, p) },
+      { label: "Open in Default App", onSelect: () => openDefault(workspace, p) },
+      "-",
+      ...edits,
+      "-",
+      ...pathItems(workspace, p),
+    ];
+  };
   return (
     <div className="side-split">
       <SectionHeader title="Files" />
-      <div className="side-split-body file-tree">
+      <div className="side-split-body file-tree" ref={body}>
         <Dir
           dir=""
           depth={0}
@@ -141,6 +219,7 @@ export function RepoTree() {
           open={open}
           onToggle={(d) => setOpen(toggled(open, d))}
           decor={decor}
+          menu={menu}
         />
       </div>
     </div>

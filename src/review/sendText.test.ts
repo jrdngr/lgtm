@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { file, review, rows } from "./fixture.test-utils";
 import { type DisplayLine, flatten } from "./model";
-import { selectionText } from "./sendText";
+import { locatedText, selectionText } from "./sendText";
 
 const files = flatten(
   review([
@@ -29,5 +29,12 @@ describe("selectionText", () => {
     expect(selectionText(files, [line([1, 2])], 0, 0)).toBe(
       "a.rs:2\n```diff\n-  old();\n+  new();\n```",
     );
+  });
+});
+
+describe("locatedText", () => {
+  it("puts the rows under their new side's range across hunks", () => {
+    const lines = [line([0]), line([1]), line([2]), line([4], 1)];
+    expect(locatedText(files, lines, 0, 3)).toBe("a.rs:1-2\nfn a() {\n  old();\n  new();\ngone");
   });
 });

@@ -24,6 +24,7 @@ interface Props {
   onCheck(checked: boolean): void;
   /** Clears the file's marks and unchecks it. */
   onClear(): void;
+  onContextMenu(e: React.MouseEvent): void;
 }
 
 /** Checkbox, collapse button, path, tags, and marks by color. The checkbox gets a ring once
@@ -38,6 +39,7 @@ export function FileHeader(props: Props) {
     <div
       className={`file-header${check === "changedSinceReviewed" ? " changed" : ""}`}
       onMouseDown={onClick}
+      onContextMenu={props.onContextMenu}
     >
       <button type="button" className="collapse" onMouseDown={stop} onClick={onToggle}>
         {collapsed ? "▸" : "▾"}

@@ -62,7 +62,7 @@ export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
       </>
     );
   } else {
-    body = <Setup personas={loaded.personas} onOpen={onOpen} />;
+    body = <Setup personas={loaded.personas} onOpen={onOpen} onChanged={loaded.reload} />;
   }
 
   return (
@@ -92,10 +92,11 @@ export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
 interface SetupProps {
   personas: Personas;
   onOpen(run: BotRun): void;
+  onChanged(): void;
 }
 
 /** Personas and report options to pick, the Run button, and the runs so far. */
-function Setup({ personas, onOpen }: SetupProps) {
+function Setup({ personas, onOpen, onChanged }: SetupProps) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const agentsOff = useAgentsOff();
@@ -148,7 +149,7 @@ function Setup({ personas, onOpen }: SetupProps) {
           {n} of {personas.personas.length}
         </span>
       </div>
-      <PersonaList personas={personas} picked={picked} onToggle={toggle} />
+      <PersonaList personas={personas} picked={picked} onToggle={toggle} onChanged={onChanged} />
       <div className="bots-section">
         <span className="bots-label">Report</span>
       </div>

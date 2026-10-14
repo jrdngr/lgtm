@@ -3,6 +3,8 @@ import "@xyflow/react/dist/style.css";
 import { useEffect, useMemo, useState } from "react";
 import type { GraphDto } from "../bindings";
 import { type CurrentReview, useCurrentReview } from "../review/current";
+import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
+import { absolutePath } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
 import { useWorkspace, type WorkspaceName } from "../workspaces/context";
 import { EdgesLayer } from "./EdgesLayer";
@@ -12,7 +14,7 @@ import { showNode } from "./nodes";
 import { route } from "./ports";
 import { type BoxData, BoxNode, OpenBoxNode } from "./SymbolNode";
 import { boxStats, jumpToBox } from "./stats";
-import { buildTree, type Tree } from "./tree";
+import { type Box, buildTree, type Tree } from "./tree";
 import { useGraph } from "./useGraph";
 import { useView } from "./useView";
 import {
@@ -30,6 +32,9 @@ import {
 import "./graph.css";
 
 const nodeTypes = { box: BoxNode, open: OpenBoxNode };
+
+/** A box's file, or a folder's own path from its `d:` id. */
+const boxPath = (box: Box) => box.path ?? box.id.slice(2);
 
 /** The last finished layout, kept while the next one runs so the canvas stays up. */
 function usePlaced(scene: Scene) {
@@ -74,9 +79,11 @@ interface FlowProps {
   view: View;
   setView(view: View): void;
   workspace: WorkspaceName;
+  /** The background menu's items after Fit to Window. */
+  paneItems(): CtxEntry[];
 }
 
-function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
+function Flow({ review, graph, tree, view, setView, workspace, paneItems }: FlowProps) {
   const { scene: wanted, present, shown, next } = useScene(graph, tree, view);
   const { scene, placed } = usePlaced(wanted) ?? {};
   const flow = useReactFlow();
@@ -133,6 +140,35 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
     requestAnimationFrame(() => flow.fitView({ padding: 0.1 }));
   }, [placed, flow]);
   if (!scene || !placed) return <div className="placeholder">Laying out…</div>;
+
+  const toggleOpen = (box: Box) => {
+    const expanded = new Set(view.expanded);
+    if (!expanded.delete(box.id)) expanded.add(box.id);
+    setView({ ...view, expanded });
+  };
+
+  function boxItems(data: BoxData): CtxEntry[] {
+    const { box } = data;
+    return [
+      {
+        label: "Jump to Code",
+        disabled: box.kind === "folder",
+        onSelect: () => jumpToBox(review, graph, tree, box, present, workspace),
+      },
+      data.expandable && {
+        label: view.expanded.has(box.id) ? "Close" : "Open",
+        onSelect: () => toggleOpen(box),
+      },
+      data.callers > 0 && {
+        label: data.callersOpen ? "Hide Callers" : "Show Callers",
+        onSelect: data.onCallers,
+      },
+      "-",
+      { label: "Copy Name", onSelect: () => copy(box.label) },
+      { label: "Copy Path", onSelect: () => copy(absolutePath(workspace, boxPath(box))) },
+    ];
+  }
+
   return (
     <ReactFlow
       nodes={nodes}
@@ -147,15 +183,21 @@ function Flow({ review, graph, tree, view, setView, workspace }: FlowProps) {
         if (isMac ? e.metaKey : e.ctrlKey) {
           return jumpToBox(review, graph, tree, box, present, workspace);
         }
-        if (expandable) {
-          const expanded = new Set(view.expanded);
-          if (!expanded.delete(box.id)) expanded.add(box.id);
-          return setView({ ...view, expanded });
-        }
+        if (expandable) return toggleOpen(box);
         const own = box.own[0];
         if (own !== undefined) showNode(review, graph.nodes[own], workspace);
       }}
       onPaneClick={() => setSelected(undefined)}
+      onNodeContextMenu={(e, n) => {
+        setSelected(n.id);
+        openMenu(e, boxItems(n.data as BoxData));
+      }}
+      onPaneContextMenu={(e) =>
+        openMenu(e, [
+          { label: "Fit to Window", onSelect: () => flow.fitView({ padding: 0.1 }) },
+          ...paneItems(),
+        ])
+      }
       onNodeMouseEnter={(_, n) => setHover(n.id)}
       onNodeMouseLeave={() => setHover(undefined)}
     >
@@ -198,15 +240,22 @@ function Loaded({
   const allOpen = graph.nodes.every(
     (n) => n.hop !== 0 || !next.has(n.id) || view.callersOpen.has(n.id),
   );
+  const [legend, setLegend] = useState(false);
+  const expandAll = () => setView(setAllExpanded(tree, view, true));
+  const collapseAll = () => setView(setAllExpanded(tree, view, false));
+  const callers = (open: boolean) => setView(toggleAllCallers(graph, tree, view, open));
+  const callersOn = firstHop > 0 && allOpen;
   return (
     <div className="graph-panel">
       <GraphBar
         changed={changed}
         callers={firstHop}
         callersOpen={allOpen}
-        onCallers={(open) => setView(toggleAllCallers(graph, tree, view, open))}
-        onExpandAll={() => setView(setAllExpanded(tree, view, true))}
-        onCollapseAll={() => setView(setAllExpanded(tree, view, false))}
+        onCallers={callers}
+        onExpandAll={expandAll}
+        onCollapseAll={collapseAll}
+        legend={legend}
+        onLegend={setLegend}
       />
       <div className="graph-canvas">
         <ReactFlowProvider>
@@ -217,6 +266,18 @@ function Loaded({
             view={view}
             setView={setView}
             workspace={workspace}
+            paneItems={() => [
+              { label: "Expand All", onSelect: expandAll },
+              { label: "Collapse All", onSelect: collapseAll },
+              {
+                label: "Callers",
+                checked: callersOn,
+                disabled: firstHop === 0,
+                onSelect: () => callers(!callersOn),
+              },
+              "-",
+              { label: "Legend", onSelect: () => setLegend(true) },
+            ]}
           />
         </ReactFlowProvider>
       </div>

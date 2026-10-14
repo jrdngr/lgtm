@@ -10,12 +10,14 @@ import { type CommandResult, commands } from "../ipc";
 import { type CurrentReview, useCurrentReview } from "../review/current";
 import { openSettings } from "../settings/open";
 import { useAgentsOff, useGithubOff } from "../tools/agents";
+import { copy, openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { isMac } from "../workbench/keys";
 import { useWorkspace } from "../workspaces/context";
 import { FocusedThread } from "./FocusedThread";
 import { useFocusRequests } from "./focus";
+import { rowMenu } from "./rowMenu";
 import { SendBox } from "./SendBox";
 import { StageBar } from "./StageBar";
 import { byStage, STAGES, threadLabel, threadWhere } from "./stages";
@@ -31,7 +33,14 @@ const isEditable = (t: EventTarget) =>
   t instanceof HTMLSelectElement ||
   t instanceof HTMLTextAreaElement;
 
-function Row({ t, focused, onClick }: { t: ThreadDto; focused: boolean; onClick(): void }) {
+interface RowProps {
+  t: ThreadDto;
+  focused: boolean;
+  onClick(): void;
+  onContextMenu(e: React.MouseEvent): void;
+}
+
+function Row({ t, focused, onClick, onContextMenu }: RowProps) {
   const last = t.github?.posts.at(-1);
   return (
     <button
@@ -40,6 +49,7 @@ function Row({ t, focused, onClick }: { t: ThreadDto; focused: boolean; onClick(
       aria-current={focused}
       data-thread={t.id}
       onClick={onClick}
+      onContextMenu={onContextMenu}
     >
       <Avatar name={last?.author ?? "you"} small />
       <span className="threads-summary">
@@ -146,6 +156,20 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
     e.preventDefault();
   }
 
+  /** Opens the row's thread and its menu. */
+  function openRowMenu(e: React.MouseEvent, t: ThreadDto) {
+    setFocus(t.id);
+    openMenu(
+      e,
+      rowMenu(t, {
+        stage,
+        // The thread's boxes render once it's the open one.
+        focusBox: (ask) => requestAnimationFrame(() => (ask ? askRef : replyRef).current?.focus()),
+        showCode: (x) => review.jumpToComment(x.id),
+      }),
+    );
+  }
+
   const toFix = threads.filter((t) => t.state.stage === "toFix");
   const fresh = threads.filter((t) => t.state.stage === "new").length;
   const run = runner.run;
@@ -186,7 +210,7 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
             {
               label: "Copy final replies",
               title: "Final replies, threads fixed as asked, and what's still open, as text",
-              onSelect: () => navigator.clipboard.writeText(finalText(threads)),
+              onSelect: () => copy(finalText(threads)),
             },
             {
               label: "Edit reply prompt…",
@@ -269,6 +293,7 @@ function ThreadsBody({ pr, review, api }: BodyProps) {
                         setFocus(t.id);
                         leave();
                       }}
+                      onContextMenu={(e) => openRowMenu(e, t)}
                     />
                     {t.id === current?.id && (
                       <FocusedThread

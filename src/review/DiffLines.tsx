@@ -74,6 +74,7 @@ interface Props extends LineHandlers {
   scrollTo?: { line: number };
   onBackgroundMouseDown(): void;
   onClearFile(file: number): void;
+  onFileMenu(e: React.MouseEvent, file: number): void;
   renderComment(id: number): ReactNode;
   renderNote(id: number): ReactNode;
 }
@@ -160,6 +161,7 @@ export function DiffLines(props: Props) {
         onToggle={() => props.onToggleFile(fileIdx)}
         onCheck={(checked) => props.onCheckFile(fileIdx, checked)}
         onClear={() => props.onClearFile(fileIdx)}
+        onContextMenu={(e) => props.onFileMenu(e, fileIdx)}
       />
     );
   };

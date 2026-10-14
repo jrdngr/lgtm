@@ -1,4 +1,5 @@
 import { type ReactNode, useRef } from "react";
+import { contextMenu } from "../ui/contextMenu";
 import { Icon, type IconName } from "../ui/icons";
 
 export interface SideState {
@@ -24,6 +25,8 @@ interface Props {
   onChange(next: SideState): void;
   /** Set to focus the panel's content, e.g. after a shortcut opens it. */
   bodyRef?: React.RefObject<HTMLDivElement | null>;
+  /** Hides the panel, from the icon tabs' menu. */
+  onHide?(): void;
 }
 
 const MIN_WIDTH = 160;
@@ -32,7 +35,7 @@ const MAX_WIDTH = 600;
 /** A panel docked to one side of the window, outside the pane grid. Holds views behind a row
  * of icon tabs, shown when there's more than one, and resizes by dragging its inner edge. Each
  * view draws its own header. */
-export function SidePanel({ side, views, state, onChange, bodyRef }: Props) {
+export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Props) {
   const drag = useRef<{ x: number; width: number }>(undefined);
   if (!state.open) return null;
   const view = views.find((v) => v.id === state.view) ?? views[0];
@@ -53,7 +56,17 @@ export function SidePanel({ side, views, state, onChange, bodyRef }: Props) {
   return (
     <aside className={`side-panel side-${side}`} style={{ width: state.width }}>
       {views.length > 1 && (
-        <div className="side-tabs" role="tablist">
+        <div
+          className="side-tabs"
+          role="tablist"
+          onContextMenu={contextMenu(() => [
+            onHide && {
+              label: side === "left" ? "Hide Left Panel" : "Hide Right Panel",
+              keys: side === "left" ? "⌘B" : "⌥⌘B",
+              onSelect: onHide,
+            },
+          ])}
+        >
           {views.map((v) => (
             <button
               type="button"

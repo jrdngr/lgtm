@@ -694,3 +694,40 @@ kbd {
 .risk-dot.risk-low {
   background: var(--muted);
 }
+
+/* The text prompt from ui/prompt.tsx, over the whole window. */
+.prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(0 0 0 / 35%);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 18vh;
+}
+.prompt {
+  width: min(440px, 90vw);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prompt label {
+  font-weight: 600;
+}
+.prompt input,
+.prompt textarea {
+  font: inherit;
+  font-family: var(--mono);
+  resize: vertical;
+}
+.prompt-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

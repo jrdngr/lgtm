@@ -1,6 +1,10 @@
 import type { GraphDto, GraphNode } from "../bindings";
-import { useCurrentReview } from "../review/current";
+import { type CurrentReview, useCurrentReview } from "../review/current";
+import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
+import { dockOf } from "../workbench/docks";
+import { openGraph } from "../workbench/panels";
+import type { WorkspaceName } from "../workspaces/context";
 import { useWorkspace } from "../workspaces/context";
 import { nodeDone, nodeLabel, nodeRisk, STATUS_SIGN, showNode } from "./nodes";
 import { useGraph } from "./useGraph";
@@ -15,6 +19,25 @@ function callersOf(graph: GraphDto) {
     out.set(e.to, [...(out.get(e.to) ?? []), from]);
   }
   return out;
+}
+
+function symbolMenu(
+  review: CurrentReview,
+  n: GraphNode,
+  users: GraphNode[],
+  ws: WorkspaceName,
+): CtxEntry[] {
+  const graph = dockOf(ws);
+  return [
+    { label: "Jump to Code", onSelect: () => showNode(review, n, ws) },
+    graph && { label: "Show in Graph", onSelect: () => openGraph(graph) },
+    users.length > 0 && {
+      label: "Show Callers",
+      items: users.map((u) => ({ label: nodeLabel(u), onSelect: () => showNode(review, u, ws) })),
+    },
+    "-",
+    { label: "Copy Name", onSelect: () => copy(n.name) },
+  ];
 }
 
 function Shell({ meta, children }: { meta?: string; children: React.ReactNode }) {
@@ -80,6 +103,7 @@ export function SymbolsPanel() {
                       type="button"
                       className={`symbol-${n.status}`}
                       onClick={() => showNode(review, n, workspace)}
+                      onContextMenu={contextMenu(() => symbolMenu(review, n, users, workspace))}
                       title={users.length ? `Used by ${users.map(nodeLabel).join(", ")}` : n.path}
                     >
                       <span className="symbol-sign">{STATUS_SIGN[n.status]}</span>

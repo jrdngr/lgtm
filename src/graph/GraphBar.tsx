@@ -1,5 +1,5 @@
 import { Panel, useReactFlow } from "@xyflow/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 
@@ -11,6 +11,8 @@ interface Props {
   onCallers(open: boolean): void;
   onExpandAll(): void;
   onCollapseAll(): void;
+  legend: boolean;
+  onLegend(open: boolean): void;
 }
 
 /** The graph's toolbar: how many symbols changed, the callers toggle, expand and collapse
@@ -31,14 +33,13 @@ export function GraphBar(p: Props) {
       </button>
       <IconButton icon="expand" label="Expand all" onClick={p.onExpandAll} />
       <IconButton icon="collapse" label="Collapse all" onClick={p.onCollapseAll} />
-      <Legend />
+      <Legend open={p.legend} setOpen={p.onLegend} />
     </SectionHeader>
   );
 }
 
 /** A ? button opening what the graph's marks mean. Closes on Escape or a click outside. */
-function Legend() {
-  const [open, setOpen] = useState(false);
+function Legend({ open, setOpen }: { open: boolean; setOpen(open: boolean): void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -56,7 +57,7 @@ function Legend() {
       window.removeEventListener("pointerdown", away, true);
       window.removeEventListener("keydown", esc, true);
     };
-  }, [open]);
+  }, [open, setOpen]);
   return (
     <div className="menu" ref={ref}>
       <IconButton
@@ -64,7 +65,7 @@ function Legend() {
         label="Legend"
         aria-expanded={open}
         className={open ? "open" : undefined}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
       />
       {open && (
         <dl className="glegend">
