@@ -11,6 +11,7 @@ import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
 import { filterLabel, matchesFilter, type Progress, plural, progressTitle } from "./state";
 import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
+import { useSendFromMenu } from "./useSendText";
 import "./FilesPanel.css";
 
 const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
@@ -113,6 +114,7 @@ export function FilesPanel() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const setup = useMarkSetup();
+  const { sendText, picker } = useSendFromMenu(workspace);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const tree = useMemo(
     () =>
@@ -168,12 +170,13 @@ export function FilesPanel() {
             onToggle={(path) => setClosed(toggled(closed, path))}
             menu={(n) =>
               n.kind === "file"
-                ? fileMenu(workspace, review, setup, n.file)
+                ? fileMenu(workspace, review, setup, n.file, sendText)
                 : dirMenu(workspace, review, n, closed, setClosed)
             }
           />
         </div>
       )}
+      {picker}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { sendToTerminal, type TerminalChoice, workspaceTerminals } from "../terminal/registry";
 import type { WorkspaceName } from "../workspaces/context";
@@ -62,4 +63,15 @@ export function useSendText(
     />
   );
   return { sendText, picker };
+}
+
+/** Sending text from a place with no error line of its own, so failures show in a dialog. */
+export function useSendFromMenu(workspace: WorkspaceName) {
+  return useSendText(
+    workspace,
+    (m) => {
+      if (m) message(m, { kind: "error" });
+    },
+    () => {},
+  );
 }

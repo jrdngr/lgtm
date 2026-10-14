@@ -26,6 +26,7 @@ export function fileMenu(
   review: CurrentReview,
   setup: MarkSetup,
   file: number,
+  send: (text: string) => void,
 ): CtxEntry[] {
   const { path, status } = review.files[file].dto;
   const checked = review.checks[file] === "checked";
@@ -51,7 +52,9 @@ export function fileMenu(
     },
     "-",
     status !== "removed" && { label: "Open File", onSelect: () => openFile(ws, path) },
-    ...(status === "removed" ? [] : pathItems(ws, path, { relative: false, files: true })),
+    ...(status === "removed"
+      ? [{ label: "Send Path to Terminal", onSelect: () => send(path) }]
+      : pathItems(ws, path, { relative: false, files: true, send })),
   ];
 }
 

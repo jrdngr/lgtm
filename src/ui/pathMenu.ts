@@ -19,16 +19,18 @@ export function absolutePath(ws: WorkspaceName, rel: string): string {
 }
 
 /** Copy Path, Copy Relative Path and Reveal in Finder for a workspace file or folder, plus
- * Reveal in Files with `files`. */
+ * Reveal in Files with `files` and Send Path to Terminal with `send`. */
 export function pathItems(
   ws: WorkspaceName,
   rel: string,
-  opts: { relative?: boolean; files?: boolean } = {},
+  opts: { relative?: boolean; files?: boolean; send?: (text: string) => void } = {},
 ): CtxEntry[] {
+  const { send } = opts;
   return [
     { label: "Copy Path", onSelect: () => copy(absolutePath(ws, rel)) },
     opts.relative !== false &&
       !rel.startsWith("/") && { label: "Copy Relative Path", onSelect: () => copy(rel) },
+    send && { label: "Send Path to Terminal", onSelect: () => send(rel) },
     opts.files && { label: "Reveal in Files", onSelect: () => revealInFiles(ws, rel) },
     { label: "Reveal in Finder", onSelect: () => reveal(ws, rel) },
   ];

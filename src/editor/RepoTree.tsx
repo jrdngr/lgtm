@@ -3,6 +3,7 @@ import type { FileEntry } from "../bindings";
 import { commands, unwrap } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { guideAt, indent, toggled } from "../review/tree";
+import { useSendFromMenu } from "../review/useSendText";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { pathItems } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -149,6 +150,7 @@ export function RepoTree() {
   const { listings, reload } = useListings(workspace, open);
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
+  const { sendText, picker } = useSendFromMenu(workspace);
 
   const body = useRef<HTMLDivElement>(null);
   // Opens the folders holding a revealed file, then focuses its row once it's listed.
@@ -204,7 +206,7 @@ export function RepoTree() {
       "-",
       ...edits,
       "-",
-      ...pathItems(workspace, p),
+      ...pathItems(workspace, p, { send: sendText }),
     ];
   };
   return (
@@ -221,6 +223,7 @@ export function RepoTree() {
           menu={menu}
         />
       </div>
+      {picker}
     </div>
   );
 }
