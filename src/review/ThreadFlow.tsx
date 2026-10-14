@@ -134,7 +134,7 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
                   {!agentsOff && (
                     <button type="button" disabled={!!running} onClick={() => c.compose(id)}>
                       <Icon name="sparkle" size={13} />
-                      Redraft
+                      Review
                     </button>
                   )}
                 </>
