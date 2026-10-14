@@ -77,7 +77,7 @@ impl RepoCtx {
     /// looked up in the repo PR numbers refer to, and may come from forks pushed to.
     pub async fn nearby_prs(&self, workspace: Option<&str>) -> anyhow::Result<NearbyPrsDto> {
         let near = self.workspace(workspace).await?.jj.bookmarks_near().await?;
-        let remotes = self.main.jj.remotes().await?;
+        let remotes = crate::github::canonical::remotes(&self.main.jj).await?;
         let bookmarks = on_github(near, &remotes);
         let mut names: Vec<String> = Vec::new();
         for (b, _) in &bookmarks {

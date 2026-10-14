@@ -78,14 +78,18 @@ pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result
 impl RepoCtx {
     /// The remote for `want`, or the repo PR numbers refer to.
     pub(super) async fn base_for(&self, want: Option<&GhRepo>) -> anyhow::Result<(Base, GhRepo)> {
-        let remotes = self.main.jj.remotes().await?;
-        let (remote, url, repo) = remote::pick(&remotes, want)?;
+        let remotes = github::canonical::remotes(&self.main.jj).await?;
+        let want = match want {
+            Some(w) => Some(github::canonical::current(w).await),
+            None => None,
+        };
+        let (remote, url, repo) = remote::pick(&remotes, want.as_ref())?;
         Ok((Base { remote, url }, repo))
     }
 
     /// The PR's base remote as stored, or another for its repo when that one is gone.
     pub(super) async fn base_of(&self, pr: &PrRecord) -> anyhow::Result<Base> {
-        let remotes = self.main.jj.remotes().await?;
+        let remotes = github::canonical::remotes(&self.main.jj).await?;
         if let Some((n, u)) = remotes.iter().find(|(n, _)| *n == pr.base_remote) {
             return Ok(Base {
                 remote: n.clone(),

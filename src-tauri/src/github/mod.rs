@@ -1,5 +1,6 @@
 //! GitHub, through the `gh` CLI.
 
+pub mod canonical;
 pub mod gh;
 pub mod heads;
 pub mod pr;

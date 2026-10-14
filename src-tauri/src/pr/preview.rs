@@ -152,7 +152,13 @@ impl RepoCtx {
         let (repo, number) = remote::parse_pr(input)?;
         let repo: GhRepo = match repo {
             Some(r) => r,
-            None => remote::pick(&self.main.jj.remotes().await?, None)?.2,
+            None => {
+                remote::pick(
+                    &crate::github::canonical::remotes(&self.main.jj).await?,
+                    None,
+                )?
+                .2
+            }
         };
         let (info, d, diff) = tokio::try_join!(
             github::pr::info(&repo, number),
