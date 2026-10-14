@@ -25,23 +25,50 @@ fn split_repo(path: &str) -> Option<GhRepo> {
     })
 }
 
-/// The GitHub repo a remote URL points at: `git@github.com:o/n.git`,
-/// `https://github.com/o/n`, or `ssh://git@github.com/o/n`.
-pub fn parse_url(url: &str) -> Option<GhRepo> {
-    let rest = url
-        .strip_prefix("git@github.com:")
-        .or_else(|| url.strip_prefix("ssh://git@github.com/"))
-        .or_else(|| url.strip_prefix("https://github.com/"))
-        .or_else(|| url.strip_prefix("http://github.com/"))?;
-    split_repo(rest)
+/// A remote URL's host and path: `[user@]host:path` (scp style) or
+/// `scheme://[user@]host[:port]/path`.
+fn host_path(url: &str) -> Option<(&str, &str)> {
+    let (rest, scp) = match url.split_once("://") {
+        Some((_, rest)) => (rest, false),
+        None => (url, true),
+    };
+    let rest = rest.rsplit_once('@').map_or(rest, |(_, r)| r);
+    let (host, path) = if scp {
+        rest.split_once(':')?
+    } else {
+        let (host, path) = rest.split_once('/')?;
+        (host.split(':').next()?, path)
+    };
+    Some((host, path))
 }
 
-/// The URL of `repo`, over SSH when `like` (the base repo's URL) is.
+/// The GitHub repo a remote URL points at, over HTTPS or SSH, including SSH host aliases
+/// like `github.com-work` from `~/.ssh/config`: any host with "github" in it.
+pub fn parse_url(url: &str) -> Option<GhRepo> {
+    let (host, _) = host_path(url.trim())?;
+    if !host.to_ascii_lowercase().contains("github") {
+        return None;
+    }
+    any_repo(url)
+}
+
+/// The `owner/name` a remote URL ends in, on any host.
+pub fn any_repo(url: &str) -> Option<GhRepo> {
+    split_repo(host_path(url.trim())?.1.trim_start_matches('/'))
+}
+
+/// The URL of `repo` on the same host, user and scheme as `like` (the base repo's URL), so
+/// SSH aliases and credentials carry over.
 pub fn url_like(like: &str, repo: &GhRepo) -> String {
-    if like.starts_with("git@") || like.starts_with("ssh://") {
-        format!("git@github.com:{repo}.git")
-    } else {
-        format!("https://github.com/{repo}.git")
+    match parse_url(like) {
+        Some(base) => {
+            let path = format!("{base}");
+            match like.rfind(&path) {
+                Some(at) => format!("{}{repo}.git", &like[..at]),
+                None => format!("https://github.com/{repo}.git"),
+            }
+        }
+        None => format!("https://github.com/{repo}.git"),
     }
 }
 
@@ -56,19 +83,39 @@ pub fn pick(
     remotes: &[(String, String)],
     want: Option<&GhRepo>,
 ) -> anyhow::Result<(String, String, GhRepo)> {
-    let github: Vec<(&String, &String, GhRepo)> = remotes
+    let mut github: Vec<(&String, &String, GhRepo)> = remotes
         .iter()
         .filter_map(|(n, u)| Some((n, u, parse_url(u)?)))
         .collect();
+    // With no host that says GitHub, the remotes may use SSH aliases: take them all.
+    if github.is_empty() {
+        github = remotes
+            .iter()
+            .filter_map(|(n, u)| Some((n, u, any_repo(u)?)))
+            .collect();
+    }
+    let same = |r: &GhRepo, w: &GhRepo| {
+        r.owner.eq_ignore_ascii_case(&w.owner) && r.name.eq_ignore_ascii_case(&w.name)
+    };
+    // A named repo matches on its path too, for SSH aliases without "github" in them.
+    let named = want.and_then(|w| {
+        remotes
+            .iter()
+            .find(|(_, u)| any_repo(u).is_some_and(|r| same(&r, w)))
+            .map(|(n, u)| (n, u, w.clone()))
+    });
     let found = match want {
-        Some(w) => github.iter().find(|(_, _, r)| {
-            r.owner.eq_ignore_ascii_case(&w.owner) && r.name.eq_ignore_ascii_case(&w.name)
-        }),
+        Some(w) => github
+            .iter()
+            .find(|(_, _, r)| same(r, w))
+            .cloned()
+            .or(named),
         None => ["upstream", "origin"]
             .iter()
             .find_map(|n| github.iter().find(|(name, _, _)| name.as_str() == *n))
             // `gh-*` remotes are forks lgtm added, not the repo's own.
-            .or(github.iter().find(|(name, _, _)| !name.starts_with("gh-"))),
+            .or(github.iter().find(|(name, _, _)| !name.starts_with("gh-")))
+            .cloned(),
     };
     match (found, want) {
         (Some((n, u, r)), _) => Ok((n.to_string(), u.to_string(), r.clone())),
@@ -133,6 +180,18 @@ mod tests {
             Some(repo("a", "b"))
         );
         assert_eq!(parse_url("https://gitlab.com/a/b"), None);
+        assert_eq!(
+            parse_url("org-1@github.com-work:a/b.git"),
+            Some(repo("a", "b"))
+        );
+        assert_eq!(
+            parse_url("ssh://git@ssh.github.com:443/a/b.git"),
+            Some(repo("a", "b"))
+        );
+        assert_eq!(
+            parse_url("https://me:tok@github.com/a/b.git"),
+            Some(repo("a", "b"))
+        );
         assert_eq!(parse_pr("#12").unwrap(), (None, 12));
         assert_eq!(
             parse_pr("https://github.com/a/b/pull/7/files").unwrap(),
@@ -144,6 +203,14 @@ mod tests {
         assert_eq!(
             url_like("git@github.com:x/y", &repo("f", "y")),
             "git@github.com:f/y.git"
+        );
+        assert_eq!(
+            url_like("git@github-work:x/y.git", &repo("f", "y")),
+            "git@github-work:f/y.git"
+        );
+        assert_eq!(
+            url_like("https://github.com/x/y", &repo("f", "y")),
+            "https://github.com/f/y.git"
         );
     }
 
@@ -159,6 +226,9 @@ mod tests {
         assert_eq!(pick(&remotes, None).unwrap().0, "upstream");
         assert_eq!(pick(&remotes, Some(&repo("ME", "r"))).unwrap().0, "origin");
         assert!(pick(&remotes, Some(&repo("x", "r"))).is_err());
+        let aliased = vec![("origin".to_string(), "work:me/r.git".to_string())];
+        assert_eq!(pick(&aliased, Some(&repo("me", "r"))).unwrap().0, "origin");
         assert!(pick(&[], None).is_err());
+        assert_eq!(pick(&aliased, None).unwrap().2, repo("me", "r"));
     }
 }

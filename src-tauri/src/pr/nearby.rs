@@ -37,7 +37,7 @@ fn on_github(near: Vec<NearBookmark>, remotes: &[(String, String)]) -> Vec<(Near
     near.into_iter()
         .filter_map(|b| {
             let (_, url) = remotes.iter().find(|(n, _)| *n == b.remote)?;
-            let repo = remote::parse_url(url)?;
+            let repo = remote::parse_url(url).or_else(|| remote::any_repo(url))?;
             Some((b, repo))
         })
         .take(MAX_BOOKMARKS)
