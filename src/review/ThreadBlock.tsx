@@ -111,17 +111,15 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
       onKeyDown={onKey}
     >
       <div className="card-bar">
-        {done && (
-          <button
-            type="button"
-            className="chevron quiet"
-            aria-expanded={true}
-            onClick={onFold}
-            title="Fold"
-          >
-            ▾
-          </button>
-        )}
+        <button
+          type="button"
+          className="chevron quiet"
+          aria-expanded={true}
+          aria-label="Fold"
+          onClick={onFold}
+        >
+          ▾
+        </button>
         <span className="card-source">
           <b>GitHub</b> ·{" "}
           {quote ? (

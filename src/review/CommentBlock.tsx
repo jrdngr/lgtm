@@ -30,12 +30,14 @@ interface Props {
 }
 
 /** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
- * editor for its text and a conversation with an agent about it. Done ones fold to a line. */
+ * editor for its text and a conversation with an agent about it. Any folds to a line; done
+ * ones start folded. */
 export function CommentBlock({ id, comment, c }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
   const agentsOff = useAgentsOff();
-  const [expanded, setExpanded] = useState(false);
+  // Set by the fold toggle; until then, and again once done changes, done ones are folded.
+  const [fold, setFold] = useState<boolean>();
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
   const gh = comment?.github;
@@ -45,6 +47,9 @@ export function CommentBlock({ id, comment, c }: Props) {
   const isNew = id === NEW_COMMENT;
   const github = !!gh || !!thread || (isNew && !!c.draft?.github);
   const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
+  const folded = fold ?? !!done;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: marking done or not folds anew
+  useEffect(() => setFold(undefined), [done]);
 
   useEffect(() => {
     if (c.focus?.id !== id) return;
@@ -70,26 +75,27 @@ export function CommentBlock({ id, comment, c }: Props) {
     openMenu(e, cardItems(card));
   };
 
-  if (comment && done && !expanded && editing === undefined && !c.running.has(id)) {
+  if (comment && folded && editing === undefined && !c.running.has(id)) {
     const summary = gh
       ? lastPost(gh, viewer)
       : (thread?.quote?.text ?? comment.body).split("\n")[0];
     return (
       <div
-        className={`comment-block ${github ? "gh" : "mine"} resolved${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
+        className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
         onContextMenu={onContextMenu}
       >
         <button
           type="button"
           className="card-bar collapsed"
           aria-expanded={false}
-          onClick={() => setExpanded(true)}
-          title={github ? "Show the thread" : "Show the note"}
+          onClick={() => setFold(false)}
         >
           <span className="chevron">▸</span>
-          <span className={`pill${gh?.resolved ? " green" : ""}`}>
-            {gh?.resolved ? "✓ Resolved" : "✓ Done"}
-          </span>
+          {done && (
+            <span className={`pill${gh?.resolved ? " green" : ""}`}>
+              {gh?.resolved ? "✓ Resolved" : "✓ Done"}
+            </span>
+          )}
           <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
           {gh && <span className="card-count">{gh.posts.length}</span>}
@@ -110,7 +116,7 @@ export function CommentBlock({ id, comment, c }: Props) {
         c={c}
         agentsOff={agentsOff}
         done={!!done}
-        onFold={() => setExpanded(false)}
+        onFold={() => setFold(true)}
         onContextMenu={onContextMenu}
         bodyRef={bodyRef}
         askRef={askRef}
@@ -155,13 +161,13 @@ export function CommentBlock({ id, comment, c }: Props) {
       onContextMenu={onContextMenu}
     >
       <div className="card-bar">
-        {done && (
+        {comment && (
           <button
             type="button"
             className="chevron quiet"
             aria-expanded={true}
-            onClick={() => setExpanded(false)}
-            title="Fold"
+            aria-label="Fold"
+            onClick={() => setFold(true)}
           >
             ▾
           </button>
