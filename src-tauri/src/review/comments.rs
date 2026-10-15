@@ -274,10 +274,11 @@ impl RepoCtx {
         self.comment_edit(id, |_, store| {
             let cid = comment as i64;
             let c = store.comment(cid)?.context("the comment is gone")?;
+            let draft = c.is_draft();
             if let Some(mut t) = c.thread
                 && c.body != body
             {
-                t.stage = after_edit(t.stage, c.github.is_none(), body);
+                t.stage = after_edit(t.stage, draft, body);
                 store.set_thread(cid, &Some(t))?;
             }
             Ok(store.set_comment_body(cid, body, now_ms())?)

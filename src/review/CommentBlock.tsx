@@ -71,10 +71,12 @@ export function CommentBlock({ id, comment, c }: Props) {
   };
 
   if (comment && done && !expanded && editing === undefined && !c.running.has(id)) {
-    const summary = gh ? lastPost(gh, viewer) : comment.body.split("\n")[0];
+    const summary = gh
+      ? lastPost(gh, viewer)
+      : (thread?.quote?.text ?? comment.body).split("\n")[0];
     return (
       <div
-        className={`comment-block ${github ? "gh" : "mine"} resolved`}
+        className={`comment-block ${github ? "gh" : "mine"} resolved${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
         onContextMenu={onContextMenu}
       >
         <button
@@ -101,7 +103,7 @@ export function CommentBlock({ id, comment, c }: Props) {
     );
   }
 
-  if (comment && gh && thread) {
+  if (comment && thread && (gh || thread.quote)) {
     return (
       <ThreadBlock
         comment={comment}

@@ -1,5 +1,5 @@
 //! A PR's conversation, outside its code: comments and review summaries, read live from
-//! GitHub. Replies post right away rather than going into the pending review.
+//! GitHub.
 
 use serde::Serialize;
 use specta::Type;
@@ -79,12 +79,5 @@ impl RepoCtx {
     pub async fn open_pr_page(&self, workspace: Option<&str>) -> anyhow::Result<()> {
         let pr = self.need_pr(workspace)?;
         github::gh::browse_pr(&pr.repo, pr.number).await
-    }
-
-    /// Posts to the PR's conversation.
-    pub async fn reply_pr(&self, workspace: Option<&str>, body: &str) -> anyhow::Result<()> {
-        let pr = self.need_pr(workspace)?;
-        anyhow::ensure!(!body.trim().is_empty(), "write something to post first");
-        github::publish::comment(&pr.id, body).await
     }
 }

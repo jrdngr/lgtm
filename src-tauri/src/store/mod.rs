@@ -20,7 +20,7 @@ pub use comments::{Author, Comment, GhLink, GhPost, Message, Pin, Workshop};
 pub use marks::{Mark, MarkColor};
 pub use notes::{Category, FlowStep, Level, Note, Source};
 pub use sessions::Session;
-pub use threads::{Proposed, ProposedState, Stage, Take, TakeVerdict, ThreadState};
+pub use threads::{Proposed, ProposedState, Quote, Stage, Take, TakeVerdict, ThreadState};
 
 pub struct Store {
     db: Connection,

@@ -9,7 +9,7 @@ use specta::Type;
 use super::PrRecord;
 use crate::anchor::Side;
 use crate::github::{self, Verdict, publish::Spot};
-use crate::review::{RepoCtx, StateDto, now_ms};
+use crate::review::{RepoCtx, StateDto, now_ms, quoted_reply};
 use crate::store::{Comment, GhLink, GhPost, Stage};
 
 /// What happens to a ready thread with no reply: one that was fixed as asked.
@@ -119,7 +119,7 @@ impl RepoCtx {
     fn check_lines(&self, id: u32, pr: &PrRecord, threads: &[Comment]) -> anyhow::Result<()> {
         let drafts = threads
             .iter()
-            .any(|c| c.github.is_none() && !c.body.trim().is_empty());
+            .any(|c| c.is_draft() && !c.body.trim().is_empty());
         anyhow::ensure!(
             !drafts || self.shows_whole(id, &pr.revset())?,
             "open the whole PR ({}) in the Combined view to send new comments, where GitHub's \
@@ -148,6 +148,18 @@ impl RepoCtx {
         fixed: Fixed,
     ) -> anyhow::Result<bool> {
         let text = c.body.trim();
+        let reply = match (text.is_empty(), fixed.reply()) {
+            (false, _) => Some(text),
+            (true, true) => Some(DONE),
+            (true, false) => None,
+        };
+        if let Some(q) = c.quote() {
+            if let Some(reply) = reply {
+                github::publish::comment(&pr.id, &quoted_reply(&q.text, reply)).await?;
+            }
+            self.mark_sent(c, None)?;
+            return Ok(false);
+        }
         let mut in_review = false;
         let link = match &c.github {
             None if text.is_empty() => return Ok(false),
@@ -156,11 +168,6 @@ impl RepoCtx {
                 Some(self.add_draft(id, pr, c, text).await?)
             }
             Some(l) => {
-                let reply = match (text.is_empty(), fixed.reply()) {
-                    (false, _) => Some(text),
-                    (true, true) => Some(DONE),
-                    (true, false) => None,
-                };
                 match (reply, l.posts.first()) {
                     (Some(reply), Some(post)) if c.path.is_empty() => {
                         let body = quoted(&post.author, &post.body, reply);
@@ -178,6 +185,12 @@ impl RepoCtx {
                 c.github.clone()
             }
         };
+        self.mark_sent(c, link)?;
+        Ok(in_review)
+    }
+
+    /// Marks a sent thread done, on GitHub's `link`, with its reply cleared.
+    fn mark_sent(&self, c: &Comment, link: Option<GhLink>) -> anyhow::Result<()> {
         let store = self.store.lock().unwrap();
         let mut thread = c.thread.clone();
         if let Some(t) = &mut thread {
@@ -186,7 +199,36 @@ impl RepoCtx {
         store.set_thread(c.id, &thread)?;
         store.set_github(c.id, &link)?;
         store.clear_body_if(c.id, &c.body, now_ms())?;
-        Ok(in_review)
+        Ok(())
+    }
+
+    /// Posts `body` to the PR's conversation as the reply of quote threads `comments`, marks
+    /// them done, and pulls the PR's threads again.
+    pub async fn send_combined(
+        &self,
+        id: u32,
+        comments: &[u32],
+        body: &str,
+    ) -> anyhow::Result<StateDto> {
+        let ws = self.review_workspace(id)?;
+        let pr = self.need_pr(ws.name.as_deref())?;
+        anyhow::ensure!(!body.trim().is_empty(), "write something to send first");
+        let quotes = {
+            let store = self.store.lock().unwrap();
+            comments
+                .iter()
+                .map(|&c| store.comment(c as i64)?.context("a quote is gone"))
+                .collect::<anyhow::Result<Vec<Comment>>>()?
+        };
+        anyhow::ensure!(
+            quotes.iter().all(|c| c.quote().is_some()),
+            "only quotes can be combined"
+        );
+        github::publish::comment(&pr.id, body.trim()).await?;
+        for c in &quotes {
+            self.mark_sent(c, None)?;
+        }
+        self.pull_sent(id).await
     }
 
     /// Starts a draft's thread on its code in the pending review.

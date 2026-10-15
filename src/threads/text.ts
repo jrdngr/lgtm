@@ -14,7 +14,12 @@ export function unanswered(posts: GhPost[], viewer?: string): [GhPost[], GhPost[
 export function threadText(t: ThreadDto): string {
   const posts = (t.github?.posts ?? []).map((p) => `${p.author}: ${p.body.trim()}`);
   const code = t.snippet ? `\n${t.snippet}\n` : "";
-  const ask = t.github ? posts.join("\n\n") : t.body.trim();
+  const quote = t.state.quote;
+  const ask = quote
+    ? `${quote.author}: ${quote.text.trim()}`
+    : t.github
+      ? posts.join("\n\n")
+      : t.body.trim();
   return `${t.path || "The PR"} (${threadWhere(t)})${code}\n${ask}`;
 }
 
@@ -23,7 +28,7 @@ export function threadText(t: ThreadDto): string {
 export function finalText(threads: ThreadDto[]): string {
   const head = (t: ThreadDto) => `${threadWhere(t)}: ${threadLabel(t)}`;
   const comment = (t: ThreadDto) => {
-    const last = t.github?.posts.at(-1)?.body.trim();
+    const last = (t.state.quote?.text ?? t.github?.posts.at(-1)?.body)?.trim();
     return last ? `\n- Comment: "${last}"` : "";
   };
   const url = (t: ThreadDto) => (t.github?.url ? `\n- ${t.github.url}` : "");

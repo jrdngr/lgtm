@@ -7,7 +7,6 @@ import { IconButton } from "../ui/icons";
 import { ago } from "../ui/time";
 import { useWorkspace } from "../workspaces/context";
 import { Avatar } from "./Post";
-import { PrDiscussion } from "./PrDiscussion";
 import { viewerLogin } from "./people";
 import type { Discussion } from "./useDiscussion";
 import "./github.css";
@@ -32,7 +31,7 @@ interface Props {
 }
 
 /** A PR workspace's PR atop its threads: state, title, how far along its threads are, branches,
- * a Sync button, and the conversation, which folds away. */
+ * and a Sync button. */
 export function PrSection({ pr, review, discussion, threads }: Props) {
   const workspace = useWorkspace();
   const [error, setError] = useState<string>();
@@ -53,36 +52,35 @@ export function PrSection({ pr, review, discussion, threads }: Props) {
   }
 
   return (
-    <>
-      <div className="pr-head">
-        <div className="pr-row">
-          {state && <span className={`pill ${state[0]}`}>{state[1]}</span>}
-          <span className="pr-number">#{pr.number}</span>
-          {pr.author === viewer && <span className="pill blue">Yours</span>}
-          <span className="spacer" />
-          <IconButton icon="external" label="Open on GitHub" onClick={openPage} />
-          <IconButton
-            icon="sync"
-            label={`Sync with GitHub: fetch the PR and pull its comments${synced(discussion.syncedAt)}`}
-            className={discussion.loading ? "spinning" : undefined}
-            disabled={discussion.loading}
-            onMouseEnter={() => hovered((n) => n + 1)}
-            onClick={sync}
-          />
-        </div>
-        <div className="pr-title">{pr.title}</div>
-        <StageBar threads={threads} />
-        <div className="pr-row pr-meta">
-          <Avatar name={pr.author} small />
-          <span>{pr.author === viewer ? "You" : pr.author}</span>
-          <span className="faint">·</span>
-          <span className="pr-branches" title={`${pr.headRef} → ${pr.baseRef}`}>
-            {pr.headRef} → {pr.baseRef}
-          </span>
-        </div>
-        {error && <div className="review-error">{error}</div>}
+    <div className="pr-head">
+      <div className="pr-row">
+        {state && <span className={`pill ${state[0]}`}>{state[1]}</span>}
+        <span className="pr-number">#{pr.number}</span>
+        {pr.author === viewer && <span className="pill blue">Yours</span>}
+        <span className="spacer" />
+        <IconButton icon="external" label="Open on GitHub" onClick={openPage} />
+        <IconButton
+          icon="sync"
+          label={`Sync with GitHub: fetch the PR and pull its comments${synced(discussion.syncedAt)}`}
+          className={discussion.loading ? "spinning" : undefined}
+          disabled={discussion.loading}
+          onMouseEnter={() => hovered((n) => n + 1)}
+          onClick={sync}
+        />
       </div>
-      <PrDiscussion discussion={discussion} viewer={viewer} />
-    </>
+      <div className="pr-title">{pr.title}</div>
+      <StageBar threads={threads} />
+      <div className="pr-row pr-meta">
+        <Avatar name={pr.author} small />
+        <span>{pr.author === viewer ? "You" : pr.author}</span>
+        <span className="faint">·</span>
+        <span className="pr-branches" title={`${pr.headRef} → ${pr.baseRef}`}>
+          {pr.headRef} → {pr.baseRef}
+        </span>
+      </div>
+      {(error ?? discussion.error) && (
+        <div className="review-error">{error ?? discussion.error}</div>
+      )}
+    </div>
   );
 }

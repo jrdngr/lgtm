@@ -19,6 +19,7 @@ import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
 import { useMarkSetup } from "./marks";
 import { buildLines, changedRows, type DisplayLine, symbolMarkers, type ViewMode } from "./model";
+import { PrCommentsHead, prLines } from "./PrCommentsHead";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
 import { type Filter, filterLabel, plural, sumProgress } from "./state";
@@ -91,7 +92,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const w = useWalkthrough(review, files, commentOn, !!pr.pr);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
-  const lines = useMemo(
+  const fileLines = useMemo(
     () =>
       buildLines(files, {
         mode,
@@ -117,6 +118,8 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       w.slots,
     ],
   );
+  const lines = useMemo(() => [...prLines(c.onPr), ...fileLines], [c.onPr, fileLines]);
+  const navComments = useMemo(() => [...c.onPr, ...c.comments], [c.onPr, c.comments]);
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, place } = s;
   const changedCount = useMemo(
@@ -203,7 +206,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     review: review?.id,
     lines,
     files,
-    comments: c.comments,
+    comments: navComments,
     notes: w.notes,
     cursor,
     place,
@@ -377,7 +380,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         />
       )}
       {error && <div className="review-error">{error}</div>}
-      {review && lines.length === 0 && (
+      {review && fileLines.length === 0 && (
         <div className="placeholder">
           {review.files.length === 0
             ? `No changes in ${review.revset}`
@@ -404,7 +407,10 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           onClearFile={a.clearFile}
           onFileMenu={openFileMenu}
           renderComment={(id) => (
-            <CommentBlock id={id} comment={c.comments.find((x) => x.id === id)} c={c} />
+            <>
+              {id === c.onPr[0]?.id && <PrCommentsHead comments={c.onPr} />}
+              <CommentBlock id={id} comment={navComments.find((x) => x.id === id)} c={c} />
+            </>
           )}
           renderNote={w.renderNote}
           {...handlers}

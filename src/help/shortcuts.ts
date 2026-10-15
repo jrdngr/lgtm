@@ -95,6 +95,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["a"], action: "Draft a reply, or ask the agent once there is one" },
       { keys: ["e"], action: "Edit the reply (in a focused comment)" },
       { keys: ["y"], action: "Mark the reply final (in a focused comment)" },
+      { keys: ["q"], action: "Quote the selected text of a comment on the PR" },
       { keys: ["t"], action: "Triage new threads (in the PR panel)" },
     ],
   },

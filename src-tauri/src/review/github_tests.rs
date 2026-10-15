@@ -6,7 +6,7 @@ use super::comment_tests::row_text;
 use super::tests::{repo, write};
 use super::*;
 use crate::anchor::Side;
-use crate::store::GhLink;
+use crate::store::{GhLink, GhPost, Stage};
 
 fn thread(id: &str, line: Option<u32>) -> PulledThread {
     PulledThread {
@@ -115,4 +115,49 @@ async fn a_thread_stays_on_its_line_when_the_working_copy_edits_it() {
     let c = &review.state.comments[0];
     let span = c.rows.expect("the thread keeps its rows");
     assert_eq!(row_text(&review, c.file, span.end), "fn new_name() {");
+}
+
+#[tokio::test]
+async fn quotes_answer_parts_of_a_pr_comment_in_its_place() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    write(&ws.root, "a.rs", "fn a() {}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let mut on_pr = thread("C1", None);
+    on_pr.path = String::new();
+    on_pr.link.posts = vec![GhPost {
+        author: "bot".into(),
+        body: "Why a 500? And why count it?".into(),
+        created_at: String::new(),
+        pending: false,
+    }];
+    let state = ctx
+        .add_threads(review.id, vec![on_pr], &HashMap::new(), "PR #1")
+        .unwrap();
+    let parent = state.threads[0].id;
+
+    let state = ctx.add_quote(review.id, parent, " Why a 500? ").unwrap();
+    let quote = state.threads.iter().find(|t| t.id != parent).unwrap();
+    let q = quote.state.quote.as_ref().unwrap();
+    assert_eq!(
+        (q.of, q.author.as_str(), q.text.as_str()),
+        (parent, "bot", "Why a 500?")
+    );
+
+    // Triage takes the quote in place of the comment it's from.
+    let new: Vec<u32> = ctx
+        .threads_at(review.id, Stage::New)
+        .unwrap()
+        .iter()
+        .map(|c| c.id as u32)
+        .collect();
+    assert_eq!(new, [quote.id]);
+
+    // A reply is worked out like one on a GitHub thread, not sent like a new draft.
+    let state = ctx
+        .edit_comment(review.id, quote.id, "It isn't now.")
+        .unwrap();
+    let edited = state.threads.iter().find(|t| t.id == quote.id).unwrap();
+    assert_eq!(edited.state.stage, Stage::Reply);
 }

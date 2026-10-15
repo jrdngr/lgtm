@@ -7,6 +7,7 @@ import { useDiscussion } from "../github/useDiscussion";
 import { commands, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { useCurrentReview } from "../review/current";
+import { prThreads, quoted } from "../review/prComments";
 import { openSettings } from "../settings/open";
 import { useAgentsOff, useGithubOff } from "../tools/agents";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
@@ -14,7 +15,7 @@ import { openUrl, run } from "../ui/pathMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { SendBox } from "./SendBox";
-import { byStage, STAGES, threadLabel, threadWhere } from "./stages";
+import { byStage, STAGES, threadLabel, threadWhere, working } from "./stages";
 import { TakePill } from "./ThreadBits";
 import { finalText, threadText } from "./text";
 import { useThreadRun } from "./useThreadRun";
@@ -26,7 +27,10 @@ function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
   const setStage = (s: Stage) =>
     run(unwrap(commands.setThreadStage(review.id, t.id, s)).then(review.apply));
   return [
-    t.placed && { label: "Show Code", onSelect: () => review.jumpToComment(t.id) },
+    (t.placed || !t.path) && {
+      label: t.path ? "Show Code" : "Show Comment",
+      onSelect: () => review.jumpToComment(t.id),
+    },
     {
       label: "Move to Stage",
       items: STAGES.map(([s, name]) => ({
@@ -41,6 +45,47 @@ function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
   ];
 }
 
+interface RowProps {
+  review: CurrentReview;
+  t: ThreadDto;
+  runner: ReturnType<typeof useThreadRun>;
+  picked: boolean;
+  onPick(): void;
+  /** A quote, under the comment it's from. */
+  sub?: boolean;
+  /** Shows its stage as a dot. */
+  dot?: boolean;
+}
+
+function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
+  const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
+  const inRun = runner.run?.threads.has(t.id);
+  return (
+    <button
+      type="button"
+      className={`thread-row${inRun ? " in-run" : ""}${sub ? " sub" : ""}`}
+      aria-current={picked}
+      onClick={() => {
+        onPick();
+        if (t.placed || !t.path) review.jumpToComment(t.id);
+      }}
+      onContextMenu={contextMenu(() => threadMenu(review, t))}
+    >
+      <span className="item-text">
+        {!t.github && !t.state.quote && <span className="pill purple">Draft</span>}{" "}
+        {t.github && !t.path && `${t.github.posts[0]?.author ?? "PR"}: `}
+        {threadLabel(t)}
+      </span>
+      <span className="thread-where">
+        <TakePill take={t.state.take} />
+        {t.path && threadWhere(t)}
+        {inRun && <Spinner />}
+        {dot && <span className={`dot stage-seg ${tone || "grey"}`} />}
+      </span>
+    </button>
+  );
+}
+
 interface ListProps {
   review: CurrentReview;
   threads: ThreadDto[];
@@ -48,11 +93,14 @@ interface ListProps {
   onError(e: string | undefined): void;
 }
 
-/** Threads grouped by stage in work order, Done folded. Picking a thread shows its comment in
- * the review. The To fix group can be fixed by an agent or sent to a terminal. */
+const CONVERSATION = "conversation";
+
+/** Comments on the PR with their quotes, then threads on code grouped by stage in work order,
+ * Done folded. Picking a thread shows its comment in the review. The To fix group can be fixed
+ * by an agent or sent to a terminal. */
 function ThreadGroups({ review, threads, runner, onError }: ListProps) {
   const agentsOff = useAgentsOff();
-  const [folded, setFolded] = useState<ReadonlySet<Stage>>(new Set(["done"]));
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set(["done"]));
   const [picked, setPicked] = useState<number>();
   if (threads.length === 0) {
     return (
@@ -61,76 +109,91 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
       </Empty>
     );
   }
-  const toggle = (s: Stage) =>
+  const toggle = (s: string) =>
     setFolded((f) => {
       const next = new Set(f);
       if (!next.delete(s)) next.add(s);
       return next;
     });
-  const toFix = threads.filter((t) => t.state.stage === "toFix");
+  const split = quoted(threads);
+  const toFix = working(threads).filter((t) => t.state.stage === "toFix");
   const sendToFix = () =>
     review.send(toFix.map(threadText).join("\n\n---\n\n"), undefined, (o) =>
       onError("error" in o ? o.error : undefined),
     );
+  const row = (t: ThreadDto, extra?: Partial<RowProps>) => (
+    <ThreadRow
+      key={t.id}
+      review={review}
+      t={t}
+      runner={runner}
+      picked={picked === t.id}
+      onPick={() => setPicked(t.id)}
+      {...extra}
+    />
+  );
+  const convo = prThreads(threads);
+  const head = (key: string, name: string, tone: string | undefined, actions?: React.ReactNode) => {
+    const shut = folded.has(key);
+    return (
+      <div className="stage-head">
+        <button
+          type="button"
+          className="stage-toggle"
+          aria-expanded={!shut}
+          onClick={() => toggle(key)}
+        >
+          <span className="chevron">{shut ? "▸" : "▾"}</span>
+          {tone !== undefined && <span className={`dot stage-seg ${tone || "grey"}`} />}
+          <span>{name}</span>
+        </button>
+        <span className="spacer" />
+        {actions}
+      </div>
+    );
+  };
   return (
     <>
-      {byStage(threads).map(([stage, group]) => {
+      {convo.length > 0 && (
+        <div>
+          {head(
+            CONVERSATION,
+            "Conversation",
+            undefined,
+            <span className="stage-count">{convo.filter((t) => !t.state.quote).length}</span>,
+          )}
+          {!folded.has(CONVERSATION) &&
+            convo.map((t) => row(t, { sub: !!t.state.quote, dot: !split.has(t.id) }))}
+        </div>
+      )}
+      {byStage(threads.filter((t) => t.path)).map(([stage, group]) => {
         const [, name, tone] = STAGES.find(([s]) => s === stage) ?? [];
-        const shut = folded.has(stage);
         return (
           <div key={stage}>
-            <div className="stage-head">
-              <button
-                type="button"
-                className="stage-toggle"
-                aria-expanded={!shut}
-                onClick={() => toggle(stage)}
-              >
-                <span className="chevron">{shut ? "▸" : "▾"}</span>
-                <span className={`dot stage-seg ${tone || "grey"}`} />
-                <span>{name}</span>
-              </button>
-              <span className="spacer" />
-              {stage === "toFix" && !agentsOff && (
-                <button
-                  type="button"
-                  className="stage-act"
-                  disabled={!!runner.run}
-                  onClick={() => runner.start("fix")}
-                >
-                  Fix {toFix.length}
-                </button>
-              )}
-              {stage === "toFix" && (
-                <button type="button" className="stage-act" onClick={sendToFix}>
-                  Send {toFix.length} to terminal
-                </button>
-              )}
-              <span className="stage-count">{group.length}</span>
-            </div>
-            {!shut &&
-              group.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  className={`thread-row${runner.run?.threads.has(t.id) ? " in-run" : ""}`}
-                  aria-current={picked === t.id}
-                  onClick={() => {
-                    setPicked(t.id);
-                    if (t.placed) review.jumpToComment(t.id);
-                  }}
-                  onContextMenu={contextMenu(() => threadMenu(review, t))}
-                >
-                  <span className="item-text">
-                    {!t.github && <span className="pill purple">Draft</span>} {threadLabel(t)}
-                  </span>
-                  <span className="thread-where">
-                    <TakePill take={t.state.take} />
-                    {threadWhere(t)}
-                    {runner.run?.threads.has(t.id) && <Spinner />}
-                  </span>
-                </button>
-              ))}
+            {head(
+              stage,
+              name ?? stage,
+              tone,
+              <>
+                {stage === "toFix" && !agentsOff && (
+                  <button
+                    type="button"
+                    className="stage-act"
+                    disabled={!!runner.run}
+                    onClick={() => runner.start("fix")}
+                  >
+                    Fix {toFix.length}
+                  </button>
+                )}
+                {stage === "toFix" && (
+                  <button type="button" className="stage-act" onClick={sendToFix}>
+                    Send {toFix.length} to terminal
+                  </button>
+                )}
+                <span className="stage-count">{group.length}</span>
+              </>,
+            )}
+            {!folded.has(stage) && group.map((t) => row(t))}
           </div>
         );
       })}
@@ -149,7 +212,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
   const threads = review?.threads ?? [];
   const viewer = discussion.d?.viewer ?? (review && viewerLogin(review.comments));
   const sending = review && !off;
-  const fresh = threads.filter((t) => t.state.stage === "new").length;
+  const fresh = working(threads).filter((t) => t.state.stage === "new").length;
   const canTriage = !!review && !agentsOff && fresh > 0 && !runner.run;
   const sync = () => {
     review?.refetchPr();
@@ -214,7 +277,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
       )}
       {error && <div className="review-error">{error}</div>}
       <div className="comments-scroll">
-        <PrSection pr={pr} review={review} discussion={discussion} threads={threads} />
+        <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
         {review ? (
           <ThreadGroups review={review} threads={threads} runner={runner} onError={setError} />
         ) : (

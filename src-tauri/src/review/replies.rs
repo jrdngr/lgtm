@@ -2,6 +2,7 @@
 //! reply; a fix run changes the code for the threads to fix. The rules for takes and replies
 //! are the user's `reply.md` prompt. Agents never post anything.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -170,6 +171,26 @@ fn fixed_stage(fixed: bool, has_reply: bool) -> Stage {
 
 /// A thread for a prompt: its id, where it is, the code, what was said, and where it stands.
 pub(super) fn thread_text(c: &Comment) -> String {
+    let mut out = match c.quote() {
+        Some(q) => format!(
+            "Thread {} on part of a comment {} wrote on the PR itself:\n> {}",
+            c.id,
+            q.author,
+            q.text.trim().replace('\n', "\n> ")
+        ),
+        None => github_text(c),
+    };
+    if let Some(t) = c.thread.as_ref().and_then(|t| t.take.as_ref()) {
+        out.push_str(&format!("\nThe take so far: {:?}: {}", t.verdict, t.why));
+    }
+    if !c.body.trim().is_empty() {
+        out.push_str(&format!("\nMy reply so far:\n{}", c.body.trim()));
+    }
+    out
+}
+
+/// Where a GitHub thread or draft is, its posts, and its code.
+fn github_text(c: &Comment) -> String {
     let at = if c.path.is_empty() {
         "a comment on the PR itself".to_string()
     } else {
@@ -193,12 +214,6 @@ pub(super) fn thread_text(c: &Comment) -> String {
     }
     if !c.snippet.is_empty() {
         out.push_str(&format!("\nThe code:\n```diff\n{}\n```", c.snippet));
-    }
-    if let Some(t) = c.thread.as_ref().and_then(|t| t.take.as_ref()) {
-        out.push_str(&format!("\nThe take so far: {:?}: {}", t.verdict, t.why));
-    }
-    if !c.body.trim().is_empty() {
-        out.push_str(&format!("\nMy reply so far:\n{}", c.body.trim()));
     }
     out
 }
@@ -226,18 +241,26 @@ impl RepoCtx {
         Ok((ws, context, rules))
     }
 
-    /// Threads on review `id`'s PR at `stage`.
-    fn threads_at(&self, id: u32, stage: Stage) -> anyhow::Result<Vec<Comment>> {
+    /// Threads on review `id`'s PR at `stage`. A comment on the PR that has quotes is left to
+    /// them.
+    pub(super) fn threads_at(&self, id: u32, stage: Stage) -> anyhow::Result<Vec<Comment>> {
         let ws = self.review_workspace(id)?;
         let pr = self
             .pr_record(ws.name.as_deref())?
             .context("this workspace isn't a PR's")?;
-        Ok(self
+        let all = self
             .store
             .lock()
             .unwrap()
-            .pr_threads(&pr.repo.to_string(), pr.number)?
+            .pr_threads(&pr.repo.to_string(), pr.number)?;
+        let quoted: HashSet<i64> = all
+            .iter()
+            .filter_map(|c| c.quote())
+            .map(|q| q.of as i64)
+            .collect();
+        Ok(all
             .into_iter()
+            .filter(|c| !quoted.contains(&c.id))
             .filter(|c| c.thread.as_ref().is_some_and(|t| t.stage == stage))
             .collect())
     }
@@ -495,6 +518,7 @@ pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String
 /// Applies a chat turn to its thread. With `suggest`, a new reply is kept as the thread's
 /// suggestion instead of replacing the reply.
 pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn, suggest: bool) -> (String, bool) {
+    let draft = c.is_draft();
     let Some(t) = c.thread.as_mut() else {
         return (turn.message, false);
     };
@@ -509,7 +533,7 @@ pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn, suggest: bool) -> (Str
         t.suggestion = reply;
     } else if let Some(reply) = reply {
         c.body = reply;
-        t.stage = super::threads::after_edit(t.stage, c.github.is_none(), &c.body);
+        t.stage = super::threads::after_edit(t.stage, draft, &c.body);
         updated = true;
     }
     (turn.message, updated)

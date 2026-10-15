@@ -25,24 +25,13 @@ export function useDiscussion(workspace: WorkspaceName, pr: PrDto) {
     setSyncedAt(Date.now());
   }
 
-  /** Posts to the conversation right away. Resolves to whether it worked. */
-  async function post(body: string) {
-    const r = await commands.replyPr(workspace, body);
-    if (r.status === "error") {
-      setError(r.error);
-      return false;
-    }
-    load();
-    return true;
-  }
-
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload when the workspace's PR does
   useEffect(() => {
     setD(undefined);
     load();
   }, [pr]);
 
-  return { d, head, error, loading, syncedAt, load, post };
+  return { d, head, error, loading, syncedAt, load };
 }
 
 export type Discussion = ReturnType<typeof useDiscussion>;

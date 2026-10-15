@@ -185,16 +185,18 @@ pub(crate) async fn pr_discussion(
         .map_err(err)
 }
 
-/// Posts to the PR's conversation right away.
+/// Posts `body` to the PR's conversation as the reply of quote threads `comments`, which
+/// then are done.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn reply_pr(
+pub(crate) async fn send_combined(
     window: WebviewWindow,
-    workspace: Option<String>,
+    review: u32,
+    comments: Vec<u32>,
     body: String,
-) -> CmdResult<()> {
+) -> CmdResult<StateDto> {
     repo(&window)?
-        .reply_pr(workspace.as_deref(), &body)
+        .send_combined(review, &comments, &body)
         .await
         .map_err(err)
 }

@@ -33,9 +33,9 @@ function draftItem({ comment, c }: Card): MenuItem | false {
   );
 }
 
-/** Deletes a note, or a draft not sent to GitHub, after asking. */
+/** Deletes a note, a quote, or a draft not sent to GitHub, after asking. */
 function deleteItem({ comment, c }: Card): MenuItem {
-  const what = comment.thread ? "Draft" : "Note";
+  const what = comment.thread?.quote ? "Quote" : comment.thread ? "Draft" : "Note";
   return {
     label: `Delete ${what}…`,
     danger: true,

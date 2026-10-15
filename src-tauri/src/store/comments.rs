@@ -132,6 +132,18 @@ pub struct Comment {
     pub done: bool,
 }
 
+impl Comment {
+    /// A new thread on code not yet sent to GitHub.
+    pub fn is_draft(&self) -> bool {
+        self.github.is_none() && self.thread.as_ref().is_some_and(|t| t.quote.is_none())
+    }
+
+    /// The part of a comment on the PR this thread answers.
+    pub fn quote(&self) -> Option<&super::Quote> {
+        self.thread.as_ref().and_then(|t| t.quote.as_ref())
+    }
+}
+
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

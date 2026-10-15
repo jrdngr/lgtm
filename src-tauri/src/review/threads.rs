@@ -155,13 +155,14 @@ impl RepoCtx {
         self.comment_edit(id, |_, store| {
             let cid = comment as i64;
             let mut c = store.comment(cid)?.context("the thread is gone")?;
+            let draft = c.is_draft();
             let t = c.thread.as_mut().context("notes have no suggestion")?;
             let Some(text) = t.suggestion.take() else {
                 return Ok(());
             };
             if apply {
                 let before = std::mem::replace(&mut c.body, text);
-                t.stage = after_edit(t.stage, c.github.is_none(), &c.body);
+                t.stage = after_edit(t.stage, draft, &c.body);
                 store.set_comment_body(cid, &c.body, now_ms())?;
                 // The review that suggested it made the reply's new version.
                 let m = &mut c.workshop.messages;

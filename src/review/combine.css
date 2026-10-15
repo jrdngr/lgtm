@@ -1,0 +1,105 @@
+.combine-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: start center;
+  padding: 70px 16px 16px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.combine {
+  display: grid;
+  width: min(620px, 100%);
+  max-height: calc(100vh - 100px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+  font-size: var(--fs-sm);
+}
+
+.combine h3 {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs);
+  font-weight: 600;
+}
+
+.combine-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 12px 14px;
+  overflow: auto;
+}
+
+.combine-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.combine-item.dragging {
+  opacity: 0.5;
+}
+
+.combine-grip {
+  color: var(--faint);
+  cursor: grab;
+  line-height: 20px;
+}
+
+.combine-pair {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.combine-pair p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.combine-move {
+  display: grid;
+  gap: 2px;
+}
+
+.combine-move button {
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.combine-text {
+  min-height: 260px;
+  font-family: var(--mono);
+}
+
+.combine-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--hair);
+}
+
+.combine-foot button {
+  padding: 2px 10px;
+  font-size: var(--fs-sm);
+}
+
+.combine-foot .combine-send {
+  border-color: var(--github);
+  background: var(--github);
+  color: #fff;
+  font-weight: 600;
+}

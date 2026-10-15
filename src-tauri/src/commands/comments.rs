@@ -100,6 +100,18 @@ pub(crate) fn edit_comment(
         .map_err(err)
 }
 
+/// Starts a thread on `text`, quoted from comment `of` on the PR.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn add_quote(
+    window: WebviewWindow,
+    review: u32,
+    of: u32,
+    text: String,
+) -> CmdResult<StateDto> {
+    repo(&window)?.add_quote(review, of, &text).map_err(err)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn delete_comment(

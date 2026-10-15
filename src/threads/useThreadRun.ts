@@ -4,6 +4,7 @@ import { endFrom, startRun } from "../agents/runs";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
+import { working } from "./stages";
 
 export type RunKind = "triage" | "fix";
 
@@ -49,7 +50,11 @@ export function useThreadRun(review: CurrentReview | undefined, onError: (e: str
     if (!review || runs.has(review.id)) return;
     const id = review.id;
     const stage = kind === "triage" ? "new" : "toFix";
-    const threads = new Set(review.threads.filter((t) => t.state.stage === stage).map((t) => t.id));
+    const threads = new Set(
+      working(review.threads)
+        .filter((t) => t.state.stage === stage)
+        .map((t) => t.id),
+    );
     set(id, { kind, activity: "", threads });
     const handle = startRun(workspace, {
       kind,

@@ -139,6 +139,8 @@ export const commands = {
 	/**  Starts a GitHub draft on a note's code, with its text. */
 	draftFromNote: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("draft_from_note", { review, comment })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
+	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
+	addQuote: (review: number, of: number, text: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
 	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
 	/**
 	 *  Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
@@ -278,8 +280,11 @@ export const commands = {
 	sendThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("send_thread", { review, comment })),
 	/**  The PR's conversation: comments and review summaries. */
 	prDiscussion: (workspace: string | null) => typedError<DiscussionDto, string>(__TAURI_INVOKE("pr_discussion", { workspace })),
-	/**  Posts to the PR's conversation right away. */
-	replyPr: (workspace: string | null, body: string) => typedError<null, string>(__TAURI_INVOKE("reply_pr", { workspace, body })),
+	/**
+	 *  Posts `body` to the PR's conversation as the reply of quote threads `comments`, which
+	 *  then are done.
+	 */
+	sendCombined: (review: number, comments: number[], body: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_combined", { review, comments, body })),
 	/**  Has an agent resolve a conflicted change, streaming its reply through `on_text`. */
 	resolveConflict: (workspace: string | null, change: string, onText: Channel<string>) => typedError<ResolveDto, string>(__TAURI_INVOKE("resolve_conflict", { workspace, change, onText })),
 	stopResolve: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("stop_resolve", { workspace })),
@@ -1311,6 +1316,15 @@ export type QuickWin = {
 	fix: string,
 };
 
+/**  The part of a comment on the PR that a thread answers. */
+export type Quote = {
+	/**  The id of the comment it's quoted from. */
+	of: number,
+	/**  Who wrote that comment. */
+	author: string,
+	text: string,
+};
+
 /**  A persona that raised a merged finding, with its own rating. */
 export type Raiser = {
 	persona: string,
@@ -1659,6 +1673,8 @@ export type ThreadState = {
 	proposal?: Proposed[],
 	/**  A reply the agent suggests after reviewing the current one. */
 	suggestion?: string | null,
+	/**  Set on a thread that answers part of a comment on the PR itself. */
+	quote?: Quote | null,
 };
 
 /**  A tool that's missing or too old. */

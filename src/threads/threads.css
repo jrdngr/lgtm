@@ -184,3 +184,13 @@
 .thread-row.in-run .spinner {
   color: rgb(215 119 87);
 }
+
+.thread-row.sub {
+  padding-left: 36px;
+}
+
+.thread-row .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}

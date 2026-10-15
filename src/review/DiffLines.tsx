@@ -93,7 +93,8 @@ function stickyFile(
   const top = v.getVirtualItems().find((item) => item.end > offset);
   if (!top) return undefined;
   const file = lines[top.index]?.file;
-  if (file === undefined) return undefined;
+  // Comments on the PR sit above every file.
+  if (file === undefined || file < 0) return undefined;
   let headerIdx = top.index;
   while (headerIdx > 0 && lines[headerIdx].kind !== "file") headerIdx--;
   const measured = v.measurementsCache;

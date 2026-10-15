@@ -8,6 +8,7 @@ import {
   markKey,
   NEW_COMMENT,
 } from "./model";
+import { quotedReply } from "./prComments";
 import { rowsText } from "./sendText";
 
 /** A comment being written on a selection, before it's saved. */
@@ -97,8 +98,15 @@ export function commentNear(lines: DisplayLine[], cursor: number): number | unde
   return undefined;
 }
 
-/** The comment's code, as it is now or as it was if it's gone, then the comment. */
+/** The comment's code, as it is now or as it was if it's gone, then the comment. A comment on
+ * the PR comes with its posts instead, and a quote with what it quotes. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
+  const quote = c.thread?.quote;
+  if (quote) return quotedReply(quote.text, c.body);
+  if (!c.path) {
+    const posts = c.github?.posts.map((p) => `${p.author} wrote:\n${p.body.trim()}`) ?? [];
+    return [...posts, c.body.trim()].filter(Boolean).join("\n\n");
+  }
   const f = files[c.file];
   const span = c.rows;
   const code =

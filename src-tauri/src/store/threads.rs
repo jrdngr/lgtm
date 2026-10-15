@@ -88,6 +88,20 @@ pub struct ThreadState {
     /// A reply the agent suggests after reviewing the current one.
     #[serde(default)]
     pub suggestion: Option<String>,
+    /// Set on a thread that answers part of a comment on the PR itself.
+    #[serde(default)]
+    pub quote: Option<Quote>,
+}
+
+/// The part of a comment on the PR that a thread answers.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct Quote {
+    /// The id of the comment it's quoted from.
+    pub of: u32,
+    /// Who wrote that comment.
+    pub author: String,
+    pub text: String,
 }
 
 impl ThreadState {
@@ -100,6 +114,7 @@ impl ThreadState {
             summary: String::new(),
             proposal: vec![],
             suggestion: None,
+            quote: None,
         }
     }
 

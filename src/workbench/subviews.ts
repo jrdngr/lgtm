@@ -1,8 +1,3 @@
-import { remembered } from "./remembered";
-
-/** Whether the PR tab's conversation is open. */
-export const prOpen = remembered("lgtm:side:pr", true, [true, false]);
-
 /** What an older build's right panel remembered under `key`, such as a tab's inner view. */
 function savedSub(key: string): unknown {
   try {

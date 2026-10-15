@@ -1,4 +1,5 @@
 import type { Fixed, Stage, TakeVerdict, ThreadDto } from "../bindings";
+import { quoted } from "../review/prComments";
 
 /** Stages in work order, with their name and color. New sits first: it needs triage. */
 export const STAGES: [Stage, string, string][] = [
@@ -28,15 +29,28 @@ export function byStage(threads: ThreadDto[]): [Stage, ThreadDto[]][] {
   ]).filter(([, ts]) => ts.length > 0);
 }
 
+/** Threads that take work: all but comments on the PR whose quotes stand in for them. */
+export function working(threads: ThreadDto[]): ThreadDto[] {
+  const q = quoted(threads);
+  return threads.filter((t) => !q.has(t.id));
+}
+
 /** Threads waiting on the user: new ones to triage and ones with a call to make. */
 export const needsYou = (threads: ThreadDto[]) =>
-  threads.filter((t) => t.state.stage === "new" || t.state.stage === "decide").length;
+  working(threads).filter((t) => t.state.stage === "new" || t.state.stage === "decide").length;
 
-/** A thread's one-line label: its summary, else the start of its latest post or draft. */
+/** A thread's one-line label: its summary, else what it quotes, else the start of its latest
+ * post or draft. */
 export function threadLabel(t: ThreadDto): string {
   if (t.state.summary) return t.state.summary;
+  if (t.state.quote) return t.state.quote.text.split("\n")[0];
   const text = t.body || t.github?.posts.at(-1)?.body || "";
-  return text.split("\n").find((l) => l.trim()) ?? "No text yet";
+  // Bots open with hidden markers and headings.
+  const line = text
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .split("\n")
+    .find((l) => l.trim());
+  return line?.replace(/^#+\s*/, "") ?? "No text yet";
 }
 
 /** Where a thread is: `file.rs:42`, `file.rs`, or `PR` for a comment on the PR itself. */

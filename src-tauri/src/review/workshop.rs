@@ -48,12 +48,17 @@ fn prompt(review: &str, c: &Comment, ask: &Ask, first: bool) -> String {
     if !first {
         return turn;
     }
-    let thread = match &c.github {
-        Some(g) => format!(
+    let thread = match (&c.github, c.quote()) {
+        (Some(g), _) => format!(
             "\n\nIt's my reply to this GitHub review thread:\n\n{}",
             thread_text(g)
         ),
-        None => String::new(),
+        (None, Some(q)) => format!(
+            "\n\nIt's my reply to this part of a comment {} wrote on the PR:\n\n> {}",
+            q.author,
+            q.text.trim().replace('\n', "\n> ")
+        ),
+        (None, None) => String::new(),
     };
     format!(
         "You're helping me with a code review comment. I'm reviewing `{review}` in this \

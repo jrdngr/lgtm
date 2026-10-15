@@ -1,5 +1,5 @@
 import { Channel } from "@tauri-apps/api/core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { endFrom, startRun } from "../agents/runs";
 import type { CommentDto, Proposed, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
@@ -10,6 +10,7 @@ import { currentReview } from "./current";
 import type { Moves } from "./follow";
 import { lineDiff } from "./lineDiff";
 import { type FlatFile, NEW_COMMENT } from "./model";
+import { prComments } from "./prComments";
 
 /** A workshop exchange in flight: what was asked and the reply so far. */
 export interface Running {
@@ -98,7 +99,10 @@ export function useComments({
   /** The text box that should take focus when its block next renders. */
   const [focus, setFocus] = useState<Focus>();
   const comments = review?.state.comments ?? NONE;
-  const byId = (id: number) => comments.find((c) => c.id === id);
+  const threads = review?.state.threads;
+  /** Comments on the PR itself and their quotes, which show above the files. */
+  const onPr = useMemo(() => prComments(threads ?? []), [threads]);
+  const byId = (id: number) => comments.find((c) => c.id === id) ?? onPr.find((c) => c.id === id);
 
   // The draft follows its rows when the diff changes, and goes when they do.
   const seen = useRef(files);
@@ -355,6 +359,17 @@ export function useComments({
     send(commentText(files, c), onDone);
   }
 
+  /** Starts a thread on `text`, quoted from comment `of` on the PR. */
+  async function quote(of: number, text: string) {
+    if (review && text.trim()) await apply(commands.addQuote(review.id, of, text));
+  }
+
+  /** Posts `body` as the reply of quotes `ids`. Resolves to whether it went. */
+  async function sendCombined(ids: number[], body: string) {
+    if (!review) return false;
+    return !!(await apply(commands.sendCombined(review.id, ids, body)));
+  }
+
   return {
     reviewId: review?.id,
     draft,
@@ -363,6 +378,9 @@ export function useComments({
     running,
     focus,
     comments,
+    onPr,
+    quote,
+    sendCombined,
     start,
     setBody: (id: number, text: string) => setEdits((m) => withEntry(m, id, text)),
     setAsk: (id: number, text: string) => setAsks((m) => withEntry(m, id, text)),
