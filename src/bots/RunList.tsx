@@ -32,7 +32,7 @@ function Outcome({ run }: { run: BotRun }) {
   );
 }
 
-/** Whether runs on other reviews are shown. */
+/** Whether reports on other reviews are shown. */
 const othersOpen = remembered("lgtm:otherRuns", false, [true, false]);
 
 interface RowProps {
@@ -47,7 +47,7 @@ function RunRow({ run, onOpen, onError }: RowProps) {
   const act = (f: Parameters<Act>[0]) => runAction(run, f, onError);
 
   async function remove() {
-    if (!(await confirmAction("Delete this run and its findings?", "Delete"))) return;
+    if (!(await confirmAction("Delete this report and its findings?", "Delete"))) return;
     const r = await commands.deleteBots(run.id);
     if (r.status === "error") return onError(r.error);
     forgetRun(run.id);
@@ -56,7 +56,7 @@ function RunRow({ run, onOpen, onError }: RowProps) {
   // The backend won't delete a run while it or one of its fixes runs.
   const del = !run.active &&
     !run.fixes?.some((f) => f.status === "running") && {
-      label: "Delete Run…",
+      label: "Delete Report…",
       danger: true,
       onSelect: remove,
     };
@@ -124,9 +124,9 @@ export function RunList({ workspace, revset, onOpen, onError }: Props) {
   return (
     <>
       <div className="bots-section">
-        <span className="bots-label">Runs</span>
+        <span className="bots-label">Reports</span>
       </div>
-      {current.length === 0 && <div className="bots-empty">No runs yet</div>}
+      {current.length === 0 && <div className="bots-empty">No reports yet</div>}
       <ul className="bots-runs">{current.map(row)}</ul>
       {others.length > 0 && (
         <>
@@ -137,7 +137,7 @@ export function RunList({ workspace, revset, onOpen, onError }: Props) {
               aria-expanded={open}
               onClick={() => othersOpen.set(!open)}
             >
-              {open ? "▾" : "▸"} Other Reviews · {others.length}
+              {open ? "▾" : "▸"} Old Reports · {others.length}
             </button>
           </div>
           {open && <ul className="bots-runs">{others.map(row)}</ul>}
