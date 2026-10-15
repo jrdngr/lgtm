@@ -218,7 +218,7 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
         <small>{blocked ?? <>on {review?.revset}</>}</small>
       </button>
       {error && <div className="bots-error">{error}</div>}
-      <RunList workspace={workspace} onOpen={onOpen} onError={setError} />
+      <RunList workspace={workspace} revset={review?.revset} onOpen={onOpen} onError={setError} />
     </>
   );
 }

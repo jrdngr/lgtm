@@ -19,6 +19,13 @@
   color: var(--muted);
 }
 
+.bots-fold {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
 .bots label {
   display: flex;
   align-items: center;
