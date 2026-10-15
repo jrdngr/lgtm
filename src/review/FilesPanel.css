@@ -97,10 +97,6 @@
   color: var(--muted);
 }
 
-.file-tree .pill {
-  padding: 0 5px;
-}
-
 .file-tree .dir-count {
   font-size: var(--fs-xs);
   color: var(--muted);
@@ -113,4 +109,23 @@
 
 .file-tree .tree-note.error {
   color: var(--error);
+}
+
+.diffstat {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  font: var(--fs-xs) var(--mono);
+}
+
+.diffstat-add {
+  color: var(--added);
+}
+
+.diffstat-del {
+  color: var(--error);
+}
+
+.section-meta .diffstat {
+  margin-right: 6px;
 }

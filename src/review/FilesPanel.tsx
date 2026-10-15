@@ -6,6 +6,8 @@ import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
+import { Diffstat } from "./Diffstat";
+import { type LineStat, lineStat, sumStats } from "./diffstat";
 import { STATUS_LABEL } from "./FileHeader";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
@@ -19,6 +21,8 @@ const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
 interface TreeProps {
   depth: number;
   review: CurrentReview;
+  /** Lines added and removed, by file. */
+  stats: LineStat[];
   setup: MarkSetup;
   closed: ReadonlySet<string>;
   onToggle(path: string): void;
@@ -39,6 +43,7 @@ function Node({
   node,
   depth,
   review,
+  stats,
   setup,
   closed,
   onToggle,
@@ -68,7 +73,7 @@ function Node({
           <span className="chevron" />
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
-          {changed && <span className="pill amber">changed</span>}
+          <Diffstat stat={stats[node.file]} />
           <MarkCounts progress={p} setup={setup} notDone />
           {p.changed > 0 && <Ring done={p.done / p.changed} title={progressTitle(p, setup)} />}
         </button>
@@ -98,6 +103,7 @@ function Node({
           nodes={node.children}
           depth={depth + 1}
           review={review}
+          stats={stats}
           setup={setup}
           closed={closed}
           onToggle={onToggle}
@@ -124,6 +130,7 @@ export function FilesPanel() {
       ),
     [review],
   );
+  const stats = useMemo(() => review?.files.map((f) => lineStat(f.dto)) ?? [], [review?.files]);
   if (!review || !tree) {
     return (
       <div className="side-split">
@@ -136,17 +143,25 @@ export function FilesPanel() {
   const pct = p.changed ? Math.floor((p.done / p.changed) * 100) : 100;
   const filter = filterLabel(review.filter, setup);
   const anyClosed = closed.size > 0;
+  const total = sumStats(
+    review.files.flatMap((_, f) =>
+      matchesFilter(review.progress[f], review.filter) ? [stats[f]] : [],
+    ),
+  );
   return (
     <div className="side-split">
       <SectionHeader
         title="Changes"
         meta={
-          p.changed > 0 && (
-            <span title={progressTitle(p, setup)}>
-              {review.filter === "all" ? "" : `${filter} · `}
-              {p.done} of {p.changed} {plural(p.changed)} done · {pct}%
-            </span>
-          )
+          <>
+            <Diffstat stat={total} />
+            {p.changed > 0 && (
+              <span title={progressTitle(p, setup)}>
+                {review.filter === "all" ? "" : `${filter} · `}
+                {p.done} of {p.changed} {plural(p.changed)} done · {pct}%
+              </span>
+            )}
+          </>
         }
       >
         {tree.children.length > 0 && (
@@ -165,6 +180,7 @@ export function FilesPanel() {
             nodes={tree.children}
             depth={0}
             review={review}
+            stats={stats}
             setup={setup}
             closed={closed}
             onToggle={(path) => setClosed(toggled(closed, path))}
