@@ -45,6 +45,7 @@
 }
 
 .card-bar.collapsed {
+  flex-wrap: nowrap;
   width: 100%;
   border: none;
   border-radius: 6px;
