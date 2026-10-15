@@ -8,7 +8,7 @@
   gap: 2px;
   height: 100%;
   overflow: hidden;
-  background: var(--panel);
+  background: var(--raise);
   cursor: pointer;
 }
 
@@ -27,14 +27,36 @@
   flex: none;
   padding: 8px 0;
   font-size: var(--fs-sm);
-  color: var(--muted);
+  color: var(--fg);
   white-space: nowrap;
   background: none;
   border: none;
   border-radius: 4px;
 }
 
-.fold-strip.x button {
+.fold-strip .fold-open {
+  display: flex;
+  padding: 3px;
+}
+
+.fold-strip.y .fold-icon {
+  transform: rotate(90deg);
+}
+
+/* A line before each title. Titles on their side are turned over, so it's their bottom. */
+.fold-strip .fold-tab {
+  border-radius: 0;
+}
+
+.fold-strip.x .fold-tab {
+  border-bottom: 1px solid var(--border);
+}
+
+.fold-strip.y .fold-tab {
+  border-left: 1px solid var(--border);
+}
+
+.fold-strip.x .fold-tab {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
 }

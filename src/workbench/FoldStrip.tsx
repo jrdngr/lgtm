@@ -22,12 +22,17 @@ function useGroup(api: DockviewApi, group: DockviewGroupPanel) {
   }, [api, group, group.panels]);
 }
 
-/** A rect with a thin strip filled in at its left. */
-function FoldIcon() {
+/** Two arrows at a center line: pointing in to collapse, out to expand. */
+function FoldIcon({ out }: { out?: boolean }) {
+  const heads = out
+    ? "M4 5.5 1.5 8 4 10.5M12 5.5 14.5 8 12 10.5"
+    : "M4 5.5 6.5 8 4 10.5M12 5.5 9.5 8 12 10.5";
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="currentColor" />
-      <rect x="2" y="3" width="3.5" height="10" fill="currentColor" opacity="0.6" />
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="fold-icon">
+      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+        <path d="M8 2.5v11M1.5 8h5M9.5 8h5" />
+        <path d={heads} strokeLinejoin="round" />
+      </g>
     </svg>
   );
 }
@@ -69,10 +74,20 @@ export function Fold({
             className={`fold-strip ${folded.axis}`}
             onClick={(e) => e.target === e.currentTarget && unfold(api, group)}
           >
+            <button
+              type="button"
+              className="fold-open"
+              title="Expand"
+              aria-label="Expand"
+              onClick={() => unfold(api, group)}
+            >
+              <FoldIcon out />
+            </button>
             {group.panels.map((p) => (
               <button
                 type="button"
                 key={p.id}
+                className="fold-tab"
                 onClick={() => {
                   unfold(api, group);
                   activate(p);
