@@ -15,7 +15,7 @@ use crate::prompts::{self, Prompt};
 use crate::store::{Author, Comment, Message, Stage, Take, TakeVerdict};
 use crate::workspace::Workspace;
 
-const VERDICTS: &str = r#"{ "enum": ["agree", "change", "disagree", "decide"] }"#;
+const VERDICTS: &str = r#"{ "enum": ["agree", "change", "disagree", "decide", "answer"] }"#;
 
 fn triage_schema() -> String {
     format!(

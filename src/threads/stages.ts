@@ -18,6 +18,7 @@ export const VERDICTS: Record<TakeVerdict, [string, string]> = {
   change: ["Change", "blue"],
   disagree: ["Disagree", "purple"],
   decide: ["Decide", "amber"],
+  answer: ["Answer", ""],
 };
 
 /** Threads by stage, in `STAGES` order, keeping the threads' own order. Empty stages are left

@@ -1638,7 +1638,9 @@ export type TakeVerdict = "agree" |
 /**  Agree, with a different fix than asked. */
 "change" | "disagree" | 
 /**  The user has a call to make. */
-"decide";
+"decide" | 
+/**  The comment asks a question, and the reply answers it. */
+"answer";
 
 export type ThreadDto = {
 	/**  Its comment's id. */

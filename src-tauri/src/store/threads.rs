@@ -38,6 +38,8 @@ pub enum TakeVerdict {
     Disagree,
     /// The user has a call to make.
     Decide,
+    /// The comment asks a question, and the reply answers it.
+    Answer,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]

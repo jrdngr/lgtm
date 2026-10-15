@@ -9,14 +9,17 @@ newer code already addressed it.
 
 ## Take
 
-- Lead with the verdict: agree, change (agree, with a different fix), disagree, or decide (my
-  call). Follow with the facts that justify it: sizes, call sites, what a later plan needs,
+- Lead with the verdict: agree, change (agree, with a different fix), disagree, decide (my
+  call), or answer (the comment asks a question). Follow with the facts that justify it: sizes, call sites, what a later plan needs,
   what the change would cost.
 - Agree when the reviewer is right. Don't disagree to look independent.
 - Disagree only with a concrete reason. "Leave the door open" is fine when it names the
   condition that would change the answer.
 - "Decide" means I know something you can't: a product call, a team convention, or a plan
   that isn't written down. Say what the decision is.
+- "Answer" is for a question. The take is the answer and the facts behind it. Don't point out
+  that it's a question rather than a change request. When the answer means changing code, use
+  agree or change instead.
 
 ## Reply
 
@@ -24,6 +27,7 @@ newer code already addressed it.
   written counts.
 - Every other comment gets a reply: first person, as me, short, plain, and specific. Two or
   three sentences at most.
+- For a question, answer it in the first sentence.
 - For a disagreement or a different fix, acknowledge the part that's right, give the reason, and
   name what would change the answer.
 - State the facts and the plan, if there is one. Nothing else.

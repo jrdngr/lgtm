@@ -164,6 +164,7 @@ impl Lgtm {
             inputs::Verdict::Change => TakeVerdict::Change,
             inputs::Verdict::Disagree => TakeVerdict::Disagree,
             inputs::Verdict::Decide => TakeVerdict::Decide,
+            inputs::Verdict::Answer => TakeVerdict::Answer,
         };
         let take = Take {
             verdict,
