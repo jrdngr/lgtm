@@ -131,10 +131,11 @@ fn resolve_with(
     lookup: impl Fn(&str) -> anyhow::Result<String>,
 ) -> anyhow::Result<Resolved> {
     let words = shlex::split(setting).context("the Claude command has unmatched quotes")?;
+    // Each word gets `~` expanded, as the shell would, since direct runs skip the shell.
+    let words: Vec<String> = words.iter().map(|w| expand_home(w)).collect();
     let Some((first, rest)) = words.split_first() else {
         bail!("the Claude command is empty");
     };
-    let first = &expand_home(first);
     let direct = |program: &str, before: &[String]| Resolved {
         program: program.to_string(),
         args: before.iter().chain(rest).cloned().collect(),
@@ -272,6 +273,8 @@ mod tests {
             shell(""),
         );
         assert_eq!(tilde.unwrap().program, installed);
+        let settings = resolve("claude --settings ~/.claude/s.json", "").unwrap();
+        assert_eq!(settings.args, ["--settings", &format!("{home}/.claude/s.json")]);
 
         assert!(resolve("cc", "").is_err());
         assert!(resolve("  ", "").is_err());
