@@ -137,7 +137,7 @@ export function RunList({ workspace, revset, onOpen, onError }: Props) {
               aria-expanded={open}
               onClick={() => othersOpen.set(!open)}
             >
-              {open ? "▾" : "▸"} Other reviews · {others.length}
+              {open ? "▾" : "▸"} Other Reviews · {others.length}
             </button>
           </div>
           {open && <ul className="bots-runs">{others.map(row)}</ul>}
