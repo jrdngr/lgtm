@@ -88,7 +88,6 @@ export function FindingCard(props: Props) {
     { label: "Open Location", disabled: !f.locations.length, onSelect: () => openLocation(0) },
     {
       label: "Send to Terminal",
-      disabled: !review,
       onSelect: () => onSend(findingText(f, source)),
     },
     { label: "Keep as Note", disabled: !first || !!kept, onSelect: () => keep(false) },
@@ -141,7 +140,6 @@ export function FindingCard(props: Props) {
           <IconButton
             icon="send"
             label="Send to terminal: paste it into a terminal's prompt"
-            disabled={!review}
             onClick={() => onSend(findingText(f, source))}
           />
           <IconButton

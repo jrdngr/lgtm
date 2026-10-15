@@ -4,6 +4,7 @@ import type { BotOptions, Finding } from "../bindings";
 import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
+import { useSendText } from "../review/useSendText";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
@@ -66,6 +67,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   const [error, setError] = useState<string>();
   const [notice, setNotice] = useState<{ error: boolean; text: string }>();
   const root = useRef<HTMLDivElement>(null);
+  const { sendText, picker } = useSendText(workspace, setError, () => {});
   if (!run) {
     return (
       <div className="placeholder">{run === null ? "This review run is gone" : "Loading…"}</div>
@@ -127,7 +129,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
 
   /** Pastes text into a terminal, and says where it went or why it couldn't. */
   function send(text: string, onSent?: () => void) {
-    review?.send(text, onSent, (o) =>
+    sendText(text, onSent, (o) =>
       setNotice(
         "error" in o
           ? { error: true, text: o.error }
@@ -307,12 +309,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
         <div className="bots-picked">
           <b>{checked.size} picked</b>
           <span className="spacer" />
-          <button
-            type="button"
-            disabled={!review}
-            title={review ? "Paste them into a terminal's prompt" : "Open a review first"}
-            onClick={sendChecked}
-          >
+          <button type="button" title="Paste them into a terminal's prompt" onClick={sendChecked}>
             Send to terminal
           </button>
           <button
@@ -326,6 +323,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
           <IconButton icon="x" label="Clear picks" onClick={() => setChecked(new Map())} />
         </div>
       )}
+      {picker}
     </div>
   );
 }
