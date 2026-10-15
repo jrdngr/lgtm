@@ -234,7 +234,11 @@ export function CommentBlock({ id, comment, c }: Props) {
               <IconButton icon="sparkle" label="Ask agent (a)" onClick={() => c.openAsk(id)} />
             )}
             {comment && (
-              <IconButton icon="terminal" label="Send to terminal" onClick={() => c.send(comment)} />
+              <IconButton
+                icon="terminal"
+                label="Send to terminal"
+                onClick={() => c.send(comment)}
+              />
             )}
             {card && <Menu items={moreItems(card)} />}
           </span>
