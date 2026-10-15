@@ -102,9 +102,29 @@ fn merge(base: &mut toml::Table, file: toml::Table) {
     }
 }
 
+/// Keys earlier versions wrote, as table path and key. They're dropped on read, and the next
+/// save leaves them out. Any other unknown key is an error, to catch typos.
+const RETIRED: &[(&[&str], &str)] = &[(&[], "designDir"), (&["models"], "design")];
+
+fn drop_retired(file: &mut toml::Table) {
+    for (tables, key) in RETIRED {
+        let mut at = Some(&mut *file);
+        for t in *tables {
+            at = at
+                .and_then(|a| a.get_mut(*t))
+                .and_then(toml::Value::as_table_mut);
+        }
+        if let Some(table) = at {
+            table.remove(*key);
+        }
+    }
+}
+
 fn parse(text: &str) -> anyhow::Result<Settings> {
     let mut settings = toml::Table::try_from(Settings::default())?;
-    merge(&mut settings, toml::from_str(text)?);
+    let mut file = toml::from_str(text)?;
+    drop_retired(&mut file);
+    merge(&mut settings, file);
     let mut settings: Settings = settings.try_into()?;
     marks::normalize(&mut settings.marks);
     Ok(settings)
@@ -189,6 +209,14 @@ mod tests {
 
         std::fs::write(&file, "claud = \"cc\"\n").unwrap();
         assert!(load_from(&file).is_err());
+    }
+
+    #[test]
+    fn keys_from_earlier_versions_are_dropped() {
+        let s =
+            parse("designDir = \"docs\"\n[models]\ndesign = \"opus\"\nqa = \"opus\"\n").unwrap();
+        assert_eq!(s.models.for_purpose(Purpose::Qa), Some("opus"));
+        assert!(!toml::to_string(&s).unwrap().contains("design"));
     }
 
     #[test]
