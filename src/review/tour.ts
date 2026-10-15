@@ -8,23 +8,51 @@ export interface TourState {
   active: string;
   /** Step index by tour id. */
   at: Record<string, number>;
-  /** Categories left out of the panel and the review. */
+  /** Categories left out of the panel and the review, in every review. */
   hidden: Category[];
-  /** Note blocks show in the review. */
+  /** Note blocks show in the review, in every review. */
   inline: boolean;
 }
 
-const START: TourState = { active: READING_ORDER, at: {}, hidden: [], inline: true };
+/** What the notes show, the same in every review and remembered across restarts. */
+type View = Pick<TourState, "hidden" | "inline">;
+const VIEW_KEY = "lgtm:walkthroughView";
+
+function loadView(): View {
+  const view: View = { hidden: [], inline: true };
+  try {
+    const saved = JSON.parse(localStorage.getItem(VIEW_KEY) ?? "null");
+    if (Array.isArray(saved?.hidden)) view.hidden = saved.hidden;
+    if (typeof saved?.inline === "boolean") view.inline = saved.inline;
+  } catch {
+    // Remembering is a convenience.
+  }
+  return view;
+}
+
+let view = loadView();
+let start: TourState = { active: READING_ORDER, at: {}, ...view };
 
 const states = new Map<number, TourState>();
 const listeners = new Set<() => void>();
 
 export function tourState(review: number): TourState {
-  return states.get(review) ?? START;
+  return states.get(review) ?? start;
 }
 
 export function setTourState(review: number, change: Partial<TourState>) {
   states.set(review, { ...tourState(review), ...change });
+  if (change.hidden !== undefined || change.inline !== undefined) {
+    const { hidden, inline } = { ...view, ...change };
+    view = { hidden, inline };
+    start = { ...start, ...view };
+    for (const [id, s] of states) states.set(id, { ...s, ...view });
+    try {
+      localStorage.setItem(VIEW_KEY, JSON.stringify(view));
+    } catch {
+      // Remembering is a convenience.
+    }
+  }
   for (const l of listeners) l();
 }
 
@@ -34,7 +62,7 @@ function subscribe(l: () => void) {
 }
 
 export function useTourState(review: number | undefined): TourState {
-  return useSyncExternalStore(subscribe, () => (review === undefined ? START : tourState(review)));
+  return useSyncExternalStore(subscribe, () => (review === undefined ? start : tourState(review)));
 }
 
 /** The notes of the review's active tour that aren't hidden, or the reading order when that

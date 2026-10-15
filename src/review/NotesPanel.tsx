@@ -3,18 +3,22 @@ import { usePr } from "../github/pr";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
+import { remembered } from "../workbench/remembered";
 import { useWorkspace } from "../workspaces/context";
 import { commentText } from "./comments";
 import { useCurrentReview } from "./current";
 import { NoteList } from "./NoteList";
 import "./comments.css";
 
+const doneShown = remembered("lgtm:showDoneNotes", false, [true, false]);
+
 /** The current review's notes: yours, for yourself and the agent, never sent anywhere. */
 export function NotesPanel() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const canDraft = !!usePr(workspace);
-  const [showDone, setShowDone] = useState(false);
+  const showDone = doneShown.use();
+  const setShowDone = doneShown.set;
   const notes = (review?.comments ?? []).filter((c) => !c.thread);
   const open = notes.filter((c) => !c.done);
   const [error, setError] = useState<string>();

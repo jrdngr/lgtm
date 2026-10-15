@@ -9,6 +9,7 @@ import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { openGraph } from "../workbench/panels";
+import { remembered } from "../workbench/remembered";
 import { useWorkspace } from "../workspaces/context";
 import { progressChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
@@ -39,6 +40,10 @@ import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
 import { useWalkthrough } from "./useWalkthrough";
 import { runWalkthrough, useWalkthroughRun } from "./walkthroughRun";
+
+/** Rows changed since they were reviewed show amber, in every review. */
+const amberRows = remembered("lgtm:amberRows", true, [true, false]);
+
 import "./review.css";
 
 const NO_CHANGES: ChangeDto[] = [];
@@ -75,7 +80,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const setup = useMarkSetup();
   const { files, index, rowState, progress } = useReviewState(review, setup.done);
   /** Whether rows changed since they were marked or their file was checked show amber. */
-  const [amber, setAmber] = useState(true);
+  const amber = amberRows.use();
   const shown = useMemo(
     () => (amber ? index : { ...index, amber: new Set<string>() }),
     [amber, index],
@@ -405,7 +410,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           mode={mode}
           index={shown}
           amber={amber}
-          onToggleAmber={() => setAmber((a) => !a)}
+          onToggleAmber={() => amberRows.set(!amber)}
           setup={setup}
           progress={progress}
           selection={sel}
