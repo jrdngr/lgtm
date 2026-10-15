@@ -7,6 +7,7 @@ import { viewerLogin } from "../github/people";
 import { STAGES } from "../threads/stages";
 import { TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
+import { Busy } from "../ui/Busy";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
@@ -54,9 +55,10 @@ export function CommentBlock({ id, comment, c }: Props) {
   const isNew = id === NEW_COMMENT;
   const github = !!gh || !!thread || (isNew && !!c.draft?.github);
   const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
-  const folded = fold ?? !!done;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: marking done or not folds anew
-  useEffect(() => setFold(undefined), [done]);
+  const ready = thread?.stage === "ready" && !!gh;
+  const folded = fold ?? (!!done || ready);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a block done or final folds anew
+  useEffect(() => setFold(undefined), [done, ready]);
 
   useEffect(() => {
     if (c.focus?.id !== id) return;
@@ -88,7 +90,7 @@ export function CommentBlock({ id, comment, c }: Props) {
       : (thread?.quote?.text ?? comment.body).split("\n")[0];
     return (
       <div
-        className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
+        className={`comment-block folded ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
         onContextMenu={onContextMenu}
       >
         <button
@@ -108,13 +110,23 @@ export function CommentBlock({ id, comment, c }: Props) {
           {gh?.outdated && <span className="pill">Outdated</span>}
           <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
-          {gh && <span className="card-count">{gh.posts.length}</span>}
+          {gh && !ready && <span className="card-count">{gh.posts.length}</span>}
           {!gh && comment.messages.length > 0 && (
             <span className="card-count">
               {comment.messages.length === 1 ? "1 message" : `${comment.messages.length} messages`}
             </span>
           )}
         </button>
+        {ready && (
+          <button
+            type="button"
+            className="card-send-gh"
+            disabled={c.sending.has(id)}
+            onClick={() => c.sendOne(id)}
+          >
+            {c.sending.has(id) ? <Busy>Sending…</Busy> : "Send to GitHub"}
+          </button>
+        )}
       </div>
     );
   }

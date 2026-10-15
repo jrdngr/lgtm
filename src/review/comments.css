@@ -54,6 +54,27 @@
   color: var(--muted);
 }
 
+.comment-block.folded {
+  display: flex;
+  align-items: center;
+}
+
+.comment-block.folded .card-bar.collapsed {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-send-gh {
+  flex: none;
+  margin-right: 4px;
+  padding: 1px 8px;
+  border-color: var(--added);
+  background: var(--added);
+  color: #0b1f10;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
 .card-bar.collapsed:hover:not(:disabled) {
   background: var(--hover);
 }
