@@ -218,16 +218,28 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
         .map(|window| crate::zoom::apply(&window))
 }
 
-/// Opens the repo named on a command line, or the start window when none is given.
-pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path) {
+/// Opens the repo named on a command line. With none, a `launch` reopens the last repo, and
+/// otherwise, or when that fails, the start window opens.
+pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool) {
     let Some(arg) = args.iter().find(|a| !a.starts_with('-')) else {
-        open_start(app).ok();
+        if !launch || open_last(app).is_err() {
+            open_start(app).ok();
+        }
         return;
     };
     if let Err(e) = open(app, &cwd.join(arg)) {
         eprintln!("lgtm: {e}");
         open_start(app).ok();
     }
+}
+
+/// Opens the most recently opened repo that's still a jj repo.
+fn open_last(app: &AppHandle) -> Result<(), String> {
+    let last = crate::recent::load(&crate::recent::path(&data_dir(app)?))
+        .into_iter()
+        .next()
+        .ok_or("no recent repo")?;
+    open(app, &last).inspect_err(|e| eprintln!("lgtm: reopen {}: {e}", last.display()))
 }
 
 #[cfg(test)]

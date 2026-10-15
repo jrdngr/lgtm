@@ -240,7 +240,7 @@ pub fn run() {
     tauri::Builder::default()
         // Must be registered first. Later launches hand their arguments to this process.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            repo::open_from_args(app, argv.get(1..).unwrap_or_default(), Path::new(&cwd));
+            repo::open_from_args(app, argv.get(1..).unwrap_or_default(), Path::new(&cwd), false);
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -260,7 +260,7 @@ pub fn run() {
                 Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
             }
             let cwd = std::env::current_dir()?;
-            repo::open_from_args(app.handle(), &args, &cwd);
+            repo::open_from_args(app.handle(), &args, &cwd, true);
             Ok(())
         })
         .on_window_event(|window, event| match event {
