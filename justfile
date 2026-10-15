@@ -17,6 +17,11 @@ test:
 build:
     pnpm tauri build --bundles app
 
+# Build the app and put it in /Applications, replacing any copy there
+install: build
+    rm -rf /Applications/lgtm.app
+    ditto src-tauri/target/release/bundle/macos/lgtm.app /Applications/lgtm.app
+
 # Run the app bundle from `just build`, optionally on a repo. Launching the
 # binary inside the .app gives it the bundle's Dock icon.
 run *repo:

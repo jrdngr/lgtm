@@ -58,8 +58,7 @@ Download the .dmg from [Releases](https://github.com/jrdngr/lgtm/releases) and d
 git clone https://github.com/jrdngr/lgtm
 cd lgtm
 pnpm install
-just build
-cp -R src-tauri/target/release/bundle/macos/lgtm.app /Applications/
+just install     # release build, copied to /Applications
 ```
 
 The app's binary takes a repo path: `lgtm /path/to/repo`. A second launch for the same repo focuses its window. Plain git repos get an offer to set up jj alongside git.
@@ -83,6 +82,7 @@ just dev         # hot reload; shows the repo picker
 just go          # jj git fetch, jj new main@origin, then just dev
 just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
 just build       # release binary and .app
+just install     # just build, then copy the .app to /Applications
 just run [repo]  # run the built .app (with its Dock icon)
 just gc [repo]   # lgtm gc with the release build
 just bump 0.2.0  # set the app version before a release
