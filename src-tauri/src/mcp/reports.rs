@@ -58,10 +58,15 @@ pub fn report(run: &BotRun) -> Result<Value, String> {
         value["state"] = run.finding_state(&f.id).into();
         findings.push(value);
     }
+    let filter = run.parts.iter().rev().find_map(|p| match &p.output {
+        Some(Output::Minimal(m)) if p.status == crate::bots::Status::Done => Some(m),
+        _ => None,
+    });
     Ok(json!({
         "id": run.label(),
         "revset": run.revset,
         "verdicts": verdicts,
         "findings": findings,
+        "suggestedFixes": filter,
     }))
 }

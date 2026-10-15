@@ -35,8 +35,8 @@ pub(super) fn next_step(run: &BotRun) -> Option<Step> {
         (Step::Reports, true),
         (Step::Challenges, o.cross_review),
         (Step::Rebuttals, o.cross_review),
-        (Step::Synthesis, o.synthesize),
-        (Step::Minimal, o.minimal),
+        (Step::Synthesis, run.synthesizes()),
+        (Step::Minimal, o.suggest),
     ]
     .into_iter()
     .find(|&(s, wanted)| wanted && !run.done.contains(&s))
@@ -44,18 +44,19 @@ pub(super) fn next_step(run: &BotRun) -> Option<Step> {
 }
 
 /// The parts `step` needs that haven't already finished: one per persona, or one in all.
+/// Synthesis and the filter always run again, since the step isn't done.
 pub(super) fn wanted(step: Step, run: &BotRun) -> Vec<Option<String>> {
     let names = run.personas.iter().map(|p| p.name.clone());
     let personas: Vec<String> = match step {
         Step::Reports => names.collect(),
         // Each persona reviews the others' findings, if they have any worth challenging.
         Step::Challenges => names
+            .chain(run.challengers.iter().map(|p| p.name.clone()))
             .filter(|n| !prompts::challengeable(run, n).is_empty())
             .collect(),
         Step::Rebuttals => names
             .filter(|n| !prompts::challenges_to(run, n).is_empty())
             .collect(),
-        Step::Synthesis | Step::Minimal if finished(run, step, None) => return vec![],
         Step::Synthesis | Step::Minimal => return vec![None],
     };
     personas
@@ -76,34 +77,70 @@ pub(super) fn drop_unfinished(run: &mut BotRun) {
     run.parts.retain(|p| p.status == Status::Done);
 }
 
-/// Adds `options` to the run's. Turning on cross-review redoes synthesis and the minimal
-/// report, since its rulings change them. Turning on synthesis redoes the minimal report, which
-/// then picks from the synthesis's findings rather than the personas'.
-pub(super) fn extend(run: &mut BotRun, options: BotOptions) {
+/// Adds `options` to the run's. Turning on cross-review redoes synthesis and the filter, since
+/// its rulings change them, and gives a lone persona the other installed ones as challengers.
+pub(super) fn extend(run: &mut BotRun, options: BotOptions, installed: &[Persona]) {
     let old = run.options;
-    let new = BotOptions {
-        synthesize: old.synthesize || options.synthesize,
+    run.options = BotOptions {
         cross_review: old.cross_review || options.cross_review,
-        adversarial: if options.cross_review && !old.cross_review {
-            options.adversarial
-        } else {
-            old.adversarial
-        },
-        minimal: old.minimal || options.minimal,
-    }
-    .normalized(run.personas.len());
-    if new.cross_review && !old.cross_review {
+        suggest: old.suggest || options.suggest,
+    };
+    if run.options.cross_review && !old.cross_review {
         let redo = [Step::Synthesis, Step::Minimal];
         run.done.retain(|s| !redo.contains(s));
         run.parts.retain(|p| !redo.contains(&p.step));
         // The new synthesis renumbers its findings, so its ids no longer name the old ones.
         run.dismissed.retain(|id| id.contains('#'));
         run.synthesis += 1;
-    } else if new.synthesize && !old.synthesize {
-        run.done.retain(|s| *s != Step::Minimal);
-        run.parts.retain(|p| p.step != Step::Minimal);
+        run.challengers = challengers(&run.personas, installed);
     }
-    run.options = new;
+}
+
+/// The installed personas that cross-review `personas` when there's only one of them.
+fn challengers(personas: &[Persona], installed: &[Persona]) -> Vec<Persona> {
+    if personas.len() != 1 {
+        return vec![];
+    }
+    installed
+        .iter()
+        .filter(|p| p.name != personas[0].name)
+        .cloned()
+        .collect()
+}
+
+/// Every persona whose file loads.
+fn installed() -> Vec<Persona> {
+    personas::load()
+        .personas
+        .into_iter()
+        .map(|p| p.persona)
+        .collect()
+}
+
+/// Sets the task for the filter, or with a blank `task` lets it work one out, and has the
+/// filter run again. Its last suggestions stay until the new ones replace them.
+pub(super) fn retask(run: &mut BotRun, task: &str) {
+    let task = task.trim();
+    run.task = (!task.is_empty()).then(|| task.to_string());
+    run.options.suggest = true;
+    run.done.retain(|s| *s != Step::Minimal);
+}
+
+/// Keeps only the newest finished filter part.
+pub(super) fn drop_old_filters(run: &mut BotRun) {
+    let Some(last) = run
+        .parts
+        .iter()
+        .rposition(|p| p.step == Step::Minimal && p.status == Status::Done)
+    else {
+        return;
+    };
+    let mut i = 0;
+    run.parts.retain(|p| {
+        let keep = p.step != Step::Minimal || i == last;
+        i += 1;
+        keep
+    });
 }
 
 /// The named personas, as their files define them now.
@@ -137,6 +174,11 @@ impl RepoCtx {
     ) -> anyhow::Result<BotRun> {
         let ws = self.workspace(workspace).await?;
         let personas = pick(personas)?;
+        let challengers = if options.cross_review {
+            challengers(&personas, &installed())
+        } else {
+            vec![]
+        };
         ws.snapshot().await?;
         let range = ws.jj.resolve(revset).await?;
         let mut run = BotRun {
@@ -146,9 +188,14 @@ impl RepoCtx {
             revset: revset.to_string(),
             from: range.from,
             to: range.to,
-            options: options.normalized(personas.len()),
+            options: BotOptions {
+                suggest: true,
+                ..options
+            },
             context,
             personas,
+            challengers,
+            task: None,
             parts: vec![],
             done: vec![],
             created_at: now_ms() as f64,
@@ -175,7 +222,24 @@ impl RepoCtx {
             !self.bots.is_active(id),
             "this review run is already running"
         );
-        self.edit_run(id, |run| extend(run, options))?;
+        let installed = installed();
+        self.edit_run(id, |run| extend(run, options, &installed))?;
+        self.spawn_bots(id, runs, notify)
+    }
+
+    /// Runs the filter again with `task`, or with a blank one, the task it works out.
+    pub fn retask_bots(
+        self: Arc<Self>,
+        id: u32,
+        task: &str,
+        runs: Runs,
+        notify: Notify,
+    ) -> anyhow::Result<()> {
+        ensure!(
+            !self.bots.is_active(id),
+            "this review run is already running"
+        );
+        self.edit_run(id, |run| retask(run, task))?;
         self.spawn_bots(id, runs, notify)
     }
 
@@ -269,9 +333,7 @@ impl RepoCtx {
             let schema = super::schema::schema(step).to_string();
             let parts = wanted.iter().enumerate().map(|(i, name)| {
                 let idx = first + i;
-                let persona = name
-                    .as_ref()
-                    .and_then(|n| run.personas.iter().find(|p| &p.name == n));
+                let persona = name.as_deref().and_then(|n| run.persona(n));
                 // A rebuttal continues the persona's own review.
                 let resume = (step == Step::Rebuttals)
                     .then(|| session(&run, name.as_deref()))
@@ -311,6 +373,7 @@ impl RepoCtx {
                 let ok = run.parts[first..].iter().all(|p| p.status == Status::Done);
                 if ok {
                     run.done.push(step);
+                    drop_old_filters(run);
                 }
                 (ok, run.clone())
             })?;

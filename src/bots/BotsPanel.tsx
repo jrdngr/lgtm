@@ -9,11 +9,11 @@ import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
+import { CrossReviewSwitch } from "./CrossReviewSwitch";
 import { Installer } from "./Installer";
 import { NewPersona } from "./NewPersona";
 import { PersonaList } from "./PersonaList";
 import { usePersonas } from "./personas";
-import { ReportOptions } from "./ReportOptions";
 import { RunList } from "./RunList";
 import { seedRun } from "./runs";
 import "./bots.css";
@@ -31,7 +31,7 @@ interface Picks {
 const DEFAULT_PICKS: Picks = {
   unpicked: [],
   favorites: [],
-  options: { synthesize: true, crossReview: false, adversarial: false, minimal: false },
+  options: { crossReview: false },
 };
 
 function loadPicks(): Picks {
@@ -99,7 +99,7 @@ interface SetupProps {
   onChanged(): void;
 }
 
-/** Personas and report options to pick, the Run button, and the runs so far. */
+/** Personas to pick, context, cross-review, the Run button, and the runs so far. */
 function Setup({ personas, onOpen, onChanged }: SetupProps) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
@@ -130,7 +130,13 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
   async function start() {
     if (!review) return;
     setStarting(true);
-    const r = await commands.startBots(workspace, review.revset, picked, options, context);
+    const r = await commands.startBots(
+      workspace,
+      review.revset,
+      picked,
+      { crossReview: !!options.crossReview, suggest: true },
+      context,
+    );
     setStarting(false);
     if (r.status === "error") return setError(r.error);
     setError(undefined);
@@ -184,14 +190,6 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
         onChanged={onChanged}
       />
       <div className="bots-section">
-        <span className="bots-label">Report</span>
-      </div>
-      <ReportOptions
-        options={options}
-        lone={n < 2}
-        onChange={(o) => setPicks({ ...picks, options: o })}
-      />
-      <div className="bots-section">
         <span className="bots-label">Context</span>
       </div>
       <GrowingText
@@ -200,6 +198,10 @@ function Setup({ personas, onOpen, onChanged }: SetupProps) {
         maxLines={5}
         placeholder="What the reviewers should know about this change"
         onChange={(e) => setContext(e.target.value)}
+      />
+      <CrossReviewSwitch
+        on={!!options.crossReview}
+        onChange={(on) => setPicks({ ...picks, options: { crossReview: on } })}
       />
       <button
         type="button"

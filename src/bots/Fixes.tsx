@@ -1,8 +1,8 @@
 import type { BotRun, Fix } from "../bindings";
 import { commands } from "../ipc";
 import { Busy } from "../ui/Busy";
-import { Refs } from "./Closing";
 import { Markdown } from "./Markdown";
+import { Refs } from "./Refs";
 
 const STATUS = { running: "Fixing…", done: "Done", failed: "Failed", stopped: "Stopped" };
 

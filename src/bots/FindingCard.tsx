@@ -36,7 +36,7 @@ interface Props {
   onCheck(): void;
   /** Pastes text into a terminal's prompt. */
   onSend(text: string): void;
-  /** Fixed by a Fix headless run, or dismissed by hand. */
+  /** Fixed by a fix run, or dismissed by hand. */
   state?: "fixed" | "dismissed";
   onDismiss(dismissed: boolean): void;
   /** The review is in a PR workspace, so findings can become drafts for GitHub. */

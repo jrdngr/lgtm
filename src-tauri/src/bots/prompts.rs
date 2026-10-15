@@ -156,16 +156,11 @@ pub fn challengeable<'a>(run: &'a BotRun, except: &str) -> Vec<&'a Finding> {
 }
 
 fn challenge(p: &Persona, target: &Target, run: &BotRun) -> String {
-    let stance = if run.options.adversarial {
-        "Argue against every one of them, making the strongest case for the opposite."
-    } else {
-        "Challenge only the ones you think are wrong, overrated, or have the wrong fix, with \
-         evidence. Leave out the ones you agree with."
-    };
     format!(
         "{intro}\n\nOther reviewers reviewed the change below. Cross-review their medium and \
-         higher findings through your priority. {stance} {READ_ONLY}\n\n{RUBRIC}\n\n{ctx}\n\n\
-         Their findings, as JSON:\n\n{findings}",
+         higher findings through your priority. Challenge only the ones you think are wrong, \
+         overrated, or have the wrong fix, with evidence. Leave out the ones you agree with. \
+         {READ_ONLY}\n\n{RUBRIC}\n\n{ctx}\n\nTheir findings, as JSON:\n\n{findings}",
         intro = persona_intro(p),
         ctx = target.context,
         findings = json(&challengeable(run, &p.name)),
@@ -278,16 +273,25 @@ fn minimal(target: &Target, run: &BotRun) -> String {
         Some(Output::Synthesis(s)) => json(&s.findings),
         _ => json(&reviews(run).flat_map(|(_, f)| f).collect::<Vec<_>>()),
     };
+    let task = match &run.task {
+        Some(task) => format!(
+            "The task is: {task}\n\nTake it as given, and return it unchanged as the task."
+        ),
+        None => "Work out the task from what I said about the change, the commit descriptions, \
+                 and the change itself, and state it in a few words."
+            .to_string(),
+    };
     format!(
-        "You pick which review findings matter to the task a change is meant to complete. Work \
-         out the task from the commit descriptions and the change itself. {READ_ONLY}\n\n\
-         {ctx}\n\n\
+        "You turn review findings into the fixes a change needs to complete its task. \
+         {READ_ONLY}\n\n{ctx}\n\n{task}\n\n\
          Keep a finding if fixing it is needed for the task to be done correctly, or if it's a \
          cheap fix to code the change adds or touches that would otherwise ship a lasting \
-         defect, such as unwanted public API or wrong docs. Leave out everything else, \
-         including hygiene nitpicks and findings that another kept finding's fix already \
-         resolves. List the critical and high findings you left out as off-task. Then \
-         recommend what to fix.\n\nThe findings, as JSON:\n\n{findings}",
+         defect, such as unwanted public API or wrong docs. Drop everything else, including \
+         nitpicks and findings that another kept fix already resolves.\n\n\
+         Return the kept findings as ordered fix actions, most important first, each naming \
+         the findings it closes. List the critical and high findings you dropped as off-task. \
+         Questions are ambiguities in the requirements that block a correct fix.\n\n\
+         The findings, as JSON:\n\n{findings}",
         ctx = target.context,
     )
 }

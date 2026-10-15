@@ -160,6 +160,8 @@ export const commands = {
 	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions, context: string) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options, context })),
 	/**  Adds `options` to a finished or halted run and runs what it's missing. */
 	continueBots: (run: number, options: BotOptions) => typedError<null, string>(__TAURI_INVOKE("continue_bots", { run, options })),
+	/**  Runs the task filter again with `task`, or with a blank one, a task it works out. */
+	retaskBots: (run: number, task: string) => typedError<null, string>(__TAURI_INVOKE("retask_bots", { run, task })),
 	stopBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("stop_bots", { run })),
 	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
 	/**  The workspace's persona reviews, newest first. */
@@ -464,14 +466,13 @@ export type BotFixText = {
 
 /**  What a run does past the personas' own reviews. */
 export type BotOptions = {
-	/**  One set of findings merged across every persona's. */
-	synthesize: boolean,
-	/**  Personas challenge each other's findings before synthesis. */
-	crossReview: boolean,
-	/**  Cross-review argues against every medium and higher finding. */
-	adversarial: boolean,
-	/**  Only the findings that matter to what the change is for. */
-	minimal: boolean,
+	/**
+	 *  Personas challenge each other's findings before synthesis. A lone persona is
+	 *  challenged by the other installed personas.
+	 */
+	crossReview?: boolean,
+	/**  The task filter picks suggested fixes. Off for published findings until asked for. */
+	suggest?: boolean,
 };
 
 /**
@@ -487,7 +488,11 @@ export type BotRun = {
 	from: string | null,
 	to: string,
 	personas: Persona[],
+	/**  Personas that only cross-review a lone persona's findings. */
+	challengers?: Persona[],
 	options: BotOptions,
+	/**  The task the user gave the filter, in place of the one it works out. */
+	task?: string | null,
 	/**  What the user told the reviewers about the change. */
 	context?: string,
 	parts: Part[],
@@ -987,13 +992,14 @@ export type Message = {
 	before?: string | null,
 };
 
+/**  The task filter's suggested fixes. */
 export type Minimal = {
 	task: string,
-	/**  Synthesis finding ids that matter to the task. */
-	kept: string[],
+	/**  Ordered actions, each with the ids of the findings it closes. */
+	fixes?: Action[],
 	/**  Critical and high findings left out as unrelated to the task. */
 	offTask: string[],
-	recommendations: string,
+	questions?: Question[],
 };
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
@@ -1078,7 +1084,7 @@ export type Output = {
 /**  One agent run within a review run. */
 export type Part = {
 	step: Step,
-	/**  The persona's name. Absent for synthesis and the minimal report. */
+	/**  The persona's name. Absent for synthesis and the task filter. */
 	persona: string | null,
 	status: Status,
 	/**  Set once it's done. */

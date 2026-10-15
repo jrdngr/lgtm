@@ -1,7 +1,8 @@
 use serde_json::json;
 
 use super::output::{Challenge, Finding, Review, Severity};
-use super::pipeline::{drop_unfinished, extend, next_step, wanted};
+use super::pipeline::{drop_old_filters, drop_unfinished, extend, next_step, retask, wanted};
+use super::submitted::Summary;
 use super::*;
 use crate::store::Store;
 
@@ -23,7 +24,9 @@ fn run(names: &[&str], options: BotOptions) -> BotRun {
         from: Some("a".into()),
         to: "b".into(),
         personas: names.iter().map(|n| persona(n)).collect(),
-        options: options.normalized(names.len()),
+        challengers: vec![],
+        options,
+        task: None,
         context: String::new(),
         parts: vec![],
         done: vec![],
@@ -71,19 +74,19 @@ fn names(parts: Vec<Option<String>>) -> Vec<String> {
 }
 
 const CROSS: BotOptions = BotOptions {
-    synthesize: false,
     cross_review: true,
-    adversarial: false,
-    minimal: false,
+    suggest: false,
+};
+
+const SUGGEST: BotOptions = BotOptions {
+    cross_review: false,
+    suggest: true,
 };
 
 #[test]
 fn cross_review_challenges_what_is_worth_it_and_rebuts_only_challenged_personas() {
     let mut r = run(&["sec", "simple"], CROSS);
-    assert!(
-        r.options.synthesize,
-        "cross-review needs a synthesis to rule"
-    );
+    assert!(r.synthesizes(), "cross-review needs a synthesis to rule");
     assert_eq!(next_step(&r), Some(Step::Reports));
     assert_eq!(names(wanted(Step::Reports, &r)), ["sec", "simple"]);
 
@@ -118,9 +121,25 @@ fn cross_review_challenges_what_is_worth_it_and_rebuts_only_challenged_personas(
 }
 
 #[test]
-fn a_lone_persona_gets_no_cross_review() {
-    let r = run(&["general"], CROSS);
-    assert!(!r.options.cross_review && !r.options.synthesize);
+fn a_lone_persona_is_cross_reviewed_by_the_other_installed_personas() {
+    let mut r = run(&["general"], BotOptions::default());
+    let installed = [persona("general"), persona("sec"), persona("simple")];
+    extend(&mut r, CROSS, &installed);
+    assert!(r.synthesizes(), "a synthesis rules on the challenges");
+    r.parts = vec![part(
+        Step::Reports,
+        Some("general"),
+        Status::Done,
+        review(vec![finding("general#1", Severity::High)]),
+    )];
+    r.done.push(Step::Reports);
+    assert_eq!(names(wanted(Step::Challenges, &r)), ["sec", "simple"]);
+}
+
+#[test]
+fn a_lone_persona_without_cross_review_skips_synthesis() {
+    assert!(!run(&["general"], SUGGEST).synthesizes());
+    assert!(run(&["general", "sec"], SUGGEST).synthesizes());
 }
 
 #[test]
@@ -136,29 +155,18 @@ fn a_retry_reruns_only_what_did_not_finish() {
 }
 
 #[test]
-fn adding_cross_review_redoes_synthesis_and_minimal() {
-    let mut r = run(
-        &["sec", "general"],
-        BotOptions {
-            synthesize: true,
-            minimal: true,
-            ..BotOptions::default()
-        },
-    );
+fn adding_cross_review_redoes_synthesis_and_the_filter() {
+    let mut r = run(&["sec", "general"], SUGGEST);
     r.done = vec![Step::Reports, Step::Synthesis, Step::Minimal];
     r.parts = vec![
         part(Step::Reports, Some("sec"), Status::Done, review(vec![])),
         part(Step::Synthesis, None, Status::Done, None),
         part(Step::Minimal, None, Status::Done, None),
     ];
-    let minimal = BotOptions {
-        minimal: true,
-        ..BotOptions::default()
-    };
-    extend(&mut r, minimal);
+    extend(&mut r, SUGGEST, &[]);
     assert_eq!(next_step(&r), None, "nothing new to do");
 
-    extend(&mut r, CROSS);
+    extend(&mut r, CROSS, &[]);
     assert_eq!(r.done, [Step::Reports]);
     assert_eq!(r.parts.len(), 1);
     assert_eq!(next_step(&r), Some(Step::Challenges));
@@ -166,11 +174,7 @@ fn adding_cross_review_redoes_synthesis_and_minimal() {
 
 #[test]
 fn redoing_synthesis_unsettles_its_old_findings_but_not_the_personas() {
-    let synthesize = BotOptions {
-        synthesize: true,
-        ..BotOptions::default()
-    };
-    let mut r = run(&["sec", "general"], synthesize);
+    let mut r = run(&["sec", "general"], SUGGEST);
     r.dismissed = vec!["2".into(), "sec#1".into()];
     r.fixes.push(Fix {
         findings: vec!["1".into(), "general#1".into()],
@@ -180,7 +184,7 @@ fn redoing_synthesis_unsettles_its_old_findings_but_not_the_personas() {
         created_at: 0.0,
         synthesis: 0,
     });
-    extend(&mut r, CROSS);
+    extend(&mut r, CROSS, &[]);
     assert_eq!(r.finding_state("1"), "open");
     assert_eq!(r.finding_state("2"), "open");
     assert_eq!(r.finding_state("general#1"), "fixed");
@@ -188,25 +192,57 @@ fn redoing_synthesis_unsettles_its_old_findings_but_not_the_personas() {
 }
 
 #[test]
-fn adding_synthesis_redoes_a_lone_personas_minimal_pick() {
-    let minimal = BotOptions {
-        minimal: true,
-        ..BotOptions::default()
-    };
-    let mut r = run(&["general"], minimal);
-    r.done = vec![Step::Reports, Step::Minimal];
+fn a_new_task_reruns_only_the_filter_and_its_result_replaces_the_old_one() {
+    let mut r = run(&["sec", "general"], SUGGEST);
+    r.done = vec![Step::Reports, Step::Synthesis, Step::Minimal];
     r.parts = vec![
-        part(Step::Reports, Some("general"), Status::Done, review(vec![])),
+        part(Step::Synthesis, None, Status::Done, None),
         part(Step::Minimal, None, Status::Done, None),
     ];
-    let synthesize = BotOptions {
-        synthesize: true,
-        ..BotOptions::default()
+    retask(&mut r, "  fix the refresh race ");
+    assert_eq!(r.task.as_deref(), Some("fix the refresh race"));
+    assert_eq!(next_step(&r), Some(Step::Minimal));
+    assert_eq!(wanted(Step::Minimal, &r), [None]);
+
+    r.parts.push(Part {
+        error: Some("newest".into()),
+        ..part(Step::Minimal, None, Status::Done, None)
+    });
+    drop_old_filters(&mut r);
+    let filters: Vec<_> = r.parts.iter().filter(|p| p.step == Step::Minimal).collect();
+    assert_eq!(filters.len(), 1);
+    assert_eq!(filters[0].error.as_deref(), Some("newest"));
+    assert_eq!(r.parts[0].step, Step::Synthesis);
+
+    retask(&mut r, " ");
+    assert_eq!(r.task, None, "a blank task lets the filter work one out");
+}
+
+#[test]
+fn published_fixes_name_findings_by_the_ids_they_get_once_sorted() {
+    let value = json!({
+        "verdict": "v",
+        "findings": [
+            { "severity": "low", "title": "a", "locations": [], "facts": [], "explanation": "", "fix": null, "offLens": false },
+            { "severity": "critical", "title": "b", "locations": [], "facts": [], "explanation": "", "fix": null, "offLens": false },
+        ],
+    });
+    let summary = Summary {
+        task: "t".into(),
+        fixes: vec![("fix b".into(), vec![2]), ("fix a".into(), vec![1])],
+        off_task: vec![],
+        questions: vec![("q".into(), vec![2])],
     };
-    extend(&mut r, synthesize);
-    assert_eq!(r.done, [Step::Reports]);
-    assert_eq!(r.parts.len(), 1);
-    assert_eq!(next_step(&r), Some(Step::Synthesis));
+    let m = summary.to_filter("cq", &value).unwrap();
+    let closes: Vec<_> = m.fixes.iter().map(|f| f.closes.clone()).collect();
+    assert_eq!(closes, [vec!["cq#1".to_string()], vec!["cq#2".to_string()]]);
+    assert_eq!(m.questions[0].findings, ["cq#1"]);
+
+    let bad = Summary {
+        off_task: vec![3],
+        ..summary
+    };
+    assert!(bad.to_filter("cq", &value).is_err());
 }
 
 #[test]
@@ -318,7 +354,6 @@ async fn personas_review_cross_review_and_synthesize_a_real_change() {
     let ctx = Arc::new(ctx);
     let options = BotOptions {
         cross_review: true,
-        minimal: true,
         ..BotOptions::default()
     };
     let notify: Notify = Arc::new(|_| {});

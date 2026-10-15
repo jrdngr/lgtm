@@ -33,7 +33,7 @@ Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, b
 - Personas are user-defined markdown files in the user's config, never in the repo. The seven wee-bots personas (`simplicity-bot`, `security-bot`, `correctness-bot`, `performance-bot`, `maintainability-bot`, `architecture-bot`, `general-bot`) ship as defaults the user installs, and can reinstall to restore them.
 - The user dispatches any subset of personas against a review.
 - The app owns the severity rubric, the prompts, and the finding format. Agents return structured findings, and the report is UI built from them, not text.
-- The user can ask for a synthesis across all findings, a cross-review before it, and a minimal set of findings for the task.
+- Every report merges the personas' findings and picks the fixes its task needs: ordered actions, each closing findings, with off-task critical and high findings and questions. The user can correct the task, which reruns only that pick, and can ask for a cross-review before the merge.
 - Findings link to code, can become comments, and can be sent to an agent in a terminal.
 - Runs on Claude Code in v1 (see Section 8). Other agents come later, so keep the agent behind one interface.
 

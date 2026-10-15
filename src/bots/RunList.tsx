@@ -7,24 +7,37 @@ import { ago, fullDate } from "../ui/time";
 import { remembered } from "../workbench/remembered";
 import type { WorkspaceName } from "../workspaces/context";
 import { finalFindings, report } from "./findings";
-import { runDetail, runState } from "./personas";
+import { published, runDetail, runState } from "./personas";
 import { type Act, RunControls } from "./RunControls";
 import { reportIdItems, reportLabel } from "./reportId";
 import { forgetRun, runAction, useRuns } from "./runs";
 import { SevTag } from "./Severity";
 
-/** A run's outcome: its state, or its findings once done, with how many are high or worse. */
+/** A run's outcome: its state, or once done, its suggested fixes and how many critical or high
+ * findings they leave out, or without them, its findings and how many are high or worse. */
 function Outcome({ run }: { run: BotRun }) {
   const { state, label } = runState(run);
   if (state !== "done") return <>{label}</>;
-  const findings = finalFindings(report(run));
+  const r = report(run);
+  const verb = published(run) ? "Published" : "Done";
+  if (r.minimal) {
+    const fixes = r.minimal.fixes?.length ?? 0;
+    const off = r.minimal.offTask.length;
+    return (
+      <>
+        {verb} · {fixes} {fixes === 1 ? "fix" : "fixes"}
+        {off > 0 && <span className="sev sev-critical">{off} off-task</span>}
+      </>
+    );
+  }
+  const findings = finalFindings(r);
   const n = findings.length;
   const serious = (["critical", "high"] as const)
     .map((s) => [s, findings.filter((f) => f.severity === s).length] as const)
     .filter(([, count]) => count > 0);
   return (
     <>
-      {n} {n === 1 ? "finding" : "findings"}
+      {verb} · {n} {n === 1 ? "finding" : "findings"}
       {serious.map(([s, count]) => (
         <SevTag key={s} severity={s} count={count} />
       ))}

@@ -79,6 +79,20 @@ pub(crate) fn continue_bots(
         .map_err(err)
 }
 
+/// Runs the task filter again with `task`, or with a blank one, a task it works out.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn retask_bots(
+    window: WebviewWindow,
+    runs: State<Runs>,
+    run: u32,
+    task: String,
+) -> CmdResult<()> {
+    repo(&window)?
+        .retask_bots(run, &task, runs.inner().clone(), notify(&window))
+        .map_err(err)
+}
+
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn stop_bots(window: WebviewWindow, runs: State<Runs>, run: u32) -> CmdResult<()> {

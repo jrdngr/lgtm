@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { BotOptions, BotRun, Part, Personas, Step } from "../bindings";
+import type { BotRun, Part, Personas, Step } from "../bindings";
 import { onSaved } from "../editor/saved";
 import { commands } from "../ipc";
 
@@ -18,22 +18,28 @@ export function usePersonas() {
   return { personas, reload };
 }
 
-/** Steps a run's options call for, in order. */
-export function steps(o: BotOptions): Step[] {
+/** Steps a run's options call for, in order. Findings merge to rule on a cross-review, or to
+ * give the filter one set from several personas. */
+export function steps(run: BotRun): Step[] {
+  const { crossReview, suggest } = run.options;
+  const synthesizes = crossReview || (suggest && run.personas.length > 1);
   return [
     "reports" as const,
-    ...(o.crossReview ? (["challenges", "rebuttals"] as const) : []),
-    ...(o.synthesize ? (["synthesis"] as const) : []),
-    ...(o.minimal ? (["minimal"] as const) : []),
+    ...(crossReview ? (["challenges", "rebuttals"] as const) : []),
+    ...(synthesizes ? (["synthesis"] as const) : []),
+    ...(suggest ? (["minimal"] as const) : []),
   ];
 }
+
+/** Whether an agent published the run's findings, rather than lgtm's personas finding them. */
+export const published = (run: BotRun) => run.personas.every((p) => !p.profile);
 
 const STEP_NAMES: Record<Step, string> = {
   reports: "reviewing",
   challenges: "cross-reviewing",
   rebuttals: "rebutting",
   synthesis: "synthesizing",
-  minimal: "picking the minimal set",
+  minimal: "picking fixes",
 };
 
 export type RunState = "running" | "done" | "halted";
@@ -46,7 +52,7 @@ export function runState(run: BotRun): { state: RunState; label: string } {
     const reports = run.parts.filter((p) => p.step === "reports" && p.status === "done").length;
     return { state: "running", label: `Running · ${reports} of ${run.personas.length} done` };
   }
-  if (steps(run.options).every((s) => run.done.includes(s))) {
+  if (steps(run).every((s) => run.done.includes(s))) {
     return { state: "done", label: "Done" };
   }
   return { state: "halted", label: "Halted" };

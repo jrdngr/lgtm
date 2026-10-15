@@ -1,4 +1,5 @@
 import type {
+  Action,
   BotRun,
   Challenge,
   Finding,
@@ -77,7 +78,7 @@ export function report(run: BotRun): Report {
     byPersona,
     verdicts,
     synthesis: outputs(run, "synthesis")[0]?.output,
-    minimal: outputs(run, "minimal")[0]?.output,
+    minimal: outputs(run, "minimal").at(-1)?.output,
     exchanges,
   };
 }
@@ -85,6 +86,35 @@ export function report(run: BotRun): Report {
 /** A run's findings: the synthesis's when there is one, otherwise every persona's. */
 export function finalFindings(r: Report): Finding[] {
   return r.synthesis?.findings ?? [...r.byPersona.values()].flat();
+}
+
+/** The verdict on the whole change: the synthesis's, or a lone persona's. */
+export function verdictOf(r: Report): string | undefined {
+  return r.synthesis?.verdict ?? (r.verdicts.size === 1 ? [...r.verdicts.values()][0] : undefined);
+}
+
+/** A finding's id as the report shows it: `#3`, or with a lone persona, `#3` for `sec#3`. */
+export function refLabel(run: BotRun, id: string): string {
+  if (!id.includes("#")) return `#${id}`;
+  return run.personas.length === 1 ? `#${id.split("#")[1]}` : id;
+}
+
+/** The personas that raised a finding. */
+export function raisers(f: Finding): string[] {
+  if (f.raisedBy?.length) return f.raisedBy.map((r) => r.persona);
+  return f.id?.includes("#") ? [f.id.split("#")[0]] : [];
+}
+
+/** Suggested fixes as a request to an agent, each with where its findings are. */
+export function actionsText(revset: string, actions: Action[], byId: Map<string, Finding>) {
+  const n = actions.length;
+  const list = actions.map((a, i) => {
+    const where = a.closes
+      .flatMap((id) => byId.get(id)?.locations ?? [])
+      .map((l) => `\`${locationText(l)}\``);
+    return `${i + 1}. ${a.action}${where.length ? `\n   ${[...new Set(where)].join(", ")}` : ""}`;
+  });
+  return `Make ${n === 1 ? "this fix" : `these ${n} fixes`} from a review of \`${revset}\`. Change only what each one needs.\n\n${list.join("\n")}`;
 }
 
 /** The persona findings a finding stands for: its sources, or itself. */

@@ -1,6 +1,6 @@
 //! Persona reviews: personas review a revset headless, each in its own agent run, and return
-//! structured findings. Synthesis, cross-review, and a minimal report are further runs over
-//! those findings.
+//! structured findings. Cross-review, synthesis, and the task filter that picks suggested
+//! fixes are further runs over those findings.
 
 mod fix;
 pub mod install;
@@ -25,31 +25,20 @@ pub use output::Output;
 pub use personas::Persona;
 pub use pipeline::{Event, Notify};
 pub use prompts::describe;
+pub use submitted::Summary;
 pub(crate) use prompts::fence;
 
 /// What a run does past the personas' own reviews.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct BotOptions {
-    /// One set of findings merged across every persona's.
-    pub synthesize: bool,
-    /// Personas challenge each other's findings before synthesis.
+    /// Personas challenge each other's findings before synthesis. A lone persona is
+    /// challenged by the other installed personas.
+    #[serde(default)]
     pub cross_review: bool,
-    /// Cross-review argues against every medium and higher finding.
-    pub adversarial: bool,
-    /// Only the findings that matter to what the change is for.
-    pub minimal: bool,
-}
-
-impl BotOptions {
-    /// Cross-review needs two personas to challenge each other, and a synthesis to rule on
-    /// disputes. A minimal report from more than one persona needs a synthesis too.
-    fn normalized(mut self, personas: usize) -> Self {
-        self.cross_review &= personas > 1;
-        self.adversarial &= self.cross_review;
-        self.synthesize |= self.cross_review || (self.minimal && personas > 1);
-        self
-    }
+    /// The task filter picks suggested fixes. Off for published findings until asked for.
+    #[serde(default)]
+    pub suggest: bool,
 }
 
 /// The steps of a run, in order.
@@ -76,7 +65,7 @@ pub enum Status {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 pub struct Part {
     pub step: Step,
-    /// The persona's name. Absent for synthesis and the minimal report.
+    /// The persona's name. Absent for synthesis and the task filter.
     pub persona: Option<String>,
     pub status: Status,
     /// Set once it's done.
@@ -118,7 +107,13 @@ pub struct BotRun {
     pub from: Option<String>,
     pub to: String,
     pub personas: Vec<Persona>,
+    /// Personas that only cross-review a lone persona's findings.
+    #[serde(default)]
+    pub challengers: Vec<Persona>,
     pub options: BotOptions,
+    /// The task the user gave the filter, in place of the one it works out.
+    #[serde(default)]
+    pub task: Option<String>,
     /// What the user told the reviewers about the change.
     #[serde(default)]
     pub context: String,
@@ -138,6 +133,22 @@ pub struct BotRun {
     /// Whether it's running now. Only memory knows, so the stored value is ignored.
     #[serde(default)]
     pub active: bool,
+}
+
+impl BotRun {
+    /// Whether the personas' findings get merged: to rule on a cross-review, or to give the
+    /// filter one set from several personas.
+    pub fn synthesizes(&self) -> bool {
+        self.options.cross_review || (self.options.suggest && self.personas.len() > 1)
+    }
+
+    /// A persona of the run, reviewer or challenger.
+    fn persona(&self, name: &str) -> Option<&Persona> {
+        self.personas
+            .iter()
+            .chain(&self.challengers)
+            .find(|p| p.name == name)
+    }
 }
 
 /// Runs in progress and what their parts are doing.

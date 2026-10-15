@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event as _;
 
 use super::{Hello, inputs, reports};
+use crate::bots::Summary;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, QaChanged, ReviewStateChanged};
 use crate::qa::queue::{Choice, NewQuestion, QState, Rewrite};
 use crate::qa::text::answer_text;
@@ -317,7 +318,8 @@ impl Lgtm {
 
     #[tool(
         description = "Publish review findings to a report in lgtm, where the human sees them \
-        as cards they can comment on, send to an agent, or fix. Pass the report id the human \
+        as cards they can comment on, send to an agent, or fix, with your suggested fixes for \
+        the change's task if you have them. Pass the report id the human \
         gave you, or leave it out to start a new report, and its id comes back. Rate severity \
         by real impact: critical (exploitable or loses data in normal use), high (a core flow \
         is broken), medium (a real bug off the main path), low (hygiene), info."
@@ -326,8 +328,23 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let reviewer = p.reviewer.as_deref().unwrap_or("terminal-agent");
         let review = serde_json::json!({ "verdict": p.verdict, "findings": p.findings });
+        let summary = match (p.task, p.fixes) {
+            (Some(task), Some(fixes)) => Some(Summary {
+                task,
+                fixes: fixes.into_iter().map(|f| (f.action, f.closes)).collect(),
+                off_task: p.off_task.unwrap_or_default(),
+                questions: p
+                    .questions
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|q| (q.question, q.findings))
+                    .collect(),
+            }),
+            (None, None) => None,
+            _ => return Err("Give task and fixes together, or neither.".into()),
+        };
         let (run, created) = ctx
-            .publish_findings(self.workspace(), p.report.as_deref(), reviewer, review)
+            .publish_findings(self.workspace(), p.report.as_deref(), reviewer, review, summary)
             .map_err(failed)?;
         BotRunChanged {
             run: run.id,

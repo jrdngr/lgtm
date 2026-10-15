@@ -134,11 +134,17 @@ pub fn schema(step: Step) -> Value {
         Step::Minimal => object(
             json!({
                 "task": string("What the change is meant to do, in a few words."),
-                "kept": strings("Ids of the merged findings that matter to the task."),
-                "offTask": strings("Ids of critical and high findings left out as unrelated to the task."),
-                "recommendations": string("What to fix, in a few sentences or bullets."),
+                "fixes": list(object(json!({
+                    "action": string("One action, in a sentence."),
+                    "closes": strings("Ids of the findings it closes."),
+                }), &["action", "closes"])),
+                "offTask": strings("Ids of critical and high findings dropped as unrelated to the task."),
+                "questions": list(object(json!({
+                    "question": string("An ambiguity in the requirements that blocks a correct fix."),
+                    "findings": strings("Ids of the findings it affects."),
+                }), &["question", "findings"])),
             }),
-            &["task", "kept", "offTask", "recommendations"],
+            &["task", "fixes", "offTask", "questions"],
         ),
     }
 }

@@ -68,7 +68,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     };
 
     let (run, created) = ctx
-        .publish_findings(None, None, "claude", review_of(vec![finding("low", "nit"), finding("high", "bug")]))
+        .publish_findings(None, None, "claude", review_of(vec![finding("low", "nit"), finding("high", "bug")]), None)
         .unwrap();
     assert!(created);
     assert_eq!(run.revset, "@");
@@ -79,18 +79,34 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     ctx.dismiss_findings(run.id, &["claude#1".into(), "claude#2".into()], true)
         .unwrap();
     let (run, created) = ctx
-        .publish_findings(None, Some(&label), "claude", review_of(vec![finding("high", "bug"), finding("medium", "new")]))
+        .publish_findings(None, Some(&label), "claude", review_of(vec![finding("high", "bug"), finding("medium", "new")]), None)
         .unwrap();
     assert!(!created);
     assert_eq!(ids(&run, 0), ["claude#1 bug", "claude#2 new"]);
     assert_eq!(run.dismissed, ["claude#1"], "the bug stays dismissed, the gone nit's mark goes");
 
+    let summary = crate::bots::Summary {
+        task: "tidy".into(),
+        fixes: vec![("restyle".into(), vec![1])],
+        off_task: vec![],
+        questions: vec![],
+    };
     let (run, _) = ctx
-        .publish_findings(None, Some(&label), "codex", review_of(vec![finding("low", "style")]))
+        .publish_findings(None, Some(&label), "codex", review_of(vec![finding("low", "style")]), Some(summary))
         .unwrap();
-    assert_eq!(run.parts.len(), 2);
     assert_eq!(run.personas[1].name, "codex");
-    assert!(ctx.publish_findings(None, Some("R999"), "x", review_of(vec![])).is_err());
+    assert!(run.options.suggest && run.done.contains(&crate::bots::Step::Minimal));
+    assert!(matches!(
+        &run.parts[2].output,
+        Some(crate::bots::Output::Minimal(m)) if m.fixes[0].closes == ["codex#1"]
+    ));
+
+    let (run, _) = ctx
+        .publish_findings(None, Some(&label), "codex", review_of(vec![]), None)
+        .unwrap();
+    assert_eq!(run.parts.len(), 2, "the old suggestions no longer match the findings");
+    assert!(!run.options.suggest);
+    assert!(ctx.publish_findings(None, Some("R999"), "x", review_of(vec![]), None).is_err());
 }
 
 #[tokio::test]
@@ -101,8 +117,8 @@ async fn reports_rename_to_unique_ids_and_back() {
     let review = ctx.open(None, "@", false).await.unwrap();
     ctx.focus(None, review.id);
     let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
-    let (a, _) = ctx.publish_findings(None, None, "x", empty()).unwrap();
-    let (b, _) = ctx.publish_findings(None, None, "x", empty()).unwrap();
+    let (a, _) = ctx.publish_findings(None, None, "x", empty(), None).unwrap();
+    let (b, _) = ctx.publish_findings(None, None, "x", empty(), None).unwrap();
 
     assert_eq!(ctx.rename_report(a.id, " auth-pass ").unwrap().label(), "auth-pass");
     assert_eq!(ctx.find_report(None, "AUTH-PASS").unwrap().id, a.id);

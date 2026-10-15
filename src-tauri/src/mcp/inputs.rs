@@ -129,6 +129,7 @@ pub struct Finding {
 }
 
 #[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Publish {
     /// The report to publish to, by the id the human gave you, like `R12` or `auth-pass`.
     /// Leave it out to start a new report on the open review.
@@ -139,6 +140,31 @@ pub struct Publish {
     /// One or two sentences on the change overall.
     pub verdict: String,
     pub findings: Vec<Finding>,
+    /// What the change is meant to do, in a few words. Give it with `fixes` to show your own
+    /// suggested fixes; without them the human can have lgtm work some out.
+    pub task: Option<String>,
+    /// The fixes the task needs, most important first.
+    pub fixes: Option<Vec<FixAction>>,
+    /// Critical and high findings left out as unrelated to the task, by number.
+    pub off_task: Option<Vec<u32>>,
+    /// Ambiguities in the requirements that block a correct fix.
+    pub questions: Option<Vec<OpenQuestion>>,
+}
+
+/// One suggested fix.
+#[derive(Deserialize, JsonSchema)]
+pub struct FixAction {
+    /// What to do, in a sentence.
+    pub action: String,
+    /// The findings it closes, by their 1-based place in `findings`.
+    pub closes: Vec<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct OpenQuestion {
+    pub question: String,
+    /// The findings it affects, by their 1-based place in `findings`.
+    pub findings: Vec<u32>,
 }
 
 #[derive(Deserialize, JsonSchema)]

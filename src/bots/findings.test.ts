@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest";
 import type { BotRun, Finding, Part } from "../bindings";
 import { file, review, rows } from "../review/fixture.test-utils";
 import { flatten } from "../review/model";
-import { findingText, history, locationText, place, report, tally } from "./findings";
+import {
+  actionsText,
+  findingText,
+  history,
+  locationText,
+  place,
+  refLabel,
+  report,
+  tally,
+} from "./findings";
 
 const finding = (id: string, over: Partial<Finding> = {}): Finding => ({
   id,
@@ -33,7 +42,7 @@ const run = (parts: Part[]): BotRun => ({
   from: null,
   to: "c",
   personas: [],
-  options: { synthesize: true, crossReview: true, adversarial: false, minimal: false },
+  options: { crossReview: true, suggest: true },
   parts,
   done: [],
   createdAt: 0,
@@ -92,6 +101,49 @@ describe("report", () => {
     expect(h.exchanges).toHaveLength(2);
     expect(h.rulings[0].outcome).toBe("kept");
   });
+});
+
+it("shows the newest suggested fixes, which replace the ones from an older task", () => {
+  const filter = (task: string): Part =>
+    done({ step: "minimal", output: { kind: "minimal", task, fixes: [], offTask: [] } });
+  expect(report(run([filter("old"), filter("new")])).minimal?.task).toBe("new");
+});
+
+it("numbers a lone persona's findings without its name", () => {
+  const lone = {
+    ...run([]),
+    personas: [{ name: "sec", description: "", offLens: false, profile: "" }],
+  };
+  expect(refLabel(lone, "sec#2")).toBe("#2");
+  expect(refLabel(run([]), "sec#2")).toBe("sec#2");
+  expect(refLabel(run([]), "4")).toBe("#4");
+});
+
+it("asks for suggested fixes in order, each with its findings' locations once", () => {
+  const byId = new Map([
+    ["1", finding("1")],
+    [
+      "2",
+      finding("2", {
+        locations: [
+          { path: "src/a.rs", start: 2, end: 3 },
+          { path: "b.rs", start: null, end: null },
+        ],
+      }),
+    ],
+  ]);
+  const text = actionsText(
+    "@",
+    [
+      { action: "Lock first", closes: ["1", "2"] },
+      { action: "Add a test", closes: [] },
+    ],
+    byId,
+  );
+  expect(text).toBe(
+    "Make these 2 fixes from a review of `@`. Change only what each one needs.\n\n" +
+      "1. Lock first\n   `src/a.rs:2-3`, `b.rs`\n2. Add a test",
+  );
 });
 
 it("tallies by severity, most severe first, skipping empty ones", () => {

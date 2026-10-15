@@ -1,47 +1,43 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
-import type { BotOptions, Finding } from "../bindings";
+import type { Finding } from "../bindings";
 import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
+import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
 import { FindingCard } from "./FindingCard";
+import { FindingsView } from "./FindingsView";
 import { covers, Fixes } from "./Fixes";
-import { finalFindings, findingsText, history, type Picked, report } from "./findings";
-import { runState } from "./personas";
-import { MinimalView, PersonaView, SynthesisView } from "./ReportViews";
+import {
+  actionsText,
+  finalFindings,
+  findingsById,
+  findingsText,
+  history,
+  type Picked,
+  report,
+} from "./findings";
+import { published, runState } from "./personas";
 import { type Act, RunControls } from "./RunControls";
 import { reportIdItems, reportLabel } from "./reportId";
 import { refreshRun, runAction, useRun } from "./runs";
 import { SettledFold } from "./SettledFold";
+import { SuggestedView } from "./SuggestedView";
 import "./bots.css";
 
-type View = "minimal" | "synthesis" | "personas" | "fixes";
+type View = "suggested" | "findings" | "fixes";
 
 const VIEW_NAMES: Record<View, string> = {
-  minimal: "Minimal",
-  synthesis: "Synthesis",
-  personas: "By persona",
+  suggested: "Suggested fixes",
+  findings: "Findings",
   fixes: "Fixes",
 };
 
-const ADD: [keyof BotOptions, string][] = [
-  ["synthesize", "Add synthesis"],
-  ["crossReview", "Add cross-review"],
-  ["minimal", "Add minimal report"],
-];
-
 const STATE_PILLS = { running: "blue", done: "green", halted: "red" };
-
-const NO_OPTIONS: BotOptions = {
-  synthesize: false,
-  crossReview: false,
-  adversarial: false,
-  minimal: false,
-};
 
 /** A request to an agent to fix the picked findings. */
 function fixPrompt(revset: string, picked: Picked[]): string {
@@ -50,8 +46,7 @@ function fixPrompt(revset: string, picked: Picked[]): string {
   return `Fix ${n === 1 ? "this finding" : `these ${n} findings`} from a review of \`${revset}\`. Change only what each one needs.\n\n${findings}`;
 }
 
-/** One persona review: its findings as cards, as the minimal set, the synthesis, or each
- * persona's own. */
+/** One report: the fixes its task needs, every finding, and the fixes agents made. */
 export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }>) {
   const run = useRun(params.run);
   const reportId = run && reportLabel(run);
@@ -66,6 +61,8 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
   const [jump, setJump] = useState<{ id?: string; n: number }>();
   /** Findings picked to send to the agent, by id. */
   const [checked, setChecked] = useState<Map<string, Picked>>(new Map());
+  /** Suggested fixes left out of Send and Fix, by index, for the suggestions they were for. */
+  const [skipped, setSkipped] = useState<{ of?: string; i: Set<number> }>({ i: new Set() });
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const canDraft = !!usePr(workspace);
@@ -79,19 +76,19 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
     );
   }
   const r = report(run);
-  const views: View[] = [
-    ...(r.minimal ? (["minimal"] as const) : []),
-    ...(r.synthesis ? (["synthesis"] as const) : []),
-    "personas",
-    ...(run.fixes?.length ? (["fixes"] as const) : []),
-  ];
+  const views: View[] = ["suggested", "findings", ...(run.fixes?.length ? ["fixes" as const] : [])];
   const view = picked && views.includes(picked) ? picked : views[0];
   const { state, label } = runState(run);
-  // Persona chips show their own failures, in the By persona view.
+  // Persona chips show their own failures, in Findings.
   const failures = run.parts.filter(
     (p) => p.status === "failed" && (p.step !== "reports" || !p.persona),
   );
-  const sourceOf = (f: Finding) => (f.id?.includes("#") ? f.id.split("#")[0] : "synthesis");
+  const filtering =
+    !!run.active && run.parts.some((p) => p.step === "minimal" && p.status === "running");
+  const fixes = r.minimal?.fixes ?? [];
+  const suggestions = r.minimal && [r.minimal.task, ...fixes.map((a) => a.action)].join("\n");
+  const skip = skipped.of === suggestions ? skipped.i : new Set<number>();
+  const sending = fixes.filter((_, i) => !skip.has(i));
 
   const act: Act = (f) => runAction(run, f, setError);
 
@@ -119,17 +116,17 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
     setChecked(next);
   };
 
-  /** Switches to view `v` and scrolls to finding `id`, showing every persona's findings. */
-  const goTo = (v: View, id: string) => {
-    if (v === "personas") setPersona(undefined);
-    setPicked(v);
+  /** Shows finding `id` in Findings, with every persona's findings. */
+  const goTo = (id: string) => {
+    setPersona(undefined);
+    setPicked("findings");
     go(id);
   };
 
-  const checkAll = (shown: Picked[]) => {
-    const next = new Map(checked);
-    for (const x of shown) if (!stateOf(x.f.id ?? "")) next.set(x.f.id ?? "", x);
-    setChecked(next);
+  const skipFix = (i: number) => {
+    const next = new Set(skip);
+    if (!next.delete(i)) next.add(i);
+    setSkipped({ of: suggestions || undefined, i: next });
   };
 
   /** Pastes text into a terminal, and says where it went or why it couldn't. */
@@ -146,24 +143,34 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
     );
   }
 
-  /** Has a headless agent fix the picked findings, and shows its reply in Fixes. */
-  async function fixChecked() {
+  /** Has a headless agent fix `findings`, and shows its reply in Fixes. */
+  async function fix(findings: string[], text: string, onDone: () => void) {
     if (!run) return;
-    const text = findingsText([...checked.values()]);
-    const res = await commands.fixFindings(run.id, [...checked.keys()], text);
+    const res = await commands.fixFindings(run.id, findings, text);
     if (res.status === "error") return setNotice({ error: true, text: res.error });
     setNotice(undefined);
-    setChecked(new Map());
+    onDone();
     setPicked("fixes");
     await refreshRun(run.id);
+  }
+
+  const fixesText = () => actionsText(run.revset, sending, findingsById(r));
+  const fixIds = () => [...new Set(sending.flatMap((a) => a.closes))];
+
+  function fixChecked() {
+    fix([...checked.keys()], findingsText([...checked.values()]), () => setChecked(new Map()));
   }
 
   function sendChecked() {
     if (run) send(fixPrompt(run.revset, [...checked.values()]), () => setChecked(new Map()));
   }
 
+  function retask(task: string) {
+    act(() => commands.retaskBots(current.id, task));
+  }
+
   const current = run;
-  /** Covered by a Fix headless run that finished, or dismissed. */
+  /** Covered by a fix run that finished, or dismissed. */
   const stateOf = (id: string) =>
     current.fixes?.some((x) => x.status === "done" && covers(current, x, id))
       ? ("fixed" as const)
@@ -219,34 +226,90 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
   };
 
   let body: React.ReactNode;
-  if (view === "minimal" && r.minimal) {
+  if (view === "fixes") {
+    body = <Fixes run={run} onGo={goTo} />;
+  } else if (view === "findings") {
     body = (
-      <MinimalView
-        r={r}
-        cards={cards}
-        checkAll={checkAll}
-        sourceOf={sourceOf}
-        onGo={(id) => goTo(r.synthesis ? "synthesis" : "personas", id)}
-      />
-    );
-  } else if (view === "fixes") {
-    body = <Fixes run={run} onGo={(id) => goTo(id.includes("#") ? "personas" : "synthesis", id)} />;
-  } else if (view === "synthesis" && r.synthesis) {
-    body = <SynthesisView r={r} cards={cards} checkAll={checkAll} onGo={go} />;
-  } else {
-    body = (
-      <PersonaView
+      <FindingsView
         run={run}
         r={r}
         persona={persona}
         onPersona={setPersona}
         cards={cards}
-        checkAll={checkAll}
+        isOpen={(id) => open.has(id)}
+        onOpen={toggle}
+        isChecked={(id) => checked.has(id)}
+        onCheck={check}
       />
+    );
+  } else if (r.minimal) {
+    body = (
+      <SuggestedView
+        run={run}
+        r={r}
+        filtering={filtering}
+        skipped={skip}
+        onSkip={skipFix}
+        onRetask={retask}
+        onGo={goTo}
+      />
+    );
+  } else if (run.active) {
+    body = (
+      <div className="suggested-empty">
+        <Busy>{label}</Busy>
+      </div>
+    );
+  } else if (state === "done" && !run.options.suggest) {
+    body = (
+      <div className="suggested-empty">
+        <button
+          type="button"
+          className="primary"
+          onClick={() => act(() => commands.continueBots(run.id, { suggest: true }))}
+        >
+          Suggest fixes
+        </button>
+      </div>
     );
   }
 
   const n = finalFindings(r).length;
+  const verb = published(run) ? "Published" : "Done";
+  const dock =
+    view === "suggested" && r.minimal && !filtering
+      ? sending.length > 0 && (
+          <div className="bots-picked">
+            <b>
+              {sending.length} of {fixes.length} fixes
+            </b>
+            <span className="spacer" />
+            <button type="button" onClick={() => send(fixesText())}>
+              Send to terminal
+            </button>
+            <button
+              type="button"
+              className="primary"
+              onClick={() => fix(fixIds(), fixesText(), () => {})}
+            >
+              Fix
+            </button>
+          </div>
+        )
+      : view === "findings" &&
+        checked.size > 0 && (
+          <div className="bots-picked">
+            <b>{checked.size} picked</b>
+            <span className="spacer" />
+            <button type="button" onClick={sendChecked}>
+              Send to terminal
+            </button>
+            <button type="button" className="primary" onClick={fixChecked}>
+              Fix
+            </button>
+            <IconButton icon="x" label="Clear picks" onClick={() => setChecked(new Map())} />
+          </div>
+        );
   return (
     <div className="bots-report" ref={root}>
       <div className="bots-report-bar">
@@ -254,19 +317,13 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
         <span className="bots-report-title">
           Review of <code className="bots-revset">{run.revset}</code>
         </span>
-        <code className="bots-commit" title={run.to}>
-          {run.to.slice(0, 4)}
-        </code>
+        <code className="bots-commit">{run.to.slice(0, 4)}</code>
         <span className={`pill ${STATE_PILLS[state]}`}>
-          {state === "done" ? `Done · ${n} ${n === 1 ? "finding" : "findings"}` : label}
+          {state === "done" ? `${verb} · ${n} ${n === 1 ? "finding" : "findings"}` : label}
         </span>
+        {run.options.crossReview && <span className="pill purple">cross-reviewed</span>}
         {review && review.to !== run.to && (
-          <span
-            className="pill amber"
-            title="Locations and line numbers may not match the open review, and agents read files from the working copy"
-          >
-            Open review is at {review.to.slice(0, 8)}
-          </span>
+          <span className="pill amber">Open review is at {review.to.slice(0, 8)}</span>
         )}
         <span className="spacer" />
         <RunControls run={run} act={act} />
@@ -274,16 +331,11 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
           label="Report actions"
           items={[
             ...reportIdItems(run, setError),
-            ...ADD.filter(([key]) => !run.active && !run.options[key]).map(([key, text]) => ({
-              label: text,
-              disabled: key === "crossReview" && run.personas.length < 2,
-              title:
-                key === "crossReview" && run.personas.length < 2
-                  ? "Needs two or more personas"
-                  : undefined,
-              onSelect: () =>
-                act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true })),
-            })),
+            !run.active &&
+              !run.options.crossReview && {
+                label: "Add cross-review",
+                onSelect: () => act(() => commands.continueBots(run.id, { crossReview: true })),
+              },
           ]}
         />
       </div>
@@ -297,6 +349,10 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
             onClick={() => setPicked(v)}
           >
             {VIEW_NAMES[v]}
+            {v === "suggested" && r.minimal && (
+              <span className="bots-tab-count">{fixes.length}</span>
+            )}
+            {v === "findings" && <span className="bots-tab-count">{n}</span>}
           </button>
         ))}
       </div>
@@ -313,25 +369,8 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
         </div>
       ))}
       {error && <div className="bots-error">{error}</div>}
-      <div className={`bots-report-body${checked.size > 0 ? " docked" : ""}`}>{body}</div>
-      {checked.size > 0 && (
-        <div className="bots-picked">
-          <b>{checked.size} picked</b>
-          <span className="spacer" />
-          <button type="button" title="Paste them into a terminal's prompt" onClick={sendChecked}>
-            Send to terminal
-          </button>
-          <button
-            type="button"
-            className="primary"
-            onClick={fixChecked}
-            title="Have a headless agent edit the working copy to fix them"
-          >
-            Fix headless
-          </button>
-          <IconButton icon="x" label="Clear picks" onClick={() => setChecked(new Map())} />
-        </div>
-      )}
+      <div className={`bots-report-body${dock ? " docked" : ""}`}>{body}</div>
+      {dock}
       {picker}
     </div>
   );

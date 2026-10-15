@@ -113,6 +113,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::stop_thread_run,
             commands::bots::start_bots,
             commands::bots::continue_bots,
+            commands::bots::retask_bots,
             commands::bots::stop_bots,
             commands::bots::delete_bots,
             commands::bots::bot_runs,

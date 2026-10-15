@@ -136,15 +136,18 @@ pub struct Synthesis {
     pub fix_first: Vec<Action>,
 }
 
+/// The task filter's suggested fixes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct Minimal {
     pub task: String,
-    /// Synthesis finding ids that matter to the task.
-    pub kept: Vec<String>,
+    /// Ordered actions, each with the ids of the findings it closes.
+    #[serde(default)]
+    pub fixes: Vec<Action>,
     /// Critical and high findings left out as unrelated to the task.
     pub off_task: Vec<String>,
-    pub recommendations: String,
+    #[serde(default)]
+    pub questions: Vec<Question>,
 }
 
 /// A finished part's result.
