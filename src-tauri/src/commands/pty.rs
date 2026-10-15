@@ -57,3 +57,10 @@ pub(crate) fn pty_resize(ptys: State<Ptys>, id: u32, cols: u16, rows: u16) -> Cm
 pub(crate) fn pty_kill(ptys: State<Ptys>, id: u32) {
     ptys.kill(id);
 }
+
+/// The program running in the foreground of PTY `id`, when it isn't the shell itself.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn pty_running(ptys: State<Ptys>, id: u32) -> Option<String> {
+    ptys.running(id)
+}

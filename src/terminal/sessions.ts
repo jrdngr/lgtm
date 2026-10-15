@@ -2,7 +2,7 @@ import { Channel } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
 import { commands, type PtyEvent } from "../ipc";
 import { report } from "../workspaces/activity";
-import type { WorkspaceName } from "../workspaces/context";
+import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { isBusyTitle, titleLabel } from "./title";
 import { createTerminal } from "./xterm";
 
@@ -13,14 +13,29 @@ export interface Session {
   refit(): void;
   /** The title its program set, if any. */
   title(): string;
+  /** The program in the foreground, when it isn't the shell. */
+  running(): Promise<string | null>;
   dispose(): void;
 }
 
 /** How long a session outlives its panels, waiting for a panel with the same id to take it. */
 const KEEP_MS = 1000;
 
-/** Sessions by panel id, with how many mounted panels show them. */
-const sessions = new Map<string, { session: Session; panels: number; timer?: number }>();
+/** Sessions by panel id, with their workspace and how many mounted panels show them. */
+const sessions = new Map<
+  string,
+  { session: Session; workspace: string; panels: number; timer?: number }
+>();
+
+/** The programs running in the sessions of the panels `pick` takes, by panel id and
+ * workspace key. */
+export async function runningPrograms(
+  pick: (panel: string, workspace: string) => boolean,
+): Promise<string[]> {
+  const picked = [...sessions].filter(([id, s]) => pick(id, s.workspace));
+  const names = await Promise.all(picked.map(([, s]) => s.session.running()));
+  return names.filter((n) => n !== null);
+}
 
 /** Shows panel `id`'s session in `container`: the one a panel with this id has, when the
  * panel is moving to the other dock or React mounts it again, or else a new shell. */
@@ -42,7 +57,7 @@ export function openSession(
   host.className = "terminal-host";
   container.append(host);
   const session = startSession(id, host, workspace, setup);
-  sessions.set(id, { session, panels: 1 });
+  sessions.set(id, { session, workspace: workspaceKey(workspace), panels: 1 });
   return session;
 }
 
@@ -104,6 +119,7 @@ function startSession(
     term,
     refit,
     title: () => title,
+    running: async () => (pty === undefined ? null : commands.ptyRunning(pty)),
     dispose() {
       disposed = true;
       report(workspace, activity, "stopped", titleLabel(title));

@@ -39,6 +39,8 @@ export const commands = {
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
+	/**  The program running in the foreground of PTY `id`, when it isn't the shell itself. */
+	ptyRunning: (id: number) => __TAURI_INVOKE<string | null>("pty_running", { id }),
 	/**  Every workspace, the repo's main one first. */
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
 	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` to run. */

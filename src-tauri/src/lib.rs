@@ -63,6 +63,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::pty::pty_write,
             commands::pty::pty_resize,
             commands::pty::pty_kill,
+            commands::pty::pty_running,
             commands::workspaces::list_workspaces,
             commands::workspaces::create_workspace,
             commands::workspaces::delete_workspace,

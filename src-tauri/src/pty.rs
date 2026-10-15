@@ -31,6 +31,8 @@ struct Session {
     /// Feeds a writer thread, so a PTY that isn't reading input never blocks a caller.
     input: Sender<Vec<u8>>,
     killer: Box<dyn ChildKiller + Send + Sync>,
+    /// The child's process id, which leads its process group.
+    pid: Option<u32>,
 }
 
 #[derive(Default)]
@@ -85,6 +87,7 @@ impl Ptys {
         let mut reader = pair.master.try_clone_reader()?;
         let input = spawn_writer(pair.master.take_writer()?);
         let killer = child.clone_killer();
+        let pid = child.process_id();
 
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         self.sessions.lock().unwrap().insert(
@@ -94,6 +97,7 @@ impl Ptys {
                 master: pair.master,
                 input,
                 killer,
+                pid,
             },
         );
 
@@ -144,6 +148,26 @@ impl Ptys {
             pixel_width: 0,
             pixel_height: 0,
         })
+    }
+
+    /// The name of the program in the foreground of PTY `id`, when it isn't the PTY's own
+    /// child, as when the shell runs a command.
+    pub fn running(&self, id: u32) -> Option<String> {
+        let (pid, leader) = {
+            let sessions = self.sessions.lock().unwrap();
+            let session = sessions.get(&id)?;
+            (session.pid?, session.master.process_group_leader()?)
+        };
+        if leader as u32 == pid {
+            return None;
+        }
+        let out = std::process::Command::new("ps")
+            .args(["-o", "comm=", "-p", &leader.to_string()])
+            .output()
+            .ok()?;
+        let comm = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        let name = comm.rsplit('/').next().unwrap_or_default();
+        Some(if name.is_empty() { "a program".into() } else { name.to_string() })
     }
 
     /// The reader thread removes the session once the child is gone.
@@ -284,6 +308,20 @@ mod tests {
         let ptys = Ptys::default();
         let (_, code) = run(&ptys, &["sh", "-c", "sleep 20 & exit 0"]);
         assert_eq!(code, 0);
+    }
+
+    #[test]
+    fn running_names_the_foreground_program_but_not_the_shell() {
+        let ptys = Ptys::default();
+        let id = ptys
+            .spawn(owner("w"), Path::new("/"), (80, 24), Some(vec!["sh".into()]), &[], |_| {})
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        assert_eq!(ptys.running(id), None);
+        ptys.write(id, b"sleep 5\n").unwrap();
+        std::thread::sleep(Duration::from_millis(500));
+        assert_eq!(ptys.running(id).as_deref(), Some("sleep"));
+        ptys.kill(id);
     }
 
     #[test]
