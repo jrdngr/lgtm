@@ -124,7 +124,8 @@ function ThreadGroups({ review, threads, runner }: ListProps) {
       {...extra}
     />
   );
-  const convo = prThreads(threads);
+  // Done comments on the PR go under Done with the threads.
+  const convo = prThreads(threads).filter((t) => t.state.stage !== "done");
   const head = (key: string, name: string, tone: string | undefined, actions?: React.ReactNode) => {
     const shut = folded.has(key);
     return (
@@ -158,7 +159,7 @@ function ThreadGroups({ review, threads, runner }: ListProps) {
             convo.map((t) => row(t, { sub: !!t.state.quote, dot: !split.has(t.id) }))}
         </div>
       )}
-      {byStage(threads.filter((t) => t.path)).map(([stage, group]) => {
+      {byStage(threads.filter((t) => t.path || t.state.stage === "done")).map(([stage, group]) => {
         const [, name, tone] = STAGES.find(([s]) => s === stage) ?? [];
         return (
           <div key={stage}>
