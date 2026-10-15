@@ -158,6 +158,29 @@ pub struct SetTake {
     pub reply: Option<String>,
 }
 
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ThreadStage {
+    New,
+    /// The human has a call to make.
+    Decide,
+    /// Code to change.
+    Fix,
+    /// A reply to work out.
+    Reply,
+    /// The reply is final and waits to be sent.
+    Ready,
+    /// Sent, fixed with nothing to say, or set aside.
+    Done,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct SetStage {
+    /// The thread's id, from list_threads.
+    pub thread_id: u32,
+    pub stage: ThreadStage,
+}
+
 #[derive(Deserialize, JsonSchema)]
 pub struct ThreadId {
     /// The thread's id, from list_threads.

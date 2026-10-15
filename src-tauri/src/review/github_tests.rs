@@ -6,7 +6,7 @@ use super::comment_tests::row_text;
 use super::tests::{repo, write};
 use super::*;
 use crate::anchor::Side;
-use crate::store::{GhLink, GhPost, Stage};
+use crate::store::{GhLink, GhPost, Stage, TakeVerdict};
 
 fn thread(id: &str, line: Option<u32>) -> PulledThread {
     PulledThread {
@@ -199,4 +199,54 @@ async fn quotes_answer_parts_of_a_pr_comment_in_its_place() {
         .unwrap();
     let edited = state.threads.iter().find(|t| t.id == quote.id).unwrap();
     assert_eq!(edited.state.stage, Stage::Reply);
+}
+
+#[tokio::test]
+async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    write(&ws.root, "a.rs", "fn a() {}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let texts = HashMap::new();
+    let post = |author: &str, body: &str| GhPost {
+        author: author.into(),
+        body: body.into(),
+        created_at: String::new(),
+        pending: false,
+    };
+    let mut asked = thread("T1", None);
+    asked.link.posts = vec![post("rev", "why?")];
+    let state = ctx
+        .add_threads(review.id, vec![asked], &texts, "PR #1")
+        .unwrap();
+    let id = state.comments[0].id;
+
+    // A terminal agent's take sorts the thread like triage does.
+    ctx.focus(Some("pr1"), review.id);
+    let take = |verdict| crate::store::Take {
+        verdict,
+        why: "facts".into(),
+        question: None,
+    };
+    let stage = |state: &StateDto| state.comments[0].thread.as_ref().unwrap().stage;
+    let (_, state) = ctx
+        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Agree), None)
+        .unwrap();
+    assert_eq!(stage(&state), Stage::ToFix);
+    let reply = Some("Because.".to_string());
+    let (_, state) = ctx
+        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Answer), reply)
+        .unwrap();
+    assert_eq!(stage(&state), Stage::Reply);
+
+    let mut answered = thread("T1", None);
+    answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];
+    answered.answered = true;
+    let state = ctx
+        .add_threads(review.id, vec![answered], &texts, "PR #1")
+        .unwrap();
+    let c = &state.comments[0];
+    assert_eq!(c.thread.as_ref().unwrap().stage, Stage::Done);
+    assert_eq!(c.body, "", "the sent reply isn't left to send again");
 }

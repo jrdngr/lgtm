@@ -181,6 +181,13 @@ impl RepoCtx {
                     };
                     let mut state = old.clone();
                     state.stage = pulled_stage(Some((old, link)), &t.link, t.answered);
+                    // A reply posted from elsewhere, like a terminal agent, isn't left to send.
+                    let sent = t.link.posts.last().is_some_and(|p| {
+                        t.answered && !c.body.trim().is_empty() && p.body.trim() == c.body.trim()
+                    });
+                    if sent {
+                        store.set_comment_body(c.id, "", now)?;
+                    }
                     store.set_thread(c.id, &Some(state))?;
                     store.set_github(c.id, &Some(t.link))?;
                     // A thread pulled while its code wasn't in the review gets placed now.

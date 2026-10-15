@@ -22,7 +22,7 @@ use crate::qa::text::answer_text;
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
-use crate::store::{Take, TakeVerdict};
+use crate::store::{Stage, Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
@@ -177,6 +177,41 @@ impl Lgtm {
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Set the take.".into())
+    }
+
+    #[tool(
+        description = "Move a thread to a stage: new, decide (the human has a call to make), \
+        fix (code to change), reply (a reply to work out), ready (the reply is final), or done \
+        (sent, fixed with nothing to say, or set aside). This never posts to GitHub."
+    )]
+    async fn set_thread_stage(&self, Parameters(p): Parameters<inputs::SetStage>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let stage = match p.stage {
+            inputs::ThreadStage::New => Stage::New,
+            inputs::ThreadStage::Decide => Stage::Decide,
+            inputs::ThreadStage::Fix => Stage::ToFix,
+            inputs::ThreadStage::Reply => Stage::Reply,
+            inputs::ThreadStage::Ready => Stage::Ready,
+            inputs::ThreadStage::Done => Stage::Done,
+        };
+        let (review, state) = ctx
+            .agent_set_stage(self.workspace(), p.thread_id, stage)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Moved it.".into())
+    }
+
+    #[tool(
+        description = "Pull the PR's review comments and conversation from GitHub into lgtm, \
+        then list them as list_threads does. Threads replied to since, from anywhere, move to \
+        done."
+    )]
+    async fn sync_threads(&self) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let review = ctx.current_review(self.workspace()).map_err(failed)?;
+        let state = ctx.pull_pr_comments(review).await.map_err(failed)?;
+        self.changed(&label, review, state);
+        json(&ctx.agent_threads(self.workspace()).map_err(failed)?)
     }
 
     #[tool(

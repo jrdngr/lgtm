@@ -42,7 +42,8 @@ pub fn after_edit(stage: Stage, draft: bool, body: &str) -> Stage {
 }
 
 /// A pulled thread's stage. `old` is the thread as last pulled. `answered` means the viewer
-/// had the last word. A thread someone posted to since comes back as new.
+/// had the last word. A thread someone posted to since comes back as new, and one the viewer
+/// replied to since, from anywhere, is done.
 pub fn pulled_stage(old: Option<(&ThreadState, &GhLink)>, new: &GhLink, answered: bool) -> Stage {
     let Some((state, link)) = old else {
         return if new.resolved || answered {
@@ -51,9 +52,10 @@ pub fn pulled_stage(old: Option<(&ThreadState, &GhLink)>, new: &GhLink, answered
             Stage::New
         };
     };
-    if new.posts.len() > link.posts.len() && !answered && !new.resolved {
+    let posted = new.posts.len() > link.posts.len();
+    if posted && !answered && !new.resolved {
         Stage::New
-    } else if new.resolved && !link.resolved {
+    } else if (posted && answered) || (new.resolved && !link.resolved) {
         Stage::Done
     } else {
         state.stage
@@ -263,6 +265,12 @@ mod tests {
         );
         assert_eq!(
             pulled_stage(Some((&ready, &old)), &link(1, true), false),
+            Stage::Done
+        );
+        // Replied to outside lgtm, like from a terminal agent.
+        let reply = ThreadState::new("o/n", 1, Stage::Reply);
+        assert_eq!(
+            pulled_stage(Some((&reply, &old)), &link(2, false), true),
             Stage::Done
         );
     }

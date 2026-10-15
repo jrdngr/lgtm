@@ -299,7 +299,8 @@ impl RepoCtx {
         Ok(threads)
     }
 
-    /// Sets a thread's take, and its reply when given, for a terminal agent.
+    /// Sets a thread's take, and its reply when given, for a terminal agent. The thread moves
+    /// to the stage triage would put it in.
     pub fn agent_set_take(
         &self,
         workspace: Option<&str>,
@@ -320,13 +321,32 @@ impl RepoCtx {
                 edits: None,
             };
             let before = c.body.clone();
+            let verdict = take.verdict;
             apply_chat(&mut c, turn, false);
+            // Sorted like triage, unless the reply is already final or sent.
+            let reply = !c.body.trim().is_empty();
+            if let Some(t) = c.thread.as_mut()
+                && !matches!(t.stage, Stage::Ready | Stage::Done)
+            {
+                t.stage = triaged_stage(false, verdict, reply);
+            }
             if c.body != before {
                 store.set_comment_body(c.id, &c.body, super::now_ms())?;
             }
             Ok(store.set_thread(c.id, &c.thread)?)
         })?;
         Ok((id, state))
+    }
+
+    /// Moves a thread to `stage`, for a terminal agent.
+    pub fn agent_set_stage(
+        &self,
+        workspace: Option<&str>,
+        thread: u32,
+        stage: Stage,
+    ) -> anyhow::Result<(u32, StateDto)> {
+        let id = self.current_review(workspace)?;
+        Ok((id, self.set_stage(id, thread, stage)?))
     }
 
     /// Marks a thread's reply final, for a terminal agent.

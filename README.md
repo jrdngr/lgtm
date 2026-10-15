@@ -63,7 +63,7 @@ just install     # release build, copied to /Applications
 
 The app's binary takes a repo path: `lgtm /path/to/repo`. A second launch for the same repo focuses its window. Plain git repos get an offer to set up jj alongside git.
 
-On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review.
+On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review, and sync a PR's threads (stage, take and reply) with a review-reply workflow run in the terminal.
 
 ## Commands
 
