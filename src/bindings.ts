@@ -55,6 +55,8 @@ export const commands = {
 	 */
 	openReview: (workspace: string | null, revset: string, resume: boolean) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
+	/**  Unchanged lines `from` to `to` of a file's new side, for showing code between hunks. */
+	contextLines: (review: number, file: number, from: number, to: number) => typedError<ContextLine[], string>(__TAURI_INVOKE("context_lines", { review, file, from, to })),
 	/**  Reloads a review after the repo changed, or switches it to `view`. */
 	refreshReview: (review: number, view: 
 /**  The whole review as one diff. */
@@ -662,6 +664,13 @@ export type CommentDto = {
 	done: boolean,
 };
 
+/**  One line of the new side, with its highlighting when the language is known. */
+export type ContextLine = {
+	line: number,
+	text: string,
+	hl: ([number | null, number])[] | null,
+};
+
 export type DefaultPersona = {
 	name: string,
 	description: string,
@@ -731,6 +740,8 @@ export type FileDto = {
 	/**  Matches a `skip` glob from the repo config. */
 	skipped: boolean,
 	hunks: HunkDto[],
+	/**  How many lines the new side has, so the code after the last hunk can be shown. */
+	lineCount: number,
 	oldSymbols: CodeSymbol[],
 	newSymbols: CodeSymbol[],
 };

@@ -26,6 +26,7 @@ import { type Filter, filterLabel, plural, sumProgress } from "./state";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
+import { useContextLines } from "./useContextLines";
 import { usePublishReview } from "./usePublishReview";
 import { usePublishTarget } from "./usePublishTarget";
 import { useReview } from "./useReview";
@@ -82,6 +83,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
+  const context = useContextLines(review, setError);
   const { sendText, picker } = useSendText(workspace, setError, focusRoot);
   const pr = usePrReview(workspace, review, { onState: edited, onError: setError, load });
   const c = useComments({
@@ -110,6 +112,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
         revealed,
         comments: slots,
         notes: w.slots,
+        context: context.lines,
       }),
     [
       files,
@@ -122,6 +125,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       revealed,
       slots,
       w.slots,
+      context.lines,
     ],
   );
   const lines = useMemo(() => [...prLines(c.onPr), ...fileLines], [c.onPr, fileLines]);
@@ -414,6 +418,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           onBackgroundMouseDown={() => place(cursor)}
           onClearFile={a.clearFile}
           onFileMenu={openFileMenu}
+          onShowContext={context.show}
           renderComment={(id) => (
             <>
               <PrCommentsHead comments={c.onPr} id={id} />

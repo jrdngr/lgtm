@@ -2,7 +2,7 @@ use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
 use crate::jj::{JjAction, LogLine};
-use crate::review::{GraphDto, RefreshDto, ReviewDto, RowRef, StateDto, View};
+use crate::review::{ContextLine, GraphDto, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
 
 /// Loads the review for `revset` after snapshotting the working copy. Starts a review
@@ -17,6 +17,22 @@ pub(crate) async fn open_review(
 ) -> CmdResult<ReviewDto> {
     repo(&window)?
         .open(workspace.as_deref(), &revset, resume)
+        .await
+        .map_err(err)
+}
+
+/// Unchanged lines `from` to `to` of a file's new side, for showing code between hunks.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn context_lines(
+    window: WebviewWindow,
+    review: u32,
+    file: u32,
+    from: u32,
+    to: u32,
+) -> CmdResult<Vec<ContextLine>> {
+    repo(&window)?
+        .context_lines(review, file, from, to)
         .await
         .map_err(err)
 }

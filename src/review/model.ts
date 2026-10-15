@@ -1,4 +1,4 @@
-import type { CodeSymbol, FileDto, ReviewDto, RowDto } from "../bindings";
+import type { CodeSymbol, ContextLine, FileDto, ReviewDto, RowDto } from "../bindings";
 import type { DoneFn } from "./marks";
 import { type Filter, type RowStateFn, rowMatches } from "./state";
 
@@ -25,7 +25,36 @@ export type DisplayLine =
    * code is gone (hunk -1). `NEW_COMMENT` is the draft. */
   | { kind: "comment"; file: number; hunk: number; comment: number }
   /** A walkthrough note's block, placed like a comment's. */
-  | { kind: "note"; file: number; hunk: number; note: number };
+  | { kind: "note"; file: number; hunk: number; note: number }
+  /** Unchanged code before hunk `hunk` (or after the last one), hidden behind a bar. */
+  | { kind: "more"; file: number; hunk: number; region: Region }
+  /** A line of that code once shown. `old` is its line on the old side. */
+  | { kind: "context"; file: number; hunk: number; line: ContextLine; old: number };
+
+/** New-side lines `from` to `to` that no hunk shows. `shift` takes a line to the old side. */
+export interface Region {
+  from: number;
+  to: number;
+  shift: number;
+}
+
+export const regionKey = (path: string, r: Region) => `${path}:${r.from}-${r.to}`;
+
+/** The unchanged code before each hunk and after the last, by the hunk it precedes. */
+export function regions(dto: FileDto): Map<number, Region> {
+  const out = new Map<number, Region>();
+  let next = 1;
+  let shift = 0;
+  dto.hunks.forEach((h, i) => {
+    if (h.newStart > next)
+      out.set(i, { from: next, to: h.newStart - 1, shift: h.oldStart - h.newStart });
+    next = h.newStart + h.newLines;
+    shift = h.oldStart + h.oldLines - next;
+  });
+  if (dto.hunks.length && dto.lineCount >= next)
+    out.set(dto.hunks.length, { from: next, to: dto.lineCount, shift });
+  return out;
+}
 
 /** The id of a comment being written that isn't saved yet. */
 export const NEW_COMMENT = 0;
@@ -72,6 +101,8 @@ export interface Layout {
   comments?: ReadonlyMap<string, number[]>;
   /** Walkthrough note ids, keyed the same way. */
   notes?: ReadonlyMap<string, number[]>;
+  /** Unchanged code clicked open, by `regionKey`. */
+  context?: ReadonlyMap<string, ContextLine[]>;
 }
 
 export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
@@ -94,8 +125,18 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
       out.push({ kind: "comment", file, hunk: -1, comment });
     for (const note of layout.notes?.get(fileSlot(file)) ?? [])
       out.push({ kind: "note", file, hunk: -1, note });
+    const hidden = filter === "all" ? regions(f.dto) : new Map<number, Region>();
+    const more = (hunk: number) => {
+      const region = hidden.get(hunk);
+      if (!region) return;
+      const lines = layout.context?.get(regionKey(f.dto.path, region));
+      if (!lines) return out.push({ kind: "more", file, hunk, region });
+      for (const line of lines)
+        out.push({ kind: "context", file, hunk, line, old: line.line + region.shift });
+    };
     let start = 0;
     f.dto.hunks.forEach((h, hunk) => {
+      more(hunk);
       const end = start + h.rows.length;
       const hunkStart = start;
       start = end;
@@ -143,6 +184,7 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
         }
       }
     });
+    more(f.dto.hunks.length);
   });
   return out;
 }

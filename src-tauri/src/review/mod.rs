@@ -8,6 +8,7 @@ mod cache;
 #[cfg(test)]
 mod comment_tests;
 mod comments;
+mod context;
 mod edits;
 mod github;
 #[cfg(test)]
@@ -48,6 +49,7 @@ use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
+pub use context::ContextLine;
 pub use github::PulledThread;
 pub use graph::GraphDto;
 use load::Loaded;

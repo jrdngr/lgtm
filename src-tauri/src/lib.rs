@@ -70,6 +70,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::workspaces::workspace_progress,
             commands::review::open_review,
             commands::review::close_review,
+            commands::review::context_lines,
             commands::review::refresh_review,
             commands::review::log_graph,
             commands::review::trunk_bookmark,

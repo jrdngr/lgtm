@@ -6,7 +6,8 @@ import "./syntax.css";
 
 const hlClass = HIGHLIGHT_NAMES.map((n) => `hl-${n.replace(".", "-")}`);
 
-function Code({ row }: { row: RowDto }) {
+/** A line's code with its highlighting. */
+export function Code({ row }: { row: Pick<RowDto, "text" | "hl"> }) {
   if (!row.hl) return <span className="code">{row.text}</span>;
   let pos = 0;
   return (

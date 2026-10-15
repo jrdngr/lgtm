@@ -52,6 +52,7 @@ export function file(path: string, hunks: RowDto[][], newSymbols: CodeSymbol[] =
       section: "",
       rows: r,
     })),
+    lineCount: 0,
     oldSymbols: [],
     newSymbols,
   };

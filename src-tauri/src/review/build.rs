@@ -49,6 +49,8 @@ pub struct FileDto {
     /// Matches a `skip` glob from the repo config.
     pub skipped: bool,
     pub hunks: Vec<HunkDto>,
+    /// How many lines the new side has, so the code after the last hunk can be shown.
+    pub line_count: u32,
     pub old_symbols: Vec<CodeSymbol>,
     pub new_symbols: Vec<CodeSymbol>,
 }
@@ -213,6 +215,7 @@ pub fn build_file(
         new_exec: d.new_exec,
         skipped: config.skips(&d.path),
         hunks,
+        line_count: new_text.as_deref().map_or(0, |t| t.lines().count() as u32),
         old_symbols: old.symbols.clone(),
         new_symbols: new.symbols.clone(),
     };

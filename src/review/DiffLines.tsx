@@ -2,12 +2,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { type ReactNode, type RefObject, useCallback, useEffect, useMemo } from "react";
 import { wordWrap } from "../workbench/wordWrap";
 import { Cell } from "./Cell";
+import { ContextRow, MoreBar } from "./ContextRows";
 import { FileHeader } from "./FileHeader";
 import type { MarkSetup } from "./marks";
 import {
   type DisplayLine,
   type FlatFile,
   hunkKey,
+  type Region,
   type SymbolMarkers,
   type ViewMode,
 } from "./model";
@@ -25,6 +27,8 @@ const HEIGHTS: Record<DisplayLine["kind"], number> = {
   hunk: ROW_HEIGHT,
   rows: ROW_HEIGHT,
   gap: 8,
+  more: ROW_HEIGHT,
+  context: ROW_HEIGHT,
   comment: 120,
   note: 80,
 };
@@ -43,6 +47,10 @@ function lineKey(line: DisplayLine): string {
       return `c:${line.comment}`;
     case "note":
       return `n:${line.note}`;
+    case "more":
+      return `m:${line.file}:${line.region.from}`;
+    case "context":
+      return `x:${line.file}:${line.line.line}`;
   }
 }
 
@@ -84,6 +92,7 @@ interface Props extends LineHandlers {
   onFileMenu(e: React.MouseEvent, file: number): void;
   renderComment(id: number): ReactNode;
   renderNote(id: number): ReactNode;
+  onShowContext(file: number, region: Region): void;
 }
 
 /** The header of the file at the top of the viewport, once its own header has scrolled
@@ -185,6 +194,11 @@ export function DiffLines(props: Props) {
     if (line.kind === "file") return header(line.file);
     if (line.kind === "comment") return props.renderComment(line.comment);
     if (line.kind === "note") return props.renderNote(line.note);
+    if (line.kind === "more")
+      return (
+        <MoreBar region={line.region} onShow={() => props.onShowContext(line.file, line.region)} />
+      );
+    if (line.kind === "context") return <ContextRow line={line.line} old={line.old} mode={mode} />;
     if (line.kind === "gap") {
       const n = line.rows.length;
       return (
@@ -297,7 +311,8 @@ export function DiffLines(props: Props) {
             // Comment and note blocks size to their content, as do rows when they wrap. Every
             // other line has a fixed height.
             const kind = lines[v.index].kind;
-            const sized = kind === "comment" || kind === "note" || (wrap && kind === "rows");
+            const code = kind === "rows" || kind === "context";
+            const sized = kind === "comment" || kind === "note" || (wrap && code);
             return (
               <div
                 key={v.key}
@@ -313,7 +328,7 @@ export function DiffLines(props: Props) {
                   transform: `translateY(${v.start}px)`,
                 }}
               >
-                {kind === "rows" ? (
+                {code ? (
                   render(lines[v.index], v.index)
                 ) : (
                   <div className="pin">{render(lines[v.index], v.index)}</div>

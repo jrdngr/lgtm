@@ -11,6 +11,8 @@ import {
   fileTargets,
   flatten,
   hunkKey,
+  regionKey,
+  regions,
   stepTarget,
   symbolMarkers,
 } from "./model";
@@ -229,5 +231,64 @@ describe("fileProgress", () => {
       done: 1,
       changed: 2,
     });
+  });
+});
+
+describe("hidden unchanged code", () => {
+  // Hunks at new lines 5-7 and 20-21 of a 30-line file, the second shifted by one removed line.
+  const dto = {
+    ...file("b.rs", []),
+    lineCount: 30,
+    hunks: [
+      {
+        oldStart: 5,
+        oldLines: 2,
+        newStart: 5,
+        newLines: 3,
+        section: "",
+        rows: rows([" a", "+b", " c"], 5, 5),
+      },
+      {
+        oldStart: 19,
+        oldLines: 2,
+        newStart: 20,
+        newLines: 2,
+        section: "",
+        rows: rows([" d", " e"], 19, 20),
+      },
+    ],
+  };
+  const b = flatten(review([dto]));
+
+  it("sits before each hunk and after the last, with the shift to old line numbers", () => {
+    expect([...regions(dto)]).toEqual([
+      [0, { from: 1, to: 4, shift: 0 }],
+      [1, { from: 8, to: 19, shift: -1 }],
+      [2, { from: 22, to: 30, shift: -1 }],
+    ]);
+  });
+
+  it("shows as a bar until opened, then as its lines, and not under a filter", () => {
+    const kinds = (l: ReturnType<typeof layout>) => buildLines(b, l).map((x) => x.kind);
+    expect(kinds(layout())).toEqual([
+      "file",
+      "more",
+      "hunk",
+      "rows",
+      "rows",
+      "rows",
+      "more",
+      "hunk",
+      "rows",
+      "rows",
+      "more",
+    ]);
+    const line = { line: 8, text: "x", hl: null };
+    const opened = buildLines(
+      b,
+      layout({ context: new Map([[regionKey("b.rs", { from: 8, to: 19, shift: -1 }), [line]]]) }),
+    );
+    expect(opened[6]).toEqual({ kind: "context", file: 0, hunk: 1, line, old: 7 });
+    expect(kinds(layout({ filter: "red" }))).not.toContain("more");
   });
 });

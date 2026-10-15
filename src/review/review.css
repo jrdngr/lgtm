@@ -254,3 +254,23 @@
 .diff-scroll.split .cell.right .code {
   text-indent: calc(-1 * var(--right-x, 0px));
 }
+
+.more-bar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 12px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background: rgb(79 140 201 / 8%);
+  cursor: pointer;
+}
+
+.more-bar:hover {
+  color: var(--fg);
+  background: rgb(79 140 201 / 18%);
+}
+
+.cell.shown-context {
+  cursor: default;
+}
