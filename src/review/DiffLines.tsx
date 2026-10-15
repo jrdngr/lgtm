@@ -5,16 +5,10 @@ import { Cell } from "./Cell";
 import { ContextRow, MoreBar } from "./ContextRows";
 import { FileHeader } from "./FileHeader";
 import type { MarkSetup } from "./marks";
-import {
-  type DisplayLine,
-  type FlatFile,
-  hunkKey,
-  type Region,
-  type SymbolMarkers,
-  type ViewMode,
-} from "./model";
+import { type DisplayLine, type FlatFile, hunkKey, type Region, type ViewMode } from "./model";
 import { SplitScroll } from "./SplitScroll";
 import type { Selection } from "./selection";
+import { useSelectionMatches } from "./selectionMatches";
 import { type MarkIndex, type Progress, plural } from "./state";
 import { useKeepFile } from "./useKeepFile";
 import { useKeepScroll } from "./useKeepScroll";
@@ -64,12 +58,10 @@ export interface LineHandlers {
   onToggleFile(file: number): void;
   onCheckFile(file: number, checked: boolean): void;
   onGapClick(file: number, hunk: number, firstRow: number): void;
-  onSymbolClick(line: number, file: number, row: number): void;
 }
 
 interface Props extends LineHandlers {
   files: FlatFile[];
-  markers: SymbolMarkers[];
   lines: DisplayLine[];
   mode: ViewMode;
   index: MarkIndex;
@@ -119,8 +111,9 @@ function stickyFile(
 }
 
 export function DiffLines(props: Props) {
-  const { files, markers, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
+  const { files, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
   const wrap = wordWrap.use();
+  useSelectionMatches(scrollRef);
   // Split sides scroll sideways on their own, under `SplitScroll`.
   const splitScroll = mode === "split" && !wrap;
   const width = useMemo(
@@ -233,15 +226,6 @@ export function DiffLines(props: Props) {
         </div>
       );
     }
-    const markerFor = (row: number | undefined) => {
-      const m = row === undefined ? undefined : markers[line.file].get(row);
-      return (
-        m && {
-          name: m.symbol.name,
-          onClick: () => props.onSymbolClick(i, line.file, row as number),
-        }
-      );
-    };
     const cells =
       mode === "unified" ? (
         <Cell
@@ -250,7 +234,6 @@ export function DiffLines(props: Props) {
           row={line.rows[0]}
           index={index}
           setup={props.setup}
-          marker={markerFor(line.rows[0])}
         />
       ) : (
         <>
@@ -261,7 +244,6 @@ export function DiffLines(props: Props) {
             index={index}
             setup={props.setup}
             side="left"
-            marker={markerFor(line.left)}
           />
           <Cell
             file={file}
@@ -270,7 +252,6 @@ export function DiffLines(props: Props) {
             index={index}
             setup={props.setup}
             side="right"
-            marker={line.right !== line.left ? markerFor(line.right) : undefined}
           />
         </>
       );

@@ -409,21 +409,3 @@ export function fileRange(lines: DisplayLine[], file: number): [number, number] 
   while (end + 1 < lines.length && lines[end + 1].kind !== "file") end++;
   return [start, end];
 }
-
-/** Flat row → the symbol whose ƒ marker sits on that row. */
-export type SymbolMarkers = Map<number, { symbol: CodeSymbol; side: "old" | "new" }>;
-
-/** ƒ markers: the first changed row of each changed symbol gets the innermost symbol. */
-export function symbolMarkers(file: FlatFile): SymbolMarkers {
-  const out: SymbolMarkers = new Map();
-  const seen = new Set<CodeSymbol>();
-  file.rows.forEach((row, r) => {
-    if (row.kind === "context") return;
-    const at = symbolSide(row);
-    if (!at) return;
-    const fresh = symbolsAt(file.dto, at.side, at.line).filter((s) => !seen.has(s));
-    for (const s of fresh) seen.add(s);
-    if (fresh.length > 0) out.set(r, { symbol: fresh[0], side: at.side });
-  });
-  return out;
-}

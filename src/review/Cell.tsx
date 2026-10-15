@@ -41,13 +41,12 @@ interface CellProps {
   row: number | undefined;
   index: MarkIndex;
   setup: MarkSetup;
-  marker?: { name: string; onClick: () => void };
   side?: "left" | "right";
 }
 
 /** One row's gutter and code, tinted by its mark. A checked file's unmarked rows show the
  * first mark color. Undefined `row` is an empty side. */
-export function Cell({ file, fileIdx, row, index, setup, marker, side }: CellProps) {
+export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
   if (row === undefined) return <div className="cell empty" />;
   const r = file.rows[row];
   const key = markKey(fileIdx, row);
@@ -69,17 +68,7 @@ export function Cell({ file, fileIdx, row, index, setup, marker, side }: CellPro
         title={hot ? `${hot.level}: ${hot.title}` : undefined}
       />
       <span className="strip" />
-      <span
-        className={`fn-marker${marker ? " on" : ""}`}
-        title={marker ? `select ${marker.name}` : undefined}
-        onMouseDown={(e) => {
-          if (!marker) return;
-          e.stopPropagation();
-          marker.onClick();
-        }}
-      >
-        {marker ? "ƒ" : ""}
-      </span>
+      <span className="flag" />
       {side ? (
         <span className="ln">{lineNo ?? ""}</span>
       ) : (

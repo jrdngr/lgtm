@@ -19,7 +19,7 @@ import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
 import { useMarkSetup } from "./marks";
-import { buildLines, changedRows, type DisplayLine, symbolMarkers, type ViewMode } from "./model";
+import { buildLines, changedRows, type DisplayLine, type ViewMode } from "./model";
 import { PrCommentsHead, prLines } from "./PrCommentsHead";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
@@ -85,7 +85,6 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     () => (amber ? index : { ...index, amber: new Set<string>() }),
     [amber, index],
   );
-  const markers = useMemo(() => files.map(symbolMarkers), [files]);
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
   const context = useContextLines(review, setError);
@@ -352,7 +351,6 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const handlers = useRowMouse({
     files,
     lines,
-    markers,
     s,
     rootRef,
     setMenu,
@@ -407,7 +405,6 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       {review && (
         <DiffLines
           files={files}
-          markers={markers}
           lines={lines}
           mode={mode}
           index={shown}

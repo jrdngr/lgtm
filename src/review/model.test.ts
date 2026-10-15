@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CheckState, MarkColor } from "../bindings";
-import { file, layout, review, rows, sym } from "./fixture.test-utils";
+import { file, layout, review, rows } from "./fixture.test-utils";
 import {
   buildLines,
   changedRows,
@@ -14,7 +14,6 @@ import {
   regionKey,
   regions,
   stepTarget,
-  symbolMarkers,
 } from "./model";
 import { fileProgress, indexState, rowStates } from "./state";
 
@@ -178,22 +177,6 @@ describe("change stepping", () => {
     expect(fileStops.map((t) => t.cursor)).toEqual([2, 12]);
     expect(stepTarget(fileStops, 5, 1)?.cursor).toBe(12);
     expect(stepTarget(fileStops, 5, -1)?.cursor).toBe(2);
-  });
-});
-
-describe("symbolMarkers", () => {
-  it("puts one marker on the first changed row of each changed symbol, innermost first", () => {
-    const f = flatten(
-      review([
-        file(
-          "a.rs",
-          [rows([" fn outer() {", "+  fn inner() {}", "+  x();", " }"])],
-          [sym("outer", 1, 4), sym("inner", 2, 2)],
-        ),
-      ]),
-    )[0];
-    const markers = symbolMarkers(f);
-    expect([...markers].map(([row, m]) => [row, m.symbol.name])).toEqual([[1, "inner"]]);
   });
 });
 

@@ -23,7 +23,7 @@ function Side({ ln, side, line }: { ln: number; side?: "left" | "right"; line: C
     <div className={`cell${side ? ` ${side}` : ""} kind-context shown-context`}>
       <span className="risk" />
       <span className="strip" />
-      <span className="fn-marker" />
+      <span className="flag" />
       <span className="ln">{ln}</span>
       <span className="sign" />
       <Code row={line} />
@@ -47,7 +47,7 @@ export function ContextRow({
         <div className="cell kind-context shown-context">
           <span className="risk" />
           <span className="strip" />
-          <span className="fn-marker" />
+          <span className="flag" />
           <span className="ln">{old}</span>
           <span className="ln">{line.line}</span>
           <span className="sign" />

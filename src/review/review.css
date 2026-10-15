@@ -170,15 +170,9 @@
   background: color-mix(in srgb, var(--m) 15%, transparent);
 }
 
-.fn-marker {
+.flag {
   flex: none;
   width: 14px;
-  text-align: center;
-  color: var(--accent);
-}
-
-.fn-marker.on {
-  cursor: pointer;
 }
 
 .cell .ln {
@@ -273,4 +267,8 @@
 
 .cell.shown-context {
   cursor: default;
+}
+
+::highlight(lgtm-match) {
+  background-color: var(--selection);
 }

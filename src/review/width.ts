@@ -2,7 +2,7 @@ import type { FlatFile } from "./model";
 
 const TAB = 4;
 /** Gutter pixels before the code in a unified row, and in each side of a split row, from
- * review.css: risk, strip, ƒ marker, line numbers and sign. */
+ * review.css: risk, strip, flag, line numbers and sign. */
 const GUTTER = { unified: 3 + 4 + 14 + 44 + 44 + 14, split: 3 + 4 + 14 + 44 + 14 };
 /** Characters that take two columns: East Asian wide and fullwidth forms, and emoji. */
 const WIDE =

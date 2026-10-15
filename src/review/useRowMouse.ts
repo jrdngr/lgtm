@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useRef } from "react";
 import type { LineHandlers } from "./DiffLines";
-import { type DisplayLine, type FlatFile, gapKey, type SymbolMarkers, symbolRange } from "./model";
+import { type DisplayLine, type FlatFile, gapKey } from "./model";
 import { fileSelection, hunkSelection, rangeSelection, units } from "./selection";
 import type { SelectionApi } from "./useSelection";
 
@@ -12,7 +12,6 @@ export function clearTextSelection() {
 interface Deps {
   files: FlatFile[];
   lines: DisplayLine[];
-  markers: SymbolMarkers[];
   s: SelectionApi;
   rootRef: RefObject<HTMLDivElement | null>;
   setMenu(at: { x: number; y: number }): void;
@@ -24,7 +23,7 @@ interface Deps {
 
 /** Mouse handlers for the diff's lines: click, drag, and multi-click to select. */
 export function useRowMouse(d: Deps): LineHandlers {
-  const { files, lines, markers, s, rootRef } = d;
+  const { files, lines, s, rootRef } = d;
   const { sel, select, place } = s;
   const dragging = useRef(false);
 
@@ -39,9 +38,11 @@ export function useRowMouse(d: Deps): LineHandlers {
   return {
     onRowMouseDown(e: React.MouseEvent, i: number) {
       if (e.button !== 0) return;
-      // Only code text is selectable. Gutters and double/triple clicks pick rows, not text.
+      // Only code text is selectable: a double-click there selects a word. Gutters, and
+      // double-clicks on them or triple clicks anywhere, pick rows.
       const inCode = e.target instanceof Element && e.target.closest(".code");
-      if (!inCode || e.detail >= 2) {
+      if (e.detail === 2 && inCode) return;
+      if (!inCode || e.detail >= 3) {
         e.preventDefault();
         clearTextSelection();
       }
@@ -82,15 +83,6 @@ export function useRowMouse(d: Deps): LineHandlers {
     onCheckFile: d.setChecked,
     onGapClick(file: number, hunk: number, firstRow: number) {
       d.reveal(gapKey(file, hunk, firstRow));
-    },
-    onSymbolClick(i: number, file: number, row: number) {
-      const marker = markers[file].get(row);
-      if (!marker) return;
-      const range = symbolRange(files, lines, file, marker.symbol, marker.side);
-      if (range) {
-        const label = `${marker.symbol.kind}: ${marker.symbol.name}`;
-        select({ start: range[0], end: range[1], level: "function", label }, i);
-      }
     },
   };
 }

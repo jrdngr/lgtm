@@ -105,7 +105,7 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 
 - There is always a selection. With nothing chosen it is the cursor row.
 - Units: line, range, function/class, hunk, file, whole review. Only changed rows are marked. Context rows in a selection are ignored, and the menu shows how many rows an action will touch.
-- Mouse: click selects a row, drag or shift-click selects a range, double-click selects the enclosing function, triple-click selects the hunk. Clicking a ƒ marker, hunk header, or file header selects that unit. ⌘A selects the whole review. Clicking empty space clears.
+- Mouse: click selects a row, drag or shift-click selects a range, double-click on code selects the word and on the gutter selects the enclosing function, triple-click selects the hunk. Clicking a hunk header, or file header selects that unit. ⌘A selects the whole review. Clicking empty space clears.
 - Keyboard: `j`/`k` move the cursor, `J`/`K` or `v` extend, `e` expands one level (line, function, hunk, file, review, skipping levels that don't apply) and `E` shrinks. The status bar shows the current level, e.g. "function: `get_user`". `Esc` clears.
 - In split view a selection covers both sides of its row pairs.
 - Functions come from tree-sitter (Section 6). A Python symbol includes its decorators. When the parse has errors in the range, `e` skips the function level.
@@ -206,7 +206,7 @@ Draft. Tree-sitter supplies everything that needs to know what the code is.
   - A symbol's range includes its leading decorators, attributes, and doc comments (Python decorators, Rust `#[...]`, TS decorators).
   - Nested symbols nest. `e` expands from the innermost symbol around the cursor to its parent before reaching hunk level.
   - When the range has a parse error, the function level is skipped (Section 5).
-- A ƒ marker in the gutter sits on the first changed row of each changed symbol. Clicking it selects that symbol.
+- Selected code text highlights its other matches across the review: case-sensitive, whole words for a one-word selection, single-line selections of 2 or more characters.
 - Hunk headers show the enclosing symbol name, like `git diff`'s function context.
 - The language's normalization class for anchoring (brace or indentation-sensitive, Section 5) is declared alongside its grammar.
 - Symbol data feeds navigation (Section 7): changed-symbol lists, jump to definition within the review, and the graph views.
