@@ -91,14 +91,37 @@ pub(super) fn build(root: &Path, edits: &[EditDto]) -> (Vec<Proposed>, Vec<Strin
     (out, problems)
 }
 
-/// Writes each proposed file whose text is still what the proposal started from. Others go
-/// stale.
+/// Settles a proposal after an agent edited the files itself: a file that already reads as
+/// proposed counts as applied, and one changed some other way drops out, since those edits
+/// replace it.
+pub(super) fn settle(root: &Path, proposal: &mut Vec<Proposed>) {
+    proposal.retain_mut(|p| {
+        if p.state != ProposedState::Proposed {
+            return true;
+        }
+        let Ok(text) = current(root, &p.path) else {
+            return true;
+        };
+        if text == p.after {
+            p.state = ProposedState::Applied;
+        }
+        text == p.before || text == p.after
+    });
+}
+
+/// Writes each proposed file whose text is still what the proposal started from, or counts it
+/// applied when it already reads as proposed. Others go stale.
 pub(super) fn write(root: &Path, proposal: &mut [Proposed]) -> anyhow::Result<()> {
     for p in proposal
         .iter_mut()
         .filter(|p| p.state == ProposedState::Proposed)
     {
-        if current(root, &p.path)? != p.before {
+        let text = current(root, &p.path)?;
+        if text == p.after {
+            p.state = ProposedState::Applied;
+            continue;
+        }
+        if text != p.before {
             p.state = ProposedState::Stale;
             continue;
         }
@@ -154,6 +177,27 @@ impl RepoCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_agent_edit_settles_the_proposal() {
+        // The agent made `a.rs` exactly as proposed, changed `b.rs` its own way, and left
+        // `c.rs` alone.
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for f in ["a.rs", "b.rs", "c.rs"] {
+            std::fs::write(root.join(f), "x\n").unwrap();
+        }
+        let (mut proposal, _) = build(
+            root,
+            &[edit("a.rs", "x", "A"), edit("b.rs", "x", "B"), edit("c.rs", "x", "C")],
+        );
+        std::fs::write(root.join("a.rs"), "A\n").unwrap();
+        std::fs::write(root.join("b.rs"), "other\n").unwrap();
+        settle(root, &mut proposal);
+        let got: Vec<_> = proposal.iter().map(|p| (p.path.as_str(), p.state)).collect();
+        use ProposedState::*;
+        assert_eq!(got, [("a.rs", Applied), ("c.rs", Proposed)]);
+    }
 
     fn edit(path: &str, old: &str, new: &str) -> EditDto {
         EditDto {
@@ -222,5 +266,10 @@ mod tests {
             std::fs::read_to_string(root.join("src/c.rs")).unwrap(),
             "c\n"
         );
+        // Written again, a file that reads as proposed counts as applied.
+        let (mut again, _) = build(root, &[edit("b.rs", "edited", "B")]);
+        std::fs::write(root.join("b.rs"), "B\n").unwrap();
+        write(root, &mut again).unwrap();
+        assert_eq!(again[0].state, Applied);
     }
 }

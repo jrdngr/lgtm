@@ -189,6 +189,11 @@ impl RepoCtx {
                             message = format!("{message}\n\n{p}");
                         }
                     }
+                    if let (true, Some(t)) = (ask.change, c.thread.as_mut()) {
+                        let was = t.proposal.clone();
+                        proposal::settle(&ws.root, &mut t.proposal);
+                        updated |= t.proposal != was;
+                    }
                     let replaced = c.body != before;
                     if replaced {
                         store.set_comment_body(cid, &c.body, super::now_ms())?;
