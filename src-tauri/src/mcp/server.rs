@@ -30,8 +30,9 @@ this terminal's workspace: read its state, comments, walkthrough, symbol graph a
 findings; add comments; write a walkthrough; submit your own review findings; and point the \
 review at \
 code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
-through decisions with the human, ask through lgtm's Q&A queue (qa_ask) instead of in the \
-chat, then read their decisions with qa_answers.";
+through decisions with the human, including whenever they say qq or ask for a qqueue \
+session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
+answer in lgtm and send their decisions back to this terminal.";
 
 type Out = Result<String, String>;
 
@@ -410,8 +411,9 @@ impl Lgtm {
         description = "Ask the human questions through lgtm's Q&A. They show one at a time in \
         the Q&A tab, in the qqueue format: context bullets, options with the recommended one \
         first, and why. A question with `auto` is answered with option 1 and skipped unless the \
-        human reopens it. Returns the session and the new questions' ids in the order given; \
-        read the decisions later with qa_answers."
+        human reopens it. The Q&A tab opens on the session. Returns the session and the new \
+        questions' ids in the order given. The human sends the decisions back to this terminal; \
+        qa_answers reads them too."
     )]
     async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
@@ -420,7 +422,20 @@ impl Lgtm {
             Some(id) => id,
             None => {
                 let title = p.title.unwrap_or_default();
-                ctx.create_qa(&ws, &title, vec![]).map_err(failed)?.id
+                let prompt = match p.brief {
+                    Some(b) => format!("{title}\n\n{b}"),
+                    None => title,
+                };
+                let id = ctx
+                    .create_qa(&ws, &prompt, p.read_first)
+                    .map_err(failed)?
+                    .id;
+                ctx.edit_qa(&ws, &id, |s| {
+                    s.from_terminal = true;
+                    Ok(())
+                })
+                .map_err(failed)?;
+                id
             }
         };
         let questions = p
@@ -454,11 +469,13 @@ impl Lgtm {
         QaChanged {
             workspace: self.hello.workspace.clone(),
             id: id.clone(),
+            show: true,
         }
         .emit_to(&self.app, &label)
         .ok();
         Ok(format!(
-            "Queued {} (in the order given) in session {id}. The human answers them in lgtm.",
+            "Queued {} (in the order given) in session {id}, now showing in lgtm's Q&A tab. \
+             Stop here: the human answers there and sends the decisions to this terminal.",
             ids.join(", ")
         ))
     }

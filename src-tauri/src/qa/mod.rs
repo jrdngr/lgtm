@@ -87,6 +87,9 @@ pub struct Session {
     /// The terminal it was sent to, when it was.
     #[serde(default)]
     pub sent: Option<String>,
+    /// A terminal agent asked its questions, and waits for the decisions.
+    #[serde(default)]
+    pub from_terminal: bool,
     /// Implemented: applied, or marked so after a send.
     #[serde(default)]
     pub archived: bool,
@@ -165,6 +168,7 @@ impl RepoCtx {
             plan: None,
             applied: None,
             sent: None,
+            from_terminal: false,
             archived: false,
             created: created as f64,
             agent: None,

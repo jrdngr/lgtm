@@ -98,4 +98,6 @@ pub struct ReviewStateChanged {
 pub struct QaChanged {
     pub workspace: Option<String>,
     pub id: String,
+    /// Bring the session forward in the Q&A tab.
+    pub show: bool,
 }

@@ -243,6 +243,14 @@ pub struct QaAsk {
     pub session: Option<String>,
     /// For a new session: what it's deciding, in a line.
     pub title: Option<String>,
+    /// For a new session: everything from this conversation that lgtm's agent can't look up
+    /// in the repo, since it updates the questions after each answer without seeing this
+    /// chat: the goal, what's settled and why, what was ruled out, and the human's
+    /// constraints. Leave out what the repo says.
+    pub brief: Option<String>,
+    /// For a new session: workspace paths lgtm's agent reads before it updates questions.
+    #[serde(default)]
+    pub read_first: Vec<String>,
     /// In the order to ask them.
     pub questions: Vec<QaQuestion>,
 }

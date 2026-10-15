@@ -125,6 +125,8 @@ export const decisionsText = (d: Session) =>
 /** What a terminal agent needs to write the result: the prompt, the decisions, the note and
  * the plan. */
 export function applyText(d: Session): string {
+  // A terminal agent asked these, and has the rest of the conversation.
+  if (d.fromTerminal) return answersText(d);
   const parts = [d.prompt.trim(), `Decisions:\n${decisionsText(d)}`];
   const deferred = d.queue.questions.filter((q) => q.state === "deferred");
   if (deferred.length)
@@ -139,6 +141,16 @@ export function applyText(d: Session): string {
     if (comments.length) parts.push(`My comments on the plan:\n${comments.join("\n")}`);
   }
   parts.push("Write the changes these decisions call for into this repo.");
+  return parts.join("\n\n");
+}
+
+/** The decisions on questions a terminal agent asked, for it to carry on with. */
+function answersText(d: Session): string {
+  const parts = [`My answers to "${d.title}":\n${decisionsText(d)}`];
+  const deferred = d.queue.questions.filter((q) => q.state === "deferred");
+  if (deferred.length)
+    parts.push(`Deferred: ${deferred.map((q) => `${q.id} (${q.text.subject})`).join(", ")}`);
+  if (d.note.trim()) parts.push(`Also: ${d.note.trim()}`);
   return parts.join("\n\n");
 }
 

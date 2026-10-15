@@ -1265,6 +1265,8 @@ export type QText_Serialize = {
 export type QaChanged = {
 	workspace: string | null,
 	id: string,
+	/**  Bring the session forward in the Q&A tab. */
+	show: boolean,
 };
 
 export type QaQuestion = QaQuestion_Serialize | QaQuestion_Deserialize;
@@ -1543,6 +1545,8 @@ export type Session_Deserialize = {
 	applied?: Applied | null,
 	/**  The terminal it was sent to, when it was. */
 	sent?: string | null,
+	/**  A terminal agent asked its questions, and waits for the decisions. */
+	fromTerminal?: boolean,
 	/**  Implemented: applied, or marked so after a send. */
 	archived?: boolean,
 	created: number | null,
@@ -1566,6 +1570,8 @@ export type Session_Serialize = {
 	applied: Applied | null,
 	/**  The terminal it was sent to, when it was. */
 	sent: string | null,
+	/**  A terminal agent asked its questions, and waits for the decisions. */
+	fromTerminal: boolean,
 	/**  Implemented: applied, or marked so after a send. */
 	archived: boolean,
 	created: number | null,

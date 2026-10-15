@@ -17,6 +17,7 @@ import { GraphPanel } from "../graph/GraphPanel";
 import { ShortcutsPanel } from "../help/ShortcutsPanel";
 import { commands, unwrap } from "../ipc";
 import { QaTab } from "../qa/QaTab";
+import { useAgentQa } from "../qa/useAgentQa";
 import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
@@ -75,6 +76,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   /** Unknown until the layout is restored. */
   const [hasPane, setHasPane] = useState<boolean>();
   useAgentShow(workspace);
+  useAgentQa(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
     gone.current = false;
