@@ -1,14 +1,12 @@
-import ReactMarkdown, { type Components } from "react-markdown";
+import ReactMarkdown from "react-markdown";
 import breaks from "remark-breaks";
+import { components, gfmPlugins } from "../editor/markdownParts";
 
-const plugins = [breaks];
+const plugins = [...gfmPlugins, breaks];
 
-/** Links show as text: following one would navigate the app's window away, and an agent could
- * put what it read into the URL. */
-const components: Components = { a: ({ children }) => <span>{children}</span> };
-
-/** Agent-written markdown. Line breaks are kept as written. Raw HTML isn't rendered and links
- * aren't followable, so an agent can't inject anything into the window. */
+/** Agent-written markdown with GitHub's extensions, Mermaid diagrams and highlighted code.
+ * Line breaks are kept as written. Raw HTML isn't rendered and links aren't followable, so an
+ * agent can't inject anything into the window or put what it read into a URL. */
 export function Markdown({ children }: { children: string }) {
   return (
     <ReactMarkdown remarkPlugins={plugins} components={components}>

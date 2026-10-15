@@ -234,6 +234,50 @@
   overflow-wrap: anywhere;
 }
 
+.msg-md {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.msg-md > :first-child {
+  margin-top: 0;
+}
+
+.msg-md > :last-child {
+  margin-bottom: 0;
+}
+
+.msg-md p,
+.msg-md ul,
+.msg-md ol {
+  margin: 4px 0;
+}
+
+.msg-md ul,
+.msg-md ol {
+  padding-left: 20px;
+}
+
+.msg-md code {
+  font: 11.5px var(--mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--hover);
+}
+
+.msg-md pre {
+  margin: 4px 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.msg-md pre code {
+  padding: 0;
+  background: none;
+}
+
 .comment-input,
 .ask-input {
   box-sizing: border-box;

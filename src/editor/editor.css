@@ -100,20 +100,6 @@
   color: var(--muted);
 }
 
-.markdown-view table {
-  border-collapse: collapse;
-}
-
-.markdown-view th,
-.markdown-view td {
-  border: 1px solid var(--border);
-  padding: 4px 8px;
-}
-
-.markdown-view .md-link {
-  color: var(--accent);
-}
-
 .editor-rendered {
   flex: 1;
   min-height: 0;
@@ -128,20 +114,6 @@
 
 .editor-host[hidden] {
   display: none;
-}
-
-.mermaid-diagram {
-  margin: 12px 0;
-  text-align: center;
-}
-
-.mermaid-diagram svg {
-  max-width: 100%;
-  height: auto;
-}
-
-.mermaid-error pre {
-  white-space: pre-wrap;
 }
 
 /* Blocks new or changed since the user last looked. */

@@ -1,4 +1,5 @@
 import type { Message } from "../bindings";
+import { Markdown } from "../bots/Markdown";
 import { Busy } from "../ui/Busy";
 import { replyParts } from "./comments";
 import type { Running } from "./useComments";
@@ -16,8 +17,8 @@ function AgentText({ text, body, onUse }: TextProps) {
       {replyParts(text).map((p, i) =>
         p.kind === "text" ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
-          <div key={i} className="msg-text">
-            {p.text}
+          <div key={i} className="msg-md">
+            <Markdown>{p.text}</Markdown>
           </div>
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: parts never reorder
