@@ -46,13 +46,13 @@ describe("fold", () => {
     fold(api, as(a));
     expect(a.constraints).toMatchObject({ minimumWidth: STRIP, maximumWidth: STRIP });
     expect(a.size.width).toBe(STRIP);
-    expect(a.element.classList.contains("folded")).toBe(true);
+    expect(a.element.classList.contains("group-folded")).toBe(true);
     expect(savedFolds(api)).toEqual({ a: { axis: "x", size: 420 } });
 
     unfold(api, as(a));
     expect(a.constraints.maximumWidth).toBe(Number.POSITIVE_INFINITY);
     expect(a.size.width).toBe(420);
-    expect(a.element.classList.contains("folded")).toBe(false);
+    expect(a.element.classList.contains("group-folded")).toBe(false);
     expect(foldOf(api, as(a))).toBeUndefined();
   });
 

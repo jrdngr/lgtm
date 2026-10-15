@@ -1,5 +1,5 @@
 /* A collapsed group shows only its strip. */
-.folded > :not(.fold-strip) {
+.group-folded > :not(.fold-strip) {
   display: none !important;
 }
 

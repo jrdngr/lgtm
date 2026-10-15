@@ -63,8 +63,8 @@ function pin(group: DockviewGroupPanel, axis: Fold["axis"], size: number | undef
       : { minimumHeight: min, maximumHeight: max },
   );
   if (size !== undefined) group.api.setSize(axis === "x" ? { width: size } : { height: size });
-  group.element.classList.toggle("folded", size !== undefined);
-  group.element.classList.toggle("folded-y", size !== undefined && axis === "y");
+  group.element.classList.toggle("group-folded", size !== undefined);
+  group.element.classList.toggle("group-folded-y", size !== undefined && axis === "y");
 }
 
 /** Shrinks `group` to a strip, keeping its tabs. */
