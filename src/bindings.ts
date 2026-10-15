@@ -194,6 +194,16 @@ export const commands = {
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
 	/**  Makes an empty file, or a folder when `dir`. */
 	createPath: (workspace: string | null, path: string, dir: boolean) => typedError<null, string>(__TAURI_INVOKE("create_path", { workspace, path, dir })),
+	/**
+	 *  Writes dropped files, over files already there when `replace`, then snapshots. Returns the
+	 *  paths that were taken and left alone.
+	 */
+	addFiles: (workspace: string | null, files: DroppedFile[], replace: boolean) => typedError<string[], string>(__TAURI_INVOKE("add_files", { workspace, files, replace })),
+	/**
+	 *  Drags workspace paths out of the window, as files for Finder and other apps. Returns once
+	 *  the drag ends.
+	 */
+	dragOut: (workspace: string | null, paths: string[]) => typedError<null, string>(__TAURI_INVOKE("drag_out", { workspace, paths })),
 	/**  Renames or moves a file or folder, then snapshots so reviews of `@` pick it up. */
 	renamePath: (workspace: string | null, from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { workspace, from, to })),
 	/**  Moves a file or folder to the Trash, then snapshots. */
@@ -672,6 +682,12 @@ export type DiscussionDto = {
 	pendingReview: boolean,
 	/**  The login `gh` is signed in as. */
 	viewer: string,
+};
+
+/**  A file dropped into the workspace: where it goes and its contents as base64. */
+export type DroppedFile = {
+	path: string,
+	data: string,
 };
 
 /**

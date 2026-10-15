@@ -20,3 +20,15 @@
   padding-right: 4px;
   font: 600 var(--fs-xs) var(--mono);
 }
+
+.file-tree {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.file-tree.drop-target,
+.file-tree .drop-target {
+  background: var(--selection);
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}

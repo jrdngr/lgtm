@@ -90,6 +90,20 @@ export function rename(ws: WorkspaceName, path: string, made: (p: string) => voi
   );
 }
 
+/** Moves `path` into folder `dir`, keeping its name. A file's open editor follows it. */
+export function moveInto(ws: WorkspaceName, path: string, dir: string, made: (p: string) => void) {
+  const to = dir ? `${dir}/${baseName(path)}` : baseName(path);
+  if (to === path || dir === path || dir.startsWith(`${path}/`)) return;
+  run(
+    (async () => {
+      if (!(await noUnsaved(ws, path, "move it"))) return;
+      await unwrap(commands.renamePath(ws, path, to));
+      made(to);
+      if (closeEditors(ws, path)) openFile(ws, to);
+    })(),
+  );
+}
+
 /** Moves `path` to the Trash after asking. */
 export function trash(ws: WorkspaceName, path: string, done: () => void) {
   run(

@@ -127,6 +127,19 @@ pub fn contain(root: &Path, path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Writes `bytes` to a new file, or over a file when `replace`. Returns false, writing
+/// nothing, when something is there and it can't replace it.
+pub fn put(path: &Path, name: &str, bytes: &[u8], replace: bool) -> anyhow::Result<bool> {
+    if path.is_dir() || (path.exists() && !replace) {
+        return Ok(false);
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("can't create {name}"))?;
+    }
+    std::fs::write(path, bytes).with_context(|| format!("can't write {name}"))?;
+    Ok(true)
+}
+
 /// Makes an empty file, or a folder when `dir`, failing when something is already there.
 pub fn create(path: &Path, name: &str, dir: bool) -> anyhow::Result<()> {
     if path.exists() {
@@ -157,6 +170,18 @@ pub fn rename(from: &Path, to: &Path, to_name: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn put_replaces_a_file_only_when_asked_and_never_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("new/a.png");
+        assert!(put(&file, "a.png", b"one", false).unwrap());
+        assert!(!put(&file, "a.png", b"two", false).unwrap());
+        assert_eq!(std::fs::read(&file).unwrap(), b"one");
+        assert!(put(&file, "a.png", b"two", true).unwrap());
+        assert_eq!(std::fs::read(&file).unwrap(), b"two");
+        assert!(!put(dir.path(), "new", b"x", true).unwrap());
+    }
 
     #[test]
     fn lists_directories_first_without_ignored_files_or_jj() {

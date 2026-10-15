@@ -102,6 +102,92 @@ pub(crate) async fn create_path(
     files::create(&confined(&ws, &path)?, &path, dir).map_err(err)
 }
 
+/// A file dropped into the workspace: where it goes and its contents as base64.
+#[derive(serde::Deserialize, specta::Type)]
+pub(crate) struct DroppedFile {
+    path: String,
+    data: String,
+}
+
+/// Writes dropped files, over files already there when `replace`, then snapshots. Returns the
+/// paths that were taken and left alone.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn add_files(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    files: Vec<DroppedFile>,
+    replace: bool,
+) -> CmdResult<Vec<String>> {
+    use base64::Engine as _;
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let mut taken = vec![];
+    for f in files {
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(&f.data)
+            .map_err(|e| format!("can't read {}: {e}", f.path))?;
+        if !files::put(&confined(&ws, &f.path)?, &f.path, &bytes, replace).map_err(err)? {
+            taken.push(f.path);
+        }
+    }
+    ws.snapshot().await.map_err(err)?;
+    Ok(taken)
+}
+
+/// Drags workspace paths out of the window, as files for Finder and other apps. Returns once
+/// the drag ends.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn drag_out(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    paths: Vec<String>,
+) -> CmdResult<()> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let files = paths
+        .iter()
+        .map(|p| confined(&ws, p))
+        .collect::<CmdResult<Vec<_>>>()?;
+    let (done, ended) = tokio::sync::oneshot::channel();
+    start_drag(window, files, done)?;
+    ended.await.ok();
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn start_drag(
+    window: WebviewWindow,
+    files: Vec<PathBuf>,
+    done: tokio::sync::oneshot::Sender<()>,
+) -> CmdResult<()> {
+    let icon = include_bytes!("../../icons/32x32.png").to_vec();
+    let done = std::sync::Mutex::new(Some(done));
+    let w = window.clone();
+    window
+        .run_on_main_thread(move || {
+            let item = drag::DragItem::Files(files);
+            let image = drag::Image::Raw(icon);
+            let ended = move |_, _| {
+                if let Some(done) = done.lock().unwrap().take() {
+                    done.send(()).ok();
+                }
+            };
+            if let Err(e) = drag::start_drag(&w, item, image, ended, Default::default()) {
+                eprintln!("lgtm: drag out: {e}");
+            }
+        })
+        .map_err(err)
+}
+
+#[cfg(not(target_os = "macos"))]
+fn start_drag(
+    _: WebviewWindow,
+    _: Vec<PathBuf>,
+    _: tokio::sync::oneshot::Sender<()>,
+) -> CmdResult<()> {
+    Err("dragging files out needs macOS".into())
+}
+
 /// Renames or moves a file or folder, then snapshots so reviews of `@` pick it up.
 #[tauri::command]
 #[specta::specta]

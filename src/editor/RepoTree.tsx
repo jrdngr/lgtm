@@ -13,6 +13,7 @@ import { type Decor, decorate, decorLetter } from "./decor";
 import { openFile } from "./open";
 import { onRevealInFiles } from "./reveal";
 import { create, foldersOf, openToSide, rename, trash } from "./treeActions";
+import { useTreeDrag } from "./useTreeDrag";
 import "../review/FilesPanel.css";
 import "./tree.css";
 
@@ -66,6 +67,8 @@ interface DirProps {
   /** How the current review changes files and folders, by path. */
   decor: ReturnType<typeof decorate>;
   menu(entry: FileEntry): CtxEntry[];
+  /** The folder files dragged over the tree would land in. */
+  dropDir?: string;
 }
 
 /** A name colored by how the review changes it, with the change's letter or, for a folder,
@@ -80,7 +83,7 @@ function Name({ name, decor, dir }: { name: string; decor?: Decor; dir?: boolean
   );
 }
 
-function Dir({ dir, depth, listings, open, onToggle, decor, menu }: DirProps) {
+function Dir({ dir, depth, listings, open, onToggle, decor, menu, dropDir }: DirProps) {
   const listing = listings.get(dir);
   const pad = { paddingLeft: indent(depth) };
   const workspace = useWorkspace();
@@ -105,8 +108,9 @@ function Dir({ dir, depth, listings, open, onToggle, decor, menu }: DirProps) {
               <button
                 type="button"
                 style={pad}
-                className="dir"
+                className={`dir${dropDir === e.path ? " drop-target" : ""}`}
                 data-path={e.path}
+                data-dir
                 onClick={() => onToggle(e.path)}
                 onContextMenu={contextMenu(() => menu(e))}
               >
@@ -117,7 +121,7 @@ function Dir({ dir, depth, listings, open, onToggle, decor, menu }: DirProps) {
                 <Dir
                   dir={e.path}
                   depth={depth + 1}
-                  {...{ listings, open, onToggle, decor, menu }}
+                  {...{ listings, open, onToggle, decor, menu, dropDir }}
                 />
               )}
             </>
@@ -176,6 +180,7 @@ export function RepoTree() {
     setOpen((o) => new Set([...o, ...foldersOf(path)]));
     reload();
   };
+  const { dropDir, dragProps } = useTreeDrag(workspace, madeAt);
   const menu = (e: FileEntry): CtxEntry[] => {
     const p = e.path;
     const edits: CtxEntry[] = [
@@ -212,7 +217,11 @@ export function RepoTree() {
   return (
     <div className="side-split">
       <SectionHeader title="Files" />
-      <div className="side-split-body file-tree" ref={body}>
+      <div
+        className={`side-split-body file-tree${dropDir === "" ? " drop-target" : ""}`}
+        ref={body}
+        {...dragProps}
+      >
         <Dir
           dir=""
           depth={0}
@@ -221,6 +230,7 @@ export function RepoTree() {
           onToggle={(d) => setOpen(toggled(open, d))}
           decor={decor}
           menu={menu}
+          dropDir={dropDir}
         />
       </div>
       {picker}

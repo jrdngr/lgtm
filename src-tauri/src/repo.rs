@@ -176,7 +176,8 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         .title(name(&root))
         .inner_size(1400.0, 900.0)
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
-        .disable_drag_drop_handler();
+        .disable_drag_drop_handler()
+        .on_navigation(stays_in_app);
     let window = crate::placement::place(app, &label, builder)
         .build()
         .map_err(|e| e.to_string())?;
@@ -191,13 +192,27 @@ fn close_start(app: &AppHandle) {
     }
 }
 
+/// Whether the webview may go to `url`: only the app's own pages, so a dropped file or a
+/// link never replaces the app.
+fn stays_in_app(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "tauri" => true,
+        "http" | "https" => matches!(
+            url.host_str(),
+            Some("localhost" | "tauri.localhost" | "127.0.0.1")
+        ),
+        _ => false,
+    }
+}
+
 pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(START_LABEL) {
         return window.set_focus();
     }
     let builder = WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
         .title("lgtm")
-        .inner_size(480.0, 420.0);
+        .inner_size(480.0, 420.0)
+        .on_navigation(stays_in_app);
     crate::placement::place(app, START_LABEL, builder)
         .build()
         .map(|window| crate::zoom::apply(&window))
@@ -218,6 +233,15 @@ pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_webview_stays_on_the_apps_own_pages() {
+        let ok = |u: &str| stays_in_app(&tauri::Url::parse(u).unwrap());
+        assert!(ok("tauri://localhost/index.html"));
+        assert!(ok("http://localhost:1420/"));
+        assert!(!ok("file:///Users/j/diagram.png"));
+        assert!(!ok("https://github.com/o/r"));
+    }
 
     #[test]
     fn find_root_walks_up_to_nearest_jj_dir() {
