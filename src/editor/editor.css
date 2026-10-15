@@ -58,9 +58,12 @@
   min-height: 0;
   overflow: auto;
   padding: 8px 24px 24px;
-  max-width: 860px;
   line-height: 1.6;
   user-select: text;
+}
+
+.markdown-view > * {
+  max-width: 860px;
 }
 
 .markdown-view h1,
