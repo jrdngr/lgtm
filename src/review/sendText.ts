@@ -9,7 +9,14 @@ export function selectionText(
   end: number,
 ): string {
   return picked(lines, start, end)
-    .flatMap(([file, rows]) => hunks(files[file], rows).map((group) => where(files[file], group)))
+    .map(([file, rows]) => rowsRefs(files[file], rows))
+    .join("\n");
+}
+
+/** Where file-flat `rows` of one file are, one `path:range` line per hunk. */
+export function rowsRefs(f: FlatFile, rows: number[]): string {
+  return hunks(f, rows)
+    .map((group) => where(f, group))
     .join("\n");
 }
 
@@ -78,21 +85,6 @@ export function selectedRowText(
 export function rowsText(f: FlatFile, rows: number[]): string {
   return hunks(f, rows)
     .map((group) => block(f, group))
-    .join("\n\n");
-}
-
-/** Like `rowsText`, with each row's line number before its sign: the old side's for a
- * removal, the new side's otherwise. */
-export function numberedRowsText(f: FlatFile, rows: number[]): string {
-  return hunks(f, rows)
-    .map((group) => {
-      const nums = group.map((r) => String(f.rows[r].newLine ?? f.rows[r].oldLine ?? ""));
-      const width = Math.max(...nums.map((n) => n.length));
-      const body = group
-        .map((r, i) => `${nums[i].padStart(width)} ${SIGN[f.rows[r].kind]}${f.rows[r].text}`)
-        .join("\n");
-      return `${location(f, group)}\n\`\`\`\n${body}\n\`\`\``;
-    })
     .join("\n\n");
 }
 

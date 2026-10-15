@@ -9,7 +9,7 @@ import {
   NEW_COMMENT,
 } from "./model";
 import { quotedReply } from "./prComments";
-import { numberedRowsText } from "./sendText";
+import { rowsRefs } from "./sendText";
 import { unified } from "./snippet";
 
 /** A comment being written on a selection, before it's saved. */
@@ -96,8 +96,8 @@ export function commentNear(lines: DisplayLine[], cursor: number): number | unde
   return undefined;
 }
 
-/** The comment's code with line numbers, as it is now or as it was if it's gone, then the
- * comment and its conversation with an agent. A comment on the PR comes with its posts
+/** Where the comment's code is, or the code as it was if it's gone, then the comment and its
+ * conversation with an agent. A comment on the PR comes with its posts
  * instead, and a quote with what it quotes. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
   const quote = c.thread?.quote;
@@ -110,7 +110,7 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
   const span = c.rows;
   const code =
     f && span
-      ? numberedRowsText(
+      ? rowsRefs(
           f,
           Array.from({ length: span.end - span.start + 1 }, (_, i) => span.start + i),
         )

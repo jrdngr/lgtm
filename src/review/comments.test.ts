@@ -3,6 +3,7 @@ import type { CommentDto, Message } from "../bindings";
 import {
   commentNear,
   commentSlots,
+  commentText,
   conversationText,
   draftFor,
   followDraft,
@@ -104,5 +105,23 @@ describe("conversationText", () => {
 
   it("is empty without messages", () => {
     expect(conversationText([])).toBe("");
+  });
+});
+
+describe("commentText", () => {
+  it("sends where the code is, then the comment and its conversation", () => {
+    const c = {
+      path: "a.rs",
+      file: 0,
+      rows: { start: 1, end: 2 },
+      body: "Rename this",
+      snippet: "",
+      messages: [{ author: "user", text: "Why?" }],
+      github: null,
+      thread: null,
+    } as unknown as CommentDto;
+    expect(commentText(files, c)).toBe(
+      "a.rs:2, and removed old line 2\n\nRename this\n\nOur conversation about it:\n\nMe:\nWhy?",
+    );
   });
 });

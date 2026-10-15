@@ -47,14 +47,6 @@ function pathAndLine(v: EditorView, path: string): string {
   return `${path}:${a === b ? a : `${a}-${b}`}`;
 }
 
-/** The selection under its `path:line` or `path:start-end`, or just the cursor's `path:line`
- * when nothing is selected. */
-export function locatedSelection(v: EditorView, path: string): string {
-  const where = pathAndLine(v, path);
-  const text = selected(v);
-  return text ? `${where}\n\`\`\`\n${text}\n\`\`\`` : where;
-}
-
 /** The right-click menu of an editor tab's text. */
 export function editorMenu(d: Deps): CtxEntry[] {
   const { view: v, path } = d;
@@ -85,7 +77,7 @@ export function editorMenu(d: Deps): CtxEntry[] {
     { label: "Paste", keys: "⌘V", onSelect: after(() => paste(v)) },
     { label: "Select All", keys: "⌘A", onSelect: after(() => selectAll(v)) },
     "-",
-    { label: "Send to Terminal", onSelect: () => d.sendText(locatedSelection(v, path)) },
+    { label: "Send to Terminal", onSelect: () => d.sendText(pathAndLine(v, path)) },
     { label: "Ask Agent", onSelect: () => d.askAgent(false) },
     { label: "Change with Agent", onSelect: () => d.askAgent(true) },
     "-",
