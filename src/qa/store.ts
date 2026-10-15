@@ -29,6 +29,8 @@ export interface QaState {
   fresh: boolean;
   /** The step the tab shows; the session's own step when unset. */
   view?: Step;
+  /** A question to show next time Questions opens. */
+  jump?: string;
   busy: Record<string, Busy>;
   /** Text the agent is writing, by `id:about`, until its run ends. */
   streams: Record<string, string>;
@@ -83,6 +85,14 @@ export const startFresh = (ws: WorkspaceName) =>
   set(ws, (s) => ({ ...s, fresh: true, view: undefined, error: undefined }));
 
 export const setView = (ws: WorkspaceName, view: Step) => set(ws, (s) => ({ ...s, view }));
+
+/** Opens Questions on question `id`. */
+export const showQuestion = (ws: WorkspaceName, id: string) =>
+  set(ws, (s) => ({ ...s, view: "questions", jump: id }));
+
+/** Questions took the question it was asked to show. */
+export const clearJump = (ws: WorkspaceName) =>
+  set(ws, (s) => (s.jump ? { ...s, jump: undefined } : s));
 
 /** Puts a session the backend returned in place of the old one. */
 export function applySession(ws: WorkspaceName, d: Session) {

@@ -28,7 +28,7 @@ import {
 } from "./model";
 import { QuestionCard } from "./QuestionCard";
 import { Rail } from "./Rail";
-import { act, type Busy, runStep, setError, setView } from "./store";
+import { act, type Busy, clearJump, runStep, setError, setView } from "./store";
 
 const isEditable = (t: EventTarget) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
@@ -40,13 +40,15 @@ interface Props {
   streams: Record<string, string>;
   /** Moves keyboard focus into the view. */
   focusKey: number;
+  /** A question to show, picked on Apply. */
+  jump?: string;
 }
 
 /** The session's questions, one at a time in the qqueue template. The first open one is
  * answered; the rest, auto answers among them, can be looked at with [ ]. Number keys pick an
  * option, ↵ decides it, and the agent then updates the questions that depend on it. */
-export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
-  const [want, setWant] = useState<string>();
+export function QuestionsView({ ws, d, busy, streams, focusKey, jump }: Props) {
+  const [want, setWant] = useState(jump);
   const [sel, setSel] = useState(0);
   const [mode, setMode] = useState<Mode>();
   const [note, setNote] = useState("");
@@ -101,6 +103,12 @@ export function QuestionsView({ ws, d, busy, streams, focusKey }: Props) {
     if (done && !wasDone.current) setView(ws, "apply");
     wasDone.current = done;
   }, [done, ws]);
+
+  useEffect(() => {
+    if (!jump) return;
+    setWant(jump);
+    clearJump(ws);
+  }, [jump, ws]);
 
   const focusRoot = () => rootRef.current?.focus({ preventScroll: true });
   useEffect(() => {

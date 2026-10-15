@@ -21,35 +21,94 @@
 
 .qa-steps {
   display: flex;
-  gap: 4px;
+  align-items: center;
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--fs-xs);
-  color: var(--faint);
+  font-size: var(--fs-sm);
+  font-weight: 600;
 }
 
-.qa-steps li + li::before {
-  content: "›";
-  margin-right: 4px;
-  color: var(--faint);
+.qa-step.s-prompt {
+  --step: var(--mark-violet);
 }
 
-.qa-steps button {
+.qa-step.s-questions {
+  --step: var(--accent);
+}
+
+.qa-step.s-apply {
+  --step: var(--added);
+}
+
+.qa-step button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 0;
   font: inherit;
-  color: inherit;
+  color: color-mix(in srgb, var(--step) 60%, var(--faint));
   border: none;
   background: none;
 }
 
-.qa-steps li.done {
-  color: var(--muted);
+.qa-step button:disabled {
+  opacity: 1;
 }
 
-.qa-steps li.current {
-  color: var(--accent);
-  font-weight: 600;
+.qa-dot {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  color: var(--step);
+  border: 2px solid var(--step);
+  border-radius: 50%;
+}
+
+.qa-step.done .qa-dot,
+.qa-step.reached .qa-dot {
+  background: color-mix(in srgb, var(--step) 25%, transparent);
+}
+
+.qa-step.current button,
+.qa-step.reached button {
+  color: var(--step);
+}
+
+.qa-step.current .qa-dot {
+  color: var(--bg);
+  background: var(--step);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--step) 25%, transparent);
+}
+
+.qa-step.todo {
+  opacity: 0.5;
+}
+
+.qa-step.todo .qa-dot {
+  border-style: dashed;
+}
+
+.qa-step:not(.current) button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.qa-step-line {
+  width: 28px;
+  height: 2px;
+  margin: 0 8px;
+  background: var(--border);
+}
+
+.qa-step-line.to-questions.on {
+  background: linear-gradient(90deg, var(--mark-violet), var(--accent));
+}
+
+.qa-step-line.to-apply.on {
+  background: linear-gradient(90deg, var(--accent), var(--added));
 }
 
 .qa-busy {

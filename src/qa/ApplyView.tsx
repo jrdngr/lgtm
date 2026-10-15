@@ -7,7 +7,7 @@ import type { WorkspaceName } from "../workspaces/context";
 import { apply, edit, writePlan } from "./actions";
 import { answerLabel, applyText, isAuto, openQuestions, type Session } from "./model";
 import { PlanView } from "./PlanView";
-import type { Busy } from "./store";
+import { type Busy, showQuestion } from "./store";
 
 interface Props {
   ws: WorkspaceName;
@@ -72,14 +72,17 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
             <ul className="qa-decisions">
               {decided.map((q) => (
                 <li key={q.id}>
-                  <code>{q.id}</code>
-                  <span>
-                    {q.text.subject}{" "}
-                    <span className="qa-answer">
-                      · <Inline>{answerLabel(q)}</Inline>
+                  <button type="button" onClick={() => showQuestion(ws, q.id)}>
+                    <code>{q.id}</code>
+                    <span>
+                      <span className="qa-subject">{q.text.subject}</span>{" "}
+                      <span className="qa-answer">
+                        · <Inline>{answerLabel(q)}</Inline>
+                      </span>
                     </span>
-                  </span>
-                  {isAuto(q) ? <span className="pill auto">auto</span> : <span />}
+                    {isAuto(q) ? <span className="pill auto">auto</span> : <span />}
+                    <span className="qa-go">›</span>
+                  </button>
                 </li>
               ))}
             </ul>

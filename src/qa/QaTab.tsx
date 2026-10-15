@@ -1,5 +1,5 @@
 import type { IDockviewPanelProps } from "dockview-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { commands } from "../ipc";
 import { useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
@@ -27,28 +27,25 @@ import "./qa.css";
 import "./auto.css";
 import "./forms.css";
 
-/** Where the session is, each step marked done, current or to come. Steps up to the
- * session's own can be gone back to. */
+/** Where the session is, each step done, current, reached or to come, joined by a line
+ * that fills between reached steps. Steps up to the session's own can be gone back to. */
 function Stepper({ d, view }: { d?: Session; view: Step }) {
   const ws = useWorkspace();
   const at = d ? STEPS.indexOf(step(d)) : 0;
+  const state = (s: Step, i: number) =>
+    s === view ? "current" : i < at ? "done" : i === at ? "reached" : "todo";
   return (
     <ol className="qa-steps">
       {STEPS.map((s, i) => (
-        <li
-          key={s}
-          className={[i < at && "done", s === view && "current"].filter(Boolean).join(" ")}
-        >
-          <button
-            type="button"
-            className="quiet"
-            disabled={!d || i > at}
-            onClick={() => setView(ws, s)}
-          >
-            {i < at ? "✓ " : ""}
-            {STEP_NAMES[s]}
-          </button>
-        </li>
+        <Fragment key={s}>
+          {i > 0 && <li aria-hidden className={`qa-step-line to-${s}${i <= at ? " on" : ""}`} />}
+          <li className={`qa-step s-${s} ${state(s, i)}`}>
+            <button type="button" disabled={!d || i > at} onClick={() => setView(ws, s)}>
+              <span className="qa-dot">{state(s, i) === "done" ? "✓" : i + 1}</span>
+              {STEP_NAMES[s]}
+            </button>
+          </li>
+        </Fragment>
       ))}
     </ol>
   );
@@ -164,6 +161,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
             busy={busy}
             streams={state.streams}
             focusKey={focusKey}
+            jump={state.jump}
           />
         )}
         {d && view === "apply" && (

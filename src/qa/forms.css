@@ -161,14 +161,38 @@
   list-style: none;
 }
 
-.qa-decisions li {
+.qa-decisions button {
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 34px 1fr auto 10px;
   gap: 10px;
   align-items: baseline;
+  width: 100%;
   padding: 6px 10px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   background: var(--panel);
+  border: none;
   border-radius: 6px;
+  cursor: pointer;
+}
+
+.qa-decisions button:hover {
+  background: var(--raise);
+}
+
+.qa-decisions button:hover .qa-subject {
+  text-decoration: underline;
+  text-decoration-color: var(--faint);
+}
+
+.qa-go {
+  color: transparent;
+}
+
+.qa-decisions button:hover .qa-go,
+.qa-decisions button:focus-visible .qa-go {
+  color: var(--muted);
 }
 
 .qq .qa-decisions code {
