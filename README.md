@@ -10,6 +10,36 @@ You're not welcome to file pull requests. I already spend too much time reading 
 
 This program may or may not be safe to run. Use it at your own risk.
 
+## Screenshots
+
+**Mark reviewed lines with customizable colored labels**
+
+![Mark reviewed lines with customizable colored labels](docs/screenshots/01-review-marks-notes.png)
+
+**jj stuff**
+
+![jj stuff](docs/screenshots/03-revisions-list.png)
+
+**Explain this PR**
+
+![Explain this PR](docs/screenshots/07-walkthrough.png)
+
+**Persona-based agentic code review**
+
+![Persona-based agentic code review](docs/screenshots/10-reviewers-report.png)
+
+**Structured Q&A**
+
+![Structured Q&A](docs/screenshots/13-qa-question.png)
+
+**Ask your agent to help you reply to PR comments about code you didn't write**
+
+![Ask your agent to help you reply to PR comments about code you didn't write](docs/screenshots/18-pr-thread-agent.png)
+
+**jj workspaces with their own terminals and layout**
+
+![jj workspaces with their own terminals and layout](docs/screenshots/20-terminals.png)
+
 ## Requirements
 
 - [jj](https://github.com/jj-vcs/jj) 0.46 or newer: `brew install jj`
