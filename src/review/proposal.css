@@ -62,7 +62,10 @@
   color: var(--error);
 }
 
+/* One column as wide as the longest line, so line backgrounds span it when scrolled. */
 .pd-body {
+  display: grid;
+  grid-template-columns: minmax(100%, max-content);
   overflow-x: auto;
   font: 12px / 19px var(--mono);
 }

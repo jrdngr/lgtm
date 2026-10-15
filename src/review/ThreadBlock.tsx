@@ -3,7 +3,7 @@ import type { CommentDto } from "../bindings";
 import { GhThread } from "../github/GhThread";
 import { viewerLogin } from "../github/people";
 import { useTriaging } from "../threads/useThreadRun";
-import { Icon, IconButton } from "../ui/icons";
+import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
 import { ApplyDialog } from "./ApplyDialog";
@@ -158,10 +158,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         {gh && (
           <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
         )}
-        <button type="button" className="card-send" onClick={() => c.send(comment)}>
-          <Icon name="send" size={13} />
-          Send to terminal
-        </button>
+        <IconButton icon="terminal" label="Send to terminal" onClick={() => c.send(comment)} />
       </div>
       {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
       {gh && (

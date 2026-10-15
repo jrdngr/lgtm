@@ -514,14 +514,6 @@ button.group-head.fold:hover {
   font-weight: 500;
 }
 
-.card-send {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 1px 8px;
-  font-size: var(--fs-sm);
-}
-
 .comment-block .stage-strip {
   display: inline-flex;
   margin: 0;
