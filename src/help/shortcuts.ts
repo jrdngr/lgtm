@@ -65,7 +65,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["c"], action: "Write a note on the selection" },
       { keys: ["C"], action: "Draft a GitHub comment (PR workspaces)" },
       { keys: ["a"], action: "Ask the agent about the note or thread at the cursor" },
-      { keys: [">"], action: "Send the selection to the last terminal" },
+      { keys: ["⌘>"], action: "Send the selection to the last terminal" },
       { keys: ["o"], action: "Open the file at the cursor in an editor" },
       { keys: ["x"], action: "Check or uncheck the file" },
       { keys: ["za"], action: "Collapse or expand the hunk or file" },

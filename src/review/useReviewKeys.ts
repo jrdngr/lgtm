@@ -75,7 +75,10 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
     if (mod) {
       const key = e.key.toLowerCase();
       if (key === "a") select(reviewSelection(lines));
-      else if (key === "z") ctx.step(!e.shiftKey);
+      else if (e.key === ">" || e.key === ".") {
+        if (!e.shiftKey) return;
+        ctx.sendToTerminal();
+      } else if (key === "z") ctx.step(!e.shiftKey);
       else if (key === "c") {
         // Selected code text copies natively; otherwise copy the selected rows.
         if (window.getSelection()?.isCollapsed === false) return;
@@ -168,9 +171,6 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "n":
       case "N":
         ctx.stepNote(e.key === "n" ? 1 : -1);
-        break;
-      case ">":
-        ctx.sendToTerminal();
         break;
       case "x": {
         const file = lines[cursor]?.file;
