@@ -81,9 +81,9 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: ["j", "k"], action: "Move" },
       { keys: ["J", "K"], action: "Extend a range" },
-      { keys: ["↵"], action: "Review the selection" },
+      { keys: ["↵", "e"], action: "Edit the commit" },
+      { keys: ["r"], action: "Review the selection" },
       { keys: ["/"], action: "Type a revset" },
-      { keys: ["e"], action: "Edit the commit" },
       { keys: ["n", "N"], action: "New commit after / before it" },
       { keys: ["s"], action: "Squash into its parent" },
       { keys: ["u", "U"], action: "Undo / redo the last of these" },

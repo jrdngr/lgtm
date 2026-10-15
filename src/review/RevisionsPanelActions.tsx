@@ -29,8 +29,8 @@ export function RevisionsPanelActions({ onReview, onKey }: Props) {
   );
   return (
     <span className="log-actions">
-      {button("Review", "Review it (↵)", onReview)}
-      {button("Edit", "Edit it (e)", () => onKey("e"))}
+      {button("Review", "Review it (r)", onReview)}
+      {button("Edit", "Edit it (↵)", () => onKey("e"))}
       <span className="log-new">
         {button("New ▾", "New commit after or before it", () => setNewOpen(!newOpen))}
         {newOpen && (

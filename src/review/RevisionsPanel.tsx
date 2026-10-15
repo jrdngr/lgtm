@@ -203,6 +203,9 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         case "Enter":
           // A focused button keeps its own Enter.
           if (e.target instanceof HTMLButtonElement) return;
+          runKey("e");
+          break;
+        case "r":
           reviewPicked();
           break;
         case "Escape":
