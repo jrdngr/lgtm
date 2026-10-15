@@ -248,6 +248,7 @@ impl Review {
     pub(super) fn agent_comments(&self) -> Vec<AgentComment> {
         self.comments
             .iter()
+            .filter(|c| c.thread.is_none())
             .map(|c| AgentComment {
                 id: c.id,
                 path: c.path.clone(),

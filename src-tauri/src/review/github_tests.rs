@@ -133,6 +133,8 @@ async fn a_thread_on_a_line_the_working_copy_edited_lands_on_its_replacement() {
     let c = &state.comments[0];
     let span = c.rows.expect("the thread is placed");
     assert_eq!(row_text(&review, c.file, span.end), "    three();");
+    // A terminal agent finds it among the threads, not the notes.
+    assert!(ctx.review(review.id).unwrap().lock().unwrap().agent_comments().is_empty());
 }
 
 #[tokio::test]

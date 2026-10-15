@@ -111,8 +111,9 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "The review's comments, with their lines, author and any \
-        conversation. Comments whose code is gone have no lines."
+        description = "The human's own notes on the review, which stay in lgtm, with their \
+        lines, author and any conversation. Notes whose code is gone have no lines. GitHub \
+        review comments are threads: see list_threads."
     )]
     async fn list_comments(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
@@ -133,7 +134,7 @@ impl Lgtm {
         Ok("Added the comment.".into())
     }
 
-    #[tool(description = "Reply to a comment. The reply joins the comment's conversation.")]
+    #[tool(description = "Reply to a note. The reply joins the note's conversation.")]
     async fn reply_to_comment(&self, Parameters(p): Parameters<inputs::Reply>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
@@ -144,8 +145,8 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "In a PR workspace, the PR's GitHub threads: where each is, its posts, \
-        its stage (new, decide, toFix, reply, ready, done), the take on it, and the reply \
+        description = "The PR's GitHub review comments and conversation, as threads: where \
+        each is, its posts, its stage (new, decide, toFix, reply, ready, done), the take on it, and the reply \
         drafted. Nothing here is posted until the human sends it."
     )]
     async fn list_threads(&self) -> Out {
