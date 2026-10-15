@@ -141,7 +141,7 @@ function BotRow({ run, workspace, onError, clear }: BotRowProps) {
   return (
     <li className="runs-row" onContextMenu={menu}>
       <span className={`runs-dot runs-dot-${outcome}`} title={outcome} />
-      <span className="runs-kind">Reviewers</span>
+      <span className="runs-kind">Reports</span>
       <span className="runs-subject">{run.revset}</span>
       <span className="runs-detail">{runDetail(run)}</span>
       <span className="runs-side">

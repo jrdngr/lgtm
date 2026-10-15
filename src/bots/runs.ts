@@ -29,7 +29,7 @@ function stateOf(active: boolean, statuses: ActivityState[]): ActivityState {
 /** Tells the workspace's activity how the review and each of its fixes stand. */
 function reportRun(run: BotRun) {
   const parts = run.parts.map((p) => p.status);
-  report(run.workspace, `bot:${run.id}`, stateOf(!!run.active, parts), "Reviewers");
+  report(run.workspace, `bot:${run.id}`, stateOf(!!run.active, parts), "Reports");
   for (const [i, f] of (run.fixes ?? []).entries()) {
     report(run.workspace, `bot:${run.id}:fix:${i}`, f.status, "Fix findings");
   }

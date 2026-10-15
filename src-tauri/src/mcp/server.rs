@@ -289,7 +289,7 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "Findings from the latest Reviewers run in this workspace: the \
+        description = "Findings from the latest report in this workspace: the \
         synthesis when there is one, otherwise each reviewer's own. Each has a state: open, or \
         fixed or dismissed by the human, which are settled and to be left alone."
     )]
@@ -297,7 +297,7 @@ impl Lgtm {
         let (_, ctx) = self.repo().map_err(failed)?;
         let runs = ctx.bot_runs(self.workspace()).map_err(failed)?;
         let Some(run) = runs.first() else {
-            return Ok("No Reviewers runs in this workspace.".into());
+            return Ok("No reports in this workspace.".into());
         };
         let outputs = run.parts.iter().filter_map(|p| p.output.as_ref());
         let synthesis = outputs.clone().find_map(|o| match o {
@@ -323,7 +323,7 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "Submit your own review of the open change as a Reviewers run, so \
+        description = "Submit your own review of the open change as a report, so \
         the human sees your findings as cards they can comment on, send to an agent, or fix. \
         Rate severity by real impact: critical (exploitable or loses data in normal use), high \
         (a core flow is broken), medium (a real bug off the main path), low (hygiene), info."

@@ -42,7 +42,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧M"], action: "Notes" },
       { keys: ["⌘⇧P"], action: "PR (workspaces with a PR)" },
       { keys: ["⌘⇧H"], action: "Walkthrough" },
-      { keys: ["⌘⇧O"], action: "Reviewers" },
+      { keys: ["⌘⇧O"], action: "Reports" },
       { keys: ["⌘⇧I"], action: "Q&A" },
       { keys: ["⌘J"], action: "Revisions list" },
       { keys: ["⇧⌘N"], action: "New workspace" },

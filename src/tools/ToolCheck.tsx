@@ -6,7 +6,7 @@ import "./tools.css";
 import { Busy } from "../ui/Busy";
 
 const NEEDED_BY: Record<string, string> = {
-  claude: "Reviewers and comment agents",
+  claude: "Reports and comment agents",
   gh: "GitHub PRs",
 };
 

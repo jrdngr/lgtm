@@ -61,7 +61,7 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
         },
         {
           id: "reviewers",
-          title: "Reviewers",
+          title: "Reports",
           icon: "users",
           badge: runs.filter((r) => r.active).length,
           render: () => <BotsPanel onOpen={onOpenReport} />,

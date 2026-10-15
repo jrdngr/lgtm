@@ -32,6 +32,8 @@ export function restoreLayout(
     try {
       api.fromJSON(saved);
       dropStalePanels(api);
+      // Report tabs saved under their old name.
+      for (const p of api.panels) if (p.title === "Reviewers") p.api.setTitle("Report");
       if (api.panels.length > 0) return;
     } catch (e) {
       console.warn("discarding unreadable layout", e);

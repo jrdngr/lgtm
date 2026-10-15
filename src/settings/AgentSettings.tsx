@@ -9,7 +9,7 @@ import { saveSettings } from "./store";
 const MODELS: [keyof Models, string, string][] = [
   ["ask", "Ask and Change", "Notes' agent chats, Fix headless, and conflict resolution"],
   ["walkthrough", "Walkthrough", "Writing the walkthrough"],
-  ["reviewers", "Reviewers", "Persona reviews and their reports"],
+  ["reviewers", "Reports", "Persona reviews and their reports"],
   ["replies", "Replies", "Triage and replies on PR threads"],
   ["qa", "Q&A", "Questions, plans and Apply in Q&A sessions"],
 ];

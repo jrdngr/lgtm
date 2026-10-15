@@ -11,7 +11,7 @@ function savedSub(key: string): unknown {
 const MOVED: Record<string, string> = { files: "changes", bots: "reviewers", design: "qa" };
 
 /** The right panel view for a view id saved by any build. Older builds nested Files and
- * Symbols under "diff", and Walkthrough and Reviewers under "reports", each remembering the
+ * Symbols under "diff", and Walkthrough and Reports under "reports", each remembering the
  * one it showed. */
 export function movedView(view: string, saved: (key: string) => unknown = savedSub): string {
   if (view === "diff") return saved("lgtm:side:diff") === "symbols" ? "symbols" : "changes";

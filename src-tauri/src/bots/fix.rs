@@ -51,7 +51,7 @@ pub(super) fn fix_key(run: u32, fix: usize) -> String {
 
 impl BotRun {
     /// Whether finding `id` is "fixed" by a finished fix, "dismissed", or "open", as the
-    /// Reviewers tab settles it.
+    /// Report tab settles it.
     pub fn finding_state(&self, id: &str) -> &'static str {
         let fixed = self
             .fixes

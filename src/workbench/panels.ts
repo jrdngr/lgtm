@@ -10,7 +10,7 @@ export type PanelKind = "review" | "terminal" | "report" | "graph" | "runs" | "q
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
-  report: "Reviewers",
+  report: "Report",
   graph: "Graph",
   runs: "Agent runs",
   qa: "Q&A",

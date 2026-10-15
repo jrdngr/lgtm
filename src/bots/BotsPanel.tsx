@@ -71,7 +71,7 @@ export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
 
   return (
     <div className="side-split">
-      <SectionHeader title="Reviewers">
+      <SectionHeader title="Reports">
         <IconButton icon="plus" label="New persona" onClick={() => setAdding(true)} />
         <Menu
           items={[{ label: "Install default personas…", onSelect: () => setInstalling(true) }]}
