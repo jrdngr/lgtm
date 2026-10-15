@@ -120,6 +120,8 @@ pub struct Task<'a> {
     pub prompt: &'a str,
     /// The session to continue.
     pub resume: Option<&'a str>,
+    /// Continue a copy of `resume` instead, leaving it as it was.
+    pub fork: bool,
     /// Whether it may edit files in `cwd`.
     pub edit: bool,
     /// A JSON schema the reply must match.
@@ -170,6 +172,7 @@ pub async fn run_registered(
     command
         .args(claude::args(
             task.resume,
+            task.fork,
             task.edit,
             task.schema,
             model.as_deref(),
@@ -297,6 +300,7 @@ mod tests {
             cwd: dir.path(),
             prompt,
             resume,
+            fork: false,
             edit: true,
             schema: None,
             purpose: Purpose::Ask,

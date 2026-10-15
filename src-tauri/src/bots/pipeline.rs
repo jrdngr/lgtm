@@ -282,6 +282,7 @@ impl RepoCtx {
                         cwd: &ws.root,
                         prompt: &prompt,
                         resume: resume.as_deref(),
+                        fork: false,
                         edit: false,
                         schema: Some(schema),
                         purpose: agent::Purpose::Reviewers,

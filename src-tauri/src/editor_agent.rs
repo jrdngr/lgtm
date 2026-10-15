@@ -74,6 +74,7 @@ pub async fn ask(
         cwd: &ws.root,
         prompt,
         resume,
+        fork: false,
         edit: ask.change,
         schema: None,
         purpose: agent::Purpose::Ask,

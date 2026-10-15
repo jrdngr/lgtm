@@ -79,6 +79,7 @@ impl RepoCtx {
             cwd: &ws.root,
             prompt: &prompt,
             resume: None,
+            fork: false,
             edit: false,
             schema: Some(SCHEMA),
             purpose: agent::Purpose::Walkthrough,

@@ -13,6 +13,7 @@ const PROTECTED: &str = "Edit(**/.claude/**),Edit(**/.mcp.json),Edit(**/CLAUDE.m
 /// checkout's `.claude/settings.json` (a PR author's, say) could otherwise run hooks.
 pub fn args<'a>(
     resume: Option<&'a str>,
+    fork: bool,
     edit: bool,
     schema: Option<&'a str>,
     model: Option<&'a str>,
@@ -46,6 +47,9 @@ pub fn args<'a>(
     }
     if let Some(id) = resume {
         args.extend(["--resume", id]);
+        if fork {
+            args.push("--fork-session");
+        }
     }
     if let Some(schema) = schema {
         args.extend(["--json-schema", schema]);
@@ -149,6 +153,15 @@ fn tool_summary(block: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_fork_continues_a_copy_of_the_session_it_resumes() {
+        let resumed = args(Some("s1"), true, false, None, None);
+        let at = resumed.iter().position(|a| *a == "--resume").unwrap();
+        assert_eq!(resumed[at + 1..at + 3], ["s1", "--fork-session"]);
+        assert!(!args(None, true, false, None, None).contains(&"--fork-session"));
+        assert!(!args(Some("s1"), false, false, None, None).contains(&"--fork-session"));
+    }
 
     #[test]
     fn parses_deltas_and_the_result() {

@@ -292,6 +292,7 @@ mod tests {
             cwd: dir.path(),
             prompt: "",
             resume: None,
+            fork: false,
             edit: false,
             schema: None,
             purpose: crate::agent::Purpose::Ask,

@@ -90,6 +90,9 @@ pub struct Session {
     /// A terminal agent asked its questions, and waits for the decisions.
     #[serde(default)]
     pub from_terminal: bool,
+    /// That terminal agent's Claude Code session, which the agent here starts from a copy of.
+    #[serde(default)]
+    pub fork_from: Option<String>,
     /// Implemented: applied, or marked so after a send.
     #[serde(default)]
     pub archived: bool,
@@ -169,6 +172,7 @@ impl RepoCtx {
             applied: None,
             sent: None,
             from_terminal: false,
+            fork_from: None,
             archived: false,
             created: created as f64,
             agent: None,

@@ -1547,6 +1547,8 @@ export type Session_Deserialize = {
 	sent?: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal?: boolean,
+	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
+	forkFrom?: string | null,
 	/**  Implemented: applied, or marked so after a send. */
 	archived?: boolean,
 	created: number | null,
@@ -1572,6 +1574,8 @@ export type Session_Serialize = {
 	sent: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal: boolean,
+	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
+	forkFrom: string | null,
 	/**  Implemented: applied, or marked so after a send. */
 	archived: boolean,
 	created: number | null,

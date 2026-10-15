@@ -50,6 +50,7 @@ function session(over: Partial<Session> = {}): Session {
     applied: null,
     sent: null,
     fromTerminal: false,
+    forkFrom: null,
     archived: false,
     created: 1,
     agent: null,

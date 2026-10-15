@@ -359,22 +359,31 @@ impl RepoCtx {
             cwd: &ws.root,
             prompt,
             resume: None,
+            fork: false,
             edit: step.edit,
             schema: step.schema.as_deref(),
             purpose: agent::Purpose::Qa,
         };
+        // Until it has a conversation of its own, the agent on a terminal agent's questions
+        // starts from a copy of that agent's conversation, so it knows what was said there.
+        let fork = session
+            .is_none()
+            .then_some(s.fork_from.as_deref())
+            .flatten();
+        let resume = session.as_deref().or(fork);
         let mut reply = agent::run(
             runs,
             &key,
             agent::Task {
-                resume: session.as_deref(),
+                resume,
+                fork: fork.is_some(),
                 ..task(&prompt)
             },
             &on,
         )
         .await;
         // A session Claude Code no longer has starts over with the intro.
-        if session.is_some() && reply.as_ref().err().is_some_and(agent::session_missing) {
+        if resume.is_some() && reply.as_ref().err().is_some_and(agent::session_missing) {
             let prompt = first()?;
             reply = agent::run(runs, &key, task(&prompt), &on).await;
         }

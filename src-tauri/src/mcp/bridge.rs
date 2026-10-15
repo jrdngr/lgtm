@@ -38,6 +38,7 @@ async fn run() -> anyhow::Result<()> {
     let hello = Hello {
         root,
         workspace: var("LGTM_WORKSPACE"),
+        claude_session: var("CLAUDE_CODE_SESSION_ID"),
     };
     stream
         .write_all(format!("{}\n", serde_json::to_string(&hello)?).as_bytes())

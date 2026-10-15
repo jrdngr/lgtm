@@ -27,6 +27,9 @@ struct Hello {
     root: String,
     /// The workspace, absent for the main one (`LGTM_WORKSPACE`).
     workspace: Option<String>,
+    /// The Claude Code session that started the bridge (`CLAUDE_CODE_SESSION_ID`).
+    #[serde(default)]
+    claude_session: Option<String>,
 }
 
 /// Starts serving agents on `path`, replacing a socket left by an earlier run.

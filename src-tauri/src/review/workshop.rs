@@ -126,6 +126,7 @@ impl RepoCtx {
             cwd: &ws.root,
             prompt,
             resume,
+            fork: false,
             edit: ask.change,
             schema: schema.as_deref(),
             purpose: match thread {
