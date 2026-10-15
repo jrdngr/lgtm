@@ -120,13 +120,61 @@ fn parse_near(out: &str) -> Vec<NearBookmark> {
         .collect()
 }
 
+/// Each remote ref of the bookmarks listed: name, remote and commit id.
+const PUSHED_TEMPLATE: &str = r#"if(remote && remote != "git" && normal_target, name ++ "\x1f" ++ remote ++ "\x1f" ++ normal_target.commit_id() ++ "\n")"#;
+
+/// Local bookmarks on the stack with no remote ref there: rewriting a pushed commit leaves
+/// its remote ref on the old commit, off the stack when nothing on the stack is below it.
+fn unplaced_locals(near: &[NearBookmark]) -> Vec<&str> {
+    let mut names: Vec<&str> = Vec::new();
+    for b in near.iter().filter(|b| b.remote.is_empty()) {
+        if !near
+            .iter()
+            .any(|r| !r.remote.is_empty() && r.name == b.name)
+            && !names.contains(&b.name.as_str())
+        {
+            names.push(&b.name);
+        }
+    }
+    names
+}
+
+/// Remote refs from `jj bookmark list` lines, after the stack's bookmarks. They're placed by
+/// their local bookmark, so where their old commit is doesn't matter.
+fn parse_pushed(out: &str) -> Vec<NearBookmark> {
+    out.lines()
+        .filter_map(|line| {
+            let mut f = line.splitn(3, '\x1f');
+            let (name, remote, commit) = (f.next()?, f.next()?, f.next()?);
+            Some(NearBookmark {
+                name: name.to_string(),
+                remote: remote.to_string(),
+                distance: u32::MAX,
+                side: StackSide::Beside,
+                change: String::new(),
+                commit: commit.to_string(),
+            })
+        })
+        .collect()
+}
+
 impl Jj {
-    /// Remote bookmarks on `@`'s stack, nearest first.
+    /// Bookmarks on `@`'s stack, nearest first, with the remote refs of its local ones.
     pub async fn bookmarks_near(&self) -> anyhow::Result<Vec<NearBookmark>> {
         let out = self
             .read(&["log", "--no-graph", "-r", STACK, "-T", TEMPLATE])
             .await?;
-        Ok(parse_near(&out))
+        let mut near = parse_near(&out);
+        let patterns: Vec<String> = unplaced_locals(&near)
+            .into_iter()
+            .map(|n| format!("exact:{n}"))
+            .collect();
+        if !patterns.is_empty() {
+            let mut args = vec!["bookmark", "list", "--all-remotes", "-T", PUSHED_TEMPLATE];
+            args.extend(patterns.iter().map(String::as_str));
+            near.extend(parse_pushed(&self.read(&args).await?));
+        }
+        Ok(near)
     }
 }
 
@@ -242,6 +290,24 @@ mod tests {
         assert_eq!(
             names(&got),
             [("three", 1), ("four", 2), ("one", 3), ("five", 3)]
+        );
+
+        // Editing a pushed commit right on trunk leaves its remote ref on the old commit,
+        // off the stack. It's found through the local bookmark that followed the edit.
+        jj(d, &["new", "main"]);
+        write(d, "solo", "solo");
+        jj(d, &["commit", "-m", "solo"]);
+        jj(d, &["bookmark", "create", "solo", "-r", "@-"]);
+        push("solo");
+        jj(d, &["edit", "solo"]);
+        write(d, "solo", "edited");
+        jj(d, &["util", "snapshot"]);
+        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
+        assert_eq!(
+            got.iter()
+                .map(|b| (b.name.as_str(), b.remote.as_str()))
+                .collect::<Vec<_>>(),
+            [("solo", "origin")]
         );
 
         // At trunk, other branches aren't near.
