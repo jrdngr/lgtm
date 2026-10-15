@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { openMenu } from "../ui/contextMenu";
 import { useWorkspace } from "../workspaces/context";
+import { Fold } from "./FoldStrip";
 import { addToGroup, KINDS, kindTitle, splitGroup } from "./panels";
 import { stripMenu } from "./tabMenu";
 import "../review/MarkMenu.css";
@@ -112,6 +113,7 @@ export function SplitButtons({ containerApi, group }: IDockviewHeaderActionsProp
       >
         <SplitIcon stacked />
       </button>
+      <Fold containerApi={containerApi} group={group} />
     </div>
   );
 }

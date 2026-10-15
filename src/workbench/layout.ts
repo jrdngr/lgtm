@@ -1,10 +1,13 @@
 import type { DockviewApi, SerializedDockview } from "dockview-react";
+import type { Fold } from "./fold";
 import { dropStalePanels } from "./panels";
 
 /** A workspace's saved docks. The bottom one is left out while it has no panels. */
 export interface SavedLayout {
   main?: SerializedDockview;
   bottom?: SerializedDockview;
+  /** Each dock's collapsed groups, by group id. */
+  folds?: { main?: Record<string, Fold>; bottom?: Record<string, Fold> };
 }
 
 /** Reads a saved layout. Layouts from earlier builds are the main dock's alone. */

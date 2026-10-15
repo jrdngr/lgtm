@@ -28,6 +28,7 @@ import { trackClosed } from "./closedTabs";
 import { isMoving, takeTabsFrom } from "./crossDock";
 import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
+import { savedFolds, trackFolds } from "./fold";
 import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
 import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "./panels";
@@ -110,6 +111,10 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
       const layout: SavedLayout = {
         main: main ? main.toJSON() : saved.main,
         bottom: below ? (below.panels.length ? below.toJSON() : undefined) : saved.bottom,
+        folds: {
+          main: main ? savedFolds(main) : saved.folds?.main,
+          bottom: below ? savedFolds(below) : saved.folds?.bottom,
+        },
       };
       commands.saveLayout(workspace, JSON.stringify(layout));
     }, 500);
@@ -120,6 +125,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     const saved = await load();
     if (latest.current.main !== api) return;
     restoreLayout(api, saved.main, () => defaultLayout(api));
+    trackFolds(api, saved.folds?.main);
     const panes = () => setHasPane(api.panels.some(isReviewPanel));
     panes();
     api.onDidAddPanel(panes);
@@ -135,6 +141,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     const saved = await load();
     if (latest.current.bottom !== api) return;
     restoreLayout(api, saved.bottom);
+    trackFolds(api, saved.folds?.bottom);
     // A new repo opens the panel on a terminal and a new workspace hides it, with a terminal
     // ready in it. An open panel never comes up empty.
     const fresh = !saved.main && !saved.bottom;

@@ -1,0 +1,49 @@
+/* A collapsed group shows only its strip. */
+.folded > :not(.fold-strip) {
+  display: none !important;
+}
+
+.fold-strip {
+  display: flex;
+  gap: 2px;
+  height: 100%;
+  overflow: hidden;
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.fold-strip.x {
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.fold-strip.y {
+  align-items: center;
+  padding: 0 8px;
+}
+
+.fold-strip button {
+  flex: none;
+  padding: 8px 0;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  border-radius: 4px;
+}
+
+.fold-strip.x button {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.fold-strip.y button {
+  padding: 2px 8px;
+}
+
+.fold-strip button:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover);
+}
