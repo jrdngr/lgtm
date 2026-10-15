@@ -1,5 +1,6 @@
 //! Tool parameters, with the JSON schemas agents see.
 
+use crate::qa::queue::Choice;
 use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 
@@ -209,6 +210,19 @@ pub struct QaChoice {
     pub risks: Vec<String>,
 }
 
+impl From<QaChoice> for Choice {
+    fn from(o: QaChoice) -> Self {
+        Choice {
+            label: o.label,
+            means: o.means,
+            pros: o.pros,
+            cons: o.cons,
+            risks: o.risks,
+            bullets: vec![],
+        }
+    }
+}
+
 #[derive(Deserialize, JsonSchema)]
 pub struct QaQuestion {
     /// A subquestion of the top-level question before it.
@@ -253,4 +267,21 @@ pub struct QaAsk {
     pub read_first: Vec<String>,
     /// In the order to ask them.
     pub questions: Vec<QaQuestion>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct QaRewrite {
+    /// The session, from list_qa or qa_ask.
+    pub session: String,
+    /// The question's id, like Q3.
+    pub id: String,
+    /// What changed, in a few words.
+    pub what: String,
+    pub subject: String,
+    /// Only the facts that change the answer, one per bullet.
+    pub context: Vec<String>,
+    /// The recommended option first, always.
+    pub options: Vec<QaChoice>,
+    /// Why option 1 is recommended, in a line or two.
+    pub why: String,
 }

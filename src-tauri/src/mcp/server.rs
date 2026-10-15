@@ -17,7 +17,7 @@ use tauri_specta::Event as _;
 use super::{Hello, inputs};
 use crate::bots::output::Output;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, QaChanged, ReviewStateChanged};
-use crate::qa::queue::{Choice, NewQuestion, QState};
+use crate::qa::queue::{Choice, NewQuestion, QState, Rewrite};
 use crate::qa::text::answer_text;
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
@@ -32,7 +32,8 @@ review at \
 code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
-answer in lgtm and send their decisions back to this terminal.";
+answer in lgtm and send their decisions back to this terminal. When they talk a queued \
+question over here instead and that changes it, rewrite it there with qa_rewrite.";
 
 type Out = Result<String, String>;
 
@@ -446,18 +447,7 @@ impl Lgtm {
                 sub: q.sub,
                 subject: q.subject,
                 context: q.context,
-                options: q
-                    .options
-                    .into_iter()
-                    .map(|o| Choice {
-                        label: o.label,
-                        means: o.means,
-                        pros: o.pros,
-                        cons: o.cons,
-                        risks: o.risks,
-                        bullets: vec![],
-                    })
-                    .collect(),
+                options: q.options.into_iter().map(Choice::from).collect(),
                 why: q.why,
                 sources: q.sources,
                 depends: q.depends,
@@ -479,6 +469,35 @@ impl Lgtm {
              Stop here: the human answers there and sends the decisions to this terminal.",
             ids.join(", ")
         ))
+    }
+
+    #[tool(
+        description = "Rewrite a queued question when talking it over in this terminal changes \
+        its context, options or recommendation. lgtm's Q&A tab shows the new version; a \
+        decided question opens again, with what it said before."
+    )]
+    async fn qa_rewrite(&self, Parameters(p): Parameters<inputs::QaRewrite>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let r = Rewrite {
+            id: p.id.clone(),
+            what: p.what,
+            subject: p.subject,
+            context: p.context,
+            options: p.options.into_iter().map(Choice::from).collect(),
+            why: p.why,
+            auto: None,
+        };
+        ctx.edit_qa(&ws, &p.session, |s| s.queue.reask(r))
+            .map_err(failed)?;
+        QaChanged {
+            workspace: self.hello.workspace.clone(),
+            id: p.session,
+            show: true,
+        }
+        .emit_to(&self.app, &label)
+        .ok();
+        Ok(format!("Rewrote {}; lgtm's Q&A tab shows it.", p.id))
     }
 
     #[tool(description = "The decisions on a Q&A session's questions so far, in ask order.")]
