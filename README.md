@@ -52,6 +52,8 @@ To build it you also need Rust, Node 22, pnpm, [just](https://github.com/casey/j
 
 ## Install
 
+Download the .dmg from [Releases](https://github.com/jrdngr/lgtm/releases) and drag lgtm to Applications. Or build it:
+
 ```sh
 git clone https://github.com/jrdngr/lgtm
 cd lgtm
@@ -83,7 +85,10 @@ just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
 just build       # release binary and .app
 just run [repo]  # run the built .app (with its Dock icon)
 just gc [repo]   # lgtm gc with the release build
+just bump 0.2.0  # set the app version before a release
 ```
+
+To release: `just bump <version>`, push, then run the Release workflow in GitHub Actions. It builds a signed, notarized universal .dmg into a draft release to publish.
 
 Debug builds regenerate `src/bindings.ts` from the Rust commands. `cargo test` fails if it's stale; rerun with `UPDATE_BINDINGS=1` to refresh it.
 
