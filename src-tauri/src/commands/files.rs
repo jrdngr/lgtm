@@ -176,7 +176,7 @@ fn start_drag(
                 eprintln!("lgtm: drag out: {e}");
             }
         })
-        .map_err(err)
+        .map_err(|e| e.to_string())
 }
 
 #[cfg(not(target_os = "macos"))]
