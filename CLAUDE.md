@@ -18,3 +18,4 @@ Desktop code review app on jj: Tauri v2, Rust backend in `src-tauri/`, React UI 
 - All jj calls go through `src-tauri/src/jj/`.
 - New Tauri plugin APIs need a permission in `src-tauri/capabilities/default.json`.
 - Update the README when a feature or shortcut changes.
+- No explanatory text in the UI: no hints, subtitles or tooltips saying what something does or why. Labels name things; that's all.
