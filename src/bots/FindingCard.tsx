@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { Finding } from "../bindings";
 import { openFile } from "../editor/open";
 import { useCurrentReview } from "../review/current";
-import { rowsText } from "../review/sendText";
+import { unified } from "../review/snippet";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { useWorkspace } from "../workspaces/context";
@@ -70,7 +70,8 @@ export function FindingCard(props: Props) {
 
   async function keep(draft: boolean) {
     if (!review || !first) return;
-    const snippet = rowsText(review.files[first.file], first.changed);
+    const rows = review.files[first.file].rows;
+    const snippet = unified(first.changed.map((r) => rows[r]));
     const text = findingText(f, source);
     if (await review.commentOn(first.file, first.changed, text, snippet, draft)) {
       setKept(draft ? "draft" : "note");

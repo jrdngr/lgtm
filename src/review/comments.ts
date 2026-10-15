@@ -10,6 +10,7 @@ import {
 } from "./model";
 import { quotedReply } from "./prComments";
 import { rowsText } from "./sendText";
+import { unified } from "./snippet";
 
 /** A comment being written on a selection, before it's saved. */
 export interface Draft {
@@ -44,10 +45,7 @@ export function draftFor(
       .filter((a) => a.file === file)
       .map((a) => a.row)
       .sort((a, b) => a - b),
-    snippet: rowsText(
-      files[file],
-      [...shown].sort((a, b) => a - b),
-    ),
+    snippet: unified([...shown].sort((a, b) => a - b).map((r) => files[file].rows[r])),
   };
 }
 

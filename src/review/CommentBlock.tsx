@@ -22,6 +22,7 @@ import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
 import { Workshop } from "./Workshop";
 import "./comments.css";
+import { SnippetDiff } from "./SnippetDiff";
 
 export { NOT_AT_WORKING_COPY } from "./AskBox";
 
@@ -256,7 +257,7 @@ export function CommentBlock({ id, comment, c }: Props) {
           </span>
         )}
       </div>
-      {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
+      {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
       {gh && <GhThread link={gh} viewer={viewer} />}
       {editing === undefined &&
         !gh &&

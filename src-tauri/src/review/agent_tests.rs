@@ -30,7 +30,7 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     assert_eq!(id, review.id);
     let c = &state.comments[0];
     assert!(c.review.ends_with("terminal agent"), "{}", c.review);
-    assert_eq!(c.snippet, "+fn c() {}");
+    assert_eq!(c.snippet, "@@ -0,0 +3,1 @@\n+fn c() {}");
 
     let (_, state) = ctx.agent_reply(None, c.id, "because").unwrap();
     assert_eq!(state.comments[0].messages[0].author, Author::Agent);

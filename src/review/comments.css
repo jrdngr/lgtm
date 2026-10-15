@@ -253,14 +253,59 @@
   border-color: var(--accent);
 }
 
-.comment-snippet {
-  margin: 0;
-  padding: 6px 10px;
+.snippet-diff {
   overflow-x: auto;
-  color: var(--muted);
   background: var(--bg);
   border-bottom: 1px solid var(--hair);
   font: var(--fs-sm) var(--mono);
+}
+
+.snip-row {
+  display: grid;
+  grid-template-columns: 7ch 7ch max-content;
+  min-width: 100%;
+  width: max-content;
+}
+
+.snip-row.added {
+  background: var(--add);
+}
+
+.snip-row.removed {
+  background: var(--del);
+}
+
+.snip-row.hunk {
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.snip-num {
+  padding: 0 6px;
+  color: var(--faint);
+  text-align: right;
+  user-select: none;
+}
+
+.snip-code {
+  padding: 0 10px 0 6px;
+  white-space: pre;
+}
+
+.snip-more {
+  display: block;
+  width: 100%;
+  padding: 0 6px;
+  border: none;
+  color: var(--muted);
+  background: var(--panel);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.snip-more:hover {
+  color: var(--fg);
 }
 
 .card-agent {

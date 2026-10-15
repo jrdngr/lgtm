@@ -10,6 +10,7 @@ import { ApplyDialog } from "./ApplyDialog";
 import { SAVE_KEY } from "./AskBox";
 import { CombineDialog } from "./CombineDialog";
 import { quotesOf } from "./prComments";
+import { SnippetDiff } from "./SnippetDiff";
 import { StageStrip } from "./StageStrip";
 import { ThreadFlow } from "./ThreadFlow";
 import type { Comments } from "./useComments";
@@ -163,7 +164,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         )}
         <IconButton icon="terminal" label="Send to terminal" onClick={() => c.send(comment)} />
       </div>
-      {changed && snippet && <pre className="comment-snippet">{comment.snippet}</pre>}
+      {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
       {gh && (
         <div ref={postsRef} onMouseUp={onPr ? quoting.onMouseUp : undefined}>
           <GhThread link={gh} viewer={viewer} />
