@@ -12,6 +12,8 @@ import { useRepoChanged } from "../workspaces/useRepoChanged";
 import type { Reload } from "./AgentBox";
 import { minimalChange } from "./change";
 import { editorMenu, placeAt } from "./editorMenu";
+import { ImagePanel } from "./ImagePanel";
+import { imageType, isSvg, svgUrl } from "./image";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { emitSaved } from "./saved";
@@ -21,10 +23,17 @@ import { useAgentBox } from "./useAgentBox";
 import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
+/** Files with a rendered view next to their text. */
+const renders = (path: string) => isMarkdown(path) || isSvg(path);
+
+/** A working-copy file in its tab: an image view for images, else the text editor. */
+export function EditorPanel(props: IDockviewPanelProps<EditorParams>) {
+  return imageType(props.params.path) ? <ImagePanel {...props} /> : <TextPanel {...props} />;
+}
 
 /** A working-copy file in CodeMirror. Saving snapshots the working copy, so reviews of `@`
  * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
-export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
+function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
   const { path, line, nonce } = params;
   const host = useRef<HTMLDivElement>(null);
@@ -164,7 +173,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
       e.preventDefault();
       agent.close();
     }
-    if (mod && e.shiftKey && e.key.toLowerCase() === "v" && isMarkdown(path)) {
+    if (mod && e.shiftKey && e.key.toLowerCase() === "v" && renders(path)) {
       e.preventDefault();
       toggleRendered();
     }
@@ -183,7 +192,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         save: () => void save(),
         sendText: (text) => sendText(text, () => view.focus()),
         askAgent: agent.open,
-        toggleRendered: isMarkdown(path) ? toggleRendered : undefined,
+        toggleRendered: renders(path) ? toggleRendered : undefined,
       }),
     );
   }
@@ -201,7 +210,7 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         <span className="path" title={path}>
           {path}
         </span>
-        {isMarkdown(path) && (
+        {renders(path) && (
           <button type="button" disabled={!view} onClick={toggleRendered} title="⇧⌘V">
             {rendered === undefined ? "Rendered" : "Editor"}
           </button>
@@ -220,9 +229,19 @@ export function EditorPanel({ params, api }: IDockviewPanelProps<EditorParams>) 
         </div>
       )}
       {rendered !== undefined && (
-        // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
-        <div className="editor-rendered" ref={renderedRef} tabIndex={0}>
-          <MarkdownView text={rendered} />
+        <div
+          className={`editor-rendered${isSvg(path) ? " image" : ""}`}
+          ref={renderedRef}
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
+          tabIndex={0}
+        >
+          {isSvg(path) ? (
+            <div className="image-view">
+              <img src={svgUrl(rendered)} alt={path} draggable={false} />
+            </div>
+          ) : (
+            <MarkdownView text={rendered} />
+          )}
         </div>
       )}
       <div

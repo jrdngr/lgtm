@@ -128,6 +128,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::editor::stop_selection_ask,
             commands::files::list_files,
             commands::files::read_file,
+            commands::files::read_image,
             commands::files::save_file,
             commands::files::create_path,
             commands::files::add_files,

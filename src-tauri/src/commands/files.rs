@@ -45,6 +45,21 @@ pub(crate) async fn read_file(
     files::read(&contained(&ws, &path)?, &path).map_err(err)
 }
 
+/// An image file's bytes as base64.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn read_image(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    path: String,
+) -> CmdResult<String> {
+    use base64::Engine as _;
+    const MAX_IMAGE: u64 = 64 * 1024 * 1024;
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let bytes = files::read_bytes(&contained(&ws, &path)?, &path, MAX_IMAGE).map_err(err)?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
 /// Saves a file, then snapshots the working copy so reviews of `@` pick it up.
 #[tauri::command]
 #[specta::specta]

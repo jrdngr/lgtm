@@ -77,14 +77,19 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
 
 /// A text file's contents, named `name` in errors.
 pub fn read(path: &Path, name: &str) -> anyhow::Result<String> {
+    let bytes = read_bytes(path, name, MAX_BYTES)?;
+    String::from_utf8(bytes).map_err(|_| anyhow::anyhow!("{name} isn't UTF-8 text"))
+}
+
+/// A file's bytes, up to `max` of them, named `name` in errors.
+pub fn read_bytes(path: &Path, name: &str, max: u64) -> anyhow::Result<Vec<u8>> {
     let len = std::fs::metadata(path)
         .with_context(|| format!("can't read {name}"))?
         .len();
-    if len > MAX_BYTES {
-        bail!("{name} is too big to edit ({} MB)", len / (1024 * 1024));
+    if len > max {
+        bail!("{name} is too big to open ({} MB)", len / (1024 * 1024));
     }
-    let bytes = std::fs::read(path).with_context(|| format!("can't read {name}"))?;
-    String::from_utf8(bytes).map_err(|_| anyhow::anyhow!("{name} isn't UTF-8 text"))
+    std::fs::read(path).with_context(|| format!("can't read {name}"))
 }
 
 /// Overwrites a file that exists, keeping its permissions. `name` is for errors.

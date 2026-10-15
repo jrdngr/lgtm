@@ -190,6 +190,8 @@ export const commands = {
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
+	/**  An image file's bytes as base64. */
+	readImage: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_image", { workspace, path })),
 	/**  Saves a file, then snapshots the working copy so reviews of `@` pick it up. */
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
 	/**  Makes an empty file, or a folder when `dir`. */

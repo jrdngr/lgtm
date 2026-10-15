@@ -121,6 +121,11 @@
   outline: none;
 }
 
+.editor-rendered.image {
+  display: flex;
+  overflow: hidden;
+}
+
 .editor-host[hidden] {
   display: none;
 }
@@ -155,4 +160,25 @@
 /* Blocks after which lines are gone. */
 .markdown-view .md-removed {
   border-bottom: 2px dashed rgb(248 81 73 / 50%);
+}
+
+.image-size {
+  color: var(--faint);
+}
+
+.image-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* A checkerboard behind the image shows where it's transparent. */
+.image-view img {
+  margin: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  background: repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 16px 16px;
 }
