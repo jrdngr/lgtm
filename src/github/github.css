@@ -34,6 +34,7 @@
 }
 
 .pr-head {
+  container-type: inline-size;
   padding: 8px 10px;
   border-bottom: 1px solid var(--hair);
   user-select: text;
@@ -70,6 +71,17 @@
 
 .pr-head .faint {
   color: var(--faint);
+}
+
+.pr-author {
+  flex: none;
+  white-space: nowrap;
+}
+
+@container (max-width: 240px) {
+  .pr-author {
+    display: none;
+  }
 }
 
 .pr-branches {

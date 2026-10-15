@@ -104,8 +104,8 @@ export function PrSection({ pr, review, discussion, threads }: Props) {
       <StageBar threads={threads} />
       <div className="pr-row pr-meta">
         <Avatar name={pr.author} small />
-        <span>{pr.author === viewer ? "You" : pr.author}</span>
-        <span className="faint">·</span>
+        <span className="pr-author">{pr.author === viewer ? "You" : pr.author}</span>
+        <span className="pr-author faint">·</span>
         <span className="pr-branches" title={`${pr.headRef} → ${pr.baseRef}`}>
           {pr.headRef} → {pr.baseRef}
         </span>
