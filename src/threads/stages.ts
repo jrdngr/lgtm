@@ -5,7 +5,7 @@ import { quoted } from "../review/prComments";
 export const STAGES: [Stage, string, string][] = [
   ["new", "New", "amber"],
   ["decide", "Decide", "amber"],
-  ["toFix", "To fix", "blue"],
+  ["toFix", "Fix", "blue"],
   ["reply", "Reply", "purple"],
   ["ready", "Ready", "green"],
   ["done", "Done", ""],
