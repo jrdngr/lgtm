@@ -5,6 +5,7 @@ import { reloadPr } from "../github/pr";
 import { commands } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
+import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { type WorkspaceName, workspaceKey } from "./context";
@@ -33,6 +34,9 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string>();
+  // Bumped by Refresh, so the stack PRs ask GitHub again.
+  const [refreshed, setRefreshed] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   function start(kind: AddKind) {
     if (kind === "workspace") setNaming(true);
@@ -76,6 +80,14 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     reload();
   }
 
+  async function refresh() {
+    setRefreshing(true);
+    setError(undefined);
+    setRefreshed((n) => n + 1);
+    await Promise.all([reload(), reloadPr(selected)]);
+    setRefreshing(false);
+  }
+
   const addItems = [
     { label: "New Workspace…", keys: "⇧⌘N", onSelect: () => start("workspace") },
     {
@@ -89,12 +101,26 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   /** The menu of the header and the space around the rows. Text fields keep their own. */
   function menu(e: React.MouseEvent) {
     if ((e.target as Element).closest("input, textarea")) return;
-    openMenu(e, [...addItems, "-", { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide }]);
+    openMenu(e, [
+      ...addItems,
+      "-",
+      { label: "Refresh", onSelect: refresh },
+      { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide },
+    ]);
   }
 
   return (
     <div className="workspaces" onContextMenu={menu}>
       <SectionHeader title="Workspaces">
+        <IconButton
+          icon="retry"
+          label="Refresh"
+          disabled={refreshing}
+          onClick={(e) => {
+            e.stopPropagation();
+            refresh();
+          }}
+        />
         <button
           type="button"
           className="ws-new"
@@ -155,7 +181,15 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
             />
           );
           if (selected !== w.name) return row;
-          return [row, <StackPrs key={`${key} stack`} workspace={w.name} onError={setError} />];
+          return [
+            row,
+            <StackPrs
+              key={`${key} stack`}
+              workspace={w.name}
+              refreshed={refreshed}
+              onError={setError}
+            />,
+          ];
         })}
       </ul>
     </div>

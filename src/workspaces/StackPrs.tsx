@@ -14,6 +14,8 @@ import { useRepoChanged } from "./useRepoChanged";
 interface Props {
   /** The workspace whose `@` the PRs are found from. */
   workspace: WorkspaceName;
+  /** Changes when the user asks for a refresh, which asks GitHub again. */
+  refreshed: number;
   onError(message: string | undefined): void;
 }
 
@@ -27,7 +29,7 @@ function quiet(error: string): string | undefined {
 /** The open PRs of the bookmarks on the selected workspace's stack, under its row. The radio
  * picks one as the workspace's PR. One `@` doesn't build on asks to edit its change first.
  * Following `@` keeps the pick in line with the stack as the repo changes. */
-export function StackPrs({ workspace, onError }: Props) {
+export function StackPrs({ workspace, refreshed, onError }: Props) {
   const githubOff = useGithubOff();
   const selected = usePr(workspace);
   const [prs, setPrs] = useState<NearbyPrDto[]>();
@@ -69,6 +71,10 @@ export function StackPrs({ workspace, onError }: Props) {
   useEffect(() => {
     if (!githubOff) load();
   }, [githubOff, load]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs on each refresh
+  useEffect(() => {
+    if (refreshed && !githubOff) load(true);
+  }, [refreshed]);
   useRepoChanged(() => {
     if (!githubOff) load();
   });
