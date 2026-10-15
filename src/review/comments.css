@@ -19,6 +19,7 @@
 
 .card-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   min-height: 30px;
@@ -535,8 +536,10 @@ button.group-head.fold:hover {
   font-weight: 500;
 }
 
+/* Never squeezed: the bar wraps it onto a line of its own instead. */
 .comment-block .stage-strip {
   display: inline-flex;
+  flex: none;
   margin: 0;
   padding: 0;
   border: 1px solid var(--border);
@@ -555,6 +558,7 @@ button.group-head.fold:hover {
   background: none;
   font-size: var(--fs-xs);
   line-height: 20px;
+  white-space: nowrap;
   color: var(--muted);
 }
 
