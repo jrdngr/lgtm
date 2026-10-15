@@ -1,7 +1,7 @@
 import { type DisplayLine, type FlatFile, SIGN } from "./model";
 
-/** The selected rows as text for an agent's prompt: per file and hunk, the path with the
- * new side's line range (the old side's for pure removals), then the rows as a diff. */
+/** Where the selected rows are, for an agent to read itself: per file and hunk, the path with
+ * the new side's line range, and the old side's range for any removed rows. */
 export function selectionText(
   files: FlatFile[],
   lines: DisplayLine[],
@@ -9,8 +9,25 @@ export function selectionText(
   end: number,
 ): string {
   return picked(lines, start, end)
-    .map(([file, rows]) => rowsText(files[file], rows))
-    .join("\n\n");
+    .flatMap(([file, rows]) => hunks(files[file], rows).map((group) => where(files[file], group)))
+    .join("\n");
+}
+
+/** `path:range` on the new side, then the removed rows' old range, or only that. */
+function where(f: FlatFile, rows: number[]): string {
+  const rowsOf = rows.map((r) => f.rows[r]);
+  const range = (ns: number[]) => {
+    const [lo, hi] = [Math.min(...ns), Math.max(...ns)];
+    return lo === hi ? `${lo}` : `${lo}-${hi}`;
+  };
+  const added = rowsOf.flatMap((r) => (r.newLine === null ? [] : [r.newLine]));
+  const removed = rowsOf.flatMap((r) =>
+    r.kind === "removed" && r.oldLine !== null ? [r.oldLine] : [],
+  );
+  if (!added.length) return `${f.dto.path}:${range(removed)} (removed, old version)`;
+  const at = `${f.dto.path}:${range(added)}`;
+  if (!removed.length) return at;
+  return `${at}, and removed old line${new Set(removed).size > 1 ? "s" : ""} ${range(removed)}`;
 }
 
 /** The selected rows' text under their `path:line` or `path:start-end`, per file. */

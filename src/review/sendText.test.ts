@@ -11,7 +11,7 @@ const files = flatten(
 const line = (r: number[], hunk = 0): DisplayLine => ({ kind: "rows", file: 0, hunk, rows: r });
 
 describe("selectionText", () => {
-  it("writes each hunk's rows as a diff under the path and line range", () => {
+  it("names each hunk's path and line ranges, with removed rows' old range", () => {
     const lines = [
       { kind: "file", file: 0 } as const,
       line([0]),
@@ -20,15 +20,12 @@ describe("selectionText", () => {
       line([4], 1),
     ];
     expect(selectionText(files, lines, 1, 4)).toBe(
-      "a.rs:1-2\n```diff\n fn a() {\n-  old();\n+  new();\n```\n\n" +
-        "a.rs:9 (removed)\n```diff\n-gone\n```",
+      "a.rs:1-2, and removed old line 2\na.rs:9 (removed, old version)",
     );
   });
 
-  it("orders split-view pairs as a unified diff", () => {
-    expect(selectionText(files, [line([1, 2])], 0, 0)).toBe(
-      "a.rs:2\n```diff\n-  old();\n+  new();\n```",
-    );
+  it("leaves out removals when every row is on the new side", () => {
+    expect(selectionText(files, [line([0]), line([2])], 0, 1)).toBe("a.rs:1-2");
   });
 });
 
