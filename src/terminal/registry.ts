@@ -3,7 +3,7 @@ import type { WorkspaceName } from "../workspaces/context";
 /** A live terminal pane that text can be pasted into. */
 interface TerminalTarget {
   workspace: WorkspaceName;
-  /** The title its program set, if any. */
+  /** Its tab's title, else the title its program set, if any. */
   title(): string;
   /** False when the program in it can't take a paste safely. */
   canPaste(): boolean;

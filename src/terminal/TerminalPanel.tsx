@@ -27,7 +27,7 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
 
     const unregister = registerTerminal(api.id, {
       workspace,
-      title: session.title,
+      title: () => api.title || session.title(),
       canPaste: () => term.modes.bracketedPasteMode,
       paste: (text) => term.paste(text),
       focus: () => {
