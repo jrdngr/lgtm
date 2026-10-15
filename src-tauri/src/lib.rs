@@ -117,6 +117,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::delete_bots,
             commands::bots::bot_runs,
             commands::bots::bot_run,
+            commands::bots::rename_report,
             commands::bots::fix_findings,
             commands::bots::dismiss_findings,
             commands::bots::stop_fix,

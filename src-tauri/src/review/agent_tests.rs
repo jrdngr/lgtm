@@ -49,7 +49,7 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
 }
 
 #[tokio::test]
-async fn submitted_findings_become_a_finished_run() {
+async fn published_findings_start_a_report_then_replace_their_section() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {}\n");
@@ -59,17 +59,55 @@ async fn submitted_findings_become_a_finished_run() {
         serde_json::json!({ "severity": severity, "title": title, "locations": [{ "path": "a.rs", "start": 1, "end": 1 }],
             "facts": [], "explanation": "e", "fix": null })
     };
-    let review_json = serde_json::json!({ "verdict": "ok", "findings": [finding("low", "nit"), finding("high", "bug")] });
-    let run = ctx.submit_findings(None, "claude", review_json).unwrap();
-    assert_eq!(run.revset, "@");
-    let Some(crate::bots::Output::Review(r)) = &run.parts[0].output else {
-        panic!("no review");
+    let review_of = |fs: Vec<serde_json::Value>| serde_json::json!({ "verdict": "ok", "findings": fs });
+    let ids = |run: &crate::bots::BotRun, i: usize| {
+        let Some(crate::bots::Output::Review(r)) = &run.parts[i].output else {
+            panic!("no review");
+        };
+        r.findings.iter().map(|f| format!("{} {}", f.id, f.title)).collect::<Vec<_>>()
     };
-    let ids: Vec<(&str, &str)> = r
-        .findings
-        .iter()
-        .map(|f| (f.id.as_str(), f.title.as_str()))
-        .collect();
-    assert_eq!(ids, [("claude#1", "bug"), ("claude#2", "nit")]);
-    assert_eq!(ctx.bot_runs(None).unwrap()[0].id, run.id);
+
+    let (run, created) = ctx
+        .publish_findings(None, None, "claude", review_of(vec![finding("low", "nit"), finding("high", "bug")]))
+        .unwrap();
+    assert!(created);
+    assert_eq!(run.revset, "@");
+    assert_eq!(run.label(), format!("R{}", run.id));
+    assert_eq!(ids(&run, 0), ["claude#1 bug", "claude#2 nit"]);
+
+    let label = run.label().to_lowercase();
+    ctx.dismiss_findings(run.id, &["claude#1".into(), "claude#2".into()], true)
+        .unwrap();
+    let (run, created) = ctx
+        .publish_findings(None, Some(&label), "claude", review_of(vec![finding("high", "bug"), finding("medium", "new")]))
+        .unwrap();
+    assert!(!created);
+    assert_eq!(ids(&run, 0), ["claude#1 bug", "claude#2 new"]);
+    assert_eq!(run.dismissed, ["claude#1"], "the bug stays dismissed, the gone nit's mark goes");
+
+    let (run, _) = ctx
+        .publish_findings(None, Some(&label), "codex", review_of(vec![finding("low", "style")]))
+        .unwrap();
+    assert_eq!(run.parts.len(), 2);
+    assert_eq!(run.personas[1].name, "codex");
+    assert!(ctx.publish_findings(None, Some("R999"), "x", review_of(vec![])).is_err());
+}
+
+#[tokio::test]
+async fn reports_rename_to_unique_ids_and_back() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn a() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    ctx.focus(None, review.id);
+    let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
+    let (a, _) = ctx.publish_findings(None, None, "x", empty()).unwrap();
+    let (b, _) = ctx.publish_findings(None, None, "x", empty()).unwrap();
+
+    assert_eq!(ctx.rename_report(a.id, " auth-pass ").unwrap().label(), "auth-pass");
+    assert_eq!(ctx.find_report(None, "AUTH-PASS").unwrap().id, a.id);
+    assert!(ctx.rename_report(b.id, "auth-pass").is_err(), "taken");
+    assert!(ctx.rename_report(b.id, "R77").is_err(), "looks like a default id");
+    assert!(ctx.rename_report(b.id, "two words").is_err());
+    assert_eq!(ctx.rename_report(a.id, "").unwrap().label(), format!("R{}", a.id));
 }

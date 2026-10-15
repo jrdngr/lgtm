@@ -60,6 +60,9 @@ pub struct BotRunActivity {
 #[derive(Clone, Serialize, Type, Event)]
 pub struct BotRunChanged {
     pub run: u32,
+    /// Set when an agent published to it, so the workspace's dock opens it.
+    pub show: bool,
+    pub workspace: Option<String>,
 }
 
 /// A persona review's fix `fix` streamed more of its reply. `text` is the whole reply so far.

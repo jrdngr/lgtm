@@ -17,6 +17,7 @@ fn persona(name: &str) -> Persona {
 fn run(names: &[&str], options: BotOptions) -> BotRun {
     BotRun {
         id: 0,
+        name: None,
         workspace: None,
         revset: "@".into(),
         from: Some("a".into()),

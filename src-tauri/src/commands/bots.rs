@@ -28,7 +28,12 @@ fn notify(window: &WebviewWindow) -> Notify {
             Event::FixText { run, fix, text } => {
                 BotFixText { run, fix, text }.emit_to(&app, &label)
             }
-            Event::Changed { run } => BotRunChanged { run }.emit_to(&app, &label),
+            Event::Changed { run } => BotRunChanged {
+                run,
+                show: false,
+                workspace: None,
+            }
+            .emit_to(&app, &label),
         }
         .ok();
     })
@@ -127,6 +132,13 @@ pub(crate) fn bot_runs(window: WebviewWindow, workspace: Option<String>) -> CmdR
 #[specta::specta]
 pub(crate) fn bot_run(window: WebviewWindow, run: u32) -> CmdResult<BotRun> {
     repo(&window)?.bot_run(run).map_err(err)
+}
+
+/// Renames a report, or with a blank `name`, gives it back its `R<n>` id.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn rename_report(window: WebviewWindow, run: u32, name: String) -> CmdResult<BotRun> {
+    repo(&window)?.rename_report(run, &name).map_err(err)
 }
 
 /// The personas a review can use, and files that couldn't be read.

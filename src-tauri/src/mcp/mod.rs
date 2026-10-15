@@ -5,6 +5,7 @@
 mod bridge;
 mod inputs;
 pub mod register;
+mod reports;
 mod server;
 
 use std::path::{Path, PathBuf};

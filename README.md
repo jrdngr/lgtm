@@ -63,7 +63,7 @@ just install     # release build, copied to /Applications
 
 The app's binary takes a repo path: `lgtm /path/to/repo`. A second launch for the same repo focuses its window. Plain git repos get an offer to set up jj alongside git.
 
-On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review, and sync a PR's threads (stage, take and reply) with a review-reply workflow run in the terminal. Questions it asks (like a qqueue session) open in the Q&A tab, talking one over in the terminal can rewrite it there, and Send to terminal gives it your answers.
+On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review, and sync a PR's threads (stage, take and reply) with a review-reply workflow run in the terminal. Questions it asks (like a qqueue session) open in the Q&A tab, talking one over in the terminal can rewrite it there, and Send to terminal gives it your answers. Any agent can publish review findings to a report: each report has an id (`R12`, or a name you give it with Rename…) that you tell the agent, and publishing again under the same reviewer name replaces that reviewer's findings.
 
 ## Commands
 

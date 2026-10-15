@@ -141,6 +141,7 @@ impl RepoCtx {
         let range = ws.jj.resolve(revset).await?;
         let mut run = BotRun {
             id: 0,
+            name: None,
             workspace: ws.name.clone(),
             revset: revset.to_string(),
             from: range.from,

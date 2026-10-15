@@ -17,7 +17,7 @@ pub enum Severity {
 }
 
 /// A place in the change: a repository-relative path, with new-side lines when known.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 pub struct Location {
     pub path: String,
     pub start: Option<u32>,

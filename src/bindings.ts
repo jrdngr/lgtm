@@ -165,6 +165,8 @@ export const commands = {
 	/**  The workspace's persona reviews, newest first. */
 	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),
 	botRun: (run: number) => typedError<BotRun, string>(__TAURI_INVOKE("bot_run", { run })),
+	/**  Renames a report, or with a blank `name`, gives it back its `R<n>` id. */
+	renameReport: (run: number, name: string) => typedError<BotRun, string>(__TAURI_INVOKE("rename_report", { run, name })),
 	/**
 	 *  Starts an agent fixing the picked findings in the run's workspace. `text` is them as
 	 *  markdown. Its reply streams as events.
@@ -478,6 +480,8 @@ export type BotOptions = {
  */
 export type BotRun = {
 	id: number,
+	/**  What the user renamed it to. Its id is `R<id>` until then. */
+	name?: string | null,
 	workspace: string | null,
 	revset: string,
 	from: string | null,
@@ -510,6 +514,9 @@ export type BotRunActivity = {
 /**  A persona review started, stopped, or added or finished a part. */
 export type BotRunChanged = {
 	run: number,
+	/**  Set when an agent published to it, so the workspace's dock opens it. */
+	show: boolean,
+	workspace: string | null,
 };
 
 /**  A persona file that couldn't be read, by path, with why. */

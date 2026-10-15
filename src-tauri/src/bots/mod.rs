@@ -8,6 +8,7 @@ pub mod output;
 pub mod personas;
 mod pipeline;
 mod prompts;
+mod reports;
 mod schema;
 mod submitted;
 #[cfg(test)]
@@ -109,6 +110,9 @@ impl Part {
 #[serde(rename_all = "camelCase")]
 pub struct BotRun {
     pub id: u32,
+    /// What the user renamed it to. Its id is `R<id>` until then.
+    #[serde(default)]
+    pub name: Option<String>,
     pub workspace: Option<String>,
     pub revset: String,
     pub from: Option<String>,

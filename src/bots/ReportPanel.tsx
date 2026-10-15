@@ -1,5 +1,5 @@
 import type { IDockviewPanelProps } from "dockview-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BotOptions, Finding } from "../bindings";
 import { usePr } from "../github/pr";
 import { commands } from "../ipc";
@@ -14,6 +14,7 @@ import { finalFindings, findingsText, history, type Picked, report } from "./fin
 import { runState } from "./personas";
 import { MinimalView, PersonaView, SynthesisView } from "./ReportViews";
 import { type Act, RunControls } from "./RunControls";
+import { reportIdItems, reportLabel } from "./reportId";
 import { refreshRun, runAction, useRun } from "./runs";
 import { SettledFold } from "./SettledFold";
 import "./bots.css";
@@ -51,8 +52,12 @@ function fixPrompt(revset: string, picked: Picked[]): string {
 
 /** One persona review: its findings as cards, as the minimal set, the synthesis, or each
  * persona's own. */
-export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
+export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }>) {
   const run = useRun(params.run);
+  const reportId = run && reportLabel(run);
+  useEffect(() => {
+    if (reportId) api.setTitle(`Report ${reportId}`);
+  }, [api, reportId]);
   const [picked, setPicked] = useState<View>();
   const [persona, setPersona] = useState<string>();
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -245,6 +250,7 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
   return (
     <div className="bots-report" ref={root}>
       <div className="bots-report-bar">
+        <code className="bots-report-id">{reportId}</code>
         <span className="bots-report-title">
           Review of <code className="bots-revset">{run.revset}</code>
         </span>
@@ -266,16 +272,19 @@ export function ReportPanel({ params }: IDockviewPanelProps<{ run: number }>) {
         <RunControls run={run} act={act} />
         <Menu
           label="Report actions"
-          items={ADD.filter(([key]) => !run.active && !run.options[key]).map(([key, text]) => ({
-            label: text,
-            disabled: key === "crossReview" && run.personas.length < 2,
-            title:
-              key === "crossReview" && run.personas.length < 2
-                ? "Needs two or more personas"
-                : undefined,
-            onSelect: () =>
-              act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true })),
-          }))}
+          items={[
+            ...reportIdItems(run, setError),
+            ...ADD.filter(([key]) => !run.active && !run.options[key]).map(([key, text]) => ({
+              label: text,
+              disabled: key === "crossReview" && run.personas.length < 2,
+              title:
+                key === "crossReview" && run.personas.length < 2
+                  ? "Needs two or more personas"
+                  : undefined,
+              onSelect: () =>
+                act(() => commands.continueBots(run.id, { ...NO_OPTIONS, [key]: true })),
+            })),
+          ]}
         />
       </div>
       <div className="bots-tabs" role="tablist">

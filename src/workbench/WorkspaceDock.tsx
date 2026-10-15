@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { RunsPanel } from "../agents/RunsPanel";
 import { ReportPanel } from "../bots/ReportPanel";
+import { useAgentReports } from "../bots/useAgentReports";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
@@ -78,6 +79,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   const [hasPane, setHasPane] = useState<boolean>();
   useAgentShow(workspace);
   useAgentQa(workspace);
+  useAgentReports(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
     gone.current = false;

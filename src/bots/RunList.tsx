@@ -8,6 +8,7 @@ import type { WorkspaceName } from "../workspaces/context";
 import { finalFindings, report } from "./findings";
 import { runDetail, runState } from "./personas";
 import { type Act, RunControls } from "./RunControls";
+import { reportIdItems, reportLabel } from "./reportId";
 import { forgetRun, runAction, useRuns } from "./runs";
 import { SevTag } from "./Severity";
 
@@ -65,7 +66,8 @@ export function RunList({ workspace, onOpen, onError }: Props) {
               onSelect: () => remove(run),
             };
           const menu = contextMenu(() => [
-            { label: "Open Findings", onSelect: () => onOpen(run) },
+            { label: "Open Report", onSelect: () => onOpen(run) },
+            ...reportIdItems(run, onError),
             {
               label: "Stop",
               disabled: !run.active,
@@ -86,6 +88,7 @@ export function RunList({ workspace, onOpen, onError }: Props) {
                   <Outcome run={run} />
                 </span>
                 <span className="bots-run-meta">
+                  <b>{reportLabel(run)}</b> ·{" "}
                   <code>
                     {run.revset} {run.to.slice(0, 4)}
                   </code>{" "}
@@ -95,7 +98,7 @@ export function RunList({ workspace, onOpen, onError }: Props) {
               <span className="bots-run-side">
                 <span className="bots-run-actions reveal">
                   <RunControls run={run} act={act} />
-                  <Menu label="Run actions" items={[del]} />
+                  <Menu label="Run actions" items={[...reportIdItems(run, onError), del]} />
                 </span>
                 {run.createdAt !== null && (
                   <span className="bots-run-time" title={fullDate(run.createdAt)}>

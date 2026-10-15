@@ -523,6 +523,16 @@
   font-size: var(--fs-sm);
 }
 
+.bots-report-id {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: 600 var(--fs-sm) var(--mono);
+  color: var(--fg);
+  user-select: text;
+}
+
 .bots-report-title {
   font-weight: 600;
   white-space: nowrap;

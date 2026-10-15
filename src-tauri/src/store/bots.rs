@@ -65,6 +65,15 @@ impl Store {
             .collect())
     }
 
+    /// Every workspace's runs.
+    pub fn all_bot_runs(&self) -> rusqlite::Result<Vec<BotRun>> {
+        let mut stmt = self.db.prepare("SELECT id, data FROM bot_runs")?;
+        Ok(stmt
+            .query_map([], row_to_run)?
+            .filter_map(Result::ok)
+            .collect())
+    }
+
     pub fn save_bot_run(&self, run: &BotRun) -> rusqlite::Result<()> {
         self.db.execute(
             "UPDATE bot_runs SET data = ? WHERE id = ?",

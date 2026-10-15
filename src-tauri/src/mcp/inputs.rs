@@ -111,12 +111,16 @@ pub struct Location {
     pub end: Option<u32>,
 }
 
+/// One finding, shown as a card with its severity, title and locations, then its facts,
+/// explanation and fix.
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct Finding {
     pub severity: Severity,
+    /// A short headline naming the problem.
     pub title: String,
+    /// Where it is. Locations in the change link to their rows in the review.
     pub locations: Vec<Location>,
-    /// What the code does, checkable facts.
+    /// What the code does, as checkable facts, one per bullet.
     pub facts: Vec<String>,
     /// Why it matters.
     pub explanation: String,
@@ -125,12 +129,22 @@ pub struct Finding {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct Findings {
-    /// The name the findings show under, like `claude`. Defaults to `terminal-agent`.
+pub struct Publish {
+    /// The report to publish to, by the id the human gave you, like `R12` or `auth-pass`.
+    /// Leave it out to start a new report on the open review.
+    pub report: Option<String>,
+    /// The name of your section of the report, like `claude`. Publishing again under the same
+    /// name replaces that section. Defaults to `terminal-agent`.
     pub reviewer: Option<String>,
     /// One or two sentences on the change overall.
     pub verdict: String,
     pub findings: Vec<Finding>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct GetReport {
+    /// The report's id, like `R12` or `auth-pass`. Defaults to the newest report.
+    pub report: Option<String>,
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema)]
