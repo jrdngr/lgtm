@@ -17,6 +17,8 @@ interface Ctx {
   pick(action: MenuAction): void;
   step(undo: boolean): void;
   copy(): void;
+  /** Sends where the selection is to the most recently used terminal. */
+  sendToTerminal(): void;
   applyMark(color: MarkColor | null): void;
   openMenuAtCursor(): void;
   startComment(): void;
@@ -166,6 +168,9 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "n":
       case "N":
         ctx.stepNote(e.key === "n" ? 1 : -1);
+        break;
+      case ">":
+        ctx.sendToTerminal();
         break;
       case "x": {
         const file = lines[cursor]?.file;

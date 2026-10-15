@@ -89,7 +89,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
   const context = useContextLines(review, setError);
-  const { sendText, picker } = useSendText(workspace, setError, focusRoot);
+  const { sendText, sendRecent, picker } = useSendText(workspace, setError, focusRoot);
   const pr = usePrReview(workspace, review, { onState: edited, onError: setError, load });
   const c = useComments({
     review,
@@ -157,6 +157,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
       fold.followChecks(checked);
     },
     sendText,
+    sendRecent,
     closeMenu,
     primary: setup.primary,
     openInEditor,
@@ -331,6 +332,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     pick: a.pick,
     step: a.step,
     copy: a.copy,
+    sendToTerminal: () => a.sendSelection(true),
     applyMark: a.applyMark,
     openMenuAtCursor,
     startComment: a.startComment,

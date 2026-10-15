@@ -62,7 +62,11 @@ export function useSendText(
       }}
     />
   );
-  return { sendText, picker };
+  /** Pastes into the workspace's most recently used terminal, without asking. */
+  const sendRecent = (text: string, onSent?: () => void) => {
+    sendTo(text, undefined, onSent);
+  };
+  return { sendText, sendRecent, picker };
 }
 
 /** Sending text from a place with no error line of its own, so failures show in a dialog. */

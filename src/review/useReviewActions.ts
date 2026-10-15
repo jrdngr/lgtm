@@ -22,6 +22,8 @@ interface Deps {
   /** Lets checked or unchecked files collapse or expand again. */
   followChecks(files: number[]): void;
   sendText(text: string, onSent?: () => void): void;
+  /** Sends to the most recently used terminal, without asking which. */
+  sendRecent(text: string, onSent?: () => void): void;
   closeMenu(): void;
   /** The mark that also checks a whole-file selection. */
   primary: MarkColor | undefined;
@@ -111,9 +113,11 @@ export function useReviewActions(d: Deps) {
     if (text) copyText(text);
   }
 
-  function sendSelection() {
+  /** Sends where the selection is, asking which terminal when there are several, or with
+   * `recent` to the most recently used one. */
+  function sendSelection(recent = false) {
     const text = selectionText(files, lines, sel.start, sel.end);
-    if (text) d.sendText(text, finishAction);
+    if (text) (recent ? d.sendRecent : d.sendText)(text, finishAction);
   }
 
   /** Opens a note on the selection, in its ask box when it's for a change. `github` makes it a
@@ -148,5 +152,16 @@ export function useReviewActions(d: Deps) {
     } else applyMark(action === "clear" ? null : action);
   }
 
-  return { applyMark, setChecked, markFile, clearFile, step, resetMarks, copy, startComment, pick };
+  return {
+    applyMark,
+    setChecked,
+    markFile,
+    clearFile,
+    step,
+    resetMarks,
+    copy,
+    startComment,
+    pick,
+    sendSelection,
+  };
 }
