@@ -51,22 +51,44 @@ pub struct PrRecord {
     /// Picked from the workspace's stack, which it follows `@` along, rather than checked out.
     #[serde(default)]
     pub stack: bool,
+    /// A stack PR `@` no longer builds on. It stays picked until the user edits back onto it
+    /// or deselects it.
+    #[serde(default)]
+    pub off: bool,
 }
 
 impl PrRecord {
     /// What the workspace reviews: the PR's commits and the working copy above them, which
     /// matches GitHub's diff.
+    /// Off the stack, it's the PR's own commits.
     pub fn revset(&self) -> String {
         let base = remote_bookmark(&self.base_ref, &self.base_remote);
-        pr_revset(&base, &self.head_ref)
+        match self.off {
+            true => format!("{base}..{}", head_revset(&self.head_ref)),
+            false => pr_revset(&base, &self.head_ref),
+        }
     }
+
+    /// The commit of the PR's head bookmark: the local one, else where it was fetched.
+    pub fn head_revset(&self) -> String {
+        head_revset(&self.head_ref)
+    }
+}
+
+fn quoted(name: &str) -> String {
+    format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 /// `base..@`, less the commits from any other bookmark above the PR's head bookmark: those
 /// belong to the next branch in the stack.
 fn pr_revset(base: &str, head: &str) -> String {
-    let head = format!("\"{}\"", head.replace('\\', "\\\\").replace('"', "\\\""));
+    let head = quoted(head);
     format!("({base}..@) ~ ((bookmarks() & (bookmarks(exact:{head})+::@))::)")
+}
+
+fn head_revset(head: &str) -> String {
+    let head = quoted(head);
+    format!("coalesce(bookmarks(exact:{head}), remote_bookmarks(exact:{head}))")
 }
 
 /// The bookmark a PR's head is fetched into when its branch can't be fetched.
@@ -95,6 +117,8 @@ pub struct PrDto {
     pub revset: String,
     /// Picked from the workspace's stack rather than checked out into it.
     pub stack: bool,
+    /// Picked from the stack, which `@` has since left.
+    pub off: bool,
 }
 
 impl From<&PrRecord> for PrDto {
@@ -110,6 +134,7 @@ impl From<&PrRecord> for PrDto {
             head: p.head.clone(),
             revset: p.revset(),
             stack: p.stack,
+            off: p.off,
         }
     }
 }

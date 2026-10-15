@@ -140,6 +140,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::github::open_url,
             commands::github::nearby_prs,
             commands::github::sync_stack_pr,
+            commands::github::edit_back_to_stack_pr,
             commands::github::select_stack_pr,
             commands::github::clear_stack_pr,
             commands::github::pr_preview,

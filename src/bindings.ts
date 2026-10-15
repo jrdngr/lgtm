@@ -226,6 +226,8 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  Picked from the stack, which `@` has since left. */
+	off: boolean,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Opens the workspace's PR on GitHub in the browser. */
 	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
@@ -252,7 +254,28 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  Picked from the stack, which `@` has since left. */
+	off: boolean,
 } | null, string>(__TAURI_INVOKE("sync_stack_pr", { workspace })),
+	/**  Edits the change of the workspace's stack PR, which `@` left. */
+	editBackToStackPr: (workspace: string | null) => typedError<{
+	number: number,
+	/**  `owner/name`. */
+	repo: string,
+	title: string,
+	url: string,
+	author: string,
+	baseRef: string,
+	headRef: string,
+	/**  The head commit as last fetched. */
+	head: string,
+	/**  The revset the workspace reviews. */
+	revset: string,
+	/**  Picked from the workspace's stack rather than checked out into it. */
+	stack: boolean,
+	/**  Picked from the stack, which `@` has since left. */
+	off: boolean,
+} | null, string>(__TAURI_INVOKE("edit_back_to_stack_pr", { workspace })),
 	/**  Picks stack PR `number` as the workspace's PR. With `edit`, edits its change first. */
 	selectStackPr: (workspace: string | null, number: number, edit: boolean) => typedError<PrDto, string>(__TAURI_INVOKE("select_stack_pr", { workspace, number, edit })),
 	/**  Deselects the workspace's stack PR. */
@@ -1107,6 +1130,8 @@ export type PrDto = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  Picked from the stack, which `@` has since left. */
+	off: boolean,
 };
 
 export type PrPreviewDto = {

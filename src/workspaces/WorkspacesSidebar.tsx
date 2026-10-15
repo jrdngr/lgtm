@@ -113,7 +113,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     <div className="workspaces" onContextMenu={menu}>
       <SectionHeader title="Workspaces">
         <IconButton
-          icon="retry"
+          icon="sync"
           label="Refresh"
           disabled={refreshing}
           onClick={(e) => {

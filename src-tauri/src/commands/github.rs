@@ -63,6 +63,19 @@ pub(crate) async fn select_stack_pr(
     pr.map_err(err)
 }
 
+/// Edits the change of the workspace's stack PR, which `@` left.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn edit_back_to_stack_pr(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<Option<PrDto>> {
+    repo(&window)?
+        .edit_back_to_stack_pr(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
 /// Deselects the workspace's stack PR.
 #[tauri::command]
 #[specta::specta]

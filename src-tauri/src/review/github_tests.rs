@@ -54,6 +54,7 @@ async fn pr_workspace(
         added_remote: None,
         head: String::new(),
         stack: false,
+        off: false,
     };
     ctx.store.lock().unwrap().save_pr(&record).unwrap();
     ctx.workspace(Some("pr1")).await.unwrap()

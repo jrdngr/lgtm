@@ -50,6 +50,7 @@ function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void
       <span className="workspace-title">
         <span className="ellipsis">{w.title}</span>
         {w.name === null && <span className="pill">main</span>}
+        {pr?.off && <span className="pill amber">Off stack</span>}
         {pr && (
           <span className="pill purple" title={pr.title}>
             #{pr.number}

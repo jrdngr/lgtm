@@ -213,3 +213,24 @@ async fn the_pr_view_stops_below_the_next_bookmark_up_the_stack() {
     jj(d, &["describe", "-m", "fix"]);
     assert_eq!(descriptions().await, ["pr", "fix"]);
 }
+
+#[tokio::test]
+async fn off_the_stack_the_pr_view_is_the_prs_own_commits() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let commit = |file: &str, bookmark: &str| {
+        write(d, file, file);
+        jj(d, &["commit", "-m", file]);
+        jj(d, &["bookmark", "create", bookmark, "-r", "@-"]);
+    };
+    commit("base", "main");
+    commit("one", "first");
+    commit("two", "feat/pr");
+    commit("three", "feat/next");
+    // `@` went elsewhere, on trunk.
+    jj(d, &["new", "main", "-m", "elsewhere"]);
+    let revset = format!("main..{}", super::head_revset("feat/pr"));
+    let changes = ctx.main.jj.changes(&revset).await.unwrap();
+    let got: Vec<_> = changes.into_iter().map(|c| c.description).collect();
+    assert_eq!(got, ["one", "two"]);
+}

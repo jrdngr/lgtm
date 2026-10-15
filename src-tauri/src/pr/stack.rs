@@ -40,9 +40,9 @@ impl RepoCtx {
         DISMISSED.lock().unwrap().as_ref()?.get(&key).cloned()
     }
 
-    /// Brings the workspace's stack PR in line with `@`: drops it once `@` no longer builds on
-    /// it, and picks the nearest PR under `@` unless that one was deselected. A workspace
-    /// checked out for a PR keeps it. Returns the workspace's PR.
+    /// Brings the workspace's stack PR in line with `@`: switches to the nearest PR under `@`
+    /// unless that one was deselected, and flags the PR as off the stack while no other one
+    /// takes its place. A workspace checked out for a PR keeps it. Returns the workspace's PR.
     pub async fn sync_stack_pr(&self, workspace: Option<&str>) -> anyhow::Result<Option<PrDto>> {
         let key = workspace.unwrap_or("");
         let current = self.store.lock().unwrap().pr(key)?;
@@ -55,24 +55,30 @@ impl RepoCtx {
         if dismissed.is_some() && dismissed.as_deref() != near.map(|p| p.bookmark.as_str()) {
             self.set_dismissed(key, None);
         }
+        let dismissed = self.dismissed(key);
+        let next = near.filter(|n| dismissed.as_deref() != Some(n.bookmark.as_str()));
         if let Some(mut pr) = current {
-            match near {
-                Some(n) if n.bookmark == pr.head_ref => {
+            let was = (pr.head.clone(), pr.off);
+            match (near, next) {
+                (Some(n), _) if n.bookmark == pr.head_ref => {
                     // A push moved what GitHub shows.
-                    if pr.head != n.pushed {
-                        pr.head = n.pushed.clone();
-                        self.store.lock().unwrap().save_pr(&pr)?;
-                    }
-                    return Ok(Some(PrDto::from(&pr)));
+                    pr.head = n.pushed.clone();
+                    pr.off = false;
                 }
-                _ => self.store.lock().unwrap().delete_pr(key)?,
+                (_, Some(n)) => {
+                    self.store.lock().unwrap().delete_pr(key)?;
+                    return self.save_stack_pr(key, n).await.map(Some);
+                }
+                _ => pr.off = true,
             }
+            if (pr.head.clone(), pr.off) != was {
+                self.store.lock().unwrap().save_pr(&pr)?;
+            }
+            return Ok(Some(PrDto::from(&pr)));
         }
-        match near {
-            Some(n) if self.dismissed(key).as_deref() != Some(n.bookmark.as_str()) => {
-                self.save_stack_pr(key, n).await.map(Some)
-            }
-            _ => Ok(None),
+        match next {
+            Some(n) => self.save_stack_pr(key, n).await.map(Some),
+            None => Ok(None),
         }
     }
 
@@ -115,6 +121,24 @@ impl RepoCtx {
         self.select_stack_pr(workspace, number).await
     }
 
+    /// Edits the change of the workspace's stack PR, which `@` left, putting it back on it.
+    pub async fn edit_back_to_stack_pr(
+        &self,
+        workspace: Option<&str>,
+    ) -> anyhow::Result<Option<PrDto>> {
+        let key = workspace.unwrap_or("");
+        let pr = self.store.lock().unwrap().pr(key)?;
+        let Some(pr) = pr.filter(|p| p.stack) else {
+            bail!("this workspace has no PR picked from its stack");
+        };
+        let ws = self.workspace(workspace).await?;
+        ws.jj
+            .edit(&format!("latest({})", pr.head_revset()))
+            .await
+            .with_context(|| format!("edit {}", pr.head_ref))?;
+        self.sync_stack_pr(workspace).await
+    }
+
     /// Deselects the workspace's stack PR. It isn't picked again until another PR is nearest.
     pub fn clear_stack_pr(&self, workspace: Option<&str>) -> anyhow::Result<()> {
         let key = workspace.unwrap_or("");
@@ -152,6 +176,7 @@ impl RepoCtx {
             added_remote: None,
             head: pr.pushed.clone(),
             stack: true,
+            off: false,
         };
         self.store.lock().unwrap().save_pr(&record)?;
         Ok(PrDto::from(&record))
