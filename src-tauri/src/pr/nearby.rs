@@ -67,14 +67,25 @@ fn placed<'a>(b: &'a NearBookmark, near: &'a [NearBookmark]) -> &'a NearBookmark
         .unwrap_or(b)
 }
 
-/// The PRs whose head is one of the bookmarks, nearest `@` first: a PR matches when its head
+/// Where a bookmark sorts in the stack, newest commit first: down the commits above `@`, then
+/// `@` and down its ancestors, then other branches nearest first.
+fn stack_order(b: &NearBookmark) -> (u8, i64) {
+    let d = i64::from(b.distance);
+    match b.side {
+        StackSide::Above => (0, -d),
+        StackSide::At | StackSide::Below => (1, d),
+        StackSide::Beside => (2, d),
+    }
+}
+
+/// The PRs whose head is one of the bookmarks, in stack order: a PR matches when its head
 /// branch has the bookmark's name in the repo the bookmark was pushed to.
 fn match_prs(
     bookmarks: &[(NearBookmark, GhRepo)],
     prs: &[HeadPr],
     near: &[NearBookmark],
 ) -> Vec<NearbyPrDto> {
-    let mut out: Vec<(u32, bool, NearbyPrDto)> = Vec::new();
+    let mut out: Vec<((u8, i64), NearbyPrDto)> = Vec::new();
     for (b, repo) in bookmarks {
         for pr in prs {
             let Some(head) = &pr.head_repository else {
@@ -84,15 +95,14 @@ fn match_prs(
                 && head.name.eq_ignore_ascii_case(&repo.name);
             if pr.head_ref_name != b.name
                 || !same_repo
-                || out.iter().any(|(.., o)| o.number == pr.number)
+                || out.iter().any(|(_, o)| o.number == pr.number)
             {
                 continue;
             }
             let at = placed(b, near);
             let under = matches!(at.side, StackSide::At | StackSide::Below);
             out.push((
-                at.distance,
-                !under,
+                stack_order(at),
                 NearbyPrDto {
                     number: pr.number,
                     title: pr.title.clone(),
@@ -108,12 +118,12 @@ fn match_prs(
             ));
         }
     }
-    out.sort_by_key(|&(d, off, _)| (d, off));
-    out.into_iter().map(|(.., p)| p).collect()
+    out.sort_by_key(|(order, _)| *order);
+    out.into_iter().map(|(_, p)| p).collect()
 }
 
 impl RepoCtx {
-    /// Open PRs of the bookmarks pushed from `workspace`'s stack, nearest `@` first. PRs are
+    /// Open PRs of the bookmarks pushed from `workspace`'s stack, newest commit first. PRs are
     /// looked up in the repo PR numbers refer to, and may come from forks pushed to. They're
     /// asked of GitHub again only with `refresh`, or when the bookmarks change.
     pub async fn nearby_prs(
@@ -232,6 +242,34 @@ mod tests {
     }
 
     #[test]
+    fn prs_list_newest_commit_first() {
+        let remotes = vec![("origin".to_string(), "git@github.com:me/r.git".to_string())];
+        let at = |name: &str, side: StackSide, distance: u32| NearBookmark {
+            side,
+            ..bookmark(name, "origin", distance)
+        };
+        let near = vec![
+            at("at", StackSide::At, 0),
+            at("up1", StackSide::Above, 1),
+            at("down1", StackSide::Below, 1),
+            at("side", StackSide::Beside, 1),
+            at("up2", StackSide::Above, 2),
+            at("down2", StackSide::Below, 2),
+        ];
+        let bookmarks = on_github(near.clone(), &remotes);
+        let prs: Vec<_> = near
+            .iter()
+            .enumerate()
+            .map(|(i, b)| pr(i as u32, &b.name, "me"))
+            .collect();
+        let got: Vec<String> = match_prs(&bookmarks, &prs, &near)
+            .into_iter()
+            .map(|p| p.bookmark)
+            .collect();
+        assert_eq!(got, ["up2", "up1", "at", "down1", "down2", "side"]);
+    }
+
+    #[test]
     fn a_squashed_or_moved_bookmark_is_placed_at_its_local_bookmark() {
         // `fix` was pushed two above `@`, then its commit was squashed below `@`: the local
         // bookmark followed it there, and `@` now builds on the PR.
@@ -244,6 +282,9 @@ mod tests {
         let bookmarks = on_github(near.clone(), &remotes);
         let got = match_prs(&bookmarks, &[pr(1, "fix", "me")], &near);
         let p = &got[0];
-        assert_eq!((p.position.as_str(), p.change.as_str(), p.under), ("@-", "kq", true));
+        assert_eq!(
+            (p.position.as_str(), p.change.as_str(), p.under),
+            ("@-", "kq", true)
+        );
     }
 }
