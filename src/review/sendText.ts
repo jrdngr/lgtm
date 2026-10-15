@@ -59,19 +59,35 @@ export function selectedRowText(
 
 /** File-flat `rows` of one file, in order, as one diff block per hunk. */
 export function rowsText(f: FlatFile, rows: number[]): string {
-  const blocks: string[] = [];
-  // One block per hunk, since rows in different hunks aren't adjacent.
-  let group: number[] = [];
-  const flush = () => {
-    if (group.length) blocks.push(block(f, group));
-    group = [];
-  };
+  return hunks(f, rows)
+    .map((group) => block(f, group))
+    .join("\n\n");
+}
+
+/** Like `rowsText`, with each row's line number before its sign: the old side's for a
+ * removal, the new side's otherwise. */
+export function numberedRowsText(f: FlatFile, rows: number[]): string {
+  return hunks(f, rows)
+    .map((group) => {
+      const nums = group.map((r) => String(f.rows[r].newLine ?? f.rows[r].oldLine ?? ""));
+      const width = Math.max(...nums.map((n) => n.length));
+      const body = group
+        .map((r, i) => `${nums[i].padStart(width)} ${SIGN[f.rows[r].kind]}${f.rows[r].text}`)
+        .join("\n");
+      return `${location(f, group)}\n\`\`\`\n${body}\n\`\`\``;
+    })
+    .join("\n\n");
+}
+
+/** `rows` split per hunk, since rows in different hunks aren't adjacent. */
+function hunks(f: FlatFile, rows: number[]): number[][] {
+  const out: number[][] = [];
   for (const r of rows) {
-    if (group.length && f.rowHunk[r] !== f.rowHunk[group[0]]) flush();
-    group.push(r);
+    const last = out[out.length - 1];
+    if (last && f.rowHunk[r] === f.rowHunk[last[0]]) last.push(r);
+    else out.push([r]);
   }
-  flush();
-  return blocks.join("\n\n");
+  return out;
 }
 
 /** `path:line` or `path:start-end` on the new side, or the old side's with "(removed)"

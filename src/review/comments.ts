@@ -1,4 +1,4 @@
-import type { CommentDto } from "../bindings";
+import type { CommentDto, Message } from "../bindings";
 import type { Moves } from "./follow";
 import {
   changedRows,
@@ -9,7 +9,7 @@ import {
   NEW_COMMENT,
 } from "./model";
 import { quotedReply } from "./prComments";
-import { rowsText } from "./sendText";
+import { numberedRowsText } from "./sendText";
 import { unified } from "./snippet";
 
 /** A comment being written on a selection, before it's saved. */
@@ -96,8 +96,9 @@ export function commentNear(lines: DisplayLine[], cursor: number): number | unde
   return undefined;
 }
 
-/** The comment's code, as it is now or as it was if it's gone, then the comment. A comment on
- * the PR comes with its posts instead, and a quote with what it quotes. */
+/** The comment's code with line numbers, as it is now or as it was if it's gone, then the
+ * comment and its conversation with an agent. A comment on the PR comes with its posts
+ * instead, and a quote with what it quotes. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
   const quote = c.thread?.quote;
   if (quote) return quotedReply(quote.text, c.body);
@@ -109,12 +110,23 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
   const span = c.rows;
   const code =
     f && span
-      ? rowsText(
+      ? numberedRowsText(
           f,
           Array.from({ length: span.end - span.start + 1 }, (_, i) => span.start + i),
         )
       : `${c.path} (this code has changed since)\n${c.snippet}`;
-  return `${code}\n\n${c.body.trim()}`;
+  return [code, c.body.trim(), conversationText(c.messages)].filter(Boolean).join("\n\n");
+}
+
+/** A comment's conversation with an agent, one message after another. Empty without one. */
+export function conversationText(messages: Message[]): string {
+  const said = messages.flatMap((m) => {
+    if (m.author === "agent") return m.text.trim() ? [`Agent:\n${m.text.trim()}`] : [];
+    if (m.compose) return [];
+    const text = m.text.trim() || (m.change ? "Make the change this comment asks for." : "");
+    return text ? [`Me:\n${text}`] : [];
+  });
+  return said.length ? ["Our conversation about it:", ...said].join("\n\n") : "";
 }
 
 /** Where a row is, as `file.ts:12`, or just the file name without a row. */

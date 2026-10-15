@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { CommentDto } from "../bindings";
-import { commentNear, commentSlots, draftFor, followDraft, replyParts } from "./comments";
+import type { CommentDto, Message } from "../bindings";
+import {
+  commentNear,
+  commentSlots,
+  conversationText,
+  draftFor,
+  followDraft,
+  replyParts,
+} from "./comments";
 import { file, layout, review, rows } from "./fixture.test-utils";
 import { buildLines, flatten, hunkRange, NEW_COMMENT } from "./model";
 
@@ -77,5 +84,25 @@ describe("commentNear", () => {
   it("doesn't reach into another hunk", () => {
     expect(lines[7].kind).toBe("hunk");
     expect(commentNear(lines, 8)).toBeUndefined();
+  });
+});
+
+describe("conversationText", () => {
+  it("writes who said what, leaving out compose asks and empty replies", () => {
+    expect(
+      conversationText([
+        { author: "user", text: "", compose: true },
+        { author: "agent", text: "Draft reply" },
+        { author: "user", text: "", change: true },
+        { author: "agent", text: "  " },
+        { author: "user", text: "Why the lock?" },
+      ] as Message[]),
+    ).toBe(
+      "Our conversation about it:\n\nAgent:\nDraft reply\n\nMe:\nMake the change this comment asks for.\n\nMe:\nWhy the lock?",
+    );
+  });
+
+  it("is empty without messages", () => {
+    expect(conversationText([])).toBe("");
   });
 });
