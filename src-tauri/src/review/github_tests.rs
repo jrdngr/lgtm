@@ -119,6 +119,42 @@ async fn a_thread_stays_on_its_line_when_the_working_copy_edits_it() {
 }
 
 #[tokio::test]
+async fn a_thread_on_a_line_the_working_copy_edited_lands_on_its_replacement() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    let head = "fn a() {\n    one();\n    two();\n}\n";
+    write(&ws.root, "a.rs", "fn a() {\n    one();\n    three();\n}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let texts = HashMap::from([("a.rs".to_string(), head.to_string())]);
+    let state = ctx
+        .add_threads(review.id, vec![thread("T1", Some(3))], &texts, "PR #1")
+        .unwrap();
+    let c = &state.comments[0];
+    let span = c.rows.expect("the thread is placed");
+    assert_eq!(row_text(&review, c.file, span.end), "    three();");
+}
+
+#[tokio::test]
+async fn a_thread_whose_line_is_deleted_stays_near_it() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    let head = "fn a() {\n    one();\n    two();\n    four();\n}\n";
+    write(&ws.root, "a.rs", head);
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let texts = HashMap::from([("a.rs".to_string(), head.to_string())]);
+    ctx.add_threads(review.id, vec![thread("T1", Some(3))], &texts, "PR #1")
+        .unwrap();
+
+    write(&ws.root, "a.rs", "fn a() {\n    one();\n    four();\n}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let c = &review.state.comments[0];
+    let span = c.rows.expect("the thread keeps a place");
+    assert_eq!(row_text(&review, c.file, span.end), "    four();");
+}
+
+#[tokio::test]
 async fn quotes_answer_parts_of_a_pr_comment_in_its_place() {
     let (_dir, mut ctx) = repo();
     let base = tempfile::tempdir().unwrap();

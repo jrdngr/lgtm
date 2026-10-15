@@ -201,6 +201,7 @@ type RemapKey = (String, String, usize, Side);
 struct LineMaps {
     exact: HashMap<u32, u32>,
     edited: HashMap<u32, Vec<u32>>,
+    nearest: HashMap<u32, u32>,
 }
 
 /// Line-diff remaps from the file an anchor was taken on to a current file side, cached.
@@ -229,6 +230,7 @@ impl Remaps {
                 Some(LineMaps {
                     exact: anchor::remap_lines(&old, new),
                     edited: anchor::follow_edits(&old, new),
+                    nearest: anchor::nearest_lines(&old, new),
                 })
             })
             .as_ref()
@@ -245,6 +247,22 @@ impl Remaps {
     ) -> Option<usize> {
         let line = self.maps(store, commit, path, rows)?.exact.get(&line)?;
         rows.row_by_line.get(line).copied()
+    }
+
+    /// The candidate of `rows` nearest where `line` is now, kept, edited or deleted.
+    pub fn nearest(
+        &mut self,
+        store: &Store,
+        commit: &str,
+        path: &str,
+        line: u32,
+        rows: &SideRows,
+    ) -> Option<usize> {
+        let at = *self.maps(store, commit, path, rows)?.nearest.get(&line)?;
+        rows.row_by_line
+            .iter()
+            .min_by_key(|&(&l, _)| (l.abs_diff(at), l))
+            .map(|(_, &row)| row)
     }
 
     /// The candidates of `rows` that replaced `line` when it was edited, nearest to its

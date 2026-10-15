@@ -209,6 +209,40 @@ pub fn remap_lines(old: &[i64], new: &[i64]) -> HashMap<u32, u32> {
     map
 }
 
+/// Maps every 1-based line of `old` to the nearest line of `new`: its own when a line diff
+/// keeps it, the first line of its replacement when edited, and the line after where it was
+/// when deleted, or the last line at the end.
+pub fn nearest_lines(old: &[i64], new: &[i64]) -> HashMap<u32, u32> {
+    let last = new.len().max(1);
+    let mut map = HashMap::new();
+    for op in similar::capture_diff_slices(similar::Algorithm::Myers, old, new) {
+        let (old_index, old_len, new_index, kept) = match op {
+            similar::DiffOp::Equal {
+                old_index,
+                new_index,
+                len,
+            } => (old_index, len, new_index, true),
+            similar::DiffOp::Replace {
+                old_index,
+                old_len,
+                new_index,
+                ..
+            }
+            | similar::DiffOp::Delete {
+                old_index,
+                old_len,
+                new_index,
+            } => (old_index, old_len, new_index, false),
+            similar::DiffOp::Insert { .. } => continue,
+        };
+        for i in 0..old_len {
+            let at = if kept { new_index + i } else { new_index };
+            map.insert((old_index + i) as u32 + 1, at.min(last - 1) as u32 + 1);
+        }
+    }
+    map
+}
+
 /// Maps 1-based lines of `old` that a line diff replaces to the lines of their replacement,
 /// nearest to the same offset first.
 pub fn follow_edits(old: &[i64], new: &[i64]) -> HashMap<u32, Vec<u32>> {
@@ -235,6 +269,16 @@ pub fn follow_edits(old: &[i64], new: &[i64]) -> HashMap<u32, Vec<u32>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nearest_lines_follow_kept_edited_and_deleted_lines() {
+        // Old 2 is edited into new 2-3, old 4 is deleted, and old 6 is deleted at the end.
+        let old = [1, 2, 3, 4, 5, 6];
+        let new = [1, 20, 21, 3, 5];
+        let map = nearest_lines(&old, &new);
+        let got: Vec<u32> = (1..=6).map(|l| map[&l]).collect();
+        assert_eq!(got, [1, 2, 4, 5, 5, 5]);
+    }
 
     #[test]
     fn brace_languages_ignore_all_whitespace_and_indent_languages_keep_leading() {

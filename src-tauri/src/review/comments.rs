@@ -69,7 +69,16 @@ impl Review {
 
     /// Where a comment goes, or `None` when none of the review's files is its file.
     fn place(&self, store: &Store, remaps: &mut Remaps, c: Comment) -> Option<CommentDto> {
-        let (file, rows) = self.placement(store, remaps, &c.path, &c.pins)?;
+        let (mut file, mut rows) = self.placement(store, remaps, &c.path, &c.pins)?;
+        if rows.is_none() && c.github.as_ref().is_some_and(|g| !g.outdated) {
+            if let Some(r) = self.near_last_pin(store, remaps, &c.path, &c.pins) {
+                file = r.file;
+                rows = Some(RowSpan {
+                    start: r.row,
+                    end: r.row,
+                });
+            }
+        }
         Some(CommentDto {
             id: c.id as u32,
             path: c.path,
@@ -126,19 +135,8 @@ impl Review {
     /// replaced it and shares some of its context.
     fn locate(&self, store: &Store, remaps: &mut Remaps, path: &str, pin: &Pin) -> Option<RowRef> {
         let path = pin.path.as_deref().unwrap_or(path);
-        let removed = self.removed_paths();
         let anchor = pin.anchor(path);
-        let sides: Vec<SideRows> = self
-            .files
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| {
-                pools(f, pin.side, &removed)
-                    .iter()
-                    .any(|p| p.contains(&path))
-            })
-            .filter_map(|(i, f)| SideRows::new(i, f, pin.side))
-            .collect();
+        let sides = self.pin_sides(path, pin);
         for rows in &sides {
             let mark = MarkRef {
                 id: 0,
@@ -163,6 +161,38 @@ impl Review {
                 .map(|c| (anchor::score(&anchor, c), c))
                 .max_by_key(|(s, _)| *s)?;
             (score > 0).then(|| RowRef::new(rows.file_idx, best.id as u32))
+        })
+    }
+
+    /// The changed rows of each file side a pin on `path` may be on.
+    fn pin_sides(&self, path: &str, pin: &Pin) -> Vec<SideRows<'_>> {
+        let removed = self.removed_paths();
+        self.files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| {
+                pools(f, pin.side, &removed)
+                    .iter()
+                    .any(|p| p.contains(&path))
+            })
+            .filter_map(|(i, f)| SideRows::new(i, f, pin.side))
+            .collect()
+    }
+
+    /// The changed row nearest where the last pin's line is now, for a GitHub thread whose code
+    /// can't be found: it stays on a line near the one GitHub shows it on.
+    fn near_last_pin(
+        &self,
+        store: &Store,
+        remaps: &mut Remaps,
+        path: &str,
+        pins: &[Pin],
+    ) -> Option<RowRef> {
+        let pin = pins.last()?;
+        let path = pin.path.as_deref().unwrap_or(path);
+        self.pin_sides(path, pin).iter().find_map(|rows| {
+            let row = remaps.nearest(store, &pin.commit, path, pin.line, rows)?;
+            Some(RowRef::new(rows.file_idx, row as u32))
         })
     }
 

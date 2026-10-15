@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use anyhow::{Context, bail};
 
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms, pulled_stage};
-use crate::anchor::{FileIndex, Side, norm_for, remap_lines};
+use crate::anchor::{FileIndex, Side, nearest_lines, norm_for, remap_lines};
 use crate::diff::RowKind;
 use crate::store::{Comment, GhLink, ThreadState, Workshop};
 
@@ -82,19 +82,19 @@ impl Review {
         })
     }
 
-    /// The review's new-side lines for `head` lines of `path`, when `head` is known and the
-    /// review shows another commit.
+    /// The review's nearest new-side lines for `head` lines of `path`, when `head` is known
+    /// and the review shows another commit.
     fn head_to_review(&self, path: &str, head: Option<&str>) -> Option<HashMap<u32, u32>> {
         let f = self.files.iter().find(|f| f.path == path)?;
         let ours = f.new.index.as_ref()?;
-        Some(line_map(&hashes(head?, path), &ours.hashes))
+        Some(nearest_lines(&hashes(head?, path), &ours.hashes))
     }
 
     /// Rows a thread covers, or `None` when it's outdated or its file isn't in the review.
     fn thread_rows(&self, t: &PulledThread, head_text: Option<&str>) -> Option<Vec<RowRef>> {
         let line = t.line?;
         let start = t.start.unwrap_or(line).min(line);
-        // A line `@` changed has no counterpart: leave the thread unplaced, not misplaced.
+        // A line `@` edited or deleted goes where its replacement is.
         let (start, line) = match (t.side, self.head_to_review(&t.path, head_text)) {
             (Side::New, Some(map)) => (*map.get(&start)?, *map.get(&line)?),
             _ => (start, line),
