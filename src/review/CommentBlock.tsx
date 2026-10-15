@@ -90,7 +90,7 @@ export function CommentBlock({ id, comment, c }: Props) {
       : (thread?.quote?.text ?? comment.body).split("\n")[0];
     return (
       <div
-        className={`comment-block folded ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.path ? "" : " on-pr"}${thread?.quote ? " quote-block" : ""}`}
+        className={`comment-block folded ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.file === -1 ? " on-pr" : ""}${thread?.quote ? " quote-block" : ""}`}
         onContextMenu={onContextMenu}
       >
         <button

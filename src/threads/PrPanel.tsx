@@ -27,7 +27,7 @@ function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
   const setStage = (s: Stage) =>
     run(unwrap(commands.setThreadStage(review.id, t.id, s)).then(review.apply));
   return [
-    (t.placed || !t.path) && {
+    {
       label: t.path ? "Show Code" : "Show Comment",
       onSelect: () => review.jumpToComment(t.id),
     },
@@ -67,7 +67,7 @@ function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
       aria-current={picked}
       onClick={() => {
         onPick();
-        if (t.placed || !t.path) review.jumpToComment(t.id);
+        review.jumpToComment(t.id);
       }}
       onContextMenu={contextMenu(() => threadMenu(review, t))}
     >

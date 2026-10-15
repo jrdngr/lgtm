@@ -1011,6 +1011,11 @@ button.group-head.fold:hover {
   font-family: var(--mono);
 }
 
+.card-path {
+  color: var(--faint);
+  font-family: var(--mono);
+}
+
 .comment-block.on-pr {
   position: relative;
   margin-left: 12px;

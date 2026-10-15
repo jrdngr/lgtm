@@ -100,8 +100,9 @@ export function useComments({
   const [focus, setFocus] = useState<Focus>();
   const comments = review?.state.comments ?? NONE;
   const threads = review?.state.threads;
-  /** Comments on the PR itself and their quotes, which show above the files. */
-  const onPr = useMemo(() => prComments(threads ?? []), [threads]);
+  /** Comments on the PR itself and their quotes, and threads whose file isn't in the review,
+   * which show above the files. */
+  const onPr = useMemo(() => prComments(threads ?? [], comments), [threads, comments]);
   const byId = (id: number) => comments.find((c) => c.id === id) ?? onPr.find((c) => c.id === id);
 
   // The draft follows its rows when the diff changes, and goes when they do.

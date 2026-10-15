@@ -106,7 +106,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
   return (
     <div
       ref={blockRef}
-      className={`comment-block thread-block${comment.path ? "" : " on-pr"}${quote ? " quote-block" : ""}${done ? " resolved" : ""}`}
+      className={`comment-block thread-block${comment.file === -1 ? " on-pr" : ""}${quote ? " quote-block" : ""}${done ? " resolved" : ""}`}
       onContextMenu={p.onContextMenu}
       onKeyDown={onKey}
     >
@@ -128,6 +128,9 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
             </>
           ) : (
             (gh?.posts[0]?.author ?? "PR")
+          )}
+          {comment.file === -1 && comment.path && (
+            <span className="card-path"> · {comment.path}</span>
           )}
         </span>
         {!split && (

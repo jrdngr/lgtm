@@ -12,11 +12,18 @@ export function prThreads(threads: ThreadDto[]): ThreadDto[] {
   return threads.filter(onPr).flatMap((t) => [t, ...quotes.filter((q) => quoteOf(q) === t.id)]);
 }
 
-/** Comments on the PR and their quotes as comment blocks, which have no code to sit under. */
-export function prComments(threads: ThreadDto[]): CommentDto[] {
-  return prThreads(threads).map((t) => ({
+/** Threads on code whose file the review doesn't show, like one deleted since. */
+export function lostThreads(threads: ThreadDto[], comments: CommentDto[]): ThreadDto[] {
+  const shown = new Set(comments.map((c) => c.id));
+  return threads.filter((t) => t.path && !shown.has(t.id));
+}
+
+/** Comments on the PR and their quotes, then threads whose file the review doesn't show, as
+ * comment blocks with no code to sit under. */
+export function prComments(threads: ThreadDto[], comments: CommentDto[]): CommentDto[] {
+  return [...prThreads(threads), ...lostThreads(threads, comments)].map((t) => ({
     id: t.id,
-    path: "",
+    path: t.path,
     file: -1,
     rows: null,
     body: t.body,

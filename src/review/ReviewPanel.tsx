@@ -408,7 +408,7 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           onFileMenu={openFileMenu}
           renderComment={(id) => (
             <>
-              {id === c.onPr[0]?.id && <PrCommentsHead comments={c.onPr} />}
+              <PrCommentsHead comments={c.onPr} id={id} />
               <CommentBlock id={id} comment={navComments.find((x) => x.id === id)} c={c} />
             </>
           )}
