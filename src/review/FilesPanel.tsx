@@ -11,7 +11,7 @@ import { STATUS_LABEL } from "./FileHeader";
 import { type LineStat, lineStat, sumStats } from "./lineStat";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
-import { filterLabel, matchesFilter, type Progress, plural, progressTitle } from "./state";
+import { filterLabel, matchesFilter, type Progress, progressTitle } from "./state";
 import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
 import { useSendFromMenu } from "./useSendText";
 import "./FilesPanel.css";
@@ -140,7 +140,6 @@ export function FilesPanel() {
     );
   }
   const p = tree.progress;
-  const pct = p.changed ? Math.floor((p.done / p.changed) * 100) : 100;
   const filter = filterLabel(review.filter, setup);
   const anyClosed = closed.size > 0;
   const total = sumStats(
@@ -155,11 +154,13 @@ export function FilesPanel() {
         meta={
           <>
             <Diffstat stat={total} />
+            {p.changed > 0 && review.filter !== "all" && <span>{filter}</span>}
             {p.changed > 0 && (
-              <span title={progressTitle(p, setup)}>
-                {review.filter === "all" ? "" : `${filter} · `}
-                {p.done} of {p.changed} {plural(p.changed)} done · {pct}%
-              </span>
+              <Ring
+                done={p.done === p.changed ? 1 : Math.min(p.done / p.changed, 0.99)}
+                title={progressTitle(p, setup)}
+                percent
+              />
             )}
           </>
         }
