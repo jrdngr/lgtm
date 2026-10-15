@@ -9,9 +9,14 @@ newer code already addressed it.
 
 ## Take
 
-- Lead with the verdict: agree, change (agree, with a different fix), disagree, decide (my
-  call), or answer (the comment asks a question). Follow with the facts that justify it: sizes, call sites, what a later plan needs,
-  what the change would cost.
+- Lead with the verdict:
+  - agree: I make the change as asked.
+  - change: I change code in this PR, but differently than asked.
+  - disagree: I don't change code in this PR, including "not now" and "separate work".
+  - decide: my call.
+  - answer: the comment asks a question.
+- Follow with the facts that justify it: sizes, call sites, what a later plan needs, what the
+  change would cost.
 - Agree when the reviewer is right. Don't disagree to look independent.
 - Disagree only with a concrete reason. "Leave the door open" is fine when it names the
   condition that would change the answer.
