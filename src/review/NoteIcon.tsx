@@ -11,13 +11,16 @@ export function NoteIcon({ category, level }: { category: Category; level?: stri
   );
 }
 
-const LEVEL_PILL: Record<string, string> = { high: "pill red", medium: "pill amber" };
+const FILLED: Record<string, number> = { high: 3, medium: 2, low: 1 };
 
-/** An important note's level as a pill: High, Medium, or Low. */
-export function LevelPill({ level }: { level: string }) {
+/** An important note's level as three dots, filled one for low up to all three for high. */
+export function LevelDots({ level }: { level: string }) {
+  const filled = FILLED[level] ?? 0;
   return (
-    <span className={LEVEL_PILL[level] ?? "pill"}>
-      {level.charAt(0).toUpperCase() + level.slice(1)}
+    <span className={`level-dots level-${level}`} role="img" aria-label={level}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={i < filled ? "on" : undefined} />
+      ))}
     </span>
   );
 }

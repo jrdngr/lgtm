@@ -7,7 +7,7 @@ import { useWorkspace } from "../workspaces/context";
 import { rowLabel } from "./comments";
 import type { CurrentReview } from "./current";
 import { noteCommentText } from "./NoteBlock";
-import { LevelPill, NoteIcon } from "./NoteIcon";
+import { LevelDots, NoteIcon } from "./NoteIcon";
 import { CATEGORIES, CATEGORY_ORDER, flowLabel, tours } from "./notes";
 import { rowsText } from "./sendText";
 import { activeTour, goToStep, setHidden, setTourState, stepTour, useTourState } from "./tour";
@@ -156,7 +156,7 @@ export function WalkthroughTour({ review }: { review: CurrentReview }) {
                 <span className="note-path-text">
                   <span className="note-path-title">{n.title}</span>
                   <span className="note-path-where">
-                    {n.category === "important" && n.level && <LevelPill level={n.level} />}
+                    {n.category === "important" && n.level && <LevelDots level={n.level} />}
                     {flow && <span className="pill">{flow}</span>}
                     {rowLabel(review.files, n.file, n.path, n.rows?.start)}
                     {!n.rows && <span className="pill amber">code changed</span>}

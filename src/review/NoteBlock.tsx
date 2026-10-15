@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { NoteDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { IconButton } from "../ui/icons";
-import { LevelPill, NoteIcon } from "./NoteIcon";
+import { LevelDots, NoteIcon } from "./NoteIcon";
 import { CATEGORIES } from "./notes";
 import "./notes.css";
 
@@ -39,7 +39,7 @@ export function NoteBlock({ note, current, flowLabel, kept, onComment, canDraft 
           <NoteIcon category={note.category} level={note.level} />
         </span>
         <span className="note-title">{note.title}</span>
-        {note.category === "important" && note.level && <LevelPill level={note.level} />}
+        {note.category === "important" && note.level && <LevelDots level={note.level} />}
         {flowLabel && <span className="pill">{flowLabel}</span>}
         <span className="spacer" />
         {kept ? (
