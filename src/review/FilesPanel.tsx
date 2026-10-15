@@ -7,7 +7,7 @@ import { useWorkspace } from "../workspaces/context";
 import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { Diffstat } from "./Diffstat";
-import { type LineStat, lineStat, sumStats } from "./diffstat";
+import { type LineStat, lineStat, sumStats } from "./lineStat";
 import { STATUS_LABEL } from "./FileHeader";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
