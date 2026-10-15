@@ -25,6 +25,9 @@ interface Props {
   /** Clears the file's marks and unchecks it. */
   onClear(): void;
   onContextMenu(e: React.MouseEvent): void;
+  /** Whether amber rows show. */
+  amber: boolean;
+  onToggleAmber(): void;
 }
 
 /** Checkbox, collapse button, path, tags, and marks by color. The checkbox gets a ring once
@@ -58,7 +61,15 @@ export function FileHeader(props: Props) {
         <Path path={dto.path} />
       </span>
       {check === "changedSinceReviewed" && (
-        <span className="tag amber">changed since reviewed</span>
+        <button
+          type="button"
+          className={`tag amber${props.amber ? " on" : ""}`}
+          aria-pressed={props.amber}
+          onMouseDown={stop}
+          onClick={props.onToggleAmber}
+        >
+          changed since reviewed
+        </button>
       )}
       {dto.skipped && <span className="tag">skipped</span>}
       {dto.oldExec !== dto.newExec && <span className="tag">{dto.newExec ? "+x" : "-x"}</span>}

@@ -73,6 +73,12 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
   const review = loaded?.review;
   const setup = useMarkSetup();
   const { files, index, rowState, progress } = useReviewState(review, setup.done);
+  /** Whether rows changed since they were marked or their file was checked show amber. */
+  const [amber, setAmber] = useState(true);
+  const shown = useMemo(
+    () => (amber ? index : { ...index, amber: new Set<string>() }),
+    [amber, index],
+  );
   const markers = useMemo(() => files.map(symbolMarkers), [files]);
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
@@ -393,7 +399,9 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           markers={markers}
           lines={lines}
           mode={mode}
-          index={index}
+          index={shown}
+          amber={amber}
+          onToggleAmber={() => setAmber((a) => !a)}
           setup={setup}
           progress={progress}
           selection={sel}

@@ -65,6 +65,9 @@ interface Props extends LineHandlers {
   lines: DisplayLine[];
   mode: ViewMode;
   index: MarkIndex;
+  /** Whether amber rows show. */
+  amber: boolean;
+  onToggleAmber(): void;
   setup: MarkSetup;
   progress: Progress[];
   selection: Selection;
@@ -170,6 +173,8 @@ export function DiffLines(props: Props) {
         onToggle={() => props.onToggleFile(fileIdx)}
         onCheck={(checked) => props.onCheckFile(fileIdx, checked)}
         onClear={() => props.onClearFile(fileIdx)}
+        amber={props.amber}
+        onToggleAmber={props.onToggleAmber}
         onContextMenu={(e) => props.onFileMenu(e, fileIdx)}
       />
     );

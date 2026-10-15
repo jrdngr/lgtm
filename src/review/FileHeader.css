@@ -83,6 +83,15 @@
 .file-header .tag.amber {
   color: var(--amber);
   border-color: var(--amber);
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.file-header .tag.amber.on {
+  color: var(--bg);
+  background: var(--amber);
 }
 
 .file-header .spacer {
