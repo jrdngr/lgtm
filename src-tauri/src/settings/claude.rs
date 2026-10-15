@@ -2,7 +2,10 @@
 //! is. Otherwise the login shell says what the name is: an alias is expanded once and run
 //! directly, and a function runs through the shell on every call.
 
+use std::io::Read;
+use std::process::Stdio;
 use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
 use serde::Serialize;
@@ -69,17 +72,42 @@ fn on_path(name: &str) -> bool {
     crate::tools::which(name).is_some()
 }
 
+/// How long the login shell gets to say what a name is. Shell startup can hang without a
+/// terminal, and tool checks wait on this.
+const SHELL_TIMEOUT: Duration = Duration::from_secs(10);
+
 /// Asks the login shell what `name` is.
 fn ask_shell(shell: &str, name: &str) -> anyhow::Result<String> {
     let quoted = shlex::try_quote(name)?;
     let script = format!("printf '\\n__LGTM_CMD__%s' \"$(command -v -- {quoted})\"");
-    let out = std::process::Command::new(shell)
+    let mut child = std::process::Command::new(shell)
         .args(["-l", "-i", "-c", &script])
-        .stdin(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .output()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
         .with_context(|| format!("couldn't run {shell}"))?;
-    let out = String::from_utf8_lossy(&out.stdout);
+    let mut stdout = child.stdout.take().context("no stdout")?;
+    // Read alongside the wait, so a full pipe can't stall the shell.
+    let reader = std::thread::spawn(move || {
+        let mut out = Vec::new();
+        stdout.read_to_end(&mut out).ok();
+        out
+    });
+    let start = Instant::now();
+    while child.try_wait()?.is_none() {
+        if start.elapsed() > SHELL_TIMEOUT {
+            child.kill().ok();
+            child.wait().ok();
+            bail!(
+                "your login shell ({shell}) didn't start in {}s",
+                SHELL_TIMEOUT.as_secs()
+            );
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let out = reader.join().unwrap_or_default();
+    let out = String::from_utf8_lossy(&out);
     Ok(out
         .rsplit_once("__LGTM_CMD__")
         .map(|(_, v)| v.to_string())

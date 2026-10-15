@@ -1,6 +1,7 @@
 //! Checks that the command-line tools the app runs are installed and new enough.
 
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::Serialize;
 use specta::Type;
@@ -19,7 +20,13 @@ pub struct ToolProblem {
     pub fix: String,
     /// Whether the app can't work without it. Otherwise only some features need it.
     pub required: bool,
+    /// Why it couldn't be checked, like a `--version` that never finished.
+    pub error: Option<String>,
 }
+
+/// How long `--version` gets. A Claude command that goes through a wrapper or the login
+/// shell can hang, and the app waits on this check before showing anything.
+const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
 
 struct Tool {
     name: &'static str,
@@ -70,7 +77,7 @@ fn parse_version(out: &str) -> Option<(u32, u32, u32)> {
         })
 }
 
-fn problem(tool: &Tool, out: Option<&str>) -> Option<ToolProblem> {
+fn problem(tool: &Tool, out: Result<&str, Option<&str>>) -> Option<ToolProblem> {
     let (major, minor, patch) = tool.minimum;
     let minimum = format!("{major}.{minor}.{patch}");
     let make = |found: Option<String>, fix: &str| ToolProblem {
@@ -79,9 +86,16 @@ fn problem(tool: &Tool, out: Option<&str>) -> Option<ToolProblem> {
         minimum: minimum.clone(),
         fix: fix.to_string(),
         required: tool.required,
+        error: None,
     };
-    let Some(out) = out else {
-        return Some(make(None, tool.install));
+    let out = match out {
+        Ok(out) => out,
+        Err(error) => {
+            return Some(ToolProblem {
+                error: error.map(str::to_string),
+                ..make(None, tool.install)
+            });
+        }
     };
     match parse_version(out) {
         Some(v) if v >= tool.minimum => None,
@@ -111,16 +125,29 @@ pub fn which(name: &str) -> Option<PathBuf> {
         .find(|p| p.is_file())
 }
 
-async fn version(name: &str) -> Option<String> {
+/// `name --version`'s output. Fails with why it couldn't be checked, or `None` when it isn't
+/// installed.
+async fn version(name: &str) -> Result<String, Option<String>> {
     let mut cmd = if name == "claude" {
-        settings::claude::command().ok()?
+        settings::claude::command().map_err(|e| Some(format!("{e:#}")))?
     } else {
         Command::new(name)
     };
-    let out = cmd.arg("--version").output().await.ok()?;
+    cmd.arg("--version").kill_on_drop(true);
+    let out = match tokio::time::timeout(VERSION_TIMEOUT, cmd.output()).await {
+        Ok(Ok(out)) => out,
+        Ok(Err(_)) => return Err(None),
+        Err(_) => {
+            return Err(Some(format!(
+                "`{name} --version` didn't finish in {}s",
+                VERSION_TIMEOUT.as_secs()
+            )));
+        }
+    };
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+        .ok_or(None)
 }
 
 /// Every tool, found or not.
@@ -142,9 +169,10 @@ pub async fn status() -> Vec<ToolStatus> {
             location,
             version: out
                 .as_deref()
+                .ok()
                 .and_then(parse_version)
                 .map(|(a, b, c)| format!("{a}.{b}.{c}")),
-            problem: problem(tool, out.as_deref()),
+            problem: problem(tool, out.as_deref().map_err(Option::as_deref)),
         });
     }
     found
@@ -168,15 +196,15 @@ mod tests {
         assert_eq!(parse_version("jj 0.46.0-abc\n"), Some((0, 46, 0)));
         assert_eq!(parse_version("2.1.296 (Claude Code)"), Some((2, 1, 296)));
         let [jj, claude, gh] = &TOOLS;
-        assert_eq!(problem(jj, Some("jj 0.46.0")), None);
-        let old = problem(jj, Some("jj 0.39.1")).unwrap();
+        assert_eq!(problem(jj, Ok("jj 0.46.0")), None);
+        let old = problem(jj, Ok("jj 0.39.1")).unwrap();
         assert_eq!(
             (old.found.as_deref(), old.fix.as_str()),
             (Some("0.39.1"), "brew upgrade jj")
         );
-        let missing = problem(claude, None).unwrap();
+        let missing = problem(claude, Err(None)).unwrap();
         assert!(missing.found.is_none() && !missing.required);
-        assert_eq!(problem(claude, Some("2.1.22 (Claude Code)")), None);
-        assert_eq!(problem(gh, Some("gh version 2.102.0 (2026-09-30)\n")), None);
+        assert_eq!(problem(claude, Ok("2.1.22 (Claude Code)")), None);
+        assert_eq!(problem(gh, Ok("gh version 2.102.0 (2026-09-30)\n")), None);
     }
 }

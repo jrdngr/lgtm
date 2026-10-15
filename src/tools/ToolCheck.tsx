@@ -11,9 +11,11 @@ const NEEDED_BY: Record<string, string> = {
 };
 
 function describe(p: ToolProblem) {
-  const what = p.found
-    ? `${p.tool} ${p.found} is older than ${p.minimum}`
-    : `${p.tool} isn't installed`;
+  const what = p.error
+    ? p.error
+    : p.found
+      ? `${p.tool} ${p.found} is older than ${p.minimum}`
+      : `${p.tool} isn't installed`;
   const needs = p.required ? "LGTM needs it." : `${NEEDED_BY[p.tool] ?? "Some features"} need it.`;
   return `${what}. ${needs}`;
 }
@@ -39,7 +41,13 @@ export function ToolCheck({ children }: { children: ReactNode }) {
     check();
   }, []);
 
-  if (!problems) return null;
+  if (!problems) {
+    return (
+      <div className="tool-check">
+        <Busy>Checking tools…</Busy>
+      </div>
+    );
+  }
   if (problems.length === 0 || dismissed) return <>{children}</>;
   const blocking = problems.some((p) => p.required);
   return (

@@ -1671,6 +1671,8 @@ export type ToolProblem = {
 	fix: string,
 	/**  Whether the app can't work without it. Otherwise only some features need it. */
 	required: boolean,
+	/**  Why it couldn't be checked, like a `--version` that never finished. */
+	error: string | null,
 };
 
 /**  A tool as found: where it is, its version, and what's wrong with it. */
