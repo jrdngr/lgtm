@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { CommentDto } from "../bindings";
+import type { CommentDto, Stage } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar } from "../github/Post";
 import { viewerLogin } from "../github/people";
+import { STAGES } from "../threads/stages";
 import { TakePill } from "../threads/ThreadBits";
 import { useAgentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
@@ -27,6 +28,12 @@ interface Props {
   id: number;
   comment?: CommentDto;
   c: Comments;
+}
+
+/** A thread's stage as a pill in its stage's color. */
+function StagePill({ stage }: { stage: Stage }) {
+  const [, name, tone] = STAGES.find(([s]) => s === stage) ?? [stage, stage, ""];
+  return <span className={`pill${tone ? ` ${tone}` : ""}`}>{name}</span>;
 }
 
 /** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
@@ -91,11 +98,14 @@ export function CommentBlock({ id, comment, c }: Props) {
           onClick={() => setFold(false)}
         >
           <span className="chevron">▸</span>
-          {done && (
+          {done ? (
             <span className={`pill${gh?.resolved ? " green" : ""}`}>
               {gh?.resolved ? "✓ Resolved" : "✓ Done"}
             </span>
+          ) : (
+            thread && <StagePill stage={thread.stage} />
           )}
+          {gh?.outdated && <span className="pill">Outdated</span>}
           <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
           {gh && <span className="card-count">{gh.posts.length}</span>}
