@@ -1,6 +1,5 @@
 //! Agent steps on a PR's threads: triage gives each new thread a take, a summary and a draft
-//! reply; a fix run changes the code for the threads to fix. The rules for takes and replies
-//! are the user's `reply.md` prompt. Agents never post anything.
+//! reply. The rules for takes and replies are the user's `reply.md` prompt. Agents never post anything.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -12,7 +11,7 @@ use super::workshop::Ask;
 use super::{RepoCtx, StateDto, ThreadDto};
 use crate::agent::{self, Progress, Runs};
 use crate::prompts::{self, Prompt};
-use crate::store::{Author, Comment, Message, Stage, Take, TakeVerdict};
+use crate::store::{Comment, Stage, Take, TakeVerdict};
 use crate::workspace::Workspace;
 
 const VERDICTS: &str = r#"{ "enum": ["agree", "change", "disagree", "decide", "answer"] }"#;
@@ -45,29 +44,6 @@ fn triage_schema() -> String {
 }}"#
     )
 }
-
-const FIX_SCHEMA: &str = r#"{
-  "type": "object",
-  "properties": {
-    "threads": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": { "type": "integer" },
-          "fixed": { "type": "boolean" },
-          "differs": { "type": "boolean" },
-          "note": { "type": "string" },
-          "reply": { "type": "string" }
-        },
-        "required": ["id", "fixed", "differs", "note"],
-        "additionalProperties": false
-      }
-    }
-  },
-  "required": ["threads"],
-  "additionalProperties": false
-}"#;
 
 /// The schema a chat turn on a thread answers with.
 pub(super) fn chat_schema() -> String {
@@ -113,15 +89,6 @@ struct Triaged {
 }
 
 #[derive(Deserialize)]
-struct Fixed {
-    id: i64,
-    fixed: bool,
-    differs: bool,
-    note: String,
-    reply: Option<String>,
-}
-
-#[derive(Deserialize)]
 struct List<T> {
     threads: Vec<T>,
 }
@@ -156,16 +123,6 @@ fn triaged_stage(skip: bool, verdict: TakeVerdict, reply: bool) -> Stage {
         (_, TakeVerdict::Decide, _) => Stage::Decide,
         (_, TakeVerdict::Agree, false) | (_, TakeVerdict::Change, _) => Stage::ToFix,
         _ => Stage::Reply,
-    }
-}
-
-/// Where a fixed thread goes: ready when it was fixed as asked with nothing to say, else to
-/// its reply.
-fn fixed_stage(fixed: bool, has_reply: bool) -> Stage {
-    match (fixed, has_reply) {
-        (false, _) => Stage::ToFix,
-        (true, false) => Stage::Ready,
-        (true, true) => Stage::Reply,
     }
 }
 
@@ -332,88 +289,6 @@ impl RepoCtx {
         })
     }
 
-    /// Has an agent change the code in `@` for the threads to fix. `on_tool` hears each tool
-    /// call.
-    pub async fn fix_threads(
-        &self,
-        id: u32,
-        runs: &Runs,
-        on_tool: impl Fn(String),
-    ) -> anyhow::Result<StateDto> {
-        let to_fix = self.threads_at(id, Stage::ToFix)?;
-        anyhow::ensure!(!to_fix.is_empty(), "no threads to fix");
-        let run = runs.register(&self.agent_key(&format!("fix-threads-{id}")))?;
-        let (ws, context, rules) = self.replies_context(id).await?;
-        let revset = self.review(id)?.lock().unwrap().revset.clone();
-        anyhow::ensure!(
-            ws.jj.includes_working_copy(&revset).await?,
-            super::NOT_AT_WORKING_COPY
-        );
-        let _busy = ws.claim()?;
-        let threads: Vec<String> = to_fix.iter().map(thread_text).collect();
-        let prompt = format!(
-            "{context}\n\nYou're in the repository. Make the changes these review threads ask \
-             for by editing the files directly, changing only what's needed. You can't run \
-             commands.\n\n{rules}\n\nReturn one result per thread with its id: whether you \
-             fixed it, whether your fix differs from what the reviewer asked, a sentence on \
-             what you did, and when it differs, a reply saying what changed and why.\n\n{}",
-            threads.join("\n\n---\n\n")
-        );
-        let reply = agent::run_registered(
-            run,
-            agent::Task {
-                cwd: &ws.root,
-                prompt: &prompt,
-                resume: None,
-                edit: true,
-                schema: Some(FIX_SCHEMA),
-                purpose: agent::Purpose::Replies,
-            },
-            |p| {
-                if let Progress::Tool(t) = p {
-                    on_tool(t)
-                }
-            },
-        )
-        .await;
-        // Pick up the edits now rather than waiting on the watcher.
-        ws.snapshot().await.ok();
-        let reply = reply?;
-        if reply.stopped {
-            return self.comment_edit(id, |_, _| Ok(()));
-        }
-        let list: List<Fixed> =
-            serde_json::from_value(reply.structured.context("the fix returned no result")?)
-                .context("the fix returned an unexpected result")?;
-        self.comment_edit(id, |_, store| {
-            for r in list.threads {
-                let Some(mut c) = store.comment(r.id)? else {
-                    continue;
-                };
-                let Some(mut t) = c.thread.take().filter(|t| t.stage == Stage::ToFix) else {
-                    continue;
-                };
-                let reply = r.reply.filter(|s| r.differs && !s.trim().is_empty());
-                if let (Some(reply), true) = (&reply, c.body.trim().is_empty()) {
-                    store.set_comment_body(c.id, reply, super::now_ms())?;
-                }
-                let has_reply = reply.is_some() || !c.body.trim().is_empty();
-                t.stage = fixed_stage(r.fixed, has_reply);
-                store.set_thread(c.id, &Some(t))?;
-                c.workshop.messages.push(Message {
-                    author: Author::Agent,
-                    text: format!("Fix: {}", r.note),
-                    change: false,
-                    updated: false,
-                    compose: false,
-                    before: None,
-                });
-                store.set_workshop(c.id, &c.workshop)?;
-            }
-            Ok(())
-        })
-    }
-
     /// The threads of the review open in `workspace`, for a terminal agent.
     pub fn agent_threads(&self, workspace: Option<&str>) -> anyhow::Result<Vec<ThreadDto>> {
         let (_, threads) = self.with_current(workspace, |r| r.threads.clone())?;
@@ -466,7 +341,6 @@ impl RepoCtx {
 
     pub fn stop_thread_run(&self, id: u32, runs: &Runs) {
         runs.stop(&self.agent_key(&format!("triage-{id}")));
-        runs.stop(&self.agent_key(&format!("fix-threads-{id}")));
     }
 }
 
@@ -555,13 +429,6 @@ mod tests {
         assert_eq!(triaged_stage(false, Change, true), Stage::ToFix);
         assert_eq!(triaged_stage(false, Agree, true), Stage::Reply);
         assert_eq!(triaged_stage(false, Disagree, true), Stage::Reply);
-    }
-
-    #[test]
-    fn a_fix_that_needs_saying_goes_to_its_reply() {
-        assert_eq!(fixed_stage(true, false), Stage::Ready);
-        assert_eq!(fixed_stage(true, true), Stage::Reply);
-        assert_eq!(fixed_stage(false, false), Stage::ToFix);
     }
 
     #[test]

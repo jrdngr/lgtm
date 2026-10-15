@@ -65,11 +65,6 @@
   color: var(--fg);
 }
 
-.stage-act {
-  padding: 1px 7px;
-  font-size: var(--fs-xs);
-}
-
 .stage-count {
   min-width: 14px;
   text-align: right;

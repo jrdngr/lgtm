@@ -108,7 +108,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::workshop_comment,
             commands::comments::stop_workshop,
             commands::comments::triage_threads,
-            commands::comments::fix_threads,
             commands::comments::stop_thread_run,
             commands::bots::start_bots,
             commands::bots::continue_bots,

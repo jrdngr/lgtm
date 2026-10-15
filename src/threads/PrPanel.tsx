@@ -17,7 +17,7 @@ import { useWorkspace } from "../workspaces/context";
 import { SendBox } from "./SendBox";
 import { byStage, STAGES, threadLabel, threadWhere, working } from "./stages";
 import { TakePill } from "./ThreadBits";
-import { finalText, threadText } from "./text";
+import { finalText } from "./text";
 import { useThreadRun } from "./useThreadRun";
 import "../review/comments.css";
 import "./threads.css";
@@ -90,16 +90,13 @@ interface ListProps {
   review: CurrentReview;
   threads: ThreadDto[];
   runner: ReturnType<typeof useThreadRun>;
-  onError(e: string | undefined): void;
 }
 
 const CONVERSATION = "conversation";
 
 /** Comments on the PR with their quotes, then threads on code grouped by stage in work order,
- * Done folded. Picking a thread shows its comment in the review. The To fix group can be fixed
- * by an agent or sent to a terminal. */
-function ThreadGroups({ review, threads, runner, onError }: ListProps) {
-  const agentsOff = useAgentsOff();
+ * Done folded. Picking a thread shows its comment in the review. */
+function ThreadGroups({ review, threads, runner }: ListProps) {
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set(["done"]));
   const [picked, setPicked] = useState<number>();
   if (threads.length === 0) {
@@ -116,11 +113,6 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
       return next;
     });
   const split = quoted(threads);
-  const toFix = working(threads).filter((t) => t.state.stage === "toFix");
-  const sendToFix = () =>
-    review.send(toFix.map(threadText).join("\n\n---\n\n"), undefined, (o) =>
-      onError("error" in o ? o.error : undefined),
-    );
   const row = (t: ThreadDto, extra?: Partial<RowProps>) => (
     <ThreadRow
       key={t.id}
@@ -170,29 +162,7 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
         const [, name, tone] = STAGES.find(([s]) => s === stage) ?? [];
         return (
           <div key={stage}>
-            {head(
-              stage,
-              name ?? stage,
-              tone,
-              <>
-                {stage === "toFix" && !agentsOff && (
-                  <button
-                    type="button"
-                    className="stage-act"
-                    disabled={!!runner.run}
-                    onClick={() => runner.start("fix")}
-                  >
-                    Fix {toFix.length}
-                  </button>
-                )}
-                {stage === "toFix" && (
-                  <button type="button" className="stage-act" onClick={sendToFix}>
-                    Send {toFix.length} to terminal
-                  </button>
-                )}
-                <span className="stage-count">{group.length}</span>
-              </>,
-            )}
+            {head(stage, name ?? stage, tone, <span className="stage-count">{group.length}</span>)}
             {!folded.has(stage) && group.map((t) => row(t))}
           </div>
         );
@@ -238,7 +208,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
     if (e.key !== "t" || e.metaKey || e.ctrlKey || e.altKey || !canTriage) return;
     e.preventDefault();
-    runner.start("triage");
+    runner.start();
   }
 
   return (
@@ -251,11 +221,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
             </button>
           )}
           {canTriage && (
-            <button
-              type="button"
-              className="pr-head-btn triage"
-              onClick={() => runner.start("triage")}
-            >
+            <button type="button" className="pr-head-btn triage" onClick={() => runner.start()}>
               Triage {fresh} <kbd>t</kbd>
             </button>
           )}
@@ -265,7 +231,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
         <div className="threads-run">
           <Spinner />
           <span>
-            {runner.run.kind === "triage" ? "Triaging" : "Fixing"} {runner.run.threads.size}{" "}
+            Triaging {runner.run.threads.size}{" "}
             {runner.run.threads.size === 1 ? "thread" : "threads"}
             {runner.run.activity && ` · ${runner.run.activity}`}
           </span>
@@ -279,7 +245,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
       <div className="comments-scroll">
         <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
         {review ? (
-          <ThreadGroups review={review} threads={threads} runner={runner} onError={setError} />
+          <ThreadGroups review={review} threads={threads} runner={runner} />
         ) : (
           <Empty>No review open</Empty>
         )}

@@ -6,12 +6,9 @@ import type { CurrentReview } from "../review/current";
 import { useWorkspace } from "../workspaces/context";
 import { working } from "./stages";
 
-export type RunKind = "triage" | "fix";
-
-/** A triage or fix run over a review's threads: the threads it covers and what the agent is
+/** A triage run over a review's threads: the threads it covers and what the agent is
  * doing now. */
 export interface ThreadRun {
-  kind: RunKind;
   activity: string;
   threads: ReadonlySet<number>;
 }
@@ -38,29 +35,28 @@ export function useRunOn(review: number | undefined) {
 /** Whether a triage run covers comment `id` of `review`. */
 export function useTriaging(review: number | undefined, id: number) {
   const run = useRunOn(review);
-  return run?.kind === "triage" && run.threads.has(id);
+  return !!run?.threads.has(id);
 }
 
-/** Starts and stops triage and fix runs over the PR's threads. */
+/** Starts and stops triage runs over the PR's threads. */
 export function useThreadRun(review: CurrentReview | undefined, onError: (e: string) => void) {
   const workspace = useWorkspace();
   const run = useRunOn(review?.id);
 
-  async function start(kind: RunKind) {
+  async function start() {
     if (!review || runs.has(review.id)) return;
     const id = review.id;
-    const stage = kind === "triage" ? "new" : "toFix";
     const threads = new Set(
       working(review.threads)
-        .filter((t) => t.state.stage === stage)
+        .filter((t) => t.state.stage === "new")
         .map((t) => t.id),
     );
-    set(id, { kind, activity: "", threads });
+    set(id, { activity: "", threads });
     const handle = startRun(workspace, {
-      kind,
-      subject: kind === "triage" ? "PR threads" : "Threads to fix",
+      kind: "triage",
+      subject: "PR threads",
       stop: () => commands.stopThreadRun(id),
-      retry: () => start(kind),
+      retry: () => start(),
     });
     const channel = new Channel<string>();
     channel.onmessage = (activity) => {
@@ -68,8 +64,7 @@ export function useThreadRun(review: CurrentReview | undefined, onError: (e: str
       if (r) set(id, { ...r, activity });
       handle.activity(activity);
     };
-    const go = kind === "triage" ? commands.triageThreads : commands.fixThreads;
-    const r = await go(id, channel);
+    const r = await commands.triageThreads(id, channel);
     set(id, undefined);
     endFrom(handle, r);
     if (r.status === "error") onError(r.error);

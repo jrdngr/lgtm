@@ -10,19 +10,6 @@ export function unanswered(posts: GhPost[], viewer?: string): [GhPost[], GhPost[
   return [posts.slice(0, at), posts.slice(at)];
 }
 
-/** A thread as text for a terminal agent: where it is, the code, and what was said. */
-export function threadText(t: ThreadDto): string {
-  const posts = (t.github?.posts ?? []).map((p) => `${p.author}: ${p.body.trim()}`);
-  const code = t.snippet ? `\n${t.snippet}\n` : "";
-  const quote = t.state.quote;
-  const ask = quote
-    ? `${quote.author}: ${quote.text.trim()}`
-    : t.github
-      ? posts.join("\n\n")
-      : t.body.trim();
-  return `${t.path || "The PR"} (${threadWhere(t)})${code}\n${ask}`;
-}
-
 /** The final replies laid out to paste elsewhere: final replies, threads fixed as asked, and
  * the ones still open. */
 export function finalText(threads: ThreadDto[]): string {

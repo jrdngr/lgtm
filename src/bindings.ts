@@ -150,12 +150,7 @@ export const commands = {
 	stopWorkshop: (comment: number) => typedError<null, string>(__TAURI_INVOKE("stop_workshop", { comment })),
 	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
 	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
-	/**
-	 *  Has an agent change the code for the threads to fix, reporting each tool call through
-	 *  `on_tool`.
-	 */
-	fixThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("fix_threads", { review, onTool })),
-	/**  Stops the review's triage or fix run. */
+	/**  Stops the review's triage run. */
 	stopThreadRun: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_thread_run", { review })),
 	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
 	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions, context: string) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options, context })),
