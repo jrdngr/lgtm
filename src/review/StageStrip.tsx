@@ -3,13 +3,15 @@ import { STAGES } from "../threads/stages";
 
 interface Props {
   stage: Stage;
+  /** Shown but not pickable, while an agent sets the stage. */
+  locked?: boolean;
   onPick(stage: Stage): void;
 }
 
 /** A thread's stages side by side, the one it's in filled with its color. */
-export function StageStrip({ stage, onPick }: Props) {
+export function StageStrip({ stage, locked, onPick }: Props) {
   return (
-    <fieldset className="stage-strip" aria-label="Stage">
+    <fieldset className="stage-strip" aria-label="Stage" disabled={locked}>
       {STAGES.map(([s, name]) => (
         <button
           key={s}

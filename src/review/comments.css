@@ -283,7 +283,15 @@
   display: flex;
   gap: 6px;
   align-items: flex-start;
-  margin-top: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.ask:disabled,
+.comment-block .stage-strip:disabled {
+  opacity: 0.45;
 }
 
 .ask-input {
@@ -792,6 +800,19 @@ button.group-head.fold:hover {
   .thread-block .flow-draft-text {
     transition: none;
   }
+}
+
+/* A thread a triage run will fill in, in place of Draft reply. */
+.thread-block .flow-triaging {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px dashed rgb(215 119 87 / 40%);
+  border-radius: 6px;
+  background: rgb(215 119 87 / 10%);
+  color: rgb(215 119 87);
+  font-size: var(--fs-sm);
 }
 
 /* Claude Code's color for a turn in progress. */

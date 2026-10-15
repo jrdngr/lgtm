@@ -14,10 +14,12 @@ interface Props {
   c: Comments;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   placeholder?: string;
+  /** Shown dimmed and unusable. */
+  off?: boolean;
 }
 
 /** The box under a comment that asks the agent about it, or tells it what to change. */
-export function AskBox({ id, body, c, inputRef, placeholder }: Props) {
+export function AskBox({ id, body, c, inputRef, placeholder, off }: Props) {
   const running = c.running.get(id);
   const asked = !!c.asks.get(id)?.trim();
 
@@ -32,7 +34,7 @@ export function AskBox({ id, body, c, inputRef, placeholder }: Props) {
   }
 
   return (
-    <div className="ask">
+    <fieldset className="ask" disabled={off}>
       <textarea
         ref={inputRef}
         className="ask-input"
@@ -65,6 +67,6 @@ export function AskBox({ id, body, c, inputRef, placeholder }: Props) {
           </button>
         </>
       )}
-    </div>
+    </fieldset>
   );
 }

@@ -97,18 +97,12 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
                   className="stage-act"
                   disabled={!!runner.run}
                   onClick={() => runner.start("fix")}
-                  title="An agent changes the code in @ for these threads"
                 >
                   Fix {toFix.length}
                 </button>
               )}
               {stage === "toFix" && (
-                <button
-                  type="button"
-                  className="stage-act"
-                  onClick={sendToFix}
-                  title="Paste these threads into a terminal's prompt"
-                >
+                <button type="button" className="stage-act" onClick={sendToFix}>
                   Send {toFix.length} to terminal
                 </button>
               )}
@@ -119,7 +113,7 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
                 <button
                   key={t.id}
                   type="button"
-                  className="thread-row"
+                  className={`thread-row${runner.run?.threads.has(t.id) ? " in-run" : ""}`}
                   aria-current={picked === t.id}
                   onClick={() => {
                     setPicked(t.id);
@@ -133,6 +127,7 @@ function ThreadGroups({ review, threads, runner, onError }: ListProps) {
                   <span className="thread-where">
                     <TakePill take={t.state.take} />
                     {threadWhere(t)}
+                    {runner.run?.threads.has(t.id) && <Spinner />}
                   </span>
                 </button>
               ))}
@@ -197,7 +192,6 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
               type="button"
               className="pr-head-btn triage"
               onClick={() => runner.start("triage")}
-              title="An agent drafts a take and a reply for each new thread and sorts it into a stage"
             >
               Triage {fresh} <kbd>t</kbd>
             </button>
@@ -208,7 +202,8 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
         <div className="threads-run">
           <Spinner />
           <span>
-            {runner.run.kind === "triage" ? "Triaging" : "Fixing"}
+            {runner.run.kind === "triage" ? "Triaging" : "Fixing"} {runner.run.threads.size}{" "}
+            {runner.run.threads.size === 1 ? "thread" : "threads"}
             {runner.run.activity && ` · ${runner.run.activity}`}
           </span>
           <span className="spacer" />

@@ -176,3 +176,11 @@
 .threads-run .spinner {
   color: var(--accent);
 }
+
+.thread-row.in-run .item-text {
+  color: var(--muted);
+}
+
+.thread-row.in-run .spinner {
+  color: rgb(215 119 87);
+}

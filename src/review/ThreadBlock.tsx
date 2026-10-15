@@ -2,6 +2,7 @@ import { type RefObject, useState } from "react";
 import type { CommentDto } from "../bindings";
 import { GhThread } from "../github/GhThread";
 import { viewerLogin } from "../github/people";
+import { useTriaging } from "../threads/useThreadRun";
 import { Icon, IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
@@ -29,6 +30,7 @@ const typing = (t: EventTarget) =>
  * workflow. `a` drafts or asks, `e` edits the reply, `y` makes it final. */
 export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props) {
   const [snippet, setSnippet] = useState(false);
+  const triaging = useTriaging(c.reviewId, comment.id);
   const gh = comment.github;
   const thread = comment.thread;
   if (!gh || !thread) return null;
@@ -40,6 +42,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
 
   function onKey(e: React.KeyboardEvent) {
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (triaging) return;
     if (e.key === "a" && !agentsOff) c.agentKey(id);
     else if (e.key === "e") c.edit(comment);
     else if (e.key === "y" && comment.body.trim() && thread?.stage !== "ready") c.final(id);
@@ -105,7 +108,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         <span className="card-source">
           <b>GitHub</b> · {gh.posts[0]?.author ?? "PR"}
         </span>
-        <StageStrip stage={thread.stage} onPick={(s) => c.setStage(id, s)} />
+        <StageStrip stage={thread.stage} locked={triaging} onPick={(s) => c.setStage(id, s)} />
         {gh.resolved && <span className="pill green">✓ Resolved</span>}
         {gh.outdated && <span className="pill">Outdated</span>}
         {changed && (
@@ -123,7 +126,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         <IconButton
           icon="retry"
           label="Reset: clear the take, reply and agent chat"
-          disabled={c.running.has(id)}
+          disabled={c.running.has(id) || triaging}
           onClick={() => c.reset(id)}
         />
         <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
@@ -139,6 +142,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         comment={comment}
         c={c}
         agentsOff={agentsOff}
+        triaging={triaging}
         editor={editor || undefined}
         askRef={p.askRef}
       />

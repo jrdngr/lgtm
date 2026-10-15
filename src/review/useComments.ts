@@ -356,6 +356,7 @@ export function useComments({
   }
 
   return {
+    reviewId: review?.id,
     draft,
     edits,
     asks,

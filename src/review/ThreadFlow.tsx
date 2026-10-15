@@ -2,7 +2,7 @@ import { type RefObject, useRef, useState } from "react";
 import type { CommentDto, Message } from "../bindings";
 import { Inline, Markdown } from "../bots/Markdown";
 import { TakePill } from "../threads/ThreadBits";
-import { Busy } from "../ui/Busy";
+import { Busy, Spinner } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { AskBox } from "./AskBox";
 import { ProposalSection } from "./ProposalSection";
@@ -13,6 +13,8 @@ interface Props {
   comment: CommentDto;
   c: Comments;
   agentsOff: boolean;
+  /** A triage run covers this thread, and will set its take, reply and stage. */
+  triaging: boolean;
   /** The reply's editor, shown in place of the reply while it's edited. */
   editor?: React.ReactNode;
   askRef: RefObject<HTMLTextAreaElement | null>;
@@ -29,7 +31,7 @@ function versions(messages: Message[]) {
 
 /** A GitHub thread's reply workflow under its posts: Draft reply to start, then the agent's
  * take, the reply draft, and the conversation that refines it. */
-export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
+export function ThreadFlow({ comment, c, agentsOff, triaging, editor, askRef }: Props) {
   const draftRef = useRef<HTMLDivElement>(null);
   const [flash, setFlash] = useState(false);
   const id = comment.id;
@@ -58,7 +60,13 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
 
   return (
     <div className="flow">
-      {!started && !agentsOff && (
+      {triaging && (
+        <div className="flow-triaging">
+          <Spinner />
+          Triaging
+        </div>
+      )}
+      {!started && !agentsOff && !triaging && (
         <div className="flow-start">
           <button type="button" className="flow-draft" onClick={() => c.compose(id)}>
             <Icon name="sparkle" size={13} />
@@ -164,6 +172,7 @@ export function ThreadFlow({ comment, c, agentsOff, editor, askRef }: Props) {
           body={body}
           c={c}
           inputRef={askRef}
+          off={triaging}
           placeholder={
             started
               ? "Ask a question, or tell it what to change"
