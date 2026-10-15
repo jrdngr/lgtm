@@ -57,8 +57,16 @@ impl PrRecord {
     /// What the workspace reviews: the PR's commits and the working copy above them, which
     /// matches GitHub's diff.
     pub fn revset(&self) -> String {
-        format!("{}..@", remote_bookmark(&self.base_ref, &self.base_remote))
+        let base = remote_bookmark(&self.base_ref, &self.base_remote);
+        pr_revset(&base, &self.head_ref)
     }
+}
+
+/// `base..@`, less the commits from any other bookmark above the PR's head bookmark: those
+/// belong to the next branch in the stack.
+fn pr_revset(base: &str, head: &str) -> String {
+    let head = format!("\"{}\"", head.replace('\\', "\\\\").replace('"', "\\\""));
+    format!("({base}..@) ~ ((bookmarks() & (bookmarks(exact:{head})+::@))::)")
 }
 
 /// The bookmark a PR's head is fetched into when its branch can't be fetched.

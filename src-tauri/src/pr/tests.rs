@@ -183,3 +183,33 @@ async fn checks_out_and_pulls_a_real_fork_pr() {
             .all(|(n, _)| !n.starts_with("gh-"))
     );
 }
+
+#[tokio::test]
+async fn the_pr_view_stops_below_the_next_bookmark_up_the_stack() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let commit = |file: &str, bookmark: &str| {
+        write(d, file, file);
+        jj(d, &["commit", "-m", file]);
+        jj(d, &["bookmark", "create", bookmark, "-r", "@-"]);
+    };
+    commit("base", "main");
+    commit("pr", "feat/pr");
+    commit("next", "feat/next");
+    let revset = super::pr_revset("main", "feat/pr");
+    let descriptions = async || {
+        let changes = ctx.main.jj.changes(&revset).await.unwrap();
+        changes
+            .into_iter()
+            .map(|c| c.description)
+            .collect::<Vec<_>>()
+    };
+
+    // `@` is a new change on `feat/next`, the next PR's branch.
+    assert_eq!(descriptions().await, ["pr"]);
+    // A new change on the PR is part of it.
+    jj(d, &["new", "feat/pr"]);
+    write(d, "fix", "fix");
+    jj(d, &["describe", "-m", "fix"]);
+    assert_eq!(descriptions().await, ["pr", "fix"]);
+}
