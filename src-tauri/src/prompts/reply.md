@@ -25,14 +25,22 @@ newer code already addressed it.
 
 - Leave the reply out for a comment I'd fix exactly as asked. Applying a `suggestion` block as
   written counts.
-- Every other comment gets a reply: first person, as me, short, plain, and specific. Two or
-  three sentences at most.
+- Every other comment gets a reply: first person, as me, the way I'd say it to a teammate.
+  One or two short sentences. Give the gist, not every detail: no file names, counts or
+  mechanics the reviewer can see in the diff.
 - For a question, answer it in the first sentence.
 - For a disagreement or a different fix, acknowledge the part that's right, give the reason, and
   name what would change the answer.
 - State the facts and the plan, if there is one. Nothing else.
 - No compliments ("good catch"), thanks, or filler.
 - No agent-speak: no em-dashes, no inflated words, no hedging.
+
+Too long: "It logged the underlying Lakebase or KMS failure with its traceback, since the 503
+body only carries a fixed description. That didn't need its own handler, so I folded it into
+the AuthError handler: 5xx errors get logged, 4xx client errors don't."
+
+Right: "It logged the Lakebase or KMS failure behind a 503, since the response body hides the
+cause. Moved to the AuthError handler, which now logs any 5xx."
 
 ## Skip
 

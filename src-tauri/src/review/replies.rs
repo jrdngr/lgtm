@@ -498,8 +498,10 @@ pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String
         &ask.draft
     };
     let turn = format!(
-        "My reply draft now:\n\n{draft}\n\n{asked}\n\nAnswer in `message`, briefly. When the \
-         reply should change, also return the whole new reply. Return a new verdict and why only \
+        "My reply draft now:\n\n{draft}\n\n{asked}\n\nAnswer in `message` in a few short \
+         sentences, like a teammate in chat: the answer, then only what I have to act on. No \
+         recap of the code, and don't mention what you left unchanged. When the reply should \
+         change, also return the whole new reply. Return a new verdict and why only \
          when your view of the thread itself changes, never to describe edits to the reply.{}",
         if ask.change { "" } else { PROPOSE }
     );
