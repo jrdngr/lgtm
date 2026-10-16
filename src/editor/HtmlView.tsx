@@ -196,19 +196,21 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
           label="Zoom Out (⌥⌘-)"
           onClick={() => setZoom((z) => stepZoom(z, -1))}
         />
-        <button
-          type="button"
-          className="html-zoom"
-          title="Actual Size (⌥⌘0)"
-          onClick={() => setZoom(1)}
-        >
-          {Math.round(zoom * 100)}%
-        </button>
+        <span className="html-zoom">{Math.round(zoom * 100)}%</span>
         <IconButton
           icon="plus"
           label="Zoom In (⌥⌘=)"
           onClick={() => setZoom((z) => stepZoom(z, 1))}
         />
+        <button
+          type="button"
+          className="icon-button html-actual"
+          title="Actual Size (⌥⌘0)"
+          aria-label="Actual Size (⌥⌘0)"
+          onClick={() => setZoom(1)}
+        >
+          1:1
+        </button>
         <IconButton icon="fit" label="Fit to Width (⌥⌘9)" onClick={() => post({ type: "fit" })} />
         {toggle}
       </div>

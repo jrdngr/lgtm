@@ -172,12 +172,51 @@
 }
 
 .html-view .editor-path .html-zoom {
-  min-width: 48px;
-  padding: 0 4px;
+  min-width: 40px;
+  text-align: center;
+  color: var(--fg);
+}
+
+.html-view .editor-path .html-actual {
+  padding: 0;
+  font: 600 10px var(--mono);
+  letter-spacing: -0.02em;
 }
 
 .html-view .editor-path > :last-child {
-  margin-left: 6px;
+  margin-left: 8px;
+}
+
+.view-switch {
+  display: inline-flex;
+  flex: none;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.editor-path .view-switch button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+}
+
+.editor-path .view-switch button:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.editor-path .view-switch button[aria-pressed="true"] {
+  background: rgb(79 140 201 / 22%);
+  color: var(--fg);
 }
 
 .html-find input {

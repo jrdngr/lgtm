@@ -22,6 +22,7 @@ import { emitSaved } from "./saved";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
 import { useAgentBox } from "./useAgentBox";
+import { ViewSwitch } from "./ViewSwitch";
 import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
@@ -207,9 +208,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   }
 
   const toggle = renders(path) && (
-    <button type="button" disabled={!view} onClick={toggleRendered} title="⇧⌘V">
-      {rendered === undefined ? "Rendered" : "Editor"}
-    </button>
+    <ViewSwitch rendered={rendered !== undefined} disabled={!view} toggle={toggleRendered} />
   );
   const html = isHtml(path) && rendered !== undefined;
 
