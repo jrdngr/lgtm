@@ -49,7 +49,6 @@ export function TerminalPicker({ terminals, onPick, onClose }: Props) {
           >
             <span className="menu-key">{i + 1}</span>
             {t.title || `Terminal ${i + 1}`}
-            {i === 0 && <span className="picker-note">last used</span>}
             {!t.canPaste && <span className="picker-note">shell</span>}
           </button>
         ))}

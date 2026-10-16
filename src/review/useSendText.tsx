@@ -1,6 +1,11 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
-import { sendToTerminal, type TerminalChoice, workspaceTerminals } from "../terminal/registry";
+import {
+  sendTarget,
+  sendToTerminal,
+  type TerminalChoice,
+  workspaceTerminals,
+} from "../terminal/registry";
 import type { Sender } from "../terminal/sendItems";
 import type { WorkspaceName } from "../workspaces/context";
 import { TerminalPicker } from "./TerminalPicker";
@@ -24,17 +29,16 @@ export function useSendText(
     report?: Report;
   }>();
 
-  /** Pastes text into the prompt of one of the workspace's terminals, asking which one when
-   * there are several. Calls `onSent` once it's sent. With `report`, it's told which terminal
-   * took the text or why none did, and failures don't show as the review's error. With
-   * `preferred`, it goes to that terminal, and asks only when that one is gone or can't take
-   * a paste. */
+  /** Pastes text into the prompt of `preferred` when it can take it, else the workspace's
+   * send target, asking which terminal when neither can. Calls `onSent` once it's sent. With
+   * `report`, it's told which terminal took the text or why none did, and failures don't show
+   * as the review's error. */
   function sendText(text: string, onSent?: () => void, report?: Report, preferred?: string) {
     const terminals = workspaceTerminals(workspace);
-    const target = preferred === undefined ? undefined : terminals.find((t) => t.id === preferred);
-    if (target?.canPaste) sendTo(text, target.id, onSent, report);
-    else if (terminals.length > 1 || (preferred !== undefined && terminals.length))
-      setPicking({ text, terminals, onSent, report });
+    const usable = (id: string | undefined) => terminals.find((t) => t.id === id && t.canPaste);
+    const to = usable(preferred) ?? usable(sendTarget(workspace));
+    if (to) sendTo(text, to.id, onSent, report);
+    else if (terminals.length > 1) setPicking({ text, terminals, onSent, report });
     else sendTo(text, undefined, onSent, report);
   }
 
@@ -68,7 +72,7 @@ export function useSendText(
       }}
     />
   );
-  /** Pastes into the workspace's most recently used terminal, without asking. */
+  /** Pastes into the workspace's send target, without asking. */
   const sendRecent = (text: string, onSent?: () => void) => {
     sendTo(text, undefined, onSent);
   };
@@ -76,7 +80,7 @@ export function useSendText(
   const sendToId = (text: string, id: string, onSent?: () => void) => {
     sendTo(text, id, onSent);
   };
-  /** For menus: the last used terminal, or a chosen one. */
+  /** For menus: the send target, or a chosen one. */
   const sender: Sender = { recent: (t) => sendRecent(t), to: (t, id) => sendToId(t, id) };
   return { sendText, sendRecent, sendToId, sender, picker };
 }

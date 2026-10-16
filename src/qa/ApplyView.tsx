@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Inline } from "../bots/Markdown";
+import { PipeButton } from "../ui/PipeButton";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { edit } from "./actions";
@@ -91,9 +92,9 @@ export function ApplyView({ ws, d, busy, focusKey, onSend }: Props) {
             />
             <div className="qq-actions">
               <span className="spacer" />
-              <button type="button" className="qq-btn primary" disabled={locked} onClick={go}>
-                Apply in terminal <kbd>⌘↵</kbd>
-              </button>
+              <PipeButton className="qq-btn" disabled={locked} onClick={go} keys="⌘↵">
+                Answers
+              </PipeButton>
             </div>
           </>
         )}

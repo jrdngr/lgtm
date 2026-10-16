@@ -21,6 +21,10 @@
   /* Mark colors. None is green or amber, so marks stand out on added rows and from amber
    * "changed since" rows. */
   --mark-violet: #a371f7;
+  /* Things that go to a terminal. */
+  --violet-text: #c9adff;
+  --violet-soft: rgb(163 113 247 / 16%);
+  --violet-line: rgb(163 113 247 / 50%);
   --mark-red: #f85149;
   --mark-gray: #6e7681;
   --mark-orange: #f0883e;

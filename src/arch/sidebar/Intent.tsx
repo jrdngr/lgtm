@@ -11,6 +11,7 @@ import { type ArchSelection, reloadArch } from "../state";
 import { intentText, STATE_LABEL } from "./logic";
 import { Box, Row, Sec, showInTab } from "./parts";
 import "../../review/notes.css";
+import { PipeButton } from "../../ui/PipeButton";
 
 interface Props {
   workspace: WorkspaceName;
@@ -125,9 +126,7 @@ export function Intent({ workspace, review, intents, components, selection, onEr
           <button type="button" onClick={() => unmark(picked)}>
             Unmark
           </button>
-          <button type="button" onClick={() => send(picked)}>
-            Send to terminal
-          </button>
+          <PipeButton onClick={() => send(picked)}>Intents</PipeButton>
           <button
             type="button"
             className="primary"

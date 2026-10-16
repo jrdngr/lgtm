@@ -3,6 +3,7 @@ import type { BotRun } from "../bindings";
 import { useCurrentReview } from "../review/current";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
+import { ReportPrompt } from "./ReportPrompt";
 import { RunList } from "./RunList";
 import "./bots.css";
 
@@ -15,6 +16,7 @@ export function BotsPanel({ onOpen }: { onOpen(run: BotRun): void }) {
     <div className="side-split">
       <SectionHeader title="Reports" />
       <div className="side-split-body bots">
+        <ReportPrompt workspace={workspace} review={review} />
         {error && <div className="bots-error">{error}</div>}
         <RunList workspace={workspace} revset={review?.revset} onOpen={onOpen} onError={setError} />
       </div>

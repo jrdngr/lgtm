@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { PipeButton } from "../ui/PipeButton";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { ask, autoAnswer, savePrompt } from "./actions";
@@ -122,9 +123,9 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
         </span>
       </button>
       <div className="qq-actions">
-        <button type="button" className="qq-btn" disabled={!prompt.trim()} onClick={send}>
-          Send to terminal
-        </button>
+        <PipeButton className="qq-btn" disabled={!prompt.trim()} onClick={send}>
+          Prompt
+        </PipeButton>
         <span className="spacer" />
         {asked && <span className="faint">Asking again replaces the questions and answers</span>}
         <button

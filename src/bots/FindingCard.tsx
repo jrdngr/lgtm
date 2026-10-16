@@ -100,8 +100,9 @@ export function FindingCard(props: Props) {
         {dismissed && <span className="pill">Dismissed</span>}
         <span className="finding-actions reveal">
           <IconButton
-            icon="send"
-            label="Send to terminal: paste it into a terminal's prompt"
+            icon="terminal"
+            className="pipe-icon"
+            label="Send to Terminal"
             onClick={() => onSend(findingText(f, source))}
           />
           <IconButton

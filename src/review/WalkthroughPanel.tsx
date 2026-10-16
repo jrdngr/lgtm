@@ -8,6 +8,7 @@ import { useCurrentReview } from "./current";
 import { setTourState, useTourState } from "./tour";
 import { WalkthroughTour } from "./WalkthroughPanelTour";
 import "./notes.css";
+import { PipeButton } from "../ui/PipeButton";
 
 /** The current review's walkthrough: its notes along the chosen tour, filtered by category.
  * Click a note to go to it; `n` and `N` in the review step through the tour. */
@@ -69,9 +70,9 @@ export function WalkthroughPanel() {
           <WalkthroughTour review={review} />
         ) : (
           <div className="note-empty">
-            <button type="button" className="primary" onClick={review.walkthroughInTerminal}>
-              Walkthrough in terminal <kbd>h</kbd>
-            </button>
+            <PipeButton onClick={review.walkthroughInTerminal} keys="h">
+              Walkthrough
+            </PipeButton>
           </div>
         )}
       </div>

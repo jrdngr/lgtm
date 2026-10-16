@@ -4,6 +4,7 @@ import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { addTerminal } from "../workbench/panels";
 import { moveToOther } from "../workbench/tabMenu";
 import type { WorkspaceName } from "../workspaces/context";
+import { targetItems } from "./sendItems";
 
 interface Deps {
   term: Terminal;
@@ -44,6 +45,8 @@ export function terminalMenu(d: Deps): CtxEntry[] {
     },
     { label: "Select All", onSelect: after(() => term.selectAll()) },
     { label: "Clear", onSelect: after(() => term.clear()) },
+    "-",
+    ...targetItems(d.workspace, panel.id),
     "-",
     { label: "New Terminal", keys: "⌘T", onSelect: () => addTerminal(api) },
     { label: "Split Right", keys: "⌘D", onSelect: split("right") },

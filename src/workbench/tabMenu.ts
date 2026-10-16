@@ -5,6 +5,7 @@ import { confirmClose, isUnsaved, saveEditor } from "../editor/unsaved";
 import { commands, unwrap } from "../ipc";
 import { currentReview } from "../review/current";
 import { targetOf } from "../review/target";
+import { targetItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { pathItems, run } from "../ui/pathMenu";
 import { confirmAction, promptText } from "../ui/prompt";
@@ -78,6 +79,8 @@ export function tabMenu({ workspace, api, panel, inBottom, close }: Tab): CtxEnt
   const path = kind === "editor" ? (panel.params as EditorParams | undefined)?.path : undefined;
   return [
     terminal && { label: "Rename…", onSelect: () => rename(panel) },
+    "-",
+    ...(terminal ? targetItems(workspace, panel.id) : []),
     path && {
       label: "Save",
       keys: "⌘S",

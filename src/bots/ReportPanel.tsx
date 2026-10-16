@@ -23,6 +23,7 @@ import { refreshRun, useRun } from "./runs";
 import { SettledFold } from "./SettledFold";
 import { SuggestedView } from "./SuggestedView";
 import "./bots.css";
+import { PipeButton } from "../ui/PipeButton";
 
 type View = "suggested" | "findings";
 
@@ -202,9 +203,7 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
               {sending.length} of {fixes.length} fixes
             </b>
             <span className="spacer" />
-            <button type="button" className="primary" onClick={() => send(fixesText())}>
-              Send to terminal
-            </button>
+            <PipeButton onClick={() => send(fixesText())}>Fixes</PipeButton>
           </div>
         )
       : view === "findings" &&
@@ -212,9 +211,7 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
           <div className="bots-picked">
             <b>{checked.size} picked</b>
             <span className="spacer" />
-            <button type="button" className="primary" onClick={sendChecked}>
-              Send to terminal
-            </button>
+            <PipeButton onClick={sendChecked}>Findings</PipeButton>
             <IconButton icon="x" label="Clear picks" onClick={() => setChecked(new Map())} />
           </div>
         );

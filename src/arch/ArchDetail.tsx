@@ -1,5 +1,6 @@
 import type { ArchDto, ComponentDto, EdgeDto, FileRefDto } from "../bindings";
 import type { CurrentReview } from "../review/current";
+import { PipeButton } from "../ui/PipeButton";
 import { startItemDrag } from "./ArchNode";
 import { edgeText } from "./actions";
 import { DetailIntent, DetailLayer, DetailLook } from "./DetailItems";
@@ -267,12 +268,8 @@ function DetailEdge(p: DetailProps & { e: EdgeDto }) {
 
 function SendButton(p: DetailProps & { e: EdgeDto }) {
   return (
-    <button
-      type="button"
-      className="abtn"
-      onClick={() => p.send(edgeText(p.review.id, p.arch, p.e))}
-    >
-      Send to terminal
-    </button>
+    <PipeButton className="abtn" onClick={() => p.send(edgeText(p.review.id, p.arch, p.e))}>
+      Edge
+    </PipeButton>
   );
 }

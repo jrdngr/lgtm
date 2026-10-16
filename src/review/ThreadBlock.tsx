@@ -152,7 +152,12 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
         {gh && (
           <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
         )}
-        <IconButton icon="terminal" label="Send to terminal" onClick={() => c.send(comment)} />
+        <IconButton
+          icon="terminal"
+          className="pipe-icon"
+          label="Send to Terminal"
+          onClick={() => c.send(comment)}
+        />
       </div>
       {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
       {gh && (

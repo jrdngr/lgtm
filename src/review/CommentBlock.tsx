@@ -237,7 +237,8 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
             {comment && (
               <IconButton
                 icon="terminal"
-                label="Send to terminal"
+                className="pipe-icon"
+                label="Send to Terminal"
                 onClick={() => c.send(comment)}
               />
             )}

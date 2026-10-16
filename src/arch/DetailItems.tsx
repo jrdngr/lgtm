@@ -1,4 +1,5 @@
 import { commands, unwrap } from "../ipc";
+import { PipeButton } from "../ui/PipeButton";
 import type { DetailProps } from "./ArchDetail";
 import { Pill, Sec, Site, Top } from "./DetailParts";
 import { intentText, STATE_LABEL } from "./sidebar/logic";
@@ -131,13 +132,12 @@ export function DetailIntent(p: DetailProps & { id: number }) {
           </button>
         )}
         {checked && (
-          <button
-            type="button"
+          <PipeButton
             className="abtn"
             onClick={() => p.send(unwrap(commands.intentPrompt(p.review.id, [it.id])))}
           >
-            Send to terminal
-          </button>
+            Intent
+          </PipeButton>
         )}
         <button type="button" className="abtn" onClick={() => p.unmark(it.id)}>
           Unmark

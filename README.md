@@ -42,6 +42,8 @@ This program may or may not be safe to run. Use it at your own risk.
 
 Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them.
 
+Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the last terminal you focused, whose tab has a violet bar on top. Right-click a terminal's tab and pick Pin as Send Target to keep sends going there.
+
 ## Requirements
 
 - [jj](https://github.com/jj-vcs/jj) 0.46 or newer: `brew install jj`
@@ -65,7 +67,7 @@ just install     # release build, copied to /Applications
 
 The app's binary takes a repo path: `lgtm /path/to/repo`. Launched without one, it reopens the last repo, or shows the repo picker when that's gone. A second launch for the same repo focuses its window. Plain git repos get an offer to set up jj alongside git.
 
-On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review, write its walkthrough (Walkthrough in terminal, `h`, sends the prompt), and sync a PR's threads (stage, take and reply) with a review-reply workflow run in the terminal. Questions it asks (like a qqueue session) open in the Q&A tab, talking one over in the terminal can rewrite it there, and Apply in terminal sends your answers back to the terminal that asked. Q&A sessions you start in lgtm end the same way: Apply in terminal sends the prompt and decisions to a terminal you pick. It also adds Claude Code hooks to `~/.claude/settings.json` (they do nothing outside lgtm), so each workspace in the sidebar shows its most urgent agent: needs input, failed, stalled (no output for 3 minutes), working, done, idle, or none. Any agent can publish review findings to a report, with its own suggested fixes if it has them, and checked findings or fixes go back to a terminal with Send to terminal: each report has an id (`R12`, or a name you give it with Rename…) that you tell the agent, and publishing again under the same reviewer name replaces that reviewer's findings.
+On first run, lgtm offers to register itself as an MCP server with Claude Code, so `claude` in an lgtm terminal can read and comment on the open review, write its walkthrough (Walkthrough, `h`, sends the prompt), and sync a PR's threads (stage, take and reply) with a review-reply workflow run in the terminal. Questions it asks (like a qqueue session) open in the Q&A tab, talking one over in the terminal can rewrite it there, and Answers sends your answers back to the terminal that asked. Q&A sessions you start in lgtm end the same way: Answers sends the prompt and decisions to the send target. It also adds Claude Code hooks to `~/.claude/settings.json` (they do nothing outside lgtm), so each workspace in the sidebar shows its most urgent agent: needs input, failed, stalled (no output for 3 minutes), working, done, idle, or none. Any agent can publish review findings to a report, with its own suggested fixes if it has them, and checked findings or fixes go back to a terminal: the Reports panel keeps a review prompt, and Create Report sends it with instructions to publish here. Each report has an id (`R12`, or a name you give it with Rename…) that you tell the agent, and publishing again under the same reviewer name replaces that reviewer's findings.
 
 ## Commands
 

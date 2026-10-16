@@ -1,4 +1,5 @@
 import type { ChangeDto } from "../bindings";
+import { PipeButton } from "../ui/PipeButton";
 
 interface Props {
   changes: ChangeDto[];
@@ -19,9 +20,7 @@ export function Conflicts({ changes, send }: Props) {
       {conflicted.map((c) => (
         <div key={c.changeId} className="review-note warn">
           {c.changeId} {c.description || "(no description)"} has conflicts.
-          <button type="button" onClick={() => send(terminalPrompt(c.changeId))}>
-            Send to terminal
-          </button>
+          <PipeButton onClick={() => send(terminalPrompt(c.changeId))}>Conflict</PipeButton>
         </div>
       ))}
     </>
