@@ -38,6 +38,13 @@
 
   addEventListener("contextmenu", (e) => e.preventDefault());
 
+  // Where the page is scrolled, once scrolling stops, so the tab can bring it back.
+  let scrolling;
+  addEventListener("scroll", () => {
+    clearTimeout(scrolling);
+    scrolling = setTimeout(() => post({ type: "scrolled", x: scrollX, y: scrollY }), 200);
+  });
+
   /** The zoom that fits the page's content to the frame's width. */
   function fitZoom() {
     const root = document.documentElement;

@@ -20,6 +20,7 @@ import { NEW_COMMENT } from "./model";
 import { StageStrip } from "./StageStrip";
 import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
+import type { CommentFolds } from "./useSavedView";
 import { Workshop } from "./Workshop";
 import "./comments.css";
 import { SnippetDiff } from "./SnippetDiff";
@@ -30,6 +31,7 @@ interface Props {
   id: number;
   comment?: CommentDto;
   c: Comments;
+  folds: CommentFolds;
 }
 
 /** A thread's stage as a pill in its stage's color. */
@@ -41,12 +43,10 @@ function StagePill({ stage }: { stage: Stage }) {
 /** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
  * editor for its text and a conversation with an agent about it. Any folds to a line; done
  * ones start folded. */
-export function CommentBlock({ id, comment, c }: Props) {
+export function CommentBlock({ id, comment, c, folds }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const askRef = useRef<HTMLTextAreaElement>(null);
   const agentsOff = useAgentsOff();
-  // Set by the fold toggle; until then, and again once done changes, done ones are folded.
-  const [fold, setFold] = useState<boolean>();
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
   const gh = comment?.github;
@@ -57,9 +57,10 @@ export function CommentBlock({ id, comment, c }: Props) {
   const github = !!gh || !!thread || (isNew && !!c.draft?.github);
   const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
   const ready = thread?.stage === "ready" && !!gh;
-  const folded = fold ?? (!!done || ready);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a block done or final folds anew
-  useEffect(() => setFold(undefined), [done, ready]);
+  // Set by the fold toggle for the state it was in; otherwise done and final ones are folded.
+  const foldState = done ? "done" : ready ? "ready" : "";
+  const folded = folds.get(id, foldState) ?? (!!done || ready);
+  const setFold = (fold: boolean) => folds.set(id, fold, foldState);
 
   useEffect(() => {
     if (c.focus?.id !== id) return;

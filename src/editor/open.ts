@@ -9,6 +9,18 @@ export interface EditorParams {
   line?: number;
   /** Changes on every open, so opening an open file at a line moves its cursor again. */
   nonce?: number;
+  // Kept with the layout, so the tab comes back as it was.
+  view?: "editor" | "rendered";
+  /** The cursor's offset and the editor's scroll. */
+  cursor?: number;
+  scroll?: number;
+  /** Rendered markdown's scroll. */
+  renderedScroll?: number;
+  /** An image's or HTML page's zoom; images shrink to fit without one. */
+  zoom?: "fit" | number;
+  /** The HTML page showing, as its URL after the root id, and its scroll. */
+  page?: string;
+  pageScroll?: [number, number];
 }
 
 export const editorId = (path: string) => `editor:${path}`;

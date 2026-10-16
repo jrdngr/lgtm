@@ -25,6 +25,7 @@ import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
+import { setStateRepo } from "./savedState";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
 import { useCloseGuard } from "./useCloseGuard";
 import { WorkspaceDock } from "./WorkspaceDock";
@@ -52,6 +53,7 @@ interface Mounted {
 /** Side panels around the selected workspace's dock. Each workspace has its own dock
  * and layout. Docks of other workspaces stay mounted but hidden, so their terminals run on. */
 export function Workbench({ repo }: { repo: RepoInfo }) {
+  setStateRepo(repo.root);
   const [selected, setSelected] = useState<WorkspaceName>(() => loadWorkspace(repo.root));
   const [mounted, setMounted] = useState<Mounted[]>([{ name: selected, setup: false }]);
   const [sides, setSidesState] = useState<Sides>(() => loadSides(repo.root));

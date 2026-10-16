@@ -36,6 +36,7 @@ import { useReviewKeys } from "./useReviewKeys";
 import { useReviewNav } from "./useReviewNav";
 import { useReviewState } from "./useReviewState";
 import { useRowMouse } from "./useRowMouse";
+import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
 import { useWalkthrough } from "./useWalkthrough";
@@ -62,7 +63,7 @@ function keepsFocus(t: EventTarget) {
   );
 }
 
-export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
+export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) {
   const workspace = useWorkspace();
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
@@ -180,16 +181,19 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
     startRevset(workspace).then(load);
   }, []);
 
-  // A newly opened review starts on its first row.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the review is replaced
-  useEffect(() => {
-    place(
-      Math.max(
-        lines.findIndex((l) => l.kind === "rows"),
-        0,
-      ),
-    );
-  }, [review?.id]);
+  const commentFolds = useSavedView({
+    api,
+    params,
+    review: review?.id,
+    revset,
+    files,
+    lines,
+    cursor,
+    fold,
+    scrollRef,
+    place,
+    setScrollTo,
+  });
 
   // Keys go to the review as soon as its tab is picked, as they do for a terminal.
   useEffect(() => {
@@ -426,7 +430,12 @@ export function ReviewPanel({ api, containerApi }: IDockviewPanelProps) {
           renderComment={(id) => (
             <>
               <PrCommentsHead comments={c.onPr} id={id} />
-              <CommentBlock id={id} comment={navComments.find((x) => x.id === id)} c={c} />
+              <CommentBlock
+                id={id}
+                comment={navComments.find((x) => x.id === id)}
+                c={c}
+                folds={commentFolds}
+              />
             </>
           )}
           renderNote={w.renderNote}

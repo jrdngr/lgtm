@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CheckState } from "../bindings";
 import { type FlatFile, hunkKey } from "./model";
+import { restoredHunks, type SavedView, savedHunks } from "./savedView";
 import { toggled } from "./tree";
 
 /** Which files and hunks are collapsed, and which gap bars were clicked open. */
@@ -38,6 +39,15 @@ export function useCollapse(files: FlatFile[], checks: CheckState[]) {
     reset() {
       setCollapsedHunks(new Set());
       setFileOpen(new Map());
+      setRevealed(new Set());
+    },
+    saved: (): Pick<SavedView, "files" | "hunks"> => ({
+      files: [...fileOpen],
+      hunks: savedHunks(files, collapsedHunks),
+    }),
+    restore(view: Pick<SavedView, "files" | "hunks">) {
+      setFileOpen(new Map(view.files));
+      setCollapsedHunks(restoredHunks(files, view.hunks));
       setRevealed(new Set());
     },
     /** Checking collapses a file and unchecking expands it, whatever was done by hand. */

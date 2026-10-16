@@ -7,6 +7,7 @@ import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
+import type { EditorParams } from "./open";
 import { ZoomControls, zoomKey } from "./ZoomControls";
 
 const base = () => convertFileSrc("", "lgtmhtml");
@@ -21,6 +22,10 @@ interface Props {
   path: string;
   /** The Rendered/Editor switch, at the end of the bar. */
   toggle: React.ReactNode;
+  /** How the tab was left before a restart. */
+  saved: Pick<EditorParams, "page" | "pageScroll" | "zoom">;
+  /** Keeps how the tab is now, for after a restart. */
+  save(values: Pick<EditorParams, "page" | "pageScroll" | "zoom">): void;
 }
 
 /** A message from the script the scheme puts first in every page. */
@@ -30,20 +35,21 @@ type FrameMessage =
   | { type: "zoom"; zoom: number }
   | { type: "found"; found: boolean }
   | { type: "scroll"; x: number; y: number }
+  | { type: "scrolled"; x: number; y: number }
   | ({ type: "key" } & KeyboardEventInit);
 
 /** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts and
  * the network but an opaque origin, so it can't reach the app. Reloads when a file it
  * loaded changes. */
 export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
-  { workspace, path, toggle },
+  { workspace, path, toggle, saved, save },
   ref,
 ) {
   const frame = useRef<HTMLIFrameElement>(null);
   const findInput = useRef<HTMLInputElement>(null);
   const [root, setRoot] = useState<string>();
   const [trail, setTrail] = useState<Trail>({ urls: [], at: 0 });
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(typeof saved.zoom === "number" ? saved.zoom : 1);
   const [find, setFind] = useState<string>();
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string>();
@@ -53,12 +59,23 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
 
   useImperativeHandle(ref, () => ({ focus: () => frame.current?.focus() }), []);
 
+  /** The saved page and scroll, until the first page shows. */
+  const restoring = useRef<typeof saved | undefined>(saved);
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  /** The start of this tab's page URLs, before the page's own path. */
+  const prefix = useRef("");
+
   useEffect(() => {
     let live = true;
     unwrap(commands.htmlRoot(workspace)).then(
       (r) => {
         if (!live) return;
-        const url = pageUrl(base(), r, path);
+        prefix.current = new URL(`${base()}${r}/`).href;
+        const back = restoring.current;
+        restoring.current = undefined;
+        const url = back?.page ? new URL(back.page, prefix.current).href : pageUrl(base(), r, path);
+        if (back?.pageScroll) scroll.current = { x: back.pageScroll[0], y: back.pageScroll[1] };
         setRoot(r);
         setTrail({ urls: [url], at: 0 });
         if (frame.current) frame.current.src = url;
@@ -88,6 +105,9 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       switch (m.type) {
         case "nav":
           setTrail((t) => visit(t, m.url));
+          if (m.url.startsWith(prefix.current)) {
+            saveRef.current({ page: m.url.slice(prefix.current.length), pageScroll: undefined });
+          }
           if (zoomRef.current !== 1) send(frame.current, { type: "zoom", zoom: zoomRef.current });
           if (scroll.current) send(frame.current, { type: "scroll", ...scroll.current });
           scroll.current = undefined;
@@ -104,6 +124,9 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         case "scroll":
           scroll.current = { x: m.x, y: m.y };
           break;
+        case "scrolled":
+          saveRef.current({ pageScroll: [Math.round(m.x), Math.round(m.y)] });
+          break;
         case "key": {
           const { type: _, ...init } = m;
           frame.current.dispatchEvent(
@@ -117,7 +140,10 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  useEffect(() => send(frame.current, { type: "zoom", zoom }), [zoom]);
+  useEffect(() => {
+    send(frame.current, { type: "zoom", zoom });
+    saveRef.current({ zoom: zoom === 1 ? undefined : zoom });
+  }, [zoom]);
 
   useRepoChanged(async () => {
     if (root && (await commands.htmlChanged(root))) reload();

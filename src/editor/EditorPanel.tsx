@@ -6,6 +6,7 @@ import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
 import { openMenu } from "../ui/contextMenu";
 import { isMac } from "../workbench/keys";
+import { saveTabParams } from "../workbench/tabParams";
 import { wordWrap } from "../workbench/wordWrap";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
@@ -48,8 +49,12 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   /** Newer text on disk, held back because of unsaved edits. */
   const [onDisk, setOnDisk] = useState<string>();
   const [error, setError] = useState<string>();
+  /** How the tab was left, for bringing it back after a restart. */
+  const restore = useRef(params);
   /** The text shown rendered, or undefined while editing. HTML opens rendered. */
-  const [rendered, setRendered] = useState(isHtml(path) ? "" : undefined);
+  const [rendered, setRendered] = useState(
+    (params.view ?? (isHtml(path) ? "rendered" : "editor")) === "rendered" ? "" : undefined,
+  );
   const renderedRef = useRef<{ focus(): void }>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
@@ -64,6 +69,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         const extensions = editorExtensions(path, text, wordWrap.get(), {
           save: () => saveRef.current(),
           changed: (u) => {
+            if (u.selectionSet) saveTabParams(api, { cursor: u.state.selection.main.head });
             if (!u.docChanged) return;
             if (saved.current) setDirty(!u.state.doc.eq(saved.current));
             // A reload from disk shows in the rendered view too.
@@ -75,6 +81,16 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           state: EditorState.create({ doc: text, extensions }),
         });
         saved.current = made.state.doc;
+        setRendered((r) => (r === undefined ? r : text));
+        const { cursor, scroll } = restore.current;
+        if (cursor !== undefined && !restore.current.line) {
+          made.dispatch({ selection: { anchor: Math.min(cursor, text.length) } });
+        }
+        const scroller = made.scrollDOM;
+        if (scroll) requestAnimationFrame(() => scroller.scrollTo({ top: scroll }));
+        scroller.addEventListener("scroll", () =>
+          saveTabParams(api, { scroll: Math.round(scroller.scrollTop) }),
+        );
         setView(made);
       },
       (e) => live && setError(errorText(e)),
@@ -83,7 +99,16 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       live = false;
       made?.destroy();
     };
-  }, [workspace, path]);
+  }, [api, workspace, path]);
+
+  // Rendered markdown goes back to where it was scrolled, once, when its text first shows.
+  useEffect(() => {
+    const top = restore.current.renderedScroll;
+    if (!rendered || !top) return;
+    restore.current = { ...restore.current, renderedScroll: undefined };
+    const el = renderedRef.current;
+    requestAnimationFrame(() => el instanceof HTMLElement && el.scrollTo({ top }));
+  }, [rendered]);
 
   useEffect(() => {
     view?.dispatch({ effects: wrapping.reconfigure(wrapExtension(wrap)) });
@@ -100,7 +125,9 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       effects: EditorView.scrollIntoView(at, { y: "center" }),
     });
     view.focus();
-  }, [view, line, nonce]);
+    // Used: a restart brings back the cursor where it was left, not this line.
+    saveTabParams(api, { line: undefined, nonce: undefined });
+  }, [api, view, line, nonce]);
 
   useEffect(() => {
     api.setTitle(dirty ? `● ${baseName(path)}` : baseName(path));
@@ -162,6 +189,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
 
   function toggleRendered() {
     if (!view) return;
+    saveTabParams(api, { view: rendered === undefined ? "rendered" : "editor" });
     if (rendered === undefined) {
       setRendered(view.state.sliceDoc());
       requestAnimationFrame(() => renderedRef.current?.focus());
@@ -218,6 +246,8 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const svg = useImageZoom(
     isSvg(path) && rendered !== undefined ? svgUrl(rendered) : undefined,
     path,
+    restore.current.zoom,
+    (zoom) => saveTabParams(api, { zoom: zoom === "shrink" ? undefined : zoom }),
   );
 
   return (
@@ -243,7 +273,16 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           </button>
         </div>
       )}
-      {html && <HtmlView ref={renderedRef} workspace={workspace} path={path} toggle={toggle} />}
+      {html && (
+        <HtmlView
+          ref={renderedRef}
+          workspace={workspace}
+          path={path}
+          toggle={toggle}
+          saved={restore.current}
+          save={(values) => saveTabParams(api, values)}
+        />
+      )}
       {rendered !== undefined && !html && (
         <div
           className={`editor-rendered${isSvg(path) ? " image" : ""}`}
@@ -251,6 +290,9 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
           tabIndex={0}
           onKeyDown={svg.onKeyDown}
+          onScroll={(e) =>
+            saveTabParams(api, { renderedScroll: Math.round(e.currentTarget.scrollTop) })
+          }
         >
           {isSvg(path) ? svg.view : <MarkdownView text={rendered} />}
         </div>

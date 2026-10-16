@@ -7,6 +7,7 @@ import { useSendFromMenu } from "../review/useSendText";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { pathItems } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
+import { useSavedSet } from "../workbench/savedState";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
@@ -150,7 +151,7 @@ function Dir({ dir, depth, listings, open, onToggle, decor, menu, dropDir }: Dir
 export function RepoTree() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
+  const [open, setOpen] = useSavedSet(`files-open:${workspace ?? ""}`);
   const { listings, reload } = useListings(workspace, open);
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
@@ -172,7 +173,7 @@ export function RepoTree() {
         };
         requestAnimationFrame(find);
       }),
-    [workspace],
+    [workspace, setOpen],
   );
 
   /** Lists the tree again with what holds `path` open, so a new or moved entry shows. */

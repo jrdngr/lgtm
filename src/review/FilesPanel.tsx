@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Ring } from "../ui/Ring";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
+import { useSavedSet } from "../workbench/savedState";
 import { useWorkspace } from "../workspaces/context";
 import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
@@ -121,7 +122,7 @@ export function FilesPanel() {
   const review = useCurrentReview(workspace);
   const setup = useMarkSetup();
   const { sender } = useSendFromMenu(workspace);
-  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const [closed, setClosed] = useSavedSet(`changes-closed:${workspace ?? ""}`);
   const tree = useMemo(
     () =>
       review &&

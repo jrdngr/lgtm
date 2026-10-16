@@ -1,6 +1,7 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useState } from "react";
 import { commands, errorText, unwrap } from "../ipc";
+import { saveTabParams } from "../workbench/tabParams";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { imageType } from "./image";
@@ -8,7 +9,7 @@ import type { EditorParams } from "./open";
 import { useImageZoom } from "./useImageZoom";
 
 /** An image file, scaled down to fit the tab until zoomed. Reloads when the repo changes. */
-export function ImagePanel({ params }: IDockviewPanelProps<EditorParams>) {
+export function ImagePanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
   const { path } = params;
   const [url, setUrl] = useState<string>();
@@ -30,7 +31,9 @@ export function ImagePanel({ params }: IDockviewPanelProps<EditorParams>) {
     load();
   }, [load]);
   useRepoChanged(load);
-  const { controls, view, size } = useImageZoom(url, path);
+  const { controls, view, size } = useImageZoom(url, path, params.zoom, (zoom) =>
+    saveTabParams(api, { zoom: zoom === "shrink" ? undefined : zoom }),
+  );
 
   return (
     <div className="editor-panel">

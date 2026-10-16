@@ -4,12 +4,21 @@ import { ZoomControls, zoomKey } from "./ZoomControls";
 
 /** How an image is sized: shrunk to fit the tab (never enlarged), scaled to fill the tab,
  * or at a zoom. */
-type Zoom = "shrink" | "fit" | number;
+export type Zoom = "shrink" | "fit" | number;
 
 /** An image that shrinks to fit its tab until zoomed or fitted. `controls` go in the tab's
  * bar; `view` shows the image and takes the zoom keys while focused. */
-export function useImageZoom(src: string | undefined, alt: string) {
-  const [zoom, setZoom] = useState<Zoom>("shrink");
+export function useImageZoom(
+  src: string | undefined,
+  alt: string,
+  saved: Zoom = "shrink",
+  onZoom?: (zoom: Zoom) => void,
+) {
+  const [zoom, setZoomState] = useState<Zoom>(saved);
+  const setZoom = (z: Zoom) => {
+    setZoomState(z);
+    onZoom?.(z);
+  };
   const [size, setSize] = useState<[number, number]>();
   /** The room the view has for the image. */
   const [room, setRoom] = useState<[number, number]>();
