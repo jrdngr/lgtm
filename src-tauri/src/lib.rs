@@ -15,6 +15,7 @@ mod layout;
 mod mcp;
 mod menu;
 mod placement;
+mod par;
 mod pr;
 mod prompts;
 mod pty;

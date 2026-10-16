@@ -101,6 +101,10 @@ pub fn graph(files: &[ReviewFile], root: Option<&Path>) -> GraphDto {
     }
     let mut dtos = dtos;
     let mut frontier = 0..dtos.len();
+    let repo = root.map(|root| {
+        let skip: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        scan::RepoFiles::walk(root, &skip)
+    });
     for hop in 1..=callers::MAX_HOPS {
         // Callers of the last hop's symbols, by names long enough to count.
         let wanted: Vec<GraphNode> = dtos[frontier.clone()]
@@ -125,11 +129,10 @@ pub fn graph(files: &[ReviewFile], root: Option<&Path>) -> GraphDto {
                 );
             }
         }
-        if let Some(root) = root {
-            let skip: HashSet<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        if let Some(repo) = &repo {
             // Names worth looking for outside the review.
             let names: HashSet<String> = index.keys().map(|s| s.to_string()).collect();
-            for s in scan::mentioning(root, &skip, &names) {
+            for s in repo.mentioning(&names) {
                 found.scan(&s.path, None, &s.symbols, &s.refs, &dtos, &index);
             }
         }

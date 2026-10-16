@@ -41,6 +41,7 @@ pub fn scan(root: &Path, skip: &HashSet<String>) -> WorkingCopy {
         imports: HashMap::new(),
         manifests: Manifests::default(),
     };
+    let mut sources = Vec::new();
     for entry in walk.flatten().take(MAX_FILES) {
         if !entry.file_type().is_some_and(|t| t.is_file()) {
             continue;
@@ -60,11 +61,16 @@ pub fn scan(root: &Path, skip: &HashSet<String>) -> WorkingCopy {
         if extract::is_source(&rel)
             && let Ok(meta) = entry.metadata()
             && meta.len() <= MAX_BYTES
-            && let Some(raw) = imports(entry.path(), &rel, stamp(&meta))
         {
-            wc.imports.insert(rel.clone(), raw);
+            sources.push((entry.into_path(), rel.clone(), stamp(&meta)));
         }
         wc.paths.insert(rel);
+    }
+    let raws = crate::par::map(&sources, |(abs, rel, stamp)| imports(abs, rel, *stamp));
+    for ((_, rel, _), raw) in sources.into_iter().zip(raws) {
+        if let Some(raw) = raw {
+            wc.imports.insert(rel, raw);
+        }
     }
     wc
 }
