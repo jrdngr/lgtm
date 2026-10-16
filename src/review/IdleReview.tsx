@@ -100,7 +100,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
         } else openFile(workspace, path, line ?? undefined);
       },
       send: (text, onSent, report) => inPane((r) => r.send(text, onSent, report)),
-      runWalkthrough: () => inPane((r) => r.runWalkthrough()),
+      walkthroughInTerminal: () => inPane((r) => r.walkthroughInTerminal()),
       refetchPr: () => inPane((r) => r.refetchPr()),
       pullPr: (quiet) => inPane((r) => r.pullPr(quiet)),
       async commentOn(file, rows, body, snippet, draft = false) {

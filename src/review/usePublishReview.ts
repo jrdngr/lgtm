@@ -34,7 +34,7 @@ type Actions = Pick<
   | "show"
   | "commentOn"
   | "send"
-  | "runWalkthrough"
+  | "walkthroughInTerminal"
   | "refetchPr"
   | "pullPr"
   | "apply"
@@ -72,7 +72,7 @@ export function usePublishReview(
         notes: review?.state.notes ?? [],
         threads: review?.state.threads ?? [],
         apply: (state) => latest.current.apply(state),
-        runWalkthrough: () => latest.current.runWalkthrough(),
+        walkthroughInTerminal: () => latest.current.walkthroughInTerminal(),
         refetchPr: () => latest.current.refetchPr(),
         pullPr: (quiet) => latest.current.pullPr(quiet),
         jump: (f) => latest.current.jump(f),

@@ -1,13 +1,12 @@
 import { openSettings } from "../settings/open";
 import { contextMenu } from "../ui/contextMenu";
-import { Icon, IconButton } from "../ui/icons";
+import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
 import { useCurrentReview } from "./current";
 import { setTourState, useTourState } from "./tour";
 import { WalkthroughTour } from "./WalkthroughPanelTour";
-import { stopWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 import "./notes.css";
 
 /** The current review's walkthrough: its notes along the chosen tour, filtered by category.
@@ -15,7 +14,6 @@ import "./notes.css";
 export function WalkthroughPanel() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
-  const run = useWalkthroughRun(review?.id);
   const state = useTourState(review?.id);
   if (!review) {
     return (
@@ -26,12 +24,12 @@ export function WalkthroughPanel() {
     );
   }
   const { notes } = review;
-  const running = !!run?.running;
-  const stop = () => stopWalkthrough(review.id);
-  const error = !running && run?.error;
-  const write = running
-    ? { label: "Stop Walkthrough", onSelect: stop }
-    : { label: "Write Walkthrough", keys: "h", title: "h", onSelect: review.runWalkthrough };
+  const write = {
+    label: "Walkthrough in Terminal",
+    keys: "h",
+    title: "h",
+    onSelect: review.walkthroughInTerminal,
+  };
   const editPrompt = {
     label: "Edit Prompt…",
     title: "Opens the prompt files in Settings",
@@ -67,31 +65,14 @@ export function WalkthroughPanel() {
         </SectionHeader>
       </div>
       <div className="side-split-body">
-        {running && (
-          <div className="note-run">
-            <span className="note-spin" />
-            <span className="note-run-text">{run?.note}</span>
-            <button type="button" className="quiet" onClick={stop}>
-              <Icon name="stop" size={12} />
-              Stop
-            </button>
-          </div>
-        )}
-        {error && <div className="note-run error">{error}</div>}
         {notes.length > 0 ? (
           <WalkthroughTour review={review} />
         ) : (
-          !running && (
-            <div className="note-empty">
-              <p>
-                A walkthrough has an agent guide you through the change: what needs a careful look,
-                how its flows run, and what to ask.
-              </p>
-              <button type="button" className="primary" onClick={review.runWalkthrough}>
-                Write walkthrough <kbd>h</kbd>
-              </button>
-            </div>
-          )
+          <div className="note-empty">
+            <button type="button" className="primary" onClick={review.walkthroughInTerminal}>
+              Walkthrough in terminal <kbd>h</kbd>
+            </button>
+          </div>
         )}
       </div>
     </div>

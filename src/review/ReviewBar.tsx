@@ -6,7 +6,6 @@ import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
 import { type Filter, type Progress, progressTitle } from "./state";
-import { stopWalkthrough, type WalkthroughRun } from "./walkthroughRun";
 import "./ReviewBar.css";
 
 const SINCE_LABEL = {
@@ -60,7 +59,6 @@ interface Props {
   onReset(): void;
   /** Hands focus back to the review once the reset confirm closes. */
   onDone(): void;
-  walkthrough?: WalkthroughRun;
 }
 
 export function ReviewBar(props: Props) {
@@ -133,14 +131,6 @@ export function ReviewBar(props: Props) {
           onClick={() => props.onMode("split")}
         />
       </span>
-      {review && props.walkthrough?.running && (
-        <span className="risk-run" title="An agent is writing a walkthrough of the change">
-          <span className="risk-note">Walking through · {props.walkthrough.note}</span>
-          <button type="button" className="quiet" onClick={() => stopWalkthrough(review.id)}>
-            Stop
-          </button>
-        </span>
-      )}
       <span className="spacer" />
       <MarkBar
         setup={props.setup}

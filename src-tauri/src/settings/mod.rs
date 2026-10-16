@@ -50,6 +50,7 @@ impl Default for Settings {
 pub struct Models {
     /// Fix on reports and intents.
     pub ask: String,
+    /// Assess on the architecture.
     pub walkthrough: String,
     pub reviewers: String,
     /// Triage and replies on PR threads.

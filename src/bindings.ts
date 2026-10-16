@@ -140,16 +140,8 @@ export const commands = {
 	mcpStatus: () => typedError<McpStatus, string>(__TAURI_INVOKE("mcp_status")),
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
 	registerMcp: () => typedError<null, string>(__TAURI_INVOKE("register_mcp")),
-	/**
-	 *  Runs an agent over the review to write its walkthrough, replacing the last one. Sends each
-	 *  tool call it makes through `activity`. `null` when it was stopped.
-	 */
-	runWalkthrough: (review: number, activity: Channel<string>) => typedError<{
-	state: StateDto,
-	/**  Notes the agent put outside the review's files. */
-	skipped: number,
-} | null, string>(__TAURI_INVOKE("run_walkthrough", { review, activity })),
-	stopWalkthrough: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_walkthrough", { review })),
+	/**  The prompt that has a terminal agent write the review's walkthrough. */
+	walkthroughPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("walkthrough_prompt", { review })),
 	/**
 	 *  Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
 	 *  makes it a draft for the workspace's PR on GitHub instead of a note.
@@ -1173,6 +1165,7 @@ export type Minimal = {
 export type Models = {
 	/**  Fix on reports and intents. */
 	ask: string,
+	/**  Assess on the architecture. */
 	walkthrough: string,
 	reviewers: string,
 	/**  Triage and replies on PR threads. */
@@ -1910,12 +1903,6 @@ export type View =
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string };
-
-export type WalkthroughDone = {
-	state: StateDto,
-	/**  Notes the agent put outside the review's files. */
-	skipped: number,
-};
 
 /**  View > Word Wrap was turned on or off. */
 export type WordWrap = {

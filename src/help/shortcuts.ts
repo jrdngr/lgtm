@@ -97,7 +97,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["x"], action: "Check or uncheck the file" },
       { keys: ["za"], action: "Collapse or expand the hunk or file" },
       { keys: ["g"], action: "Architecture" },
-      { keys: ["h"], action: "Walkthrough" },
+      { keys: ["h"], action: "Walkthrough in terminal" },
       { keys: ["]", "["], action: "Next / previous change" },
       { keys: ["}", "{"], action: "Next / previous file" },
       { keys: ["n", "N"], action: "Next / previous walkthrough note" },

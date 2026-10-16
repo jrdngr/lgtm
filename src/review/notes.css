@@ -155,10 +155,6 @@
   color: var(--muted);
 }
 
-.note-empty p {
-  margin: 0;
-}
-
 .note-empty kbd {
   margin-left: 4px;
   color: rgb(255 255 255 / 80%);

@@ -27,7 +27,7 @@ interface Ctx {
   /** Opens the agent box of the comment at the cursor. */
   openArchitecture(): void;
   openInEditor(): void;
-  runWalkthrough(): void;
+  walkthroughInTerminal(): void;
   stepNote(dir: 1 | -1): void;
   stepHunk(dir: 1 | -1): void;
   stepFile(dir: 1 | -1): void;
@@ -154,7 +154,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         ctx.openInEditor();
         break;
       case "h":
-        if (!e.repeat) ctx.runWalkthrough();
+        if (!e.repeat) ctx.walkthroughInTerminal();
         break;
       case "]":
       case "[":

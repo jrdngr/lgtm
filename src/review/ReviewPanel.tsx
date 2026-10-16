@@ -6,7 +6,6 @@ import { openFileIn } from "../editor/open";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
-import { agentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { openArchitecture } from "../workbench/panels";
 import { remembered } from "../workbench/remembered";
@@ -39,7 +38,6 @@ import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
 import { useWalkthrough } from "./useWalkthrough";
-import { runWalkthrough, useWalkthroughRun } from "./walkthroughRun";
 
 /** Rows changed since they were reviewed show amber, in every review. */
 const amberRows = remembered("lgtm:amberRows", true, [true, false]);
@@ -140,7 +138,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     [files, lines, sel],
   );
   const closeMenu = () => setMenu(undefined);
-  const walkthrough = useWalkthroughRun(review?.id);
   const a = useReviewActions({
     review,
     files,
@@ -244,11 +241,11 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     return true;
   }
 
-  function runWalkthroughNow() {
+  async function walkthroughInTerminal() {
     if (!review) return;
-    if (agentsOff()) return setError("Walkthrough needs Claude Code, which is turned off.");
-    const id = review.id;
-    runWalkthrough(workspace, id, revset, (state) => setState(state, id));
+    const r = await commands.walkthroughPrompt(review.id);
+    if (r.status === "error") return setError(r.error);
+    sendText(r.data, focusRoot);
   }
 
   function openInEditor() {
@@ -268,7 +265,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       show: showLine,
       commentOn,
       send: sendText,
-      runWalkthrough: runWalkthroughNow,
+      walkthroughInTerminal,
       refetchPr: pr.refetch,
       pullPr: pr.pull,
       apply: setState,
@@ -328,7 +325,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     startDraft: () => a.startComment(true),
     openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
-    runWalkthrough: runWalkthroughNow,
+    walkthroughInTerminal,
     stepNote,
     stepHunk,
     stepFile,
@@ -371,7 +368,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         setup={setup}
         onMark={a.applyMark}
         onReset={a.resetMarks}
-        walkthrough={walkthrough}
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />

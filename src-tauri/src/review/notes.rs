@@ -1,8 +1,6 @@
 //! Walkthrough notes on a review: placing them on rows, and saving a new walkthrough from
 //! line ranges.
 
-use std::sync::Mutex;
-
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
@@ -139,17 +137,7 @@ impl RepoCtx {
         inputs: &[NoteInput],
         source: Source,
     ) -> anyhow::Result<(StateDto, usize)> {
-        self.save_notes_to(&*self.review(id)?, inputs, source)
-    }
-
-    /// [`Self::save_notes`] on a review held since before a long run, which saves the notes
-    /// even when the review was closed in the meantime.
-    pub(super) fn save_notes_to(
-        &self,
-        review: &Mutex<Review>,
-        inputs: &[NoteInput],
-        source: Source,
-    ) -> anyhow::Result<(StateDto, usize)> {
+        let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         let mut store = self.store.lock().unwrap();
         let notes = review.anchor_notes(&store, inputs, source)?;

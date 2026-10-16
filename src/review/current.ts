@@ -27,8 +27,8 @@ export interface CurrentReview {
   /** Shows a new state, after a side view changed comments or threads. With `review`, only
    * while that review is still the one shown. */
   apply(state: StateDto, review?: number): void;
-  /** Starts an agent writing the review's walkthrough. */
-  runWalkthrough(): void;
+  /** Sends a terminal agent the prompt to write the review's walkthrough. */
+  walkthroughInTerminal(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */
