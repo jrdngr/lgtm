@@ -50,12 +50,14 @@ export async function runningPrograms(
 }
 
 /** Shows panel `id`'s session in `container`: the one a panel with this id has, when the
- * panel is moving to the other dock or React mounts it again, or else a new shell. */
+ * panel is moving to the other dock or React mounts it again, or else a new shell, which then
+ * runs `command` if given. */
 export function openSession(
   id: string,
   container: HTMLElement,
   workspace: WorkspaceName,
   setup: boolean,
+  command?: string,
 ): Session {
   const open = sessions.get(id);
   if (open) {
@@ -68,7 +70,7 @@ export function openSession(
   const host = document.createElement("div");
   host.className = "terminal-host";
   container.append(host);
-  const session = startSession(id, host, workspace, setup);
+  const session = startSession(id, host, workspace, setup, command);
   sessions.set(id, { session, workspace: workspaceKey(workspace), panels: 1 });
   return session;
 }
@@ -91,6 +93,7 @@ function startSession(
   host: HTMLDivElement,
   workspace: WorkspaceName,
   setup: boolean,
+  command?: string,
 ): Session {
   const { term, refit, unwatch } = createTerminal(host);
   let pty: number | undefined;
@@ -131,6 +134,7 @@ function startSession(
       commands.ptyKill(r.data);
     } else {
       pty = r.data;
+      if (command) commands.ptyWrite(pty, `${command}\r`);
       // Resizes while it started weren't sent.
       if (term.cols !== cols || term.rows !== rows) commands.ptyResize(pty, term.cols, term.rows);
     }

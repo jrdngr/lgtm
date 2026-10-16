@@ -1614,6 +1614,10 @@ export type TerminalAgent = {
 	prompt: string | null,
 	/**  The agent's last message, when it stopped. */
 	reply: string | null,
+	/**  Claude Code's session id. */
+	session: string | null,
+	/**  The user ended the session. */
+	ended: boolean,
 };
 
 export type ThreadDto = {

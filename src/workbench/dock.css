@@ -92,19 +92,12 @@
   outline: none;
 }
 
-/* An agent's state glyph stands where the × is; hovering the tab brings the × back. */
+/* An agent's state glyph, before the tab's title. */
 .dock .tab-glyph {
-  position: absolute;
-  top: 50%;
-  right: 4px;
-  margin-top: -6px;
-  pointer-events: none;
+  margin-right: 6px;
 }
 
-.dock .dv-tab:hover .tab-glyph {
+/* Only the selected tab offers its ›_. */
+.dock .dv-inactive-tab .tab-pin {
   display: none;
-}
-
-.dock .dv-tab:not(:hover) .tab-row.agent .dv-default-tab .dv-default-tab-action {
-  visibility: hidden;
 }

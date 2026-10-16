@@ -65,8 +65,8 @@ function RenameField({ title, onDone }: { title: string; onDone(title?: string):
 
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
  * selects it and opens its menu. The send target's tab is marked, and a terminal's tab leads
- * with a ›_ that pins it as the send target. A tab running agents shows their most urgent
- * state where its × is, until hovered. */
+ * with a ›_ that pins it as the send target, shown while the tab is selected. A tab running
+ * agents shows their most urgent state before its title. */
 export function Tab(props: IDockviewPanelHeaderProps) {
   const { api, containerApi } = props;
   const workspace = useWorkspace();
@@ -85,7 +85,10 @@ export function Tab(props: IDockviewPanelHeaderProps) {
       <RenameField
         title={api.title ?? ""}
         onDone={(title) => {
-          if (title?.trim()) api.setTitle(title.trim());
+          if (title?.trim()) {
+            api.setTitle(title.trim());
+            api.updateParameters({ renamed: true });
+          }
           setRenaming(null);
         }}
       />
@@ -107,15 +110,15 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   );
   if (!hasTerminal(api.id))
     return glyph ? (
-      <div className="tab-row agent">
-        {tab}
+      <div className="tab-row">
         {glyph}
+        {tab}
       </div>
     ) : (
       tab
     );
   return (
-    <div className={`tab-row${glyph ? " agent" : ""}`}>
+    <div className="tab-row">
       <button
         type="button"
         className={`tab-pin${pinned ? " on" : ""}`}
@@ -126,8 +129,8 @@ export function Tab(props: IDockviewPanelHeaderProps) {
       >
         <Icon name="terminal" size={13} />
       </button>
-      {tab}
       {glyph}
+      {tab}
     </div>
   );
 }

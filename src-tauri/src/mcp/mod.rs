@@ -85,6 +85,8 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 state: report.state,
                 prompt: report.prompt,
                 reply: report.reply,
+                session: report.session,
+                ended: report.ended,
             }
             .emit_to(&app, &label)
             .ok();

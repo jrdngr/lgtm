@@ -97,4 +97,8 @@ pub struct TerminalAgent {
     pub prompt: Option<String>,
     /// The agent's last message, when it stopped.
     pub reply: Option<String>,
+    /// Claude Code's session id.
+    pub session: Option<String>,
+    /// The user ended the session.
+    pub ended: bool,
 }

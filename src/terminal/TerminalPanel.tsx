@@ -5,12 +5,21 @@ import { commands } from "../ipc";
 import { openMenu } from "../ui/contextMenu";
 import { bottom } from "../workbench/bottom";
 import { useWorkspace } from "../workspaces/context";
+import { watchAgentHooks } from "./agentHooks";
 import { registerTerminal, touchTerminal } from "./registry";
+import { resumeCommand } from "./resume";
 import { openSession, releaseSession } from "./sessions";
 import { shellPaths } from "./shellPaths";
 import { terminalMenu } from "./terminalMenu";
+import { isAgentTitle, titleLabel } from "./title";
 
-type Params = { setup?: boolean };
+type Params = {
+  setup?: boolean;
+  /** The Claude Code session running in it, which a restart resumes. */
+  claudeSession?: string;
+  /** The user named the tab, so its agent's title doesn't. */
+  renamed?: boolean;
+};
 
 export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps<Params>) {
   const ref = useRef<HTMLDivElement>(null);
@@ -19,7 +28,8 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
 
   useEffect(() => {
     const container = ref.current as HTMLDivElement;
-    const session = openSession(api.id, container, workspace, setup.current);
+    const resume = resumeCommand(api.getParameters<Params>().claudeSession);
+    const session = openSession(api.id, container, workspace, setup.current, resume);
     const { term } = session;
     // Setup runs once, not again when the layout is restored.
     if (setup.current) {
@@ -71,6 +81,17 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
     container.addEventListener("dragover", onDragOver);
     container.addEventListener("drop", onDrop);
 
+    // The agent's session is kept for a restart, and its title names the tab.
+    const unwatch = watchAgentHooks((r) => {
+      if (r.terminal !== api.id) return;
+      const saved = api.getParameters<Params>().claudeSession;
+      if (r.ended) api.updateParameters({ claudeSession: undefined });
+      else if (r.session && r.session !== saved) api.updateParameters({ claudeSession: r.session });
+    });
+    const titled = term.onTitleChange((t) => {
+      if (isAgentTitle(t) && !api.getParameters<Params>().renamed) api.setTitle(titleLabel(t));
+    });
+
     const sub = api.onDidActiveChange(({ isActive }) => isActive && term.focus());
     const observer = new ResizeObserver(session.refit);
     observer.observe(container);
@@ -84,6 +105,8 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
       container.removeEventListener("drop", onDrop);
       observer.disconnect();
       sub.dispose();
+      unwatch();
+      titled.dispose();
       releaseSession(api.id);
     };
   }, [api, containerApi, workspace]);

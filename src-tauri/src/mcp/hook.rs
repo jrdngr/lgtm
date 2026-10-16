@@ -48,6 +48,13 @@ pub(super) struct HookReport {
     /// The agent's last message, on `Stop`.
     #[serde(default)]
     pub reply: Option<String>,
+    /// Claude Code's session id, for resuming it.
+    #[serde(default)]
+    pub session: Option<String>,
+    /// The user ended the session, so it isn't one to resume. A session the app stopped by
+    /// closing its terminal ends with reason `other`.
+    #[serde(default)]
+    pub ended: bool,
 }
 
 /// The state a hook event's input means, if any.
@@ -66,6 +73,11 @@ fn state(input: &serde_json::Value) -> Option<AgentHookState> {
         "SessionEnd" => Gone,
         _ => return None,
     })
+}
+
+/// Whether the event is the user ending the session, by exiting or clearing it.
+fn ended(input: &serde_json::Value) -> bool {
+    input["hook_event_name"] == "SessionEnd" && input["reason"] != "other"
 }
 
 /// The prompt a `UserPromptSubmit` event carries.
@@ -140,6 +152,8 @@ pub fn main() -> i32 {
         state,
         prompt: prompt(&input),
         reply: reply(&input),
+        session: input["session_id"].as_str().map(str::to_string),
+        ended: ended(&input),
     };
     if let Ok(mut stream) = UnixStream::connect(socket) {
         stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
@@ -173,6 +187,17 @@ mod tests {
         assert_eq!(of(r#"{"hook_event_name":"StopFailure"}"#), Some(Failed));
         assert_eq!(of(r#"{"hook_event_name":"SubagentStop"}"#), None);
         assert_eq!(of("{}"), None);
+    }
+
+    #[test]
+    fn only_a_session_the_user_ends_is_ended() {
+        let end = |reason: &str| {
+            ended(&serde_json::json!({ "hook_event_name": "SessionEnd", "reason": reason }))
+        };
+        assert!(end("prompt_input_exit"));
+        assert!(end("clear"));
+        assert!(!end("other"));
+        assert!(!ended(&serde_json::json!({ "hook_event_name": "Stop" })));
     }
 
     #[test]

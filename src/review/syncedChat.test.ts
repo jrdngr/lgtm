@@ -31,7 +31,15 @@ const report = (
   terminal: string,
   state: AgentHookState,
   said: { prompt?: string; reply?: string },
-) => mirror({ terminal, state, prompt: said.prompt ?? null, reply: said.reply ?? null });
+) =>
+  mirror({
+    terminal,
+    state,
+    prompt: said.prompt ?? null,
+    reply: said.reply ?? null,
+    session: null,
+    ended: false,
+  });
 
 describe("synced chat", () => {
   it("mirrors the synced terminal's prompts and replies into its thread until it ends", () => {
