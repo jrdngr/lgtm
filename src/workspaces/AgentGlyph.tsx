@@ -94,14 +94,20 @@ interface Props {
 /** A workspace's most urgent agent state as a 12px mark. Hovering it lists its agents. */
 export function AgentGlyph({ a, name, onOpen }: Props) {
   const mark = useRef<HTMLSpanElement>(null);
-  const [place, setPlace] = useState<{ top: number; right: number }>();
+  const [place, setPlace] = useState<{ top: number; right: number; maxWidth: number }>();
   const leave = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(leave.current), []);
   const shown = place && a.agents.length > 0;
   const enter = () => {
     clearTimeout(leave.current);
     const r = mark.current?.getBoundingClientRect();
-    if (r) setPlace({ top: r.bottom + 4, right: window.innerWidth - r.right - 4 });
+    // Grows left from the mark, as wide as its longest name, within the window.
+    if (r)
+      setPlace({
+        top: r.bottom + 4,
+        right: window.innerWidth - r.right - 4,
+        maxWidth: r.right - 4,
+      });
   };
   const out = () => {
     clearTimeout(leave.current);

@@ -1,5 +1,5 @@
 import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { confirmClose } from "../editor/unsaved";
 import { hasTerminal, pinTarget, useSendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
@@ -73,6 +73,11 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   const send = useSendTarget(workspace);
   const renaming = useRenaming(api.id);
   const pinned = send.pinned === api.id;
+  const [title, setTitle] = useState(api.title ?? "");
+  useEffect(() => {
+    const sub = api.onDidTitleChange((e) => setTitle(e.title));
+    return () => sub.dispose();
+  }, [api]);
   const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
   const panel = containerApi.getPanel(api.id);
   const agents = tabState(useActivity(workspace), api.id, !!panel && isReviewPanel(panel));
@@ -97,6 +102,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
     <DockviewDefaultTab
       {...props}
       data-send={mark}
+      title={title}
       closeActionOverride={close}
       onContextMenu={(e) => {
         const panel = containerApi.getPanel(api.id);
