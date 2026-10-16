@@ -1,7 +1,7 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { commands } from "../ipc";
-import { useSendText } from "../review/useSendText";
+import { type SendOutcome, useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
 import { useAgentsOff } from "../tools/agents";
 import { copy } from "../ui/contextMenu";
@@ -76,12 +76,14 @@ export function QaTab({ api }: IDockviewPanelProps) {
 
   if (!state.loaded) return null;
 
-  /** Pastes text into a terminal and remembers which one took it. */
+  /** Pastes text into a terminal, the one whose agent asked when it still can, and remembers
+   * which one took it. */
   function send(text: string) {
-    sendText(text, undefined, (o) => {
+    const report = (o: SendOutcome) => {
       if ("error" in o) setError(ws, o.error);
       else if (d) edit(ws, d, { kind: "sent", terminal: o.terminal });
-    });
+    };
+    sendText(text, undefined, report, d?.terminal ?? undefined);
   }
 
   const q = d && openQuestions(d)[0];

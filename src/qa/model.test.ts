@@ -51,6 +51,7 @@ function session(over: Partial<Session> = {}): Session {
     sent: null,
     fromTerminal: false,
     forkFrom: null,
+    terminal: null,
     archived: false,
     created: 1,
     agent: null,
@@ -151,7 +152,7 @@ describe("applyText", () => {
     );
   });
 
-  it("gives a terminal agent its answers without telling it to write anything", () => {
+  it("gives a terminal agent its answers and plan without telling it to write anything", () => {
     const d = session({
       fromTerminal: true,
       queue: {
@@ -161,12 +162,14 @@ describe("applyText", () => {
         questions: [question("Q1", "decided", 1, 1), question("Q2", "deferred")],
       },
       note: "Keep it small",
+      plan: { files: [{ path: "a.rs", change: "edit", edits: ["Load"], decisions: ["Q1"] }] },
     });
     expect(applyText(d)).toBe(
       [
         'My answers to "T":\nQ1 — Subject Q1: Change it',
         "Deferred: Q2 (Subject Q2)",
         "Also: Keep it small",
+        "Plan:\n- a.rs (edit): Load",
       ].join("\n\n"),
     );
   });

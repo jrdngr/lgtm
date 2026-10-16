@@ -36,10 +36,10 @@ export const commands = {
 	htmlChanged: (root: string) => __TAURI_INVOKE<boolean>("html_changed", { root }),
 	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
 	/**
-	 *  Starts a login shell in the workspace. With `setup`, the shell first runs its
-	 *  `.lgtm/setup`.
+	 *  Starts a login shell in the workspace for terminal panel `terminal`. With `setup`, the
+	 *  shell first runs its `.lgtm/setup`.
 	 */
-	ptySpawn: (workspace: string | null, cols: number, rows: number, setup: boolean, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, cols, rows, setup, onEvent })),
+	ptySpawn: (workspace: string | null, terminal: string, cols: number, rows: number, setup: boolean, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, terminal, cols, rows, setup, onEvent })),
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
@@ -1798,6 +1798,8 @@ export type Session_Deserialize = {
 	fromTerminal?: boolean,
 	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
 	forkFrom?: string | null,
+	/**  The terminal panel that agent runs in, which Apply sends the decisions back to. */
+	terminal?: string | null,
 	/**  Implemented: applied, or marked so after a send. */
 	archived?: boolean,
 	created: number | null,
@@ -1825,6 +1827,8 @@ export type Session_Serialize = {
 	fromTerminal: boolean,
 	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
 	forkFrom: string | null,
+	/**  The terminal panel that agent runs in, which Apply sends the decisions back to. */
+	terminal: string | null,
 	/**  Implemented: applied, or marked so after a send. */
 	archived: boolean,
 	created: number | null,

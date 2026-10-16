@@ -5,14 +5,15 @@ use super::{CmdResult, err, repo};
 use crate::pty::{Owner, PtyEvent, Ptys};
 use crate::workspaces;
 
-/// Starts a login shell in the workspace. With `setup`, the shell first runs its
-/// `.lgtm/setup`.
+/// Starts a login shell in the workspace for terminal panel `terminal`. With `setup`, the
+/// shell first runs its `.lgtm/setup`.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn pty_spawn(
     window: WebviewWindow,
     ptys: State<'_, Ptys>,
     workspace: Option<String>,
+    terminal: String,
     cols: u16,
     rows: u16,
     setup: bool,
@@ -29,6 +30,7 @@ pub(crate) async fn pty_spawn(
         ("LGTM_ROOT", root.as_ref()),
         ("LGTM_WORKSPACE", ws.name.as_deref().unwrap_or("")),
         ("LGTM_SOCKET", socket.as_str()),
+        ("LGTM_TERMINAL", terminal.as_str()),
     ];
     let owner = Owner {
         window: window.label().to_string(),

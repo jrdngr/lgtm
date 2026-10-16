@@ -454,6 +454,7 @@ impl Lgtm {
                 ctx.edit_qa(&ws, &id, |s| {
                     s.from_terminal = true;
                     s.fork_from = self.hello.claude_session.clone();
+                    s.terminal = self.hello.terminal.clone();
                     Ok(())
                 })
                 .map_err(failed)?;

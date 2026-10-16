@@ -93,7 +93,7 @@ function startSession(
   };
 
   const { cols, rows } = term;
-  commands.ptySpawn(workspace, cols, rows, setup, channel).then((r) => {
+  commands.ptySpawn(workspace, id, cols, rows, setup, channel).then((r) => {
     if (r.status === "error") {
       term.write(`failed to start shell: ${r.error}\r\n`);
     } else if (disposed) {

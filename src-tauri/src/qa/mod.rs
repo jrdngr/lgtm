@@ -93,6 +93,9 @@ pub struct Session {
     /// That terminal agent's Claude Code session, which the agent here starts from a copy of.
     #[serde(default)]
     pub fork_from: Option<String>,
+    /// The terminal panel that agent runs in, which Apply sends the decisions back to.
+    #[serde(default)]
+    pub terminal: Option<String>,
     /// Implemented: applied, or marked so after a send.
     #[serde(default)]
     pub archived: bool,
@@ -173,6 +176,7 @@ impl RepoCtx {
             sent: None,
             from_terminal: false,
             fork_from: None,
+            terminal: None,
             archived: false,
             created: created as f64,
             agent: None,

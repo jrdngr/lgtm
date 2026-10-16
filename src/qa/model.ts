@@ -134,14 +134,19 @@ export function applyText(d: Session): string {
       `Deferred, leave unimplemented: ${deferred.map((q) => `${q.id} (${q.text.subject})`).join(", ")}`,
     );
   if (d.note.trim()) parts.push(`Also: ${d.note.trim()}`);
-  if (d.plan) {
-    const files = d.plan.files.map((f) => `- ${f.path} (${f.change}): ${f.edits.join("; ")}`);
-    const comments = (d.plan.comments ?? []).map((c) => `- On "${c.quote}": ${c.body}`);
-    parts.push(`Plan:\n${files.join("\n")}`);
-    if (comments.length) parts.push(`My comments on the plan:\n${comments.join("\n")}`);
-  }
+  parts.push(...planText(d));
   parts.push("Write the changes these decisions call for into this repo.");
   return parts.join("\n\n");
+}
+
+/** The plan and the user's comments on it, when there is one. */
+function planText(d: Session): string[] {
+  if (!d.plan) return [];
+  const files = d.plan.files.map((f) => `- ${f.path} (${f.change}): ${f.edits.join("; ")}`);
+  const comments = (d.plan.comments ?? []).map((c) => `- On "${c.quote}": ${c.body}`);
+  const parts = [`Plan:\n${files.join("\n")}`];
+  if (comments.length) parts.push(`My comments on the plan:\n${comments.join("\n")}`);
+  return parts;
 }
 
 /** The decisions on questions a terminal agent asked, for it to carry on with. */
@@ -151,6 +156,7 @@ function answersText(d: Session): string {
   if (deferred.length)
     parts.push(`Deferred: ${deferred.map((q) => `${q.id} (${q.text.subject})`).join(", ")}`);
   if (d.note.trim()) parts.push(`Also: ${d.note.trim()}`);
+  parts.push(...planText(d));
   return parts.join("\n\n");
 }
 

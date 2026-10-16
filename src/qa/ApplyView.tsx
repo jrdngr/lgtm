@@ -38,10 +38,12 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
 
   const saveNote = () => note !== d.note && edit(ws, d, { kind: "note", note });
 
+  /** Writes the decisions into @, or hands them back to the terminal agent that asked. */
   async function go() {
     if (locked) return;
     await saveNote();
-    apply(ws, d);
+    if (d.fromTerminal) onSend(applyText({ ...d, note }));
+    else apply(ws, d);
   }
 
   async function plan() {
@@ -108,20 +110,22 @@ export function ApplyView({ ws, d, busy, feed, focusKey, onSend }: Props) {
                 onBlur={saveNote}
               />
               <div className="qq-actions">
-                <button
-                  type="button"
-                  className="qq-btn"
-                  disabled={!!busy}
-                  onClick={() => onSend(applyText({ ...d, note }))}
-                >
-                  Send to terminal
-                </button>
+                {!d.fromTerminal && (
+                  <button
+                    type="button"
+                    className="qq-btn"
+                    disabled={!!busy}
+                    onClick={() => onSend(applyText({ ...d, note }))}
+                  >
+                    Send to terminal
+                  </button>
+                )}
                 <button type="button" className="qq-btn" disabled={locked} onClick={plan}>
                   Plan first
                 </button>
                 <span className="spacer" />
                 <button type="button" className="qq-btn primary" disabled={locked} onClick={go}>
-                  Apply <kbd>⌘↵</kbd>
+                  {d.fromTerminal ? "Apply in terminal" : "Apply"} <kbd>⌘↵</kbd>
                 </button>
               </div>
             </>

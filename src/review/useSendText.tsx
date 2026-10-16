@@ -26,10 +26,15 @@ export function useSendText(
 
   /** Pastes text into the prompt of one of the workspace's terminals, asking which one when
    * there are several. Calls `onSent` once it's sent. With `report`, it's told which terminal
-   * took the text or why none did, and failures don't show as the review's error. */
-  function sendText(text: string, onSent?: () => void, report?: Report) {
+   * took the text or why none did, and failures don't show as the review's error. With
+   * `preferred`, it goes to that terminal, and asks only when that one is gone or can't take
+   * a paste. */
+  function sendText(text: string, onSent?: () => void, report?: Report, preferred?: string) {
     const terminals = workspaceTerminals(workspace);
-    if (terminals.length > 1) setPicking({ text, terminals, onSent, report });
+    const target = preferred === undefined ? undefined : terminals.find((t) => t.id === preferred);
+    if (target?.canPaste) sendTo(text, target.id, onSent, report);
+    else if (terminals.length > 1 || (preferred !== undefined && terminals.length))
+      setPicking({ text, terminals, onSent, report });
     else sendTo(text, undefined, onSent, report);
   }
 

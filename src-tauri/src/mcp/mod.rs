@@ -31,6 +31,9 @@ struct Hello {
     /// The Claude Code session that started the bridge (`CLAUDE_CODE_SESSION_ID`).
     #[serde(default)]
     claude_session: Option<String>,
+    /// The terminal panel the bridge runs in (`LGTM_TERMINAL`).
+    #[serde(default)]
+    terminal: Option<String>,
 }
 
 /// Starts serving agents on `path`, replacing a socket left by an earlier run.
