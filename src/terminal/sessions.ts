@@ -101,6 +101,9 @@ function startSession(
 ): Session {
   const { term, refit, unwatch } = createTerminal(host);
   let pty: number | undefined;
+  /** Input from before the PTY's id came back, like the terminal's replies to a program that
+   * queries it as soon as it starts. */
+  let early = "";
   let disposed = false;
   let title = "";
   const activity = `term:${id}`;
@@ -130,11 +133,15 @@ function startSession(
     pulse(activity);
   });
 
-  const { cols, rows } = term;
-  // The shell starts by running the command, so it can't arrive before the shell is ready.
-  const started = (command ?? Promise.resolve(undefined)).then((run) =>
-    commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel),
-  );
+  // The shell starts by running the command, so it can't arrive before the shell is ready. It
+  // starts at the size the terminal has by then, since a program may only read it once.
+  let cols = term.cols;
+  let rows = term.rows;
+  const started = (command ?? Promise.resolve(undefined)).then((run) => {
+    refit();
+    ({ cols, rows } = term);
+    return commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel);
+  });
   started.then((r) => {
     if (r.status === "error") {
       term.write(`failed to start shell: ${r.error}\r\n`);
@@ -142,13 +149,18 @@ function startSession(
       commands.ptyKill(r.data);
     } else {
       pty = r.data;
+      if (early) commands.ptyWrite(pty, early);
+      early = "";
       // Resizes while it started weren't sent.
       if (term.cols !== cols || term.rows !== rows) commands.ptyResize(pty, term.cols, term.rows);
     }
   });
 
   const subs = [
-    term.onData((data) => pty !== undefined && commands.ptyWrite(pty, data)),
+    term.onData((data) => {
+      if (pty === undefined) early += data;
+      else commands.ptyWrite(pty, data);
+    }),
     term.onTitleChange((t) => {
       title = t;
       if (hooked) set(agent);
