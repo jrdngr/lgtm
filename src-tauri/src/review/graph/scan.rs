@@ -6,8 +6,8 @@ use std::path::Path;
 use crate::syntax::{self, CodeSymbol, Ref};
 
 /// Past these the scan stops, so a huge repo can't stall the graph.
-const MAX_FILES: usize = 20_000;
-const MAX_BYTES: u64 = 512 * 1024;
+pub(in crate::review) const MAX_FILES: usize = 20_000;
+pub(in crate::review) const MAX_BYTES: u64 = 512 * 1024;
 
 pub(super) struct Scanned {
     pub path: String,

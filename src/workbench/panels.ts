@@ -5,19 +5,19 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "graph" | "runs" | "qa";
+export type PanelKind = "review" | "terminal" | "report" | "architecture" | "runs" | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
   report: "Report",
-  graph: "Graph",
+  architecture: "Architecture",
   runs: "Agent runs",
   qa: "Q&A",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "graph", "qa", "runs"];
+export const KINDS: PanelKind[] = ["review", "terminal", "architecture", "qa", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -78,11 +78,11 @@ export function openReport(api: DockviewApi, run: number) {
   addPanel(api, "report", { run }, inActivePane(api), `report-${run}`);
 }
 
-/** Shows the symbol graph, in its pane if it's already open. */
-export function openGraph(api: DockviewApi) {
-  const open = api.getPanel("graph");
+/** Shows the Architecture tab, in its pane if it's already open. */
+export function openArchitecture(api: DockviewApi) {
+  const open = api.getPanel("architecture");
   if (open) return activate(open);
-  addPanel(api, "graph", {}, inActivePane(api), "graph");
+  addPanel(api, "architecture", {}, inActivePane(api), "architecture");
 }
 
 /** Shows the Q&A tab, or brings it forward. */
@@ -93,9 +93,9 @@ export function openQa(api: DockviewApi) {
 }
 
 /** Tabs a dock has one of. */
-const SINGLE: PanelKind[] = ["graph", "qa"];
+const SINGLE: PanelKind[] = ["architecture", "qa"];
 
-/** Opens a `kind` tab in `group`. The graph and Q&A are one per dock, so an open one moves
+/** Opens a `kind` tab in `group`. Architecture and Q&A are one per dock, so an open one moves
  * here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;
@@ -125,12 +125,14 @@ export function defaultLayout(api: DockviewApi) {
   addPanel(api, "review");
 }
 
-/** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads) and panes that
- * belonged to other workspaces. */
+/** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads, Graph) and panes
+ * that belonged to other workspaces. */
 export function dropStalePanels(api: DockviewApi) {
   for (const p of [...api.panels]) {
     const task = (p.params as { task?: unknown } | undefined)?.task;
-    const moved = ["tasks", "files", "design", "threads"].includes(p.view.contentComponent);
+    const moved = ["tasks", "files", "design", "threads", "graph"].includes(
+      p.view.contentComponent,
+    );
     if (moved || typeof task === "string") p.api.close();
   }
 }

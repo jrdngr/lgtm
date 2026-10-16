@@ -1,34 +1,30 @@
-import { type Node, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
+import { type Node, ReactFlow, useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { GraphDto } from "../bindings";
-import { type CurrentReview, useCurrentReview } from "../review/current";
+import type { CurrentReview } from "../review/current";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import { absolutePath } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
-import { useWorkspace, type WorkspaceName } from "../workspaces/context";
+import type { WorkspaceName } from "../workspaces/context";
 import { EdgesLayer } from "./EdgesLayer";
-import { GraphBar, ZoomControls } from "./GraphBar";
 import { layout, type Placed, type Scene } from "./layout";
 import { showNode } from "./nodes";
 import { route } from "./ports";
 import { type BoxData, BoxNode, OpenBoxNode } from "./SymbolNode";
 import { boxStats, jumpToBox } from "./stats";
-import { type Box, buildTree, type Tree } from "./tree";
-import { useGraph } from "./useGraph";
-import { useView } from "./useView";
+import type { Box, Tree } from "./tree";
 import {
   canExpand,
   links,
   nextCallers,
   presentBoxes,
   presentNodes,
-  setAllExpanded,
-  toggleAllCallers,
   toggleCallers,
   type View,
   visibleBoxes,
 } from "./view";
+import { ZoomControls } from "./ZoomControls";
 import "./graph.css";
 
 const nodeTypes = { box: BoxNode, open: OpenBoxNode };
@@ -72,7 +68,7 @@ function useScene(graph: GraphDto, tree: Tree, view: View) {
   }, [graph, tree, view]);
 }
 
-interface FlowProps {
+export interface FlowProps {
   review: CurrentReview;
   graph: GraphDto;
   tree: Tree;
@@ -81,9 +77,23 @@ interface FlowProps {
   workspace: WorkspaceName;
   /** The background menu's items after Fit to Window. */
   paneItems(): CtxEntry[];
+  /** Handles a click on a box in place of showing it. Returns whether it did. */
+  onBox?(box: Box): boolean;
+  /** Double-click on a box. */
+  onBoxOpen?(box: Box): void;
+  /** A box's menu in place of its own. */
+  menu?(box: Box): CtxEntry[] | undefined;
+  /** More of a box's look and behavior, like classes and drag and drop. */
+  decorate?(box: Box): Partial<BoxData>;
+  /** Drawn over the graph once it's laid out. */
+  overlay?(placed: Placed): ReactNode;
 }
 
-function Flow({ review, graph, tree, view, setView, workspace, paneItems }: FlowProps) {
+/** The symbol graph: boxes nested in their folders, files and enclosing symbols. Click a box
+ * to open it, a symbol to show it in the review, and a symbol's callers badge to bring in the
+ * unchanged code that uses it. */
+export function Flow(p: FlowProps) {
+  const { review, graph, tree, view, setView, workspace, paneItems, decorate } = p;
   const { scene: wanted, present, shown, next } = useScene(graph, tree, view);
   const { scene, placed } = usePlaced(wanted) ?? {};
   const flow = useReactFlow();
@@ -119,6 +129,7 @@ function Flow({ review, graph, tree, view, setView, workspace, paneItems }: Flow
         title: ownNode
           ? `${ownNode.path}:${ownNode.line}, ${ownNode.status}`
           : (box.path ?? box.label),
+        ...decorate?.(box),
       };
       out.push({
         id,
@@ -131,7 +142,7 @@ function Flow({ review, graph, tree, view, setView, workspace, paneItems }: Flow
       });
     }
     return out;
-  }, [review, graph, tree, view, setView, scene, placed, present, shown, next, selected]);
+  }, [review, graph, tree, view, setView, scene, placed, present, shown, next, selected, decorate]);
   // Fit when the boxes change, not on every progress update. A box can unmount under the
   // pointer without a mouse leave, so hover starts over.
   useEffect(() => {
@@ -176,10 +187,12 @@ function Flow({ review, graph, tree, view, setView, workspace, paneItems }: Flow
       colorMode="dark"
       nodesDraggable={false}
       nodesConnectable={false}
+      zoomOnDoubleClick={!p.onBoxOpen}
       minZoom={0.1}
       onNodeClick={(e, n) => {
         const { box, expandable } = n.data as BoxData;
         setSelected(n.id);
+        if (p.onBox?.(box)) return;
         if (isMac ? e.metaKey : e.ctrlKey) {
           return jumpToBox(review, graph, tree, box, present, workspace);
         }
@@ -187,10 +200,12 @@ function Flow({ review, graph, tree, view, setView, workspace, paneItems }: Flow
         const own = box.own[0];
         if (own !== undefined) showNode(review, graph.nodes[own], workspace);
       }}
+      onNodeDoubleClick={(_, n) => p.onBoxOpen?.((n.data as BoxData).box)}
       onPaneClick={() => setSelected(undefined)}
       onNodeContextMenu={(e, n) => {
         setSelected(n.id);
-        openMenu(e, boxItems(n.data as BoxData));
+        const data = n.data as BoxData;
+        openMenu(e, p.menu?.(data.box) ?? boxItems(data));
       }}
       onPaneContextMenu={(e) =>
         openMenu(e, [
@@ -202,85 +217,8 @@ function Flow({ review, graph, tree, view, setView, workspace, paneItems }: Flow
       onNodeMouseLeave={() => setHover(undefined)}
     >
       <EdgesLayer routed={scene.routed} placed={placed} hover={hover} selected={selected} />
+      {p.overlay?.(placed)}
       <ZoomControls />
     </ReactFlow>
-  );
-}
-
-/** The current review's changed symbols and how they use each other, nested in their
- * folders, files and enclosing symbols. Click a box to open it, a symbol to show it in the
- * review, and a symbol's callers badge to bring in the unchanged code that uses it. */
-export function GraphPanel() {
-  const workspace = useWorkspace();
-  const review = useCurrentReview(workspace);
-  const { graph, error, loading } = useGraph(review);
-  if (!review) return <div className="placeholder">No review open</div>;
-  if (error) return <div className="placeholder error">{error}</div>;
-  if (loading || !graph) return <div className="placeholder">Finding symbols…</div>;
-  if (!graph.nodes.some((n) => n.hop === 0)) {
-    return <div className="placeholder">No changed symbols in {review.revset}</div>;
-  }
-  return <Loaded review={review} graph={graph} workspace={workspace} />;
-}
-
-function Loaded({
-  review,
-  graph,
-  workspace,
-}: {
-  review: CurrentReview;
-  graph: GraphDto;
-  workspace: WorkspaceName;
-}) {
-  const tree = useMemo(() => buildTree(graph), [graph]);
-  const [view, setView] = useView(`${workspace}\n${review.revset}`, graph, tree);
-  const changed = graph.nodes.filter((n) => n.hop === 0).length;
-  const firstHop = graph.nodes.filter((n) => n.hop === 1).length;
-  const next = nextCallers(graph);
-  const allOpen = graph.nodes.every(
-    (n) => n.hop !== 0 || !next.has(n.id) || view.callersOpen.has(n.id),
-  );
-  const [legend, setLegend] = useState(false);
-  const expandAll = () => setView(setAllExpanded(tree, view, true));
-  const collapseAll = () => setView(setAllExpanded(tree, view, false));
-  const callers = (open: boolean) => setView(toggleAllCallers(graph, tree, view, open));
-  const callersOn = firstHop > 0 && allOpen;
-  return (
-    <div className="graph-panel">
-      <GraphBar
-        changed={changed}
-        callers={firstHop}
-        callersOpen={allOpen}
-        onCallers={callers}
-        onExpandAll={expandAll}
-        onCollapseAll={collapseAll}
-        legend={legend}
-        onLegend={setLegend}
-      />
-      <div className="graph-canvas">
-        <ReactFlowProvider>
-          <Flow
-            review={review}
-            graph={graph}
-            tree={tree}
-            view={view}
-            setView={setView}
-            workspace={workspace}
-            paneItems={() => [
-              { label: "Expand All", onSelect: expandAll },
-              { label: "Collapse All", onSelect: collapseAll },
-              {
-                label: "Callers",
-                checked: callersOn,
-                disabled: firstHop === 0,
-                onSelect: () => callers(!callersOn),
-              },
-              "-",
-              { label: "Legend", onSelect: () => setLegend(true) },
-            ]}
-          />
-        </ReactFlowProvider>
-      </div>
-    </div>
   );
 }

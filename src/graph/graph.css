@@ -17,66 +17,6 @@
   --xy-background-color: var(--bg);
 }
 
-.gchip {
-  margin-right: 4px;
-  padding: 1px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: none;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-
-.gchip.on {
-  border-color: transparent;
-  background: var(--selection);
-  color: var(--fg);
-}
-
-.glegend {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  z-index: 40;
-  display: grid;
-  grid-template-columns: 20px auto;
-  align-items: center;
-  gap: 6px 8px;
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--raise);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 45%);
-  font-size: var(--fs-sm);
-  white-space: nowrap;
-}
-
-.glegend dt {
-  display: flex;
-  justify-content: center;
-  font-family: var(--mono);
-}
-
-.glegend dd {
-  margin: 0;
-}
-
-.gline,
-.gdash,
-.glit {
-  width: 16px;
-  border-top: 2px solid var(--reviewed);
-}
-
-.gdash {
-  border-top: 1.5px dashed var(--link);
-}
-
-.glit {
-  border-top-color: var(--accent);
-}
-
 .gzoom {
   display: flex;
   flex-direction: column;
@@ -241,10 +181,6 @@
 .gfile > .gdot {
   top: 8px;
   right: 8px;
-}
-
-.glegend .gdot {
-  position: static;
 }
 
 .gnode {

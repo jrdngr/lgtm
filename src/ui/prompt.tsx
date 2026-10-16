@@ -8,6 +8,8 @@ interface Ask {
   action: string;
   /** A description box: ↵ adds a line and ⌘↵ submits. */
   multiline?: boolean;
+  /** Submitting it empty gives "" rather than undefined. */
+  allowEmpty?: boolean;
   /** Where focus was, to go back to after. */
   from: Element | null;
   /** Tells one ask's box from the next, so a new one starts with its own text. */
@@ -24,11 +26,11 @@ const set = (a: Ask | undefined) => {
   for (const l of listeners) l();
 };
 
-/** Asks for one line of text, or several with `multiline`. Undefined when cancelled or left
- * empty. One question at a time: a new one cancels the last. */
+/** Asks for one line of text, or several with `multiline`. Undefined when cancelled, or left
+ * empty without `allowEmpty`. One question at a time: a new one cancels the last. */
 export function promptText(
   title: string,
-  opts: { value?: string; action?: string; multiline?: boolean } = {},
+  opts: { value?: string; action?: string; multiline?: boolean; allowEmpty?: boolean } = {},
 ): Promise<string | undefined> {
   current?.done(undefined);
   return new Promise((done) =>
@@ -37,6 +39,7 @@ export function promptText(
       value: opts.value ?? "",
       action: opts.action ?? "OK",
       multiline: opts.multiline,
+      allowEmpty: opts.allowEmpty,
       from: document.activeElement,
       id: ++asks,
       done,
@@ -76,9 +79,10 @@ export function PromptHost() {
   const finish = (value: string | undefined) => {
     set(undefined);
     if (ask.from instanceof HTMLElement) ask.from.focus();
-    ask.done(value?.trim() ? value.trim() : undefined);
+    const text = value?.trim();
+    ask.done(text || (text === "" && ask.allowEmpty ? "" : undefined));
   };
-  const submit = () => finish(ref.current?.value);
+  const submit = () => finish(ref.current?.value ?? "");
   const keys = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") finish(undefined);

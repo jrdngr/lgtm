@@ -2,7 +2,7 @@
 //! symbols that use them. Without type information, symbols link by name.
 
 mod callers;
-mod scan;
+pub(super) mod scan;
 #[cfg(test)]
 mod tests;
 

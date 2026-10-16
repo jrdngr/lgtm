@@ -3,7 +3,7 @@ import { type CurrentReview, useCurrentReview } from "../review/current";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { dockOf } from "../workbench/docks";
-import { openGraph } from "../workbench/panels";
+import { openArchitecture } from "../workbench/panels";
 import type { WorkspaceName } from "../workspaces/context";
 import { useWorkspace } from "../workspaces/context";
 import { nodeDone, nodeLabel, nodeRisk, STATUS_SIGN, showNode } from "./nodes";
@@ -31,7 +31,7 @@ function symbolMenu(
   const graph = dockOf(ws);
   return [
     { label: "Jump to Code", onSelect: () => showNode(review, n, ws) },
-    graph && { label: "Show in Graph", onSelect: () => openGraph(graph) },
+    graph && { label: "Show in Architecture", onSelect: () => openArchitecture(graph) },
     users.length > 0 && {
       label: "Show Callers",
       items: users.map((u) => ({ label: nodeLabel(u), onSelect: () => showNode(review, u, ws) })),

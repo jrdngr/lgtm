@@ -26,7 +26,7 @@ interface Ctx {
   startDraft(): void;
   /** Opens the agent box of the comment at the cursor. */
   askAgent(): void;
-  openGraph(): void;
+  openArchitecture(): void;
   openInEditor(): void;
   runWalkthrough(): void;
   stepNote(dir: 1 | -1): void;
@@ -152,7 +152,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         if (!e.repeat) ctx.askAgent();
         break;
       case "g":
-        ctx.openGraph();
+        ctx.openArchitecture();
         break;
       case "o":
         ctx.openInEditor();

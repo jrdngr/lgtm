@@ -71,7 +71,7 @@ impl RepoCtx {
     }
 
     /// Builds each file, reusing the last load's build of files whose diff is unchanged.
-    async fn build(
+    pub(super) async fn build(
         &self,
         sides: Sides,
         interdiff: bool,

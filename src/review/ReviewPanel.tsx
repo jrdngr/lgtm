@@ -8,7 +8,7 @@ import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { agentsOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
-import { openGraph } from "../workbench/panels";
+import { openArchitecture } from "../workbench/panels";
 import { remembered } from "../workbench/remembered";
 import { useWorkspace } from "../workspaces/context";
 import { progressChanged } from "../workspaces/useWorkspaces";
@@ -341,7 +341,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     startComment: a.startComment,
     startDraft: () => a.startComment("body", true),
     askAgent,
-    openGraph: () => openGraph(containerApi),
+    openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
     runWalkthrough: runWalkthroughNow,
     stepNote,

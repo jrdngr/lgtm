@@ -1,4 +1,5 @@
 import { Handle, type NodeProps, Position } from "@xyflow/react";
+import type { DragEvent } from "react";
 import type { NodeStatus } from "../bindings";
 import { STATUS_SIGN } from "./nodes";
 import type { Box } from "./tree";
@@ -22,7 +23,35 @@ export interface BoxData extends Record<string, unknown> {
   callersOpen: boolean;
   onCallers(): void;
   title: string;
+  /** More classes on the box. */
+  extra?: string;
+  /** Makes the box draggable. */
+  onDragStart?(e: DragEvent): void;
+  /** Makes the box take drops of `dropType`. */
+  dropType?: string;
+  onDrop?(e: DragEvent): void;
 }
+
+/** A box's drag and drop handlers, from its data. */
+function dragProps(data: BoxData) {
+  const { dropType, onDrop, onDragStart } = data;
+  return {
+    draggable: onDragStart ? true : undefined,
+    onDragStart,
+    onDragOver:
+      dropType && onDrop
+        ? (e: DragEvent) => {
+            if (!e.dataTransfer.types.includes(dropType)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+          }
+        : undefined,
+    onDrop,
+  };
+}
+
+const extraClass = (data: BoxData) =>
+  `${data.extra ? ` ${data.extra}` : ""}${data.onDragStart ? " nopan nodrag" : ""}`;
 
 /** "2 callers" in dim text, a chip on hover or while they're shown. */
 function CallersBadge({ data }: { data: BoxData }) {
@@ -61,7 +90,11 @@ export function BoxNode({ data, selected }: NodeProps & { data: BoxData }) {
   const { box, status, done, risk, count } = data;
   const kind = status ?? (data.outside ? "caller" : `box gnode-${box.kind}`);
   return (
-    <div className={`gnode gnode-${kind}${selected ? " selected" : ""}`} title={data.title}>
+    <div
+      className={`gnode gnode-${kind}${selected ? " selected" : ""}${extraClass(data)}`}
+      title={data.title}
+      {...dragProps(data)}
+    >
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <div className="gnode-name">
         {chevron(data, false)}
@@ -86,8 +119,9 @@ export function OpenBoxNode({ data, selected }: NodeProps & { data: BoxData }) {
   const { box, status, risk } = data;
   return (
     <div
-      className={`gfile gfile-${box.kind}${data.outside ? " outside" : ""}${selected ? " selected" : ""}`}
+      className={`gfile gfile-${box.kind}${data.outside ? " outside" : ""}${selected ? " selected" : ""}${extraClass(data)}`}
       title={data.title}
+      {...dragProps(data)}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} />
       <div className="gfile-head">

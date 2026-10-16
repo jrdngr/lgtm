@@ -1,0 +1,351 @@
+.arch-side {
+  font-size: var(--fs-sm);
+}
+
+/* Score: meter, risk, Assess; why under them. */
+.arch-score {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.arch-score button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 5px;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.arch-score button:not(.primary) {
+  background: var(--raise);
+}
+
+.arch-score button.primary {
+  font-weight: 600;
+}
+
+.arch-score-mid {
+  min-width: 0;
+}
+
+.arch-score .pill {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  line-height: 18px;
+  padding: 0 8px;
+}
+
+.arch-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.arch-meter i {
+  width: 20px;
+  height: 8px;
+  border-radius: 2px;
+  background: #333;
+}
+
+.arch-meter.lo i.on {
+  background: var(--flagged);
+}
+
+.arch-meter.mid i.on {
+  background: var(--amber);
+}
+
+.arch-meter.hi i.on {
+  background: var(--added);
+}
+
+.arch-meter b {
+  margin-left: 6px;
+  font: 600 var(--fs-sm) var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.arch-meter b small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.arch-busy {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.arch-busy .note-spin {
+  width: 10px;
+  height: 10px;
+}
+
+.arch-busy-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.arch-loading {
+  height: auto;
+}
+
+/* Agent sections while Assess replaces them. */
+.arch-stale {
+  opacity: 0.45;
+}
+
+.arch-sec {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 18px;
+  padding: 9px 6px 3px 10px;
+}
+
+.arch-sec .icon-button {
+  width: 18px;
+  height: 18px;
+}
+
+.arch-sec-title {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.arch-sec-count {
+  font: var(--fs-xs) var(--mono);
+  color: var(--faint);
+}
+
+.arch-items {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+}
+
+.arch-items li:hover {
+  background: var(--hover);
+}
+
+.arch-items li:has(> .arch-row[aria-current]) {
+  background: rgb(79 140 201 / 16%);
+}
+
+.arch-items li.done {
+  opacity: 0.5;
+}
+
+/* A row: number or checkbox, what, a chip; why and progress under them. */
+.arch-row {
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr) auto;
+  gap: 1px 8px;
+  align-items: start;
+  width: 100%;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.arch-row:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+/* Checkable rows: the box sits outside the row's button. */
+.arch-check {
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr);
+  column-gap: 8px;
+  padding-left: 10px;
+}
+
+.arch-check .arch-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-left: 0;
+}
+
+.arch-what {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.arch-why {
+  grid-column: 2 / -1;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.arch-src {
+  color: var(--faint);
+}
+
+.arch-box {
+  appearance: none;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 13px;
+  height: 13px;
+  margin: 6px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg);
+}
+
+.arch-box:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.arch-box:checked::after {
+  content: "✓";
+  color: #fff;
+  font-size: 9px;
+  line-height: 1;
+}
+
+.arch-num {
+  margin-top: 1px;
+  font: 600 var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+
+.arch-sev {
+  margin-top: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font: 600 9px var(--mono);
+  line-height: 15px;
+  text-transform: uppercase;
+}
+
+.arch-sev.high {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
+.arch-sev.medium {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
+}
+
+.arch-sev.low {
+  color: var(--muted);
+  background: var(--hover);
+}
+
+.arch-prog {
+  grid-column: 2 / -1;
+  height: 2px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 1px;
+  background: #333;
+}
+
+.arch-prog i {
+  display: block;
+  height: 100%;
+  background: var(--added);
+}
+
+.arch-st {
+  margin-top: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  line-height: 15px;
+  white-space: nowrap;
+}
+
+.arch-st.open {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
+}
+
+.arch-st.broken {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
+.arch-st.met {
+  color: var(--added);
+  background: rgb(63 185 80 / 14%);
+}
+
+.arch-st.tag {
+  color: var(--muted);
+  background: var(--hover);
+}
+
+.arch-hist .arch-row {
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.arch-id {
+  margin-top: 1px;
+  font: var(--fs-xs) var(--mono);
+  color: var(--rev-unique);
+}
+
+.arch-delta {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: var(--fs-xs);
+}
+
+.arch-delta .g {
+  color: var(--added);
+}
+
+/* Picked intents' actions, kept in view at the bottom of the panel. */
+.arch-picked {
+  position: sticky;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 8px 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--raise);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 40%);
+  font-size: var(--fs-sm);
+}
+
+.arch-picked button:not(.icon-button) {
+  padding: 1px 10px;
+  font-size: var(--fs-sm);
+}
+
+.arch-score .arch-why,
+.arch-check .arch-why {
+  grid-column: 1 / -1;
+}
+
+.arch-score .arch-why.error {
+  color: var(--error);
+}

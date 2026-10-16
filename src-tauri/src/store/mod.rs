@@ -1,6 +1,7 @@
 //! Per-repo SQLite store for marks, file checks, comments, review sessions, and persona
 //! review runs.
 
+mod arch;
 mod bots;
 mod checks;
 mod comments;
@@ -231,6 +232,7 @@ impl Store {
         db.execute_batch("PRAGMA journal_mode = WAL;")?;
         db.execute_batch(SCHEMA)?;
         comments::create_table(&db)?;
+        arch::create_table(&db)?;
         bots::create_table(&db)?;
         notes::create_table(&db)?;
         prs::create_table(&db)?;

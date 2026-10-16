@@ -1,3 +1,6 @@
+import { ArchSection } from "../arch/sidebar/ArchSection";
+import { archBadge } from "../arch/sidebar/logic";
+import { useArch } from "../arch/state";
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useRuns } from "../bots/runs";
@@ -28,13 +31,15 @@ interface Props {
 }
 
 /** The right side panel: the review's changes and symbols, the repo's files, notes, the
- * workspace's PR, the walkthrough, reviewers, and Q&A. Tabs count threads that need you,
- * walkthrough notes, running reviews, and open Q&A questions. */
+ * workspace's PR, the walkthrough, the architecture, reviewers, and Q&A. Tabs count threads
+ * that need you, walkthrough notes, broken intents and open high Look items, running reviews,
+ * and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const runs = useRuns(workspace);
   const qa = useQa(workspace);
+  const { arch } = useArch(review);
   return (
     <SidePanel
       side="right"
@@ -58,6 +63,14 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           icon: "map",
           badge: review?.notes.length,
           render: () => <WalkthroughPanel />,
+        },
+        {
+          id: "architecture",
+          title: "Architecture",
+          icon: "architecture",
+          badge: archBadge(arch),
+          badgeTone: "amber",
+          render: () => <ArchSection />,
         },
         {
           id: "reviewers",

@@ -67,7 +67,7 @@ function move(
   moving.add(panel);
   panel.api.close();
   moving.delete(panel);
-  // Panes that are one per dock, such as the graph, are already here: show that one.
+  // Panes that are one per dock, such as Architecture, are already here: show that one.
   const existing = to.getPanel(id);
   if (existing) {
     existing.api.setActive();

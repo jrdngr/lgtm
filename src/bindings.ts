@@ -94,6 +94,31 @@ export const commands = {
 	resetReviewMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_review_marks", { review })),
 	/**  The review's symbol graph: changed symbols, their links, and unchanged callers. */
 	reviewGraph: (review: number) => typedError<GraphDto, string>(__TAURI_INVOKE("review_graph", { review })),
+	/**  The review's architecture diff, or the diff between two of its commits. */
+	reviewArch: (review: number, transitive: boolean, range: {
+	/**  Absent for the root. */
+	from: string | null,
+	to: string,
+} | null) => typedError<ArchDto, string>(__TAURI_INVOKE("review_arch", { review, transitive, range })),
+	archHistory: (review: number) => typedError<HistoryDto[], string>(__TAURI_INVOKE("arch_history", { review })),
+	archLens: (edit: LensEdit) => typedError<null, string>(__TAURI_INVOKE("arch_lens", { edit })),
+	addIntent: (kind: IntentKind) => typedError<number, string>(__TAURI_INVOKE("add_intent", { kind })),
+	removeIntent: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_intent", { id })),
+	checkLook: (review: number, key: string, checked: boolean) => typedError<null, string>(__TAURI_INVOKE("check_look", { review, key, checked })),
+	intentPrompt: (review: number, ids: number[]) => typedError<string, string>(__TAURI_INVOKE("intent_prompt", { review, ids })),
+	/**  Sends each tool call the agent makes through `activity`. `null` when it was stopped. */
+	runAssess: (review: number, activity: Channel<string>) => typedError<{
+	/**  1 (risky) to 5 (safe to merge). */
+	score: number,
+	risk: RiskLevel,
+	reason: string,
+	boundaries: BoundaryDto[],
+	createdAt: number | null,
+} | null, string>(__TAURI_INVOKE("run_assess", { review, activity })),
+	stopAssess: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_assess", { review })),
+	/**  The agent's reply, `null` when it was stopped. */
+	fixIntents: (review: number, ids: number[], activity: Channel<string>) => typedError<string | null, string>(__TAURI_INVOKE("fix_intents", { review, ids, activity })),
+	stopIntentFix: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_intent_fix", { review })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
@@ -453,6 +478,25 @@ export type Applied = {
 	at: number | null,
 };
 
+export type ArchDto = {
+	containers: ContainerDto[],
+	components: ComponentDto[],
+	edges: EdgeDto[],
+	/**  Assess's layers once it has run, else one per changed component in dependency order. */
+	layers: LayerDto[],
+	look: LookDto[],
+	intents: IntentDto[],
+	assessment: AssessmentDto | null,
+	counts: CountsDto,
+};
+
+/**  Two commits to compare instead of the review's base and head. */
+export type ArchRange = {
+	/**  Absent for the root. */
+	from: string | null,
+	to: string,
+};
+
 /**  A message for a comment's agent. */
 export type Ask = {
 	message: string,
@@ -462,6 +506,15 @@ export type Ask = {
 	change: boolean,
 	/**  Ask for a first take and reply, with no message of the user's. */
 	compose?: boolean,
+};
+
+export type AssessmentDto = {
+	/**  1 (risky) to 5 (safe to merge). */
+	score: number,
+	risk: RiskLevel,
+	reason: string,
+	boundaries: BoundaryDto[],
+	createdAt: number | null,
 };
 
 export type Author = "user" | "agent";
@@ -531,6 +584,11 @@ export type BotRunChanged = {
 	/**  Set when an agent published to it, so the workspace's dock opens it. */
 	show: boolean,
 	workspace: string | null,
+};
+
+export type BoundaryDto = {
+	name: string,
+	components: string[],
 };
 
 /**  A persona file that couldn't be read, by path, with why. */
@@ -685,11 +743,60 @@ export type CommentDto = {
 	done: boolean,
 };
 
+export type CompStatus = 
+/**  Only at head. */
+"added" | 
+/**  Only at base. */
+"removed" | 
+/**  Has a changed file. */
+"changed" | 
+/**  Unchanged, but a changed component uses it. */
+"upstream" | 
+/**  Unchanged, but uses a changed or removed symbol of a changed component. */
+"impacted" | "unchanged";
+
+export type ComponentDto = {
+	/**
+	 *  Stable across lens renames: the folder (or root, for loose files) it was grouped from,
+	 *  or the id of the component it was merged into.
+	 */
+	id: string,
+	/**  The lens name, or the folder's name. */
+	name: string,
+	container: string,
+	/**  Files at head, plus removed files. */
+	files: FileRefDto[],
+	status: CompStatus,
+	/**  The first layer that covers it, 1-based. */
+	layer: number | null,
+	/**  Tagged by an intent. */
+	risk: boolean,
+	trust: boolean,
+	note: string | null,
+	/**  Paths (or `path#symbol`) in it that Move intents say belong elsewhere. */
+	misplaced: string[],
+	/**  The worst open Look item on it. */
+	severity: LookSeverity | null,
+};
+
+/**  A source root, like a crate's `src/` or a package root. */
+export type ContainerDto = {
+	/**  The root's repo-relative path, "" for the repo root. */
+	id: string,
+	name: string,
+};
+
 /**  One line of the new side, with its highlighting when the language is known. */
 export type ContextLine = {
 	line: number,
 	text: string,
 	hl: ([number | null, number])[] | null,
+};
+
+export type CountsDto = {
+	changed: number,
+	upstream: number,
+	impacted: number,
 };
 
 export type DefaultPersona = {
@@ -721,6 +828,20 @@ export type DroppedFile = {
 	path: string,
 	data: string,
 };
+
+/**  `from` imports from `to`. */
+export type EdgeDto = {
+	from: string,
+	to: string,
+	status: EdgeStatus,
+	/**  `from` is impacted through this edge. */
+	impacted: boolean,
+	imports: ImportDto[],
+	/**  The Wrong intent on it. */
+	wrong: number | null,
+};
+
+export type EdgeStatus = "added" | "removed" | "same";
 
 /**
  *  The questions an update after `after` dropped or rewrote, as they were, and the ones it
@@ -772,6 +893,12 @@ export type FileEntry = {
 	/**  Relative to the workspace root, `/`-separated. */
 	path: string,
 	dir: boolean,
+};
+
+export type FileRefDto = {
+	path: string,
+	/**  The review file, absent for a file the review doesn't change. */
+	file: number | null,
 };
 
 export type FileStatus = "modified" | "added" | "removed" | "copied" | "renamed";
@@ -889,6 +1016,19 @@ export type HeadDto = {
 	state: string,
 };
 
+/**  A commit in the review that changed the architecture. */
+export type HistoryDto = {
+	changeId: string,
+	commitId: string,
+	/**  The commit's parent, for its delta. */
+	parent: string | null,
+	description: string,
+	componentsAdded: number,
+	componentsRemoved: number,
+	edgesAdded: number,
+	edgesRemoved: number,
+};
+
 export type Hunk = {
 	oldStart: number,
 	oldLines: number,
@@ -908,11 +1048,41 @@ export type HunkDto = {
 	rows: RowDto[],
 };
 
+/**  One import line behind an edge. */
+export type ImportDto = {
+	fromPath: string,
+	toPath: string,
+	/**  1-based, at head, or at base for a removed import. */
+	line: number,
+};
+
 export type Installed = "no" | "yes" | 
 /**  Installed as an older shipped version, untouched since. */
 "outdated" | 
 /**  Installed, and edited since. */
 "changed";
+
+export type IntentDto = {
+	id: number,
+	state: IntentState,
+} & IntentKind;
+
+/**  What an intent says the code should be. */
+export type IntentKind = 
+/**  `from` must not import from `to`. */
+{ kind: "wrong"; from: string; to: string; reason: string | null } | 
+/**  The file, or the symbol in it, belongs in component `to`. */
+{ kind: "move"; path: string; symbol: string | null; to: string } | { kind: "risk"; component: string } | { kind: "trust"; component: string } | { kind: "note"; component: string; text: string };
+
+export type IntentState = 
+/**  The review introduces what the intent forbids. */
+"broken" | 
+/**  The code doesn't match yet, but the review didn't cause it. */
+"open" | 
+/**  The code matches. */
+"met" | 
+/**  Risk, Trust and Note, which aren't checked. */
+"tag";
 
 /**  A change to the repo, on a revision given by change id. */
 export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: string } | { kind: "newBefore"; rev: string } | 
@@ -923,6 +1093,21 @@ export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: 
 { kind: "squash"; rev: string } | { kind: "describe"; rev: string; message: string } | { kind: "abandon"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
+
+/**  One step of the change stack. */
+export type LayerDto = {
+	/**  1-based. */
+	n: number,
+	title: string,
+	summary: string,
+	components: string[],
+	ranges: RangeDto[],
+};
+
+/**  A grouping change that flags nothing. */
+export type LensEdit = { kind: "rename"; component: string; name: string } | { kind: "merge"; component: string; into: string } | 
+/**  Undoes merges into it and groups its subfolders as their own components. */
+{ kind: "split"; component: string };
 
 export type Level = "high" | "medium" | "low";
 
@@ -944,6 +1129,25 @@ export type LogLine = {
 	/**  Whether this line starts the workspace's working-copy commit. */
 	workingCopy: boolean,
 };
+
+export type LookDto = {
+	/**  Stable across loads of the same review, so checks stick. */
+	key: string,
+	source: LookSource,
+	severity: LookSeverity,
+	title: string,
+	detail: string | null,
+	component: string | null,
+	/**  An edge, as its `from` and `to` components. */
+	edge: [string, string] | null,
+	path: string | null,
+	line: number | null,
+	checked: boolean,
+};
+
+export type LookSeverity = "low" | "medium" | "high";
+
+export type LookSource = "rule" | "agent" | "security";
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
 export type MarkColor = "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
@@ -1407,6 +1611,14 @@ export type Raiser = {
 	inLens: boolean,
 };
 
+/**  A new-side line range, or old-side for a removed file. */
+export type RangeDto = {
+	path: string,
+	file: number | null,
+	start: number,
+	end: number,
+};
+
 export type RefreshDto = {
 	review: ReviewDto,
 	/**  Where rows of the review as it was went. */
@@ -1480,6 +1692,8 @@ export type ReviewStateChanged = {
 	review: number,
 	state: StateDto,
 };
+
+export type RiskLevel = "minimal" | "low" | "moderate" | "high" | "critical";
 
 export type Row = {
 	kind: RowKind,

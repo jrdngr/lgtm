@@ -9,12 +9,12 @@ import "./dock.css";
 import { useEffect, useRef, useState } from "react";
 import { createPortal, flushSync } from "react-dom";
 import { RunsPanel } from "../agents/RunsPanel";
+import { ArchPanel } from "../arch/ArchPanel";
 import { ReportPanel } from "../bots/ReportPanel";
 import { useAgentReports } from "../bots/useAgentReports";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
-import { GraphPanel } from "../graph/GraphPanel";
 import { ShortcutsPanel } from "../help/ShortcutsPanel";
 import { commands, unwrap } from "../ipc";
 import { QaTab } from "../qa/QaTab";
@@ -39,19 +39,20 @@ const components = {
   review: ReviewPanel,
   terminal: TerminalPanel,
   report: ReportPanel,
-  graph: GraphPanel,
+  architecture: ArchPanel,
   editor: EditorPanel,
   prPreview: PrPreview,
   settings: SettingsPanel,
   shortcuts: ShortcutsPanel,
   runs: RunsPanel,
   qa: QaTab,
-  // Restores layouts from earlier builds, whose Tasks, Files, Design and Threads panels are then
-  // closed.
+  // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads and Graph panels
+  // are then closed.
   tasks: () => null,
   threads: () => null,
   files: () => null,
   design: () => null,
+  graph: () => null,
 };
 
 interface Props {

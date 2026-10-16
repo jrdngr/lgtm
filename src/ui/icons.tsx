@@ -144,6 +144,14 @@ const PATHS = {
   star: (
     <path d="m12 2.7 2.85 5.85 6.45.9-4.65 4.5 1.05 6.45L12 17.4l-5.7 3 1.05-6.45L2.7 9.45l6.45-.9z" />
   ),
+  architecture: (
+    <>
+      <rect x="9" y="2.5" width="6" height="6" rx="1" />
+      <rect x="2.5" y="15.5" width="6" height="6" rx="1" />
+      <rect x="15.5" y="15.5" width="6" height="6" rx="1" />
+      <path d="M12 8.5V12M5.5 15.5V13a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v2.5" />
+    </>
+  ),
 };
 
 export type IconName = keyof typeof PATHS;

@@ -13,6 +13,7 @@ mod edits;
 mod github;
 #[cfg(test)]
 mod github_tests;
+pub(crate) mod arch;
 mod graph;
 mod load;
 mod matching;

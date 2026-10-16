@@ -6,7 +6,7 @@ let elk: Promise<Elk> | undefined;
 
 /** ELK in a web worker, so a big graph doesn't block the window. Tests have no workers and
  * run it inline. */
-function getElk(): Promise<Elk> {
+export function getElk(): Promise<Elk> {
   elk ??=
     typeof Worker === "undefined"
       ? import("elkjs/lib/elk.bundled.js").then((m) => new m.default())

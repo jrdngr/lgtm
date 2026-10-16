@@ -83,6 +83,11 @@ pub fn parse(path: &str, source: &str) -> Option<Parsed> {
 }
 
 impl Parsed {
+    /// The syntax tree's root, for walks the queries here don't cover.
+    pub fn root(&self) -> Node<'_> {
+        self.tree.root_node()
+    }
+
     pub fn symbols(&self, source: &str) -> Vec<CodeSymbol> {
         let query = &self.lang.symbols;
         let name_idx = query.capture_index_for_name("name");
