@@ -113,13 +113,21 @@ export function AgentSettings({ settings }: { settings: Settings }) {
   return (
     <>
       <Section id="claude" title="Claude Code">
+        <Row label="Claude command" htmlFor="settings-claude-terminal">
+          <SavedInput
+            id="settings-claude-terminal"
+            value={settings.claudeTerminal}
+            placeholder="claude"
+            onSave={(c) => saveSettings({ claudeTerminal: c.trim() || "claude" })}
+          />
+        </Row>
         <Row
-          label="Claude command"
+          label="Headless Claude command"
           htmlFor="settings-claude"
           help={
             <>
-              What runs Claude Code for every agent: a command, or an alias or function from your
-              login shell like <code>cc</code>. LGTM adds its own arguments after it.
+              What runs Claude Code for headless agents: a command, or an alias or function from
+              your login shell like <code>cc</code>. LGTM adds its own arguments after it.
             </>
           }
         >

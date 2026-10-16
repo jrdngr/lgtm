@@ -2,6 +2,7 @@
 //!
 //! ```toml
 //! claude = "cc"
+//! claudeTerminal = "cc"
 //! terminalFontSize = 13
 //!
 //! [models]
@@ -32,8 +33,11 @@ pub fn config_dir() -> Option<PathBuf> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
-    /// How to start Claude Code: a command line, or an alias or function from the login shell.
+    /// How headless agents start Claude Code: a command line, or an alias or function from the
+    /// login shell.
     pub claude: String,
+    /// What a terminal runs to start Claude Code, typed into its shell.
+    pub claude_terminal: String,
     pub models: Models,
     pub terminal_font_size: u16,
     /// Every mark color, the ones in use first in key order.
@@ -44,6 +48,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             claude: "claude".into(),
+            claude_terminal: "claude".into(),
             models: Models::default(),
             terminal_font_size: 13,
             marks: marks::defaults(),

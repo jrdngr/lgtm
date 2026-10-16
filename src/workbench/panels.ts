@@ -5,11 +5,20 @@ import type {
   IDockviewPanel,
 } from "dockview-react";
 
-export type PanelKind = "review" | "terminal" | "report" | "architecture" | "runs" | "qa";
+/** The kinds of tab. A Claude tab is a terminal that starts Claude Code. */
+export type PanelKind =
+  | "review"
+  | "terminal"
+  | "claude"
+  | "report"
+  | "architecture"
+  | "runs"
+  | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
   terminal: "Terminal",
+  claude: "Claude",
   report: "Report",
   architecture: "Architecture",
   runs: "Agent runs",
@@ -17,7 +26,7 @@ const TITLES: Record<PanelKind, string> = {
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "architecture", "qa", "runs"];
+export const KINDS: PanelKind[] = ["review", "terminal", "claude", "architecture", "qa", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -47,14 +56,15 @@ function addPanel(
   position?: AddPanelOptions["position"],
   id = `${component}-${crypto.randomUUID()}`,
 ) {
+  const terminal = component === "terminal" || component === "claude";
   return api.addPanel({
     id,
-    component,
+    component: component === "claude" ? "terminal" : component,
     title: TITLES[component],
-    params,
+    params: component === "claude" ? { ...params, claude: true } : params,
     position,
     // Terminals keep their DOM while their tab is hidden so scrollback and state survive.
-    renderer: component === "terminal" ? "always" : "onlyWhenVisible",
+    renderer: terminal ? "always" : "onlyWhenVisible",
   });
 }
 

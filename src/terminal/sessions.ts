@@ -51,13 +51,13 @@ export async function runningPrograms(
 
 /** Shows panel `id`'s session in `container`: the one a panel with this id has, when the
  * panel is moving to the other dock or React mounts it again, or else a new shell, which then
- * runs `command` if given. */
+ * runs the command `command` resolves to, if any. */
 export function openSession(
   id: string,
   container: HTMLElement,
   workspace: WorkspaceName,
   setup: boolean,
-  command?: string,
+  command?: Promise<string | undefined>,
 ): Session {
   const open = sessions.get(id);
   if (open) {
@@ -93,7 +93,7 @@ function startSession(
   host: HTMLDivElement,
   workspace: WorkspaceName,
   setup: boolean,
-  command?: string,
+  command?: Promise<string | undefined>,
 ): Session {
   const { term, refit, unwatch } = createTerminal(host);
   let pty: number | undefined;
@@ -133,8 +133,11 @@ function startSession(
     } else if (disposed) {
       commands.ptyKill(r.data);
     } else {
-      pty = r.data;
-      if (command) commands.ptyWrite(pty, `${command}\r`);
+      const id = r.data;
+      pty = id;
+      command?.then((c) => {
+        if (c && !disposed) commands.ptyWrite(id, `${c}\r`);
+      });
       // Resizes while it started weren't sent.
       if (term.cols !== cols || term.rows !== rows) commands.ptyResize(pty, term.cols, term.rows);
     }

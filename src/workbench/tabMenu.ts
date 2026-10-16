@@ -126,7 +126,7 @@ export function tabMenu({ workspace, api, panel, inBottom, close }: Tab): CtxEnt
 }
 
 /** What the new tab submenu offers, in order. */
-const NEW_TABS: PanelKind[] = ["terminal", "review", "architecture", "qa", "runs"];
+const NEW_TABS: PanelKind[] = ["terminal", "claude", "review", "architecture", "qa", "runs"];
 
 interface Strip {
   workspace: WorkspaceName;

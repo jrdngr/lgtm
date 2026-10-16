@@ -30,6 +30,16 @@ export function useSettings() {
   return useSyncExternalStore(subscribe, () => current);
 }
 
+/** The settings, once they've loaded. */
+export function loadedSettings(): Promise<Settings> {
+  return new Promise((done) => {
+    const stop = watchSettings((s) => {
+      queueMicrotask(stop);
+      done(s);
+    });
+  });
+}
+
 /** Calls `on` with the settings now (once loaded) and whenever they change. */
 export function watchSettings(on: (s: Settings) => void) {
   const fire = () => current && on(current);

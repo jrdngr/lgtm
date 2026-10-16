@@ -2,6 +2,7 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { commands } from "../ipc";
+import { loadedSettings } from "../settings/store";
 import { openMenu } from "../ui/contextMenu";
 import { bottom } from "../workbench/bottom";
 import { useWorkspace } from "../workspaces/context";
@@ -15,6 +16,8 @@ import { isAgentTitle, titleLabel } from "./title";
 
 type Params = {
   setup?: boolean;
+  /** Starts Claude Code once the shell is up, for a new Claude tab. */
+  claude?: boolean;
   /** The Claude Code session running in it, which a restart resumes. */
   claudeSession?: string;
   /** The user named the tab, so its agent's title doesn't. */
@@ -28,8 +31,16 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
 
   useEffect(() => {
     const container = ref.current as HTMLDivElement;
-    const resume = resumeCommand(api.getParameters<Params>().claudeSession);
-    const session = openSession(api.id, container, workspace, setup.current, resume);
+    const { claude, claudeSession } = api.getParameters<Params>();
+    // A new Claude tab starts Claude Code, and a terminal coming back resumes its session.
+    const command =
+      claude || claudeSession
+        ? loadedSettings().then((s) =>
+            claude ? s.claudeTerminal : resumeCommand(s.claudeTerminal, claudeSession),
+          )
+        : undefined;
+    const session = openSession(api.id, container, workspace, setup.current, command);
+    if (claude) api.updateParameters({ claude: undefined });
     const { term } = session;
     // Setup runs once, not again when the layout is restored.
     if (setup.current) {

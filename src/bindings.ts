@@ -1516,8 +1516,13 @@ export type Session_Serialize = {
 };
 
 export type Settings = {
-	/**  How to start Claude Code: a command line, or an alias or function from the login shell. */
+	/**
+	 *  How headless agents start Claude Code: a command line, or an alias or function from the
+	 *  login shell.
+	 */
 	claude: string,
+	/**  What a terminal runs to start Claude Code, typed into its shell. */
+	claudeTerminal: string,
 	models: Models,
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
