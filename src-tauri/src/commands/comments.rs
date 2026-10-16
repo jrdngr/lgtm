@@ -1,10 +1,12 @@
 use tauri::ipc::Channel;
-use tauri::{State, WebviewWindow};
+use tauri::{Manager, State, WebviewWindow};
+use tauri_specta::Event;
 
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
+use crate::events::ReviewStateChanged;
 use crate::review::{RowRef, StateDto};
-use crate::store::Stage;
+use crate::store::{Author, Stage};
 
 /// Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
 /// makes it a draft for the workspace's PR on GitHub instead of a note.
@@ -106,6 +108,36 @@ pub(crate) fn delete_comment(
     comment: u32,
 ) -> CmdResult<StateDto> {
     repo(&window)?.delete_comment(review, comment).map_err(err)
+}
+
+/// Adds a message from a synced terminal to a comment's chat. The review shows it as it
+/// would an agent's change, wherever the review is open.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn add_chat_message(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+    author: Author,
+    text: String,
+) -> CmdResult<()> {
+    let state = repo(&window)?
+        .add_chat_message(review, comment, author, &text)
+        .map_err(err)?;
+    ReviewStateChanged { review, state }
+        .emit_to(window.app_handle(), window.label())
+        .map_err(|e| e.to_string())
+}
+
+/// Makes a thread's suggested reply its reply.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn take_suggestion(
+    window: WebviewWindow,
+    review: u32,
+    comment: u32,
+) -> CmdResult<StateDto> {
+    repo(&window)?.take_suggestion(review, comment).map_err(err)
 }
 
 /// Triages the new threads on the review's PR, reporting each tool call through `on_tool`.

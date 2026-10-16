@@ -8,7 +8,7 @@ import { STAGES } from "../threads/stages";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy } from "../ui/Busy";
 import { openMenu } from "../ui/contextMenu";
-import { IconButton } from "../ui/icons";
+import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
 import { isMac, SAVE_KEY } from "../workbench/keys";
@@ -16,6 +16,7 @@ import { Conversation } from "./Conversation";
 import { cardItems, moreItems, noteItems } from "./cardMenu";
 import { NEW_COMMENT } from "./model";
 import { StageStrip } from "./StageStrip";
+import { useSyncedChat } from "./syncedChat";
 import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
 import type { CommentFolds } from "./useSavedView";
@@ -41,6 +42,7 @@ function StagePill({ stage }: { stage: Stage }) {
 export function CommentBlock({ id, comment, c, folds }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [snippet, setSnippet] = useState(false);
+  const { synced } = useSyncedChat(comment?.id);
   const editing = c.edits.get(id);
   const gh = comment?.github;
   const thread = comment?.thread;
@@ -105,6 +107,11 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
           <span className="card-summary">{thread?.summary || summary}</span>
           <span className="spacer" />
           {gh && !ready && <span className="card-count">{gh.posts.length}</span>}
+          {synced && (
+            <span className="card-synced">
+              <Icon name="terminal" size={15} />
+            </span>
+          )}
           {!gh && comment.messages.length > 0 && (
             <span className="card-count">
               {comment.messages.length === 1 ? "1 message" : `${comment.messages.length} messages`}

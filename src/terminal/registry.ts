@@ -82,14 +82,18 @@ export function sendTarget(workspace: WorkspaceName): string | undefined {
   );
 }
 
-function subscribe(l: () => void) {
+/** Calls `l` on every change to the terminals, their order or the pins. */
+export function subscribeTerminals(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
 }
 
+/** Whether terminal `id` is open. */
+export const hasTerminal = (id: string) => terminals.has(id);
+
 /** The workspace's send target and whether it's pinned, kept current. */
 export function useSendTarget(workspace: WorkspaceName) {
-  useSyncExternalStore(subscribe, () => version);
+  useSyncExternalStore(subscribeTerminals, () => version);
   return { target: sendTarget(workspace), pinned: pinnedTarget(workspace) };
 }
 

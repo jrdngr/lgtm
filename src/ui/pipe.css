@@ -23,3 +23,7 @@ button.pipe kbd {
 .icon-button.pipe-icon {
   color: var(--violet-text);
 }
+
+.icon-button.pipe-icon.on {
+  background: var(--violet-soft);
+}

@@ -10,6 +10,7 @@ import { CombineDialog } from "./CombineDialog";
 import { quotesOf } from "./prComments";
 import { SnippetDiff } from "./SnippetDiff";
 import { StageStrip } from "./StageStrip";
+import { useSyncedChat } from "./syncedChat";
 import { ThreadFlow } from "./ThreadFlow";
 import type { Comments } from "./useComments";
 import { useQuoting } from "./useQuoting";
@@ -37,6 +38,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const blockRef = useRef<HTMLDivElement>(null);
   const postsRef = useRef<HTMLDivElement>(null);
   const quoting = useQuoting(comment, c, postsRef, blockRef);
+  const chat = useSyncedChat(comment.id);
   const gh = comment.github;
   const thread = comment.thread;
   const quote = thread?.quote;
@@ -154,9 +156,10 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
         )}
         <IconButton
           icon="terminal"
-          className="pipe-icon"
-          label="Send to Terminal"
-          onClick={() => c.send(comment)}
+          className={`pipe-icon${chat.synced ? " on" : ""}`}
+          label={chat.synced ? "Stop Chat" : "Synced Chat"}
+          aria-pressed={chat.synced}
+          onClick={() => (chat.synced ? c.stopSync() : c.sync(comment))}
         />
       </div>
       {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
@@ -178,7 +181,13 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
           </button>
         </div>
       ) : (
-        <ThreadFlow comment={comment} c={c} triaging={triaging} editor={editor || undefined} />
+        <ThreadFlow
+          comment={comment}
+          c={c}
+          chat={chat}
+          triaging={triaging}
+          editor={editor || undefined}
+        />
       )}
       {combining && (
         <CombineDialog

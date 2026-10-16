@@ -32,6 +32,7 @@ export function prComments(threads: ThreadDto[], comments: CommentDto[]): Commen
     createdAt: t.createdAt,
     updatedAt: t.createdAt,
     messages: t.messages,
+    suggestion: t.suggestion,
     github: t.github,
     thread: t.state,
     done: false,

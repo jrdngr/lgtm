@@ -25,6 +25,7 @@ describe("finalText", () => {
     body,
     snippet: "",
     messages: [],
+    suggestion: null,
     state: { repo: "o/n", pr: 1, stage, take: null, summary: `s${id}` },
     github: {
       repo: "o/n",

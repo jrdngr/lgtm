@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
+import { submitNextSend } from "../terminal/registry";
 import { confirmAction } from "../ui/prompt";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
 import { type FlatFile, NEW_COMMENT } from "./model";
 import { prComments } from "./prComments";
+import { resumable, startSync, stopSync } from "./syncedChat";
+import { syncText } from "./syncText";
 
 const NONE: CommentDto[] = [];
 
@@ -36,8 +39,8 @@ interface Deps {
   /** Shows a new state after a comment on `review` changed. */
   onState(state: StateDto, review?: number): void;
   onError(message: string): void;
-  /** Pastes text into one of the workspace's terminals, then calls `onSent`. */
-  send(text: string, onSent: () => void): void;
+  /** Pastes text into one of the workspace's terminals, then calls `onSent` with it. */
+  send(text: string, onSent: (terminal: string) => void): void;
   /** Called when the user is done in a comment block, to give keys back to the review. */
   onDone(): void;
   /** The review is in a PR workspace, so drafts for GitHub can be written. */
@@ -198,6 +201,24 @@ export function useComments({
     send(commentText(files, c), onDone);
   }
 
+  /** Syncs a thread's chat with a terminal: the one it was synced with, else the send target
+   * once the thread is pasted there. */
+  function sync(c: CommentDto) {
+    if (!review) return;
+    const id = review.id;
+    const again = resumable(c.id);
+    if (again) return startSync(again, id, c.id);
+    submitNextSend();
+    send(syncText(files, c), (terminal) => startSync(terminal, id, c.id));
+  }
+
+  /** Makes a thread's suggested reply its reply. */
+  async function takeSuggestion(id: number) {
+    if (!review) return;
+    setEdits((m) => without(m, id));
+    await apply(commands.takeSuggestion(review.id, id));
+  }
+
   /** Starts a thread on `text`, quoted from comment `of` on the PR. */
   async function quote(of: number, text: string) {
     if (review && text.trim()) await apply(commands.addQuote(review.id, of, text));
@@ -226,6 +247,9 @@ export function useComments({
     edit,
     remove,
     send: sendComment,
+    sync,
+    stopSync,
+    takeSuggestion,
     final,
     sending,
     sendOne,

@@ -66,6 +66,9 @@ pub struct Message {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Conversation {
     pub messages: Vec<Message>,
+    /// A reply a synced terminal agent suggested, for the user to use or not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggestion: Option<String>,
 }
 
 /// A post in a GitHub review thread.
@@ -343,6 +346,7 @@ mod tests {
                 author: Author::Agent,
                 text: "hi".into(),
             }],
+            suggestion: Some("ok".into()),
         };
         store.set_conversation(c.id, &conversation).unwrap();
         let got = store.comment(c.id).unwrap().unwrap();

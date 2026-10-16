@@ -36,6 +36,8 @@ pub struct CommentDto {
     pub created_at: f64,
     pub updated_at: f64,
     pub messages: Vec<Message>,
+    /// A reply a synced terminal agent suggested.
+    pub suggestion: Option<String>,
     /// The GitHub thread it's on, whose replies show above it.
     pub github: Option<GhLink>,
     /// Set on GitHub threads and drafts of them; notes have none.
@@ -90,6 +92,7 @@ impl Review {
             created_at: c.created_at as f64,
             updated_at: c.updated_at as f64,
             messages: c.conversation.messages,
+            suggestion: c.conversation.suggestion,
             github: c.github,
             thread: c.thread,
             done: c.done,

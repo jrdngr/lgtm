@@ -229,6 +229,14 @@ pub struct ThreadId {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct SuggestReply {
+    /// The thread's id, from list_threads.
+    pub thread_id: u32,
+    /// The whole reply, in the human's voice.
+    pub text: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct QaSession {
     /// The session's id, from list_qa or qa_ask.
     pub session: String,

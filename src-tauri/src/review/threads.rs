@@ -25,6 +25,8 @@ pub struct ThreadDto {
     pub snippet: String,
     /// The agent conversation about it.
     pub messages: Vec<Message>,
+    /// A reply a synced terminal agent suggested.
+    pub suggestion: Option<String>,
     /// Whether the review shows its code.
     pub placed: bool,
     pub created_at: f64,
@@ -99,6 +101,7 @@ impl Review {
                 body: c.body,
                 snippet: c.snippet,
                 messages: c.conversation.messages,
+                suggestion: c.conversation.suggestion,
                 state: c.thread.expect("pr threads have a state"),
                 github: c.github,
                 created_at: c.created_at as f64,

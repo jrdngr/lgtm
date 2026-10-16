@@ -5,6 +5,7 @@ mod agent;
 mod agent_tests;
 mod build;
 mod cache;
+mod chat;
 #[cfg(test)]
 mod comment_tests;
 mod comments;

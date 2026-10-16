@@ -91,16 +91,21 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
     const posts = c.github?.posts.map((p) => `${p.author} wrote:\n${p.body.trim()}`) ?? [];
     return [...posts, c.body.trim()].filter(Boolean).join("\n\n");
   }
+  return [codeText(files, c), c.body.trim(), conversationText(c.messages)]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** Where a comment's code is, or the code as it was if it's gone. */
+export function codeText(files: FlatFile[], c: CommentDto): string {
   const f = files[c.file];
   const span = c.rows;
-  const code =
-    f && span
-      ? rowsRefs(
-          f,
-          Array.from({ length: span.end - span.start + 1 }, (_, i) => span.start + i),
-        )
-      : `${c.path} (this code has changed since)\n${c.snippet}`;
-  return [code, c.body.trim(), conversationText(c.messages)].filter(Boolean).join("\n\n");
+  return f && span
+    ? rowsRefs(
+        f,
+        Array.from({ length: span.end - span.start + 1 }, (_, i) => span.start + i),
+      )
+    : `${c.path} (this code has changed since)\n${c.snippet}`;
 }
 
 /** A comment's conversation, one message after another. Empty without one. */

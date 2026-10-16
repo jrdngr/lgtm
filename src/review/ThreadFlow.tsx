@@ -2,21 +2,22 @@ import type { CommentDto } from "../bindings";
 import { Inline, Markdown } from "../bots/Markdown";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy, Spinner } from "../ui/Busy";
-import { Conversation } from "./Conversation";
+import { ThreadChat } from "./ThreadChat";
 import type { Comments } from "./useComments";
 
 interface Props {
   comment: CommentDto;
   c: Comments;
+  /** Whether its chat is synced with a terminal, and whether the agent there is working. */
+  chat: { synced: boolean; working: boolean };
   /** A triage run covers this thread, and will set its take, reply and stage. */
   triaging: boolean;
   /** The reply's editor, shown in place of the reply while it's edited. */
   editor?: React.ReactNode;
 }
 
-/** A GitHub thread's reply workflow under its posts: the take, the reply, and any
- * conversation. */
-export function ThreadFlow({ comment, c, triaging, editor }: Props) {
+/** A GitHub thread's reply workflow under its posts: the take, the reply, and its chat. */
+export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
   const id = comment.id;
   const take = comment.thread?.take;
   const body = comment.body;
@@ -90,11 +91,7 @@ export function ThreadFlow({ comment, c, triaging, editor }: Props) {
           </div>
         </section>
       )}
-      {comment.messages.length > 0 && (
-        <section className="flow-sec">
-          <Conversation messages={comment.messages} />
-        </section>
-      )}
+      <ThreadChat comment={comment} c={c} {...chat} />
     </div>
   );
 }

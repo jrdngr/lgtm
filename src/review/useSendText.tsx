@@ -13,6 +13,8 @@ import { TerminalPicker } from "./TerminalPicker";
 /** Where sent text went (the terminal's title, which may be empty), or why it couldn't go. */
 export type SendOutcome = { terminal: string } | { error: string };
 type Report = (outcome: SendOutcome) => void;
+/** Told which terminal took the text. */
+type Sent = (terminal: string) => void;
 
 /** Sending text to one of the workspace's terminals. `picker` is the terminal picker to
  * render while the user chooses one. */
@@ -25,7 +27,7 @@ export function useSendText(
   const [picking, setPicking] = useState<{
     text: string;
     terminals: TerminalChoice[];
-    onSent?: () => void;
+    onSent?: Sent;
     report?: Report;
   }>();
 
@@ -33,7 +35,7 @@ export function useSendText(
    * send target, asking which terminal when neither can. Calls `onSent` once it's sent. With
    * `report`, it's told which terminal took the text or why none did, and failures don't show
    * as the review's error. */
-  function sendText(text: string, onSent?: () => void, report?: Report, preferred?: string) {
+  function sendText(text: string, onSent?: Sent, report?: Report, preferred?: string) {
     const terminals = workspaceTerminals(workspace);
     const usable = (id: string | undefined) => terminals.find((t) => t.id === id && t.canPaste);
     const to = usable(preferred) ?? usable(sendTarget(workspace));
@@ -42,11 +44,12 @@ export function useSendText(
     else sendTo(text, undefined, onSent, report);
   }
 
-  function sendTo(text: string, id: string | undefined, onSent?: () => void, report?: Report) {
+  function sendTo(text: string, id: string | undefined, onSent?: Sent, report?: Report) {
     setPicking(undefined);
     const where = workspace ? `workspace ${workspace}` : "the main workspace";
-    const terminal = workspaceTerminals(workspace).find((t) => id === undefined || t.id === id);
-    const result = sendToTerminal(workspace, text, id);
+    const to = id ?? sendTarget(workspace);
+    const terminal = workspaceTerminals(workspace).find((t) => t.id === to);
+    const result = sendToTerminal(workspace, text, to);
     const error =
       result === "noTerminal"
         ? `No terminal is open in ${where}. Open one with ⌘T and start your agent.`
@@ -55,7 +58,7 @@ export function useSendText(
           : undefined;
     if (!report || !error) setError(error);
     report?.(error ? { error } : { terminal: terminal?.title ?? "" });
-    if (!error) onSent?.();
+    if (!error && to !== undefined) onSent?.(to);
     return error;
   }
 

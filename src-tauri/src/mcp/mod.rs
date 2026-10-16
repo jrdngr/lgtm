@@ -83,6 +83,8 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
             TerminalAgent {
                 terminal: report.terminal,
                 state: report.state,
+                prompt: report.prompt,
+                reply: report.reply,
             }
             .emit_to(&app, &label)
             .ok();

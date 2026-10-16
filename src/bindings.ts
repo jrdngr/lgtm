@@ -159,6 +159,13 @@ export const commands = {
 	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
 	addQuote: (review: number, of: number, text: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
 	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
+	/**
+	 *  Adds a message from a synced terminal to a comment's chat. The review shows it as it
+	 *  would an agent's change, wherever the review is open.
+	 */
+	addChatMessage: (review: number, comment: number, author: Author, text: string) => typedError<null, string>(__TAURI_INVOKE("add_chat_message", { review, comment, author, text })),
+	/**  Makes a thread's suggested reply its reply. */
+	takeSuggestion: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("take_suggestion", { review, comment })),
 	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
 	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
 	/**  Stops the review's triage run. */
@@ -604,6 +611,8 @@ export type CommentDto = {
 	createdAt: number | null,
 	updatedAt: number | null,
 	messages: Message[],
+	/**  A reply a synced terminal agent suggested. */
+	suggestion: string | null,
 	/**  The GitHub thread it's on, whose replies show above it. */
 	github: GhLink | null,
 	/**  Set on GitHub threads and drafts of them; notes have none. */
@@ -1606,6 +1615,10 @@ export type TerminalAgent = {
 	/**  The terminal's panel id. */
 	terminal: string,
 	state: AgentHookState,
+	/**  The prompt the user submitted, when this is a prompt. */
+	prompt: string | null,
+	/**  The agent's last message, when it stopped. */
+	reply: string | null,
 };
 
 export type ThreadDto = {
@@ -1623,6 +1636,8 @@ export type ThreadDto = {
 	snippet: string,
 	/**  The agent conversation about it. */
 	messages: Message[],
+	/**  A reply a synced terminal agent suggested. */
+	suggestion: string | null,
 	/**  Whether the review shows its code. */
 	placed: boolean,
 	createdAt: number | null,

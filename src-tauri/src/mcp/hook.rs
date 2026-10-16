@@ -42,6 +42,12 @@ pub(super) struct HookReport {
     /// The terminal panel (`LGTM_TERMINAL`).
     pub terminal: String,
     pub state: AgentHookState,
+    /// The prompt the user submitted, on `UserPromptSubmit`.
+    #[serde(default)]
+    pub prompt: Option<String>,
+    /// The agent's last message, on `Stop`.
+    #[serde(default)]
+    pub reply: Option<String>,
 }
 
 /// The state a hook event's input means, if any.
@@ -62,6 +68,54 @@ fn state(input: &serde_json::Value) -> Option<AgentHookState> {
     })
 }
 
+/// The prompt a `UserPromptSubmit` event carries.
+fn prompt(input: &serde_json::Value) -> Option<String> {
+    (input["hook_event_name"] == "UserPromptSubmit")
+        .then(|| input["prompt"].as_str().map(str::to_string))
+        .flatten()
+}
+
+/// The agent's last message on a `Stop` event: the event's own copy, else the last text in
+/// its transcript since the user last spoke.
+fn reply(input: &serde_json::Value) -> Option<String> {
+    if input["hook_event_name"] != "Stop" {
+        return None;
+    }
+    if let Some(text) = input["last_assistant_message"].as_str() {
+        return Some(text.to_string());
+    }
+    let transcript = std::fs::read_to_string(input["transcript_path"].as_str()?).ok()?;
+    last_text(&transcript)
+}
+
+/// The text of the last assistant entry in a JSONL transcript that has any, unless the user
+/// spoke after it.
+fn last_text(transcript: &str) -> Option<String> {
+    for line in transcript.lines().rev() {
+        let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let content = &entry["message"]["content"];
+        match entry["type"].as_str() {
+            Some("user") if content.is_string() => return None,
+            Some("assistant") => {
+                let text: Vec<&str> = content
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter(|b| b["type"] == "text")
+                    .filter_map(|b| b["text"].as_str())
+                    .collect();
+                if !text.is_empty() {
+                    return Some(text.join("\n\n"));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 pub fn main() -> i32 {
     let var = |name| std::env::var(name).ok().filter(|v: &String| !v.is_empty());
     let (Some(socket), Some(root), Some(terminal)) =
@@ -74,13 +128,18 @@ pub fn main() -> i32 {
         .take(1 << 20)
         .read_to_string(&mut input)
         .ok();
-    let Some(state) = serde_json::from_str(&input).ok().as_ref().and_then(state) else {
+    let Ok(input) = serde_json::from_str::<serde_json::Value>(&input) else {
+        return 0;
+    };
+    let Some(state) = state(&input) else {
         return 0;
     };
     let report = HookReport {
         root,
         terminal,
         state,
+        prompt: prompt(&input),
+        reply: reply(&input),
     };
     if let Ok(mut stream) = UnixStream::connect(socket) {
         stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
@@ -114,5 +173,31 @@ mod tests {
         assert_eq!(of(r#"{"hook_event_name":"StopFailure"}"#), Some(Failed));
         assert_eq!(of(r#"{"hook_event_name":"SubagentStop"}"#), None);
         assert_eq!(of("{}"), None);
+    }
+
+    #[test]
+    fn carries_the_prompt_and_the_agents_last_message() {
+        let input = |json: &str| serde_json::from_str::<serde_json::Value>(json).unwrap();
+        let submit = input(r#"{"hook_event_name":"UserPromptSubmit","prompt":"Is it?"}"#);
+        assert_eq!(prompt(&submit).as_deref(), Some("Is it?"));
+        assert_eq!(reply(&submit), None);
+        let stop = input(r#"{"hook_event_name":"Stop","last_assistant_message":"Yes."}"#);
+        assert_eq!(reply(&stop).as_deref(), Some("Yes."));
+        assert_eq!(prompt(&stop), None);
+    }
+
+    #[test]
+    fn finds_the_last_text_in_a_transcript_since_the_user_spoke() {
+        let transcript = [
+            r#"{"type":"user","message":{"content":"Is it?"}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Checking."}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read"}]}}"#,
+            r#"{"type":"user","message":{"content":[{"type":"tool_result"}]}}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"Yes."}]}}"#,
+            r#"{"type":"system"}"#,
+        ];
+        assert_eq!(last_text(&transcript.join("\n")).as_deref(), Some("Yes."));
+        let unanswered = [transcript[1], r#"{"type":"user","message":{"content":"And?"}}"#];
+        assert_eq!(last_text(&unanswered.join("\n")), None);
     }
 }

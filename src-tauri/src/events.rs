@@ -93,4 +93,8 @@ pub struct TerminalAgent {
     /// The terminal's panel id.
     pub terminal: String,
     pub state: crate::mcp::hook::AgentHookState,
+    /// The prompt the user submitted, when this is a prompt.
+    pub prompt: Option<String>,
+    /// The agent's last message, when it stopped.
+    pub reply: Option<String>,
 }

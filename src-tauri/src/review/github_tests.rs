@@ -6,7 +6,7 @@ use super::comment_tests::row_text;
 use super::tests::{repo, write};
 use super::*;
 use crate::anchor::Side;
-use crate::store::{GhLink, GhPost, Stage, TakeVerdict};
+use crate::store::{Author, GhLink, GhPost, Stage, TakeVerdict};
 
 fn thread(id: &str, line: Option<u32>) -> PulledThread {
     PulledThread {
@@ -249,4 +249,37 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     let c = &state.comments[0];
     assert_eq!(c.thread.as_ref().unwrap().stage, Stage::Done);
     assert_eq!(c.body, "", "the sent reply isn't left to send again");
+}
+
+#[tokio::test]
+async fn a_synced_chat_suggests_a_reply_that_becomes_the_thread_reply() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let ws = pr_workspace(&mut ctx, base.path()).await;
+    write(&ws.root, "a.rs", "fn a() {}\n");
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
+    let state = ctx
+        .add_threads(review.id, vec![thread("T1", None)], &HashMap::new(), "PR #1")
+        .unwrap();
+    let id = state.comments[0].id;
+    ctx.focus(Some("pr1"), review.id);
+
+    ctx.add_chat_message(review.id, id, Author::User, "  ").unwrap();
+    let state = ctx
+        .add_chat_message(review.id, id, Author::User, "Is that true?")
+        .unwrap();
+    assert_eq!(state.comments[0].messages.len(), 1, "blank text adds nothing");
+
+    let (_, state) = ctx
+        .agent_suggest_reply(Some("pr1"), id, "Good catch.\n")
+        .unwrap();
+    assert_eq!(state.comments[0].suggestion.as_deref(), Some("Good catch."));
+
+    let state = ctx.take_suggestion(review.id, id).unwrap();
+    let c = &state.comments[0];
+    assert_eq!(c.body, "Good catch.");
+    assert_eq!(c.suggestion, None);
+    assert_eq!(c.thread.as_ref().unwrap().stage, Stage::Reply);
+    assert_eq!(c.messages.len(), 1, "the chat stays");
+    assert!(ctx.take_suggestion(review.id, id).is_err());
 }

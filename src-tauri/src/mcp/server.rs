@@ -229,6 +229,20 @@ impl Lgtm {
     }
 
     #[tool(
+        description = "Suggest a reply to a thread, in the human's voice. It shows in the \
+        thread's chat for the human to use or not, replacing any earlier suggestion. This never \
+        posts to GitHub."
+    )]
+    async fn suggest_reply(&self, Parameters(p): Parameters<inputs::SuggestReply>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let (review, state) = ctx
+            .agent_suggest_reply(self.workspace(), p.thread_id, &p.text)
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok("Suggested it.".into())
+    }
+
+    #[tool(
         description = "The review's walkthrough: notes on the code in reading order, each \
         important (with a level), a step in a named flow, context, or a question."
     )]

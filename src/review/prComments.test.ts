@@ -20,6 +20,7 @@ const thread = (id: number, path: string): ThreadDto => ({
   },
   snippet: "old code",
   messages: [],
+  suggestion: null,
   placed: false,
   createdAt: id,
 });
