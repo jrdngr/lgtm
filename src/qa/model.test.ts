@@ -46,8 +46,6 @@ function session(over: Partial<Session> = {}): Session {
     queue: { effects: [], deferrals: [], reopens: [], questions: [] },
     asked: false,
     note: "",
-    plan: null,
-    applied: null,
     sent: null,
     fromTerminal: false,
     forkFrom: null,
@@ -55,7 +53,6 @@ function session(over: Partial<Session> = {}): Session {
     archived: false,
     created: 1,
     agent: null,
-    nextComment: 0,
     ...over,
   };
 }
@@ -126,7 +123,7 @@ describe("qqText", () => {
 });
 
 describe("applyText", () => {
-  it("carries the decisions, the note, the plan and its comments", () => {
+  it("carries the prompt, the decisions and the note", () => {
     const d = session({
       queue: {
         effects: [],
@@ -135,24 +132,18 @@ describe("applyText", () => {
         questions: [question("Q1", "decided", 1, 1), question("Q2", "open")],
       },
       note: " Keep it small ",
-      plan: {
-        files: [{ path: "a.rs", change: "edit", edits: ["Load", "Save"], decisions: ["Q1"] }],
-        comments: [{ id: 1, quote: "Save", body: "Not yet" }],
-      },
     });
     expect(applyText(d)).toBe(
       [
         "Add templates",
         "Decisions:\nQ1 — Subject Q1: Change it",
         "Also: Keep it small",
-        "Plan:\n- a.rs (edit): Load; Save",
-        'My comments on the plan:\n- On "Save": Not yet',
         "Write the changes these decisions call for into this repo.",
       ].join("\n\n"),
     );
   });
 
-  it("gives a terminal agent its answers and plan without telling it to write anything", () => {
+  it("gives a terminal agent its answers without telling it to write anything", () => {
     const d = session({
       fromTerminal: true,
       queue: {
@@ -162,14 +153,12 @@ describe("applyText", () => {
         questions: [question("Q1", "decided", 1, 1), question("Q2", "deferred")],
       },
       note: "Keep it small",
-      plan: { files: [{ path: "a.rs", change: "edit", edits: ["Load"], decisions: ["Q1"] }] },
     });
     expect(applyText(d)).toBe(
       [
         'My answers to "T":\nQ1 — Subject Q1: Change it',
         "Deferred: Q2 (Subject Q2)",
         "Also: Keep it small",
-        "Plan:\n- a.rs (edit): Load",
       ].join("\n\n"),
     );
   });

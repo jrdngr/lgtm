@@ -1,6 +1,6 @@
-//! Q&A: working through decisions with an agent before it writes them into the repo. A
-//! session is a prompt, the question queue built from it, an optional plan, and what Apply
-//! did. Sessions live in the store, never in the repo.
+//! Q&A: working through decisions with an agent before a terminal agent writes them into the
+//! repo. A session is a prompt and the question queue built from it. Sessions live in the
+//! store, never in the repo.
 
 pub mod agent;
 mod discuss;
@@ -15,53 +15,6 @@ use specta::Type;
 use crate::review::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
 use queue::Queue;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum FileChange {
-    New,
-    Edit,
-    Delete,
-}
-
-/// A file the plan would touch.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PlanFile {
-    pub path: String,
-    pub change: FileChange,
-    /// What changes in it, a line each.
-    pub edits: Vec<String>,
-    /// The ids of the decisions it follows from.
-    pub decisions: Vec<String>,
-}
-
-/// A comment on a passage of the plan.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct PlanComment {
-    pub id: u32,
-    pub quote: String,
-    pub body: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Plan {
-    pub files: Vec<PlanFile>,
-    #[serde(default)]
-    pub comments: Vec<PlanComment>,
-}
-
-/// What Apply did.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct Applied {
-    pub summary: String,
-    /// Files it created or edited, relative to the workspace root.
-    pub files: Vec<String>,
-    pub at: f64,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -80,10 +33,6 @@ pub struct Session {
     /// Anything the user adds for the write.
     #[serde(default)]
     pub note: String,
-    #[serde(default)]
-    pub plan: Option<Plan>,
-    #[serde(default)]
-    pub applied: Option<Applied>,
     /// The terminal it was sent to, when it was.
     #[serde(default)]
     pub sent: Option<String>,
@@ -93,18 +42,17 @@ pub struct Session {
     /// That terminal agent's Claude Code session, which the agent here starts from a copy of.
     #[serde(default)]
     pub fork_from: Option<String>,
-    /// The terminal panel that agent runs in, which Apply sends the decisions back to.
+    /// The terminal panel that agent runs in, which Apply in terminal sends the decisions back
+    /// to.
     #[serde(default)]
     pub terminal: Option<String>,
-    /// Implemented: applied, or marked so after a send.
+    /// Implemented: marked so after a send.
     #[serde(default)]
     pub archived: bool,
     pub created: f64,
     /// The agent's conversation, resumed by each step.
     #[serde(default)]
     pub agent: Option<String>,
-    #[serde(default)]
-    next_comment: u32,
 }
 
 /// A title from the prompt's first line, until the agent names it.
@@ -171,8 +119,6 @@ impl RepoCtx {
             queue: Queue::default(),
             asked: false,
             note: String::new(),
-            plan: None,
-            applied: None,
             sent: None,
             from_terminal: false,
             fork_from: None,
@@ -180,7 +126,6 @@ impl RepoCtx {
             archived: false,
             created: created as f64,
             agent: None,
-            next_comment: 0,
         };
         self.store.lock().unwrap().save_qa_session(
             ws_key(ws),
@@ -196,26 +141,6 @@ impl RepoCtx {
             .lock()
             .unwrap()
             .delete_qa_session(ws_key(ws), id)?)
-    }
-
-    pub fn add_plan_comment(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        quote: &str,
-        body: &str,
-    ) -> anyhow::Result<Session> {
-        self.edit_qa(ws, id, |s| {
-            let plan = s.plan.as_mut().context("there's no plan to comment on")?;
-            s.next_comment += 1;
-            plan.comments.push(PlanComment {
-                id: s.next_comment,
-                quote: quote.to_string(),
-                body: body.to_string(),
-            });
-            Ok(())
-        })?;
-        self.qa_session(ws, id)
     }
 }
 

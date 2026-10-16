@@ -51,7 +51,8 @@ function Stepper({ d, view }: { d?: Session; view: Step }) {
   );
 }
 
-/** The Q&A tab: one session at a time, from its prompt through questions to Apply. */
+/** The Q&A tab: one session at a time, from its prompt through questions to Apply in
+ * terminal. */
 export function QaTab({ api }: IDockviewPanelProps) {
   const ws = useWorkspace();
   const state = useQa(ws);
@@ -119,7 +120,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
             },
             {
               label: "Edit Q&A prompts…",
-              title: "How the agent asks, plans and writes",
+              title: "How the agent asks",
               onSelect: () => openSettings(ws, "prompts"),
             },
           ]}
@@ -167,15 +168,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
           />
         )}
         {d && view === "apply" && (
-          <ApplyView
-            key={d.id}
-            ws={ws}
-            d={d}
-            busy={busy}
-            feed={state.feeds[d.id] ?? []}
-            focusKey={focusKey}
-            onSend={send}
-          />
+          <ApplyView key={d.id} ws={ws} d={d} busy={busy} focusKey={focusKey} onSend={send} />
         )}
       </div>
       {picker}

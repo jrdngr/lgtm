@@ -61,7 +61,7 @@ pub struct Models {
     pub walkthrough: String,
     /// Triage and replies on PR threads.
     pub replies: String,
-    /// Every step of a Q&A session: questions, plan, apply.
+    /// Q&A questions, their updates, and discussion.
     pub qa: String,
 }
 

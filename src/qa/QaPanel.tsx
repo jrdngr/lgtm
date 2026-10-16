@@ -15,7 +15,6 @@ function status(d: Session) {
   if (!all && !d.asked) return "Not asked yet";
   if (open) return `${all - open} of ${all} decided`;
   if (d.sent != null) return "Sent to a terminal";
-  if (d.plan) return "Planned";
   return "Ready to apply";
 }
 
@@ -56,10 +55,7 @@ function Row({ d, current, busyLabel }: { d: Session; current: boolean; busyLabe
         {open > 0 && <span className="pill amber">{open} open</span>}
         <span className="spacer" />
         <span className="faint">
-          {busyLabel ??
-            (d.archived
-              ? new Date(d.applied?.at ?? d.created ?? 0).toLocaleDateString()
-              : status(d))}
+          {busyLabel ?? (d.archived ? new Date(d.created ?? 0).toLocaleDateString() : status(d))}
         </span>
       </button>
     </div>

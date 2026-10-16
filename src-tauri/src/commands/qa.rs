@@ -63,14 +63,6 @@ pub enum SessionEdit {
     Sent {
         terminal: String,
     },
-    PlanComment {
-        quote: String,
-        body: String,
-    },
-    DeletePlanComment {
-        id: u32,
-    },
-    DiscardPlan,
 }
 
 #[tauri::command]
@@ -83,9 +75,6 @@ pub(crate) async fn edit_qa(
 ) -> CmdResult<Session> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let ctx = repo(&window)?;
-    if let SessionEdit::PlanComment { quote, body } = &edit {
-        return ctx.add_plan_comment(&ws, &id, quote, body).map_err(err);
-    }
     ctx.edit_qa(&ws, &id, |s| {
         match edit {
             SessionEdit::Prompt { prompt, attach } => {
@@ -95,13 +84,6 @@ pub(crate) async fn edit_qa(
             SessionEdit::Note { note } => s.note = note,
             SessionEdit::Archive { archived } => s.archived = archived,
             SessionEdit::Sent { terminal } => s.sent = Some(terminal),
-            SessionEdit::DeletePlanComment { id } => {
-                if let Some(p) = s.plan.as_mut() {
-                    p.comments.retain(|c| c.id != id);
-                }
-            }
-            SessionEdit::DiscardPlan => s.plan = None,
-            SessionEdit::PlanComment { .. } => {}
         }
         Ok(())
     })
@@ -264,44 +246,6 @@ pub(crate) async fn reask_question(
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     repo(&window)?
         .reask_question(&ws, &session, &id, &runs)
-        .await
-        .map_err(err)
-}
-
-/// Plans the write, or revises the plan with the comments on it.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn write_plan(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-    on_tool: Channel<String>,
-) -> CmdResult<Session> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?
-        .write_plan(&ws, &session, &runs, |t| {
-            on_tool.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-/// Writes the decisions into the workspace's @.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn apply_qa(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-    on_tool: Channel<String>,
-) -> CmdResult<Session> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?
-        .apply_qa(&ws, &session, &runs, |t| {
-            on_tool.send(t).ok();
-        })
         .await
         .map_err(err)
 }

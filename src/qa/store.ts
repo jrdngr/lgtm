@@ -11,7 +11,7 @@ import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { Session, Step } from "./model";
 
 /** What the agent is doing for a session. `answer` is the update after decision `about`. */
-export type BusyKind = "ask" | "answer" | "discuss" | "reask" | "plan" | "apply";
+export type BusyKind = "ask" | "answer" | "discuss" | "reask";
 
 export interface Busy {
   kind: BusyKind;
@@ -35,8 +35,6 @@ export interface QaState {
   busy: Record<string, Busy>;
   /** Text the agent is writing, by `id:about`, until its run ends. */
   streams: Record<string, string>;
-  /** Tool calls of the running ask, plan or apply, by session. */
-  feeds: Record<string, string[]>;
   error?: string;
 }
 
@@ -46,7 +44,6 @@ const EMPTY: QaState = {
   fresh: false,
   busy: {},
   streams: {},
-  feeds: {},
 };
 const states = new Map<string, QaState>();
 const listeners = new Set<() => void>();
@@ -57,8 +54,6 @@ const BUSY_NAMES: Record<BusyKind, string> = {
   answer: "Updating dependent questions",
   discuss: "Discussing",
   reask: "Rewriting the question",
-  plan: "Writing the plan",
-  apply: "Applying to @",
 };
 
 export const busyName = (b: Busy) => BUSY_NAMES[b.kind];
@@ -80,7 +75,7 @@ function reportWaiting(ws: WorkspaceName) {
   const before = waiting.get(key) ?? new Set();
   const now = new Set<string>();
   for (const d of getQa(ws).sessions) {
-    if (!d.fromTerminal || d.sent != null || d.applied || d.archived) continue;
+    if (!d.fromTerminal || d.sent != null || d.archived) continue;
     now.add(d.id);
     report(ws, `qa:${d.id}`, "input", `Q&A: ${d.title}`);
   }
@@ -173,7 +168,6 @@ export async function runStep(
     error: undefined,
     busy: { ...s.busy, [id]: { kind: o.kind, about: o.about, activity: "" } },
     streams: o.streams ? { ...s.streams, [key]: "" } : s.streams,
-    feeds: { ...s.feeds, [id]: [] },
   }));
   const handle = startRun(ws, {
     kind: "qa",
@@ -191,12 +185,7 @@ export async function runStep(
       set(ws, (s) => {
         const b = s.busy[id];
         if (!b) return s;
-        const feed = [...(s.feeds[id] ?? []), text];
-        return {
-          ...s,
-          busy: { ...s.busy, [id]: { ...b, activity: text } },
-          feeds: { ...s.feeds, [id]: feed },
-        };
+        return { ...s, busy: { ...s.busy, [id]: { ...b, activity: text } } };
       });
     }
   };

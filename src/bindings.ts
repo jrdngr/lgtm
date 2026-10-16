@@ -326,10 +326,6 @@ export const commands = {
 	reaskQuestion: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, session, id })),
 	/**  The open questions deferring question `id` would also defer. */
 	deferPreview: (workspace: string | null, session: string, id: string) => typedError<string[], string>(__TAURI_INVOKE("defer_preview", { workspace, session, id })),
-	/**  Plans the write, or revises the plan with the comments on it. */
-	writePlan: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("write_plan", { workspace, session, onTool })),
-	/**  Writes the decisions into the workspace's @. */
-	applyQa: (workspace: string | null, session: string, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_qa", { workspace, session, onTool })),
 	stopQa: (workspace: string | null, session: string) => typedError<null, string>(__TAURI_INVOKE("stop_qa", { workspace, session })),
 };
 
@@ -416,14 +412,6 @@ export type Answer_Serialize = {
 	 *  the questions, so undo leaves them.
 	 */
 	auto?: string | null,
-};
-
-/**  What Apply did. */
-export type Applied = {
-	summary: string,
-	/**  Files it created or edited, relative to the workspace root. */
-	files: string[],
-	at: number | null,
 };
 
 export type ArchDto = {
@@ -744,8 +732,6 @@ export type Effect_Serialize = {
 	added: string[],
 };
 
-export type FileChange = "new" | "edit" | "delete";
-
 export type FileDto = {
 	path: string,
 	oldPath: string | null,
@@ -1053,7 +1039,7 @@ export type Models = {
 	walkthrough: string,
 	/**  Triage and replies on PR threads. */
 	replies: string,
-	/**  Every step of a Q&A session: questions, plan, apply. */
+	/**  Q&A questions, their updates, and discussion. */
 	qa: string,
 };
 
@@ -1139,28 +1125,6 @@ export type PlacedThreadDto = {
 	thread: PreviewThreadDto,
 };
 
-export type Plan = {
-	files: PlanFile[],
-	comments?: PlanComment[],
-};
-
-/**  A comment on a passage of the plan. */
-export type PlanComment = {
-	id: number,
-	quote: string,
-	body: string,
-};
-
-/**  A file the plan would touch. */
-export type PlanFile = {
-	path: string,
-	change: FileChange,
-	/**  What changes in it, a line each. */
-	edits: string[],
-	/**  The ids of the decisions it follows from. */
-	decisions: string[],
-};
-
 export type PostDto = {
 	author: string,
 	body: string,
@@ -1234,9 +1198,7 @@ export type Prompt = "walkthrough" |
 /**  How takes and replies on GitHub threads are written. */
 "reply" | 
 /**  How Q&A questions are built, after the qqueue skill. */
-"qq" | 
-/**  How Q&A plans and writes its result. */
-"qaWrite";
+"qq";
 
 /**  A prompt and its file, for the Settings tab. */
 export type PromptInfo = {
@@ -1489,7 +1451,7 @@ export type SessionEdit = { kind: "prompt"; prompt: string; attach: string[] } |
 /**  Implemented, or back to active. */
 { kind: "archive"; archived: boolean } | 
 /**  It went to a terminal, named by its title. */
-{ kind: "sent"; terminal: string } | { kind: "planComment"; quote: string; body: string } | { kind: "deletePlanComment"; id: number } | { kind: "discardPlan" };
+{ kind: "sent"; terminal: string };
 
 export type Session_Deserialize = {
 	id: string,
@@ -1502,22 +1464,22 @@ export type Session_Deserialize = {
 	asked?: boolean,
 	/**  Anything the user adds for the write. */
 	note?: string,
-	plan?: Plan | null,
-	applied?: Applied | null,
 	/**  The terminal it was sent to, when it was. */
 	sent?: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal?: boolean,
 	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
 	forkFrom?: string | null,
-	/**  The terminal panel that agent runs in, which Apply sends the decisions back to. */
+	/**
+	 *  The terminal panel that agent runs in, which Apply in terminal sends the decisions back
+	 *  to.
+	 */
 	terminal?: string | null,
-	/**  Implemented: applied, or marked so after a send. */
+	/**  Implemented: marked so after a send. */
 	archived?: boolean,
 	created: number | null,
 	/**  The agent's conversation, resumed by each step. */
 	agent?: string | null,
-	nextComment?: number,
 };
 
 export type Session_Serialize = {
@@ -1531,22 +1493,22 @@ export type Session_Serialize = {
 	asked: boolean,
 	/**  Anything the user adds for the write. */
 	note: string,
-	plan: Plan | null,
-	applied: Applied | null,
 	/**  The terminal it was sent to, when it was. */
 	sent: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal: boolean,
 	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
 	forkFrom: string | null,
-	/**  The terminal panel that agent runs in, which Apply sends the decisions back to. */
+	/**
+	 *  The terminal panel that agent runs in, which Apply in terminal sends the decisions back
+	 *  to.
+	 */
 	terminal: string | null,
-	/**  Implemented: applied, or marked so after a send. */
+	/**  Implemented: marked so after a send. */
 	archived: boolean,
 	created: number | null,
 	/**  The agent's conversation, resumed by each step. */
 	agent: string | null,
-	nextComment: number,
 };
 
 export type Settings = {

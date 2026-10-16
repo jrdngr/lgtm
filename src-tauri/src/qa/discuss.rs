@@ -132,11 +132,9 @@ impl RepoCtx {
                 runs,
                 Step {
                     turn,
-                    edit: false,
                     schema: None,
                     fresh: false,
                     restart,
-                    decided: false,
                 },
                 |p| {
                     if let Progress::Text(t) = p {
@@ -223,11 +221,9 @@ impl RepoCtx {
                 runs,
                 Step {
                     turn,
-                    edit: false,
                     schema: Some(rewrite(auto)),
                     fresh: false,
                     restart: None,
-                    decided: false,
                 },
                 |_| {},
             )

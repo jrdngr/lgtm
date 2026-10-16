@@ -18,24 +18,16 @@ pub enum Prompt {
     Reply,
     /// How Q&A questions are built, after the qqueue skill.
     Qq,
-    /// How Q&A plans and writes its result.
-    QaWrite,
 }
 
 impl Prompt {
-    pub const ALL: [Prompt; 4] = [
-        Prompt::Walkthrough,
-        Prompt::Reply,
-        Prompt::Qq,
-        Prompt::QaWrite,
-    ];
+    pub const ALL: [Prompt; 3] = [Prompt::Walkthrough, Prompt::Reply, Prompt::Qq];
 
     fn file(self) -> &'static str {
         match self {
             Prompt::Walkthrough => "walkthrough.md",
             Prompt::Reply => "reply.md",
             Prompt::Qq => "qq.md",
-            Prompt::QaWrite => "qa-write.md",
         }
     }
 
@@ -44,7 +36,6 @@ impl Prompt {
             Prompt::Walkthrough => include_str!("walkthrough.md"),
             Prompt::Reply => include_str!("reply.md"),
             Prompt::Qq => include_str!("qq.md"),
-            Prompt::QaWrite => include_str!("qa-write.md"),
         }
     }
 }

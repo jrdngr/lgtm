@@ -1,17 +1,16 @@
-//! The agent steps of a Q&A session: building the questions from the prompt, applying each
-//! answer to the questions that depend on it, writing a plan, and applying the decisions to
-//! the repo. Discussing a question is in `discuss`. Every step continues one conversation per
-//! session.
+//! The agent steps of a Q&A session: building the questions from the prompt, and applying
+//! each answer to the questions that depend on it. Discussing a question is in `discuss`.
+//! Every step continues one conversation per session.
 
 use anyhow::Context;
 use serde::Deserialize;
 
 use super::queue::{self, NewQuestion, QState, Update};
 use super::text;
-use super::{Applied, Plan, PlanFile, Session};
+use super::Session;
 use crate::agent::{self, Progress, Runs};
 use crate::prompts::{self, Prompt};
-use crate::review::{RepoCtx, now_ms};
+use crate::review::RepoCtx;
 use crate::workspace::Workspace;
 
 const CHOICE: &str = r#"{
@@ -130,37 +129,10 @@ pub(super) const REAUTO_RULE: &str = "When you rewrite an auto-answered question
 why option 1 is still obvious if it is, in a short line, or leave it empty so I decide it. \
 Leave `auto` empty for every other question.";
 
-const PLAN_SCHEMA: &str = r#"{
-  "type": "object",
-  "properties": {
-    "files": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "path": { "type": "string" },
-          "change": { "enum": ["new", "edit", "delete"] },
-          "edits": { "type": "array", "items": { "type": "string" } },
-          "decisions": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["path", "change", "edits", "decisions"],
-        "additionalProperties": false
-      }
-    }
-  },
-  "required": ["files"],
-  "additionalProperties": false
-}"#;
-
 #[derive(Deserialize)]
 struct Asked {
     title: String,
     questions: Vec<NewQuestion>,
-}
-
-#[derive(Deserialize)]
-struct Planned {
-    files: Vec<PlanFile>,
 }
 
 pub(super) fn parse<T: serde::de::DeserializeOwned>(
@@ -178,18 +150,15 @@ pub(super) fn parse<T: serde::de::DeserializeOwned>(
 /// One step of the session's conversation.
 pub(super) struct Step {
     pub turn: String,
-    pub edit: bool,
     pub schema: Option<String>,
     /// Starts a new conversation instead of continuing the session's.
     pub fresh: bool,
     /// The turn to send instead when a new conversation starts, for a `turn` that leans on
     /// earlier ones.
     pub restart: Option<String>,
-    /// `turn` lists the decisions, so a new conversation's context leaves them out.
-    pub decided: bool,
 }
 
-/// Every decision, a line each, for the plan and the write.
+/// Every decision, a line each.
 fn decisions(s: &Session) -> String {
     s.queue
         .questions
@@ -198,51 +167,6 @@ fn decisions(s: &Session) -> String {
         .map(|q| format!("- {} ({}): {}", q.id, q.text.subject, text::answer_text(q)))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-/// The decisions for a turn that lists them, saying so when there are none.
-fn decided_list(s: &Session) -> String {
-    let d = decisions(s);
-    if d.is_empty() {
-        "- None: nothing needed deciding.".into()
-    } else {
-        d
-    }
-}
-
-/// The questions still open, as a paragraph telling the agent to leave them out of `what`.
-fn still_open(s: &Session, what: &str) -> String {
-    let open = s
-        .queue
-        .questions
-        .iter()
-        .filter(|q| q.state == QState::Open)
-        .map(|q| format!("- {} ({})", q.id, q.text.subject))
-        .collect::<Vec<_>>();
-    if open.is_empty() {
-        String::new()
-    } else {
-        format!(
-            "These are still open; leave them out of the {what}:\n\n{}\n\n",
-            open.join("\n")
-        )
-    }
-}
-
-/// The deferred questions, as a paragraph telling the agent to leave them unimplemented.
-fn deferred(s: &Session) -> String {
-    let put_off = s
-        .queue
-        .questions
-        .iter()
-        .filter(|q| q.state == QState::Deferred)
-        .map(|q| format!("{} ({})", q.id, q.text.subject))
-        .collect::<Vec<_>>();
-    if put_off.is_empty() {
-        String::new()
-    } else {
-        format!("Deferred, leave unimplemented: {}\n\n", put_off.join(", "))
-    }
 }
 
 /// The files the user asked the agent to read first, as a line after the prompt.
@@ -254,14 +178,9 @@ fn read_first(s: &Session) -> String {
     }
 }
 
-/// What a conversation that starts partway through the session needs to know, with the
-/// decisions unless the turn has them.
-fn context(s: &Session, with_decisions: bool) -> String {
-    let decided = if with_decisions {
-        decisions(s)
-    } else {
-        String::new()
-    };
+/// What a conversation that starts partway through the session needs to know.
+fn context(s: &Session) -> String {
+    let decided = decisions(s);
     let decided = if decided.is_empty() {
         String::new()
     } else {
@@ -274,54 +193,13 @@ fn context(s: &Session, with_decisions: bool) -> String {
     )
 }
 
-/// The plan as text, with the user's comments on it.
-fn plan_text(plan: &Plan) -> String {
-    let mut out = String::new();
-    for f in &plan.files {
-        let change = match f.change {
-            super::FileChange::New => "new",
-            super::FileChange::Edit => "edit",
-            super::FileChange::Delete => "delete",
-        };
-        out.push_str(&format!(
-            "- {} ({change}; {})\n",
-            f.path,
-            f.decisions.join(", ")
-        ));
-        for e in &f.edits {
-            out.push_str(&format!("  - {e}\n"));
-        }
-    }
-    for c in &plan.comments {
-        out.push_str(&format!(
-            "\nMy comment on \"{}\": {}\n",
-            c.quote.trim(),
-            c.body.trim()
-        ));
-    }
-    out
-}
-
-/// A path from a tool call, relative to the workspace root.
-fn written(tool: &str, root: &std::path::Path) -> Option<String> {
-    let path = tool
-        .strip_prefix("Edit ")
-        .or_else(|| tool.strip_prefix("Write "))?;
-    let rel = std::path::Path::new(path)
-        .strip_prefix(root)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.to_string());
-    Some(rel)
-}
-
 /// The opening of the session's conversation: where things are and the rules.
 fn qa_intro() -> anyhow::Result<String> {
     let qq = prompts::load(Prompt::Qq)?;
-    let write = prompts::load(Prompt::QaWrite)?;
     Ok(format!(
         "We're working through the decisions for a change to this repository, one question at \
-         a time, before you write it. You're in the repository and can read any file. Don't \
-         edit files until I ask you to apply. You can't run commands.\n\n{qq}\n\n{write}"
+         a time, before it's written. You're in the repository and can read any file. Don't \
+         edit files. You can't run commands.\n\n{qq}"
     ))
 }
 
@@ -346,7 +224,7 @@ impl RepoCtx {
             Ok(if step.fresh {
                 format!("{intro}\n\n{turn}")
             } else {
-                format!("{intro}\n\n{}\n\n{turn}", context(&s, !step.decided))
+                format!("{intro}\n\n{}\n\n{turn}", context(&s))
             })
         };
         let prompt = match session {
@@ -354,13 +232,12 @@ impl RepoCtx {
             None => first()?,
         };
         let key = self.qa_key(ws, id);
-        let _busy = if step.edit { Some(ws.claim()?) } else { None };
         let task = |prompt| agent::Task {
             cwd: &ws.root,
             prompt,
             resume: None,
             fork: false,
-            edit: step.edit,
+            edit: false,
             schema: step.schema.as_deref(),
             purpose: agent::Purpose::Qa,
         };
@@ -386,9 +263,6 @@ impl RepoCtx {
         if resume.is_some() && reply.as_ref().err().is_some_and(agent::session_missing) {
             let prompt = first()?;
             reply = agent::run(runs, &key, task(&prompt), &on).await;
-        }
-        if step.edit {
-            ws.snapshot().await.ok();
         }
         let reply = reply?;
         if !reply.stopped && reply.session.is_some() {
@@ -428,11 +302,9 @@ impl RepoCtx {
                 runs,
                 Step {
                     turn,
-                    edit: false,
                     schema: Some(ask_schema(auto)),
                     fresh: true,
                     restart: None,
-                    decided: false,
                 },
                 tool_only(on_tool),
             )
@@ -446,9 +318,7 @@ impl RepoCtx {
                 s.queue = queue::Queue::default();
                 s.queue.add_round(questions);
                 s.asked = true;
-                s.plan = None;
                 s.sent = None;
-                s.applied = None;
                 Ok(())
             })?;
         }
@@ -511,11 +381,9 @@ impl RepoCtx {
                 runs,
                 Step {
                     turn,
-                    edit: false,
                     schema: Some(update_schema()),
                     fresh: false,
                     restart: None,
-                    decided: false,
                 },
                 |_| {},
             )
@@ -530,141 +398,9 @@ impl RepoCtx {
         self.qa_session(ws, id)
     }
 
-    /// Has the agent plan the write from the decisions, or revise its plan with the user's
-    /// comments on it. Nothing is written.
-    pub async fn write_plan(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        runs: &Runs,
-        on_tool: impl Fn(String),
-    ) -> anyhow::Result<Session> {
-        let s = self.qa_session(ws, id)?;
-        let (turn, decided) = match &s.plan {
-            Some(plan) if !plan.comments.is_empty() => (
-                format!(
-                    "Revise your plan with my comments. Don't edit files yet.\n\n{}",
-                    plan_text(plan)
-                ),
-                false,
-            ),
-            _ => (
-                format!(
-                    "These are decided:\n\n{}\n\n{}{}{}Plan the write by the planning \
-                     rules. Don't edit files yet.",
-                    decided_list(&s),
-                    still_open(&s, "plan"),
-                    deferred(&s),
-                    note_line(&s.note)
-                ),
-                true,
-            ),
-        };
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    edit: false,
-                    schema: Some(PLAN_SCHEMA.into()),
-                    fresh: false,
-                    restart: None,
-                    decided,
-                },
-                tool_only(on_tool),
-            )
-            .await?;
-        if !reply.stopped {
-            let Planned { files } = parse(&reply, "plan")?;
-            self.edit_qa(ws, id, |s| {
-                s.plan = Some(Plan {
-                    files,
-                    comments: vec![],
-                });
-                Ok(())
-            })?;
-        }
-        self.qa_session(ws, id)
-    }
-
-    /// Has the agent write the decisions into the workspace's @, following the plan when
-    /// there is one. Archives the session when it succeeds.
-    pub async fn apply_qa(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        runs: &Runs,
-        on_tool: impl Fn(String),
-    ) -> anyhow::Result<Session> {
-        let s = self.qa_session(ws, id)?;
-        let plan = s
-            .plan
-            .as_ref()
-            .map(|p| format!("Follow this plan:\n\n{}\n\n", plan_text(p)))
-            .unwrap_or_default();
-        let turn = format!(
-            "Apply it now: write the changes the prompt and these decisions call for, by the \
-             applying rules.\n\n{}\n\n{}{}{}{plan}",
-            decided_list(&s),
-            still_open(&s, "write"),
-            deferred(&s),
-            note_line(&s.note)
-        );
-        let files = std::sync::Mutex::new(Vec::<String>::new());
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    edit: true,
-                    schema: None,
-                    fresh: false,
-                    restart: None,
-                    decided: true,
-                },
-                |p| {
-                    if let Progress::Tool(t) = p {
-                        if let Some(f) = written(&t, &ws.root) {
-                            let mut files = files.lock().unwrap();
-                            if !files.contains(&f) {
-                                files.push(f);
-                            }
-                        }
-                        on_tool(t)
-                    }
-                },
-            )
-            .await?;
-        if !reply.stopped {
-            let files = files.into_inner().unwrap();
-            self.edit_qa(ws, id, |s| {
-                s.applied = Some(Applied {
-                    summary: reply.text.trim().to_string(),
-                    files,
-                    at: now_ms() as f64,
-                });
-                s.archived = true;
-                Ok(())
-            })?;
-        }
-        self.qa_session(ws, id)
-    }
-
     /// Stops whatever the agent is doing on the session.
     pub fn stop_qa(&self, ws: &Workspace, id: &str, runs: &Runs) {
         runs.stop_all(&self.qa_key(ws, id));
-    }
-}
-
-fn note_line(note: &str) -> String {
-    if note.trim().is_empty() {
-        String::new()
-    } else {
-        format!("Also: {}\n\n", note.trim())
     }
 }
 
@@ -688,20 +424,8 @@ mod tests {
             update_schema(),
             rewrite(true),
             rewrite(false),
-            PLAN_SCHEMA.into(),
         ] {
             serde_json::from_str::<serde_json::Value>(&s).unwrap();
         }
-    }
-
-    #[test]
-    fn writes_are_read_from_tool_calls() {
-        let root = std::path::Path::new("/r/ws");
-        assert_eq!(
-            written("Edit /r/ws/src/a.rs", root).as_deref(),
-            Some("src/a.rs")
-        );
-        assert_eq!(written("Write /tmp/x", root).as_deref(), Some("/tmp/x"));
-        assert_eq!(written("Read /r/ws/src/a.rs", root), None);
     }
 }

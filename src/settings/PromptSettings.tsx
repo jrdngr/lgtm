@@ -12,10 +12,6 @@ const PROMPTS: Record<Prompt, { name: string; help: string }> = {
     help: "How the agent takes a position on PR threads and drafts replies in your voice.",
   },
   qq: { name: "Q&A questions", help: "How the agent turns a Q&A prompt into questions." },
-  qaWrite: {
-    name: "Q&A write",
-    help: "How the agent plans and applies a Q&A session's decisions.",
-  },
 };
 
 /** One prompt's file: open it (creating it from the built-in prompt) or remove it. */

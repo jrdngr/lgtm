@@ -10,7 +10,7 @@ const MODELS: [keyof Models, string, string][] = [
   ["ask", "Fixes", "Fix on intents"],
   ["walkthrough", "Assess", "Assessing the architecture"],
   ["replies", "Replies", "Triage and replies on PR threads"],
-  ["qa", "Q&A", "Questions, plans and Apply in Q&A sessions"],
+  ["qa", "Q&A", "Questions and discussion in Q&A sessions"],
 ];
 
 /** A text field that saves when it loses focus or Enter is pressed. */

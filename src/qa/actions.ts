@@ -86,18 +86,6 @@ export function ask(ws: WorkspaceName, id: string, title: string) {
   return runStep(ws, id, { kind: "ask", subject: title }, (ch) => commands.askQa(ws, id, auto, ch));
 }
 
-export function writePlan(ws: WorkspaceName, d: Session) {
-  return runStep(ws, d.id, { kind: "plan", subject: `${d.title}: plan` }, (ch) =>
-    commands.writePlan(ws, d.id, ch),
-  );
-}
-
-export function apply(ws: WorkspaceName, d: Session) {
-  return runStep(ws, d.id, { kind: "apply", subject: `${d.title}: apply` }, (ch) =>
-    commands.applyQa(ws, d.id, ch),
-  );
-}
-
 export const archiveLabel = (d: Session) => (d.archived ? "Unarchive" : "Archive");
 
 export const edit = (ws: WorkspaceName, d: Session, e: SessionEdit) =>
