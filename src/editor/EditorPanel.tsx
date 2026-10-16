@@ -84,7 +84,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         setRendered((r) => (r === undefined ? r : text));
         const { cursor, scroll } = restore.current;
         if (cursor !== undefined && !restore.current.line) {
-          made.dispatch({ selection: { anchor: Math.min(cursor, text.length) } });
+          made.dispatch({ selection: { anchor: Math.min(cursor, made.state.doc.length) } });
         }
         const scroller = made.scrollDOM;
         if (scroll) requestAnimationFrame(() => scroller.scrollTo({ top: scroll }));

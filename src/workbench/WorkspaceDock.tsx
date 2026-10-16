@@ -23,6 +23,7 @@ import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
+import { guarded } from "../ui/Crash";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
 import { trackClosed } from "./closedTabs";
@@ -36,16 +37,16 @@ import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "./panels"
 import { Tab } from "./Tab";
 
 const components = {
-  review: ReviewPanel,
-  terminal: TerminalPanel,
-  report: ReportPanel,
-  architecture: ArchPanel,
-  editor: EditorPanel,
-  prPreview: PrPreview,
-  settings: SettingsPanel,
-  shortcuts: ShortcutsPanel,
-  runs: RunsPanel,
-  qa: QaTab,
+  review: guarded(ReviewPanel),
+  terminal: guarded(TerminalPanel),
+  report: guarded(ReportPanel),
+  architecture: guarded(ArchPanel),
+  editor: guarded(EditorPanel),
+  prPreview: guarded(PrPreview),
+  settings: guarded(SettingsPanel),
+  shortcuts: guarded(ShortcutsPanel),
+  runs: guarded(RunsPanel),
+  qa: guarded(QaTab),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads and Graph panels
   // are then closed.
   tasks: () => null,

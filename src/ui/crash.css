@@ -1,0 +1,19 @@
+.crash {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  height: 100%;
+  overflow: auto;
+  padding: 12px;
+  color: var(--error);
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.crash pre {
+  margin: 0;
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+  white-space: pre-wrap;
+}
