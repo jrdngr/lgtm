@@ -160,7 +160,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::qa::edit_qa,
             commands::qa::delete_qa,
             commands::qa::act_on_question,
-            commands::qa::ask_qa,
             commands::qa::apply_answer,
             commands::qa::discuss_question,
             commands::qa::reask_question,

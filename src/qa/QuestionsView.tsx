@@ -231,15 +231,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey, jump }: Props) {
   }
 
   if (!d.queue.questions.length)
-    return (
-      <div className="placeholder">
-        {busy?.kind === "ask"
-          ? "Questions show here once the agent has read the prompt"
-          : d.asked
-            ? "Nothing to decide"
-            : "No questions yet. Ask from the prompt first."}
-      </div>
-    );
+    return <div className="placeholder">{d.asked ? "Nothing to decide" : "No questions yet"}</div>;
 
   const index = q ? list.findIndex((x) => x.id === q.id) : -1;
 

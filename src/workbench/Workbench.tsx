@@ -159,7 +159,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => showView("left", "workspaces"),
     "Mod+Shift+E": () => showView("right", "changes"),
-    "Mod+Shift+Y": () => showView("right", "symbols"),
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
     "Mod+Shift+P": () => showView("right", "pr"),

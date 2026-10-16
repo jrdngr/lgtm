@@ -4,7 +4,7 @@ import { movedView } from "./subviews";
 test("old nested tabs open the view they last showed", () => {
   const saved = (sub: Record<string, string>) => (key: string) => sub[key] ?? null;
   expect(movedView("diff", saved({}))).toBe("changes");
-  expect(movedView("diff", saved({ "lgtm:side:diff": "symbols" }))).toBe("symbols");
+  expect(movedView("symbols", saved({}))).toBe("changes");
   expect(movedView("reports", saved({}))).toBe("walkthrough");
   expect(movedView("reports", saved({ "lgtm:side:reports": "reviewers" }))).toBe("reviewers");
   expect(movedView("bots", saved({}))).toBe("reviewers");

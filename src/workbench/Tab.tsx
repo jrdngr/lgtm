@@ -6,6 +6,18 @@ import { useWorkspace } from "../workspaces/context";
 import { activate } from "./panels";
 import { tabMenu } from "./tabMenu";
 
+// Dockview's pointer drags start on any button, and the native context menu swallows the
+// pointerup, so a right-click would leave the tab following the pointer.
+window.addEventListener(
+  "pointerdown",
+  (e) => {
+    if (e.button !== 0 && e.target instanceof Element && e.target.closest(".dv-tab")) {
+      e.stopPropagation();
+    }
+  },
+  true,
+);
+
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
  * selects it and opens its menu. The send target's tab is marked, and pinned when it is. */
 export function Tab(props: IDockviewPanelHeaderProps) {

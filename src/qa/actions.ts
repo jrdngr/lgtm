@@ -3,7 +3,7 @@ import { commands } from "../ipc";
 import { remembered } from "../workbench/remembered";
 import type { WorkspaceName } from "../workspaces/context";
 import { dependents, type Session } from "./model";
-import { act, removeSession, runStep, selectSession, setError, setView } from "./store";
+import { act, removeSession, runStep, selectSession, setError } from "./store";
 
 /** Decides question `id`, then has the agent update the questions still open. */
 export async function decide(ws: WorkspaceName, d: Session, id: string, answer: AnswerInput) {
@@ -78,13 +78,6 @@ export async function savePrompt(
 
 /** Whether asking has the agent answer the obvious questions itself. */
 export const autoAnswer = remembered("lgtm:qa:autoAnswer", true, [true, false]);
-
-/** Has the agent build the session's questions from its prompt. */
-export function ask(ws: WorkspaceName, id: string, title: string) {
-  setView(ws, "questions");
-  const auto = autoAnswer.get();
-  return runStep(ws, id, { kind: "ask", subject: title }, (ch) => commands.askQa(ws, id, auto, ch));
-}
 
 export const archiveLabel = (d: Session) => (d.archived ? "Unarchive" : "Archive");
 

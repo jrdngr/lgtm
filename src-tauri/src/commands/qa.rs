@@ -174,27 +174,6 @@ pub(crate) async fn defer_preview(
     Ok(s.queue.defer_preview(&id))
 }
 
-/// Has the agent turn the session's prompt into questions, answering the obvious ones
-/// itself when `auto` is on.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn ask_qa(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-    auto: bool,
-    on_tool: Channel<String>,
-) -> CmdResult<Session> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?
-        .ask_qa(&ws, &session, auto, &runs, |t| {
-            on_tool.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
 /// Applies the answer to question `id` to the rest of the queue.
 #[tauri::command]
 #[specta::specta]

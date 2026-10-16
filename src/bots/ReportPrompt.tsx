@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { CurrentReview } from "../review/current";
-import { useSendTarget, workspaceTerminals } from "../terminal/registry";
-import { Icon } from "../ui/icons";
+import { submitNextSend } from "../terminal/registry";
 import { PipeButton } from "../ui/PipeButton";
 import { isMac } from "../workbench/keys";
 import { loadState, saveState } from "../workbench/savedState";
@@ -9,7 +8,6 @@ import type { WorkspaceName } from "../workspaces/context";
 import { workspaceRoot } from "../workspaces/useWorkspaces";
 
 const SAVED = "report-prompt";
-const DEFAULT = "Review this change. Look for bugs, risky code and missing tests.";
 
 /** What lgtm adds to the prompt, so the agent publishes a report to this review. */
 export function reportText(prompt: string, revset: string, root: string | undefined): string {
@@ -29,10 +27,8 @@ export function ReportPrompt({
   review: CurrentReview | undefined;
 }) {
   const [prompt, setPrompt] = useState(() =>
-    loadState(SAVED, DEFAULT, (v): v is string => typeof v === "string"),
+    loadState(SAVED, "", (v): v is string => typeof v === "string"),
   );
-  const { target } = useSendTarget(workspace);
-  const title = workspaceTerminals(workspace).find((t) => t.id === target)?.title;
   const ready = !!review && !!prompt.trim();
 
   function create() {
@@ -47,6 +43,7 @@ export function ReportPrompt({
         value={prompt}
         rows={5}
         aria-label="Review prompt"
+        placeholder="Describe the report you want to generate"
         spellCheck={false}
         onChange={(e) => {
           setPrompt(e.target.value);
@@ -55,17 +52,12 @@ export function ReportPrompt({
         onKeyDown={(e) => {
           if (e.key === "Enter" && (isMac ? e.metaKey : e.ctrlKey)) {
             e.preventDefault();
+            submitNextSend();
             create();
           }
         }}
       />
       <div className="report-prompt-bar">
-        {target && (
-          <span className="report-target">
-            <Icon name="terminal" size={11} />
-            <b>{title || "Terminal"}</b>
-          </span>
-        )}
         <span className="spacer" />
         <PipeButton disabled={!ready} onClick={create} keys="⌘↵">
           Create Report

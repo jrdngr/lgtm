@@ -4,7 +4,6 @@ import { useArch } from "../arch/state";
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { RepoTree } from "../editor/RepoTree";
-import { SymbolsPanel } from "../graph/SymbolsPanel";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
@@ -45,7 +44,6 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       views={[
         { id: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
         { id: "changes", title: "Changes", icon: "gitTree", render: () => <FilesPanel /> },
-        { id: "symbols", title: "Symbols", icon: "symbols", render: () => <SymbolsPanel /> },
         { id: "comments", title: "Notes", icon: "comments", render: () => <NotesPanel /> },
         {
           id: "pr",

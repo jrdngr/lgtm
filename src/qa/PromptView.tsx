@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { submitNextSend } from "../terminal/registry";
 import { PipeButton } from "../ui/PipeButton";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
-import { ask, autoAnswer, savePrompt } from "./actions";
+import { autoAnswer, savePrompt } from "./actions";
 import type { Session } from "./model";
 import type { Busy } from "./store";
 
@@ -19,7 +20,7 @@ const terminalText = (id: string, prompt: string, auto: boolean) =>
   `${prompt.trim()}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
 
 /** What the session is for, files the agent reads first and whether it answers the obvious
- * questions itself, then asking. */
+ * questions itself, then starting it in a terminal. */
 export function PromptView({ ws, d, busy, onSend }: Props) {
   const auto = autoAnswer.use();
   const [prompt, setPrompt] = useState(d?.prompt ?? "");
@@ -27,18 +28,11 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   const [path, setPath] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const locked = !!busy || !!d?.archived;
-  const asked = d?.asked || !!d?.queue.questions.length;
 
   useEffect(() => ref.current?.focus(), []);
 
   const save = (next = attach) =>
     d || prompt.trim() ? savePrompt(ws, d, prompt, next) : Promise.resolve(undefined);
-
-  async function go() {
-    if (locked || !prompt.trim()) return;
-    const id = await save();
-    if (id) ask(ws, id, prompt.split("\n")[0].slice(0, 60));
-  }
 
   async function send() {
     if (!prompt.trim()) return;
@@ -58,7 +52,8 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   function onKey(e: React.KeyboardEvent) {
     if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
       e.preventDefault();
-      go();
+      submitNextSend();
+      send();
     }
   }
 
@@ -123,19 +118,10 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
         </span>
       </button>
       <div className="qq-actions">
-        <PipeButton className="qq-btn" disabled={!prompt.trim()} onClick={send}>
-          Prompt
-        </PipeButton>
         <span className="spacer" />
-        {asked && <span className="faint">Asking again replaces the questions and answers</span>}
-        <button
-          type="button"
-          className="qq-btn primary"
-          disabled={locked || !prompt.trim()}
-          onClick={go}
-        >
-          {asked ? "Ask again" : "Ask me"} <kbd>⌘↵</kbd>
-        </button>
+        <PipeButton className="qq-btn" disabled={!prompt.trim()} onClick={send} keys="⌘↵">
+          Start Q&A
+        </PipeButton>
       </div>
     </div>
   );

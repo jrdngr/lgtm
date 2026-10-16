@@ -320,11 +320,6 @@ export const commands = {
 	editQa: (workspace: string | null, id: string, edit: SessionEdit) => typedError<Session_Serialize, string>(__TAURI_INVOKE("edit_qa", { workspace, id, edit })),
 	deleteQa: (workspace: string | null, id: string) => typedError<null, string>(__TAURI_INVOKE("delete_qa", { workspace, id })),
 	actOnQuestion: (workspace: string | null, session: string, act: QuestionAct) => typedError<Session_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, session, act })),
-	/**
-	 *  Has the agent turn the session's prompt into questions, answering the obvious ones
-	 *  itself when `auto` is on.
-	 */
-	askQa: (workspace: string | null, session: string, auto: boolean, onTool: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("ask_qa", { workspace, session, auto, onTool })),
 	/**  Applies the answer to question `id` to the rest of the queue. */
 	applyAnswer: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, session, id })),
 	/**  A discussion turn on a question, streaming the agent's reply through `on_text`. */

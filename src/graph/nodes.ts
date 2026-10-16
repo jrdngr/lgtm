@@ -5,15 +5,6 @@ import { needsReview } from "../review/model";
 import { stateDone } from "../review/state";
 import type { WorkspaceName } from "../workspaces/context";
 
-/** A node's label: `Parent::name` for a member. */
-export const nodeLabel = (n: GraphNode) => (n.parent ? `${n.parent}::${n.name}` : n.name);
-
-/** Share of a changed node's rows that are done, or undefined for callers. */
-export function nodeDone(review: CurrentReview, n: GraphNode): number | undefined {
-  const [done, all] = rowsDone(review, n);
-  return all === 0 ? undefined : done / all;
-}
-
 /** How many of a node's changed rows are done, and how many it has. */
 export function rowsDone(review: CurrentReview, n: GraphNode): [number, number] {
   const file = n.file;

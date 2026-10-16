@@ -11,7 +11,7 @@ import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { Session, Step } from "./model";
 
 /** What the agent is doing for a session. `answer` is the update after decision `about`. */
-export type BusyKind = "ask" | "answer" | "discuss" | "reask";
+export type BusyKind = "answer" | "discuss" | "reask";
 
 export interface Busy {
   kind: BusyKind;
@@ -50,7 +50,6 @@ const listeners = new Set<() => void>();
 const watchers = new Map<string, { count: number; stop(): void }>();
 
 const BUSY_NAMES: Record<BusyKind, string> = {
-  ask: "Building the questions",
   answer: "Updating dependent questions",
   discuss: "Discussing",
   reask: "Rewriting the question",

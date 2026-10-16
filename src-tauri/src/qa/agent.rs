@@ -3,9 +3,8 @@
 //! Every step continues one conversation per session.
 
 use anyhow::Context;
-use serde::Deserialize;
 
-use super::queue::{self, NewQuestion, QState, Update};
+use super::queue::{self, QState, Update};
 use super::text;
 use super::Session;
 use crate::agent::{self, Progress, Runs};
@@ -105,35 +104,10 @@ fn update_schema() -> String {
     )
 }
 
-fn ask_schema(auto: bool) -> String {
-    format!(
-        r#"{{
-  "type": "object",
-  "properties": {{
-    "title": {{ "type": "string" }},
-    "questions": {{ "type": "array", "items": {} }}
-  }},
-  "required": ["title", "questions"],
-  "additionalProperties": false
-}}"#,
-        new_question(auto)
-    )
-}
-
-const AUTO_RULE: &str = "Answer the obvious questions yourself: when option 1 is clearly right \
-and the other options are non-starters, still write the question in full, and set `auto` to \
-why, in a short line. Leave `auto` empty for every question I should decide.";
-
 /// How a rewrite keeps or gives up an auto answer.
 pub(super) const REAUTO_RULE: &str = "When you rewrite an auto-answered question, set `auto` to \
 why option 1 is still obvious if it is, in a short line, or leave it empty so I decide it. \
 Leave `auto` empty for every other question.";
-
-#[derive(Deserialize)]
-struct Asked {
-    title: String,
-    questions: Vec<NewQuestion>,
-}
 
 pub(super) fn parse<T: serde::de::DeserializeOwned>(
     reply: &agent::Reply,
@@ -274,57 +248,6 @@ impl RepoCtx {
         Ok(reply)
     }
 
-    /// Has the agent turn the prompt into questions, answering the obvious ones itself when
-    /// `auto` is on. Replaces the queue.
-    pub async fn ask_qa(
-        &self,
-        ws: &Workspace,
-        id: &str,
-        auto: bool,
-        runs: &Runs,
-        on_tool: impl Fn(String),
-    ) -> anyhow::Result<Session> {
-        let s = self.qa_session(ws, id)?;
-        let mut turn = format!(
-            "Here's what I want:\n\n{}{}\n\nRead whatever in the repo it touches. \
-             Then return a short title for it and every question I need to answer before you \
-             write it, in the order to ask them.",
-            s.prompt.trim(),
-            read_first(&s)
-        );
-        if auto {
-            turn.push_str(&format!("\n\n{AUTO_RULE}"));
-        }
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    schema: Some(ask_schema(auto)),
-                    fresh: true,
-                    restart: None,
-                },
-                tool_only(on_tool),
-            )
-            .await?;
-        if !reply.stopped {
-            let Asked { title, questions } = parse(&reply, "questions")?;
-            self.edit_qa(ws, id, |s| {
-                if !title.trim().is_empty() {
-                    s.title = title.trim().to_string();
-                }
-                s.queue = queue::Queue::default();
-                s.queue.add_round(questions);
-                s.asked = true;
-                s.sent = None;
-                Ok(())
-            })?;
-        }
-        self.qa_session(ws, id)
-    }
-
     /// Applies the answer to `qid` to the questions that depend on it: drops, rewrites and
     /// new ones. Skips the agent when nothing depends on it.
     pub async fn apply_answer(
@@ -404,14 +327,6 @@ impl RepoCtx {
     }
 }
 
-fn tool_only(on_tool: impl Fn(String)) -> impl Fn(Progress) {
-    move |p| {
-        if let Progress::Tool(t) = p {
-            on_tool(t)
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,8 +334,6 @@ mod tests {
     #[test]
     fn the_schemas_are_json() {
         for s in [
-            ask_schema(true),
-            ask_schema(false),
             update_schema(),
             rewrite(true),
             rewrite(false),

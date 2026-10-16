@@ -39,7 +39,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘B", "⌥⌘B"], action: "Show or hide the left / right panel" },
       { keys: ["⌘⇧K"], action: "Workspaces (in an editor: delete the line)" },
       { keys: ["⌘⇧E"], action: "Changes" },
-      { keys: ["⌘⇧Y"], action: "Symbols" },
       { keys: ["⌘⇧R"], action: "Files" },
       { keys: ["⌘⇧M"], action: "Notes" },
       { keys: ["⌘⇧P"], action: "PR (workspaces with a PR)" },

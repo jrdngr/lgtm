@@ -662,20 +662,3 @@
   align-items: center;
   gap: 6px;
 }
-
-.report-target {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  color: var(--mark-violet);
-  font-size: var(--fs-xs);
-}
-
-.report-target b {
-  overflow: hidden;
-  color: var(--violet-text);
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
