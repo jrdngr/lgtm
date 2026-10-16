@@ -38,7 +38,7 @@ test("the same file open in two workspaces is tracked separately", async () => {
   expect(await confirmClose(null, "editor:a.ts")).toBe(true);
   expect(ask).not.toHaveBeenCalled();
 
-  ask.mockResolvedValue("cancel");
+  ask.mockResolvedValue(false);
   expect(await confirmClose("feature", "editor:a.ts")).toBe(false);
   expect(await confirmWorkspace(null)).toBe(true);
   expect(ask).toHaveBeenCalledOnce();
@@ -49,7 +49,7 @@ test("Save All saves each file and stops at the first that fails", async () => {
   const b = edits("b.ts");
   setUnsaved(null, "editor:a.ts", a);
   setUnsaved("feature", "editor:b.ts", b);
-  ask.mockResolvedValue("save");
+  ask.mockImplementation((_files, _programs, save) => save());
 
   expect(await confirmAll()).toBe(false);
   expect(ask.mock.calls[0][0]).toEqual(["a.ts", "b.ts"]);
@@ -60,7 +60,7 @@ test("Save All saves each file and stops at the first that fails", async () => {
 test("Don't Save lets everything go without saving", async () => {
   const a = edits("a.ts");
   setUnsaved(null, "editor:a.ts", a);
-  ask.mockResolvedValue("discard");
+  ask.mockResolvedValue(true);
 
   expect(await confirmAll()).toBe(true);
   expect(a.save).not.toHaveBeenCalled();
@@ -73,7 +73,7 @@ test("a running program asks before its terminal, workspace or window goes", asy
     ["term:3", "feature", "npm"],
   ];
   report(null, "term-agent", "running", "claude", { stays: true, tab: "term:1" });
-  ask.mockResolvedValue("cancel");
+  ask.mockResolvedValue(false);
 
   expect(await confirmClose(null, "term:2")).toBe(true);
   expect(ask).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ test("a running program asks before its terminal, workspace or window goes", asy
   expect(files).toEqual([]);
   expect(agent).toMatchObject({ name: "Fix login", agent: { state: "working" } });
 
-  ask.mockResolvedValue("stop");
+  ask.mockResolvedValue(true);
   expect(await confirmWorkspace("feature")).toBe(true);
   expect(ask.mock.calls[1][1]).toEqual([{ key: "term:3", name: "npm", agent: undefined }]);
   expect(await confirmAll()).toBe(true);
@@ -92,9 +92,12 @@ test("a running program asks before its terminal, workspace or window goes", asy
 test("unsaved edits and running programs are asked about together", async () => {
   setUnsaved(null, "editor:a.ts", edits("a.ts"));
   terminals = [["term:3", "", "npm"]];
-  ask.mockResolvedValue("cancel");
+  ask.mockResolvedValue(false);
 
   expect(await confirmAll()).toBe(false);
   expect(ask).toHaveBeenCalledOnce();
-  expect(ask.mock.calls[0]).toEqual([["a.ts"], [{ key: "term:3", name: "npm", agent: undefined }]]);
+  expect(ask.mock.calls[0].slice(0, 2)).toEqual([
+    ["a.ts"],
+    [{ key: "term:3", name: "npm", agent: undefined }],
+  ]);
 });

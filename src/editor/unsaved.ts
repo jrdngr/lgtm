@@ -55,23 +55,23 @@ export async function confirmAll(): Promise<boolean> {
   return confirm([...unsaved.values()], await runningPrograms(() => true));
 }
 
-/** Asks once about `files` and `running`: Save saves every file and stops at the first that
- * fails, and any choice but Cancel stops the programs. Each terminal's agent is listed like
- * the workspace's agent list, and any other program by name. */
+/** Asks once about `files` and `running`. Saving saves every file and stops at the first that
+ * fails. Each terminal's agent is listed like the workspace's agent list, and any other
+ * program by name. */
 async function confirm(files: Unsaved[], running: Running[]): Promise<boolean> {
   if (files.length === 0 && running.length === 0) return true;
   const programs = running.map(({ panel, program }) => {
     const agent = tabAgent(panel);
     return { key: panel, name: agent ? (terminalTitle(panel) ?? agent.label) : program, agent };
   });
-  const choice = await askClose(
+  return askClose(
     files.map((f) => f.name),
     programs,
+    async () => {
+      for (const f of files) {
+        if (!(await f.save())) return false;
+      }
+      return true;
+    },
   );
-  if (choice === "cancel") return false;
-  if (choice !== "save") return true;
-  for (const f of files) {
-    if (!(await f.save())) return false;
-  }
-  return true;
 }

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { Busy } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { Glyph, since } from "../workspaces/AgentGlyph";
 import type { AgentInfo } from "../workspaces/activity";
@@ -13,35 +14,95 @@ export interface ProgramRow {
   agent?: AgentInfo;
 }
 
-export type CloseChoice = "save" | "discard" | "stop" | "cancel";
+type FilesChoice = "open" | "saving" | "saved" | "discarded";
 
 interface Props {
   /** Names of the files with unsaved edits. */
   files: string[];
   programs: ProgramRow[];
-  onDone(choice: CloseChoice): void;
+  /** Saves every file. Resolves to whether all saved. */
+  save(): Promise<boolean>;
+  onDone(close: boolean): void;
 }
 
-function CloseDialog({ files, programs, onDone }: Props) {
+const FILE_TAGS: Partial<Record<FilesChoice, string>> = { saved: "Saved", discarded: "Not saved" };
+
+/** Asks about unsaved files and running programs. With both, each section has its own buttons
+ * and the dialog closes once both are decided. */
+function CloseDialog({ files, programs, save, onDone }: Props) {
   const mainRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => mainRef.current?.focus(), []);
+  const [filesChoice, setFilesChoice] = useState<FilesChoice>("open");
+  const [stop, setStop] = useState(false);
   const both = files.length > 0 && programs.length > 0;
+  const filesDone = files.length === 0 || filesChoice === "saved" || filesChoice === "discarded";
+  const programsDone = programs.length === 0 || stop;
+
+  useEffect(() => mainRef.current?.focus(), []);
+  useEffect(() => {
+    if (filesDone && programsDone) onDone(true);
+  }, [filesDone, programsDone, onDone]);
+
+  async function saveAll() {
+    setFilesChoice("saving");
+    if (await save()) setFilesChoice("saved");
+    else onDone(false);
+  }
+
+  const fileButtons = (
+    <>
+      <button
+        type="button"
+        disabled={filesChoice === "saving"}
+        onClick={() => setFilesChoice("discarded")}
+      >
+        Don't Save
+      </button>
+      <button
+        ref={mainRef}
+        type="button"
+        className="primary"
+        disabled={filesChoice === "saving"}
+        onClick={saveAll}
+      >
+        {filesChoice === "saving" ? <Busy>Saving…</Busy> : files.length === 1 ? "Save" : "Save All"}
+      </button>
+    </>
+  );
+  const stopButton = (
+    <button
+      ref={files.length ? undefined : mainRef}
+      type="button"
+      className="close-stop"
+      onClick={() => setStop(true)}
+    >
+      Stop
+    </button>
+  );
+  const fileTag = FILE_TAGS[filesChoice];
+
   return (
     <div
       className="close-scrim"
       onKeyDown={(e) => {
         if (e.key !== "Escape") return;
         e.preventDefault();
-        onDone("cancel");
+        onDone(false);
       }}
-      onMouseDown={(e) => e.target === e.currentTarget && onDone("cancel")}
+      onMouseDown={(e) => e.target === e.currentTarget && onDone(false)}
     >
       <div className="close-dialog" role="dialog" aria-labelledby="close-title">
-        <h3 id="close-title">{files.length ? "Save changes?" : "Stop running programs?"}</h3>
+        <h3 id="close-title">
+          {both ? "Before closing" : files.length ? "Save changes?" : "Stop running programs?"}
+        </h3>
         <div className="close-body">
           {files.length > 0 && (
-            <section>
-              {both && <h4>Unsaved</h4>}
+            <section className={fileTag ? "decided" : undefined}>
+              {both && (
+                <h4>
+                  Unsaved
+                  {fileTag && <span className="close-tag">{fileTag}</span>}
+                </h4>
+              )}
               <div className="close-list">
                 {files.map((name) => (
                   <div key={name} className="close-row">
@@ -49,11 +110,17 @@ function CloseDialog({ files, programs, onDone }: Props) {
                   </div>
                 ))}
               </div>
+              {both && !fileTag && <div className="close-section-foot">{fileButtons}</div>}
             </section>
           )}
           {programs.length > 0 && (
-            <section>
-              {both && <h4>Running</h4>}
+            <section className={stop ? "decided" : undefined}>
+              {both && (
+                <h4>
+                  Running
+                  {stop && <span className="close-tag">Stopping</span>}
+                </h4>
+              )}
               <div className="close-list">
                 {programs.map(({ key, name, agent }) => (
                   <div key={key} className="close-row">
@@ -73,57 +140,47 @@ function CloseDialog({ files, programs, onDone }: Props) {
                   </div>
                 ))}
               </div>
+              {both && !stop && <div className="close-section-foot">{stopButton}</div>}
             </section>
           )}
         </div>
         <div className="close-foot">
-          <button type="button" className="quiet" onClick={() => onDone("cancel")}>
+          <button type="button" className="quiet" onClick={() => onDone(false)}>
             Cancel <kbd>Esc</kbd>
           </button>
-          {files.length > 0 ? (
-            <>
-              <button type="button" onClick={() => onDone("discard")}>
-                Don't Save
-              </button>
-              <button
-                ref={mainRef}
-                type="button"
-                className="primary"
-                onClick={() => onDone("save")}
-              >
-                {files.length === 1 ? "Save" : "Save All"}
-              </button>
-            </>
-          ) : (
-            <button
-              ref={mainRef}
-              type="button"
-              className="close-stop"
-              onClick={() => onDone("stop")}
-            >
-              Stop
-            </button>
-          )}
+          {!both && (files.length ? fileButtons : stopButton)}
         </div>
       </div>
     </div>
   );
 }
 
-/** Shows the dialog over the window and resolves to the user's choice. */
-export function askClose(files: string[], programs: ProgramRow[]): Promise<CloseChoice> {
+/** Shows the dialog over the window. Resolves to whether everything may close: the files were
+ * saved or let go and the programs may stop. A failed save resolves to false. */
+export function askClose(
+  files: string[],
+  programs: ProgramRow[],
+  save: () => Promise<boolean>,
+): Promise<boolean> {
   const host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
   return new Promise((resolve) => {
+    let done = false;
     root.render(
       <CloseDialog
         files={files}
         programs={programs}
-        onDone={(choice) => {
-          root.unmount();
-          host.remove();
-          resolve(choice);
+        save={save}
+        onDone={(close) => {
+          if (done) return;
+          done = true;
+          // After the render that called it.
+          queueMicrotask(() => {
+            root.unmount();
+            host.remove();
+          });
+          resolve(close);
         }}
       />,
     );
