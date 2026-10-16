@@ -16,6 +16,10 @@ export interface Session {
   title(): string;
   /** The program in the foreground, when it isn't the shell. */
   running(): Promise<string | null>;
+  /** Whether an agent runs in it. */
+  hasAgent(): boolean;
+  /** Presses Enter, after a paste has landed. */
+  submit(): void;
   dispose(): void;
 }
 
@@ -78,6 +82,9 @@ export function releaseSession(id: string) {
     open.session.dispose();
   }, KEEP_MS);
 }
+
+/** How long Enter waits after a paste. */
+const SUBMIT_DELAY_MS = 150;
 
 function startSession(
   id: string,
@@ -146,6 +153,11 @@ function startSession(
     term,
     refit,
     title: () => title,
+    hasAgent: () => agent !== "gone",
+    submit() {
+      // After the paste has landed, or the agent takes the Enter as part of it.
+      window.setTimeout(() => pty !== undefined && commands.ptyWrite(pty, "\r"), SUBMIT_DELAY_MS);
+    },
     running: async () => (pty === undefined ? null : commands.ptyRunning(pty)),
     dispose() {
       disposed = true;

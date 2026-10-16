@@ -10,6 +10,10 @@ interface TerminalTarget {
   /** False when the program in it can't take a paste safely. */
   canPaste(): boolean;
   paste(text: string): void;
+  /** Whether an agent like Claude Code runs in it, by its hooks or its title. */
+  hasAgent(): boolean;
+  /** Presses Enter. */
+  submit(): void;
   /** Brings the pane forward and focuses it. */
   focus(): void;
 }
@@ -107,6 +111,16 @@ export function workspaceTerminals(workspace: WorkspaceName): TerminalChoice[] {
 
 type SendResult = "sent" | "noTerminal" | "unsafe";
 
+/** Until when the next send also presses Enter. */
+let submitUntil = 0;
+const SUBMIT_MS = 5000;
+
+/** Has the next send, within a few seconds, also press Enter when an agent runs in its
+ * terminal, so the agent starts on it. Buttons call it before working out what to send. */
+export function submitNextSend() {
+  submitUntil = Date.now() + SUBMIT_MS;
+}
+
 /** C0 and C1 control characters other than tab and newline. An escape in pasted text could end
  * bracketed paste early and have the shell run the rest. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
@@ -117,9 +131,13 @@ const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
 export function sendToTerminal(workspace: WorkspaceName, text: string, id?: string): SendResult {
   const to = id ?? sendTarget(workspace);
   const target = to === undefined ? undefined : terminals.get(to);
+  const submit = Date.now() < submitUntil;
+  submitUntil = 0;
   if (!target) return "noTerminal";
   if (!target.canPaste()) return "unsafe";
   target.paste(text.replace(CONTROLS, ""));
+  // A plain shell would run the text, so Enter waits for an agent.
+  if (submit && target.hasAgent()) target.submit();
   target.focus();
   return "sent";
 }

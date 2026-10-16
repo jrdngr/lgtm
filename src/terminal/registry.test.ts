@@ -4,15 +4,18 @@ import {
   registerTerminal,
   sendTarget,
   sendToTerminal,
+  submitNextSend,
   touchTerminal,
   workspaceTerminals,
 } from "./registry";
 
-function fake(workspace: string | null, canPaste = true) {
+function fake(workspace: string | null, canPaste = true, agent = false) {
   const got: string[] = [];
   return {
     got,
     target: {
+      hasAgent: () => agent,
+      submit: () => got.push("\r"),
       workspace,
       title: () => "",
       canPaste: () => canPaste,
@@ -84,5 +87,24 @@ describe("send target", () => {
     expect(sendTarget("w2")).toBe("qb");
     pinTarget("w2", null);
     for (const f of off) f();
+  });
+});
+
+describe("submitNextSend", () => {
+  it("presses Enter after the next send only when an agent runs in the target", () => {
+    const agent = fake("s1", true, true);
+    const off = registerTerminal("s-agent", agent.target);
+    submitNextSend();
+    sendToTerminal("s1", "fix it");
+    sendToTerminal("s1", "plain");
+    off();
+    expect(agent.got).toEqual(["fix it", "\r", "plain"]);
+
+    const shell = fake("s2");
+    const off2 = registerTerminal("s-shell", shell.target);
+    submitNextSend();
+    sendToTerminal("s2", "ls");
+    off2();
+    expect(shell.got).toEqual(["ls"]);
   });
 });
