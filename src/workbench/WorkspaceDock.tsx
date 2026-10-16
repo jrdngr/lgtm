@@ -180,6 +180,8 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
         watermarkComponent={EmptyGroup}
         onReady={ready}
         theme={themeDark}
+        // WebKit's HTML drag and drop sometimes drops nothing and leaves the drop highlight up.
+        dndStrategy="pointer"
       />
     </div>
   );
