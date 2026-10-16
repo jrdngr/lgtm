@@ -22,3 +22,13 @@ export function bottomKey(e: KeyboardEvent): "toggle" | "terminal" | undefined {
   if (e.code !== "Backquote" || !e.ctrlKey || e.metaKey || e.altKey) return undefined;
   return e.shiftKey ? "terminal" : "toggle";
 }
+
+/** Ctrl+Tab and Ctrl+Shift+Tab step through the focused pane's tabs; Option+Tab and
+ * Option+Shift+Tab step through the panes. */
+export function tabKey(
+  e: KeyboardEvent,
+): "nextTab" | "prevTab" | "nextPane" | "prevPane" | undefined {
+  if (e.key !== "Tab" || e.metaKey || e.ctrlKey === e.altKey) return undefined;
+  if (e.ctrlKey) return e.shiftKey ? "prevTab" : "nextTab";
+  return e.shiftKey ? "prevPane" : "nextPane";
+}

@@ -19,7 +19,7 @@ import { BottomPanel } from "./BottomPanel";
 import { bottom } from "./bottom";
 import { reopenClosed } from "./closedTabs";
 import { bottomDockOf, dockOf, revealPanel } from "./docks";
-import { bottomKey, chord } from "./keys";
+import { bottomKey, chord, tabKey } from "./keys";
 import { addTerminal, focusPanel, openReport } from "./panels";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
@@ -170,7 +170,28 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Alt+N": () => addFromPanel("pr"),
     toggle: () => toggleBottom(),
     terminal: () => toggleBottom(true),
+    nextTab: () => stepTab(1),
+    prevTab: () => stepTab(-1),
+    nextPane: () => stepPane(1),
+    prevPane: () => stepPane(-1),
   };
+
+  /** Focuses the next or previous tab in the focused pane, wrapping around. */
+  function stepTab(by: 1 | -1) {
+    const group = api()?.activeGroup;
+    const at = group?.activePanel ? group.panels.indexOf(group.activePanel) : -1;
+    if (!group || at < 0) return;
+    focusPanel(group.panels[(at + by + group.panels.length) % group.panels.length]);
+  }
+
+  /** Focuses the next or previous pane in the focused dock, wrapping around. */
+  function stepPane(by: 1 | -1) {
+    const dock = api();
+    if (!dock) return;
+    if (by > 0) dock.activateNext();
+    else dock.activatePrevious();
+    focusPanel(dock.activeGroup?.activePanel);
+  }
 
   /** The action for a chord, if it has one now. */
   const keyRef = useRef<(key: string) => (() => void) | undefined>(undefined);
@@ -183,7 +204,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
-      const key = bottomKey(e) ?? chord(e) ?? "";
+      const key = bottomKey(e) ?? tabKey(e) ?? chord(e) ?? "";
       if (editorKeys.has(key) && (e.target as Element).closest?.(".cm-editor")) return;
       const run = keyRef.current?.(key);
       if (!run) return;
