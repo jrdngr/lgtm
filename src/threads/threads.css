@@ -76,16 +76,6 @@
   font-size: var(--fs-xs);
 }
 
-.pr-head-btn.triage {
-  border-color: transparent;
-  background: rgb(139 92 246);
-  color: white;
-}
-
-.pr-head-btn.triage:hover:not(:disabled) {
-  background: rgb(124 77 230);
-}
-
 .pr-head-btn kbd {
   color: inherit;
   opacity: 0.8;

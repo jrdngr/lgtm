@@ -5,6 +5,7 @@ import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { autoAnswer, savePrompt } from "./actions";
 import type { Session } from "./model";
+import { ReadFirst } from "./ReadFirst";
 import type { Busy } from "./store";
 
 interface Props {
@@ -16,8 +17,8 @@ interface Props {
 }
 
 /** The terminal prompt for asking through an agent the user drives. */
-const terminalText = (id: string, prompt: string, auto: boolean) =>
-  `${prompt.trim()}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
+const terminalText = (id: string, prompt: string, attach: string[], auto: boolean) =>
+  `${prompt.trim()}${attach.length ? `\n\nRead these first: ${attach.join(", ")}` : ""}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
 
 /** What the session is for, files the agent reads first and whether it answers the obvious
  * questions itself, then starting it in a terminal. */
@@ -25,7 +26,6 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   const auto = autoAnswer.use();
   const [prompt, setPrompt] = useState(d?.prompt ?? "");
   const [attach, setAttach] = useState(d?.attach ?? []);
-  const [path, setPath] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   const locked = !!busy || !!d?.archived;
 
@@ -37,16 +37,7 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
   async function send() {
     if (!prompt.trim()) return;
     const id = await save();
-    if (id) onSend(terminalText(id, prompt, auto));
-  }
-
-  function addPath() {
-    const p = path.trim();
-    if (locked || !p || attach.includes(p)) return;
-    const next = [...attach, p];
-    setAttach(next);
-    setPath("");
-    if (d) save(next);
+    if (id) onSend(terminalText(id, prompt, attach, auto));
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -72,38 +63,15 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
         onBlur={() => d && !locked && save()}
       />
       <div className="qq-label">Read first</div>
-      <div className="qa-field qa-attach">
-        {attach.map((a) => (
-          <span key={a} className="qa-chip">
-            {a}
-            {!locked && (
-              <button
-                type="button"
-                aria-label={`Remove ${a}`}
-                onClick={() => {
-                  const next = attach.filter((x) => x !== a);
-                  setAttach(next);
-                  if (d) save(next);
-                }}
-              >
-                ×
-              </button>
-            )}
-          </span>
-        ))}
-        <input
-          value={path}
-          disabled={locked}
-          placeholder="A file or folder in the repo, then ↵"
-          onChange={(e) => setPath(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addPath();
-            }
-          }}
-        />
-      </div>
+      <ReadFirst
+        ws={ws}
+        paths={attach}
+        locked={locked}
+        onChange={(next) => {
+          setAttach(next);
+          if (d) save(next);
+        }}
+      />
       <button
         type="button"
         role="switch"

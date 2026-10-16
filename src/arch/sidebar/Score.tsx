@@ -1,4 +1,5 @@
 import type { AssessmentDto, RiskLevel } from "../../bindings";
+import { AgentButton } from "../../ui/AgentButton";
 import { Icon } from "../../ui/icons";
 import type { WorkspaceName } from "../../workspaces/context";
 import { type ArchRun, runAssess, stopAssess } from "../runs";
@@ -44,13 +45,7 @@ export function Score({ workspace, review, revset, assessment, run }: Props) {
           Stop
         </button>
       ) : (
-        <button
-          type="button"
-          className={assessment ? undefined : "primary"}
-          onClick={() => runAssess(workspace, review, revset)}
-        >
-          Assess
-        </button>
+        <AgentButton onClick={() => runAssess(workspace, review, revset)}>Assess</AgentButton>
       )}
       {error && <span className="arch-why error">{error}</span>}
       {assessment && <span className="arch-why">{assessment.reason}</span>}

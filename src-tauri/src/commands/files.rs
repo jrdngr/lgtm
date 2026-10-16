@@ -255,10 +255,19 @@ pub(crate) async fn reveal_path(
     Ok(())
 }
 
-/// Paths of the files just dropped on the app. Runs on the main thread, which owns the
-/// pasteboard.
+/// Paths of the files just dropped on the app, folders ending in `/`. Runs on the main
+/// thread, which owns the pasteboard.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn dropped_paths() -> Vec<String> {
     crate::dragged::paths()
+        .into_iter()
+        .map(|p| {
+            if std::path::Path::new(&p).is_dir() {
+                format!("{}/", p.trim_end_matches('/'))
+            } else {
+                p
+            }
+        })
+        .collect()
 }

@@ -10,6 +10,7 @@ import { useCurrentReview } from "../review/current";
 import { prThreads, quoted } from "../review/prComments";
 import { openSettings } from "../settings/open";
 import { useAgentsOff, useGithubOff } from "../tools/agents";
+import { AgentButton } from "../ui/AgentButton";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { openUrl, run } from "../ui/pathMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
@@ -222,9 +223,9 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
             </button>
           )}
           {canTriage && (
-            <button type="button" className="pr-head-btn triage" onClick={() => runner.start()}>
-              Triage {fresh} <kbd>t</kbd>
-            </button>
+            <AgentButton className="pr-head-btn triage" onClick={() => runner.start()} keys="t">
+              Triage {fresh}
+            </AgentButton>
           )}
         </SectionHeader>
       </div>

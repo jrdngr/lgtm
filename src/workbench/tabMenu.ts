@@ -8,7 +8,7 @@ import { targetOf } from "../review/target";
 import { targetItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { pathItems, run } from "../ui/pathMenu";
-import { confirmAction, promptText } from "../ui/prompt";
+import { confirmAction } from "../ui/prompt";
 import type { WorkspaceName } from "../workspaces/context";
 import { bottom } from "./bottom";
 import { moveAcross } from "./crossDock";
@@ -21,6 +21,7 @@ import {
   type PanelKind,
   splitGroup,
 } from "./panels";
+import { setRenaming } from "./tabRename";
 
 /** Closes `panels` one by one, each editor asking about unsaved edits. Cancel stops there. */
 export async function closePanels(workspace: WorkspaceName, panels: IDockviewPanel[]) {
@@ -51,11 +52,6 @@ async function resetReview(workspace: WorkspaceName) {
   run(unwrap(commands.resetReviewMarks(review.id)).then(review.apply));
 }
 
-async function rename(panel: IDockviewPanel) {
-  const title = await promptText("Rename terminal", { value: panel.title, action: "Rename" });
-  if (title) panel.api.setTitle(title);
-}
-
 interface Tab {
   workspace: WorkspaceName;
   api: DockviewApi;
@@ -78,7 +74,7 @@ export function tabMenu({ workspace, api, panel, inBottom, close }: Tab): CtxEnt
   };
   const path = kind === "editor" ? (panel.params as EditorParams | undefined)?.path : undefined;
   return [
-    terminal && { label: "Rename…", onSelect: () => rename(panel) },
+    terminal && { label: "Rename", onSelect: () => setRenaming(panel.id) },
     "-",
     ...(terminal ? targetItems(workspace, panel.id) : []),
     path && {

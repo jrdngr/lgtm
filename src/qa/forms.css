@@ -36,54 +36,96 @@
 
 .qa-prompt-text:focus,
 .qa-note:focus,
-.qa-attach:focus-within {
+/* Read first: files and folders as rows, in an area that takes drops, with Add. */
+.qa-read {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+}
+
+.qa-read.empty {
+  place-items: center;
+  min-height: 52px;
+}
+
+.qa-read.over {
   border-color: var(--accent);
-  outline: none;
+  background: rgb(79 140 201 / 10%);
 }
 
-.qa-attach {
+.qa-read-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  gap: 8px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: var(--fs-sm);
 }
 
-.qa-attach input {
-  flex: 1;
-  min-width: 160px;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fs-sm);
+.qa-read-row:hover {
+  background: var(--hover);
+}
+
+.qa-read-icon {
+  display: inline-grid;
+  color: var(--muted);
+}
+
+.qa-read-icon.folder {
+  color: #d7ba7d;
+}
+
+.qa-read-name {
   color: var(--fg);
+  white-space: nowrap;
+}
+
+.qa-read-dir {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qa-read-remove {
+  width: 16px;
+  padding: 0;
+  color: var(--faint);
   background: none;
   border: none;
-  outline: none;
 }
 
-.qa-attach input::placeholder {
-  color: var(--faint);
+.qa-read-row:hover .qa-read-remove {
+  color: var(--fg);
 }
 
-.qa-chip {
+.qa-read-add {
+  display: flex;
+  padding: 4px 4px 2px;
+}
+
+.qa-read.empty .qa-read-add {
+  padding: 0;
+}
+
+.qa-read-btn {
   display: inline-flex;
   align-items: center;
-  padding: 1px 0 1px 6px;
-  font: var(--fs-xs) var(--mono);
-  background: var(--hover);
-  border-radius: 4px;
-}
-
-.qa-chip button {
-  padding: 0 5px;
-  font: inherit;
-  color: var(--muted);
-  background: none;
-  border: none;
-}
-
-.qa-chip button:hover {
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
   color: var(--fg);
+  background: var(--raise);
+  border: 1px solid var(--border);
+  border-radius: 5px;
 }
 
 .qq .qa-toggle {

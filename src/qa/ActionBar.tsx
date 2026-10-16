@@ -1,3 +1,4 @@
+import { AgentButton } from "../ui/AgentButton";
 import type { Question, UndoKind } from "./model";
 
 /** What's being written under the question. */
@@ -93,9 +94,9 @@ export function ActionBar({ q, next, ahead, auto, canAnswer, agentBusy, sel, las
         </>
       )}
       {q.state !== "dropped" && q.state !== "deferred" && (
-        <button type="button" className="qq-btn" onClick={() => p.onMode("discuss")}>
-          Discuss <kbd>d</kbd>
-        </button>
+        <AgentButton className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
+          Discuss
+        </AgentButton>
       )}
       {q.state === "open" && (
         <button type="button" className="qq-btn ghost" disabled={!canAnswer} onClick={p.onDefer}>

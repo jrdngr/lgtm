@@ -3,6 +3,7 @@ import type { ComponentDto, IntentDto } from "../../bindings";
 import { commands } from "../../ipc";
 import type { CurrentReview } from "../../review/current";
 import { useSendText } from "../../review/useSendText";
+import { AgentButton } from "../../ui/AgentButton";
 import { contextMenu } from "../../ui/contextMenu";
 import { Icon, IconButton } from "../../ui/icons";
 import type { WorkspaceName } from "../../workspaces/context";
@@ -127,14 +128,9 @@ export function Intent({ workspace, review, intents, components, selection, onEr
             Unmark
           </button>
           <PipeButton onClick={() => send(picked)}>Intents</PipeButton>
-          <button
-            type="button"
-            className="primary"
-            disabled={running || fixable.length === 0}
-            onClick={() => fix(fixable)}
-          >
+          <AgentButton disabled={running || fixable.length === 0} onClick={() => fix(fixable)}>
             Fix
-          </button>
+          </AgentButton>
           <IconButton icon="x" label="Clear picks" onClick={clear} />
         </div>
       )}
