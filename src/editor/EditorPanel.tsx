@@ -20,7 +20,6 @@ import { imageType, isSvg, svgUrl } from "./image";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { lineRef, renderedLines } from "./renderedLines";
-import { emitSaved } from "./saved";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
 import { useImageZoom } from "./useImageZoom";
@@ -163,7 +162,6 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       setDirty(!view.state.doc.eq(doc));
       setOnDisk(undefined);
       setError(undefined);
-      emitSaved(path);
       return true;
     } catch (e) {
       setError(errorText(e));

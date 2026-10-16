@@ -71,7 +71,7 @@ export function inActivePane(api: DockviewApi): AddPanelOptions["position"] {
   return api.activeGroup ? { referenceGroup: api.activeGroup } : undefined;
 }
 
-/** Shows a persona review's reports, in the pane it's already open in if there is one. */
+/** Shows a report, in the pane it's already open in if there is one. */
 export function openReport(api: DockviewApi, run: number) {
   const open = api.getPanel(`report-${run}`);
   if (open) return activate(open);

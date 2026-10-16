@@ -141,7 +141,7 @@ pub struct Publish {
     pub verdict: String,
     pub findings: Vec<Finding>,
     /// What the change is meant to do, in a few words. Give it with `fixes` to show your own
-    /// suggested fixes; without them the human can have lgtm work some out.
+    /// suggested fixes.
     pub task: Option<String>,
     /// The fixes the task needs, most important first.
     pub fixes: Option<Vec<FixAction>>,

@@ -7,7 +7,7 @@ use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::bots::personas::{config_dir, is_plain_file};
+use crate::settings::config_dir;
 
 /// An editable prompt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -47,6 +47,11 @@ impl Prompt {
             Prompt::QaWrite => include_str!("qa-write.md"),
         }
     }
+}
+
+/// A file that isn't a symlink.
+fn is_plain_file(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file())
 }
 
 /// A prompt and its file, for the Settings tab.
@@ -141,7 +146,8 @@ fn is_prompt_file_in(config: Option<&Path>, file: &Path) -> bool {
             .any(|prompt| path(prompt, config).is_ok_and(|p| p == file))
 }
 
-/// Whether `file` is a prompt file, which the app opens for editing like a persona.
+/// Whether `file` is a prompt file, which the app opens for editing. Symlinks aren't, so Edit
+/// can't be pointed at some other file through one.
 pub fn is_prompt_file(file: &Path) -> bool {
     is_prompt_file_in(config_dir().as_deref(), file)
 }

@@ -163,37 +163,14 @@ export const commands = {
 	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
 	/**  Stops the review's triage run. */
 	stopThreadRun: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_thread_run", { review })),
-	/**  Starts the named personas reviewing `revset` in the background. Progress comes as events. */
-	startBots: (workspace: string | null, revset: string, personas: string[], options: BotOptions, context: string) => typedError<BotRun, string>(__TAURI_INVOKE("start_bots", { workspace, revset, personas, options, context })),
-	/**  Adds `options` to a finished or halted run and runs what it's missing. */
-	continueBots: (run: number, options: BotOptions) => typedError<null, string>(__TAURI_INVOKE("continue_bots", { run, options })),
-	/**  Runs the task filter again with `task`, or with a blank one, a task it works out. */
-	retaskBots: (run: number, task: string) => typedError<null, string>(__TAURI_INVOKE("retask_bots", { run, task })),
-	stopBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("stop_bots", { run })),
 	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
-	/**  The workspace's persona reviews, newest first. */
+	/**  The workspace's reports, newest first. */
 	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),
 	botRun: (run: number) => typedError<BotRun, string>(__TAURI_INVOKE("bot_run", { run })),
 	/**  Renames a report, or with a blank `name`, gives it back its `R<n>` id. */
 	renameReport: (run: number, name: string) => typedError<BotRun, string>(__TAURI_INVOKE("rename_report", { run, name })),
-	/**
-	 *  Starts an agent fixing the picked findings in the run's workspace. `text` is them as
-	 *  markdown. Its reply streams as events.
-	 */
-	fixFindings: (run: number, findings: string[], text: string) => typedError<null, string>(__TAURI_INVOKE("fix_findings", { run, findings, text })),
-	/**  Dismisses findings of a run, or with `dismissed` false, brings them back. */
+	/**  Dismisses findings of a report, or with `dismissed` false, brings them back. */
 	dismissFindings: (run: number, findings: string[], dismissed: boolean) => typedError<BotRun, string>(__TAURI_INVOKE("dismiss_findings", { run, findings, dismissed })),
-	stopFix: (run: number, fix: number) => typedError<null, string>(__TAURI_INVOKE("stop_fix", { run, fix })),
-	/**  The personas a review can use, and files that couldn't be read. */
-	listPersonas: () => __TAURI_INVOKE<Personas>("list_personas"),
-	/**  The default personas, and whether each is installed. */
-	defaultPersonas: () => __TAURI_INVOKE<DefaultPersona[]>("default_personas"),
-	/**  Writes the named default personas. */
-	installPersonas: (names: string[]) => typedError<null, string>(__TAURI_INVOKE("install_personas", { names })),
-	/**  Writes a starter file for a new persona. Returns its path, to open in the editor. */
-	newPersona: (name: string) => typedError<string, string>(__TAURI_INVOKE("new_persona", { name })),
-	/**  Copies a persona file beside itself as `name`. Returns the copy's path. */
-	duplicatePersona: (path: string, name: string) => typedError<string, string>(__TAURI_INVOKE("duplicate_persona", { path, name })),
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
@@ -360,8 +337,6 @@ export const commands = {
 export const events = {
 	agentRevset: makeEvent<AgentRevset>("agent-revset"),
 	agentShow: makeEvent<AgentShow>("agent-show"),
-	botFixText: makeEvent<BotFixText>("bot-fix-text"),
-	botRunActivity: makeEvent<BotRunActivity>("bot-run-activity"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
@@ -481,28 +456,7 @@ export type AssessmentDto = {
 
 export type Author = "user" | "agent";
 
-/**  A persona review's fix `fix` streamed more of its reply. `text` is the whole reply so far. */
-export type BotFixText = {
-	run: number,
-	fix: number,
-	text: string,
-};
-
-/**  What a run does past the personas' own reviews. */
-export type BotOptions = {
-	/**
-	 *  Personas challenge each other's findings before synthesis. A lone persona is
-	 *  challenged by the other installed personas.
-	 */
-	crossReview?: boolean,
-	/**  The task filter picks suggested fixes. Off for published findings until asked for. */
-	suggest?: boolean,
-};
-
-/**
- *  A persona review of a revset, frozen at the commits it resolved to and the personas as
- *  they were when it started.
- */
+/**  A report on a revset, frozen at the commits it resolved to when it was first published. */
 export type BotRun = {
 	id: number,
 	/**  What the user renamed it to. Its id is `R<id>` until then. */
@@ -512,51 +466,21 @@ export type BotRun = {
 	from: string | null,
 	to: string,
 	personas: Persona[],
-	/**  Personas that only cross-review a lone persona's findings. */
-	challengers?: Persona[],
-	options: BotOptions,
-	/**  The task the user gave the filter, in place of the one it works out. */
-	task?: string | null,
-	/**  What the user told the reviewers about the change. */
-	context?: string,
 	parts: Part[],
-	/**  Steps whose parts all finished. */
-	done: Step[],
 	createdAt: number | null,
-	/**  Agent runs that fixed picked findings, oldest first. */
-	fixes?: Fix[],
 	/**  Ids of findings the user dismissed. */
 	dismissed?: string[],
-	/**  Bumped each time synthesis is redone, which renumbers its findings. */
-	synthesis?: number,
-	/**  Whether it's running now. Only memory knows, so the stored value is ignored. */
-	active?: boolean,
 };
 
-/**  A persona review's part `part` moved on to something else, like reading a file. */
-export type BotRunActivity = {
-	run: number,
-	part: number,
-	activity: string,
-};
-
-/**  A persona review started, stopped, or added or finished a part. */
+/**  An agent published findings to report `run`, so the workspace's dock opens it. */
 export type BotRunChanged = {
 	run: number,
-	/**  Set when an agent published to it, so the workspace's dock opens it. */
-	show: boolean,
 	workspace: string | null,
 };
 
 export type BoundaryDto = {
 	name: string,
 	components: string[],
-};
-
-/**  A persona file that couldn't be read, by path, with why. */
-export type Broken = {
-	path: string,
-	error: string,
 };
 
 export type Category = 
@@ -568,11 +492,6 @@ export type Category =
 "context" | 
 /**  Something for the reviewer or author to settle. */
 "question";
-
-export type Challenge = {
-	finding: string,
-	argument: string,
-};
 
 /**
  *  A rewrite of a decided question, which opened it again, or an auto answer the user
@@ -761,12 +680,6 @@ export type CountsDto = {
 	impacted: number,
 };
 
-export type DefaultPersona = {
-	name: string,
-	description: string,
-	installed: Installed,
-};
-
 /**  The questions one defer put off: `id` and the open questions that depend on it. */
 export type Deferral = {
 	id: string,
@@ -866,37 +779,14 @@ export type FileRefDto = {
 export type FileStatus = "modified" | "added" | "removed" | "copied" | "renamed";
 
 export type Finding = {
-	/**
-	 *  `<persona>#<n>` for a persona's finding, which the app assigns, and the synthesis's own
-	 *  number for a merged one.
-	 */
+	/**  `<reviewer>#<n>`, which the app assigns. */
 	id?: string,
 	severity: Severity,
 	title: string,
 	locations: Location[],
 	facts: string[],
 	explanation: string,
-	/**  Absent for off-lens findings. */
 	fix?: string | null,
-	offLens?: boolean,
-	/**  Merged findings only: the persona findings this one combines. */
-	sources?: string[],
-	raisedBy?: Raiser[],
-	/**  How the personas disagreed, and the ruling. */
-	contested?: string | null,
-};
-
-/**  One agent run fixing findings. */
-export type Fix = {
-	/**  Ids of the findings it was asked to fix. */
-	findings: string[],
-	status: Status,
-	/**  The reply, or the reply so far while it runs. */
-	text: string,
-	error: string | null,
-	createdAt: number | null,
-	/**  The run's `synthesis` when it started. Its synthesis ids name that synthesis's findings. */
-	synthesis?: number,
 };
 
 /**  What happens to a ready thread with no reply: one that was fixed as asked. */
@@ -1017,12 +907,6 @@ export type ImportDto = {
 	/**  1-based, at head, or at base for a removed import. */
 	line: number,
 };
-
-export type Installed = "no" | "yes" | 
-/**  Installed as an older shipped version, untouched since. */
-"outdated" | 
-/**  Installed, and edited since. */
-"changed";
 
 export type IntentDto = {
 	id: number,
@@ -1151,7 +1035,7 @@ export type Message = {
 	text: string,
 };
 
-/**  The task filter's suggested fixes. */
+/**  Suggested fixes for the change's task. */
 export type Minimal = {
 	task: string,
 	/**  Ordered actions, each with the ids of the findings it closes. */
@@ -1163,11 +1047,10 @@ export type Minimal = {
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
 export type Models = {
-	/**  Fix on reports and intents. */
+	/**  Fix on intents. */
 	ask: string,
 	/**  Assess on the architecture. */
 	walkthrough: string,
-	reviewers: string,
 	/**  Triage and replies on PR threads. */
 	replies: string,
 	/**  Every step of a Q&A session: questions, plan, apply. */
@@ -1230,50 +1113,23 @@ export type OpenSettings = Record<string, never>;
 /**  Help > Keyboard Shortcuts was chosen while this window had focus. */
 export type OpenShortcuts = Record<string, never>;
 
-export type Outcome = "kept" | "dropped" | "downgraded" | "upgraded";
-
-/**  A finished part's result. */
 export type Output = {
 	kind: "review",
-} & Review | ({ kind: "challenges"; challenges: Challenge[] }) & { responses?: never } | ({ kind: "rebuttals"; responses: Response[] }) & { challenges?: never } | {
-	kind: "synthesis",
-} & Synthesis | {
+} & Review | {
 	kind: "minimal",
 } & Minimal;
 
-/**  One agent run within a review run. */
+/**  A reviewer's findings, or the suggested fixes. */
 export type Part = {
-	step: Step,
-	/**  The persona's name. Absent for synthesis and the task filter. */
+	/**  The reviewer's name. Absent for suggested fixes. */
 	persona: string | null,
-	status: Status,
-	/**  Set once it's done. */
-	output: Output | null,
-	/**  Why it failed. */
-	error: string | null,
-	/**  The agent's session, which a rebuttal resumes. */
-	session: string | null,
-	/**  What the agent is doing while it runs. Only memory knows. */
-	activity?: string | null,
+	output: Output,
 };
 
-/**  What a run needs of a persona, copied into the run when it starts. */
+/**  A reviewer with a section in a report. */
 export type Persona = {
 	name: string,
 	description: string,
-	/**  Whether it also reports serious issues outside its lens. */
-	offLens: boolean,
-	profile: string,
-};
-
-export type PersonaFile = {
-	path: string,
-} & Persona;
-
-export type Personas = {
-	/**  By name. */
-	personas: PersonaFile[],
-	broken: Broken[],
 };
 
 /**  A thread after row `row` of hunk `hunk`. */
@@ -1508,11 +1364,6 @@ export type Queue_Serialize = {
 	reopens: Reopen_Serialize[],
 };
 
-export type QuickWin = {
-	finding: string,
-	fix: string,
-};
-
 /**  The part of a comment on the PR that a thread answers. */
 export type Quote = {
 	/**  The id of the comment it's quoted from. */
@@ -1520,13 +1371,6 @@ export type Quote = {
 	/**  Who wrote that comment. */
 	author: string,
 	text: string,
-};
-
-/**  A persona that raised a merged finding, with its own rating. */
-export type Raiser = {
-	persona: string,
-	severity: Severity,
-	inLens: boolean,
 };
 
 /**  A new-side line range, or old-side for a removed file. */
@@ -1563,12 +1407,6 @@ export type RepoChanged = Record<string, never>;
 export type RepoInfo = {
 	root: string,
 	name: string,
-};
-
-export type Response = {
-	finding: string,
-	stance: Stance,
-	evidence: string,
 };
 
 export type Review = {
@@ -1640,15 +1478,6 @@ export type RowRef = {
 export type RowSpan = {
 	start: number,
 	end: number,
-};
-
-/**  The ruling on a challenged persona finding. */
-export type Ruling = {
-	/**  The persona finding's id. */
-	finding: string,
-	outcome: Outcome,
-	severity: Severity | null,
-	reason: string,
 };
 
 export type Session = Session_Serialize | Session_Deserialize;
@@ -1765,8 +1594,6 @@ export type Stage =
 /**  Sent, resolved, or answered already. */
 "done";
 
-export type Stance = "concede" | "defend" | "partlyConcede";
-
 /**  Everything marking and commenting can change. */
 export type StateDto = {
 	marks: MarkDto[],
@@ -1788,11 +1615,6 @@ export type StateDto = {
 	threads: ThreadDto[],
 };
 
-export type Status = "running" | "done" | "failed" | "stopped";
-
-/**  The steps of a run, in order. */
-export type Step = "reports" | "challenges" | "rebuttals" | "synthesis" | "minimal";
-
 /**
  *  File > Open Repository in this window. The window swaps itself for the start window once
  *  unsaved edits are dealt with.
@@ -1800,15 +1622,6 @@ export type Step = "reports" | "challenges" | "rebuttals" | "synthesis" | "minim
 export type SwitchRepo = Record<string, never>;
 
 export type SymbolKind = "function" | "class" | "module" | "section";
-
-export type Synthesis = {
-	verdict: string,
-	findings: Finding[],
-	rulings?: Ruling[],
-	quickWins: QuickWin[],
-	questions: Question[],
-	fixFirst: Action[],
-};
 
 export type Take = {
 	verdict: TakeVerdict,

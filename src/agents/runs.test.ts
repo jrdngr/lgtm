@@ -11,9 +11,9 @@ describe("agent runs", () => {
 
   it("clears finished runs but keeps running ones", () => {
     const done = startRun("clear", { kind: "qa", subject: "a.ts" });
-    startRun("clear", { kind: "fix", subject: "b.ts" });
+    startRun("clear", { kind: "triage", subject: "b.ts" });
     done.end("done");
     clearFinished("clear");
-    expect(list("clear").map((r) => r.kind)).toEqual(["fix"]);
+    expect(list("clear").map((r) => r.kind)).toEqual(["triage"]);
   });
 });

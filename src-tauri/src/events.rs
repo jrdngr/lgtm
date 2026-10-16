@@ -48,29 +48,11 @@ pub struct WorkingCopyStale {
     pub message: Option<String>,
 }
 
-/// A persona review's part `part` moved on to something else, like reading a file.
-#[derive(Clone, Serialize, Type, Event)]
-pub struct BotRunActivity {
-    pub run: u32,
-    pub part: u32,
-    pub activity: String,
-}
-
-/// A persona review started, stopped, or added or finished a part.
+/// An agent published findings to report `run`, so the workspace's dock opens it.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct BotRunChanged {
     pub run: u32,
-    /// Set when an agent published to it, so the workspace's dock opens it.
-    pub show: bool,
     pub workspace: Option<String>,
-}
-
-/// A persona review's fix `fix` streamed more of its reply. `text` is the whole reply so far.
-#[derive(Clone, Serialize, Type, Event)]
-pub struct BotFixText {
-    pub run: u32,
-    pub fix: u32,
-    pub text: String,
 }
 
 /// An agent asked to see `path` at `line`: in the review pane, or an editor when the review

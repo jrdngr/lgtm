@@ -18,9 +18,16 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::bots::personas::config_dir;
-
 const FILE: &str = "settings.toml";
+
+/// lgtm's config: `$XDG_CONFIG_HOME/lgtm`, falling back to `~/.config`.
+pub fn config_dir() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::home_dir().map(|h| h.join(".config")))?;
+    Some(config.join("lgtm"))
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -48,11 +55,10 @@ impl Default for Settings {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Models {
-    /// Fix on reports and intents.
+    /// Fix on intents.
     pub ask: String,
     /// Assess on the architecture.
     pub walkthrough: String,
-    pub reviewers: String,
     /// Triage and replies on PR threads.
     pub replies: String,
     /// Every step of a Q&A session: questions, plan, apply.
@@ -64,7 +70,6 @@ pub struct Models {
 pub enum Purpose {
     Ask,
     Walkthrough,
-    Reviewers,
     /// Triage and fixes on GitHub threads.
     Replies,
     Qa,
@@ -75,7 +80,6 @@ impl Models {
         let model = match purpose {
             Purpose::Ask => &self.ask,
             Purpose::Walkthrough => &self.walkthrough,
-            Purpose::Reviewers => &self.reviewers,
             Purpose::Replies => &self.replies,
             Purpose::Qa => &self.qa,
         };
@@ -105,7 +109,11 @@ fn merge(base: &mut toml::Table, file: toml::Table) {
 
 /// Keys earlier versions wrote, as table path and key. They're dropped on read, and the next
 /// save leaves them out. Any other unknown key is an error, to catch typos.
-const RETIRED: &[(&[&str], &str)] = &[(&[], "designDir"), (&["models"], "design")];
+const RETIRED: &[(&[&str], &str)] = &[
+    (&[], "designDir"),
+    (&["models"], "design"),
+    (&["models"], "reviewers"),
+];
 
 fn drop_retired(file: &mut toml::Table) {
     for (tables, key) in RETIRED {

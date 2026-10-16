@@ -6,57 +6,39 @@ import { unified } from "../review/snippet";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { useWorkspace } from "../workspaces/context";
-import { type Exchange, findingText, locationText, place } from "./findings";
+import { findingText, locationText, place } from "./findings";
 import { Inline, Markdown } from "./Markdown";
 import { SevTag } from "./Severity";
 
-const STANCES = { concede: "conceded", defend: "defended", partlyConcede: "partly conceded" };
-
-function ExchangeView({ e }: { e: Exchange }) {
-  return (
-    <li>
-      <span className="finding-who">
-        {e.kind === "challenge" ? `${e.by} challenged` : `${e.by} ${STANCES[e.stance]}`}
-      </span>
-      <Markdown>{e.kind === "challenge" ? e.argument : e.evidence}</Markdown>
-    </li>
-  );
-}
-
 interface Props {
   finding: Finding;
-  /** Who it's from: a persona, or "synthesis". */
+  /** The reviewer it's from. */
   source: string;
-  exchanges: Exchange[];
-  rulings: { outcome: string; reason: string }[];
   open: boolean;
   onToggle(): void;
-  /** Picked to send to the agent with others. */
+  /** Picked to send with others. */
   checked: boolean;
   onCheck(): void;
   /** Pastes text into a terminal's prompt. */
   onSend(text: string): void;
-  /** Fixed by a fix run, or dismissed by hand. */
-  state?: "fixed" | "dismissed";
+  dismissed: boolean;
   onDismiss(dismissed: boolean): void;
   /** The review is in a PR workspace, so findings can become drafts for GitHub. */
   canDraft: boolean;
 }
 
 /** A finding: its severity tag and title, then where it is, who raised it, and its id. Opens to
- * show the evidence, the fix, and the cross-review behind it. */
+ * show the evidence and the fix. */
 export function FindingCard(props: Props) {
   const {
     finding: f,
     source,
-    exchanges,
-    rulings,
     open,
     onToggle,
     checked,
     onCheck,
     onSend,
-    state,
+    dismissed,
     onDismiss,
     canDraft,
   } = props;
@@ -66,7 +48,6 @@ export function FindingCard(props: Props) {
   const placed = f.locations.map((loc) => (review ? place(review.files, loc) : undefined));
   const first = placed.find((p) => p);
   const notHere = review ? "Not in the open review" : "Open a review to see the code";
-  const raisers = f.raisedBy?.length ? f.raisedBy : undefined;
 
   async function keep(draft: boolean) {
     if (!review || !first) return;
@@ -100,42 +81,23 @@ export function FindingCard(props: Props) {
     { label: "Select for Batch", checked, onSelect: onCheck },
     { label: "Copy Finding", onSelect: () => copy(findingText(f, source)) },
     "-",
-    state !== "fixed" && {
-      label: state === "dismissed" ? "Bring Back" : "Dismiss",
-      onSelect: () => onDismiss(state !== "dismissed"),
-    },
+    { label: dismissed ? "Bring Back" : "Dismiss", onSelect: () => onDismiss(!dismissed) },
   ]);
 
   const id = f.id?.includes("#") ? f.id : `#${f.id}`;
-  const who = raisers
-    ? raisers.map((r, i) => (
-        <span key={r.persona} title={`${r.persona} rated it ${r.severity}`}>
-          {i > 0 && ", "}
-          {r.persona}
-          {!r.inLens && " (off-lens)"}
-        </span>
-      ))
-    : `${source}${f.offLens ? " (off-lens)" : ""}`;
-
   return (
-    <div className={`finding${state ? " settled" : ""}`} data-finding={f.id} onContextMenu={menu}>
+    <div
+      className={`finding${dismissed ? " settled" : ""}`}
+      data-finding={f.id}
+      onContextMenu={menu}
+    >
       <div className="finding-top">
-        <input
-          type="checkbox"
-          className="finding-check"
-          checked={checked}
-          onChange={onCheck}
-          title="Pick it to fix or send with others"
-        />
+        <input type="checkbox" className="finding-check" checked={checked} onChange={onCheck} />
         <SevTag severity={f.severity} />
         <button type="button" className="finding-head" onClick={onToggle} aria-expanded={open}>
           <Inline>{f.title}</Inline>
         </button>
-        {state && (
-          <span className={`pill${state === "fixed" ? " green" : ""}`}>
-            {state === "fixed" ? "Fixed" : "Dismissed"}
-          </span>
-        )}
+        {dismissed && <span className="pill">Dismissed</span>}
         <span className="finding-actions reveal">
           <IconButton
             icon="send"
@@ -158,13 +120,11 @@ export function FindingCard(props: Props) {
               onClick={() => keep(true)}
             />
           )}
-          {state !== "fixed" && (
-            <IconButton
-              icon={state === "dismissed" ? "retry" : "x"}
-              label={state === "dismissed" ? "Bring it back" : "Dismiss"}
-              onClick={() => onDismiss(state !== "dismissed")}
-            />
-          )}
+          <IconButton
+            icon={dismissed ? "retry" : "x"}
+            label={dismissed ? "Bring it back" : "Dismiss"}
+            onClick={() => onDismiss(!dismissed)}
+          />
         </span>
       </div>
       <div className="finding-meta">
@@ -181,7 +141,7 @@ export function FindingCard(props: Props) {
           </button>
         ))}
         <span className="finding-dot">·</span>
-        <span className="finding-who">{who}</span>
+        <span className="finding-who">{source}</span>
         <span className="finding-dot">· {id}</span>
       </div>
       {open && (
@@ -196,23 +156,7 @@ export function FindingCard(props: Props) {
             </ul>
           )}
           <Markdown>{f.explanation}</Markdown>
-          {f.contested && <Markdown>{`**Contested:** ${f.contested}`}</Markdown>}
           {f.fix && <Markdown>{`**Fix:** ${f.fix}`}</Markdown>}
-          {(exchanges.length > 0 || rulings.length > 0) && (
-            <div className="finding-cross">
-              <div className="finding-who">Cross-review</div>
-              <ul>
-                {exchanges.map((e, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: exchanges never reorder
-                  <ExchangeView key={i} e={e} />
-                ))}
-              </ul>
-              {rulings.map((r, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: rulings never reorder
-                <Markdown key={i}>{`**Ruling: ${r.outcome}.** ${r.reason}`}</Markdown>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

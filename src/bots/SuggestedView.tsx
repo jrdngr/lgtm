@@ -1,12 +1,11 @@
 import { useState } from "react";
 import type { BotRun, Finding } from "../bindings";
-import { Busy } from "../ui/Busy";
 import {
-  finalFindings,
+  allFindings,
   findingsById,
   locationText,
   type Report,
-  raisers,
+  raiser,
   refLabel,
   verdictOf,
 } from "./findings";
@@ -17,26 +16,21 @@ import { SevTag, Tally } from "./Severity";
 interface Props {
   run: BotRun;
   r: Report;
-  /** The filter is running again for a new task. */
-  filtering: boolean;
-  /** Indexes of the fixes left out of Send and Fix. */
+  /** Indexes of the fixes left out of Send. */
   skipped: Set<number>;
   onSkip(i: number): void;
-  onRetask(task: string): void;
   /** Shows a finding in Findings. */
   onGo(id: string): void;
 }
 
 /** The task, then the fixes it needs, the off-task findings that matter, and questions. */
-export function SuggestedView({ run, r, filtering, skipped, onSkip, onRetask, onGo }: Props) {
+export function SuggestedView({ run, r, skipped, onSkip, onGo }: Props) {
   const m = r.minimal;
-  const [editing, setEditing] = useState<string>();
   const [open, setOpen] = useState<Set<number>>(new Set());
   if (!m) return null;
   const byId = findingsById(r);
   const label = (id: string) => refLabel(run, id);
   const verdict = verdictOf(r);
-  const task = run.task ?? m.task;
   const fixes = m.fixes ?? [];
   const questions = m.questions ?? [];
   const offTask = m.offTask.flatMap((id) => {
@@ -53,43 +47,15 @@ export function SuggestedView({ run, r, filtering, skipped, onSkip, onRetask, on
     <div className="suggested">
       <div className="suggested-task">
         <span className="suggested-key">Task</span>
-        {editing === undefined ? (
-          <button
-            type="button"
-            className="suggested-task-text"
-            disabled={filtering || !!run.active}
-            onClick={() => setEditing(task)}
-          >
-            {task}
-          </button>
-        ) : (
-          <input
-            // biome-ignore lint/a11y/noAutofocus: it opens on a click to edit
-            autoFocus
-            className="suggested-task-input"
-            value={editing}
-            onChange={(e) => setEditing(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && editing.trim()) {
-                setEditing(undefined);
-                if (editing.trim() !== task) onRetask(editing);
-              } else if (e.key === "Escape") {
-                e.stopPropagation();
-                setEditing(undefined);
-              }
-            }}
-            onBlur={() => setEditing(undefined)}
-          />
-        )}
-        {filtering && <Busy>Filtering…</Busy>}
+        <span className="suggested-task-text">{m.task}</span>
       </div>
-      <div className={filtering ? "suggested-body stale" : "suggested-body"}>
+      <div className="suggested-body">
         {verdict && (
-          <div className={`suggested-verdict worst-${finalFindings(r)[0]?.severity ?? "none"}`}>
+          <div className={`suggested-verdict worst-${allFindings(r)[0]?.severity ?? "none"}`}>
             <div className="suggested-verdict-text">
               <Markdown>{verdict}</Markdown>
             </div>
-            <Tally findings={finalFindings(r)} />
+            <Tally findings={allFindings(r)} />
           </div>
         )}
         <section>
@@ -169,7 +135,7 @@ function Closed({ f }: { f: Finding }) {
       </div>
       <div className="suggested-loc">
         {f.locations.map(locationText).join(", ")}
-        <span className="finding-who"> · {raisers(f).join(", ")}</span>
+        <span className="finding-who"> · {raiser(f)}</span>
       </div>
     </div>
   );

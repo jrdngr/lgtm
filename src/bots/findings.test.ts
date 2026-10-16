@@ -5,12 +5,12 @@ import { flatten } from "../review/model";
 import {
   actionsText,
   findingText,
-  history,
   locationText,
   place,
   refLabel,
   report,
   tally,
+  verdictOf,
 } from "./findings";
 
 const finding = (id: string, over: Partial<Finding> = {}): Finding => ({
@@ -21,18 +21,17 @@ const finding = (id: string, over: Partial<Finding> = {}): Finding => ({
   facts: ["a fact"],
   explanation: "Why it matters.",
   fix: "Do this.",
-  offLens: false,
   ...over,
 });
 
-const done = (over: Partial<Part>): Part => ({
-  step: "reports",
+const section = (persona: string, findings: Finding[]): Part => ({
+  persona,
+  output: { kind: "review", verdict: `${persona} verdict`, findings },
+});
+
+const fixes = (task: string): Part => ({
   persona: null,
-  status: "done",
-  output: null,
-  error: null,
-  session: null,
-  ...over,
+  output: { kind: "minimal", task, fixes: [], offTask: [] },
 });
 
 const run = (parts: Part[]): BotRun => ({
@@ -42,78 +41,25 @@ const run = (parts: Part[]): BotRun => ({
   from: null,
   to: "c",
   personas: [],
-  options: { crossReview: true, suggest: true },
   parts,
-  done: [],
   createdAt: 0,
-  active: false,
 });
 
 describe("report", () => {
-  const r = report(
-    run([
-      done({
-        persona: "sec",
-        output: { kind: "review", verdict: "no", findings: [finding("sec#1")] },
-      }),
-      done({
-        persona: "simple",
-        step: "challenges",
-        output: { kind: "challenges", challenges: [{ finding: "sec#1", argument: "overrated" }] },
-      }),
-      done({
-        persona: "sec",
-        step: "rebuttals",
-        output: {
-          kind: "rebuttals",
-          responses: [{ finding: "sec#1", stance: "defend", evidence: "see line 2" }],
-        },
-      }),
-      done({
-        step: "synthesis",
-        output: {
-          kind: "synthesis",
-          verdict: "fix 1",
-          findings: [finding("1", { sources: ["sec#1"] })],
-          rulings: [{ finding: "sec#1", outcome: "kept", severity: null, reason: "holds" }],
-          quickWins: [],
-          questions: [],
-          fixFirst: [],
-        },
-      }),
-      done({ persona: "general", status: "failed", output: null }),
-    ]),
-  );
-
-  it("gathers each layer", () => {
+  it("gathers each reviewer's findings and the suggested fixes", () => {
+    const r = report(run([section("sec", [finding("sec#1")]), fixes("t")]));
     expect([...r.byPersona.keys()]).toEqual(["sec"]);
-    expect(r.synthesis?.verdict).toBe("fix 1");
-    expect(r.exchanges.map((e) => `${e.kind}:${e.by}`)).toEqual([
-      "challenge:simple",
-      "response:sec",
-    ]);
+    expect(r.minimal?.task).toBe("t");
+    expect(verdictOf(r)).toBe("sec verdict");
   });
 
-  it("puts a merged finding's cross-review history on it", () => {
-    const merged = r.synthesis?.findings[0];
-    if (!merged) throw new Error("no synthesis");
-    const h = history(r, merged);
-    expect(h.exchanges).toHaveLength(2);
-    expect(h.rulings[0].outcome).toBe("kept");
+  it("has no overall verdict with several reviewers", () => {
+    expect(verdictOf(report(run([section("a", []), section("b", [])])))).toBeUndefined();
   });
 });
 
-it("shows the newest suggested fixes, which replace the ones from an older task", () => {
-  const filter = (task: string): Part =>
-    done({ step: "minimal", output: { kind: "minimal", task, fixes: [], offTask: [] } });
-  expect(report(run([filter("old"), filter("new")])).minimal?.task).toBe("new");
-});
-
-it("numbers a lone persona's findings without its name", () => {
-  const lone = {
-    ...run([]),
-    personas: [{ name: "sec", description: "", offLens: false, profile: "" }],
-  };
+it("numbers a lone reviewer's findings without its name", () => {
+  const lone = { ...run([]), personas: [{ name: "sec", description: "" }] };
   expect(refLabel(lone, "sec#2")).toBe("#2");
   expect(refLabel(run([]), "sec#2")).toBe("sec#2");
   expect(refLabel(run([]), "4")).toBe("#4");

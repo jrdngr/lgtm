@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err};
-use crate::bots::personas;
 use crate::files::{self, FileEntry};
 use crate::prompts;
 use crate::syntax::{self, Segment};
@@ -21,14 +20,14 @@ pub(crate) async fn list_files(
     files::list(&ws.root, &dir).map_err(err)
 }
 
-/// A workspace-relative path, or an absolute one only for persona and prompt files,
-/// which live outside the repo.
+/// A workspace-relative path, or an absolute one only for prompt files, which live outside
+/// the repo.
 fn locate(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     let abs = Path::new(path);
     if !abs.is_absolute() {
         return files::resolve(&ws.root, path).map_err(err);
     }
-    if !personas::is_persona_file(abs) && !prompts::is_prompt_file(abs) {
+    if !prompts::is_prompt_file(abs) {
         return Err(format!("{path} isn't in the workspace"));
     }
     Ok(abs.to_path_buf())
@@ -83,8 +82,8 @@ pub(crate) async fn highlight_text(path: String, text: String) -> Vec<Vec<Segmen
         .unwrap_or_default()
 }
 
-/// A workspace path that a symlinked folder can't lead out of, or an absolute persona or
-/// prompt file as `locate` allows.
+/// A workspace path that a symlinked folder can't lead out of, or an absolute prompt file as
+/// `locate` allows.
 fn confined(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     if Path::new(path).is_absolute() {
         return locate(ws, path);

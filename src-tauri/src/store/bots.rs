@@ -1,6 +1,7 @@
-//! Persona review runs, stored whole as JSON.
+//! Reports, stored whole as JSON.
 
 use rusqlite::{OptionalExtension, params};
+use serde_json::Value;
 
 use super::Store;
 use crate::bots::BotRun;
@@ -23,8 +24,24 @@ fn to_json(run: &BotRun) -> rusqlite::Result<String> {
     serde_json::to_string(run).map_err(super::json_err)
 }
 
+/// Keeps what a report shows of one an older build stored with headless runs: each reviewer's
+/// findings, and suggested fixes unless they name findings of a synthesis, which is dropped.
+fn upgrade(run: &mut Value) {
+    let Some(parts) = run.get_mut("parts").and_then(Value::as_array_mut) else {
+        return;
+    };
+    let synthesized = parts.iter().any(|p| p["step"] == "synthesis");
+    parts.retain(|p| {
+        let done = p.get("status").is_none_or(|s| s == "done");
+        let kind = &p["output"]["kind"];
+        done && (kind == "review" || (kind == "minimal" && !synthesized))
+    });
+}
+
 fn row_to_run(r: &rusqlite::Row) -> rusqlite::Result<BotRun> {
-    let mut run: BotRun = serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::json_err)?;
+    let mut value: Value = serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::json_err)?;
+    upgrade(&mut value);
+    let mut run: BotRun = serde_json::from_value(value).map_err(super::json_err)?;
     run.id = r.get(0)?;
     Ok(run)
 }

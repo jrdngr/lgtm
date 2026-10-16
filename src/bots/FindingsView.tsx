@@ -1,15 +1,7 @@
 import type { ReactNode } from "react";
 import type { BotRun, Finding } from "../bindings";
-import {
-  finalFindings,
-  locationText,
-  type Report,
-  raisers,
-  refLabel,
-  SEVERITIES,
-} from "./findings";
+import { allFindings, locationText, type Report, raiser, refLabel, SEVERITIES } from "./findings";
 import { Inline } from "./Markdown";
-import { Progress } from "./Progress";
 import { SevTag, Tally } from "./Severity";
 
 /** Finding cards with their sources, settled ones folded at the end. */
@@ -18,7 +10,7 @@ type Cards = (list: [Finding, string][]) => ReactNode;
 interface Props {
   run: BotRun;
   r: Report;
-  /** Shows only the findings this persona raised. */
+  /** Shows only the findings this reviewer raised. */
   persona: string | undefined;
   onPersona(name: string | undefined): void;
   cards: Cards;
@@ -32,14 +24,14 @@ interface Props {
 const MINOR = new Set(["low", "info"]);
 
 /** Every finding, worst first: cards for medium and up, a line each for low and info. A chip
- * per persona filters to the findings it raised. */
+ * per reviewer filters to the findings it raised. */
 export function FindingsView(p: Props) {
   const { run, r, persona } = p;
-  const source = (f: Finding) => (r.synthesis ? "synthesis" : (raisers(f)[0] ?? ""));
-  const all = [...finalFindings(r)].sort(
+  const source = raiser;
+  const all = [...allFindings(r)].sort(
     (a, b) => SEVERITIES.indexOf(a.severity) - SEVERITIES.indexOf(b.severity),
   );
-  const shown = persona ? all.filter((f) => raisers(f).includes(persona)) : all;
+  const shown = persona ? all.filter((f) => raiser(f) === persona) : all;
   const major = shown.filter((f) => !MINOR.has(f.severity));
   const minor = shown.filter((f) => MINOR.has(f.severity));
   return (
@@ -53,7 +45,18 @@ export function FindingsView(p: Props) {
         >
           All
         </button>
-        <Progress run={run} persona={persona} onPersona={p.onPersona} />
+        {run.personas.map(({ name }) => (
+          <button
+            type="button"
+            key={name}
+            className="bots-chip"
+            aria-pressed={persona === name}
+            onClick={() => p.onPersona(persona === name ? undefined : name)}
+          >
+            {name}
+            <span className="bots-chip-text">{r.byPersona.get(name)?.length ?? 0}</span>
+          </button>
+        ))}
         <span className="spacer" />
         <Tally findings={shown} />
       </div>

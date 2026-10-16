@@ -61,7 +61,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     };
     let review_of = |fs: Vec<serde_json::Value>| serde_json::json!({ "verdict": "ok", "findings": fs });
     let ids = |run: &crate::bots::BotRun, i: usize| {
-        let Some(crate::bots::Output::Review(r)) = &run.parts[i].output else {
+        let crate::bots::Output::Review(r) = &run.parts[i].output else {
             panic!("no review");
         };
         r.findings.iter().map(|f| format!("{} {}", f.id, f.title)).collect::<Vec<_>>()
@@ -95,17 +95,15 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         .publish_findings(None, Some(&label), "codex", review_of(vec![finding("low", "style")]), Some(summary))
         .unwrap();
     assert_eq!(run.personas[1].name, "codex");
-    assert!(run.options.suggest && run.done.contains(&crate::bots::Step::Minimal));
     assert!(matches!(
         &run.parts[2].output,
-        Some(crate::bots::Output::Minimal(m)) if m.fixes[0].closes == ["codex#1"]
+        crate::bots::Output::Minimal(m) if m.fixes[0].closes == ["codex#1"]
     ));
 
     let (run, _) = ctx
         .publish_findings(None, Some(&label), "codex", review_of(vec![]), None)
         .unwrap();
     assert_eq!(run.parts.len(), 2, "the old suggestions no longer match the findings");
-    assert!(!run.options.suggest);
     assert!(ctx.publish_findings(None, Some("R999"), "x", review_of(vec![]), None).is_err());
 }
 

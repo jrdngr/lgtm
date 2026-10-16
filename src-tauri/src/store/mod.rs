@@ -1,5 +1,4 @@
-//! Per-repo SQLite store for marks, file checks, comments, review sessions, and persona
-//! review runs.
+//! Per-repo SQLite store for marks, file checks, comments, review sessions, and reports.
 
 mod arch;
 mod bots;

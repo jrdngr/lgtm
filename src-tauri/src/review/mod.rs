@@ -80,8 +80,6 @@ pub struct RepoCtx {
     current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
-    /// Persona reviews in progress.
-    pub bots: crate::bots::Live,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -221,7 +219,6 @@ impl RepoCtx {
             current: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
-            bots: Default::default(),
         }
     }
 

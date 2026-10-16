@@ -1,4 +1,5 @@
-//! Reports by the id the user knows them by: `R<n>`, or the name they renamed it to.
+//! Stored reports, found by the id the user knows them by: `R<n>`, or the name they renamed
+//! it to.
 
 use anyhow::{Context, bail, ensure};
 
@@ -10,6 +11,15 @@ impl BotRun {
     pub fn label(&self) -> String {
         self.name.clone().unwrap_or_else(|| format!("R{}", self.id))
     }
+
+    /// Whether finding `id` is "dismissed" or "open".
+    pub fn finding_state(&self, id: &str) -> &'static str {
+        if self.dismissed.iter().any(|d| d == id) {
+            "dismissed"
+        } else {
+            "open"
+        }
+    }
 }
 
 /// Whether `name` has the shape of a default id, like `R12`.
@@ -19,6 +29,56 @@ fn looks_default(name: &str) -> bool {
 }
 
 impl RepoCtx {
+    /// The workspace's reports, newest first.
+    pub fn bot_runs(&self, workspace: Option<&str>) -> anyhow::Result<Vec<BotRun>> {
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .bot_runs(workspace.unwrap_or(""))?)
+    }
+
+    pub fn bot_run(&self, id: u32) -> anyhow::Result<BotRun> {
+        self.store
+            .lock()
+            .unwrap()
+            .bot_run(id)?
+            .context("the report is gone")
+    }
+
+    pub fn delete_bots(&self, id: u32) -> anyhow::Result<()> {
+        Ok(self.store.lock().unwrap().delete_bot_run(id)?)
+    }
+
+    /// Applies `f` to the stored report and saves it.
+    pub(super) fn edit_run<T>(
+        &self,
+        id: u32,
+        f: impl FnOnce(&mut BotRun) -> T,
+    ) -> anyhow::Result<T> {
+        let store = self.store.lock().unwrap();
+        let mut run = store.bot_run(id)?.context("the report is gone")?;
+        let out = f(&mut run);
+        store.save_bot_run(&run)?;
+        Ok(out)
+    }
+
+    /// Dismisses `findings`, or with `dismissed` false, brings them back.
+    pub fn dismiss_findings(
+        &self,
+        id: u32,
+        findings: &[String],
+        dismissed: bool,
+    ) -> anyhow::Result<BotRun> {
+        self.edit_run(id, |run| {
+            run.dismissed.retain(|f| !findings.contains(f));
+            if dismissed {
+                run.dismissed.extend(findings.iter().cloned());
+            }
+            run.clone()
+        })
+    }
+
     /// The workspace's report whose id is `label`, ignoring case.
     pub fn find_report(&self, workspace: Option<&str>, label: &str) -> anyhow::Result<BotRun> {
         let label = label.trim();

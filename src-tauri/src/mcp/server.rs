@@ -298,9 +298,9 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "A report's findings: the synthesis when there is one, otherwise each \
-        reviewer's own, with each reviewer's verdict. Each finding has a state: open, or fixed \
-        or dismissed by the human, which are settled and to be left alone."
+        description = "A report's findings, each reviewer's own, with each reviewer's verdict. \
+        Each finding has a state: open, or dismissed by the human, which is settled and to be \
+        left alone."
     )]
     async fn get_report(&self, Parameters(p): Parameters<inputs::GetReport>) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
@@ -318,7 +318,7 @@ impl Lgtm {
 
     #[tool(
         description = "Publish review findings to a report in lgtm, where the human sees them \
-        as cards they can comment on, send to an agent, or fix, with your suggested fixes for \
+        as cards they can comment on or send to an agent, with your suggested fixes for \
         the change's task if you have them. Pass the report id the human \
         gave you, or leave it out to start a new report, and its id comes back. Rate severity \
         by real impact: critical (exploitable or loses data in normal use), high (a core flow \
@@ -348,7 +348,6 @@ impl Lgtm {
             .map_err(failed)?;
         BotRunChanged {
             run: run.id,
-            show: true,
             workspace: self.workspace().map(str::to_string),
         }
         .emit_to(&self.app, &label)

@@ -1,16 +1,4 @@
-import type {
-  Action,
-  BotRun,
-  Challenge,
-  Finding,
-  Location,
-  Minimal,
-  Output,
-  Response,
-  Ruling,
-  Severity,
-  Synthesis,
-} from "../bindings";
+import type { Action, BotRun, Finding, Location, Minimal, Severity } from "../bindings";
 import type { FlatFile } from "../review/model";
 
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -33,77 +21,46 @@ export const BADGES: Record<Severity, string> = {
   info: "⚪ INFO",
 };
 
-type Of<K extends Output["kind"]> = Extract<Output, { kind: K }>;
-
-/** The done parts of a run's step, with their output and persona. */
-function outputs<K extends Output["kind"]>(run: BotRun, kind: K) {
-  return run.parts.flatMap((p) =>
-    p.status === "done" && p.output?.kind === kind
-      ? [{ persona: p.persona ?? "", output: p.output as Of<K> }]
-      : [],
-  );
-}
-
-/** A challenge or rebuttal on a persona finding, with who made it. */
-export type Exchange =
-  | ({ kind: "challenge"; by: string } & Challenge)
-  | ({ kind: "response"; by: string } & Response);
-
 /** Everything the report pane shows of a run, gathered from its parts. */
 export interface Report {
-  /** Each persona's findings, by persona name. */
+  /** Each reviewer's findings, by name. */
   byPersona: Map<string, Finding[]>;
   verdicts: Map<string, string>;
-  synthesis?: Synthesis;
   minimal?: Minimal;
-  exchanges: Exchange[];
 }
 
 export function report(run: BotRun): Report {
   const byPersona = new Map<string, Finding[]>();
   const verdicts = new Map<string, string>();
-  for (const { persona, output } of outputs(run, "review")) {
-    byPersona.set(persona, output.findings);
-    verdicts.set(persona, output.verdict);
+  let minimal: Minimal | undefined;
+  for (const { persona, output } of run.parts) {
+    if (output.kind === "minimal") minimal = output;
+    else {
+      byPersona.set(persona ?? "", output.findings);
+      verdicts.set(persona ?? "", output.verdict);
+    }
   }
-  const exchanges: Exchange[] = [
-    ...outputs(run, "challenges").flatMap(({ persona, output }) =>
-      output.challenges.map((c) => ({ kind: "challenge" as const, by: persona, ...c })),
-    ),
-    ...outputs(run, "rebuttals").flatMap(({ persona, output }) =>
-      output.responses.map((r) => ({ kind: "response" as const, by: persona, ...r })),
-    ),
-  ];
-  return {
-    byPersona,
-    verdicts,
-    synthesis: outputs(run, "synthesis")[0]?.output,
-    minimal: outputs(run, "minimal").at(-1)?.output,
-    exchanges,
-  };
+  return { byPersona, verdicts, minimal };
 }
 
-/** A run's findings: the synthesis's when there is one, otherwise every persona's. */
-export function finalFindings(r: Report): Finding[] {
-  return r.synthesis?.findings ?? [...r.byPersona.values()].flat();
+/** Every reviewer's findings. */
+export function allFindings(r: Report): Finding[] {
+  return [...r.byPersona.values()].flat();
 }
 
-/** The verdict on the whole change: the synthesis's, or a lone persona's. */
+/** The verdict on the whole change: a lone reviewer's. */
 export function verdictOf(r: Report): string | undefined {
-  return r.synthesis?.verdict ?? (r.verdicts.size === 1 ? [...r.verdicts.values()][0] : undefined);
+  return r.verdicts.size === 1 ? [...r.verdicts.values()][0] : undefined;
 }
 
-/** A finding's id as the report shows it: `#3`, or with a lone persona, `#3` for `sec#3`. */
+/** A finding's id as the report shows it: `#3`, or with a lone reviewer, `#3` for `sec#3`. */
 export function refLabel(run: BotRun, id: string): string {
   if (!id.includes("#")) return `#${id}`;
   return run.personas.length === 1 ? `#${id.split("#")[1]}` : id;
 }
 
-/** The personas that raised a finding. */
-export function raisers(f: Finding): string[] {
-  if (f.raisedBy?.length) return f.raisedBy.map((r) => r.persona);
-  return f.id?.includes("#") ? [f.id.split("#")[0]] : [];
-}
+/** The reviewer that raised a finding. */
+export const raiser = (f: Finding) => f.id?.split("#")[0] ?? "";
 
 /** Suggested fixes as a request to an agent, each with where its findings are. */
 export function actionsText(revset: string, actions: Action[], byId: Map<string, Finding>) {
@@ -117,25 +74,10 @@ export function actionsText(revset: string, actions: Action[], byId: Map<string,
   return `Make ${n === 1 ? "this fix" : `these ${n} fixes`} from a review of \`${revset}\`. Change only what each one needs.\n\n${list.join("\n")}`;
 }
 
-/** The persona findings a finding stands for: its sources, or itself. */
-export function sourceIds(f: Finding): string[] {
-  return f.sources?.length ? f.sources : f.id ? [f.id] : [];
-}
-
-/** The cross-review exchanges and rulings behind a finding. */
-export function history(r: Report, f: Finding): { exchanges: Exchange[]; rulings: Ruling[] } {
-  const ids = new Set(sourceIds(f));
-  return {
-    exchanges: r.exchanges.filter((e) => ids.has(e.finding)),
-    rulings: (r.synthesis?.rulings ?? []).filter((x) => ids.has(x.finding)),
-  };
-}
-
-/** Findings by id, from the synthesis and every persona, for resolving references. */
+/** Findings by id, for resolving references. */
 export function findingsById(r: Report): Map<string, Finding> {
   const out = new Map<string, Finding>();
   for (const fs of r.byPersona.values()) for (const f of fs) if (f.id) out.set(f.id, f);
-  for (const f of r.synthesis?.findings ?? []) if (f.id) out.set(f.id, f);
   return out;
 }
 
@@ -165,7 +107,7 @@ export function findingText(f: Finding, source: string): string {
   return parts.filter((p) => p.trim()).join("\n\n");
 }
 
-/** A finding picked to fix or send, with whose finding it is. */
+/** A finding picked to send, with whose finding it is. */
 export interface Picked {
   f: Finding;
   source: string;

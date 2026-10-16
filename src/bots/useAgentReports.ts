@@ -10,7 +10,7 @@ export function useAgentReports(workspace: WorkspaceName) {
   useEffect(() => {
     const key = workspaceKey(workspace);
     const sub = events.botRunChanged(getCurrentWebviewWindow()).listen(({ payload: p }) => {
-      if (!p.show || workspaceKey(p.workspace) !== key) return;
+      if (workspaceKey(p.workspace) !== key) return;
       const api = dockOf(workspace);
       if (api) openReport(api, p.run);
     });
