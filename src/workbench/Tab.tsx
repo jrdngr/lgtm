@@ -8,6 +8,7 @@ import { Glyph } from "../workspaces/AgentGlyph";
 import { tabState, useActivity } from "../workspaces/activity";
 import { useWorkspace } from "../workspaces/context";
 import { activate, isReviewPanel } from "./panels";
+import { fitTabs } from "./tabFit";
 import { tabMenu } from "./tabMenu";
 import { setRenaming, useRenaming } from "./tabRename";
 
@@ -75,8 +76,16 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   const pinned = send.pinned === api.id;
   const [title, setTitle] = useState(api.title ?? "");
   useEffect(() => {
-    const sub = api.onDidTitleChange((e) => setTitle(e.title));
-    return () => sub.dispose();
+    // A tab coming, going or retitled changes how much room its pane's titles have.
+    fitTabs();
+    const sub = api.onDidTitleChange((e) => {
+      setTitle(e.title);
+      fitTabs();
+    });
+    return () => {
+      sub.dispose();
+      fitTabs();
+    };
   }, [api]);
   const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
   const panel = containerApi.getPanel(api.id);

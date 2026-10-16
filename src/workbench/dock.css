@@ -31,9 +31,10 @@
 }
 
 /* The terminal sends go to: a violet bar along the tab's top. */
-/* Long titles end in an ellipsis; hovering shows the whole title. */
+/* Titles shorten with an ellipsis once a pane's tabs run out of room (tabFit.ts), down to
+   10 characters; hovering shows the whole title. */
 .dock .dv-default-tab-content {
-  max-width: 220px;
+  max-width: max(10ch, var(--tab-title-max, 100000px));
   overflow: hidden;
   text-overflow: ellipsis;
 }
