@@ -56,6 +56,12 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: "Editor or rendered markdown",
+    shortcuts: [
+      { keys: ["⌘>"], action: "Send the selection's path and lines to the last terminal" },
+    ],
+  },
+  {
     title: "HTML file, rendered",
     shortcuts: [
       { keys: ["⌘←", "⌘→"], action: "Back / forward" },

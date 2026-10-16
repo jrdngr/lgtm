@@ -4,20 +4,22 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
-import { openMenu } from "../ui/contextMenu";
+import { type Sender, sendItems } from "../terminal/sendItems";
+import { copy, openMenu } from "../ui/contextMenu";
 import { isMac } from "../workbench/keys";
 import { saveTabParams } from "../workbench/tabParams";
 import { wordWrap } from "../workbench/wordWrap";
 import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { minimalChange } from "./change";
-import { editorMenu, placeAt } from "./editorMenu";
+import { editorMenu, pathAndLine, placeAt } from "./editorMenu";
 import { HtmlView } from "./HtmlView";
 import { isHtml } from "./htmlNav";
 import { ImagePanel } from "./ImagePanel";
 import { imageType, isSvg, svgUrl } from "./image";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
+import { lineRef, renderedLines } from "./renderedLines";
 import { emitSaved } from "./saved";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
@@ -192,11 +194,31 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     }
   }
 
+  /** Where the selection is, as `path:lines`: in the rendered markdown when it shows (or the
+   * block at `at` there), else in the text. */
+  function selectionRef(at?: Node): string {
+    const root = renderedRef.current;
+    if (root instanceof HTMLElement && markdown) {
+      const lines = renderedLines(root, at);
+      return lines ? lineRef(path, lines) : path;
+    }
+    return view ? pathAndLine(view, path) : path;
+  }
+
+  const refocus = () => (renderedRef.current ?? view)?.focus();
+  const sender: Sender = {
+    recent: (text) => sendRecent(text, refocus),
+    to: (text, id) => sendToId(text, id, refocus),
+  };
+
   function onKeyDown(e: React.KeyboardEvent) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod && e.shiftKey && e.key.toLowerCase() === "v" && renders(path)) {
       e.preventDefault();
       toggleRendered();
+    } else if (mod && e.shiftKey && (e.key === ">" || e.key === ".") && !html) {
+      e.preventDefault();
+      sender.recent(selectionRef());
     }
   }
 
@@ -211,13 +233,21 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         path,
         dirty,
         save: () => void save(),
-        send: {
-          recent: (text) => sendRecent(text, () => view.focus()),
-          to: (text, id) => sendToId(text, id, () => view.focus()),
-        },
+        send: sender,
         toggleRendered: renders(path) ? toggleRendered : undefined,
       }),
     );
+  }
+
+  function onRenderedMenu(e: React.MouseEvent) {
+    const text = window.getSelection()?.toString() ?? "";
+    openMenu(e, [
+      { label: "Copy", keys: "⌘C", disabled: !text, onSelect: () => copy(text) },
+      "-",
+      ...sendItems(workspace, "Send", selectionRef(e.target as Node), sender),
+      "-",
+      { label: "Show Editor", keys: "⇧⌘V", onSelect: toggleRendered },
+    ]);
   }
 
   function keepMine() {
@@ -231,6 +261,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     <ViewSwitch rendered={rendered !== undefined} disabled={!view} toggle={toggleRendered} />
   );
   const html = isHtml(path) && rendered !== undefined;
+  const markdown = rendered !== undefined && !html && !isSvg(path);
   const svg = useImageZoom(
     isSvg(path) && rendered !== undefined ? svgUrl(rendered) : undefined,
     path,
@@ -278,11 +309,12 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
           tabIndex={0}
           onKeyDown={svg.onKeyDown}
+          onContextMenu={markdown ? onRenderedMenu : undefined}
           onScroll={(e) =>
             saveTabParams(api, { renderedScroll: Math.round(e.currentTarget.scrollTop) })
           }
         >
-          {isSvg(path) ? svg.view : <MarkdownView text={rendered} />}
+          {isSvg(path) ? svg.view : <MarkdownView text={rendered} lines />}
         </div>
       )}
       <div

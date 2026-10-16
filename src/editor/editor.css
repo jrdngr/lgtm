@@ -53,6 +53,10 @@
   font: inherit;
 }
 
+.markdown-view .md-lines {
+  display: contents;
+}
+
 .markdown-view {
   flex: 1;
   min-height: 0;

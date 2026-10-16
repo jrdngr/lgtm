@@ -7,6 +7,7 @@ import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { wordWrap } from "../workbench/wordWrap";
 import type { WorkspaceName } from "../workspaces/context";
+import { lineRef } from "./renderedLines";
 import { revealInFiles } from "./reveal";
 
 interface Deps {
@@ -40,10 +41,9 @@ function paste(v: EditorView) {
 }
 
 /** `path:line`, or `path:start-end` over a selection of several lines. */
-function pathAndLine(v: EditorView, path: string): string {
+export function pathAndLine(v: EditorView, path: string): string {
   const { from, to } = v.state.selection.main;
-  const [a, b] = [v.state.doc.lineAt(from).number, v.state.doc.lineAt(to).number];
-  return `${path}:${a === b ? a : `${a}-${b}`}`;
+  return lineRef(path, [v.state.doc.lineAt(from).number, v.state.doc.lineAt(to).number]);
 }
 
 /** The right-click menu of an editor tab's text. */

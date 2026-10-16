@@ -38,6 +38,17 @@ function lineComponents(marks?: LineMarks): Components {
       });
     };
   }
+  // Code blocks keep their own rendering, inside a box that carries the lines.
+  const Pre = components.pre as (props: ExtraProps) => React.ReactNode;
+  out.pre = (props: ExtraProps) => {
+    const start = props.node?.position?.start.line ?? 0;
+    const end = props.node?.position?.end.line ?? start;
+    return createElement(
+      "div",
+      { className: "md-lines", "data-start": start, "data-end": end },
+      createElement(Pre, props),
+    );
+  };
   return out as Components;
 }
 
