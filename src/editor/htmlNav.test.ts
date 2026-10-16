@@ -41,7 +41,7 @@ describe("stepZoom", () => {
   });
 
   it("stays put past the ends", () => {
-    expect(stepZoom(3, 1)).toBe(3);
+    expect(stepZoom(8, 1)).toBe(8);
     expect(stepZoom(0.2, -1)).toBe(0.2);
     expect(fitted(0.01)).toBe(0.1);
   });

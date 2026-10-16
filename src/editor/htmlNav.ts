@@ -31,7 +31,7 @@ export function visit(trail: Trail, url: string): Trail {
   return { urls: [...trail.urls.slice(0, trail.at + 1), url], at: trail.at + 1 };
 }
 
-const ZOOMS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 3];
+const ZOOMS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 3, 4, 6, 8];
 
 /** The next zoom step in or out from `zoom`, which may sit between steps after a fit. */
 export function stepZoom(zoom: number, by: 1 | -1): number {
@@ -43,4 +43,4 @@ export function stepZoom(zoom: number, by: 1 | -1): number {
 }
 
 /** A fitted zoom kept in a usable range. */
-export const fitted = (zoom: number) => Math.min(Math.max(zoom, 0.1), 3);
+export const fitted = (zoom: number) => Math.min(Math.max(zoom, 0.1), 8);
