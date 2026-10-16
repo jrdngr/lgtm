@@ -54,7 +54,12 @@
     inset 0 -2px var(--accent);
 }
 
+/* The send target's title: violet, darker unless its tab is the focused pane's. */
 .dock .dv-default-tab[data-send] .dv-default-tab-content {
+  color: color-mix(in srgb, var(--violet-text) 55%, var(--bg));
+}
+
+.dock .dv-active-group .dv-active-tab .dv-default-tab[data-send] .dv-default-tab-content {
   color: var(--violet-text);
 }
 
