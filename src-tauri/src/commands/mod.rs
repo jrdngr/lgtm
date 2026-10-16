@@ -5,6 +5,7 @@ pub mod comments;
 pub mod editor;
 pub mod files;
 pub mod github;
+pub mod html;
 pub mod notes;
 pub mod pty;
 pub mod qa;

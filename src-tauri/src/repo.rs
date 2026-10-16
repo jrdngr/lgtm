@@ -192,11 +192,12 @@ fn close_start(app: &AppHandle) {
     }
 }
 
-/// Whether the webview may go to `url`: only the app's own pages, so a dropped file or a
-/// link never replaces the app.
+/// Whether the webview or a frame in it may go to `url`: only the app's own pages and HTML
+/// tabs' files, so a dropped file or a link never replaces the app and an HTML tab's page
+/// never leaves for the web.
 fn stays_in_app(url: &tauri::Url) -> bool {
     match url.scheme() {
-        "tauri" => true,
+        "tauri" | crate::html::SCHEME => true,
         "http" | "https" => matches!(
             url.host_str(),
             Some("localhost" | "tauri.localhost" | "127.0.0.1")
@@ -251,6 +252,7 @@ mod tests {
         let ok = |u: &str| stays_in_app(&tauri::Url::parse(u).unwrap());
         assert!(ok("tauri://localhost/index.html"));
         assert!(ok("http://localhost:1420/"));
+        assert!(ok("lgtmhtml://localhost/r0/docs/map.html"));
         assert!(!ok("file:///Users/j/diagram.png"));
         assert!(!ok("https://github.com/o/r"));
     }

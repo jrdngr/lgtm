@@ -12,6 +12,8 @@ import { useRepoChanged } from "../workspaces/useRepoChanged";
 import type { Reload } from "./AgentBox";
 import { minimalChange } from "./change";
 import { editorMenu, placeAt } from "./editorMenu";
+import { HtmlView } from "./HtmlView";
+import { isHtml } from "./htmlNav";
 import { ImagePanel } from "./ImagePanel";
 import { imageType, isSvg, svgUrl } from "./image";
 import { MarkdownView } from "./MarkdownView";
@@ -24,7 +26,7 @@ import "./editor.css";
 
 const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 /** Files with a rendered view next to their text. */
-const renders = (path: string) => isMarkdown(path) || isSvg(path);
+const renders = (path: string) => isMarkdown(path) || isSvg(path) || isHtml(path);
 
 /** A working-copy file in its tab: an image view for images, else the text editor. */
 export function EditorPanel(props: IDockviewPanelProps<EditorParams>) {
@@ -44,9 +46,9 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   /** Newer text on disk, held back because of unsaved edits. */
   const [onDisk, setOnDisk] = useState<string>();
   const [error, setError] = useState<string>();
-  /** The text shown rendered, for markdown, or undefined while editing. */
-  const [rendered, setRendered] = useState<string>();
-  const renderedRef = useRef<HTMLDivElement>(null);
+  /** The text shown rendered, or undefined while editing. HTML opens rendered. */
+  const [rendered, setRendered] = useState(isHtml(path) ? "" : undefined);
+  const renderedRef = useRef<{ focus(): void }>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
   const { sendText, picker } = useSendText(workspace, setError, () => view?.focus());
@@ -204,18 +206,23 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     setOnDisk(undefined);
   }
 
+  const toggle = renders(path) && (
+    <button type="button" disabled={!view} onClick={toggleRendered} title="⇧⌘V">
+      {rendered === undefined ? "Rendered" : "Editor"}
+    </button>
+  );
+  const html = isHtml(path) && rendered !== undefined;
+
   return (
     <div className="editor-panel" onKeyDown={onKeyDown}>
-      <div className="editor-path">
-        <span className="path" title={path}>
-          {path}
-        </span>
-        {renders(path) && (
-          <button type="button" disabled={!view} onClick={toggleRendered} title="⇧⌘V">
-            {rendered === undefined ? "Rendered" : "Editor"}
-          </button>
-        )}
-      </div>
+      {!html && (
+        <div className="editor-path">
+          <span className="path" title={path}>
+            {path}
+          </span>
+          {toggle}
+        </div>
+      )}
       {error && <div className="editor-bar error">{error}</div>}
       {onDisk !== undefined && (
         <div className="editor-bar">
@@ -228,10 +235,11 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           </button>
         </div>
       )}
-      {rendered !== undefined && (
+      {html && <HtmlView ref={renderedRef} workspace={workspace} path={path} toggle={toggle} />}
+      {rendered !== undefined && !html && (
         <div
           className={`editor-rendered${isSvg(path) ? " image" : ""}`}
-          ref={renderedRef}
+          ref={renderedRef as React.RefObject<HTMLDivElement>}
           // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
           tabIndex={0}
         >

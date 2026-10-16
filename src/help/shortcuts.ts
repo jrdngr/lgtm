@@ -47,7 +47,20 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘J"], action: "Revisions list" },
       { keys: ["⇧⌘N"], action: "New workspace" },
       { keys: ["⌥⌘N"], action: "Review a PR by URL or number, in its own workspace" },
-      { keys: ["⇧⌘V"], action: "Markdown editor: switch between editor and rendered view" },
+      {
+        keys: ["⇧⌘V"],
+        action: "Markdown, SVG or HTML file: switch between editor and rendered view",
+      },
+    ],
+  },
+  {
+    title: "HTML file, rendered",
+    shortcuts: [
+      { keys: ["⌘←", "⌘→"], action: "Back / forward" },
+      { keys: ["⌘R"], action: "Reload" },
+      { keys: ["⌘F"], action: "Find in the page" },
+      { keys: ["⌥⌘=", "⌥⌘-", "⌥⌘0"], action: "Zoom the page in, out, actual size" },
+      { keys: ["⌥⌘9"], action: "Fit the page to the tab's width" },
     ],
   },
   {

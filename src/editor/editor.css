@@ -154,3 +154,45 @@
   object-fit: contain;
   background: repeating-conic-gradient(#2a2a2a 0% 25%, #222 0% 50%) 0 0 / 16px 16px;
 }
+
+.html-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.html-view .editor-path {
+  gap: 2px;
+  padding: 2px 6px;
+}
+
+.html-view .editor-path .path {
+  margin: 0 6px;
+}
+
+.html-view .editor-path .html-zoom {
+  min-width: 48px;
+  padding: 0 4px;
+}
+
+.html-view .editor-path > :last-child {
+  margin-left: 6px;
+}
+
+.html-find input {
+  width: 220px;
+  font: inherit;
+}
+
+.html-find input.not-found {
+  outline: 1px solid var(--error);
+}
+
+.html-frame {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}

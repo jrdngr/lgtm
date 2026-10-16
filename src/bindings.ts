@@ -30,6 +30,10 @@ export const commands = {
 	/**  Shows the window's saved Word Wrap setting as View > Word Wrap's check. */
 	setWordWrap: (on: boolean) => typedError<null, string>(__TAURI_INVOKE("set_word_wrap", { on })),
 	loadLayout: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("load_layout", { workspace })),
+	/**  A root id for a workspace's files on the `lgtmhtml:` scheme, for one HTML tab. */
+	htmlRoot: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("html_root", { workspace })),
+	/**  Whether a file the HTML tab's root served changed since, so the tab reloads. */
+	htmlChanged: (root: string) => __TAURI_INVOKE<boolean>("html_changed", { root }),
 	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
 	/**
 	 *  Starts a login shell in the workspace. With `setup`, the shell first runs its

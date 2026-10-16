@@ -8,6 +8,7 @@ mod editor_agent;
 mod events;
 mod files;
 mod github;
+mod html;
 mod gitmeta;
 mod jj;
 mod layout;
@@ -40,6 +41,7 @@ use tauri_specta::{collect_commands, collect_events};
 
 use agent::Runs;
 use placement::Placements;
+use html::HtmlRoots;
 use pty::Ptys;
 use repo::RepoWindows;
 
@@ -58,6 +60,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::keep_window,
             commands::repo::set_word_wrap,
             commands::repo::load_layout,
+            commands::html::html_root,
+            commands::html::html_changed,
             commands::repo::save_layout,
             commands::pty::pty_spawn,
             commands::pty::pty_write,
@@ -250,6 +254,8 @@ pub fn run() {
         .manage(Ptys::default())
         .manage(Runs::default())
         .manage(RepoWindows::default())
+        .manage(HtmlRoots::default())
+        .register_asynchronous_uri_scheme_protocol(html::SCHEME, html::handle)
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
@@ -271,6 +277,7 @@ pub fn run() {
             WindowEvent::Destroyed => {
                 window.state::<Placements>().save();
                 window.state::<Ptys>().kill_window(window.label());
+                window.state::<HtmlRoots>().close_window(window.label());
                 let runs = window.state::<Runs>();
                 window.state::<RepoWindows>().remove(window.label(), &runs);
                 #[cfg(target_os = "macos")]
