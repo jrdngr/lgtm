@@ -32,21 +32,25 @@ const sessions = new Map<
   { session: Session; workspace: string; panels: number; timer?: number }
 >();
 
+/** A program running in a terminal panel's session. */
+export interface Running {
+  panel: string;
+  program: string;
+}
+
 /** The programs running in the sessions of the panels `pick` takes, by panel id and
- * workspace key. With `named`, each is `workspace: program`. */
+ * workspace key. */
 export async function runningPrograms(
   pick: (panel: string, workspace: string) => boolean,
-  named = false,
-): Promise<string[]> {
+): Promise<Running[]> {
   const picked = [...sessions].filter(([id, s]) => pick(id, s.workspace));
-  const names = await Promise.all(
-    picked.map(async ([, s]) => {
+  const running = await Promise.all(
+    picked.map(async ([panel, s]) => {
       const program = await s.session.running();
-      if (program === null || !named) return program;
-      return `${s.workspace || "default"}: ${program}`;
+      return program === null ? [] : [{ panel, program }];
     }),
   );
-  return names.filter((n) => n !== null);
+  return running.flat();
 }
 
 /** Shows panel `id`'s session in `container`: the one a panel with this id has, when the

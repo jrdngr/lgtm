@@ -1,6 +1,8 @@
-import { message } from "@tauri-apps/plugin-dialog";
-import { runningPrograms } from "../terminal/sessions";
+import { terminalTitle } from "../terminal/registry";
+import { type Running, runningPrograms } from "../terminal/sessions";
+import { tabAgent } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { askClose } from "./CloseDialog";
 
 interface Unsaved {
   workspace: string;
@@ -36,56 +38,38 @@ export const saveEditor = (workspace: WorkspaceName, id: string) =>
  * the user saved or discarded the edits and agreed to stop the program. */
 export async function confirmClose(workspace: WorkspaceName, id: string): Promise<boolean> {
   const edits = unsaved.get(keyOf(workspace, id));
-  return (
-    (await confirmDiscard(edits ? [edits] : [])) &&
-    confirmStop(await runningPrograms((panel) => panel === id))
-  );
+  return confirm(edits ? [edits] : [], await runningPrograms((panel) => panel === id));
 }
 
 /** Whether the workspace's editors and terminals may go, as `confirmClose` asks for one. */
 export async function confirmWorkspace(workspace: WorkspaceName): Promise<boolean> {
   const key = workspaceKey(workspace);
-  return (
-    (await confirmDiscard([...unsaved.values()].filter((u) => u.workspace === key))) &&
-    confirmStop(await runningPrograms((_, ws) => ws === key))
+  return confirm(
+    [...unsaved.values()].filter((u) => u.workspace === key),
+    await runningPrograms((_, ws) => ws === key),
   );
 }
 
 /** Whether every editor and terminal in the window may go, as `confirmClose` asks for one. */
 export async function confirmAll(): Promise<boolean> {
-  return (
-    (await confirmDiscard([...unsaved.values()])) &&
-    confirmStop(await runningPrograms(() => true, true))
+  return confirm([...unsaved.values()], await runningPrograms(() => true));
+}
+
+/** Asks once about `files` and `running`: Save saves every file and stops at the first that
+ * fails, and any choice but Cancel stops the programs. Each terminal's agent is listed like
+ * the workspace's agent list, and any other program by name. */
+async function confirm(files: Unsaved[], running: Running[]): Promise<boolean> {
+  if (files.length === 0 && running.length === 0) return true;
+  const programs = running.map(({ panel, program }) => {
+    const agent = tabAgent(panel);
+    return { key: panel, name: agent ? (terminalTitle(panel) ?? agent.label) : program, agent };
+  });
+  const choice = await askClose(
+    files.map((f) => f.name),
+    programs,
   );
-}
-
-async function confirmStop(programs: string[]): Promise<boolean> {
-  if (programs.length === 0) return true;
-  const text =
-    programs.length === 1
-      ? `${programs[0]} is running in a terminal.`
-      : `${programs.length} programs are running in terminals:\n\n${programs.join("\n")}`;
-  const choice = await message(text, {
-    title: "Stop running programs?",
-    kind: "warning",
-    buttons: { ok: "Stop", cancel: "Cancel" },
-  });
-  return choice === "Stop";
-}
-
-async function confirmDiscard(files: Unsaved[]): Promise<boolean> {
-  if (files.length === 0) return true;
-  const text =
-    files.length === 1
-      ? `${files[0].name} has unsaved changes.`
-      : `${files.length} files have unsaved changes:\n\n${files.map((f) => f.name).join("\n")}`;
-  const choice = await message(text, {
-    title: "Save changes?",
-    kind: "warning",
-    buttons: { yes: files.length === 1 ? "Save" : "Save All", no: "Don't Save", cancel: "Cancel" },
-  });
-  if (choice === "Don't Save") return true;
-  if (choice !== "Save" && choice !== "Save All") return false;
+  if (choice === "cancel") return false;
+  if (choice !== "save") return true;
   for (const f of files) {
     if (!(await f.save())) return false;
   }

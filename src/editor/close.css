@@ -1,0 +1,102 @@
+.close-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: start center;
+  padding: 90px 16px 16px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.close-dialog {
+  display: grid;
+  width: min(380px, 100%);
+  max-height: calc(100vh - 120px);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+  font-size: var(--fs-sm);
+}
+
+.close-dialog h3 {
+  margin: 0;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--hair);
+  font-size: var(--fs);
+  font-weight: 600;
+}
+
+.close-body {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 10px 14px;
+  overflow: auto;
+}
+
+.close-body h4 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* The workspace agent list's look. */
+.close-list {
+  display: grid;
+  gap: 1px;
+  padding: 6px;
+  background: #171718;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.close-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.close-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.close-name.in-terminal {
+  color: var(--violet-text);
+}
+
+.close-name.headless {
+  color: var(--agent-text);
+}
+
+.close-ago {
+  min-width: 22px;
+  text-align: right;
+  font: 10.5px var(--mono);
+  color: var(--faint);
+}
+
+.close-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 14px 12px;
+}
+
+.close-stop {
+  color: #fff;
+  background: var(--error);
+  border-color: var(--error);
+}

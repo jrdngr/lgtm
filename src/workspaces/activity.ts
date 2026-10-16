@@ -175,6 +175,15 @@ function info(id: string, a: Agent, now: number): AgentInfo {
   };
 }
 
+/** The most urgent agent running in panel `id`, in any workspace. */
+export function tabAgent(id: string): AgentInfo | undefined {
+  const now = Date.now();
+  return [...agents]
+    .filter(([, a]) => a.tab === id)
+    .map(([key, a]) => info(key, a, now))
+    .sort((a, b) => rank(a.state) - rank(b.state))[0];
+}
+
 /** The most urgent state of the agents running in panel `id`, a review tab when `review`. */
 export function tabState(a: Activity, id: string, review: boolean): AgentState | undefined {
   return a.agents.find((g) => g.tab === id || (review && g.tab === REVIEW_TAB))?.state;

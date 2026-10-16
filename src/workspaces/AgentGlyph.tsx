@@ -76,7 +76,7 @@ export function Glyph({ state, className = "" }: { state: Activity["state"]; cla
 }
 
 /** How long ago `t` was, in seconds under a minute. */
-function since(t: number) {
+export function since(t: number) {
   const s = Math.floor((Date.now() - t) / 1000);
   return s < 60 ? `${Math.max(s, 0)}s` : ago(t);
 }

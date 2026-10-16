@@ -88,6 +88,9 @@ export function subscribeTerminals(l: () => void) {
   return () => listeners.delete(l);
 }
 
+/** Terminal `id`'s tab title, if it's open. */
+export const terminalTitle = (id: string) => terminals.get(id)?.title();
+
 /** Whether terminal `id` is open. */
 export const hasTerminal = (id: string) => terminals.has(id);
 
