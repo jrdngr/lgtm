@@ -15,7 +15,8 @@ import {
   isReviewPanel,
   openReviewTab,
 } from "../workbench/panels";
-import type { WorkspaceName } from "./context";
+import { type WorkspaceName, workspaceKey } from "./context";
+import { COLORS, type PinColor, setColor, togglePin } from "./pins";
 import { clearStackPr } from "./stack";
 
 /** The row's Delete, in its ⋯ menu and its right-click menu. The main workspace can't go. */
@@ -36,8 +37,25 @@ function reviewAt(workspace: WorkspaceName, api: DockviewApi) {
   targetOf(workspace)?.load("@");
 }
 
+const title = (c: string) => c[0].toUpperCase() + c.slice(1);
+
+function colorItems(key: string, color: PinColor | undefined): CtxEntry[] {
+  return [
+    { label: "None", checked: !color, onSelect: () => setColor(key, null) },
+    "-",
+    ...(Object.keys(COLORS) as PinColor[]).map((c) => ({
+      label: title(c),
+      swatch: COLORS[c],
+      checked: c === color,
+      onSelect: () => setColor(key, c),
+    })),
+  ];
+}
+
 interface Row {
   w: WorkspaceDto;
+  pinned: boolean;
+  color: PinColor | undefined;
   /** Set in a PR workspace. */
   pr: PrDto | null | undefined;
   /** Whether the row shows an agent that ended while away. */
@@ -49,8 +67,18 @@ interface Row {
 }
 
 /** A workspace row's right-click menu. Items that work in the workspace switch to it first. */
-export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): CtxEntry[] {
+export function workspaceMenu({
+  w,
+  pinned,
+  color,
+  pr,
+  dot,
+  open,
+  onDelete,
+  onClearDot,
+}: Row): CtxEntry[] {
   const ws = w.name;
+  const key = workspaceKey(ws);
   const inIt = (f: (api: DockviewApi) => void) => () => {
     open();
     // A frame later, once the switch has shown the workspace's dock.
@@ -58,6 +86,9 @@ export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): 
   };
   return [
     { label: "Open Workspace", onSelect: open },
+    "-",
+    { label: pinned ? "Unpin" : "Pin to Top", onSelect: () => togglePin(key) },
+    { label: "Color", items: colorItems(key, color) },
     "-",
     { label: "New Terminal Here", onSelect: inIt((api) => focusPanel(addTerminal(api))) },
     (!pr || pr.stack) && { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },

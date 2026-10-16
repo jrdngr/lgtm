@@ -5,6 +5,8 @@ import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
+import { workspaceKey } from "./context";
+import { COLORS, usePins } from "./pins";
 import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";
 
@@ -79,16 +81,25 @@ interface Props {
   onSelect(): void;
   onDelete(): void;
   onError(message: string): void;
+  /** Starts dragging a pinned row. */
+  onPinDrag?(e: React.PointerEvent): void;
+  /** Where a dragged pin would land, next to this row. */
+  drop?: "before" | "after";
 }
 
 /** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
-export function WorkspaceRow({ w, selected, onSelect, onDelete, onError }: Props) {
+export function WorkspaceRow({ w, selected, onSelect, onDelete, onError, onPinDrag, drop }: Props) {
   const pr = usePr(w.name);
   const a = useActivity(w.name);
+  const key = workspaceKey(w.name);
+  const pins = usePins();
+  const color = pins.colors[key];
   const dot = a.state === "done" || a.state === "failed";
   const menu = contextMenu(() =>
     workspaceMenu({
       w,
+      pinned: pins.pinned.includes(key),
+      color,
       pr,
       dot,
       open: onSelect,
@@ -97,7 +108,13 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onError }: Props
     }),
   );
   return (
-    <li className={`workspace${selected ? " selected" : ""}`} onContextMenu={menu}>
+    <li
+      className={`workspace${selected ? " selected" : ""}${color ? " colored" : ""}${drop ? ` drop-${drop}` : ""}`}
+      style={color ? ({ "--ws-color": COLORS[color] } as React.CSSProperties) : undefined}
+      data-pin={onPinDrag ? key : undefined}
+      onPointerDown={onPinDrag}
+      onContextMenu={menu}
+    >
       <button type="button" className="workspace-open" onClick={onSelect} title={w.root}>
         <Lines w={w} onError={onError} />
       </button>

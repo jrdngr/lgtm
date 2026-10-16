@@ -1,5 +1,11 @@
 import { LogicalPosition } from "@tauri-apps/api/dpi";
-import { Menu, type MenuItemOptions, type SubmenuOptions } from "@tauri-apps/api/menu";
+import { Image } from "@tauri-apps/api/image";
+import {
+  type IconMenuItemOptions,
+  Menu,
+  type MenuItemOptions,
+  type SubmenuOptions,
+} from "@tauri-apps/api/menu";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { MouseEvent as ReactMouseEvent } from "react";
 
@@ -12,6 +18,8 @@ export type CtxItem =
       keys?: string;
       disabled?: boolean;
       checked?: boolean;
+      /** A color dot before the label, as `#rrggbb`, ringed when `checked`. */
+      swatch?: string;
     }
   | { label: string; items: CtxEntry[]; disabled?: boolean }
   | "-";
@@ -38,6 +46,7 @@ export function accelerator(keys: string): string | undefined {
 
 type Native =
   | MenuItemOptions
+  | IconMenuItemOptions
   | SubmenuOptions
   | { item: "Separator" }
   | { text: string; checked: boolean };
@@ -54,18 +63,60 @@ export function tidy(entries: CtxEntry[]): CtxItem[] {
   return out;
 }
 
-function native(items: CtxItem[]): Native[] {
-  return items.map((i): Native => {
-    if (i === "-") return { item: "Separator" };
-    if ("items" in i) return { text: i.label, enabled: !i.disabled, items: native(tidy(i.items)) };
-    const base = {
-      text: i.label,
-      enabled: !i.disabled,
-      accelerator: i.keys ? accelerator(i.keys) : undefined,
-      action: () => i.onSelect(),
-    };
-    return i.checked === undefined ? base : { ...base, checked: i.checked };
-  });
+/** Menu images draw 18pt tall, so a 10pt dot sits in a 36px square for Retina. */
+const SWATCH_PX = 36;
+const SWATCH_R = 10;
+
+const RING_IN = 13;
+const RING_OUT = 16;
+
+/** A filled circle, antialiased at its edge, with a ring around it when `ringed`. */
+export function swatchPixels(hex: string, ringed = false): Uint8Array {
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+  const px = new Uint8Array(SWATCH_PX * SWATCH_PX * 4);
+  const c = SWATCH_PX / 2;
+  for (let y = 0; y < SWATCH_PX; y++) {
+    for (let x = 0; x < SWATCH_PX; x++) {
+      const d = Math.hypot(x + 0.5 - c, y + 0.5 - c);
+      const edge = (r: number) => Math.max(0, Math.min(1, r + 0.5 - d));
+      const ring = ringed ? edge(RING_OUT) - edge(RING_IN) : 0;
+      const a = Math.max(edge(SWATCH_R), ring);
+      px.set([r, g, b, Math.round(a * 255)], (y * SWATCH_PX + x) * 4);
+    }
+  }
+  return px;
+}
+
+const swatches = new Map<string, Promise<Image>>();
+
+function swatch(hex: string, ringed: boolean): Promise<Image> {
+  const key = `${hex}${ringed ? "o" : ""}`;
+  let img = swatches.get(key);
+  if (!img) {
+    img = Image.new(swatchPixels(hex, ringed), SWATCH_PX, SWATCH_PX);
+    swatches.set(key, img);
+    img.catch(() => swatches.delete(key));
+  }
+  return img;
+}
+
+function native(items: CtxItem[]): Promise<Native[]> {
+  return Promise.all(
+    items.map(async (i): Promise<Native> => {
+      if (i === "-") return { item: "Separator" };
+      if ("items" in i) {
+        return { text: i.label, enabled: !i.disabled, items: await native(tidy(i.items)) };
+      }
+      const base = {
+        text: i.label,
+        enabled: !i.disabled,
+        accelerator: i.keys ? accelerator(i.keys) : undefined,
+        action: () => i.onSelect(),
+      };
+      if (i.swatch) return { ...base, icon: await swatch(i.swatch, !!i.checked) };
+      return i.checked === undefined ? base : { ...base, checked: i.checked };
+    }),
+  );
 }
 
 /** Shows a native menu at the pointer. Stops the event, so no other menu opens for it. */
@@ -75,7 +126,8 @@ export function openMenu(e: ReactMouseEvent | MouseEvent, entries: CtxEntry[]) {
   const items = tidy(entries);
   if (!items.length) return;
   const at = new LogicalPosition(e.clientX, e.clientY);
-  Menu.new({ items: native(items) as MenuItemOptions[] })
+  native(items)
+    .then((n) => Menu.new({ items: n as MenuItemOptions[] }))
     .then((menu) => menu.popup(at))
     .catch((err) => console.error("context menu", err));
 }

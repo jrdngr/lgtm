@@ -43,6 +43,54 @@
   background: var(--panel);
 }
 
+.workspace.colored {
+  box-shadow: inset 3px 0 0 var(--ws-color);
+}
+
+.workspace.colored.selected {
+  border-left-color: transparent;
+  box-shadow:
+    inset 3px 0 0 var(--ws-color),
+    inset 0 0 0 1px rgb(79 140 201 / 45%);
+}
+
+.workspace[data-pin] {
+  position: relative;
+}
+
+.workspace.drop-before::before,
+.workspace.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.workspace.drop-before::before {
+  top: -1px;
+}
+
+.workspace.drop-after::after {
+  bottom: -1px;
+}
+
+.ws-cap {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.ws-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--hair);
+}
+
 .workspace-open {
   display: flex;
   flex-direction: column;

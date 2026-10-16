@@ -40,6 +40,8 @@ This program may or may not be safe to run. Use it at your own risk.
 
 ![jj workspaces with their own terminals and layout](docs/screenshots/20-terminals.png)
 
+Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them.
+
 ## Requirements
 
 - [jj](https://github.com/jj-vcs/jj) 0.46 or newer: `brew install jj`

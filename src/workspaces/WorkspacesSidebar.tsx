@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { WorkspaceDto } from "../bindings";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
@@ -9,7 +10,9 @@ import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { type WorkspaceName, workspaceKey } from "./context";
+import { arrange, forgetPin, usePins } from "./pins";
 import { StackPrs } from "./StackPrs";
+import { usePinDrag } from "./usePinDrag";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
@@ -37,6 +40,8 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   // Bumped by Refresh, so the stack PRs ask GitHub again.
   const [refreshed, setRefreshed] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const pins = usePins();
+  const { drop, start: startDrag } = usePinDrag(pins.pinned);
 
   function start(kind: AddKind) {
     if (kind === "workspace") setNaming(true);
@@ -76,7 +81,10 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     setError(undefined);
     const r = await commands.deleteWorkspace(ws);
     if (r.status === "error") setError(r.error);
-    else onDeleted(ws);
+    else {
+      forgetPin(workspaceKey(ws));
+      onDeleted(ws);
+    }
     reload();
   }
 
@@ -107,6 +115,51 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
       { label: "Refresh", onSelect: refresh },
       { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide },
     ]);
+  }
+
+  const { top, rest } = arrange(workspaces ?? [], (w) => workspaceKey(w.name), pins.pinned);
+  const lastPin = top.filter((w) => workspaceKey(w.name) !== drop?.key).at(-1);
+
+  /** Where the dragged pin would land, next to the row with `key`. */
+  function dropAt(key: string) {
+    if (!drop || key === drop.key) return undefined;
+    if (drop.before === key) return "before";
+    if (drop.before === null && lastPin && workspaceKey(lastPin.name) === key) return "after";
+    return undefined;
+  }
+
+  function row(w: WorkspaceDto, pinned: boolean) {
+    const key = workspaceKey(w.name);
+    if (confirming === w.name) {
+      return (
+        <li key={key} className="workspace confirm">
+          <span>Delete {w.title}? Its commits stay in the repo.</span>
+          <button type="button" onClick={() => remove(confirming)}>
+            Delete
+          </button>
+          <button type="button" className="quiet" onClick={() => setConfirming(undefined)}>
+            Cancel
+          </button>
+        </li>
+      );
+    }
+    const item = (
+      <WorkspaceRow
+        key={key}
+        w={w}
+        selected={selected === w.name}
+        onSelect={() => onSelect(w.name)}
+        onDelete={() => setConfirming(w.name ?? undefined)}
+        onError={setError}
+        onPinDrag={pinned ? (e) => startDrag(e, key) : undefined}
+        drop={pinned ? dropAt(key) : undefined}
+      />
+    );
+    if (selected !== w.name) return item;
+    return [
+      item,
+      <StackPrs key={`${key} stack`} workspace={w.name} refreshed={refreshed} onError={setError} />,
+    ];
   }
 
   return (
@@ -153,44 +206,14 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
         </form>
       )}
       {error && <div className="review-error">{error}</div>}
-      <ul>
-        {workspaces?.map((w) => {
-          const key = workspaceKey(w.name);
-          if (confirming === w.name) {
-            return (
-              <li key={key} className="workspace confirm">
-                <span>Delete {w.title}? Its commits stay in the repo.</span>
-                <button type="button" onClick={() => remove(confirming)}>
-                  Delete
-                </button>
-                <button type="button" className="quiet" onClick={() => setConfirming(undefined)}>
-                  Cancel
-                </button>
-              </li>
-            );
-          }
-          const row = (
-            <WorkspaceRow
-              key={key}
-              w={w}
-              selected={selected === w.name}
-              onSelect={() => onSelect(w.name)}
-              onDelete={() => setConfirming(w.name ?? undefined)}
-              onError={setError}
-            />
-          );
-          if (selected !== w.name) return row;
-          return [
-            row,
-            <StackPrs
-              key={`${key} stack`}
-              workspace={w.name}
-              refreshed={refreshed}
-              onError={setError}
-            />,
-          ];
-        })}
-      </ul>
+      {top.length > 0 && (
+        <>
+          <div className="ws-cap">Pinned</div>
+          <ul>{top.map((w) => row(w, true))}</ul>
+          <div className="ws-divider" />
+        </>
+      )}
+      <ul>{rest.map((w) => row(w, false))}</ul>
     </div>
   );
 }
