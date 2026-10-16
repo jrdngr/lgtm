@@ -1,4 +1,8 @@
-import type { Activity } from "./activity";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ago } from "../ui/time";
+import type { Activity, AgentInfo } from "./activity";
+import "./workspaces.css";
 
 const NAMES = {
   input: "Needs input",
@@ -62,14 +66,73 @@ function Shape({ state }: { state: Activity["state"] }) {
   }
 }
 
-/** A workspace's most urgent agent state as a 12px mark. */
-export function AgentGlyph({ a }: { a: Activity }) {
-  const title = a.labels.length ? `${NAMES[a.state]}: ${a.labels.join(", ")}` : NAMES[a.state];
+/** An agent state as a 12px mark. */
+export function Glyph({ state, className = "" }: { state: Activity["state"]; className?: string }) {
   return (
-    <span className="ws-agents" title={title}>
-      <svg className={`ws-glyph ${a.state}`} viewBox="0 0 12 12" aria-label={NAMES[a.state]}>
-        <Shape state={a.state} />
-      </svg>
+    <svg className={`ws-glyph ${state} ${className}`} viewBox="0 0 12 12" aria-label={NAMES[state]}>
+      <Shape state={state} />
+    </svg>
+  );
+}
+
+/** How long ago `t` was, in seconds under a minute. */
+function since(t: number) {
+  const s = Math.floor((Date.now() - t) / 1000);
+  return s < 60 ? `${Math.max(s, 0)}s` : ago(t);
+}
+
+/** How long the list stays up after the pointer leaves, to let it reach the list. */
+const LEAVE_MS = 150;
+
+interface Props {
+  a: Activity;
+  /** The agent's name, like its tab's title. */
+  name(agent: AgentInfo): string;
+  onOpen(agent: AgentInfo): void;
+}
+
+/** A workspace's most urgent agent state as a 12px mark. Hovering it lists its agents. */
+export function AgentGlyph({ a, name, onOpen }: Props) {
+  const mark = useRef<HTMLSpanElement>(null);
+  const [place, setPlace] = useState<{ top: number; right: number }>();
+  const leave = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(leave.current), []);
+  const shown = place && a.agents.length > 0;
+  const enter = () => {
+    clearTimeout(leave.current);
+    const r = mark.current?.getBoundingClientRect();
+    if (r) setPlace({ top: r.bottom + 4, right: window.innerWidth - r.right - 4 });
+  };
+  const out = () => {
+    clearTimeout(leave.current);
+    leave.current = setTimeout(() => setPlace(undefined), LEAVE_MS);
+  };
+  return (
+    <span className="ws-agents" ref={mark} onPointerEnter={enter} onPointerLeave={out}>
+      <Glyph state={a.state} />
+      {shown &&
+        createPortal(
+          <div className="ws-agent-list" style={place} onPointerEnter={enter} onPointerLeave={out}>
+            {a.agents.map((g) => (
+              <button
+                type="button"
+                key={g.id}
+                className="ws-agent"
+                onClick={() => {
+                  setPlace(undefined);
+                  onOpen(g);
+                }}
+              >
+                <Glyph state={g.state} />
+                <span className={`ws-agent-name ${g.headless ? "headless" : "terminal"}`}>
+                  {name(g)}
+                </span>
+                <span className="ws-agent-ago">{since(g.since)}</span>
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
     </span>
   );
 }

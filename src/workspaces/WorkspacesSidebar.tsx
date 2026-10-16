@@ -2,20 +2,25 @@ import { useEffect, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
-import { reloadPr } from "../github/pr";
-import { commands } from "../ipc";
+import { prOf, reloadPr } from "../github/pr";
+import { commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
+import { loadState, saveState } from "../workbench/savedState";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { type WorkspaceName, workspaceKey } from "./context";
 import { arrange, forgetPin, usePins } from "./pins";
 import { StackPrs } from "./StackPrs";
+import { clearStackPr } from "./stack";
 import { usePinDrag } from "./usePinDrag";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
+
+/** Whether stack PRs show under the selected workspace. Saved per repo. */
+const SHOW_PRS = "stack-prs";
 
 interface Props {
   /** The repo's workspaces, from `useWorkspaces`. */
@@ -40,6 +45,21 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   // Bumped by Refresh, so the stack PRs ask GitHub again.
   const [refreshed, setRefreshed] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [showPrs, setShowPrs] = useState(() =>
+    loadState(SHOW_PRS, true, (v): v is boolean => typeof v === "boolean"),
+  );
+
+  /** Shows or hides the stack PRs. Hiding deselects every workspace's stack PR. */
+  async function toggleStackPrs() {
+    const show = !showPrs;
+    setShowPrs(show);
+    saveState(SHOW_PRS, show);
+    if (show) return;
+    for (const w of workspaces ?? []) {
+      const pr = await prOf(w.name);
+      if (pr?.stack) await clearStackPr(w.name, pr).catch((e) => setError(errorText(e)));
+    }
+  }
   const pins = usePins();
   const { drop, start: startDrag } = usePinDrag(pins.pinned);
 
@@ -155,7 +175,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
         drop={pinned ? dropAt(key) : undefined}
       />
     );
-    if (selected !== w.name) return item;
+    if (selected !== w.name || !showPrs || githubOff) return item;
     return [
       item,
       <StackPrs key={`${key} stack`} workspace={w.name} refreshed={refreshed} onError={setError} />,
@@ -165,6 +185,18 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   return (
     <div className="workspaces" onContextMenu={menu}>
       <SectionHeader title="Workspaces">
+        {!githubOff && (
+          <IconButton
+            icon="pr"
+            label="Stack PRs"
+            className={`ws-pr-toggle${showPrs ? " on" : ""}`}
+            aria-pressed={showPrs}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleStackPrs();
+            }}
+          />
+        )}
         <IconButton
           icon="sync"
           label="Refresh"

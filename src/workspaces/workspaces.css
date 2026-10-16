@@ -393,3 +393,64 @@
   font-size: var(--fs-xs);
   color: var(--muted);
 }
+
+/* Shows the stack PRs: violet while they show. */
+.ws-pr-toggle.on {
+  color: var(--violet-text);
+  background: var(--violet-soft);
+}
+
+.ws-agent-list {
+  position: fixed;
+  z-index: 100;
+  min-width: 150px;
+  max-width: 240px;
+  display: grid;
+  gap: 1px;
+  padding: 6px;
+  background: #2a2a2c;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+}
+
+.ws-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ws-agent:hover {
+  background: var(--hover);
+}
+
+.ws-agent-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ws-agent-name.terminal {
+  color: var(--violet-text);
+}
+
+.ws-agent-name.headless {
+  color: var(--agent-text);
+}
+
+.ws-agent-ago {
+  min-width: 22px;
+  text-align: right;
+  font: 10.5px var(--mono);
+  color: var(--faint);
+}

@@ -4,8 +4,10 @@ import { confirmClose } from "../editor/unsaved";
 import { hasTerminal, pinTarget, useSendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
+import { Glyph } from "../workspaces/AgentGlyph";
+import { tabState, useActivity } from "../workspaces/activity";
 import { useWorkspace } from "../workspaces/context";
-import { activate } from "./panels";
+import { activate, isReviewPanel } from "./panels";
 import { tabMenu } from "./tabMenu";
 import { setRenaming, useRenaming } from "./tabRename";
 
@@ -63,7 +65,8 @@ function RenameField({ title, onDone }: { title: string; onDone(title?: string):
 
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
  * selects it and opens its menu. The send target's tab is marked, and a terminal's tab leads
- * with a ›_ that pins it as the send target. */
+ * with a ›_ that pins it as the send target. A tab running agents shows their most urgent
+ * state where its × is, until hovered. */
 export function Tab(props: IDockviewPanelHeaderProps) {
   const { api, containerApi } = props;
   const workspace = useWorkspace();
@@ -71,6 +74,9 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   const renaming = useRenaming(api.id);
   const pinned = send.pinned === api.id;
   const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
+  const panel = containerApi.getPanel(api.id);
+  const agents = tabState(useActivity(workspace), api.id, !!panel && isReviewPanel(panel));
+  const glyph = agents && <Glyph state={agents} className="tab-glyph" />;
   async function close() {
     if (await confirmClose(workspace, api.id)) api.close();
   }
@@ -99,9 +105,17 @@ export function Tab(props: IDockviewPanelHeaderProps) {
       }}
     />
   );
-  if (!hasTerminal(api.id)) return tab;
+  if (!hasTerminal(api.id))
+    return glyph ? (
+      <div className="tab-row agent">
+        {tab}
+        {glyph}
+      </div>
+    ) : (
+      tab
+    );
   return (
-    <div className="tab-row">
+    <div className={`tab-row${glyph ? " agent" : ""}`}>
       <button
         type="button"
         className={`tab-pin${pinned ? " on" : ""}`}
@@ -113,6 +127,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
         <Icon name="terminal" size={13} />
       </button>
       {tab}
+      {glyph}
     </div>
   );
 }

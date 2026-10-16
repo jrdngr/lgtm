@@ -6,4 +6,4 @@ export const isBusyTitle = (title: string) => /^[\u2801-\u28ff]/.test(title);
 export const isAgentTitle = (title: string) => /^[\u2801-\u28ff\u2733]/.test(title);
 
 /** The title without its leading spinner or idle mark, for the workspace's activity. */
-export const titleLabel = (title: string) => `Terminal: ${title.replace(/^\S\s+/, "") || "agent"}`;
+export const titleLabel = (title: string) => title.replace(/^\S\s+/, "") || "Terminal";

@@ -103,7 +103,7 @@ function startSession(
   let hooked = false;
   const set = (state: ActivityState) => {
     agent = state;
-    report(workspace, activity, state, titleLabel(title), true);
+    report(workspace, activity, state, titleLabel(title), { stays: true, tab: id });
   };
 
   const channel = new Channel<PtyEvent>();

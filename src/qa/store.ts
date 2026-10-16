@@ -76,7 +76,7 @@ function reportWaiting(ws: WorkspaceName) {
   for (const d of getQa(ws).sessions) {
     if (!d.fromTerminal || d.sent != null || d.archived) continue;
     now.add(d.id);
-    report(ws, `qa:${d.id}`, "input", `Q&A: ${d.title}`);
+    report(ws, `qa:${d.id}`, "input", `Q&A: ${d.title}`, { tab: "qa" });
   }
   for (const id of before) if (!now.has(id)) report(ws, `qa:${id}`, "gone", "");
   waiting.set(key, now);

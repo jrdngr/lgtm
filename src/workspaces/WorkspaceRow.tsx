@@ -5,6 +5,7 @@ import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
+import { agentName, openAgent } from "./agentTabs";
 import { workspaceKey } from "./context";
 import { COLORS, usePins } from "./pins";
 import { clearStackPr } from "./stack";
@@ -127,7 +128,14 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onError, onPinDr
         {w.name !== null && (
           <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
-        <AgentGlyph a={a} />
+        <AgentGlyph
+          a={a}
+          name={(g) => agentName(w.name, g)}
+          onOpen={(g) => {
+            onSelect();
+            openAgent(w.name, g);
+          }}
+        />
       </span>
     </li>
   );

@@ -51,6 +51,7 @@
 
 /* A terminal tab's ›_: gray, violet when it pins the tab as the send target. */
 .dock .tab-row {
+  position: relative;
   display: flex;
   align-items: center;
   height: 100%;
@@ -89,4 +90,21 @@
   border: 1px solid var(--accent);
   border-radius: 3px;
   outline: none;
+}
+
+/* An agent's state glyph stands where the × is; hovering the tab brings the × back. */
+.dock .tab-glyph {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  margin-top: -6px;
+  pointer-events: none;
+}
+
+.dock .dv-tab:hover .tab-glyph {
+  display: none;
+}
+
+.dock .dv-tab:not(:hover) .tab-row.agent .dv-default-tab .dv-default-tab-action {
+  visibility: hidden;
 }

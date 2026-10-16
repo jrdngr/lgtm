@@ -9,12 +9,33 @@ export type ActivityState = "running" | "input" | "done" | "failed" | "stopped" 
 export const AGENT_STATES = ["input", "failed", "stalled", "working", "done", "idle"] as const;
 export type AgentState = (typeof AGENT_STATES)[number];
 
-/** The workspace's most urgent agent state, how many agents it has, and the labels of the
- * agents in that state. */
+/** One of a workspace's agents as its row lists it. */
+export interface AgentInfo {
+  id: string;
+  label: string;
+  state: AgentState;
+  /** When it took that state. */
+  since: number;
+  /** A headless run rather than an agent in a terminal. */
+  headless: boolean;
+  /** The panel it runs in, or `REVIEW_TAB` for any review tab. */
+  tab?: string;
+}
+
+/** The workspace's most urgent agent state and its agents, most urgent first. */
 export interface Activity {
   state: AgentState | "none";
-  count: number;
-  labels: string[];
+  agents: AgentInfo[];
+}
+
+/** An agent's `tab` that stands for every review tab. */
+export const REVIEW_TAB = "review";
+
+export interface ReportOptions {
+  /** Stays as idle once its ending is seen, like Claude in a terminal. Others go. */
+  stays?: boolean;
+  headless?: boolean;
+  tab?: string;
 }
 
 /** A running agent with no output for this long counts as stalled. */
@@ -27,8 +48,11 @@ interface Agent {
   state: "working" | "input" | "idle" | "done" | "failed";
   /** When it last showed signs of life. */
   pulse: number;
-  /** Stays as idle once its ending is seen, like Claude in a terminal. Others go. */
+  /** When it took its state. */
+  since: number;
   stays: boolean;
+  headless: boolean;
+  tab?: string;
 }
 
 const agents = new Map<string, Agent>();
@@ -57,13 +81,15 @@ export function report(
   id: string,
   state: ActivityState,
   label: string,
-  stays = false,
+  { stays = false, headless = false, tab }: ReportOptions = {},
 ) {
   const key = workspaceKey(workspace);
   const a = agents.get(id);
   const set = (s: Agent["state"]) => {
-    if (a?.key === key && a.state === s && a.label === label) return;
-    agents.set(id, { key, label, state: s, pulse: Date.now(), stays });
+    if (a?.key === key && a.state === s && a.label === label && a.tab === tab) return;
+    const now = Date.now();
+    const since = a?.state === s ? a.since : now;
+    agents.set(id, { key, label, state: s, pulse: now, since, stays, headless, tab });
     changed();
   };
   switch (state) {
@@ -113,8 +139,10 @@ export function clearFinished(workspace: WorkspaceName) {
   for (const [id, a] of agents) {
     if (a.key !== key || (a.state !== "done" && a.state !== "failed")) continue;
     any = true;
-    if (a.stays) a.state = "idle";
-    else agents.delete(id);
+    if (a.stays) {
+      a.state = "idle";
+      a.since = Date.now();
+    } else agents.delete(id);
   }
   if (any) changed();
 }
@@ -124,14 +152,32 @@ export function activity(workspace: WorkspaceName): Activity {
   const hit = cache.get(key);
   if (hit) return hit;
   const now = Date.now();
-  const mine = [...agents.values()]
-    .filter((a) => a.key === key)
-    .map((a) => ({ label: a.label, state: isStalled(a, now) ? ("stalled" as const) : a.state }));
-  const state = AGENT_STATES.find((s) => mine.some((a) => a.state === s)) ?? "none";
-  const labels = mine.filter((a) => a.state === state).map((a) => a.label);
-  const result: Activity = { state, count: mine.length, labels };
+  const mine = [...agents]
+    .filter(([, a]) => a.key === key)
+    .map(([id, a]) => info(id, a, now))
+    .sort((a, b) => rank(a.state) - rank(b.state) || b.since - a.since);
+  const result: Activity = { state: mine[0]?.state ?? "none", agents: mine };
   cache.set(key, result);
   return result;
+}
+
+const rank = (s: AgentState) => AGENT_STATES.indexOf(s);
+
+function info(id: string, a: Agent, now: number): AgentInfo {
+  const stalled = isStalled(a, now);
+  return {
+    id,
+    label: a.label,
+    state: stalled ? "stalled" : a.state,
+    since: stalled ? a.pulse + STALL_MS : a.since,
+    headless: a.headless,
+    tab: a.tab,
+  };
+}
+
+/** The most urgent state of the agents running in panel `id`, a review tab when `review`. */
+export function tabState(a: Activity, id: string, review: boolean): AgentState | undefined {
+  return a.agents.find((g) => g.tab === id || (review && g.tab === REVIEW_TAB))?.state;
 }
 
 function subscribe(l: () => void) {

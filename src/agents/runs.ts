@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { pulse, report } from "../workspaces/activity";
+import { pulse, REVIEW_TAB, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 export type AgentKind = "triage" | "qa" | "assess" | "intentFix";
@@ -10,6 +10,14 @@ export const KIND_NAMES: Record<AgentKind, string> = {
   qa: "Q&A",
   assess: "Assess",
   intentFix: "Fix intents",
+};
+
+/** The tab each kind of run works for. */
+const TABS: Record<AgentKind, string> = {
+  triage: REVIEW_TAB,
+  qa: "qa",
+  assess: "architecture",
+  intentFix: "architecture",
 };
 
 /** A headless agent run the window started. */
@@ -63,7 +71,8 @@ export function startRun(
   byWorkspace.set(key, [{ ...run, id, started: Date.now(), outcome: "running" }, ...kept]);
   for (const l of listeners) l();
   const label = KIND_NAMES[run.kind];
-  report(workspace, `run:${id}`, "running", label);
+  const where = { headless: true, tab: TABS[run.kind] };
+  report(workspace, `run:${id}`, "running", label, where);
   return {
     activity: (detail) => {
       pulse(`run:${id}`);
@@ -71,7 +80,7 @@ export function startRun(
     },
     end: (outcome, detail) => {
       update(key, id, (r) => ({ ...r, outcome, detail }));
-      report(workspace, `run:${id}`, outcome, label);
+      report(workspace, `run:${id}`, outcome, label, where);
     },
   };
 }
