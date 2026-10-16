@@ -55,6 +55,42 @@ body,
   overflow: hidden;
 }
 
+/* Only text you'd copy selects: fields, editors, and prose that agents and people write. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable],
+.cm-editor,
+.markdown-view,
+.qa-body,
+.qq-context,
+.qq-dep-answer,
+.qq-option-body,
+.combine-text,
+.card-summary,
+.post-body,
+.msg-text,
+.item-text,
+.take-question,
+.note-text,
+.quote-text,
+.note-body,
+.note-run-text,
+.pd-body,
+.bots-context,
+.bots-report-body,
+.finding-body,
+.suggested-body,
+.suggested-task-text,
+.suggested-verdict-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 button {
   font: inherit;
   color: var(--fg);
