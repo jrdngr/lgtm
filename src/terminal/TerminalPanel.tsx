@@ -28,10 +28,13 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
   const ref = useRef<HTMLDivElement>(null);
   const workspace = useWorkspace();
   const setup = useRef(params.setup ?? false);
+  const initial = useRef(params);
 
   useEffect(() => {
     const container = ref.current as HTMLDivElement;
-    const { claude, claudeSession } = api.getParameters<Params>();
+    // The panel's parameters as they stand. The api's own copy holds only the last update.
+    const current = () => (containerApi.getPanel(api.id)?.params ?? initial.current) as Params;
+    const { claude, claudeSession } = current();
     // A new Claude tab starts Claude Code, and a terminal coming back resumes its session.
     const command =
       claude || claudeSession
@@ -95,12 +98,12 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
     // The agent's session is kept for a restart, and its title names the tab.
     const unwatch = watchAgentHooks((r) => {
       if (r.terminal !== api.id) return;
-      const saved = api.getParameters<Params>().claudeSession;
+      const saved = current().claudeSession;
       if (r.ended) api.updateParameters({ claudeSession: undefined });
       else if (r.session && r.session !== saved) api.updateParameters({ claudeSession: r.session });
     });
     const titled = term.onTitleChange((t) => {
-      if (isAgentTitle(t) && !api.getParameters<Params>().renamed) api.setTitle(titleLabel(t));
+      if (isAgentTitle(t) && !current().renamed) api.setTitle(titleLabel(t));
     });
 
     const sub = api.onDidActiveChange(({ isActive }) => isActive && term.focus());
