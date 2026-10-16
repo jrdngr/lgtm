@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import type { StateDto } from "../bindings";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
-import { progressChanged } from "../workspaces/useWorkspaces";
 import {
   type CurrentReview,
   currentReview,
@@ -60,12 +58,8 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
     startRevset(workspace).then(load);
   }, []);
 
-  function edited(state: StateDto, review?: number) {
-    setState(state, review);
-    progressChanged();
-  }
-  const editedRef = useRef(edited);
-  editedRef.current = edited;
+  const setStateRef = useRef(setState);
+  setStateRef.current = setState;
 
   // A pane that took over keeps what it published.
   useEffect(() => {
@@ -96,7 +90,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       comments: review.state.comments,
       notes: review.state.notes,
       threads: review.state.threads,
-      apply: (state, review) => editedRef.current(state, review),
+      apply: (state, review) => setStateRef.current(state, review),
       jump: (file) => inPane((r) => r.jump(file)),
       jumpToComment: (id) => inPane((r) => r.jumpToComment(id)),
       jumpToRow: (file, row) => inPane((r) => r.jumpToRow(file, row)),
@@ -113,7 +107,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
         const refs = rows.map((row) => ({ file, row }));
         const r = await commands.addComment(review.id, refs, body, snippet, draft);
         if (r.status === "error") return false;
-        editedRef.current(r.data);
+        setStateRef.current(r.data);
         return true;
       },
     });

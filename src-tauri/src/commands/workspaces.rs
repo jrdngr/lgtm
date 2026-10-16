@@ -3,7 +3,6 @@ use tauri::{State, WebviewWindow};
 use super::{CmdResult, err, layout_path, repo};
 use crate::layout;
 use crate::pty::{Owner, Ptys};
-use crate::review::ProgressDto;
 use crate::workspaces::WorkspaceDto;
 
 /// Every workspace, the repo's main one first.
@@ -39,15 +38,3 @@ pub(crate) async fn delete_workspace(
     layout::remove(&layout_path(&window, Some(&name))?).map_err(|e| e.to_string())
 }
 
-/// Review progress of the workspace's latest review, or of its `@`.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn workspace_progress(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<ProgressDto> {
-    repo(&window)?
-        .progress(workspace.as_deref())
-        .await
-        .map_err(err)
-}

@@ -1,5 +1,4 @@
-use crate::review::tests::{repo, row_of, write};
-use crate::store::MarkColor;
+use crate::review::tests::{repo, write};
 
 use super::*;
 
@@ -12,7 +11,7 @@ fn names_are_safe_path_components() {
 }
 
 #[tokio::test]
-async fn a_workspace_has_its_own_working_copy_and_progress() {
+async fn a_workspace_has_its_own_working_copy() {
     let (dir, mut ctx) = repo();
     let base = tempfile::tempdir().unwrap();
     ctx.workspace_base = Some(base.path().to_path_buf());
@@ -33,15 +32,6 @@ async fn a_workspace_has_its_own_working_copy_and_progress() {
     let review = ctx.open(Some("t1"), "@", false).await.unwrap();
     let paths: Vec<&str> = review.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["a.py"]);
-    let row = row_of(&review, 0, "x = 1", 0);
-    ctx.mark(review.id, &[row], Some(MarkColor::Cyan), &[])
-        .unwrap();
-
-    let p = ctx.progress(Some("t1")).await.unwrap();
-    assert_eq!((p.revset.as_str(), p.done, p.changed), ("@", 1, 2));
-    assert_eq!(p.marks.len(), 1);
-    let main = ctx.progress(None).await.unwrap();
-    assert_eq!((main.done, main.changed), (0, 1));
 
     let root = ws.root.clone();
     ctx.delete_workspace("t1", || ()).await.unwrap();

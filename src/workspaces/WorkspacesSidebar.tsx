@@ -25,9 +25,9 @@ interface Props {
   onHide(): void;
 }
 
-/** The repo's workspaces with review progress. Click one to switch to it. */
+/** The repo's workspaces. Click one to switch to it. */
 export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide }: Props) {
-  const { workspaces, progress, error, setError, reload } = list;
+  const { workspaces, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
   const [openingPr, setOpeningPr] = useState(false);
   const githubOff = useGithubOff();
@@ -173,7 +173,6 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
             <WorkspaceRow
               key={key}
               w={w}
-              progress={progress.get(key)}
               selected={selected === w.name}
               onSelect={() => onSelect(w.name)}
               onDelete={() => setConfirming(w.name ?? undefined)}

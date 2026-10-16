@@ -1,6 +1,6 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeDto, StateDto, View } from "../bindings";
+import type { ChangeDto, View } from "../bindings";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
 import { PrNote } from "../github/PrNote";
@@ -11,7 +11,6 @@ import { openMenu } from "../ui/contextMenu";
 import { openArchitecture } from "../workbench/panels";
 import { remembered } from "../workbench/remembered";
 import { useWorkspace } from "../workspaces/context";
-import { progressChanged } from "../workspaces/useWorkspaces";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
 import { commentNear, commentSlots } from "./comments";
@@ -90,12 +89,12 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const fold = useCollapse(files, index.checks);
   const context = useContextLines(review, setError);
   const { sendText, sendRecent, picker } = useSendText(workspace, setError, focusRoot);
-  const pr = usePrReview(workspace, review, { onState: edited, onError: setError, load });
+  const pr = usePrReview(workspace, review, { onState: setState, onError: setError, load });
   const c = useComments({
     review,
     files,
     moves: loaded?.moves,
-    onState: edited,
+    onState: setState,
     onError: setError,
     send: sendText,
     onDone: focusRoot,
@@ -150,7 +149,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     s,
     c,
     setError,
-    edited,
+    edited: setState,
     followChecks(checked) {
       // A file checked or unchecked on its own keeps its header in place as it folds.
       if (checked.length === 1) keepFile.current?.(checked[0]);
@@ -202,13 +201,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     return () => sub.dispose();
   }, [api, focusRoot]);
 
-  /** Shows marks after an edit to `review`, if given, and tells the workspace list its
-   * progress moved. */
-  function edited(state: StateDto, review?: number) {
-    setState(state, review);
-    progressChanged();
-  }
-
   function changeFilter(next: Filter) {
     setFilter(next);
     fold.clearRevealed();
@@ -249,7 +241,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       setError(r.error);
       return false;
     }
-    edited(r.data);
+    setState(r.data);
     return true;
   }
 
@@ -257,7 +249,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     if (!review) return;
     if (agentsOff()) return setError("Walkthrough needs Claude Code, which is turned off.");
     const id = review.id;
-    runWalkthrough(workspace, id, revset, (state) => edited(state, id));
+    runWalkthrough(workspace, id, revset, (state) => setState(state, id));
   }
 
   function openInEditor() {
@@ -280,7 +272,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       runWalkthrough: runWalkthroughNow,
       refetchPr: pr.refetch,
       pullPr: pr.pull,
-      apply: edited,
+      apply: setState,
     },
   );
 

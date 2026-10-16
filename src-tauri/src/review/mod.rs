@@ -20,7 +20,6 @@ mod matching;
 #[cfg(test)]
 mod note_tests;
 mod notes;
-mod progress;
 mod proposal;
 mod quotes;
 mod replies;
@@ -56,7 +55,6 @@ pub use graph::GraphDto;
 use load::Loaded;
 use matching::MatchedCheck;
 pub use notes::{NoteDto, NoteInput};
-pub use progress::ProgressDto;
 pub use rowmap::RowMove;
 pub use quotes::quoted_reply;
 pub use threads::{ThreadDto, pulled_stage};

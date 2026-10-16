@@ -1,12 +1,9 @@
-import type { ProgressDto, WorkspaceDto } from "../bindings";
+import type { WorkspaceDto } from "../bindings";
 import { usePr } from "../github/pr";
 import { errorText } from "../ipc";
-import { useMarkSetup } from "../review/marks";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
-import { Ring } from "../ui/Ring";
 import { clearFinished, useActivity } from "./activity";
-import { doneShare, progressTitle } from "./progress";
 import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";
 
@@ -89,16 +86,14 @@ function ActivityMark({ w }: { w: WorkspaceDto }) {
 
 interface Props {
   w: WorkspaceDto;
-  progress?: ProgressDto;
   selected: boolean;
   onSelect(): void;
   onDelete(): void;
   onError(message: string): void;
 }
 
-/** One workspace: its PR or change, its agents, review progress, and a ⋯ menu on hover. */
-export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete, onError }: Props) {
-  const setup = useMarkSetup();
+/** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
+export function WorkspaceRow({ w, selected, onSelect, onDelete, onError }: Props) {
   const pr = usePr(w.name);
   const dot = useActivity(w.name)?.kind === "finished";
   const menu = contextMenu(() =>
@@ -121,7 +116,6 @@ export function WorkspaceRow({ w, progress: p, selected, onSelect, onDelete, onE
           <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
         <ActivityMark w={w} />
-        {p && p.changed > 0 && <Ring done={doneShare(p)} title={progressTitle(p, setup)} percent />}
       </span>
     </li>
   );

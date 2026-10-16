@@ -51,8 +51,6 @@ export const commands = {
 	createWorkspace: (name: string) => typedError<boolean, string>(__TAURI_INVOKE("create_workspace", { name })),
 	/**  Ends the workspace's terminals, then forgets it and deletes its directory. */
 	deleteWorkspace: (name: string) => typedError<null, string>(__TAURI_INVOKE("delete_workspace", { name })),
-	/**  Review progress of the workspace's latest review, or of its `@`. */
-	workspaceProgress: (workspace: string | null) => typedError<ProgressDto, string>(__TAURI_INVOKE("workspace_progress", { workspace })),
 	/**
 	 *  Loads the review for `revset` after snapshotting the working copy. Starts a review
 	 *  session, or with `resume` continues the revset's latest one.
@@ -1152,11 +1150,6 @@ export type LookSource = "rule" | "agent" | "security";
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
 export type MarkColor = "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
 
-export type MarkCount = {
-	color: MarkColor,
-	rows: number,
-};
-
 export type MarkDto = {
 	file: number,
 	row: number,
@@ -1424,17 +1417,6 @@ export type PreviewThreadDto = {
 	path: string,
 	/**  GitHub's diff hunk ending at the thread's line, for threads not on the diff. */
 	hunk: string,
-};
-
-/**  Changed-row counts, as the review header counts them. */
-export type ProgressDto = {
-	/**  The revset counted: the workspace's latest review, or `@`. */
-	revset: string,
-	/**  Rows that count as done: marked in a done color, or in a checked or skipped file. */
-	done: number,
-	changed: number,
-	/**  Marked rows by color, in key order. */
-	marks: MarkCount[],
 };
 
 /**  An editable prompt. */
