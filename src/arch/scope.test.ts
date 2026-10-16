@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { GraphDto, GraphNode } from "../bindings";
-import { scopedTree, scopeGraph } from "./drill";
 import { archOf, comp } from "./fixture.test-utils";
+import { scopedTree, scopeGraph } from "./scope";
 
 const node = (id: number, path: string, name: string): GraphNode => ({
   id,

@@ -11,9 +11,9 @@ import type { CurrentReview } from "../review/current";
 import type { CtxEntry } from "../ui/contextMenu";
 import type { WorkspaceName } from "../workspaces/context";
 import { DRAG_TYPE, droppedItem, startItemDrag } from "./ArchNode";
-import { scopedTree, scopeGraph } from "./drill";
 import { arrowHead, roundedPath } from "./paths";
 import { moveSource } from "./scene";
+import { scopedTree, scopeGraph } from "./scope";
 
 interface Props {
   review: CurrentReview;

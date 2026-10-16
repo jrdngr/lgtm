@@ -10,6 +10,7 @@ go:
 
 # Typecheck, lint, and run all tests
 test:
+    scripts/case-check.sh
     pnpm check
     pnpm test
 
