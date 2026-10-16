@@ -29,12 +29,19 @@ const sessions = new Map<
 >();
 
 /** The programs running in the sessions of the panels `pick` takes, by panel id and
- * workspace key. */
+ * workspace key. With `named`, each is `workspace: program`. */
 export async function runningPrograms(
   pick: (panel: string, workspace: string) => boolean,
+  named = false,
 ): Promise<string[]> {
   const picked = [...sessions].filter(([id, s]) => pick(id, s.workspace));
-  const names = await Promise.all(picked.map(([, s]) => s.session.running()));
+  const names = await Promise.all(
+    picked.map(async ([, s]) => {
+      const program = await s.session.running();
+      if (program === null || !named) return program;
+      return `${s.workspace || "default"}: ${program}`;
+    }),
+  );
   return names.filter((n) => n !== null);
 }
 

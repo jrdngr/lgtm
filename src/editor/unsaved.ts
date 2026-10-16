@@ -54,7 +54,8 @@ export async function confirmWorkspace(workspace: WorkspaceName): Promise<boolea
 /** Whether every editor and terminal in the window may go, as `confirmClose` asks for one. */
 export async function confirmAll(): Promise<boolean> {
   return (
-    (await confirmDiscard([...unsaved.values()])) && confirmStop(await runningPrograms(() => true))
+    (await confirmDiscard([...unsaved.values()])) &&
+    confirmStop(await runningPrograms(() => true, true))
   );
 }
 
