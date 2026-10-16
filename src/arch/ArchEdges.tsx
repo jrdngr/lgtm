@@ -47,6 +47,9 @@ export function ArchEdges({ placed, groups, edges, boundaries, focus }: Props) {
             <path className="ahead" d={p.arrows} />
           </g>
         ))}
+        {placed.joins.map((j) => (
+          <circle key={`${j.x},${j.y}`} className="ajoin" cx={j.x} cy={j.y} r={2.5} />
+        ))}
         {paths.badges.map((b) => (
           <g key={`${b.x},${b.y}`} className="abadge">
             <circle cx={b.x} cy={b.y} r={8} />

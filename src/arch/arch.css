@@ -497,6 +497,10 @@ button.apill {
   stroke-width: 1.25;
 }
 
+.ajoin {
+  fill: var(--link);
+}
+
 .edge .ahead {
   fill: var(--link);
 }
