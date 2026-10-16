@@ -11,7 +11,7 @@ use super::matching::{Remaps, SideRows, pools};
 use super::threads::after_edit;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::anchor::{self, MarkRef};
-use crate::store::{Comment, GhLink, Message, Pin, Store, ThreadState, Workshop};
+use crate::store::{Comment, Conversation, GhLink, Message, Pin, Store, ThreadState};
 
 /// The first and last rows a comment covers, by index among its file's rows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
@@ -89,7 +89,7 @@ impl Review {
             review: c.review,
             created_at: c.created_at as f64,
             updated_at: c.updated_at as f64,
-            messages: c.workshop.messages,
+            messages: c.conversation.messages,
             github: c.github,
             thread: c.thread,
             done: c.done,
@@ -290,7 +290,7 @@ impl RepoCtx {
                 review: review.label.clone(),
                 created_at: now,
                 updated_at: now,
-                workshop: Workshop::default(),
+                conversation: Conversation::default(),
                 github: None,
                 thread,
                 done: false,

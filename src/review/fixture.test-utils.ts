@@ -78,7 +78,6 @@ export function review(files: FileDto[]): ReviewDto {
     changes: [],
     removedChanges: [],
     previousSession: null,
-    hasWorkingCopy: true,
     stale: null,
   };
 }

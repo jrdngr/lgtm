@@ -7,7 +7,7 @@ import { Row, Section } from "./SettingsPanel";
 import { saveSettings } from "./store";
 
 const MODELS: [keyof Models, string, string][] = [
-  ["ask", "Ask and Change", "Notes' agent chats, Fix, and conflict resolution"],
+  ["ask", "Fixes", "Fix and conflict resolution"],
   ["walkthrough", "Walkthrough", "Writing the walkthrough"],
   ["reviewers", "Reports", "Persona reviews and their reports"],
   ["replies", "Replies", "Triage and replies on PR threads"],

@@ -17,11 +17,11 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
-pub use comments::{Author, Comment, GhLink, GhPost, Message, Pin, Workshop};
+pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use marks::{Mark, MarkColor};
 pub use notes::{Category, FlowStep, Level, Note, Source};
 pub use sessions::Session;
-pub use threads::{Proposed, ProposedState, Quote, Stage, Take, TakeVerdict, ThreadState};
+pub use threads::{Quote, Stage, Take, TakeVerdict, ThreadState};
 
 pub struct Store {
     db: Connection,

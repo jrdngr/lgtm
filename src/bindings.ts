@@ -159,12 +159,6 @@ export const commands = {
 	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
 	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
 	resetThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
-	/**  Makes a thread's suggested reply its reply with `apply`, or drops it. */
-	settleSuggestion: (review: number, comment: number, apply: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("settle_suggestion", { review, comment, apply })),
-	/**  Writes a thread's proposed code changes to the working copy. */
-	applyProposal: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("apply_proposal", { review, comment })),
-	/**  Drops a thread's proposed change to `path`, or all of them without one. */
-	discardProposal: (review: number, comment: number, path: string | null) => typedError<StateDto, string>(__TAURI_INVOKE("discard_proposal", { review, comment, path })),
 	/**  Marks a note done, or open again. */
 	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
 	/**  Starts a GitHub draft on a note's code, with its text. */
@@ -173,12 +167,6 @@ export const commands = {
 	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
 	addQuote: (review: number, of: number, text: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
 	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
-	/**
-	 *  Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
-	 *  the reply's text through `on_text` and returns once it's saved.
-	 */
-	workshopComment: (review: number, comment: number, ask: Ask, onText: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("workshop_comment", { review, comment, ask, onText })),
-	stopWorkshop: (comment: number) => typedError<null, string>(__TAURI_INVOKE("stop_workshop", { comment })),
 	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
 	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
 	/**  Stops the review's triage run. */
@@ -491,17 +479,6 @@ export type ArchRange = {
 	/**  Absent for the root. */
 	from: string | null,
 	to: string,
-};
-
-/**  A message for a comment's agent. */
-export type Ask = {
-	message: string,
-	/**  The comment's text as it is in the editor, which may not be saved. */
-	draft: string,
-	/**  Have the agent edit the working copy. */
-	change: boolean,
-	/**  Ask for a first take and reply, with no message of the user's. */
-	compose?: boolean,
 };
 
 export type AssessmentDto = {
@@ -1183,17 +1160,6 @@ export type McpStatus = {
 export type Message = {
 	author: Author,
 	text: string,
-	/**  A user message that asked for a change, which the agent could make by editing files. */
-	change?: boolean,
-	/**  An agent message that rewrote its thread's take or reply. */
-	updated?: boolean,
-	/**
-	 *  A user message that asked for a first take and reply, shown as nothing but the agent's
-	 *  answer.
-	 */
-	compose?: boolean,
-	/**  The reply an agent message replaced, empty for a first one. */
-	before?: string | null,
 };
 
 /**  The task filter's suggested fixes. */
@@ -1208,7 +1174,7 @@ export type Minimal = {
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
 export type Models = {
-	/**  Asks and changes on notes, Fix headless, and conflict resolution. */
+	/**  Fix headless, and conflict resolution. */
 	ask: string,
 	walkthrough: string,
 	reviewers: string,
@@ -1435,24 +1401,6 @@ export type PromptInfo = {
 	exists: boolean,
 };
 
-/**
- *  A change to one file the agent proposed in a thread's chat, written once the reply is
- *  final. `before` is empty for a new file.
- */
-export type Proposed = {
-	/**  Relative to the workspace root. */
-	path: string,
-	before: string,
-	after: string,
-	state: ProposedState,
-};
-
-/**
- *  Where a proposed file change is: waiting for the reply to go final, written, or not
- *  written because the file changed after it was proposed.
- */
-export type ProposedState = "proposed" | "applied" | "stale";
-
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
 
 export type QState = "open" | "decided" | 
@@ -1663,8 +1611,6 @@ export type ReviewDto = {
 	/**  When the previous session started (Unix ms), if there was one. */
 	previousSession: number | null,
 	stale: string | null,
-	/**  Whether the revset includes the workspace's `@`, where an agent's changes land. */
-	hasWorkingCopy: boolean,
 };
 
 /**  An agent changed review `review`'s comments or walkthrough notes. */
@@ -1934,10 +1880,6 @@ export type ThreadState = {
 	take: Take | null,
 	/**  A few words on what the thread asks, from triage. */
 	summary: string,
-	/**  Code changes the agent's reply promises, by file. */
-	proposal?: Proposed[],
-	/**  A reply the agent suggests after reviewing the current one. */
-	suggestion?: string | null,
 	/**  Set on a thread that answers part of a comment on the PR itself. */
 	quote?: Quote | null,
 };

@@ -3,7 +3,7 @@ use tauri::{State, WebviewWindow};
 
 use super::{CmdResult, err, repo};
 use crate::agent::Runs;
-use crate::review::{Ask, RowRef, StateDto};
+use crate::review::{RowRef, StateDto};
 use crate::store::Stage;
 
 /// Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
@@ -46,20 +46,6 @@ pub(crate) fn reset_thread(
     comment: u32,
 ) -> CmdResult<StateDto> {
     repo(&window)?.reset_thread(review, comment).map_err(err)
-}
-
-/// Makes a thread's suggested reply its reply with `apply`, or drops it.
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn settle_suggestion(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-    apply: bool,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .settle_suggestion(review, comment, apply)
-        .map_err(err)
 }
 
 /// Marks a note done, or open again.
@@ -116,72 +102,10 @@ pub(crate) fn add_quote(
 #[specta::specta]
 pub(crate) fn delete_comment(
     window: WebviewWindow,
-    runs: State<'_, Runs>,
     review: u32,
     comment: u32,
 ) -> CmdResult<StateDto> {
-    let repo = repo(&window)?;
-    repo.stop_workshop(comment, &runs);
-    repo.delete_comment(review, comment).map_err(err)
-}
-
-/// Sends `ask` to the comment's agent, which edits the code when it asks for a change. Streams
-/// the reply's text through `on_text` and returns once it's saved.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn workshop_comment(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    review: u32,
-    comment: u32,
-    ask: Ask,
-    on_text: Channel<String>,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .workshop(review, comment, &ask, &runs, |t| {
-            on_text.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-/// Writes a thread's proposed code changes to the working copy.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn apply_proposal(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .apply_proposal(review, comment)
-        .await
-        .map_err(err)
-}
-
-/// Drops a thread's proposed change to `path`, or all of them without one.
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn discard_proposal(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-    path: Option<String>,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .discard_proposal(review, comment, path)
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn stop_workshop(
-    window: WebviewWindow,
-    runs: State<Runs>,
-    comment: u32,
-) -> CmdResult<()> {
-    repo(&window)?.stop_workshop(comment, &runs);
-    Ok(())
+    repo(&window)?.delete_comment(review, comment).map_err(err)
 }
 
 /// Triages the new threads on the review's PR, reporting each tool call through `on_tool`.

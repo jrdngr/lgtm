@@ -6,7 +6,7 @@ use serde::Serialize;
 use specta::Type;
 
 use super::{RepoCtx, Review, StateDto, now_ms};
-use crate::store::{Author, Comment, GhLink, Message, Stage, Store, ThreadState, Workshop};
+use crate::store::{Comment, Conversation, GhLink, Message, Stage, Store, ThreadState};
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -98,7 +98,7 @@ impl Review {
                 path: c.path,
                 body: c.body,
                 snippet: c.snippet,
-                messages: c.workshop.messages,
+                messages: c.conversation.messages,
                 state: c.thread.expect("pr threads have a state"),
                 github: c.github,
                 created_at: c.created_at as f64,
@@ -134,7 +134,7 @@ impl RepoCtx {
         })
     }
 
-    /// Clears a GitHub thread's take, reply and agent conversation, and puts it back where a
+    /// Clears a GitHub thread's take, reply and conversation, and puts it back where a
     /// freshly pulled thread starts.
     pub fn reset_thread(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |_, store| {
@@ -142,41 +142,8 @@ impl RepoCtx {
             let c = store.comment(cid)?.context("the thread is gone")?;
             let link = c.github.context("only GitHub threads reset")?;
             store.set_comment_body(cid, "", now_ms())?;
-            store.set_workshop(cid, &Workshop::default())?;
+            store.set_conversation(cid, &Conversation::default())?;
             Ok(store.set_thread(cid, &Some(ThreadState::from_link(&link)))?)
-        })
-    }
-
-    /// Makes a thread's suggested reply its reply with `apply`, or drops it.
-    pub fn settle_suggestion(
-        &self,
-        id: u32,
-        comment: u32,
-        apply: bool,
-    ) -> anyhow::Result<StateDto> {
-        self.comment_edit(id, |_, store| {
-            let cid = comment as i64;
-            let mut c = store.comment(cid)?.context("the thread is gone")?;
-            let draft = c.is_draft();
-            let t = c.thread.as_mut().context("notes have no suggestion")?;
-            let Some(text) = t.suggestion.take() else {
-                return Ok(());
-            };
-            if apply {
-                let before = std::mem::replace(&mut c.body, text);
-                t.stage = after_edit(t.stage, draft, &c.body);
-                store.set_comment_body(cid, &c.body, now_ms())?;
-                // The review that suggested it made the reply's new version.
-                let m = &mut c.workshop.messages;
-                let made = (1..m.len())
-                    .rev()
-                    .find(|&i| m[i].author == Author::Agent && m[i - 1].compose);
-                if let Some(i) = made {
-                    m[i].before = Some(before);
-                    store.set_workshop(cid, &c.workshop)?;
-                }
-            }
-            Ok(store.set_thread(cid, &c.thread)?)
         })
     }
 
@@ -199,7 +166,7 @@ impl RepoCtx {
                 review: review.label.clone(),
                 created_at: now,
                 updated_at: now,
-                workshop: Workshop::default(),
+                conversation: Conversation::default(),
                 github: None,
                 done: false,
                 ..note

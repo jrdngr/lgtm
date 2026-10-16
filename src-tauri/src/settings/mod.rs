@@ -48,7 +48,7 @@ impl Default for Settings {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Models {
-    /// Asks and changes on notes, Fix headless, and conflict resolution.
+    /// Fix headless, and conflict resolution.
     pub ask: String,
     pub walkthrough: String,
     pub reviewers: String,
@@ -64,7 +64,7 @@ pub enum Purpose {
     Ask,
     Walkthrough,
     Reviewers,
-    /// Triage, fixes and the reply chat on GitHub threads.
+    /// Triage and fixes on GitHub threads.
     Replies,
     Qa,
 }

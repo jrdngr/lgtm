@@ -5,9 +5,7 @@ import { viewerLogin } from "../github/people";
 import { useTriaging } from "../threads/useThreadRun";
 import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
-import { isMac } from "../workbench/keys";
-import { ApplyDialog } from "./ApplyDialog";
-import { SAVE_KEY } from "./AskBox";
+import { isMac, SAVE_KEY } from "../workbench/keys";
 import { CombineDialog } from "./CombineDialog";
 import { quotesOf } from "./prComments";
 import { SnippetDiff } from "./SnippetDiff";
@@ -19,22 +17,20 @@ import { useQuoting } from "./useQuoting";
 interface Props {
   comment: CommentDto;
   c: Comments;
-  agentsOff: boolean;
   done: boolean;
   onFold(): void;
   onContextMenu(e: React.MouseEvent): void;
   bodyRef: RefObject<HTMLTextAreaElement | null>;
-  askRef: RefObject<HTMLTextAreaElement | null>;
 }
 
 const typing = (t: EventTarget) =>
   t instanceof HTMLTextAreaElement || t instanceof HTMLInputElement;
 
 /** A GitHub thread under its code, a comment on the PR, or a quote of part of one: who started
- * it and its stage, its posts, then the reply workflow. `a` drafts or asks, `e` edits the
- * reply, `y` makes it final. In a comment on the PR, `q` quotes the selected text; once it has
- * quotes, they carry its replies. */
-export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props) {
+ * it and its stage, its posts, then the reply workflow. `e` edits the reply, `y` makes it
+ * final. In a comment on the PR, `q` quotes the selected text; once it has quotes, they carry
+ * its replies. */
+export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const [snippet, setSnippet] = useState(false);
   const [combining, setCombining] = useState(false);
   const triaging = useTriaging(c.reviewId, comment.id);
@@ -60,8 +56,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
   function onKey(e: React.KeyboardEvent) {
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (triaging || split) return;
-    if (e.key === "a" && !agentsOff) c.agentKey(id);
-    else if (e.key === "e") c.edit(comment);
+    if (e.key === "e") c.edit(comment);
     else if (e.key === "y" && comment.body.trim() && thread?.stage !== "ready") c.final(id);
     else return;
     e.preventDefault();
@@ -152,12 +147,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
         )}
         <span className="spacer" />
         {!split && (
-          <IconButton
-            icon="retry"
-            label="Reset"
-            disabled={c.running.has(id) || triaging}
-            onClick={() => c.reset(id)}
-          />
+          <IconButton icon="retry" label="Reset" disabled={triaging} onClick={() => c.reset(id)} />
         )}
         {gh && (
           <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
@@ -172,7 +162,6 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
       )}
       {quote && <blockquote className="quote-text quote-own">{quote.text}</blockquote>}
       {quoting.quoteButton}
-      {c.confirming === id && <ApplyDialog comment={comment} c={c} />}
       {split ? (
         <div className="flow quote-bar">
           <span className="pill purple">
@@ -184,14 +173,7 @@ export function ThreadBlock({ comment, c, agentsOff, done, onFold, ...p }: Props
           </button>
         </div>
       ) : (
-        <ThreadFlow
-          comment={comment}
-          c={c}
-          agentsOff={agentsOff}
-          triaging={triaging}
-          editor={editor || undefined}
-          askRef={p.askRef}
-        />
+        <ThreadFlow comment={comment} c={c} triaging={triaging} editor={editor || undefined} />
       )}
       {combining && (
         <CombineDialog

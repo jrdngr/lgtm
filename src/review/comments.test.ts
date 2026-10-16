@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CommentDto, Message } from "../bindings";
-import {
-  commentNear,
-  commentSlots,
-  commentText,
-  conversationText,
-  draftFor,
-  followDraft,
-  replyParts,
-} from "./comments";
+import { commentSlots, commentText, conversationText, draftFor, followDraft } from "./comments";
 import { file, layout, review, rows } from "./fixture.test-utils";
 import { buildLines, flatten, hunkRange, NEW_COMMENT } from "./model";
 
@@ -38,17 +30,6 @@ describe("comment blocks", () => {
   });
 });
 
-describe("replyParts", () => {
-  it("splits suggested comments out of a reply", () => {
-    const reply = "Try:\n\n```comment\nWhy `x`?\nIt's unused.\n```\n\nOr drop it.";
-    expect(replyParts(reply)).toEqual([
-      { kind: "text", text: "Try:" },
-      { kind: "suggestion", text: "Why `x`?\nIt's unused." },
-      { kind: "text", text: "Or drop it." },
-    ]);
-  });
-});
-
 describe("followDraft", () => {
   const draft = { file: 0, rows: [1, 2], snippet: "" };
   const moves = (rows: [string, string][]) => ({ rows: new Map(rows), files: new Map([[0, 1]]) });
@@ -71,36 +52,15 @@ describe("comments whose code is gone", () => {
   });
 });
 
-describe("commentNear", () => {
-  const two = flatten(review([file("a.rs", [rows([" a", "-b", "+B", " c"]), rows(["+x", " y"])])]));
-  const c = { id: 3, file: 0, rows: { start: 1, end: 2 } } as unknown as CommentDto;
-  const lines = buildLines(two, layout({ comments: commentSlots([c], undefined) }));
-
-  it("finds the block below the cursor, else above it, within the hunk", () => {
-    expect(lines[5]).toMatchObject({ kind: "comment", comment: 3 });
-    expect(commentNear(lines, 2)).toBe(3);
-    expect(commentNear(lines, 6)).toBe(3);
-  });
-
-  it("doesn't reach into another hunk", () => {
-    expect(lines[7].kind).toBe("hunk");
-    expect(commentNear(lines, 8)).toBeUndefined();
-  });
-});
-
 describe("conversationText", () => {
-  it("writes who said what, leaving out compose asks and empty replies", () => {
+  it("writes who said what, leaving out empty messages", () => {
     expect(
       conversationText([
-        { author: "user", text: "", compose: true },
         { author: "agent", text: "Draft reply" },
-        { author: "user", text: "", change: true },
         { author: "agent", text: "  " },
         { author: "user", text: "Why the lock?" },
       ] as Message[]),
-    ).toBe(
-      "Our conversation about it:\n\nAgent:\nDraft reply\n\nMe:\nMake the change this comment asks for.\n\nMe:\nWhy the lock?",
-    );
+    ).toBe("Our conversation about it:\n\nAgent:\nDraft reply\n\nMe:\nWhy the lock?");
   });
 
   it("is empty without messages", () => {

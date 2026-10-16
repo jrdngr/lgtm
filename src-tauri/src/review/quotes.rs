@@ -4,7 +4,7 @@
 use anyhow::Context;
 
 use super::{RepoCtx, StateDto, now_ms};
-use crate::store::{Comment, Quote, Stage, Workshop};
+use crate::store::{Comment, Conversation, Quote, Stage};
 
 impl RepoCtx {
     /// Starts a thread on `text`, quoted from comment `of` on the PR.
@@ -40,7 +40,7 @@ impl RepoCtx {
                 review: parent.review,
                 created_at: now,
                 updated_at: now,
-                workshop: Workshop::default(),
+                conversation: Conversation::default(),
                 github: None,
                 thread: Some(thread),
                 done: false,

@@ -9,7 +9,6 @@ import type { Comments } from "./useComments";
 interface Card {
   comment: CommentDto;
   c: Comments;
-  agentsOff: boolean;
 }
 
 function stageItems({ comment, c }: Card) {
@@ -59,7 +58,6 @@ export function noteItems(card: Card): (MenuItem | false)[] {
   const { comment, c } = card;
   return [
     { label: "Edit", onSelect: () => c.edit(comment) },
-    !card.agentsOff && { label: "Ask Agent", onSelect: () => c.openAsk(comment.id) },
     { label: "Send to Terminal", onSelect: () => c.send(comment) },
     { label: "Copy", disabled: !comment.body, onSelect: () => copy(comment.body) },
     draftItem(card),
@@ -71,11 +69,6 @@ export function noteItems(card: Card): (MenuItem | false)[] {
 export function cardItems(card: Card): CtxEntry[] {
   const { comment, c } = card;
   const gh = comment.github;
-  const ask = !card.agentsOff && {
-    label: "Ask the Agent",
-    keys: "a",
-    onSelect: () => c.agentKey(comment.id),
-  };
   const send = { label: "Send to Terminal", onSelect: () => c.send(comment) };
   if (!comment.thread) {
     return [
@@ -85,7 +78,6 @@ export function cardItems(card: Card): CtxEntry[] {
         checked: comment.done,
         onSelect: () => c.setDone(comment.id, !comment.done),
       },
-      ask,
       send,
       draftItem(card),
       "-",
@@ -100,7 +92,6 @@ export function cardItems(card: Card): CtxEntry[] {
       onSelect: () => c.edit(comment),
     },
     { label: "Move to Stage", items: stageItems(card) },
-    ask,
     send,
     "-",
     gh && { label: "Open on GitHub", onSelect: () => openUrl(gh.url) },

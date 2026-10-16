@@ -1,6 +1,6 @@
 //! Review comments: local notes, and GitHub threads and drafts of them. A comment is anchored
 //! like a mark, on the first and last changed rows of the selection it was made on, and keeps
-//! its workshop conversation with an agent.
+//! the replies terminal agents gave on it.
 
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -60,26 +60,11 @@ pub enum Author {
 pub struct Message {
     pub author: Author,
     pub text: String,
-    /// A user message that asked for a change, which the agent could make by editing files.
-    #[serde(default)]
-    pub change: bool,
-    /// An agent message that rewrote its thread's take or reply.
-    #[serde(default)]
-    pub updated: bool,
-    /// A user message that asked for a first take and reply, shown as nothing but the agent's
-    /// answer.
-    #[serde(default)]
-    pub compose: bool,
-    /// The reply an agent message replaced, empty for a first one.
-    #[serde(default)]
-    pub before: Option<String>,
 }
 
-/// The agent conversation inside a comment block.
+/// The conversation inside a comment block. Stored in the `workshop` column.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Workshop {
-    /// The agent's session, resumed by each follow-up.
-    pub session: Option<String>,
+pub struct Conversation {
     pub messages: Vec<Message>,
 }
 
@@ -124,7 +109,7 @@ pub struct Comment {
     pub review: String,
     pub created_at: i64,
     pub updated_at: i64,
-    pub workshop: Workshop,
+    pub conversation: Conversation,
     pub github: Option<GhLink>,
     /// Set on threads and drafts of them; notes have none.
     pub thread: Option<ThreadState>,
@@ -213,7 +198,7 @@ pub(super) fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
         review: r.get(5)?,
         created_at: r.get(6)?,
         updated_at: r.get(7)?,
-        workshop: serde_json::from_str(&r.get::<_, String>(8)?).map_err(json_err)?,
+        conversation: serde_json::from_str(&r.get::<_, String>(8)?).map_err(json_err)?,
         github,
         thread,
         done: r.get(11)?,
@@ -243,7 +228,7 @@ impl Store {
                 c.review,
                 c.created_at,
                 c.updated_at,
-                serde_json::to_string(&c.workshop).map_err(json_err)?,
+                serde_json::to_string(&c.conversation).map_err(json_err)?,
                 github_to_sql(&c.github)?,
                 thread_to_sql(&c.thread)?,
                 c.done,
@@ -260,10 +245,10 @@ impl Store {
         Ok(())
     }
 
-    pub fn set_workshop(&self, id: i64, workshop: &Workshop) -> rusqlite::Result<()> {
+    pub fn set_conversation(&self, id: i64, conversation: &Conversation) -> rusqlite::Result<()> {
         self.db.execute(
             "UPDATE comments SET workshop = ? WHERE id = ?",
-            params![serde_json::to_string(workshop).map_err(json_err)?, id],
+            params![serde_json::to_string(conversation).map_err(json_err)?, id],
         )?;
         Ok(())
     }
@@ -344,7 +329,7 @@ mod tests {
             review: "@".into(),
             created_at: 1,
             updated_at: 1,
-            workshop: Workshop::default(),
+            conversation: Conversation::default(),
             github: None,
             thread: None,
             done: false,
@@ -353,21 +338,16 @@ mod tests {
         assert_eq!(store.comments_for_paths(&["a.rs"]).unwrap(), [c.clone()]);
 
         store.set_comment_body(c.id, "because", 2).unwrap();
-        let workshop = Workshop {
-            session: Some("s".into()),
+        let conversation = Conversation {
             messages: vec![Message {
                 author: Author::Agent,
                 text: "hi".into(),
-                change: false,
-                updated: false,
-                compose: false,
-                before: None,
             }],
         };
-        store.set_workshop(c.id, &workshop).unwrap();
+        store.set_conversation(c.id, &conversation).unwrap();
         let got = store.comment(c.id).unwrap().unwrap();
         assert_eq!((got.body.as_str(), got.updated_at), ("because", 2));
-        assert_eq!(got.workshop, workshop);
+        assert_eq!(got.conversation, conversation);
 
         let link = Some(GhLink {
             repo: "o/n".into(),

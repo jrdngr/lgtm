@@ -47,7 +47,6 @@ impl RepoCtx {
         let cfg = config.matching;
         let (files, dtos) = self.build(sides, interdiff, diffs, config).await?;
         let (from, to) = spec.endpoints();
-        let has_working_copy = ws.jj.includes_working_copy(revset).await?;
         Ok(Loaded {
             files,
             commits: stack.changes.iter().map(|c| c.commit_id.clone()).collect(),
@@ -65,7 +64,6 @@ impl RepoCtx {
                 removed_changes: stack.removed,
                 previous_session: prev.map(|p| p.started_at as f64),
                 stale: ws.stale.lock().unwrap().clone(),
-                has_working_copy,
             },
         })
     }

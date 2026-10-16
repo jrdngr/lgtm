@@ -1,7 +1,6 @@
 import type { MarkColor, ReviewDto, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { copy as copyText } from "../ui/contextMenu";
-import { NOT_AT_WORKING_COPY } from "./CommentBlock";
 import { draftFor } from "./comments";
 import type { MenuAction } from "./MarkMenu";
 import { changedRows, type DisplayLine, type FlatFile } from "./model";
@@ -120,9 +119,8 @@ export function useReviewActions(d: Deps) {
     if (text) (recent ? d.sendRecent : d.sendText)(text, finishAction);
   }
 
-  /** Opens a note on the selection, in its ask box when it's for a change. `github` makes it a
-   * draft for the PR instead. */
-  function startComment(field: "body" | "ask" = "body", github = false) {
+  /** Opens a note on the selection. `github` makes it a draft for the PR instead. */
+  function startComment(github = false) {
     if (github && !d.c.canDraft) {
       setError("Drafts for GitHub need a PR workspace. Press c for a note.");
       return;
@@ -133,7 +131,7 @@ export function useReviewActions(d: Deps) {
       return;
     }
     setError(undefined);
-    d.c.start({ ...draft, github }, field);
+    d.c.start({ ...draft, github });
     finishAction();
   }
 
@@ -141,15 +139,12 @@ export function useReviewActions(d: Deps) {
     d.closeMenu();
     if (action === "copy") copy();
     else if (action === "location") copyLocated();
-    else if (action === "draft") startComment("body", true);
+    else if (action === "draft") startComment(true);
     else if (action === "open") d.openInEditor();
     else if (action === "collapse") d.collapseHunk();
     else if (action === "agent") sendSelection();
     else if (action === "comment") startComment();
-    else if (action === "change") {
-      if (review?.hasWorkingCopy) startComment("ask");
-      else setError(NOT_AT_WORKING_COPY);
-    } else applyMark(action === "clear" ? null : action);
+    else applyMark(action === "clear" ? null : action);
   }
 
   return {

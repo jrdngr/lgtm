@@ -53,20 +53,6 @@ async fn comments_follow_their_code_and_outlive_it() {
 }
 
 #[tokio::test]
-async fn reviews_know_whether_they_include_the_working_copy() {
-    let (dir, ctx) = repo();
-    write(dir.path(), "a.rs", "fn a() {}\n");
-    super::tests::jj(dir.path(), &["new"]);
-    assert!(
-        ctx.open(None, "@-::@", false)
-            .await
-            .unwrap()
-            .has_working_copy
-    );
-    assert!(!ctx.open(None, "@-", false).await.unwrap().has_working_copy);
-}
-
-#[tokio::test]
 async fn a_comment_on_a_renamed_file_keeps_its_removed_rows() {
     let (dir, ctx) = repo();
     let d = dir.path();

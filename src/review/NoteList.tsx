@@ -10,13 +10,8 @@ import { commentText } from "./comments";
 import type { CurrentReview } from "./current";
 import type { FlatFile } from "./model";
 
-/** Where the note's agent conversation stands: it changed the code, or it answered. */
-function agentState(c: CommentDto): "changed" | "replied" | undefined {
-  const last = c.messages.at(-1);
-  if (last?.author !== "agent") return undefined;
-  const asked = c.messages.filter((m) => m.author === "user").at(-1);
-  return asked?.change ? "changed" : "replied";
-}
+/** Whether an agent had the last word on the note. */
+const replied = (c: CommentDto) => c.messages.at(-1)?.author === "agent";
 
 /** The line a comment ends on, in its file now. */
 function lineOf(files: FlatFile[], c: CommentDto) {
@@ -76,7 +71,7 @@ function noteMenu({ c, review, canDraft }: ItemProps): CtxEntry[] {
 function NoteItem(props: ItemProps) {
   const { c, review } = props;
   const line = lineOf(review.files, c);
-  const agent = agentState(c);
+  const agent = replied(c);
   return (
     <button
       type="button"
@@ -84,14 +79,12 @@ function NoteItem(props: ItemProps) {
       onClick={() => review.jumpToComment(c.id)}
       onContextMenu={contextMenu(() => noteMenu(props))}
     >
-      <span className="item-icon">
-        {agent && <Icon name={agent === "changed" ? "edit" : "sparkle"} />}
-      </span>
+      <span className="item-icon">{agent && <Icon name="sparkle" />}</span>
       <span className="item-text">
         <Inline>{(c.body || "No text yet").split("\n")[0]}</Inline>
       </span>
       <span className="item-where">
-        {agent && <span className="faint">{agent === "changed" ? "Changed" : "Replied"}</span>}
+        {agent && <span className="faint">Replied</span>}
         {line === undefined ? <span className="pill amber">Code changed</span> : line}
       </span>
     </button>

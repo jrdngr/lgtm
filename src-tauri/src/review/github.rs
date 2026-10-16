@@ -9,7 +9,7 @@ use anyhow::{Context, bail};
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms, pulled_stage};
 use crate::anchor::{FileIndex, Side, nearest_lines, norm_for, remap_lines};
 use crate::diff::RowKind;
-use crate::store::{Comment, GhLink, ThreadState, Workshop};
+use crate::store::{Comment, Conversation, GhLink, ThreadState};
 
 /// A thread pulled from GitHub, to become a comment block.
 pub struct PulledThread {
@@ -214,7 +214,7 @@ impl RepoCtx {
                     review: label.to_string(),
                     created_at: now,
                     updated_at: now,
-                    workshop: Workshop::default(),
+                    conversation: Conversation::default(),
                     github: Some(t.link),
                     thread: Some(thread),
                     done: false,

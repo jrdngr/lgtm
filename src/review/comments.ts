@@ -81,23 +81,8 @@ export function commentedRows(comments: CommentDto[]): Set<string> {
   return out;
 }
 
-/** The comment block nearest the cursor: the first below it in its hunk, else the last above.
- * Undefined when its hunk has none. */
-export function commentNear(lines: DisplayLine[], cursor: number): number | undefined {
-  const edge = (i: number) => lines[i].kind === "file" || lines[i].kind === "hunk";
-  for (let i = cursor; i < lines.length && (i === cursor || !edge(i)); i++) {
-    const l = lines[i];
-    if (l.kind === "comment") return l.comment;
-  }
-  for (let i = cursor - 1; i >= 0 && !edge(i); i--) {
-    const l = lines[i];
-    if (l.kind === "comment") return l.comment;
-  }
-  return undefined;
-}
-
 /** Where the comment's code is, or the code as it was if it's gone, then the comment and its
- * conversation with an agent. A comment on the PR comes with its posts
+ * conversation. A comment on the PR comes with its posts
  * instead, and a quote with what it quotes. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
   const quote = c.thread?.quote;
@@ -118,13 +103,11 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
   return [code, c.body.trim(), conversationText(c.messages)].filter(Boolean).join("\n\n");
 }
 
-/** A comment's conversation with an agent, one message after another. Empty without one. */
+/** A comment's conversation, one message after another. Empty without one. */
 export function conversationText(messages: Message[]): string {
   const said = messages.flatMap((m) => {
-    if (m.author === "agent") return m.text.trim() ? [`Agent:\n${m.text.trim()}`] : [];
-    if (m.compose) return [];
-    const text = m.text.trim() || (m.change ? "Make the change this comment asks for." : "");
-    return text ? [`Me:\n${text}`] : [];
+    const text = m.text.trim();
+    return text ? [`${m.author === "agent" ? "Agent" : "Me"}:\n${text}`] : [];
   });
   return said.length ? ["Our conversation about it:", ...said].join("\n\n") : "";
 }
@@ -134,22 +117,4 @@ export function rowLabel(files: FlatFile[], file: number, path: string, row?: nu
   const r = row !== undefined ? files[file]?.rows[row] : undefined;
   const line = r ? (r.newLine ?? r.oldLine) : undefined;
   return `${path.split("/").pop()}${line != null ? `:${line}` : ""}`;
-}
-
-/** Parts of an agent reply: plain text, and suggested comments from ```comment blocks. */
-export type ReplyPart = { kind: "text" | "suggestion"; text: string };
-
-export function replyParts(reply: string): ReplyPart[] {
-  const parts: ReplyPart[] = [];
-  const fence = /^```comment[^\n]*\n([\s\S]*?)^```[ \t]*$/gm;
-  let at = 0;
-  for (const m of reply.matchAll(fence)) {
-    const before = reply.slice(at, m.index).trim();
-    if (before) parts.push({ kind: "text", text: before });
-    parts.push({ kind: "suggestion", text: m[1].replace(/\n$/, "") });
-    at = m.index + m[0].length;
-  }
-  const rest = reply.slice(at).trim();
-  if (rest) parts.push({ kind: "text", text: rest });
-  return parts;
 }

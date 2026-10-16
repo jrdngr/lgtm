@@ -3,9 +3,6 @@ import { pulse, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 export type AgentKind =
-  | "ask"
-  | "change"
-  | "reply"
   | "triage"
   | "fix"
   | "walkthrough"
@@ -16,9 +13,6 @@ export type AgentKind =
 export type Outcome = "running" | "done" | "failed" | "stopped";
 
 export const KIND_NAMES: Record<AgentKind, string> = {
-  ask: "Ask",
-  change: "Change",
-  reply: "Reply chat",
   triage: "Triage",
   fix: "Fix threads",
   walkthrough: "Walkthrough",

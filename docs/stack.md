@@ -13,7 +13,7 @@ Use **Tauri v2**: a Rust backend and a TypeScript UI in the system webview.
 | Requirement | What it needs |
 |---|---|
 | Terminal panes, arbitrary splits | A full VT emulator, PTY spawning, fast output streaming |
-| Review diff view | Custom gutters, row tints, selection units, collapsible hunks, gap bars, inline comment blocks with an agent chat inside them |
+| Review diff view | Custom gutters, row tints, selection units, collapsible hunks, gap bars, inline comment blocks |
 | Editor | Syntax highlighting, tree-sitter symbols |
 | Dockable tabs, per-repo layouts | Drag-to-split docking with serializable state |
 | jj | Spawning the CLI, one writer per workspace, debounced snapshots |
@@ -51,7 +51,7 @@ Use **Tauri v2**: a Rust backend and a TypeScript UI in the system webview.
 | egui | `egui_term` | weak for code | `egui_dock` | Immediate mode is a poor fit for large diffs with rich rows |
 | Slint, Freya, Xilem | none mature | none mature | none | Too early |
 
-- Every review-specific surface is custom work: tinted rows, selection levels, gap bars, inline comment blocks with markdown and an agent chat, graph views.
+- Every review-specific surface is custom work: tinted rows, selection levels, gap bars, inline comment blocks with markdown, graph views.
 - Best performance and a single language. GPUI is the only option that has shipped an app like this (Zed).
 - Worth it only if native feel matters more than shipping the review features. It would roughly double M1 and M3.
 

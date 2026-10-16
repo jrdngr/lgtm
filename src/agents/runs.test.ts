@@ -10,7 +10,7 @@ describe("agent runs", () => {
   });
 
   it("clears finished runs but keeps running ones", () => {
-    const done = startRun("clear", { kind: "ask", subject: "a.ts" });
+    const done = startRun("clear", { kind: "qa", subject: "a.ts" });
     startRun("clear", { kind: "fix", subject: "b.ts" });
     done.end("done");
     clearFinished("clear");

@@ -6,26 +6,21 @@ import { Avatar } from "../github/Post";
 import { viewerLogin } from "../github/people";
 import { STAGES } from "../threads/stages";
 import { TakePill } from "../threads/ThreadBits";
-import { useAgentsOff } from "../tools/agents";
 import { Busy } from "../ui/Busy";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
-
-import { isMac } from "../workbench/keys";
-import { AskBox, SAVE_KEY } from "./AskBox";
+import { isMac, SAVE_KEY } from "../workbench/keys";
+import { Conversation } from "./Conversation";
 import { cardItems, moreItems, noteItems } from "./cardMenu";
 import { NEW_COMMENT } from "./model";
 import { StageStrip } from "./StageStrip";
 import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
 import type { CommentFolds } from "./useSavedView";
-import { Workshop } from "./Workshop";
 import "./comments.css";
 import { SnippetDiff } from "./SnippetDiff";
-
-export { NOT_AT_WORKING_COPY } from "./AskBox";
 
 interface Props {
   id: number;
@@ -41,18 +36,15 @@ function StagePill({ stage }: { stage: Stage }) {
 }
 
 /** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
- * editor for its text and a conversation with an agent about it. Any folds to a line; done
+ * editor for its text and its conversation. Any folds to a line; done
  * ones start folded. */
 export function CommentBlock({ id, comment, c, folds }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const askRef = useRef<HTMLTextAreaElement>(null);
-  const agentsOff = useAgentsOff();
   const [snippet, setSnippet] = useState(false);
   const editing = c.edits.get(id);
   const gh = comment?.github;
   const thread = comment?.thread;
   const viewer = viewerLogin(c.comments);
-  const asking = c.asking(id);
   const isNew = id === NEW_COMMENT;
   const github = !!gh || !!thread || (isNew && !!c.draft?.github);
   const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
@@ -63,15 +55,15 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   const setFold = (fold: boolean) => folds.set(id, fold, foldState);
 
   useEffect(() => {
-    if (c.focus?.id !== id) return;
-    const el = (c.focus.field === "body" ? bodyRef : askRef).current;
+    if (c.focus !== id) return;
+    const el = bodyRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
     c.focused();
   });
 
-  const card = comment && { comment, c, agentsOff };
+  const card = comment && { comment, c };
   /** A note of yours, not a GitHub thread or draft. */
   const note = !!comment && !gh && !thread;
 
@@ -86,7 +78,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
     openMenu(e, cardItems(card));
   };
 
-  if (comment && folded && editing === undefined && !c.running.has(id)) {
+  if (comment && folded && editing === undefined) {
     const summary = gh
       ? lastPost(gh, viewer)
       : (thread?.quote?.text ?? comment.body).split("\n")[0];
@@ -138,12 +130,10 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
       <ThreadBlock
         comment={comment}
         c={c}
-        agentsOff={agentsOff}
         done={!!done}
         onFold={() => setFold(true)}
         onContextMenu={onContextMenu}
         bodyRef={bodyRef}
-        askRef={askRef}
       />
     );
   }
@@ -244,9 +234,6 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
                 onClick={() => c.edit(comment)}
               />
             )}
-            {!agentsOff && (
-              <IconButton icon="sparkle" label="Ask agent (a)" onClick={() => c.openAsk(id)} />
-            )}
             {comment && (
               <IconButton
                 icon="terminal"
@@ -319,15 +306,9 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
           </div>
         )
       )}
-      {asking && (
+      {!!comment?.messages.length && (
         <div className="card-agent">
-          <Workshop
-            messages={comment?.messages ?? []}
-            running={c.running.get(id)}
-            body={comment?.body}
-            onUse={(t) => (note ? c.saveSuggestion(id, t) : c.use(id, t))}
-          />
-          {!agentsOff && <AskBox id={id} body={body} c={c} inputRef={askRef} />}
+          <Conversation messages={comment.messages} />
         </div>
       )}
     </div>

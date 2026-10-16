@@ -1,7 +1,7 @@
 import { flag } from "./flag";
 
 /** Whether `claude` is missing or too old and the user chose to go on without it. Agent
- * features (persona reviews, comment workshopping) are off then. */
+ * features (persona reviews, triage, Q&A) are off then. */
 const agents = flag();
 
 export const agentsOff = agents.get;

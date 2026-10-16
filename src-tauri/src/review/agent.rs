@@ -11,7 +11,7 @@ use super::comments::RowSpan;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::diff::{FileStatus, RowKind};
 use crate::settings::{self, marks};
-use crate::store::{Author, Comment, MarkColor, Message, Workshop};
+use crate::store::{Author, Comment, Conversation, MarkColor, Message};
 
 /// What comments and notes from a terminal agent record as their source review.
 const BY_AGENT: &str = "terminal agent";
@@ -421,7 +421,7 @@ impl RepoCtx {
                 review: format!("{} · {BY_AGENT}", review.label),
                 created_at: now,
                 updated_at: now,
-                workshop: Workshop::default(),
+                conversation: Conversation::default(),
                 github: None,
                 thread: None,
                 done: false,
@@ -443,15 +443,11 @@ impl RepoCtx {
             let mut c = store
                 .comment(comment as i64)?
                 .with_context(|| format!("no comment {comment}"))?;
-            c.workshop.messages.push(Message {
+            c.conversation.messages.push(Message {
                 author: Author::Agent,
                 text: text.to_string(),
-                change: false,
-                updated: false,
-                compose: false,
-                before: None,
             });
-            Ok(store.set_workshop(c.id, &c.workshop)?)
+            Ok(store.set_conversation(c.id, &c.conversation)?)
         })?;
         Ok((id, state))
     }

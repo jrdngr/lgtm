@@ -92,7 +92,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘C"], action: "Copy the selected text or rows" },
       { keys: ["c"], action: "Write a note on the selection" },
       { keys: ["C"], action: "Draft a GitHub comment (PR workspaces)" },
-      { keys: ["a"], action: "Ask the agent about the note or thread at the cursor" },
       { keys: ["⌘>"], action: "Send the selection to the last terminal" },
       { keys: ["o"], action: "Open the file at the cursor in an editor" },
       { keys: ["x"], action: "Check or uncheck the file" },
@@ -129,7 +128,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "PR comments",
     shortcuts: [
-      { keys: ["a"], action: "Draft a reply, or ask the agent once there is one" },
       { keys: ["e"], action: "Edit the reply (in a focused comment)" },
       { keys: ["y"], action: "Mark the reply final (in a focused comment)" },
       { keys: ["q"], action: "Quote the selected text of a comment on the PR" },

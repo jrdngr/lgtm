@@ -20,7 +20,6 @@ mod matching;
 #[cfg(test)]
 mod note_tests;
 mod notes;
-mod proposal;
 mod quotes;
 mod replies;
 mod rowmap;
@@ -31,7 +30,6 @@ mod views;
 pub(crate) mod walkthrough;
 #[cfg(test)]
 mod workflow_tests;
-mod workshop;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -59,7 +57,9 @@ pub use rowmap::RowMove;
 pub use quotes::quoted_reply;
 pub use threads::{ThreadDto, pulled_stage};
 pub use views::{ChangeDto, View};
-pub use workshop::{Ask, NOT_AT_WORKING_COPY};
+
+pub const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
+doesn't include, so its changes wouldn't show here. Review a revset that includes @ first.";
 
 /// Reports a workspace's watch events, with the workspace's name.
 pub type Emit = Arc<dyn Fn(Option<String>, watch::Event) + Send + Sync>;
@@ -103,8 +103,6 @@ pub struct ReviewDto {
     /// When the previous session started (Unix ms), if there was one.
     pub previous_session: Option<f64>,
     pub stale: Option<String>,
-    /// Whether the revset includes the workspace's `@`, where an agent's changes land.
-    pub has_working_copy: bool,
 }
 
 #[derive(Clone, Serialize, Type)]

@@ -20,9 +20,8 @@ Inspirations, not parity targets: Orca ADE, tuicr, Crit.
 - Comments attach to a selection and persist with the same anchoring as marks.
 - A comment can be sent to an agent or published to a GitHub PR.
 - Comments can be pulled down from a GitHub PR and replied to locally.
-- Core workflow: pull a GitHub comment, workshop a reply with an agent inside the local comment block, then send the final reply back to GitHub.
+- Core workflow: pull a GitHub comment, work out a reply (with triage or an agent in a terminal), then send the final reply back to GitHub.
 - A comment block shows under the last changed row it covers. A comment covers changed rows in one file and keeps the code it was made on, for when that code is gone.
-- Workshopping runs the agent headless in the review's workspace. Ask is read only. Change can edit files, and edits the working copy in place. Each block keeps its conversation and resumes the agent's session. The agent marks a suggested comment with a `comment` code block, which the user can take into the editor.
 - The Comments view lists a review's comments, including ones whose code is gone.
 - Publishing adds a comment to the user's pending review on the PR, as a reply on its thread or a new thread on its code. The Comments view submits the review with a verdict and summary. The PR's conversation (comments not on code, and review summaries) shows in a PR view, with a box that posts to it right away.
 
@@ -116,7 +115,7 @@ Marking is two steps: select code, then choose a mark. The same selection is the
 
 - `1`–`9` mark the selection with the color in use on that key. `0` clears its marks.
 - `c` comments on the selection (Section 2).
-- `m` and right-click open the same menu: the colors in use on their numbers, `0` clear mark, `c` comment, `g` change with agent, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
+- `m` and right-click open the same menu: the colors in use on their numbers, `0` clear mark, `c` comment, `a` send to agent, plus Copy. Right-clicking outside the selection first selects the row under the pointer.
 - Marks never toggle. Applying a mark the code already has changes nothing. Clear mark removes it.
 - Mark keys ignore key repeat.
 - The cursor stays put after marking.
@@ -223,7 +222,7 @@ Draft. Tree-sitter supplies everything that needs to know what the code is.
 - Full terminal emulation in panes with arbitrary custom splits.
 - A comment sent to the agent goes to a terminal pane and is pasted into the prompt by default. More delivery options later.
 - v1 agent is Claude Code. Two ways to run it:
-  - Headless: the app spawns `claude -p` with stream-JSON output for persona reviews, highlighting, and comment workshopping.
+  - Headless: the app spawns `claude -p` with stream-JSON output for persona reviews, highlighting, and triage.
   - Terminal: the app pastes a prompt into a pane already running `claude`. This covers users on a subscription plan and is a choice for any agent action except persona reviews, whose findings need structured output.
 - Other agents (Codex, pi, etc.) are planned. Agent-specific code stays behind one adapter.
 

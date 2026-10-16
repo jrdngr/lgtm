@@ -9,7 +9,6 @@ export type MenuAction =
   | "clear"
   | "comment"
   | "draft"
-  | "change"
   | "agent"
   | "copy"
   | "location"
@@ -19,7 +18,6 @@ export type MenuAction =
 const LETTERS: Record<string, MenuAction> = {
   c: "comment",
   C: "draft",
-  g: "change",
   a: "agent",
   o: "open",
 };
@@ -68,7 +66,6 @@ export function MarkMenu({ x, y, changed, setup, canDraft, inHunk, onPick, onClo
     "-",
     { action: "comment", key: "c", label: "Comment" },
     ...(canDraft ? [{ action: "draft", key: "C", label: "Draft PR Comment" } as const] : []),
-    { action: "change", key: "g", label: "Change with Agent" },
     { action: "agent", key: "a", label: "Send to Agent" },
     "-",
     { action: "copy", key: "⌘C", label: "Copy" },

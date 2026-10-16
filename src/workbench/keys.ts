@@ -1,5 +1,7 @@
 export const isMac = navigator.platform.startsWith("Mac");
 
+export const SAVE_KEY = isMac ? "⌘↵" : "Ctrl+↵";
+
 /**
  * Normalizes an app shortcut to a string like "Mod+Shift+D" or "Mod+Alt+B". Returns undefined
  * for keys that aren't app chords, so they reach the focused panel. Mod is ⌘ on macOS and

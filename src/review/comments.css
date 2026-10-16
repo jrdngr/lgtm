@@ -204,8 +204,7 @@
   gap: 6px;
 }
 
-.card-foot button,
-.ask button {
+.card-foot button {
   font-size: var(--fs-sm);
   padding: 1px 8px;
 }
@@ -278,8 +277,7 @@
   background: none;
 }
 
-.comment-input,
-.ask-input {
+.comment-input {
   box-sizing: border-box;
   width: 100%;
   resize: vertical;
@@ -291,8 +289,7 @@
   font: inherit;
 }
 
-.comment-input:focus,
-.ask-input:focus {
+.comment-input:focus {
   outline: none;
   border-color: var(--accent);
 }
@@ -357,7 +354,7 @@
   border-top: 1px solid var(--hair);
 }
 
-.workshop {
+.conversation {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -380,35 +377,8 @@
   color: var(--accent);
 }
 
-.suggestion {
-  margin: 2px 0;
-  padding: 4px 8px;
-  border-left: 2px solid var(--reviewed);
-  background: var(--bg);
-}
-
-.suggestion button {
-  margin-top: 4px;
-}
-
-.ask {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
-  margin: 8px 0 0;
-  padding: 0;
-  border: none;
-  min-width: 0;
-}
-
-.ask:disabled,
 .comment-block .stage-strip:disabled {
   opacity: 0.45;
-}
-
-.ask-input {
-  flex: 1;
-  resize: none;
 }
 
 .cell.commented .flag {
@@ -754,24 +724,6 @@ button.group-head.fold:hover {
   color: var(--muted);
 }
 
-.thread-block .flow-link {
-  padding: 0;
-  border: none;
-  background: none;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.thread-block .flow-link {
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-
-.thread-block .flow-link:hover:not(:disabled) {
-  background: none;
-  color: var(--fg);
-}
-
 .thread-block .flow-take,
 .thread-block .flow-draft-text {
   padding: 8px 10px;
@@ -785,8 +737,7 @@ button.group-head.fold:hover {
   border: 1px solid var(--hair);
 }
 
-.thread-block .flow-take p,
-.thread-block .flow-changes {
+.thread-block .flow-take p {
   margin: 0;
 }
 
@@ -796,15 +747,10 @@ button.group-head.fold:hover {
 
 .thread-block .flow-draft-text {
   border: 1px solid rgb(163 113 247 / 14%);
-  transition: box-shadow 0.3s;
 }
 
 .thread-block .flow-draft-text.final {
   border-color: rgb(63 185 80 / 40%);
-}
-
-.thread-block .flow-draft-text.fresh {
-  box-shadow: 0 0 0 2px rgb(163 113 247 / 30%);
 }
 
 .thread-block .flow-draft-text > :first-child {
@@ -815,28 +761,12 @@ button.group-head.fold:hover {
   margin-bottom: 0;
 }
 
-.thread-block .flow-changes {
-  white-space: pre-wrap;
-}
-
-.thread-block .flow-ins {
-  border-radius: 2px;
-  background: rgb(63 185 80 / 18%);
-}
-
-.thread-block .flow-del {
-  border-radius: 2px;
-  background: rgb(248 81 73 / 18%);
-  text-decoration: line-through;
-}
-
 .thread-block .flow-none {
   color: var(--faint);
   font-size: var(--fs-sm);
 }
 
-.thread-block .flow-buttons,
-.thread-block .flow-start {
+.thread-block .flow-buttons {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -844,29 +774,13 @@ button.group-head.fold:hover {
   font-size: var(--fs-sm);
 }
 
-.thread-block .flow-buttons button,
-.thread-block .flow-draft {
+.thread-block .flow-buttons button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
   border-radius: 5px;
   font-size: var(--fs-sm);
-}
-
-.thread-block .flow-draft,
-.thread-block .flow-buttons button.flow-draft {
-  border-color: var(--github);
-  background: var(--github);
-  color: #fff;
-  font-weight: 600;
-}
-
-.thread-block .flow-draft:hover:not(:disabled),
-.thread-block .flow-buttons button.flow-draft:hover:not(:disabled) {
-  border-color: var(--github);
-  background: var(--github);
-  filter: brightness(1.1);
 }
 
 .thread-block .flow-buttons button.flow-final {
@@ -881,35 +795,13 @@ button.group-head.fold:hover {
   filter: brightness(1.1);
 }
 
-.thread-block button.flow-draft kbd,
 .thread-block button.flow-final kbd {
   color: inherit;
   border-color: rgb(255 255 255 / 35%);
   opacity: 0.8;
 }
 
-.thread-block .flow .ask {
-  margin-top: 0;
-  align-items: center;
-  padding: 4px 4px 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
-}
-
-.thread-block .flow .ask-input {
-  border: none;
-  background: none;
-  padding: 2px 0;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .thread-block .flow-draft-text {
-    transition: none;
-  }
-}
-
-/* A thread a triage run will fill in, in place of Draft reply. */
+/* A thread a triage run will fill in. */
 .thread-block .flow-triaging {
   display: flex;
   align-items: center;
@@ -920,15 +812,6 @@ button.group-head.fold:hover {
   background: rgb(215 119 87 / 10%);
   color: rgb(215 119 87);
   font-size: var(--fs-sm);
-}
-
-/* Claude Code's color for a turn in progress. */
-.flow-thinking {
-  color: rgb(215 119 87);
-}
-
-.flow-thinking.compose {
-  color: var(--github);
 }
 
 /* A note's Done and ⋯ buttons, and its text, which edits on a click. */
@@ -975,110 +858,6 @@ button.group-head.fold:hover {
 .note-text {
   padding: 8px 10px;
   cursor: text;
-}
-
-.thread-block .flow-chat {
-  display: grid;
-}
-
-.thread-block .flow-turn {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 10px;
-  padding: 8px 0;
-  border-top: 1px solid var(--hair);
-  font-size: var(--fs-sm);
-}
-
-.thread-block .flow-turn:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.thread-block .flow-who {
-  padding-top: 1px;
-  font-size: var(--fs-xs);
-  color: var(--faint);
-}
-
-.thread-block .flow-turn.agent .flow-who {
-  color: var(--accent);
-}
-
-.thread-block .flow-said {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.thread-block .flow-said p {
-  margin: 0;
-}
-
-.thread-block .flow-turn.you p {
-  white-space: pre-wrap;
-}
-
-.thread-block .flow-event {
-  justify-self: start;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0;
-  border: none;
-  background: none;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-
-.thread-block .flow-event::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-.thread-block .flow-event.reply {
-  cursor: pointer;
-}
-
-.thread-block .flow-event.reply:hover:not(:disabled) {
-  background: none;
-  text-decoration: underline;
-}
-
-.thread-block .flow-event.reply::before {
-  background: var(--github);
-}
-
-.thread-block .flow-event.code::before {
-  background: var(--mark-yellow);
-}
-
-.thread-block .flow-said code {
-  font: 11.5px var(--mono);
-  padding: 0 4px;
-  border-radius: 3px;
-  background: var(--hover);
-}
-
-.thread-block .flow-said pre {
-  margin: 0;
-  padding: 4px 6px;
-  overflow-x: auto;
-  border-radius: 4px;
-  background: var(--bg);
-}
-
-.thread-block .flow-said pre code {
-  padding: 0;
-  background: none;
-}
-
-.thread-block .flow-said :is(ul, ol) {
-  margin: 0;
-  padding-left: 18px;
 }
 
 /* Comments on the PR sit above the files, with their quotes under them. */

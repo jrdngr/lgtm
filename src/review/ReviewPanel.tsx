@@ -13,7 +13,7 @@ import { remembered } from "../workbench/remembered";
 import { useWorkspace } from "../workspaces/context";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
-import { commentNear, commentSlots } from "./comments";
+import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
@@ -98,7 +98,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     onError: setError,
     send: sendText,
     onDone: focusRoot,
-    onChanged: () => refresh(),
     canDraft: !!pr.pr,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
@@ -312,11 +311,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     openMenu(e, fileMenu(deps, file));
   }
 
-  function askAgent() {
-    const id = commentNear(lines, cursor);
-    if (id !== undefined && !agentsOff()) c.agentKey(id);
-  }
-
   const onKeyDown = useReviewKeys({
     files,
     lines,
@@ -331,8 +325,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     applyMark: a.applyMark,
     openMenuAtCursor,
     startComment: a.startComment,
-    startDraft: () => a.startComment("body", true),
-    askAgent,
+    startDraft: () => a.startComment(true),
     openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
     runWalkthrough: runWalkthroughNow,

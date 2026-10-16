@@ -7,7 +7,6 @@ use std::sync::Arc;
 use anyhow::Context;
 use serde::Deserialize;
 
-use super::workshop::Ask;
 use super::{RepoCtx, StateDto, ThreadDto};
 use crate::agent::{self, Progress, Runs};
 use crate::prompts::{self, Prompt};
@@ -45,38 +44,6 @@ fn triage_schema() -> String {
     )
 }
 
-/// The schema a chat turn on a thread answers with.
-pub(super) fn chat_schema() -> String {
-    format!(
-        r#"{{
-  "type": "object",
-  "properties": {{
-    "message": {{ "type": "string" }},
-    "verdict": {VERDICTS},
-    "why": {{ "type": "string" }},
-    "question": {{ "type": "string" }},
-    "reply": {{ "type": "string" }},
-    "edits": {{
-      "type": "array",
-      "items": {{
-        "type": "object",
-        "properties": {{
-          "path": {{ "type": "string" }},
-          "old": {{ "type": "string" }},
-          "new": {{ "type": "string" }},
-          "all": {{ "type": "boolean" }}
-        }},
-        "required": ["path", "old", "new"],
-        "additionalProperties": false
-      }}
-    }}
-  }},
-  "required": ["message"],
-  "additionalProperties": false
-}}"#
-    )
-}
-
 #[derive(Deserialize)]
 struct Triaged {
     id: i64,
@@ -91,19 +58,6 @@ struct Triaged {
 #[derive(Deserialize)]
 struct List<T> {
     threads: Vec<T>,
-}
-
-/// One chat turn's answer: what to say, and the take and reply when they change.
-#[derive(Clone, Deserialize)]
-pub(super) struct ChatTurn {
-    pub message: String,
-    pub verdict: Option<TakeVerdict>,
-    pub why: Option<String>,
-    pub question: Option<String>,
-    pub reply: Option<String>,
-    /// The code changes the reply promises, replacing any proposed before.
-    #[serde(default)]
-    pub edits: Option<Vec<super::proposal::EditDto>>,
 }
 
 fn take(verdict: TakeVerdict, why: String, question: Option<String>) -> Take {
@@ -313,17 +267,9 @@ impl RepoCtx {
         let state = self.comment_edit(id, |_, store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;
             anyhow::ensure!(c.thread.is_some(), "that's a note, not a thread");
-            let turn = ChatTurn {
-                message: String::new(),
-                verdict: Some(take.verdict),
-                why: Some(take.why),
-                question: take.question,
-                reply,
-                edits: None,
-            };
             let before = c.body.clone();
             let verdict = take.verdict;
-            apply_chat(&mut c, turn, false);
+            set_take(&mut c, take, reply);
             // Sorted like triage, unless the reply is already final or sent.
             let reply = !c.body.trim().is_empty();
             if let Some(t) = c.thread.as_mut()
@@ -365,75 +311,17 @@ impl RepoCtx {
     }
 }
 
-/// A chat turn on a thread. The first carries the change, the rules, and the thread.
-/// How a turn that can't edit files offers the code changes its reply promises.
-const PROPOSE: &str = "\n\nYou change code by proposing edits: return them in `edits`, and I \
-see them as diffs that are written when I make the reply final. Your tools can't write files, \
-so never say you can't make a change; propose it. Each edit is an exact replacement: `path` \
-from the repository root, `old` copied exactly from the file and unique in it (empty for a new \
-file), and `new`. Set `all` to replace every occurrence of `old` in the file instead, as for a \
-rename; a rename needs an edit for each file that uses the name. Return `edits` only when the \
-proposed changes should change; it replaces the ones before, and an empty list drops them.";
-
-pub(super) fn chat_prompt(c: &Comment, ask: &Ask, intro: Option<&(String, String)>) -> String {
-    const EDIT: &str = "Edit the files directly and change only what's needed.";
-    let asked = match (ask.change, ask.message.trim().is_empty()) {
-        _ if ask.compose => {
-            "Write my take and a reply for this thread. Return the verdict, why, and the whole \
-             reply."
-                .to_string()
-        }
-        (false, _) => ask.message.clone(),
-        (true, true) => format!("Make the change this thread asks for. {EDIT}"),
-        (true, false) => format!("Make this change: {} {EDIT}", ask.message.trim()),
-    };
-    let draft = if ask.draft.trim().is_empty() {
-        "(empty)"
-    } else {
-        &ask.draft
-    };
-    let turn = format!(
-        "My reply draft now:\n\n{draft}\n\n{asked}\n\nAnswer in `message` in a few short \
-         sentences, like a teammate in chat: the answer, then only what I have to act on. No \
-         recap of the code, and don't mention what you left unchanged. When the reply should \
-         change, also return the whole new reply. Return a new verdict and why only \
-         when your view of the thread itself changes, never to describe edits to the reply.{}",
-        if ask.change { "" } else { PROPOSE }
-    );
-    match intro {
-        None => turn,
-        Some((context, rules)) => format!(
-            "{context}\n\nYou're in the repository and can read any file.\n\n{rules}\n\nWe're \
-             working on this thread together:\n\n{}\n\n{turn}",
-            thread_text(c)
-        ),
-    }
-}
-
-/// Applies a chat turn to its thread: a new take and reply replace the old ones. Returns the
-/// message to show and whether anything was updated.
-/// Applies a chat turn to its thread. With `suggest`, a new reply is kept as the thread's
-/// suggestion instead of replacing the reply.
-pub(super) fn apply_chat(c: &mut Comment, turn: ChatTurn, suggest: bool) -> (String, bool) {
+/// Gives a thread a new take, and a new reply when one is given.
+fn set_take(c: &mut Comment, new: Take, reply: Option<String>) {
     let draft = c.is_draft();
     let Some(t) = c.thread.as_mut() else {
-        return (turn.message, false);
+        return;
     };
-    let mut updated = false;
-    if let (Some(verdict), Some(why)) = (turn.verdict, turn.why) {
-        t.take = Some(take(verdict, why, turn.question));
-        updated = true;
-    }
-    let reply = turn.reply.filter(|r| !r.trim().is_empty() && *r != c.body);
-    if suggest {
-        updated |= reply.is_some() || t.suggestion.is_some();
-        t.suggestion = reply;
-    } else if let Some(reply) = reply {
+    t.take = Some(take(new.verdict, new.why, new.question));
+    if let Some(reply) = reply.filter(|r| !r.trim().is_empty() && *r != c.body) {
         c.body = reply;
         t.stage = super::threads::after_edit(t.stage, draft, &c.body);
-        updated = true;
     }
-    (turn.message, updated)
 }
 
 #[cfg(test)]
@@ -453,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn a_chat_turn_rewrites_take_and_reply_together() {
+    fn a_new_take_rewrites_take_and_reply_together() {
         let mut c = Comment {
             id: 1,
             path: "a.rs".into(),
@@ -463,44 +351,24 @@ mod tests {
             review: String::new(),
             created_at: 0,
             updated_at: 0,
-            workshop: Default::default(),
+            conversation: Default::default(),
             github: None,
             thread: Some(ThreadState::new("o/n", 1, Stage::Ready)),
             done: false,
         };
-        let turn = |reply: Option<&str>| ChatTurn {
-            message: "ok".into(),
-            verdict: Some(TakeVerdict::Disagree),
-            why: Some("2 is enough".into()),
+        let new = || Take {
+            verdict: TakeVerdict::Disagree,
+            why: "2 is enough".into(),
             question: Some(" ".into()),
-            reply: reply.map(String::from),
-            edits: None,
         };
-        assert_eq!(
-            apply_chat(&mut c, turn(Some("new")), false),
-            ("ok".into(), true)
-        );
+        set_take(&mut c, new(), Some("new".into()));
         let t = c.thread.as_ref().unwrap();
         assert_eq!(c.body, "new");
         assert_eq!(t.take.as_ref().unwrap().question, None);
         // A draft with text stays ready.
         assert_eq!(t.stage, Stage::Ready);
-        // Saying nothing new about the reply leaves it.
-        let mut quiet = turn(None);
-        quiet.verdict = None;
-        assert_eq!(
-            apply_chat(&mut c, quiet.clone(), false),
-            ("ok".into(), false)
-        );
+        // No reply leaves the one there is.
+        set_take(&mut c, new(), None);
         assert_eq!(c.body, "new");
-        // A review suggests its reply, and a later one that keeps the reply drops it.
-        apply_chat(&mut c, turn(Some("newer")), true);
-        assert_eq!(c.body, "new");
-        assert_eq!(
-            c.thread.as_ref().unwrap().suggestion.as_deref(),
-            Some("newer")
-        );
-        apply_chat(&mut c, quiet, true);
-        assert_eq!(c.thread.as_ref().unwrap().suggestion, None);
     }
 }

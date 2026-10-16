@@ -1,31 +1,13 @@
-import { Channel } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { endFrom, startRun } from "../agents/runs";
-import type { CommentDto, Proposed, ReviewDto, Stage, StateDto } from "../bindings";
+import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { confirmAction } from "../ui/prompt";
-import { useWorkspace } from "../workspaces/context";
 import { commentText, type Draft, followDraft } from "./comments";
-import { currentReview } from "./current";
 import type { Moves } from "./follow";
-import { lineDiff } from "./lineDiff";
 import { type FlatFile, NEW_COMMENT } from "./model";
 import { prComments } from "./prComments";
 
-/** A workshop exchange in flight: what was asked and the reply so far. */
-export interface Running {
-  ask: string;
-  change: boolean;
-  /** A first take and reply, asked for with no message. */
-  compose?: boolean;
-  reply: string;
-}
-
 const NONE: CommentDto[] = [];
-
-/** Whether a thread has proposed changes still to write. */
-const proposed = (c: CommentDto | undefined) =>
-  !!c?.thread?.proposal?.some((p) => p.state === "proposed");
 
 const without = <V>(m: ReadonlyMap<number, V>, id: number) => {
   const next = new Map(m);
@@ -46,11 +28,6 @@ const moved = <V>(m: ReadonlyMap<number, V>, from: number, to: number) => {
   return v === undefined ? m : without(m, from).set(to, v);
 };
 
-interface Focus {
-  id: number;
-  field: "body" | "ask";
-}
-
 interface Deps {
   review: ReviewDto | undefined;
   files: FlatFile[];
@@ -63,13 +40,11 @@ interface Deps {
   send(text: string, onSent: () => void): void;
   /** Called when the user is done in a comment block, to give keys back to the review. */
   onDone(): void;
-  /** Called after the agent was asked to change the code, to show its edits. */
-  onChanged(): void;
   /** The review is in a PR workspace, so drafts for GitHub can be written. */
   canDraft: boolean;
 }
 
-/** The comment being drafted, bodies being edited, and workshop conversations. */
+/** The comment being drafted and bodies being edited. */
 export function useComments({
   review,
   files,
@@ -78,32 +53,20 @@ export function useComments({
   onError,
   send,
   onDone,
-  onChanged,
   canDraft,
 }: Deps) {
-  const workspace = useWorkspace();
   const [draft, setDraft] = useState<Draft>();
   /** Bodies being edited, by comment id. Present means the block is in edit mode. */
   const [edits, setEdits] = useState<ReadonlyMap<number, string>>(new Map());
-  /** Unsent workshop messages, by comment id. */
-  const [asks, setAsks] = useState<ReadonlyMap<number, string>>(new Map());
-  const [running, setRunning] = useState<ReadonlyMap<number, Running>>(new Map());
-  /** The thread whose Final waits on whether to write its proposed changes. */
-  const [confirming, setConfirming] = useState<number>();
-  /** Threads whose proposed changes are being written. */
-  const [applying, setApplying] = useState<ReadonlySet<number>>(new Set());
   /** Threads being sent to GitHub. */
   const [sending, setSending] = useState<ReadonlySet<number>>(new Set());
-  /** Blocks whose ask box was opened. It also shows while a block has a conversation. */
-  const [askOpen, setAskOpen] = useState<ReadonlySet<number>>(new Set());
-  /** The text box that should take focus when its block next renders. */
-  const [focus, setFocus] = useState<Focus>();
+  /** The block whose text box should take focus when it next renders. */
+  const [focus, setFocus] = useState<number>();
   const comments = review?.state.comments ?? NONE;
   const threads = review?.state.threads;
   /** Comments on the PR itself and their quotes, and threads whose file isn't in the review,
    * which show above the files. */
   const onPr = useMemo(() => prComments(threads ?? [], comments), [threads, comments]);
-  const byId = (id: number) => comments.find((c) => c.id === id) ?? onPr.find((c) => c.id === id);
 
   // The draft follows its rows when the diff changes, and goes when they do.
   const seen = useRef(files);
@@ -114,11 +77,7 @@ export function useComments({
     if (!draft) return;
     const next = followDraft(draft, moves);
     setDraft(next);
-    if (!next) {
-      setEdits((m) => without(m, NEW_COMMENT));
-      setAsks((m) => without(m, NEW_COMMENT));
-      setAskOpen((s) => withoutId(s, NEW_COMMENT));
-    }
+    if (!next) setEdits((m) => without(m, NEW_COMMENT));
   }, [files, moves]);
 
   async function apply(result: Promise<CommandResult<StateDto>>): Promise<StateDto | undefined> {
@@ -132,12 +91,11 @@ export function useComments({
     return r.data;
   }
 
-  /** Opens a draft with the cursor in its body, or in its ask box to request a change. */
-  function start(next: Draft, field: Focus["field"] = "body") {
+  /** Opens a draft with the cursor in its body. */
+  function start(next: Draft) {
     setDraft(next);
     setEdits((m) => withEntry(m, NEW_COMMENT, m.get(NEW_COMMENT) ?? ""));
-    if (field === "ask") setAskOpen((s) => new Set(s).add(NEW_COMMENT));
-    setFocus({ id: NEW_COMMENT, field });
+    setFocus(NEW_COMMENT);
   }
 
   /** Saves the draft and returns the new comment. */
@@ -153,8 +111,6 @@ export function useComments({
     const id = saved.id;
     setDraft(undefined);
     setEdits((m) => moved(m, NEW_COMMENT, id));
-    setAsks((m) => moved(m, NEW_COMMENT, id));
-    setAskOpen((s) => (s.has(NEW_COMMENT) ? withoutId(s, NEW_COMMENT).add(id) : s));
     return saved;
   }
 
@@ -172,11 +128,7 @@ export function useComments({
 
   function cancel(id: number) {
     setEdits((m) => without(m, id));
-    if (id === NEW_COMMENT) {
-      setDraft(undefined);
-      setAsks((m) => without(m, id));
-      setAskOpen((s) => withoutId(s, id));
-    }
+    if (id === NEW_COMMENT) setDraft(undefined);
     onDone();
   }
 
@@ -187,56 +139,10 @@ export function useComments({
     }
   }
 
-  /** Sends the block's workshop message, saving a draft first so the exchange has a home.
-   * A change with no message asks for what the comment says. */
-  async function ask(id: number, change: boolean, compose = false, text?: string) {
-    const message = compose ? "" : (text ?? asks.get(id)?.trim() ?? "");
-    const body = edits.get(id) ?? byId(id)?.body ?? "";
-    if (!review || running.has(id) || !(compose || message || (change && body.trim()))) return;
-    // A note started for a change takes the request as its text.
-    const asText = id === NEW_COMMENT && change && !!message && !body.trim() && !draft?.github;
-    const c = id === NEW_COMMENT ? await create(asText ? message : body) : byId(id);
-    if (!c) return;
-    if (asText) setEdits((m) => without(m, c.id));
-    const cid = c.id;
-    // A saved draft's block is a new one, so the ask box needs focus again.
-    if (cid !== id) setFocus({ id: cid, field: "ask" });
-    if (!compose && text === undefined) setAsks((m) => without(m, cid));
-    setRunning((m) => withEntry(m, cid, { ask: message, change, compose, reply: "" }));
-    const handle = startRun(workspace, {
-      kind: change ? "change" : c.thread ? "reply" : "ask",
-      subject: c.path || "Comment",
-      stop: () => commands.stopWorkshop(cid),
-      open: () => currentReview(workspace)?.jumpToComment(cid),
-    });
-    const channel = new Channel<string>();
-    channel.onmessage = (text) =>
-      setRunning((m) => {
-        const r = m.get(cid);
-        return r ? withEntry(m, cid, { ...r, reply: r.reply + text }) : m;
-      });
-    const r = await commands.workshopComment(
-      review.id,
-      cid,
-      { message, draft: asText ? message : body, change, compose },
-      channel,
-    );
-    endFrom(handle, r);
-    await apply(Promise.resolve(r));
-    setRunning((m) => without(m, cid));
-    if (change && r.status === "ok") onChanged();
-  }
-
-  /** Puts an agent's suggestion in the body for the user to check and save. */
-  function use(id: number, text: string) {
-    setEdits((m) => withEntry(m, id, text));
-    setFocus({ id, field: "body" });
-  }
-
-  /** Saves an agent's suggestion as the note's text. */
-  async function saveSuggestion(id: number, text: string) {
-    if (!review) return;
-    if (await apply(commands.editComment(review.id, id, text))) setEdits((m) => without(m, id));
+  /** Opens the comment's text for editing. */
+  function edit(c: CommentDto) {
+    setEdits((m) => withEntry(m, c.id, c.body));
+    setFocus(c.id);
   }
 
   /** Saves the block's text when it's being edited. Resolves to the comment's id. */
@@ -252,54 +158,11 @@ export function useComments({
     return cid;
   }
 
-  /** Saves the thread's reply as final, which makes it ready to send. With proposed code
-   * changes it asks first whether to write them. */
+  /** Saves the thread's reply as final, which makes it ready to send. */
   async function final(id: number) {
-    if (proposed(byId(id))) return setConfirming(id);
-    await finish(id, false);
-  }
-
-  /** Makes the reply final, first writing the proposed changes with `write`, or dropping
-   * them. */
-  async function finish(id: number, write: boolean) {
-    setConfirming(undefined);
     const cid = await saveEdit(id);
-    if (!review || cid === undefined) return onDone();
-    if (proposed(byId(cid))) {
-      if (write) {
-        setApplying((s) => new Set(s).add(cid));
-        const ok = await apply(commands.applyProposal(review.id, cid));
-        setApplying((s) => withoutId(s, cid));
-        if (ok) onChanged();
-      } else await apply(commands.discardProposal(review.id, cid, null));
-    }
-    await apply(commands.setThreadStage(review.id, cid, "ready"));
+    if (review && cid !== undefined) await apply(commands.setThreadStage(review.id, cid, "ready"));
     onDone();
-  }
-
-  /** Drops the proposed change to `path`. */
-  async function discard(id: number, path: string) {
-    if (review) await apply(commands.discardProposal(review.id, id, path));
-  }
-
-  /** Has the agent make a proposed change that went stale, then drops the proposal. */
-  async function applyByAgent(id: number, p: Proposed) {
-    if (!review) return;
-    const diff = lineDiff(p.before, p.after)
-      .map((h) => h.map((l) => `${{ ctx: " ", add: "+", del: "-" }[l.kind]}${l.text}`).join("\n"))
-      .join("\n...\n");
-    await discard(id, p.path);
-    await ask(
-      id,
-      true,
-      false,
-      `Make this change to ${p.path}, which changed since you proposed it:\n\n\`\`\`diff\n${diff}\n\`\`\``,
-    );
-  }
-
-  /** Makes the suggested reply the thread's reply with `apply`, or drops it. */
-  async function settleSuggestion(id: number, accept: boolean) {
-    if (review) await apply(commands.settleSuggestion(review.id, id, accept));
   }
 
   /** Sends a final thread to GitHub on its own. */
@@ -314,11 +177,10 @@ export function useComments({
     if (review) await apply(commands.setThreadStage(review.id, id, stage));
   }
 
-  /** Clears a GitHub thread's take, reply and agent conversation, after asking. */
+  /** Clears a GitHub thread's take, reply and conversation, after asking. */
   async function reset(id: number) {
     if (!review) return;
-    if (!(await confirmAction("Reset this thread? Its take, reply and agent chat go.", "Reset")))
-      return;
+    if (!(await confirmAction("Reset this thread? Its take and reply go.", "Reset"))) return;
     setEdits((m) => without(m, id));
     await apply(commands.resetThread(review.id, id));
   }
@@ -330,30 +192,6 @@ export function useComments({
   /** Starts a GitHub draft on the note's code, with its text. */
   async function draftFromNote(id: number) {
     if (review) await apply(commands.draftFromNote(review.id, id));
-  }
-
-  /** Has the agent write a thread's first take and reply. */
-  const compose = (id: number) => ask(id, false, true);
-
-  /** The `a` key on a block: drafts a thread's reply when it has neither take nor reply, and
-   * otherwise puts the cursor in the ask box. */
-  function agentKey(id: number) {
-    const c = byId(id);
-    if (c?.github && c.thread && !c.thread.take && !c.body.trim() && !running.has(id)) {
-      compose(id);
-    } else openAsk(id);
-  }
-
-  /** Shows the block's ask box with the cursor in it. */
-  function openAsk(id: number) {
-    setAskOpen((s) => new Set(s).add(id));
-    setFocus({ id, field: "ask" });
-  }
-
-  /** Hides the block's ask box, unless it holds a conversation, and gives keys back. */
-  function closeAsk(id: number) {
-    setAskOpen((s) => withoutId(s, id));
-    onDone();
   }
 
   function sendComment(c: CommentDto) {
@@ -375,8 +213,6 @@ export function useComments({
     reviewId: review?.id,
     draft,
     edits,
-    asks,
-    running,
     focus,
     comments,
     onPr,
@@ -384,40 +220,20 @@ export function useComments({
     sendCombined,
     start,
     setBody: (id: number, text: string) => setEdits((m) => withEntry(m, id, text)),
-    setAsk: (id: number, text: string) => setAsks((m) => withEntry(m, id, text)),
     focused: () => setFocus(undefined),
     save,
     cancel,
-    edit: (c: CommentDto) => use(c.id, c.body),
+    edit,
     remove,
-    ask,
-    compose,
-    agentKey,
-    stop: commands.stopWorkshop,
-    use,
-    saveSuggestion,
     send: sendComment,
     final,
-    finish,
-    confirming,
-    cancelFinal: () => setConfirming(undefined),
-    applying,
-    discard,
-    applyByAgent,
     sending,
     sendOne,
-    settleSuggestion,
     setStage,
     reset,
     setDone,
     draftFromNote,
-    /** Whether the block's ask box shows: opened, or holding a conversation. */
-    asking: (id: number) => askOpen.has(id) || running.has(id) || !!byId(id)?.messages.length,
-    openAsk,
-    closeAsk,
     canDraft,
-    /** The agent edits `@`, so a change only shows when the review includes it. */
-    canChange: review?.hasWorkingCopy ?? false,
     done: onDone,
   };
 }
