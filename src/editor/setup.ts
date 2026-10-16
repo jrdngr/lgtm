@@ -12,6 +12,7 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { treeSitter } from "./highlight";
+import { linkClicks } from "./linkClicks";
 
 const theme = EditorView.theme(
   {
@@ -36,6 +37,8 @@ export const wrapExtension = (on: boolean): Extension => (on ? EditorView.lineWr
 interface Hooks {
   save(): void;
   changed(u: ViewUpdate): void;
+  /** Follows a link ⌘-clicked in a markdown file. */
+  link(href: string): void;
 }
 
 /** Keeps the file's own line endings, so saving a CRLF file doesn't rewrite every line. */
@@ -72,6 +75,7 @@ export function editorExtensions(
     lineEnding(text),
     wrapping.of(wrapExtension(wrap)),
     treeSitter(path),
+    /\.(md|markdown|mdx)$/i.test(path) ? linkClicks(hooks.link) : [],
     theme,
     EditorView.updateListener.of(hooks.changed),
   ];

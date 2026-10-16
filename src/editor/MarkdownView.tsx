@@ -1,6 +1,6 @@
 import { createElement, useMemo } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
-import { components, gfmPlugins } from "./markdownParts";
+import { components, gfmPlugins, LinkContext } from "./markdownParts";
 
 /** Blocks that carry their source lines. */
 const BLOCKS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr", "hr"] as const;
@@ -58,17 +58,21 @@ export function MarkdownView({
   text,
   lines,
   marks,
+  onLink,
 }: {
   text: string;
   lines?: boolean;
   marks?: LineMarks;
+  /** Follows a ⌘-clicked link, in place of opening only web addresses. */
+  onLink?: (href: string) => void;
 }) {
   const parts = useMemo(() => (lines ? lineComponents(marks) : components), [lines, marks]);
-  return (
+  const view = (
     <div className="markdown-view">
       <ReactMarkdown remarkPlugins={gfmPlugins} components={parts}>
         {text}
       </ReactMarkdown>
     </div>
   );
+  return onLink ? <LinkContext.Provider value={onLink}>{view}</LinkContext.Provider> : view;
 }

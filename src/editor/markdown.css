@@ -19,6 +19,12 @@
   color: var(--accent);
 }
 
+.cmd-held .md-link:hover,
+.cmd-held .cm-link-hot {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .contains-task-list {
   padding-left: 0;
   list-style: none;

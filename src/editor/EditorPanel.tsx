@@ -17,6 +17,7 @@ import { HtmlView } from "./HtmlView";
 import { isHtml } from "./htmlNav";
 import { ImagePanel } from "./ImagePanel";
 import { imageType, isSvg, svgUrl } from "./image";
+import { followLink } from "./links";
 import { MarkdownView } from "./MarkdownView";
 import { baseName, type EditorParams } from "./open";
 import { lineRef, renderedLines } from "./renderedLines";
@@ -67,6 +68,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         if (!live || !host.current) return;
         const extensions = editorExtensions(path, text, wordWrap.get(), {
           save: () => saveRef.current(),
+          link: (href) => followLink(href, workspace, path),
           changed: (u) => {
             if (u.selectionSet) saveTabParams(api, { cursor: u.state.selection.main.head });
             if (!u.docChanged) return;
@@ -312,7 +314,15 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
             saveTabParams(api, { renderedScroll: Math.round(e.currentTarget.scrollTop) })
           }
         >
-          {isSvg(path) ? svg.view : <MarkdownView text={rendered} lines />}
+          {isSvg(path) ? (
+            svg.view
+          ) : (
+            <MarkdownView
+              text={rendered}
+              lines
+              onLink={(href) => followLink(href, workspace, path)}
+            />
+          )}
         </div>
       )}
       <div

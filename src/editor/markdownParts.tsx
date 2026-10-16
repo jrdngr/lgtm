@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import type { Components } from "react-markdown";
 import gfm from "remark-gfm";
 import { HIGHLIGHT_NAMES } from "../bindings";
 import { commands } from "../ipc";
+import { cmdClick, trackCmd } from "../ui/cmdHeld";
+import { followLink } from "./links";
 import { Mermaid } from "./Mermaid";
 import "../review/syntax.css";
 import "./markdown.css";
@@ -51,10 +53,35 @@ function Code({ lang, text }: { lang: string; text: string }) {
   );
 }
 
-/** Links show as text, since following one would navigate the app's window away. Mermaid
- * blocks draw as diagrams, fenced code is highlighted, and wide tables scroll. */
+/** Follows a ⌘-clicked link. Outside a file, only web addresses go anywhere. */
+export const LinkContext = createContext<(href: string) => void>((href) => followLink(href, null));
+
+trackCmd();
+
+/** A link, which a ⌘-click follows. It isn't an `<a>`, since a plain click on one would
+ * navigate the app's window away. */
+function Link({ href, children }: { href?: string; children?: React.ReactNode }) {
+  const follow = useContext(LinkContext);
+  return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a ⌘-click shortcut; the text stays plain text to the keyboard
+    // biome-ignore lint/a11y/noStaticElementInteractions: as above
+    <span
+      className="md-link"
+      onClick={(e) => {
+        if (!href || !cmdClick(e)) return;
+        e.preventDefault();
+        follow(href);
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Links follow on a ⌘-click. Mermaid blocks draw as diagrams, fenced code is highlighted,
+ * and wide tables scroll. */
 export const components: Components = {
-  a: ({ children }) => <span className="md-link">{children}</span>,
+  a: ({ href, children }) => <Link href={href}>{children}</Link>,
   pre: ({ node, children, ...rest }) => {
     const code = node?.children[0];
     const cls = code?.type === "element" ? code.properties.className : undefined;
