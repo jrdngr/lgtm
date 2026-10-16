@@ -1,4 +1,4 @@
-//! Moving the working copy and rewriting commits, for refetching PRs and resolving conflicts.
+//! Moving the working copy and rewriting commits, for refetching PRs.
 
 use super::Jj;
 
@@ -23,14 +23,5 @@ impl Jj {
     /// Rebases the commits in `source` and their descendants onto `dest`.
     pub async fn rebase(&self, source: &str, dest: &str) -> anyhow::Result<()> {
         self.write(&["rebase", "-s", source, "-o", dest]).await
-    }
-
-    /// Moves `@`'s changes into its parent, keeping the parent's description.
-    pub async fn squash_into_parent(&self) -> anyhow::Result<()> {
-        self.write(&["squash", "--use-destination-message"]).await
-    }
-
-    pub async fn abandon(&self, rev: &str) -> anyhow::Result<()> {
-        self.write(&["abandon", rev]).await
     }
 }

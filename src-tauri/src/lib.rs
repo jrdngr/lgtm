@@ -23,7 +23,6 @@ mod qa;
 mod quit;
 mod recent;
 mod repo;
-mod resolve;
 mod review;
 mod settings;
 mod store;
@@ -165,8 +164,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::github::send_thread,
             commands::github::pr_discussion,
             commands::github::send_combined,
-            commands::github::resolve_conflict,
-            commands::github::stop_resolve,
             commands::qa::list_qa,
             commands::qa::create_qa,
             commands::qa::edit_qa,

@@ -106,15 +106,6 @@ impl Jj {
             .map(drop)
     }
 
-    /// Paths with conflicts in `rev`.
-    pub async fn conflicted_files(&self, rev: &str) -> anyhow::Result<Vec<String>> {
-        let template = r#"if(conflict, path.display() ++ "\n")"#;
-        let out = self
-            .read(&["file", "list", "-r", rev, "-T", template])
-            .await?;
-        Ok(out.lines().map(str::to_string).collect())
-    }
-
     /// Whether `commit` is in the repo.
     pub async fn has_commit(&self, commit: &str) -> bool {
         self.commit_ids(&format!("present({commit})"))

@@ -337,9 +337,6 @@ export const commands = {
 	 *  then are done.
 	 */
 	sendCombined: (review: number, comments: number[], body: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_combined", { review, comments, body })),
-	/**  Has an agent resolve a conflicted change, streaming its reply through `on_text`. */
-	resolveConflict: (workspace: string | null, change: string, onText: Channel<string>) => typedError<ResolveDto, string>(__TAURI_INVOKE("resolve_conflict", { workspace, change, onText })),
-	stopResolve: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("stop_resolve", { workspace })),
 	/**  The workspace's Q&A sessions, oldest first. */
 	listQa: (workspace: string | null) => typedError<Session_Serialize[], string>(__TAURI_INVOKE("list_qa", { workspace })),
 	/**  Starts a session from a prompt. Nothing runs until it's asked. */
@@ -1174,7 +1171,7 @@ export type Minimal = {
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
 export type Models = {
-	/**  Fix headless, and conflict resolution. */
+	/**  Fix on reports and intents. */
 	ask: string,
 	walkthrough: string,
 	reviewers: string,
@@ -1573,14 +1570,6 @@ export type RepoChanged = Record<string, never>;
 export type RepoInfo = {
 	root: string,
 	name: string,
-};
-
-export type ResolveDto = {
-	/**  The agent's reply. */
-	text: string,
-	stopped: boolean,
-	/**  The commit still has conflicts. */
-	conflicted: boolean,
 };
 
 export type Response = {

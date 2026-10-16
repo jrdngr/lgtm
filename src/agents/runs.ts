@@ -2,21 +2,13 @@ import { useSyncExternalStore } from "react";
 import { pulse, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
-export type AgentKind =
-  | "triage"
-  | "fix"
-  | "walkthrough"
-  | "resolve"
-  | "qa"
-  | "assess"
-  | "intentFix";
+export type AgentKind = "triage" | "fix" | "walkthrough" | "qa" | "assess" | "intentFix";
 export type Outcome = "running" | "done" | "failed" | "stopped";
 
 export const KIND_NAMES: Record<AgentKind, string> = {
   triage: "Triage",
   fix: "Fix threads",
   walkthrough: "Walkthrough",
-  resolve: "Resolve",
   qa: "Q&A",
   assess: "Assess",
   intentFix: "Fix intents",

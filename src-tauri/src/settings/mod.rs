@@ -48,7 +48,7 @@ impl Default for Settings {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Models {
-    /// Fix headless, and conflict resolution.
+    /// Fix on reports and intents.
     pub ask: String,
     pub walkthrough: String,
     pub reviewers: String,

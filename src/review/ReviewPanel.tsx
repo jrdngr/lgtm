@@ -375,14 +375,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />
-      {review && (
-        <Conflicts
-          workspace={workspace}
-          changes={review.changes}
-          send={(text) => sendText(text, focusRoot)}
-          onDone={() => refresh()}
-        />
-      )}
+      {review && <Conflicts changes={review.changes} send={(text) => sendText(text, focusRoot)} />}
       {error && <div className="review-error">{error}</div>}
       {review && fileLines.length === 0 && (
         <div className="placeholder">

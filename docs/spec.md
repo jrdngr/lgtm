@@ -92,7 +92,7 @@ Persona-based review, modeled on the `wee-bots` skill in `jrdngr/agent-stuff`, b
 - Fork PR: add a remote named `gh-<owner>` on demand, then fetch the head branch.
 - Fallback when the branch is gone: `git fetch origin pull/N/head:refs/heads/lgtm/pr-N` into jj's git store, then `jj git import`. Clean these bookmarks up when the workspace is deleted.
 - GitHub calls go through the `gh` CLI, which holds the user's auth.
-- A conflicted change can go to an agent to resolve, headless or pasted into a terminal.
+- A conflicted change can go to an agent to resolve, pasted into a terminal.
 
 ## 5. Marking and anchoring
 

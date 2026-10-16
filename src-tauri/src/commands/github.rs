@@ -1,11 +1,8 @@
-use tauri::ipc::Channel;
-use tauri::{State, WebviewWindow};
+use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::agent::Runs;
 use crate::github::Verdict;
 use crate::pr::{DiscussionDto, Fixed, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto};
-use crate::resolve::ResolveDto;
 use crate::review::StateDto;
 
 /// Checks out the PR `input` names (a number or a URL) into its own workspace, or finds the
@@ -212,35 +209,6 @@ pub(crate) async fn send_combined(
         .send_combined(review, &comments, &body)
         .await
         .map_err(err)
-}
-
-/// Has an agent resolve a conflicted change, streaming its reply through `on_text`.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn resolve_conflict(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    change: String,
-    on_text: Channel<String>,
-) -> CmdResult<ResolveDto> {
-    repo(&window)?
-        .resolve_conflict(workspace.as_deref(), &change, &runs, |t| {
-            on_text.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn stop_resolve(
-    window: WebviewWindow,
-    runs: State<Runs>,
-    workspace: Option<String>,
-) -> CmdResult<()> {
-    repo(&window)?.stop_resolve(workspace.as_deref(), &runs);
-    Ok(())
 }
 
 /// Opens a web page in the default browser.
