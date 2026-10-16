@@ -167,13 +167,6 @@
   margin-left: 2px;
 }
 
-.ws-count {
-  min-width: 7px;
-  font: 10px var(--mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
 .ws-glyph {
   width: 12px;
   height: 12px;

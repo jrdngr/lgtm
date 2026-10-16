@@ -28,7 +28,7 @@ function Change({ w }: { w: WorkspaceDto }) {
   return (
     <>
       <ChangeId id={w.changeId} unique={w.unique} />{" "}
-      {w.description || <i className="ws-none">no description</i>}
+      {w.description.split("\n")[0] || <i className="ws-none">no description</i>}
     </>
   );
 }
@@ -115,7 +115,12 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onError, onPinDr
       onPointerDown={onPinDrag}
       onContextMenu={menu}
     >
-      <button type="button" className="workspace-open" onClick={onSelect} title={w.root}>
+      <button
+        type="button"
+        className="workspace-open"
+        onClick={onSelect}
+        title={w.description.trim() || undefined}
+      >
         <Lines w={w} onError={onError} />
       </button>
       <span className="workspace-side">

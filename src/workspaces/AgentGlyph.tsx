@@ -62,13 +62,11 @@ function Shape({ state }: { state: Activity["state"] }) {
   }
 }
 
-/** A workspace's most urgent agent state as a 12px mark, with a count when it has several
- * agents. */
+/** A workspace's most urgent agent state as a 12px mark. */
 export function AgentGlyph({ a }: { a: Activity }) {
   const title = a.labels.length ? `${NAMES[a.state]}: ${a.labels.join(", ")}` : NAMES[a.state];
   return (
     <span className="ws-agents" title={title}>
-      {a.count > 1 && <span className="ws-count">{a.count}</span>}
       <svg className={`ws-glyph ${a.state}`} viewBox="0 0 12 12" aria-label={NAMES[a.state]}>
         <Shape state={a.state} />
       </svg>
