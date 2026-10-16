@@ -57,6 +57,11 @@ export function QaTab({ api }: IDockviewPanelProps) {
   const ws = useWorkspace();
   const state = useQa(ws);
   const agentsOff = useAgentsOff();
+  /** Archives the session and closes the tab. */
+  async function archive(d: Session) {
+    await edit(ws, d, { kind: "archive", archived: true });
+    api.close();
+  }
   const [focusKey, setFocusKey] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const { sendText, picker } = useSendText(
@@ -110,7 +115,8 @@ export function QaTab({ api }: IDockviewPanelProps) {
             d && {
               label: archiveLabel(d),
               disabled: !!busy,
-              onSelect: () => edit(ws, d, { kind: "archive", archived: !d.archived }),
+              onSelect: () =>
+                d.archived ? edit(ws, d, { kind: "archive", archived: false }) : archive(d),
             },
             d && {
               label: "Delete",
@@ -143,7 +149,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
         <div className="qa-sent">
           Sent to {d.sent || "a terminal"}
           <span className="spacer" />
-          <button type="button" onClick={() => edit(ws, d, { kind: "archive", archived: true })}>
+          <button type="button" onClick={() => archive(d)}>
             Archive
           </button>
         </div>

@@ -22,7 +22,7 @@
   white-space: nowrap;
 }
 
-.arch-score button:not(.primary) {
+.arch-score button:not(.primary, .agent-run) {
   background: var(--raise);
 }
 
