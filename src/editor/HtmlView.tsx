@@ -7,6 +7,7 @@ import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
+import { ZoomControls, zoomKey } from "./ZoomControls";
 
 const base = () => convertFileSrc("", "lgtmhtml");
 
@@ -156,10 +157,10 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
     const inField = e.target instanceof HTMLInputElement;
     let run: (() => void) | undefined;
     if (e.key === "Escape" && find !== undefined) run = closeFind;
-    else if (mod && e.altKey && e.code === "Equal") run = () => setZoom((z) => stepZoom(z, 1));
-    else if (mod && e.altKey && e.code === "Minus") run = () => setZoom((z) => stepZoom(z, -1));
-    else if (mod && e.altKey && e.code === "Digit0") run = () => setZoom(1);
-    else if (mod && e.altKey && e.code === "Digit9") run = () => post({ type: "fit" });
+    else if (zoomKey(e) === "in") run = () => setZoom((z) => stepZoom(z, 1));
+    else if (zoomKey(e) === "out") run = () => setZoom((z) => stepZoom(z, -1));
+    else if (zoomKey(e) === "actual") run = () => setZoom(1);
+    else if (zoomKey(e) === "fit") run = () => post({ type: "fit" });
     else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "r") run = reload;
     else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f") run = openFind;
     else if (mod && !inField && e.key === "ArrowLeft") run = () => go(-1);
@@ -191,27 +192,12 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         <span className="path" title={shown}>
           {shown}
         </span>
-        <IconButton
-          icon="minus"
-          label="Zoom Out (⌥⌘-)"
-          onClick={() => setZoom((z) => stepZoom(z, -1))}
+        <ZoomControls
+          zoom={zoom}
+          setZoom={setZoom}
+          fit={() => post({ type: "fit" })}
+          fitLabel="Fit to Width"
         />
-        <span className="html-zoom">{Math.round(zoom * 100)}%</span>
-        <IconButton
-          icon="plus"
-          label="Zoom In (⌥⌘=)"
-          onClick={() => setZoom((z) => stepZoom(z, 1))}
-        />
-        <button
-          type="button"
-          className="icon-button html-actual"
-          title="Actual Size (⌥⌘0)"
-          aria-label="Actual Size (⌥⌘0)"
-          onClick={() => setZoom(1)}
-        >
-          1:1
-        </button>
-        <IconButton icon="fit" label="Fit to Width (⌥⌘9)" onClick={() => post({ type: "fit" })} />
         {toggle}
       </div>
       {find !== undefined && (

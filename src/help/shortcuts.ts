@@ -64,6 +64,13 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     ],
   },
   {
+    title: "Image or rendered SVG",
+    shortcuts: [
+      { keys: ["⌥⌘=", "⌥⌘-", "⌥⌘0"], action: "Zoom in, out, actual size" },
+      { keys: ["⌥⌘9"], action: "Fit the image to the tab" },
+    ],
+  },
+  {
     title: "Review",
     shortcuts: [
       { keys: ["j", "k"], action: "Move the cursor" },

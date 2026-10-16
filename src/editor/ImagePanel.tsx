@@ -5,15 +5,14 @@ import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { imageType } from "./image";
 import type { EditorParams } from "./open";
+import { useImageZoom } from "./useImageZoom";
 
-/** An image file at its own size, scaled down when it doesn't fit the tab. Reloads when
- * the repo changes. */
+/** An image file, scaled down to fit the tab until zoomed. Reloads when the repo changes. */
 export function ImagePanel({ params }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
   const { path } = params;
   const [url, setUrl] = useState<string>();
   const [error, setError] = useState<string>();
-  const [size, setSize] = useState<[number, number]>();
 
   const load = useCallback(
     () =>
@@ -31,6 +30,7 @@ export function ImagePanel({ params }: IDockviewPanelProps<EditorParams>) {
     load();
   }, [load]);
   useRepoChanged(load);
+  const { controls, view, size } = useImageZoom(url, path);
 
   return (
     <div className="editor-panel">
@@ -43,18 +43,10 @@ export function ImagePanel({ params }: IDockviewPanelProps<EditorParams>) {
             {size[0]} × {size[1]}
           </span>
         )}
+        {url && controls}
       </div>
       {error && <div className="editor-bar error">{error}</div>}
-      {url && (
-        <div className="image-view">
-          <img
-            src={url}
-            alt={path}
-            draggable={false}
-            onLoad={(e) => setSize([e.currentTarget.naturalWidth, e.currentTarget.naturalHeight])}
-          />
-        </div>
-      )}
+      {view}
     </div>
   );
 }

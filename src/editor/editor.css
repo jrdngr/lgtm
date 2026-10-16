@@ -146,6 +146,14 @@
   overflow: hidden;
 }
 
+.image-view.zoomed {
+  overflow: auto;
+}
+
+.image-view:focus {
+  outline: none;
+}
+
 /* A checkerboard behind the image shows where it's transparent. */
 .image-view img {
   margin: auto;
@@ -171,13 +179,13 @@
   margin: 0 6px;
 }
 
-.html-view .editor-path .html-zoom {
+.editor-path .zoom-pct {
   min-width: 40px;
   text-align: center;
   color: var(--fg);
 }
 
-.html-view .editor-path .html-actual {
+.editor-path .zoom-actual {
   padding: 0;
   font: 600 10px var(--mono);
   letter-spacing: -0.02em;

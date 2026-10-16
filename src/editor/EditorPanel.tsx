@@ -22,6 +22,7 @@ import { emitSaved } from "./saved";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
 import { useAgentBox } from "./useAgentBox";
+import { useImageZoom } from "./useImageZoom";
 import { ViewSwitch } from "./ViewSwitch";
 import "./editor.css";
 
@@ -214,6 +215,10 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     <ViewSwitch rendered={rendered !== undefined} disabled={!view} toggle={toggleRendered} />
   );
   const html = isHtml(path) && rendered !== undefined;
+  const svg = useImageZoom(
+    isSvg(path) && rendered !== undefined ? svgUrl(rendered) : undefined,
+    path,
+  );
 
   return (
     <div className="editor-panel" onKeyDown={onKeyDown}>
@@ -222,6 +227,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           <span className="path" title={path}>
             {path}
           </span>
+          {svg.view && svg.controls}
           {toggle}
         </div>
       )}
@@ -244,14 +250,9 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           ref={renderedRef as React.RefObject<HTMLDivElement>}
           // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
           tabIndex={0}
+          onKeyDown={svg.onKeyDown}
         >
-          {isSvg(path) ? (
-            <div className="image-view">
-              <img src={svgUrl(rendered)} alt={path} draggable={false} />
-            </div>
-          ) : (
-            <MarkdownView text={rendered} />
-          )}
+          {isSvg(path) ? svg.view : <MarkdownView text={rendered} />}
         </div>
       )}
       <div
