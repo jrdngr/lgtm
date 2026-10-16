@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { report } from "../workspaces/activity";
+import { pulse, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 export type AgentKind =
@@ -81,7 +81,10 @@ export function startRun(
   const label = KIND_NAMES[run.kind];
   report(workspace, `run:${id}`, "running", label);
   return {
-    activity: (detail) => update(key, id, (r) => (r.outcome === "running" ? { ...r, detail } : r)),
+    activity: (detail) => {
+      pulse(`run:${id}`);
+      update(key, id, (r) => (r.outcome === "running" ? { ...r, detail } : r));
+    },
     end: (outcome, detail) => {
       update(key, id, (r) => ({ ...r, outcome, detail }));
       report(workspace, `run:${id}`, outcome, label);

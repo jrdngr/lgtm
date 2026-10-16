@@ -112,28 +112,92 @@
   padding: 1px 8px;
 }
 
-.ws-activity {
-  box-sizing: border-box;
-  width: 8px;
-  height: 8px;
-  margin: 0 4px;
-  border-radius: 50%;
+.ws-agents {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 2px;
 }
 
-.ws-activity.done {
-  background: var(--added);
+.ws-count {
+  min-width: 7px;
+  font: 10px var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
 }
 
-.ws-activity.failed {
-  background: var(--error);
+.ws-glyph {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  overflow: visible;
+  fill: var(--glyph);
+  stroke: var(--glyph);
+  stroke-width: 0;
 }
 
-.ws-activity.working {
-  width: 10px;
-  height: 10px;
-  border: 2px solid rgb(79 140 201 / 30%);
-  border-top-color: var(--accent);
+.ws-glyph.input {
+  --glyph: var(--mark-yellow);
+}
+
+.ws-glyph.failed {
+  --glyph: var(--error);
+}
+
+.ws-glyph.stalled {
+  --glyph: var(--mark-orange);
+}
+
+.ws-glyph.working {
+  --glyph: var(--accent);
+}
+
+.ws-glyph.done {
+  --glyph: var(--added);
+}
+
+.ws-glyph.idle {
+  --glyph: var(--muted);
+}
+
+.ws-glyph.none {
+  --glyph: var(--faint);
+}
+
+.ws-glyph .ws-cut {
+  stroke: var(--bg);
+}
+
+.ws-glyph .ws-track {
+  stroke: rgb(79 140 201 / 30%);
+}
+
+.ws-glyph .ws-spin {
+  transform-origin: 6px 6px;
   animation: ws-spin 0.9s linear infinite;
+}
+
+.ws-glyph .ws-halo {
+  transform-origin: 6px 6px;
+  animation: ws-halo 1.6s ease-out infinite;
+}
+
+@keyframes ws-halo {
+  from {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-glyph .ws-spin,
+  .ws-glyph .ws-halo {
+    animation: none;
+  }
 }
 
 @keyframes ws-spin {

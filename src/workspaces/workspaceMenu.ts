@@ -40,7 +40,7 @@ interface Row {
   w: WorkspaceDto;
   /** Set in a PR workspace. */
   pr: PrDto | null | undefined;
-  /** Whether the row shows the dot of a finished run. */
+  /** Whether the row shows an agent that ended while away. */
   dot: boolean;
   /** Switches to the workspace. */
   open(): void;
@@ -78,7 +78,7 @@ export function workspaceMenu({ w, pr, dot, open, onDelete, onClearDot }: Row): 
       : []),
     ...pathItems(ws, "", { relative: false }),
     "-",
-    w.name !== null && !pr && dot && { label: "Clear Activity Dot", onSelect: onClearDot },
+    w.name !== null && !pr && dot && { label: "Mark Agents Seen", onSelect: onClearDot },
     "-",
     deleteItem(w, onDelete),
   ];

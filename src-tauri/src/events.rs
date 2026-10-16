@@ -104,3 +104,11 @@ pub struct QaChanged {
     /// Bring the session forward in the Q&A tab.
     pub show: bool,
 }
+
+/// Claude Code's hooks in a terminal reported how its agent stands.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct TerminalAgent {
+    /// The terminal's panel id.
+    pub terminal: String,
+    pub state: crate::mcp::hook::AgentHookState,
+}

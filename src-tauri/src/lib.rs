@@ -204,7 +204,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::AgentShow,
             events::AgentRevset,
             events::ReviewStateChanged,
-            events::QaChanged
+            events::QaChanged,
+            events::TerminalAgent
         ])
 }
 
@@ -244,6 +245,9 @@ pub fn run() {
     // Claude Code starts this, inside a terminal that already has the user's PATH.
     if args.first().is_some_and(|a| a == "mcp") {
         std::process::exit(mcp::bridge_main());
+    }
+    if args.first().is_some_and(|a| a == "hook") {
+        std::process::exit(mcp::hook::main());
     }
     adopt_login_shell_path();
     settings::load();

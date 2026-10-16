@@ -1,9 +1,10 @@
 import { Channel } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
 import { commands, type PtyEvent } from "../ipc";
-import { report } from "../workspaces/activity";
+import { type ActivityState, pulse, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
-import { isBusyTitle, titleLabel } from "./title";
+import { onAgentHook } from "./agentHooks";
+import { isAgentTitle, isBusyTitle, titleLabel } from "./title";
 import { createTerminal } from "./xterm";
 
 /** An xterm and the shell it runs, in an element its panel shows. */
@@ -82,15 +83,31 @@ function startSession(
   let disposed = false;
   let title = "";
   const activity = `term:${id}`;
+  /** How its agent stands, as last reported. */
+  let agent: ActivityState = "gone";
+  /** Whether Claude Code's hooks report for it, which then wins over the title. */
+  let hooked = false;
+  const set = (state: ActivityState) => {
+    agent = state;
+    report(workspace, activity, state, titleLabel(title), true);
+  };
 
   const channel = new Channel<PtyEvent>();
   channel.onmessage = (e) => {
-    if (e.kind === "data") term.write(e.data);
-    else {
+    if (e.kind === "data") {
+      term.write(e.data);
+      pulse(activity);
+    } else {
       term.write(`\r\n[process exited with code ${e.code}]\r\n`);
-      report(workspace, activity, "done", titleLabel(title));
+      const busy = agent === "running" || agent === "input";
+      set(busy && e.code !== 0 ? "failed" : "gone");
     }
   };
+  const unhook = onAgentHook(id, (state) => {
+    hooked = true;
+    set(state === "working" ? "running" : state);
+    pulse(activity);
+  });
 
   const { cols, rows } = term;
   commands.ptySpawn(workspace, id, cols, rows, setup, channel).then((r) => {
@@ -109,7 +126,10 @@ function startSession(
     term.onData((data) => pty !== undefined && commands.ptyWrite(pty, data)),
     term.onTitleChange((t) => {
       title = t;
-      report(workspace, activity, isBusyTitle(t) ? "running" : "done", titleLabel(t));
+      if (hooked) set(agent);
+      else if (isBusyTitle(t)) set("running");
+      else if (isAgentTitle(t)) set(agent === "running" ? "done" : "idle");
+      else set("gone");
     }),
     term.onResize(({ cols, rows }) => pty !== undefined && commands.ptyResize(pty, cols, rows)),
   ];
@@ -122,7 +142,8 @@ function startSession(
     running: async () => (pty === undefined ? null : commands.ptyRunning(pty)),
     dispose() {
       disposed = true;
-      report(workspace, activity, "stopped", titleLabel(title));
+      set("gone");
+      unhook();
       for (const s of subs) s.dispose();
       if (pty !== undefined) commands.ptyKill(pty);
       unwatch();

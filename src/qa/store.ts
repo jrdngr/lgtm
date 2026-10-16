@@ -6,6 +6,7 @@ import { events } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { dockOf } from "../workbench/docks";
 import { openQa } from "../workbench/panels";
+import { report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { Session, Step } from "./model";
 
@@ -66,7 +67,25 @@ export const getQa = (ws: WorkspaceName) => states.get(workspaceKey(ws)) ?? EMPT
 
 function set(ws: WorkspaceName, f: (s: QaState) => QaState) {
   states.set(workspaceKey(ws), f(getQa(ws)));
+  reportWaiting(ws);
   for (const l of listeners) l();
+}
+
+/** Sessions shown as waiting on the user in the workspace's row, by workspace key. */
+const waiting = new Map<string, Set<string>>();
+
+/** Shows each session a terminal agent asked as needing input until its answers go back. */
+function reportWaiting(ws: WorkspaceName) {
+  const key = workspaceKey(ws);
+  const before = waiting.get(key) ?? new Set();
+  const now = new Set<string>();
+  for (const d of getQa(ws).sessions) {
+    if (!d.fromTerminal || d.sent != null || d.applied || d.archived) continue;
+    now.add(d.id);
+    report(ws, `qa:${d.id}`, "input", `Q&A: ${d.title}`);
+  }
+  for (const id of before) if (!now.has(id)) report(ws, `qa:${id}`, "gone", "");
+  waiting.set(key, now);
 }
 
 export const setError = (ws: WorkspaceName, error?: string) => set(ws, (s) => ({ ...s, error }));

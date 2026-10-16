@@ -399,6 +399,7 @@ export const events = {
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
+	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
 	workingCopyMoved: makeEvent<WorkingCopyMoved>("working-copy-moved"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
@@ -412,6 +413,9 @@ export type Action = {
 	action: string,
 	closes: string[],
 };
+
+/**  How a terminal's agent stands after a hook event. */
+export type AgentHookState = "working" | "input" | "done" | "failed" | "idle" | "gone";
 
 /**  An agent asked the workspace's review pane to review `revset`. */
 export type AgentRevset = {
@@ -1924,6 +1928,13 @@ export type TakeVerdict = "agree" |
 "decide" | 
 /**  The comment asks a question, and the reply answers it. */
 "answer";
+
+/**  Claude Code's hooks in a terminal reported how its agent stands. */
+export type TerminalAgent = {
+	/**  The terminal's panel id. */
+	terminal: string,
+	state: AgentHookState,
+};
 
 export type ThreadDto = {
 	/**  Its comment's id. */

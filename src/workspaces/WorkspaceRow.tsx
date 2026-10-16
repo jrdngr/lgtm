@@ -3,6 +3,7 @@ import { usePr } from "../github/pr";
 import { errorText } from "../ipc";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
+import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
 import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";
@@ -72,18 +73,6 @@ function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void
   );
 }
 
-/** A spinner while the workspace's agents work, or a dot once one finishes while you're away:
- * green, or red when one failed. */
-function ActivityMark({ w }: { w: WorkspaceDto }) {
-  const a = useActivity(w.name);
-  if (!a) return null;
-  if (a.kind === "working") {
-    return <span className="ws-activity working" title={`Working: ${a.labels.join(", ")}`} />;
-  }
-  const tone = a.failed ? "failed" : "done";
-  return <span className={`ws-activity ${tone}`} title={`Finished: ${a.labels.join(", ")}`} />;
-}
-
 interface Props {
   w: WorkspaceDto;
   selected: boolean;
@@ -95,7 +84,8 @@ interface Props {
 /** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
 export function WorkspaceRow({ w, selected, onSelect, onDelete, onError }: Props) {
   const pr = usePr(w.name);
-  const dot = useActivity(w.name)?.kind === "finished";
+  const a = useActivity(w.name);
+  const dot = a.state === "done" || a.state === "failed";
   const menu = contextMenu(() =>
     workspaceMenu({
       w,
@@ -115,7 +105,7 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onError }: Props
         {w.name !== null && (
           <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
-        <ActivityMark w={w} />
+        <AgentGlyph a={a} />
       </span>
     </li>
   );

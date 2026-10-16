@@ -1,8 +1,10 @@
 //! The MCP server agents in lgtm's terminals use to read the review and add to it. The app
 //! listens on a Unix socket, and terminals get its path as `LGTM_SOCKET`. Claude Code starts
-//! `lgtm mcp`, which bridges its stdio to that socket.
+//! `lgtm mcp`, which bridges its stdio to that socket. Its hooks run `lgtm hook`, which reports
+//! the terminal agent's state over the same socket.
 
 mod bridge;
+pub mod hook;
 mod inputs;
 pub mod register;
 mod reports;
@@ -11,7 +13,11 @@ mod server;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
+use tauri_specta::Event;
+
+use crate::events::TerminalAgent;
+use crate::repo::RepoWindows;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 
@@ -70,7 +76,20 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     let mut read = BufReader::new(read);
     let mut line = String::new();
     read.read_line(&mut line).await?;
-    let hello: Hello = serde_json::from_str(&line)?;
+    let first: serde_json::Value = serde_json::from_str(&line)?;
+    if let Some(hook) = first.get("hook") {
+        let report: hook::HookReport = serde_json::from_value(hook.clone())?;
+        if let Some((label, _)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
+            TerminalAgent {
+                terminal: report.terminal,
+                state: report.state,
+            }
+            .emit_to(&app, &label)
+            .ok();
+        }
+        return Ok(());
+    }
+    let hello: Hello = serde_json::from_value(first)?;
     server::Lgtm::new(app, hello)
         .serve((read, write))
         .await?

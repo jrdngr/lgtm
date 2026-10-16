@@ -13,6 +13,7 @@ vi.mock("../ipc", () => ({
     ptyKill: (id: number) => killed.push(id),
   },
 }));
+vi.mock("./agentHooks", () => ({ onAgentHook: () => () => {} }));
 vi.mock("./xterm", () => ({
   createTerminal: () => ({
     term: { cols: 80, rows: 24, onData: sub, onTitleChange: sub, onResize: sub, dispose() {} },

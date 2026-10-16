@@ -1,12 +1,15 @@
 //! Registering `lgtm mcp` with Claude Code at user scope, so every `claude` in an lgtm
-//! terminal gets the tools.
+//! terminal gets the tools, and `lgtm hook` in its user settings, so the app sees how each
+//! terminal's agent stands.
 
 use std::path::PathBuf;
 
 use anyhow::{Context, ensure};
 use serde::Serialize;
+use serde_json::{Value, json};
 use specta::Type;
 
+use super::hook;
 use crate::settings;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
@@ -40,6 +43,84 @@ fn claude_json() -> Option<PathBuf> {
     }
 }
 
+/// Claude Code's user settings, which hold user hooks.
+fn settings_json() -> Option<PathBuf> {
+    match std::env::var_os("CLAUDE_CONFIG_DIR") {
+        Some(dir) => Some(PathBuf::from(dir).join("settings.json")),
+        None => std::env::home_dir().map(|h| h.join(".claude/settings.json")),
+    }
+}
+
+/// The hook command for this binary.
+fn hook_command(exe: &str) -> String {
+    format!("'{}' hook", exe.replace('\'', "'\\''"))
+}
+
+/// Whether a hook command runs some lgtm binary's `hook`.
+fn is_lgtm_hook(command: &str) -> bool {
+    command.ends_with("/lgtm' hook")
+}
+
+/// Whether settings JSON has this binary's hook on every event lgtm listens to.
+fn hooks_in(config: &str, exe: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<Value>(config) else {
+        return false;
+    };
+    let command = hook_command(exe);
+    hook::EVENTS.iter().all(|event| {
+        v["hooks"][event].as_array().is_some_and(|groups| {
+            groups.iter().any(|g| {
+                g["hooks"]
+                    .as_array()
+                    .is_some_and(|hs| hs.iter().any(|h| h["command"] == command.as_str()))
+            })
+        })
+    })
+}
+
+/// Settings JSON with this binary's hook on every event lgtm listens to, replacing any other
+/// lgtm binary's and keeping everything else.
+fn with_hooks(config: &str, exe: &str) -> anyhow::Result<String> {
+    let mut v: Value = if config.trim().is_empty() {
+        json!({})
+    } else {
+        serde_json::from_str(config).context("Claude Code's settings.json isn't valid JSON")?
+    };
+    let root = v.as_object_mut().context("Claude Code's settings.json isn't an object")?;
+    let hooks = root.entry("hooks").or_insert_with(|| json!({}));
+    let hooks = hooks.as_object_mut().context("`hooks` in settings.json isn't an object")?;
+    for event in hook::EVENTS {
+        let groups = hooks.entry(event).or_insert_with(|| json!([]));
+        let groups = groups
+            .as_array_mut()
+            .with_context(|| format!("`hooks.{event}` in settings.json isn't a list"))?;
+        for g in groups.iter_mut() {
+            if let Some(hs) = g["hooks"].as_array_mut() {
+                hs.retain(|h| !h["command"].as_str().is_some_and(is_lgtm_hook));
+            }
+        }
+        groups.retain(|g| g["hooks"].as_array().is_none_or(|hs| !hs.is_empty()));
+        groups.push(json!({
+            "hooks": [{ "type": "command", "command": hook_command(exe), "timeout": 5 }]
+        }));
+    }
+    Ok(serde_json::to_string_pretty(&v)? + "\n")
+}
+
+/// Adds this binary's hooks to Claude Code's user settings.
+fn register_hooks(exe: &str) -> anyhow::Result<()> {
+    let path = settings_json().context("there's no home folder for Claude Code's settings")?;
+    let config = std::fs::read_to_string(&path).unwrap_or_default();
+    let updated = with_hooks(&config, exe)?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let tmp = path.with_extension("json.lgtm-tmp");
+    std::fs::write(&tmp, updated)?;
+    std::fs::rename(&tmp, &path).context("couldn't save Claude Code's settings.json")?;
+    Ok(())
+}
+
 /// How `lgtm` is registered in a `.claude.json`, for this binary.
 fn setup_in(config: &str, exe: &str) -> McpSetup {
     let Ok(v) = serde_json::from_str::<serde_json::Value>(config) else {
@@ -70,13 +151,21 @@ pub fn status() -> anyhow::Result<McpStatus> {
     let config = claude_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .unwrap_or_default();
+    let hooks = settings_json()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .is_some_and(|c| hooks_in(&c, &exe));
+    let setup = match setup_in(&config, &exe) {
+        McpSetup::Registered if !hooks => McpSetup::Missing,
+        setup => setup,
+    };
     Ok(McpStatus {
-        setup: setup_in(&config, &exe),
+        setup,
         command: format!("{claude} mcp add -s user lgtm -- '{exe}' mcp"),
     })
 }
 
-/// Registers this app as the `lgtm` MCP server, replacing any earlier registration.
+/// Registers this app as the `lgtm` MCP server and its hooks, replacing any earlier
+/// registration.
 pub async fn register() -> anyhow::Result<()> {
     let exe = exe()?;
     // Fails when there's nothing to remove, which is fine.
@@ -94,7 +183,7 @@ pub async fn register() -> anyhow::Result<()> {
         "`claude mcp add` failed: {}",
         String::from_utf8_lossy(&out.stderr).trim()
     );
-    Ok(())
+    register_hooks(&exe)
 }
 
 #[cfg(test)]
@@ -121,5 +210,25 @@ mod tests {
         assert_eq!(setup_in(&config(&other), "/a/lgtm"), McpSetup::Elsewhere);
         assert_eq!(setup_in("{}", "/a/lgtm"), McpSetup::Missing);
         assert_eq!(setup_in("", "/a/lgtm"), McpSetup::Missing);
+    }
+
+    #[test]
+    fn adds_hooks_replacing_other_lgtm_builds_and_keeping_the_users() {
+        let mine = r#"{"type":"command","command":"say hi"}"#;
+        let config = format!(
+            r#"{{"model":"opus","hooks":{{"Stop":[{{"hooks":[{mine},{{"type":"command","command":"'/old/lgtm' hook"}}]}}],
+            "Notification":[{{"hooks":[{{"type":"command","command":"'/old/lgtm' hook"}}]}}]}}}}"#
+        );
+        assert!(!hooks_in(&config, "/a/lgtm"));
+        let out = with_hooks(&config, "/a/lgtm").unwrap();
+        assert!(hooks_in(&out, "/a/lgtm"));
+        assert!(!out.contains("/old/lgtm"));
+        let v: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["model"], "opus");
+        assert_eq!(v["hooks"]["Stop"][0]["hooks"][0]["command"], "say hi");
+        assert_eq!(v["hooks"]["Notification"].as_array().unwrap().len(), 1);
+        assert_eq!(with_hooks(&out, "/a/lgtm").unwrap(), out);
+        assert!(hooks_in(&with_hooks("", "/a/lgtm").unwrap(), "/a/lgtm"));
+        assert!(with_hooks("[1]", "/a/lgtm").is_err());
     }
 }
