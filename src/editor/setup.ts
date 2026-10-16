@@ -11,7 +11,6 @@ import {
   lineNumbers,
   type ViewUpdate,
 } from "@codemirror/view";
-import { agentBoxField } from "./boxWidget";
 import { treeSitter } from "./highlight";
 
 const theme = EditorView.theme(
@@ -74,7 +73,6 @@ export function editorExtensions(
     wrapping.of(wrapExtension(wrap)),
     treeSitter(path),
     theme,
-    agentBoxField,
     EditorView.updateListener.of(hooks.changed),
   ];
 }

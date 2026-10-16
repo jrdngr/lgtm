@@ -3,7 +3,6 @@
 pub mod arch;
 pub mod bots;
 pub mod comments;
-pub mod editor;
 pub mod files;
 pub mod github;
 pub mod html;

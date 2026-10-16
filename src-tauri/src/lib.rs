@@ -5,7 +5,6 @@ mod commands;
 mod config;
 pub mod diff;
 mod dragged;
-mod editor_agent;
 mod events;
 mod files;
 mod github;
@@ -142,8 +141,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::install_personas,
             commands::bots::new_persona,
             commands::bots::duplicate_persona,
-            commands::editor::ask_selection,
-            commands::editor::stop_selection_ask,
             commands::files::list_files,
             commands::files::read_file,
             commands::files::read_image,
