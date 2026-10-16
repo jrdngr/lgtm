@@ -39,7 +39,7 @@ export const commands = {
 	 *  Starts a login shell in the workspace for terminal panel `terminal`. With `setup`, the
 	 *  shell first runs its `.lgtm/setup`.
 	 */
-	ptySpawn: (workspace: string | null, terminal: string, cols: number, rows: number, setup: boolean, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, terminal, cols, rows, setup, onEvent })),
+	ptySpawn: (workspace: string | null, terminal: string, cols: number, rows: number, setup: boolean, run: string | null, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, terminal, cols, rows, setup, run, onEvent })),
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
 	ptyResize: (id: number, cols: number, rows: number) => typedError<null, string>(__TAURI_INVOKE("pty_resize", { id, cols, rows })),
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),

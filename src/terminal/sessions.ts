@@ -127,17 +127,17 @@ function startSession(
   });
 
   const { cols, rows } = term;
-  commands.ptySpawn(workspace, id, cols, rows, setup, channel).then((r) => {
+  // The shell starts by running the command, so it can't arrive before the shell is ready.
+  const started = (command ?? Promise.resolve(undefined)).then((run) =>
+    commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel),
+  );
+  started.then((r) => {
     if (r.status === "error") {
       term.write(`failed to start shell: ${r.error}\r\n`);
     } else if (disposed) {
       commands.ptyKill(r.data);
     } else {
-      const id = r.data;
-      pty = id;
-      command?.then((c) => {
-        if (c && !disposed) commands.ptyWrite(id, `${c}\r`);
-      });
+      pty = r.data;
       // Resizes while it started weren't sent.
       if (term.cols !== cols || term.rows !== rows) commands.ptyResize(pty, term.cols, term.rows);
     }

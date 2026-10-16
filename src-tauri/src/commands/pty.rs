@@ -17,11 +17,15 @@ pub(crate) async fn pty_spawn(
     cols: u16,
     rows: u16,
     setup: bool,
+    run: Option<String>,
     on_event: Channel<PtyEvent>,
 ) -> CmdResult<u32> {
     let ctx = repo(&window)?;
     let ws = ctx.workspace(workspace.as_deref()).await.map_err(err)?;
-    let command = setup.then(workspaces::setup_command);
+    let command = match run {
+        Some(line) => Some(crate::pty::shell_running(&line)),
+        None => setup.then(workspaces::setup_command),
+    };
     let root = ctx.root.to_string_lossy();
     let socket = crate::repo::data_dir(window.app_handle())
         .map(|d| crate::mcp::socket_path(&d).to_string_lossy().into_owned())

@@ -26,7 +26,7 @@ const TITLES: Record<PanelKind, string> = {
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["review", "terminal", "claude", "architecture", "qa", "runs"];
+export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa", "runs"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 

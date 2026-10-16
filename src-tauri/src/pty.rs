@@ -211,6 +211,15 @@ pub fn default_shell() -> String {
     std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())
 }
 
+/// The login shell running `line` interactively, so the user's aliases and functions work, then
+/// carrying on as a plain login shell once it ends.
+pub fn shell_running(line: &str) -> Vec<String> {
+    let shell = default_shell();
+    let quoted = format!("'{}'", shell.replace('\'', r"'\''"));
+    let script = format!("{line}; exec {quoted} -l");
+    vec![shell, "-l".into(), "-i".into(), "-c".into(), script]
+}
+
 /// Decodes a chunk of PTY output. A multi-byte character split across reads is held in
 /// `carry` until the rest arrives. Invalid bytes become U+FFFD.
 fn decode_utf8(carry: &mut Vec<u8>, chunk: &[u8]) -> String {
