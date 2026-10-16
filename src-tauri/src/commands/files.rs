@@ -255,3 +255,11 @@ pub(crate) async fn reveal_path(
     }
     Ok(())
 }
+
+/// Paths of the files just dropped on the app. Runs on the main thread, which owns the
+/// pasteboard.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn dropped_paths() -> Vec<String> {
+    crate::dragged::paths()
+}

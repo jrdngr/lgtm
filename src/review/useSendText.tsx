@@ -1,6 +1,7 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { sendToTerminal, type TerminalChoice, workspaceTerminals } from "../terminal/registry";
+import type { Sender } from "../terminal/sendItems";
 import type { WorkspaceName } from "../workspaces/context";
 import { TerminalPicker } from "./TerminalPicker";
 
@@ -66,7 +67,13 @@ export function useSendText(
   const sendRecent = (text: string, onSent?: () => void) => {
     sendTo(text, undefined, onSent);
   };
-  return { sendText, sendRecent, picker };
+  /** Pastes into terminal `id`, without asking. */
+  const sendToId = (text: string, id: string, onSent?: () => void) => {
+    sendTo(text, id, onSent);
+  };
+  /** For menus: the last used terminal, or a chosen one. */
+  const sender: Sender = { recent: (t) => sendRecent(t), to: (t, id) => sendToId(t, id) };
+  return { sendText, sendRecent, sendToId, sender, picker };
 }
 
 /** Sending text from a place with no error line of its own, so failures show in a dialog. */

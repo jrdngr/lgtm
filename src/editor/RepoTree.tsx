@@ -154,7 +154,7 @@ export function RepoTree() {
   const { listings, reload } = useListings(workspace, open);
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
-  const { sendText, picker } = useSendFromMenu(workspace);
+  const { sender } = useSendFromMenu(workspace);
 
   const body = useRef<HTMLDivElement>(null);
   // Opens the folders holding a revealed file, then focuses its row once it's listed.
@@ -211,7 +211,7 @@ export function RepoTree() {
       "-",
       ...edits,
       "-",
-      ...pathItems(workspace, p, { send: sendText }),
+      ...pathItems(workspace, p, { send: sender }),
     ];
   };
   return (
@@ -233,7 +233,6 @@ export function RepoTree() {
           dropDir={dropDir}
         />
       </div>
-      {picker}
     </div>
   );
 }

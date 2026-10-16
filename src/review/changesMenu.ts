@@ -1,6 +1,7 @@
 import type { MarkColor, StateDto } from "../bindings";
 import { openFile } from "../editor/open";
 import { type CommandResult, commands, unwrap } from "../ipc";
+import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { absolutePath, pathItems, run } from "../ui/pathMenu";
 import type { WorkspaceName } from "../workspaces/context";
@@ -26,7 +27,7 @@ export function fileMenu(
   review: CurrentReview,
   setup: MarkSetup,
   file: number,
-  send: (text: string) => void,
+  send: Sender,
 ): CtxEntry[] {
   const { path, status } = review.files[file].dto;
   const checked = review.checks[file] === "checked";
@@ -53,7 +54,7 @@ export function fileMenu(
     "-",
     status !== "removed" && { label: "Open File", onSelect: () => openFile(ws, path) },
     ...(status === "removed"
-      ? [{ label: "Send Path to Terminal", onSelect: () => send(path) }]
+      ? sendItems(ws, "Send Path", path, send)
       : pathItems(ws, path, { relative: false, files: true, send })),
   ];
 }

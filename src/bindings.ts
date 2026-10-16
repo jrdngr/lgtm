@@ -222,6 +222,11 @@ export const commands = {
 	trashPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { workspace, path })),
 	/**  Shows a path in Finder. `""` is the workspace's root. */
 	revealPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("reveal_path", { workspace, path })),
+	/**
+	 *  Paths of the files just dropped on the app. Runs on the main thread, which owns the
+	 *  pasteboard.
+	 */
+	droppedPaths: () => __TAURI_INVOKE<string[]>("dropped_paths"),
 	/**  Highlight segments per line, empty when `path` has no grammar. */
 	highlightText: (path: string, text: string) => __TAURI_INVOKE<(([number | null, number])[])[]>("highlight_text", { path, text }),
 	/**

@@ -52,7 +52,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const renderedRef = useRef<{ focus(): void }>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
-  const { sendText, picker } = useSendText(workspace, setError, () => view?.focus());
+  const { sendRecent, sendToId } = useSendText(workspace, setError, () => view?.focus());
 
   useEffect(() => {
     let live = true;
@@ -193,7 +193,10 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         path,
         dirty,
         save: () => void save(),
-        sendText: (text) => sendText(text, () => view.focus()),
+        send: {
+          recent: (text) => sendRecent(text, () => view.focus()),
+          to: (text, id) => sendToId(text, id, () => view.focus()),
+        },
         askAgent: agent.open,
         toggleRendered: renders(path) ? toggleRendered : undefined,
       }),
@@ -258,7 +261,6 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         onContextMenu={onContextMenu}
       />
       {agent.portal}
-      {picker}
     </div>
   );
 }

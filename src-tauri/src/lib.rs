@@ -4,6 +4,7 @@ mod bots;
 mod commands;
 mod config;
 pub mod diff;
+mod dragged;
 mod editor_agent;
 mod events;
 mod files;
@@ -143,6 +144,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::rename_path,
             commands::files::trash_path,
             commands::files::reveal_path,
+            commands::files::dropped_paths,
             commands::files::highlight_text,
             commands::github::open_pr,
             commands::github::pr_info,

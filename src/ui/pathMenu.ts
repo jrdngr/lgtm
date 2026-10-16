@@ -1,6 +1,7 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { revealInFiles } from "../editor/reveal";
 import { commands, errorText, unwrap } from "../ipc";
+import { type Sender, sendItems } from "../terminal/sendItems";
 import type { WorkspaceName } from "../workspaces/context";
 import { workspaceRoot } from "../workspaces/useWorkspaces";
 import { type CtxEntry, copy } from "./contextMenu";
@@ -23,14 +24,14 @@ export function absolutePath(ws: WorkspaceName, rel: string): string {
 export function pathItems(
   ws: WorkspaceName,
   rel: string,
-  opts: { relative?: boolean; files?: boolean; send?: (text: string) => void } = {},
+  opts: { relative?: boolean; files?: boolean; send?: Sender } = {},
 ): CtxEntry[] {
   const { send } = opts;
   return [
     { label: "Copy Path", onSelect: () => copy(absolutePath(ws, rel)) },
     opts.relative !== false &&
       !rel.startsWith("/") && { label: "Copy Relative Path", onSelect: () => copy(rel) },
-    send && { label: "Send Path to Terminal", onSelect: () => send(rel) },
+    ...(send ? sendItems(ws, "Send Path", rel, send) : []),
     opts.files && { label: "Reveal in Files", onSelect: () => revealInFiles(ws, rel) },
     { label: "Reveal in Finder", onSelect: () => reveal(ws, rel) },
   ];

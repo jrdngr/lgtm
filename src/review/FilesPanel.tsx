@@ -120,7 +120,7 @@ export function FilesPanel() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const setup = useMarkSetup();
-  const { sendText, picker } = useSendFromMenu(workspace);
+  const { sender } = useSendFromMenu(workspace);
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const tree = useMemo(
     () =>
@@ -187,13 +187,12 @@ export function FilesPanel() {
             onToggle={(path) => setClosed(toggled(closed, path))}
             menu={(n) =>
               n.kind === "file"
-                ? fileMenu(workspace, review, setup, n.file, sendText)
+                ? fileMenu(workspace, review, setup, n.file, sender)
                 : dirMenu(workspace, review, n, closed, setClosed)
             }
           />
         </div>
       )}
-      {picker}
     </div>
   );
 }

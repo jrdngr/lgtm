@@ -3,6 +3,7 @@ import type { EditorView } from "@codemirror/view";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { commands } from "../ipc";
 import { currentReview } from "../review/current";
+import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { wordWrap } from "../workbench/wordWrap";
 import type { WorkspaceName } from "../workspaces/context";
@@ -15,7 +16,7 @@ interface Deps {
   dirty: boolean;
   save(): void;
   /** Pastes text into one of the workspace's terminals. */
-  sendText(text: string): void;
+  send: Sender;
   /** Opens the agent box under the selection, to ask about it or to change it. */
   askAgent(change: boolean): void;
   /** Set for markdown, which can show rendered. */
@@ -77,7 +78,7 @@ export function editorMenu(d: Deps): CtxEntry[] {
     { label: "Paste", keys: "⌘V", onSelect: after(() => paste(v)) },
     { label: "Select All", keys: "⌘A", onSelect: after(() => selectAll(v)) },
     "-",
-    { label: "Send to Terminal", onSelect: () => d.sendText(pathAndLine(v, path)) },
+    ...sendItems(d.workspace, "Send", pathAndLine(v, path), d.send),
     { label: "Ask Agent", onSelect: () => d.askAgent(false) },
     { label: "Change with Agent", onSelect: () => d.askAgent(true) },
     "-",
