@@ -30,7 +30,6 @@
   box-shadow: inset 0 -2px var(--accent);
 }
 
-/* The terminal sends go to: a violet bar along the tab's top. */
 /* Titles shorten with an ellipsis once a pane's tabs run out of room (tabFit.ts), down to
    10 characters; hovering shows the whole title. */
 .dock .dv-default-tab-content {
@@ -39,7 +38,9 @@
   text-overflow: ellipsis;
 }
 
-.dock .dv-tab:has(.dv-default-tab[data-send]) {
+/* The terminal sends go to: a violet bar along the tab's top, unless it's pinned, which its
+   violet ›_ shows. */
+.dock .dv-tab:has(.dv-default-tab[data-send="target"]) {
   box-shadow: inset 0 2px var(--mark-violet);
 }
 
@@ -47,7 +48,7 @@
   .dockview-theme-dark
   .dv-groupview.dv-active-group
   > .dv-tabs-and-actions-container
-  .dv-tab.dv-active-tab:has(.dv-default-tab[data-send]) {
+  .dv-tab.dv-active-tab:has(.dv-default-tab[data-send="target"]) {
   box-shadow:
     inset 0 2px var(--mark-violet),
     inset 0 -2px var(--accent);

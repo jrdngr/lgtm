@@ -42,7 +42,7 @@ This program may or may not be safe to run. Use it at your own risk.
 
 Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them. The PR button in the Workspaces header shows or hides the stack's PR list; hiding it clears the selected PRs.
 
-Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the last terminal you focused, whose tab has a violet bar on top. Click the ›_ before a selected terminal tab's title (or pick Pin as Send Target from its menu) to keep sends going there; it turns violet while pinned. Rename on a terminal tab's menu edits its title in place. Orange buttons with a sparkle (Triage, Assess, Fix, Discuss) run a headless agent instead. Violet buttons also press Enter when an agent runs in the target, so it starts right away; ⌘> and Send Path only paste.
+Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the last terminal you focused, whose tab has a violet bar on top. Click the ›_ before a selected terminal tab's title (or pick Pin as Send Target from its menu) to keep sends going there; it turns violet while pinned, in place of the bar. Rename on a terminal tab's menu edits its title in place. Orange buttons with a sparkle (Triage, Assess, Fix, Discuss) run a headless agent instead. Violet buttons also press Enter when an agent runs in the target, so it starts right away; ⌘> and Send Path only paste.
 
 ## Requirements
 
