@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
+import { Icon } from "../ui/icons";
 import { Glyph, since } from "../workspaces/AgentGlyph";
 import type { AgentInfo } from "../workspaces/activity";
 import "./close.css";
 
 /** A running program as the dialog lists it: an agent the way the workspace's agent list shows
- * it, or else just its name. */
+ * it, or else a ›_ and its name. */
 export interface ProgramRow {
   key: string;
   name: string;
@@ -56,7 +57,13 @@ function CloseDialog({ files, programs, onDone }: Props) {
               <div className="close-list">
                 {programs.map(({ key, name, agent }) => (
                   <div key={key} className="close-row">
-                    {agent && <Glyph state={agent.state} />}
+                    {agent ? (
+                      <Glyph state={agent.state} />
+                    ) : (
+                      <span className="close-program">
+                        <Icon name="terminal" size={12} />
+                      </span>
+                    )}
                     <span
                       className={`close-name${agent ? (agent.headless ? " headless" : " in-terminal") : ""}`}
                     >
