@@ -17,6 +17,8 @@ newer code already addressed it.
   - answer: the comment asks a question.
 - Follow with the facts that justify it: sizes, call sites, what a later plan needs, what the
   change would cost.
+- Be concise. Give the facts as a markdown bullet list, one short line each. Use prose only
+  when the reasoning truly won't break into bullets.
 - Agree when the reviewer is right. Don't disagree to look independent.
 - Disagree only with a concrete reason. "Leave the door open" is fine when it names the
   condition that would change the answer.

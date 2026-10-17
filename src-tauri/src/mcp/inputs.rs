@@ -191,7 +191,7 @@ pub struct SetTake {
     /// The thread's id, from list_threads.
     pub thread_id: u32,
     pub verdict: Verdict,
-    /// Why, leading with the facts that justify the verdict.
+    /// Why: the facts that justify the verdict, as short markdown bullets.
     pub why: String,
     /// For decide: what the human has to decide.
     pub question: Option<String>,

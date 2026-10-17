@@ -741,6 +741,18 @@ button.group-head.fold:hover {
   margin: 0;
 }
 
+.thread-block .flow-why > :first-child {
+  margin-top: 0;
+}
+
+.thread-block .flow-why > :last-child {
+  margin-bottom: 0;
+}
+
+.thread-block .flow-why ul {
+  padding-left: 18px;
+}
+
 .thread-block .flow-question {
   color: var(--amber);
 }

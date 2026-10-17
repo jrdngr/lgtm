@@ -38,9 +38,9 @@ export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
             <p>
               <TakePill take={take} />
             </p>
-            <p>
-              <Inline>{take.why}</Inline>
-            </p>
+            <div className="flow-why">
+              <Markdown>{take.why}</Markdown>
+            </div>
             {take.question && (
               <p className="flow-question">
                 <Inline>{take.question}</Inline>
