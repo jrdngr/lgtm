@@ -7,7 +7,7 @@ import {
 import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { createPortal } from "react-dom";
 import { RunsPanel } from "../agents/RunsPanel";
 import { ArchPanel } from "../arch/ArchPanel";
 import { ReportPanel } from "../bots/ReportPanel";
@@ -93,6 +93,18 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     };
   }, [workspace]);
 
+  /** Hides the bottom panel when this workspace is shown with nothing in its bottom dock. It
+   * opens empty only when asked to. */
+  function hideEmpty() {
+    const below = latest.current.bottom;
+    if (shown.current && below && below.panels.length === 0 && bottom.get().open)
+      bottom.set({ open: false });
+  }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the workspace is shown
+  useEffect(() => {
+    if (!hidden) hideEmpty();
+  }, [hidden]);
+
   /** The saved layout, loaded once for both docks. */
   function load() {
     loading.current ??= unwrap(commands.loadLayout(workspace))
@@ -146,13 +158,9 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     if (latest.current.bottom !== api) return;
     restoreLayout(api, saved.bottom);
     trackFolds(api, saved.folds?.bottom);
-    // A new repo opens the panel on a terminal and a new workspace hides it, with a terminal
-    // ready in it. An open panel never comes up empty.
-    const fresh = !saved.main && !saved.bottom;
-    if (api.panels.length === 0 && (fresh || (shown.current && bottom.get().open))) {
-      if (fresh && shown.current) flushSync(() => bottom.set({ open: workspace === null }));
-      addTerminal(api, undefined, setup);
-    }
+    // A new workspace's setup script runs in a terminal of its own.
+    if (setup && api.panels.length === 0) addTerminal(api, undefined, true);
+    hideEmpty();
     // Closing the last tab hides the panel, while dragging it to the main dock leaves the panel
     // open. Checked once the close settles, since moving a tab within the dock removes it from
     // its pane before adding it to the next.

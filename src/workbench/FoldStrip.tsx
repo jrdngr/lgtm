@@ -1,8 +1,12 @@
 import type { DockviewApi, DockviewGroupPanel } from "dockview-react";
 import { useEffect, useReducer, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { useSendTarget } from "../terminal/registry";
+import { useWorkspace, type WorkspaceName } from "../workspaces/context";
+import { bottom } from "./bottom";
+import { dockOf } from "./docks";
 import { fold, foldAxis, foldOf, neighbor, subscribeFolds, unfold } from "./fold";
-import { activate } from "./panels";
+import { activate, focusPanel } from "./panels";
 import "./fold.css";
 
 /** Re-renders on folds and on the group's tabs changing. */
@@ -23,7 +27,7 @@ function useGroup(api: DockviewApi, group: DockviewGroupPanel) {
 }
 
 /** Two arrows at a center line: pointing in to collapse, out to expand. */
-function FoldIcon({ out }: { out?: boolean }) {
+export function FoldIcon({ out }: { out?: boolean }) {
   const heads = out
     ? "M4 5.5 1.5 8 4 10.5M12 5.5 14.5 8 12 10.5"
     : "M4 5.5 6.5 8 4 10.5M12 5.5 9.5 8 12 10.5";
@@ -37,8 +41,15 @@ function FoldIcon({ out }: { out?: boolean }) {
   );
 }
 
+/** How a strip marks the send target's title, as its tab does. */
+export function useSendMark(workspace: WorkspaceName) {
+  const send = useSendTarget(workspace);
+  return (id: string) =>
+    id === send.pinned ? "pinned" : id === send.target ? "target" : undefined;
+}
+
 /** The group's collapse button, and the strip it collapses to: every tab's title, which
- * opens the group on that tab. */
+ * opens the group on that tab. A lone pane in the bottom panel collapses the panel. */
 export function Fold({
   containerApi: api,
   group,
@@ -47,15 +58,24 @@ export function Fold({
   group: DockviewGroupPanel;
 }) {
   useGroup(api, group);
+  const workspace = useWorkspace();
+  const sendMark = useSendMark(workspace);
   const folded = foldOf(api, group);
+  const axis = foldAxis(api, group);
+  const inBottom = !!group.element.closest(".bottom-panel");
   return (
     <>
       <button
         type="button"
         title="Collapse"
         aria-label="Collapse"
-        disabled={!foldAxis(api, group)}
+        disabled={!axis && !inBottom}
         onClick={() => {
+          if (!axis) {
+            bottom.set({ open: false });
+            focusPanel(dockOf(workspace)?.activePanel);
+            return;
+          }
           fold(api, group);
           // Keys go to a neighbor rather than the hidden tabs.
           const next = (["right", "left", "down", "up"] as const)
@@ -88,6 +108,7 @@ export function Fold({
                 type="button"
                 key={p.id}
                 className="fold-tab"
+                data-send={sendMark(p.id)}
                 onClick={() => {
                   unfold(api, group);
                   activate(p);

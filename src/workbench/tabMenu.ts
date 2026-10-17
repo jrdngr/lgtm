@@ -155,7 +155,7 @@ export function stripMenu({ workspace, api, group, inBottom }: Strip): CtxEntry[
       newTab,
       "-",
       {
-        label: "Hide Bottom Panel",
+        label: "Collapse Bottom Panel",
         keys: "⌃`",
         onSelect: () => {
           bottom.set({ open: false });

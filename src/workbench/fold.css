@@ -69,3 +69,13 @@
   color: var(--fg);
   background: var(--hover);
 }
+
+/* The send target's title, violet as on its tab. */
+.fold-strip .fold-tab[data-send] {
+  color: var(--violet-text);
+}
+
+.bottom-strip {
+  flex: 1;
+  height: 28px;
+}

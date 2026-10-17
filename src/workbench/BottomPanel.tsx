@@ -1,15 +1,25 @@
 import { useRef } from "react";
+import type { WorkspaceName } from "../workspaces/context";
+import { BottomStrip, useBottomDock } from "./BottomStrip";
 import { bottom } from "./bottom";
 
 const MIN_HEIGHT = 80;
 /** Room left above the panel for the toolbar and some of the panes. */
 const MIN_ABOVE = 160;
 
-/** A panel docked under the panes, between the side panels. Each
- * workspace's bottom dock renders into `docksRef`. Hidden rather than unmounted, so its
- * terminals keep running. */
-export function BottomPanel({ docksRef }: { docksRef(el: HTMLDivElement | null): void }) {
+/** A panel docked under the panes, between the side panels. Each workspace's bottom dock
+ * renders into `docksRef`. Collapsed, it's a strip of the selected workspace's tabs, and
+ * gone when it has none. Hidden rather than unmounted, so its terminals keep running. */
+export function BottomPanel({
+  docksRef,
+  workspace,
+}: {
+  docksRef(el: HTMLDivElement | null): void;
+  workspace: WorkspaceName;
+}) {
   const { open, height } = bottom.use();
+  const dock = useBottomDock(workspace);
+  const strip = !open && !!dock?.panels.length;
   const drag = useRef<{ y: number; height: number }>(undefined);
 
   function startResize(e: React.PointerEvent) {
@@ -26,16 +36,19 @@ export function BottomPanel({ docksRef }: { docksRef(el: HTMLDivElement | null):
   }
 
   return (
-    <div className="bottom-panel" hidden={!open} style={{ height }}>
-      <div className="docks" ref={docksRef} />
-      <div
-        className="bottom-resizer"
-        onPointerDown={startResize}
-        onPointerMove={resize}
-        onPointerUp={() => {
-          drag.current = undefined;
-        }}
-      />
+    <div className="bottom-panel" hidden={!open && !strip} style={open ? { height } : undefined}>
+      <div className="docks" ref={docksRef} hidden={!open} />
+      {strip && dock && <BottomStrip api={dock} workspace={workspace} />}
+      {open && (
+        <div
+          className="bottom-resizer"
+          onPointerDown={startResize}
+          onPointerMove={resize}
+          onPointerUp={() => {
+            drag.current = undefined;
+          }}
+        />
+      )}
     </div>
   );
 }

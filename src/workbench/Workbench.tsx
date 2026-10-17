@@ -122,7 +122,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   }
 
   /** Hides the bottom panel when focus is in it or it has no tabs, and otherwise shows and
-   * focuses it. It opens with a terminal when it would open empty, and `terminal` adds one. */
+   * focuses it. Empty, it shows the kinds of tab to open. `terminal` adds a terminal. */
   function toggleBottom(terminal = false) {
     const open = bottom.get().open;
     const empty = !bottomDockOf(selected)?.panels.length;
@@ -135,7 +135,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     flushSync(() => bottom.set({ open: true }));
     const dock = bottomDockOf(selected);
     if (!dock) return;
-    if (terminal || empty) addTerminal(dock);
+    if (terminal) addTerminal(dock);
     else focusPanel(dock.activePanel);
   }
 
@@ -284,7 +284,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
               />
             ))}
           </div>
-          <BottomPanel docksRef={setBottomEl} />
+          <BottomPanel docksRef={setBottomEl} workspace={selected} />
         </div>
         <WorkspaceContext.Provider value={selected}>
           <RightPanel

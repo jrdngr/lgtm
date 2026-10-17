@@ -8,6 +8,20 @@ export type DockSlot = "main" | "bottom";
 
 /** Each mounted workspace's docks, for opening panes from outside them. */
 const docks: Record<DockSlot, Map<string, DockviewApi>> = { main: new Map(), bottom: new Map() };
+/** Bumped whenever a dock comes or goes. */
+let version = 0;
+const dockListeners = new Set<() => void>();
+
+/** Calls `l` whenever a dock comes or goes. */
+export function subscribeDocks(l: () => void) {
+  dockListeners.add(l);
+  return () => {
+    dockListeners.delete(l);
+  };
+}
+
+export const docksVersion = () => version;
+
 /** Callers waiting for a workspace's main dock to come up. */
 const waiting = new Map<string, ((api: DockviewApi) => void)[]>();
 
@@ -17,11 +31,11 @@ export function registerDock(
   slot: DockSlot = "main",
 ) {
   const key = workspaceKey(workspace);
-  if (!api) {
-    docks[slot].delete(key);
-    return;
-  }
-  docks[slot].set(key, api);
+  version++;
+  if (api) docks[slot].set(key, api);
+  else docks[slot].delete(key);
+  for (const l of dockListeners) l();
+  if (!api) return;
   if (slot !== "main") return;
   for (const done of waiting.get(key) ?? []) done(api);
   waiting.delete(key);
