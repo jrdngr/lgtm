@@ -68,7 +68,7 @@ export function FileHeader(props: Props) {
           onMouseDown={stop}
           onClick={props.onToggleAmber}
         >
-          changed since reviewed
+          changed
         </button>
       )}
       {dto.skipped && <span className="tag">skipped</span>}
