@@ -129,11 +129,15 @@ pub(crate) fn add_chat_message(
         .map_err(|e| e.to_string())
 }
 
-/// Records whether the user is syncing a thread's chat with a terminal.
+/// Lets terminal agents suggest replies to a thread, or stops them.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn set_chat_synced(window: WebviewWindow, comment: u32, synced: bool) -> CmdResult<()> {
-    repo(&window)?.set_chat_synced(comment, synced);
+pub(crate) fn allow_suggestions(
+    window: WebviewWindow,
+    comment: u32,
+    allowed: bool,
+) -> CmdResult<()> {
+    repo(&window)?.allow_suggestions(comment, allowed);
     Ok(())
 }
 

@@ -32,10 +32,11 @@ impl RepoCtx {
         })
     }
 
-    /// Records whether the user is syncing a thread's chat with a terminal.
-    pub fn set_chat_synced(&self, comment: u32, synced: bool) {
+    /// Lets terminal agents suggest replies to a thread, or stops them once the user stops
+    /// syncing its chat.
+    pub fn allow_suggestions(&self, comment: u32, allowed: bool) {
         let mut stopped = self.stopped_chats.lock().unwrap();
-        if synced {
+        if allowed {
             stopped.remove(&comment);
         } else {
             stopped.insert(comment);

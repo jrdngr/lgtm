@@ -82,7 +82,7 @@ pub struct RepoCtx {
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
     /// Threads whose synced chat the user stopped, so a terminal agent can't suggest replies
-    /// to them.
+    /// to them until they sync or review it again.
     stopped_chats: Mutex<HashSet<u32>>,
 }
 

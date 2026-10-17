@@ -2,6 +2,7 @@ import type { CommentDto } from "../bindings";
 import { Inline, Markdown } from "../bots/Markdown";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy, Spinner } from "../ui/Busy";
+import { PipeButton } from "../ui/PipeButton";
 import { ThreadChat } from "./ThreadChat";
 import type { Comments } from "./useComments";
 
@@ -86,6 +87,9 @@ export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
                 <button type="button" onClick={() => c.edit(comment)}>
                   {body.trim() ? "Edit" : "Write reply"} <kbd>e</kbd>
                 </button>
+                {body.trim() && (
+                  <PipeButton onClick={() => c.reviewReply(comment)}>Review</PipeButton>
+                )}
               </>
             )}
           </div>

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CommentDto } from "../bindings";
-import { syncText } from "./syncText";
+import { reviewText, syncText } from "./syncText";
 
 vi.mock("../terminal/agentHooks", () => ({ watchAgentHooks: () => () => {} }));
 
@@ -39,5 +39,21 @@ describe("syncText", () => {
     const text = syncText([], c);
     expect(text).toContain("Your take from triage (agree):\nThe name hides the unit.");
     expect(text).not.toContain("what you make of it");
+  });
+
+  it("has a review hand the agent my reply rules and how to suggest a better reply", () => {
+    const c = {
+      id: 5,
+      path: "",
+      body: "Kept it.",
+      messages: [],
+      github: { posts: [post("mkosta", "Inline this?")] },
+      thread: { quote: null },
+    } as unknown as CommentDto;
+    const text = reviewText([], c, "No compliments.\n");
+    expect(text).toContain("mkosta wrote:\nInline this?");
+    expect(text).toContain("My reply so far:\nKept it.");
+    expect(text).toContain("My rules for takes and replies:\n\nNo compliments.");
+    expect(text).toContain("suggest_reply tool with thread_id 5");
   });
 });

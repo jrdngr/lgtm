@@ -8,7 +8,7 @@ import type { Moves } from "./follow";
 import { type FlatFile, NEW_COMMENT } from "./model";
 import { prComments } from "./prComments";
 import { resumable, startSync, stopSync } from "./syncedChat";
-import { syncText } from "./syncText";
+import { reviewText, syncText } from "./syncText";
 
 const NONE: CommentDto[] = [];
 
@@ -215,6 +215,14 @@ export function useComments({
     send(syncText(files, c), (terminal) => startSync(terminal, id, c.id));
   }
 
+  /** Pastes a thread and my rules for replies into the send target, for its agent to review
+   * the reply and suggest a better one. */
+  async function reviewReply(c: CommentDto) {
+    const rules = await commands.promptText("reply");
+    if (rules.status === "error") return onError(rules.error);
+    send(reviewText(files, c, rules.data), () => commands.allowSuggestions(c.id, true));
+  }
+
   /** Makes a thread's suggested reply its reply. */
   async function takeSuggestion(id: number) {
     if (!review) return;
@@ -252,6 +260,7 @@ export function useComments({
     send: sendComment,
     sync,
     stopSync,
+    reviewReply,
     takeSuggestion,
     final,
     sending,

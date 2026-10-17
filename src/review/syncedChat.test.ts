@@ -11,7 +11,7 @@ vi.mock("../ipc", () => ({
       added.push([author, text]);
       return Promise.resolve({ status: "ok", data: null });
     },
-    setChatSynced: (comment: number, synced: boolean) => {
+    allowSuggestions: (comment: number, synced: boolean) => {
       syncs.push([comment, synced]);
       return Promise.resolve({ status: "ok", data: null });
     },

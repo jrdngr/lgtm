@@ -73,6 +73,13 @@ pub(crate) fn edit_prompt(prompt: Prompt) -> CmdResult<String> {
     Ok(path.to_string_lossy().into_owned())
 }
 
+/// The prompt's text: its file, else the built-in prompt.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn prompt_text(prompt: Prompt) -> CmdResult<String> {
+    prompts::load(prompt).map_err(err)
+}
+
 /// Deletes the prompt's file.
 #[tauri::command]
 #[specta::specta]
