@@ -51,6 +51,8 @@
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 0 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .file-header .tag.conflict {
@@ -86,6 +88,7 @@
   background: none;
   font: inherit;
   font-size: 11px;
+  line-height: 16px;
   cursor: pointer;
 }
 
@@ -94,11 +97,18 @@
   background: var(--amber);
 }
 
+.file-header .mark-counts {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .file-header .spacer {
   flex: 1;
 }
 
 .file-header .file-count {
   font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
   color: var(--muted);
 }
