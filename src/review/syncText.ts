@@ -49,3 +49,15 @@ export function reviewText(files: FlatFile[], c: CommentDto, rules: string): str
     .filter(Boolean)
     .join("\n\n");
 }
+
+/** What has a terminal agent make a new thread's first take and reply. */
+export function triageText(files: FlatFile[], c: CommentDto, rules: string): string {
+  return [
+    "Triage this review thread on my PR. Read the code it points at first.",
+    ...threadText(files, c),
+    `My rules for takes and replies:\n\n${rules.trim()}`,
+    `Then call lgtm's set_thread_take tool with thread_id ${c.id}, your verdict and why, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}

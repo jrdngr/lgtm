@@ -90,6 +90,9 @@ export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
                 {body.trim() && (
                   <PipeButton onClick={() => c.reviewReply(comment)}>Review</PipeButton>
                 )}
+                {!take && comment.thread?.stage === "new" && (
+                  <PipeButton onClick={() => c.triage(comment)}>Triage</PipeButton>
+                )}
               </>
             )}
           </div>

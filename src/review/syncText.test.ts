@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CommentDto } from "../bindings";
-import { reviewText, syncText } from "./syncText";
+import { reviewText, syncText, triageText } from "./syncText";
 
 vi.mock("../terminal/agentHooks", () => ({ watchAgentHooks: () => () => {} }));
 
@@ -56,5 +56,21 @@ describe("syncText", () => {
     expect(text).toContain("My reply so far:\nKept it.");
     expect(text).toContain("My rules for takes and replies:\n\nNo compliments.");
     expect(text).toContain("suggest_reply tool with thread_id 5");
+  });
+
+  it("has a triage hand over my rules and set the take and reply in one call", () => {
+    const c = {
+      id: 8,
+      path: "",
+      body: "",
+      messages: [],
+      github: { posts: [post("mkosta", "Split this?")] },
+      thread: { quote: null, take: null },
+    } as unknown as CommentDto;
+    const text = triageText([], c, "Agree when they're right.");
+    expect(text).toContain("mkosta wrote:\nSplit this?");
+    expect(text).toContain("My rules for takes and replies:\n\nAgree when they're right.");
+    expect(text).toContain("set_thread_take tool with thread_id 8");
+    expect(text).not.toContain("My reply so far");
   });
 });
