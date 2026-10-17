@@ -62,9 +62,10 @@ export function stopSync() {
   set(undefined);
 }
 
-/** The terminal comment `comment` was last synced with, while it's still open. */
-export function resumable(comment: number): string | undefined {
-  return last?.comment === comment && hasTerminal(last.terminal) ? last.terminal : undefined;
+/** Whether comment `comment` was last synced with `terminal`, so syncing it there again
+ * needs no new start text. */
+export function resumable(comment: number, terminal: string | undefined): boolean {
+  return last?.comment === comment && last.terminal === terminal && hasTerminal(terminal);
 }
 
 function subscribe(l: () => void) {

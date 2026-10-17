@@ -41,6 +41,8 @@ interface Deps {
   onError(message: string): void;
   /** Pastes text into one of the workspace's terminals, then calls `onSent` with it. */
   send(text: string, onSent: (terminal: string) => void): void;
+  /** The terminal `send` pastes into now. */
+  target(): string | undefined;
   /** Called when the user is done in a comment block, to give keys back to the review. */
   onDone(): void;
   /** The review is in a PR workspace, so drafts for GitHub can be written. */
@@ -55,6 +57,7 @@ export function useComments({
   onState,
   onError,
   send,
+  target,
   onDone,
   canDraft,
 }: Deps) {
@@ -201,13 +204,13 @@ export function useComments({
     send(commentText(files, c), onDone);
   }
 
-  /** Syncs a thread's chat with a terminal: the one it was synced with, else the send target
-   * once the thread is pasted there. */
+  /** Syncs a thread's chat with the send target, pasting the thread there unless it was
+   * synced there last. */
   function sync(c: CommentDto) {
     if (!review) return;
     const id = review.id;
-    const again = resumable(c.id);
-    if (again) return startSync(again, id, c.id);
+    const to = target();
+    if (to && resumable(c.id, to)) return startSync(to, id, c.id);
     submitNextSend();
     send(syncText(files, c), (terminal) => startSync(terminal, id, c.id));
   }

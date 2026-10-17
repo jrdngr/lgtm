@@ -8,6 +8,7 @@ import { syncMarker } from "./syncedChat";
 export function syncText(files: FlatFile[], c: CommentDto): string {
   const quote = c.thread?.quote;
   const posts = c.github?.posts.map((p) => `${p.author} wrote:\n${p.body.trim()}`) ?? [];
+  const take = c.thread?.take;
   return [
     `This chat is synced with ${syncMarker(c.id)}, a review thread on my PR. What we say here shows in the thread.`,
     quote ? `${quote.author} wrote, in a comment on the PR:\n${quote.text}` : "",
@@ -16,7 +17,8 @@ export function syncText(files: FlatFile[], c: CommentDto): string {
     c.body.trim() ? `My reply so far:\n${c.body.trim()}` : "",
     conversationText(c.messages),
     `When I ask for a reply, call lgtm's suggest_reply tool with thread_id ${c.id}. It never posts to GitHub.`,
-    "Start by telling me what you make of it.",
+    take ? `Your take from triage (${take.verdict}):\n${take.why}` : "",
+    take ? "Just say you're ready and wait for me." : "Start by telling me what you make of it.",
   ]
     .filter(Boolean)
     .join("\n\n");
