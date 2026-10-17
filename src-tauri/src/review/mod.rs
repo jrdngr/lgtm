@@ -81,6 +81,9 @@ pub struct RepoCtx {
     current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
+    /// Threads whose synced chat the user stopped, so a terminal agent can't suggest replies
+    /// to them.
+    stopped_chats: Mutex<HashSet<u32>>,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -220,6 +223,7 @@ impl RepoCtx {
             current: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
+            stopped_chats: Mutex::default(),
         }
     }
 

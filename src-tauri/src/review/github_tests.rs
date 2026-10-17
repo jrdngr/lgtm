@@ -282,4 +282,10 @@ async fn a_synced_chat_suggests_a_reply_that_becomes_the_thread_reply() {
     assert_eq!(c.thread.as_ref().unwrap().stage, Stage::Reply);
     assert_eq!(c.messages.len(), 1, "the chat stays");
     assert!(ctx.take_suggestion(review.id, id).is_err());
+
+    ctx.set_chat_synced(id, false);
+    let err = ctx.agent_suggest_reply(Some("pr1"), id, "Done.").err().unwrap();
+    assert!(err.to_string().contains("stopped syncing"));
+    ctx.set_chat_synced(id, true);
+    assert!(ctx.agent_suggest_reply(Some("pr1"), id, "Done.").is_ok());
 }

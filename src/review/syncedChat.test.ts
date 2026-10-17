@@ -4,10 +4,15 @@ import { registerTerminal } from "../terminal/registry";
 import { mirror, startSync, syncMarker, useSyncedChat } from "./syncedChat";
 
 const added: [string, string][] = [];
+const syncs: [number, boolean][] = [];
 vi.mock("../ipc", () => ({
   commands: {
     addChatMessage: (_review: number, _comment: number, author: string, text: string) => {
       added.push([author, text]);
+      return Promise.resolve({ status: "ok", data: null });
+    },
+    setChatSynced: (comment: number, synced: boolean) => {
+      syncs.push([comment, synced]);
       return Promise.resolve({ status: "ok", data: null });
     },
   },
@@ -61,6 +66,10 @@ describe("synced chat", () => {
 
     close();
     expect(useSyncedChat(7).synced).toBe(false);
+    expect(syncs).toEqual([
+      [7, true],
+      [7, false],
+    ]);
   });
 
   it("ends when the agent leaves", () => {

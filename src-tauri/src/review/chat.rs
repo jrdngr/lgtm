@@ -32,6 +32,16 @@ impl RepoCtx {
         })
     }
 
+    /// Records whether the user is syncing a thread's chat with a terminal.
+    pub fn set_chat_synced(&self, comment: u32, synced: bool) {
+        let mut stopped = self.stopped_chats.lock().unwrap();
+        if synced {
+            stopped.remove(&comment);
+        } else {
+            stopped.insert(comment);
+        }
+    }
+
     /// Sets a thread's suggested reply, for a terminal agent. It replaces any earlier one.
     pub fn agent_suggest_reply(
         &self,
@@ -39,6 +49,11 @@ impl RepoCtx {
         thread: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
+        anyhow::ensure!(
+            !self.stopped_chats.lock().unwrap().contains(&thread),
+            "The user has stopped syncing this thread. Don't suggest a reply to it unless they \
+             sync it again."
+        );
         let id = self.current_review(workspace)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;

@@ -166,6 +166,8 @@ export const commands = {
 	addChatMessage: (review: number, comment: number, author: Author, text: string) => typedError<null, string>(__TAURI_INVOKE("add_chat_message", { review, comment, author, text })),
 	/**  Makes a thread's suggested reply its reply. */
 	takeSuggestion: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("take_suggestion", { review, comment })),
+	/**  Records whether the user is syncing a thread's chat with a terminal. */
+	setChatSynced: (comment: number, synced: boolean) => typedError<null, string>(__TAURI_INVOKE("set_chat_synced", { comment, synced })),
 	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
 	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
 	/**  Stops the review's triage run. */

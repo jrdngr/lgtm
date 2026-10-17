@@ -19,7 +19,10 @@ let last: Pick<Sync, "terminal" | "comment"> | undefined;
 const listeners = new Set<() => void>();
 
 function set(next: Sync | undefined) {
+  const prev = sync;
   sync = next;
+  if (prev && prev.comment !== next?.comment) commands.setChatSynced(prev.comment, false);
+  if (next && next.comment !== prev?.comment) commands.setChatSynced(next.comment, true);
   if (next) last = { terminal: next.terminal, comment: next.comment };
   for (const l of listeners) l();
 }

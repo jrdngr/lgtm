@@ -119,6 +119,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::delete_comment,
             commands::comments::add_chat_message,
             commands::comments::take_suggestion,
+            commands::comments::set_chat_synced,
             commands::comments::triage_threads,
             commands::comments::stop_thread_run,
             commands::bots::delete_bots,
