@@ -22,6 +22,7 @@ describe("syncText", () => {
     expect(text).toContain("suggest_reply tool with thread_id 12");
     expect(text).toContain("lgtm thread 12");
     expect(text).toContain("Start by telling me what you make of it.");
+    expect(text).toContain("set_thread_take tool with thread_id 12");
   });
 
   it("gives a triaged thread's take instead of asking for one", () => {

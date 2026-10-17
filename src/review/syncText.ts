@@ -17,6 +17,10 @@ export function threadText(files: FlatFile[], c: CommentDto): string[] {
   ];
 }
 
+/** How the agent keeps the thread's take current. */
+const takeText = (id: number) =>
+  `Whenever your take on the thread changes, call lgtm's set_thread_take tool with thread_id ${id}, the verdict and why, and no reply.`;
+
 /** What starts a synced chat on a thread: the thread, the reply so far, and how the agent
  * hands back a reply. */
 export function syncText(files: FlatFile[], c: CommentDto): string {
@@ -25,6 +29,7 @@ export function syncText(files: FlatFile[], c: CommentDto): string {
     `This chat is synced with ${syncMarker(c.id)}, a review thread on my PR. What we say here shows in the thread.`,
     ...threadText(files, c),
     `When I ask for a reply, call lgtm's suggest_reply tool with thread_id ${c.id}. It never posts to GitHub.`,
+    takeText(c.id),
     take ? `Your take from triage (${take.verdict}):\n${take.why}` : "",
     take ? "Just say you're ready and wait for me." : "Start by telling me what you make of it.",
   ]
@@ -39,6 +44,7 @@ export function reviewText(files: FlatFile[], c: CommentDto, rules: string): str
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
     `Tell me in a few short bullets what you'd change and why. If you'd change the reply, call lgtm's suggest_reply tool with thread_id ${c.id} and the whole new reply. It never posts to GitHub.`,
+    takeText(c.id),
   ]
     .filter(Boolean)
     .join("\n\n");
