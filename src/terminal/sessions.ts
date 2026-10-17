@@ -142,6 +142,7 @@ function startSession(
     ({ cols, rows } = term);
     return commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel);
   });
+  started.catch((e) => term.write(`failed to start shell: ${e}\r\n`));
   started.then((r) => {
     if (r.status === "error") {
       term.write(`failed to start shell: ${r.error}\r\n`);

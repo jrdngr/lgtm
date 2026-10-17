@@ -32,10 +32,12 @@ export function useSettings() {
 
 /** The settings, once they've loaded. */
 export function loadedSettings(): Promise<Settings> {
+  if (current) return Promise.resolve(current);
   return new Promise((done) => {
-    const stop = watchSettings((s) => {
-      queueMicrotask(stop);
-      done(s);
+    const stop = subscribe(() => {
+      if (!current) return;
+      stop();
+      done(current);
     });
   });
 }
