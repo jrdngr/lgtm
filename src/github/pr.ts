@@ -36,16 +36,22 @@ export function prOf(workspace: WorkspaceName, retries = 5): Promise<PrDto | nul
   return p;
 }
 
-/** Sets the workspace's PR, as picking one from its stack does. */
+/** Sets the workspace's PR, as picking one from its stack does. The same PR again changes
+ * nothing, so what shows it doesn't reload. */
 export function setPr(workspace: WorkspaceName, pr: PrDto | null) {
-  prs.set(workspaceKey(workspace), pr);
+  const key = workspaceKey(workspace);
+  if (prs.has(key) && JSON.stringify(prs.get(key)) === JSON.stringify(pr)) return;
+  prs.set(key, pr);
   for (const l of listeners) l();
 }
 
-/** Loads the workspace's PR again, after a refetch changed it. */
-export function reloadPr(workspace: WorkspaceName) {
-  prs.delete(workspaceKey(workspace));
-  return prOf(workspace);
+/** Loads the workspace's PR again, after a refetch changed it. The old one shows until then. */
+export async function reloadPr(workspace: WorkspaceName): Promise<PrDto | null> {
+  if (!prs.has(workspaceKey(workspace))) return prOf(workspace);
+  const r = await commands.prInfo(workspace);
+  if (r.status === "error") return prs.get(workspaceKey(workspace)) ?? null;
+  setPr(workspace, r.data);
+  return r.data;
 }
 
 /** The workspace's PR: `undefined` while loading, `null` when it has none. */

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DiscussionDto, HeadDto, PrDto } from "../bindings";
 import { commands } from "../ipc";
 import type { WorkspaceName } from "../workspaces/context";
@@ -25,9 +25,16 @@ export function useDiscussion(workspace: WorkspaceName, pr: PrDto) {
     setSyncedAt(Date.now());
   }
 
+  // Cleared only for another PR, so a reload of the same one doesn't flash empty.
+  const which = `${pr.repo}#${pr.number}`;
+  const shown = useRef(which);
   // biome-ignore lint/correctness/useExhaustiveDependencies: reload when the workspace's PR does
   useEffect(() => {
-    setD(undefined);
+    if (shown.current !== which) {
+      shown.current = which;
+      setD(undefined);
+      setHead(undefined);
+    }
     load();
   }, [pr]);
 
