@@ -38,22 +38,6 @@
   text-overflow: ellipsis;
 }
 
-/* The terminal sends go to: a violet bar along the tab's top, unless it's pinned, which its
-   violet ›_ shows. */
-.dock .dv-tab:has(.dv-default-tab[data-send="target"]) {
-  box-shadow: inset 0 2px var(--mark-violet);
-}
-
-.dock
-  .dockview-theme-dark
-  .dv-groupview.dv-active-group
-  > .dv-tabs-and-actions-container
-  .dv-tab.dv-active-tab:has(.dv-default-tab[data-send="target"]) {
-  box-shadow:
-    inset 0 2px var(--mark-violet),
-    inset 0 -2px var(--accent);
-}
-
 /* The send target's title: violet, darker unless its tab is the focused pane's. */
 .dock .dv-default-tab[data-send] .dv-default-tab-content {
   color: color-mix(in srgb, var(--violet-text) 55%, var(--bg));
@@ -111,7 +95,8 @@
   margin-right: 6px;
 }
 
-/* Only the selected tab offers its ›_. */
-.dock .dv-inactive-tab .tab-pin {
+/* Only the focused pane's selected tab offers its ›_. */
+.dock .dv-tab:not(.dv-active-tab) .tab-pin,
+.dock .dv-groupview:not(.dv-active-group) .tab-pin {
   display: none;
 }
