@@ -29,12 +29,17 @@ const set = (a: Ask | undefined) => {
   for (const l of listeners) l();
 };
 
+/** Whether `confirmShown` is up. It's answered only by its buttons or Escape, so a new ask is
+ * refused while it is, rather than cancelling it. */
+const held = () => current?.shown !== undefined;
+
 /** Asks for one line of text, or several with `multiline`. Undefined when cancelled, or left
  * empty without `allowEmpty`. One question at a time: a new one cancels the last. */
 export function promptText(
   title: string,
   opts: { value?: string; action?: string; multiline?: boolean; allowEmpty?: boolean } = {},
 ): Promise<string | undefined> {
+  if (held()) return Promise.resolve(undefined);
   current?.done(undefined);
   return new Promise((done) =>
     set({
@@ -58,6 +63,7 @@ export async function confirmShown(
   action: string,
   cancel = "Cancel",
 ): Promise<boolean> {
+  if (held()) return false;
   current?.done(undefined);
   const value = await new Promise<string | undefined>((done) =>
     set({
@@ -122,8 +128,14 @@ export function PromptHost() {
   const submit = () => finish(ref.current?.value ?? "");
   const keys = (e: KeyboardEvent) => {
     e.stopPropagation();
+    // Enter on a button presses that button.
+    const inBox = e.target === ref.current || e.target === shownRef.current;
     if (e.key === "Escape") finish(undefined);
-    else if (e.key === "Enter" && ((!ask.multiline && ask.shown === undefined) || e.metaKey)) {
+    else if (
+      inBox &&
+      e.key === "Enter" &&
+      ((!ask.multiline && ask.shown === undefined) || e.metaKey)
+    ) {
       e.preventDefault();
       submit();
     }
@@ -131,10 +143,13 @@ export function PromptHost() {
   return (
     <div
       className="prompt-backdrop"
-      onPointerDown={(e) => e.target === e.currentTarget && finish(undefined)}
+      onPointerDown={(e) =>
+        e.target === e.currentTarget && ask.shown === undefined && finish(undefined)
+      }
     >
       <form
         className={ask.shown === undefined ? "prompt" : "prompt wide"}
+        onKeyDown={keys}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -142,25 +157,17 @@ export function PromptHost() {
       >
         <label htmlFor="prompt-text">{ask.title}</label>
         {ask.shown !== undefined ? (
-          <pre key={ask.id} id="prompt-text" ref={shownRef} tabIndex={-1} onKeyDown={keys}>
+          <pre key={ask.id} id="prompt-text" ref={shownRef} tabIndex={-1}>
             {ask.shown}
           </pre>
         ) : ask.multiline ? (
-          <textarea
-            key={ask.id}
-            id="prompt-text"
-            ref={ref}
-            defaultValue={ask.value}
-            rows={6}
-            onKeyDown={keys}
-          />
+          <textarea key={ask.id} id="prompt-text" ref={ref} defaultValue={ask.value} rows={6} />
         ) : (
           <input
             key={ask.id}
             id="prompt-text"
             ref={ref}
             defaultValue={ask.value}
-            onKeyDown={keys}
             spellCheck={false}
           />
         )}

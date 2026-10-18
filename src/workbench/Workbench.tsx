@@ -204,6 +204,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
+      // A prompt keeps its keys.
+      if ((e.target as Element).closest?.(".prompt")) return;
       const key = bottomKey(e) ?? tabKey(e) ?? chord(e) ?? "";
       if (editorKeys.has(key) && (e.target as Element).closest?.(".cm-editor")) return;
       const run = keyRef.current?.(key);
