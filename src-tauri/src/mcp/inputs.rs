@@ -210,8 +210,6 @@ pub enum ThreadStage {
     Fix,
     /// A reply to work out.
     Reply,
-    /// The reply is final and waits to be sent.
-    Ready,
     /// Sent, fixed with nothing to say, or set aside.
     Done,
 }
@@ -221,12 +219,6 @@ pub struct SetStage {
     /// The thread's id, from list_threads.
     pub thread_id: u32,
     pub stage: ThreadStage,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct ThreadId {
-    /// The thread's id, from list_threads.
-    pub thread_id: u32,
 }
 
 #[derive(Deserialize, JsonSchema)]

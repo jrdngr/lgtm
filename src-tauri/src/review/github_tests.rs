@@ -232,6 +232,8 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
         .unwrap();
     assert_eq!(stage(&state), Stage::Reply);
     assert_eq!(state.comments[0].thread.as_ref().unwrap().summary, "Why 2");
+    // Only the human marks a reply ready.
+    assert!(ctx.agent_set_stage(Some("pr1"), id, Stage::Ready).is_err());
 
     let mut answered = thread("T1", None);
     answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];

@@ -32,7 +32,8 @@ through decisions with the human, including whenever they say qq or ask for a qq
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
 answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
 questions, and sends their decisions back to this terminal. When they talk a queued question \
-over here instead and that changes it, rewrite it there with qa_rewrite.";
+over here instead and that changes it, rewrite it there with qa_rewrite. On a PR's threads, \
+stop at a drafted reply: only the human marks a reply ready to send.";
 
 pub(super) type Out = Result<String, String>;
 
@@ -186,8 +187,8 @@ impl Lgtm {
 
     #[tool(
         description = "Move a thread to a stage: new, decide (the human has a call to make), \
-        fix (code to change), reply (a reply to work out), ready (the reply is final), or done \
-        (sent, fixed with nothing to say, or set aside). This never posts to GitHub."
+        fix (code to change), reply (a reply to work out), or done (sent, fixed with nothing \
+        to say, or set aside). Only the human marks a reply ready. This never posts to GitHub."
     )]
     async fn set_thread_stage(&self, Parameters(p): Parameters<inputs::SetStage>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
@@ -196,7 +197,6 @@ impl Lgtm {
             inputs::ThreadStage::Decide => Stage::Decide,
             inputs::ThreadStage::Fix => Stage::ToFix,
             inputs::ThreadStage::Reply => Stage::Reply,
-            inputs::ThreadStage::Ready => Stage::Ready,
             inputs::ThreadStage::Done => Stage::Done,
         };
         let (review, state) = ctx
@@ -217,19 +217,6 @@ impl Lgtm {
         let state = ctx.pull_pr_comments(review).await.map_err(failed)?;
         self.changed(&label, review, state);
         json(&ctx.agent_threads(self.workspace()).map_err(failed)?)
-    }
-
-    #[tool(
-        description = "Mark a thread's reply final, so it's ready for the human to send. Use \
-        it only when the human said the reply is good. This never posts to GitHub."
-    )]
-    async fn mark_thread_ready(&self, Parameters(p): Parameters<inputs::ThreadId>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let (review, state) = ctx
-            .agent_thread_ready(self.workspace(), p.thread_id)
-            .map_err(failed)?;
-        self.changed(&label, review, state);
-        Ok("Marked it ready.".into())
     }
 
     #[tool(

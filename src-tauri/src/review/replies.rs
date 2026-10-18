@@ -72,31 +72,22 @@ impl RepoCtx {
         Ok((id, state))
     }
 
-    /// Moves a thread to `stage`, for a terminal agent.
+    /// Moves a thread to `stage`, for a terminal agent. Only I mark a reply ready.
     pub fn agent_set_stage(
         &self,
         workspace: Option<&str>,
         thread: u32,
         stage: Stage,
     ) -> anyhow::Result<(u32, StateDto)> {
+        anyhow::ensure!(stage != Stage::Ready, "only the human marks a reply ready");
         let id = self.current_review(workspace)?;
         Ok((id, self.set_stage(id, thread, stage)?))
-    }
-
-    /// Marks a thread's reply final, for a terminal agent.
-    pub fn agent_thread_ready(
-        &self,
-        workspace: Option<&str>,
-        thread: u32,
-    ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review(workspace)?;
-        Ok((id, self.set_stage(id, thread, Stage::Ready)?))
     }
 }
 
 /// Gives a thread a new take, and a new reply when one is given. A reply on a thread that has
 /// one becomes its suggested reply, so the agent never overwrites mine, and a done thread keeps
-/// the reply it has.
+/// the reply it has. A reply the agent writes is a draft, never ready.
 fn set_take(c: &mut Comment, new: Take, reply: Option<String>) {
     let draft = c.is_draft();
     let Some(t) = c.thread.as_mut() else {
@@ -111,7 +102,10 @@ fn set_take(c: &mut Comment, new: Take, reply: Option<String>) {
     }
     if c.body.trim().is_empty() {
         c.body = reply;
-        t.stage = super::threads::after_edit(t.stage, draft, &c.body);
+        t.stage = match super::threads::after_edit(t.stage, draft, &c.body) {
+            Stage::Ready => Stage::Reply,
+            stage => stage,
+        };
     } else {
         c.conversation.suggestion = Some(reply.trim().to_string());
     }
@@ -169,5 +163,6 @@ mod tests {
         set_take(&mut c, new(), Some("first".into()));
         assert_eq!(c.body, "first");
         assert_eq!(c.conversation.suggestion, None);
+        assert_eq!(c.thread.as_ref().unwrap().stage, Stage::Reply);
     }
 }
