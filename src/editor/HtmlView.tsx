@@ -13,6 +13,9 @@ import { ZoomControls, zoomKey } from "./ZoomControls";
 
 const base = () => convertFileSrc("", "lgtmhtml");
 
+/** An open confirm is up in some HTML tab, so pages' next asks are dropped rather than queued. */
+let confirming = false;
+
 /** Posts to the script in the frame's page. */
 function send(frame: HTMLIFrameElement | null, message: object) {
   frame?.contentWindow?.postMessage({ lgtm: true, ...message }, "*");
@@ -98,8 +101,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   // Latest state for the message listener.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
-  /** An open confirm is up, so the page's next asks are dropped rather than queued. */
-  const confirming = useRef(false);
+  /** The user cancelled an open, so the page's asks are dropped until it loads again. */
+  const refused = useRef(false);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -108,6 +111,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       if (m?.lgtm !== true) return;
       switch (m.type) {
         case "nav":
+          refused.current = false;
           setTrail((t) => visit(t, m.url));
           if (m.url.startsWith(prefix.current)) {
             saveRef.current({ page: m.url.slice(prefix.current.length), pageScroll: undefined });
@@ -119,12 +123,15 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         case "open": {
           // A page can post this without a click, so the URL is shown before it opens.
           const url = webUrl(m.url);
-          if (!url || confirming.current) break;
-          confirming.current = true;
+          if (!url || confirming || refused.current) break;
+          confirming = true;
           confirmAction(url, "Open")
-            .then((ok) => ok && openUrl(url))
+            .then((ok) => {
+              if (ok) openUrl(url);
+              else refused.current = true;
+            })
             .finally(() => {
-              confirming.current = false;
+              confirming = false;
             });
           break;
         }
