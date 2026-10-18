@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appKey, fitted, pagePath, pageUrl, stepZoom, visit } from "./htmlNav";
+import { appKey, fitted, pagePath, pageUrl, stepZoom, visit, webUrl } from "./htmlNav";
 
 const base = "lgtmhtml://localhost/";
 
@@ -75,5 +75,15 @@ describe("appKey", () => {
     expect(appKey(key("C", { ctrlKey: true }))).toBeUndefined();
     expect(appKey({ key: "w", metaKey: true })).toBeUndefined();
     expect(appKey({ ...key("w", {}), metaKey: "yes" })).toBeUndefined();
+  });
+});
+
+describe("webUrl", () => {
+  it("passes http(s) addresses only", () => {
+    expect(webUrl("https://example.com/a?b")).toBe("https://example.com/a?b");
+    expect(webUrl("HTTP://example.com")).toBe("HTTP://example.com");
+    expect(webUrl("javascript:alert(1)")).toBeUndefined();
+    expect(webUrl("file:///etc/passwd")).toBeUndefined();
+    expect(webUrl(42)).toBeUndefined();
   });
 });

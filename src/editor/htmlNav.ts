@@ -59,3 +59,8 @@ export function appKey(m: Record<string, unknown>): KeyboardEventInit | undefine
   }
   return { key, code, metaKey, ctrlKey, shiftKey, altKey } as KeyboardEventInit;
 }
+
+/** The web address a page asked to open, or undefined when it isn't http(s). */
+export function webUrl(url: unknown): string | undefined {
+  return typeof url === "string" && /^https?:\/\//i.test(url) ? url : undefined;
+}

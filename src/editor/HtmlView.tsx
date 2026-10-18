@@ -5,8 +5,9 @@ import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { openUrl } from "../services/pathMenu";
 import { IconButton } from "../ui/icons";
+import { confirmAction } from "../ui/prompt";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
-import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
+import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit, webUrl } from "./htmlNav";
 import type { EditorParams } from "./open";
 import { ZoomControls, zoomKey } from "./ZoomControls";
 
@@ -39,8 +40,9 @@ type FrameMessage =
   | ({ type: "key" } & Record<string, unknown>);
 
 /** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts but
- * an opaque origin, so it can't reach the app, and the scheme's CSP keeps it from sending
- * anything out. Reloads when a file it loaded changes. */
+ * an opaque origin, so it can't reach the app. The scheme's CSP blocks fetches, XHR,
+ * websockets and forms off it, but not script or style URLs, or the frame navigating itself.
+ * Reloads when a file it loaded changes. */
 export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   { workspace, path, toggle, saved, save },
   ref,
@@ -112,9 +114,12 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
           if (scroll.current) send(frame.current, { type: "scroll", ...scroll.current });
           scroll.current = undefined;
           break;
-        case "open":
-          if (/^https?:\/\//.test(m.url)) openUrl(m.url);
+        case "open": {
+          // A page can post this without a click, so the URL is shown before it opens.
+          const url = webUrl(m.url);
+          if (url) confirmAction(url, "Open").then((ok) => ok && openUrl(url));
           break;
+        }
         case "zoom":
           setZoom(fitted(m.zoom));
           break;

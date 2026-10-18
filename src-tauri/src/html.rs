@@ -17,9 +17,10 @@ use crate::files;
 pub const SCHEME: &str = "lgtmhtml";
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 const FRAME_SCRIPT: &str = include_str!("html_frame.js");
-/// Pages run scripts and styles from anywhere, so CDN libraries work, but load everything
-/// else from their own files and can't send anything out: no fetches, beacons or forms off
-/// the scheme. The frame's origin is opaque, so `'self'` alone may match nothing.
+/// Pages run scripts and styles from anywhere, so CDN libraries work, and load everything
+/// else from their own files. Fetches, XHR, websockets, beacons and forms can't leave the
+/// scheme, but that's all: a script or style URL can still carry data out, and the frame can
+/// navigate itself off it. The frame's origin is opaque, so `'self'` alone may match nothing.
 const CSP: &str = "default-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
     script-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline' 'unsafe-eval' https:; \
     style-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline' https:; \
