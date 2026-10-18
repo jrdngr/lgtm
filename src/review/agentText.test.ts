@@ -32,8 +32,7 @@ describe("threadContext", () => {
       github: t.github,
       thread: { quote: null },
     } as unknown as CommentDto;
-    const { id, short, full } = threadContext([], t, c);
-    expect(id).toBe(31);
+    const { short, full } = threadContext([], t, c);
     expect(short).toBe("lgtm: I'm on thread 31, mkosta's on src/revset.ts:88.");
     expect(full).toBe(`${short}\n\nmkosta wrote:\nTwice?\n\nMy reply so far:\nOnce.`);
   });

@@ -14,15 +14,15 @@ import {
 } from "./linkedAgent";
 
 const added: [number, string, string][] = [];
-const links: [string, boolean, number | null][] = [];
+const links: [string, boolean, string | null][] = [];
 vi.mock("../ipc", () => ({
   commands: {
     addChatMessage: (_review: number, comment: number, author: string, text: string) => {
       added.push([comment, author, text]);
       return Promise.resolve({ status: "ok", data: null });
     },
-    setAgentLink: (terminal: string, linked: boolean, thread: { id: number } | null) => {
-      links.push([terminal, linked, thread?.id ?? null]);
+    setAgentLink: (terminal: string, linked: boolean, thread: { short: string } | null) => {
+      links.push([terminal, linked, thread?.short ?? null]);
       return Promise.resolve({ status: "ok", data: null });
     },
   },
@@ -92,7 +92,7 @@ describe("linked agent", () => {
       [7, "agent", "No."],
       [7, "agent", "Done."],
     ]);
-    expect(links.at(-1)).toEqual(["t1", true, 8]);
+    expect(links.at(-1)).toEqual(["t1", true, "lgtm: I'm on thread 8 on the PR."]);
   });
 
   it("moves to another terminal by unlinking the first, and ends when the agent leaves", () => {

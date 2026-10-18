@@ -175,7 +175,6 @@ export const commands = {
 	 *  or with `linked` false, unlinks it.
 	 */
 	setAgentLink: (terminal: string, linked: boolean, thread: {
-	id: number,
 	/**  The whole thread, for the first prompt on it. */
 	full: string,
 	/**  One line naming it, for later prompts. */
@@ -964,7 +963,6 @@ export type Level = "high" | "medium" | "low";
 
 /**  The thread the user is on, as the agent reads it. */
 export type LinkThread = {
-	id: number,
 	/**  The whole thread, for the first prompt on it. */
 	full: string,
 	/**  One line naming it, for later prompts. */

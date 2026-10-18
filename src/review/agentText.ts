@@ -43,7 +43,7 @@ function named(t: ThreadDto): string {
  * name. */
 export function threadContext(files: FlatFile[], t: ThreadDto, c: CommentDto | undefined) {
   const short = named(t);
-  return { id: t.id, short, full: c ? join([short, ...threadText(files, c)]) : short };
+  return { short, full: c ? join([short, ...threadText(files, c)]) : short };
 }
 
 /** What has a terminal agent review my reply on a thread against my rules for replies. */

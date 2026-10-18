@@ -9,7 +9,6 @@ use super::RepoCtx;
 /// The thread the user is on, as the agent reads it.
 #[derive(Clone, Debug, Deserialize, Type)]
 pub struct LinkThread {
-    pub id: u32,
     /// The whole thread, for the first prompt on it.
     pub full: String,
     /// One line naming it, for later prompts.
@@ -83,7 +82,6 @@ mod tests {
 
     fn on(id: u32) -> Option<LinkThread> {
         Some(LinkThread {
-            id,
             full: format!("whole {id}"),
             short: format!("line {id}"),
         })
