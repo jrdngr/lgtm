@@ -1,5 +1,6 @@
 # Run the app with hot reload
 dev:
+    pnpm install --frozen-lockfile
     pnpm tauri dev
 
 # Fetch, start a new change on main@origin, and run the app
@@ -16,6 +17,7 @@ test:
 
 # Build the release binary and macOS app
 build:
+    pnpm install --frozen-lockfile
     pnpm tauri build --bundles app
 
 # Build the app and put it in /Applications, replacing any copy there

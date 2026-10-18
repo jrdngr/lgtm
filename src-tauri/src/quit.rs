@@ -8,7 +8,7 @@ use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
 use objc2::{class, ffi, msg_send, sel};
 use tauri::{AppHandle, Manager};
 
-use crate::repo::{RepoWindows, START_LABEL};
+use crate::repo::START_LABEL;
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
 static QUIT: Mutex<Option<Quit>> = Mutex::new(None);
