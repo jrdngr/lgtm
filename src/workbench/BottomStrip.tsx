@@ -1,11 +1,11 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useReducer, useSyncExternalStore } from "react";
 import { flushSync } from "react-dom";
-import type { WorkspaceName } from "../workspaces/context";
-import { bottom } from "./bottom";
-import { bottomDockOf, docksVersion, subscribeDocks } from "./docks";
+import { bottom } from "../core/bottom";
+import { bottomDockOf, docksVersion, subscribeDocks } from "../core/docks";
+import { activate } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 import { FoldIcon, useSendMark } from "./FoldStrip";
-import { activate } from "./panels";
 
 /** The workspace's bottom dock, re-rendering as its tabs come, go or retitle. */
 export function useBottomDock(workspace: WorkspaceName): DockviewApi | undefined {

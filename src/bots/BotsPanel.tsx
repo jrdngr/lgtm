@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { BotRun } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { useCurrentReview } from "../review/current";
 import { SectionHeader } from "../ui/SectionHeader";
-import { useWorkspace } from "../workspaces/context";
 import { ReportPrompt } from "./ReportPrompt";
 import { RunList } from "./RunList";
 import "./bots.css";

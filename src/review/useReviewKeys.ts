@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { MarkColor } from "../bindings";
-import { isMac } from "../workbench/keys";
+import { isMac } from "../core/keys";
 import { type MenuAction, menuAction } from "./MarkMenu";
 import { colorForKey, type MarkSetup } from "./marks";
 import type { DisplayLine, FlatFile } from "./model";

@@ -1,5 +1,6 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { Fragment, useEffect, useRef, useState } from "react";
+import { useWorkspace } from "../core/workspace";
 import { type SendOutcome, useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
 import { focusTerminal } from "../terminal/registry";
@@ -7,7 +8,6 @@ import { useAgentsOff } from "../tools/agents";
 import { copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
-import { useWorkspace } from "../workspaces/context";
 import { ApplyView } from "./ApplyView";
 import { archiveLabel, edit, remove } from "./actions";
 import {

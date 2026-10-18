@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { Finding } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { useCurrentReview } from "../review/current";
 import { unified } from "../review/snippet";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
-import { useWorkspace } from "../workspaces/context";
 import { findingText, locationText, place } from "./findings";
 import { Inline, Markdown } from "./Markdown";
 import { SevTag } from "./Severity";

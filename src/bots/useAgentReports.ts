@@ -1,9 +1,9 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events } from "../bindings";
-import { dockOf } from "../workbench/docks";
-import { openReport } from "../workbench/panels";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { dockOf } from "../core/docks";
+import { openReport } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 
 /** Opens a report a terminal agent published findings to. */
 export function useAgentReports(workspace: WorkspaceName) {

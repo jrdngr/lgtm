@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { HeadDto, ReviewDto, StateDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { useGithubOff } from "../tools/agents";
-import type { WorkspaceName } from "../workspaces/context";
 import { reloadPr, usePr } from "./pr";
 
 interface Deps {

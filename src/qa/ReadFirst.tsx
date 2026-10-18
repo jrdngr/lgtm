@@ -1,8 +1,8 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { Icon } from "../ui/icons";
-import type { WorkspaceName } from "../workspaces/context";
 import { workspaceRoot } from "../workspaces/useWorkspaces";
 import { addPaths, repoRelative, splitPath } from "./readFirstPaths";
 

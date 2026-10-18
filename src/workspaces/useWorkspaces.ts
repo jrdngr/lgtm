@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
-import { type WorkspaceName, workspaceKey } from "./context";
 import { useRepoChanged } from "./useRepoChanged";
 
 const roots = new Map<string, string>();

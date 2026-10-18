@@ -1,3 +1,6 @@
+import { dockOf } from "../core/docks";
+import { openReviewTab } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import {
   askDescribe,
@@ -9,9 +12,6 @@ import {
 import type { ReviewTarget } from "../review/target";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { run } from "../ui/pathMenu";
-import type { WorkspaceName } from "../workspaces/context";
-import { dockOf } from "./docks";
-import { openReviewTab } from "./panels";
 
 /** Runs a jj action, then reloads the review as the revisions panel does. */
 async function act(workspace: WorkspaceName, target: ReviewTarget, [action, , next]: RevAction) {

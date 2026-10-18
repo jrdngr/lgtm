@@ -3,6 +3,7 @@ import { archBadge } from "../arch/sidebar/logic";
 import { useArch } from "../arch/state";
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
+import { useWorkspace, workspaceKey } from "../core/workspace";
 import { RepoTree } from "../editor/RepoTree";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
@@ -13,7 +14,6 @@ import { NotesPanel } from "../review/NotesPanel";
 import { WalkthroughPanel } from "../review/WalkthroughPanel";
 import { PrPanel } from "../threads/PrPanel";
 import { needsYou } from "../threads/stages";
-import { useWorkspace, workspaceKey } from "../workspaces/context";
 import { SidePanel, type SideState } from "./SidePanel";
 
 function RepoTab() {

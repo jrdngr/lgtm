@@ -1,6 +1,6 @@
 import type { LayerDto } from "../../bindings";
+import type { WorkspaceName } from "../../core/workspace";
 import type { CurrentReview } from "../../review/current";
-import type { WorkspaceName } from "../../workspaces/context";
 import type { ArchSelection } from "../state";
 import { layerDone } from "./logic";
 import { Row, Sec, showInTab } from "./parts";

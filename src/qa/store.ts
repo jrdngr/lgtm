@@ -1,11 +1,11 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useSyncExternalStore } from "react";
 import { events } from "../bindings";
+import { dockOf } from "../core/docks";
+import { openQa } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { type CommandResult, commands } from "../ipc";
-import { dockOf } from "../workbench/docks";
-import { openQa } from "../workbench/panels";
 import { report } from "../workspaces/activity";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import type { Session, Step } from "./model";
 
 /** What the agent is doing for a session. `answer` is the update after decision `about`. */

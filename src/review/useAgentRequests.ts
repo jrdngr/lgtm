@@ -1,7 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef } from "react";
 import { events } from "../bindings";
-import type { WorkspaceName } from "../workspaces/context";
+import type { WorkspaceName } from "../core/workspace";
 
 interface Handlers {
   /** Whether this pane is the one its workspace's agents act on. */

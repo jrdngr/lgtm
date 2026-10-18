@@ -1,7 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events } from "../bindings";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { reloadArch } from "./state";
 
 /** Loads a review's architecture again when a terminal agent assesses it. */

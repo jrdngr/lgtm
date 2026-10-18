@@ -1,6 +1,6 @@
 import type { DockviewApi } from "dockview-react";
 import { describe, expect, it } from "vitest";
-import { registerDock } from "../workbench/docks";
+import { registerDock } from "../core/docks";
 import { type CurrentReview, publishReview } from "./current";
 import { inReviewPane, markIdle } from "./idle";
 

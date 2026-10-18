@@ -1,9 +1,9 @@
 import type { NoteDto } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon, IconButton } from "../ui/icons";
 import { run } from "../ui/pathMenu";
-import { useWorkspace } from "../workspaces/context";
 import { rowLabel } from "./comments";
 import type { CurrentReview } from "./current";
 import { noteCommentText } from "./NoteBlock";

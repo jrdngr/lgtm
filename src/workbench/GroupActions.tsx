@@ -1,10 +1,10 @@
 import type { IDockviewHeaderActionsProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { addToGroup, KINDS, kindTitle, splitGroup } from "../core/panels";
+import { useWorkspace } from "../core/workspace";
 import { openMenu } from "../ui/contextMenu";
-import { useWorkspace } from "../workspaces/context";
 import { Fold } from "./FoldStrip";
-import { addToGroup, KINDS, kindTitle, splitGroup } from "./panels";
 import { stripMenu } from "./tabMenu";
 import "../review/MarkMenu.css";
 import "./GroupActions.css";

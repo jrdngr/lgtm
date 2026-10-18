@@ -1,9 +1,9 @@
 import { useSyncExternalStore } from "react";
 import type { TerminalAgent } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
 import { watchAgentHooks } from "../terminal/agentHooks";
 import { hasTerminal, subscribeTerminals, terminalTitle } from "../terminal/registry";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { LINK_START, threadContext } from "./agentText";
 import { currentReview, onReviewChange } from "./current";
 

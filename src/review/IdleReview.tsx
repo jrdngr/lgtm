@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
-import type { WorkspaceName } from "../workspaces/context";
 import {
   type CurrentReview,
   currentReview,

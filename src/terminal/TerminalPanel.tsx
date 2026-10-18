@@ -1,11 +1,11 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
+import { bottom } from "../core/bottom";
+import { useWorkspace } from "../core/workspace";
 import { commands } from "../ipc";
 import { loadedSettings } from "../settings/store";
 import { openMenu } from "../ui/contextMenu";
-import { bottom } from "../workbench/bottom";
-import { useWorkspace } from "../workspaces/context";
 import { watchAgentHooks } from "./agentHooks";
 import { registerTerminal, touchTerminal } from "./registry";
 import { resumeCommand } from "./resume";

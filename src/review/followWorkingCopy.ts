@@ -1,10 +1,10 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events, type PrDto } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { prOf, setPr } from "../github/pr";
 import { commands } from "../ipc";
 import { githubOff } from "../tools/agents";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 import { targetOf } from "./target";
 

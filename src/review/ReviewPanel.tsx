@@ -1,15 +1,15 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeDto, View } from "../bindings";
+import { openArchitecture } from "../core/panels";
+import { remembered } from "../core/remembered";
+import { useWorkspace } from "../core/workspace";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { openMenu } from "../ui/contextMenu";
-import { openArchitecture } from "../workbench/panels";
-import { remembered } from "../workbench/remembered";
-import { useWorkspace } from "../workspaces/context";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
 import { commentSlots } from "./comments";

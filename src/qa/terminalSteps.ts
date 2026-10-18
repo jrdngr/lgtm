@@ -1,4 +1,5 @@
 import type { TerminalAgent } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { notePasted } from "../review/linkedAgent";
 import { watchAgentHooks } from "../terminal/agentHooks";
@@ -10,7 +11,6 @@ import {
   terminalHasAgent,
   terminalTitle,
 } from "../terminal/registry";
-import type { WorkspaceName } from "../workspaces/context";
 import type { Session } from "./model";
 import { act, type BusyKind, setBusy, setError } from "./store";
 

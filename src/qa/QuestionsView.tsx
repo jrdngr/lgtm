@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { isMac } from "../core/keys";
+import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
 import { GrowingText } from "../ui/GrowingText";
-import { isMac } from "../workbench/keys";
-import type { WorkspaceName } from "../workspaces/context";
 import { ActionBar, type Mode } from "./ActionBar";
 import {
   decide as decideQuestion,

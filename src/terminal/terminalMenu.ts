@@ -1,9 +1,9 @@
 import type { Terminal } from "@xterm/xterm";
 import type { DockviewApi, IDockviewPanel } from "dockview-react";
+import { addTerminal } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
-import { addTerminal } from "../workbench/panels";
 import { moveToOther } from "../workbench/tabMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import { targetItems } from "./sendItems";
 
 interface Deps {

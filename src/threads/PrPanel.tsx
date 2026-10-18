@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { CommentDto, PrDto, Stage, ThreadDto } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { PrSection } from "../github/PrSection";
 import { viewerLogin } from "../github/people";
 import { usePr } from "../github/pr";
@@ -18,7 +19,6 @@ import { Icon } from "../ui/icons";
 import { PipeButton } from "../ui/PipeButton";
 import { openUrl, run } from "../ui/pathMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
-import { useWorkspace } from "../workspaces/context";
 import { LinkStrip } from "./LinkStrip";
 import { SendBox } from "./SendBox";
 import { byStage, STAGES, threadLabel, threadWhere, working } from "./stages";

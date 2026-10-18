@@ -1,5 +1,5 @@
+import type { WorkspaceName } from "../core/workspace";
 import type { CtxEntry } from "../ui/contextMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import { pinnedTarget, pinTarget, workspaceTerminals } from "./registry";
 
 /** Sends text to the send target, or to a chosen one. */

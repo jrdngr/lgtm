@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CommentDto, Stage } from "../bindings";
 import { Markdown } from "../bots/Markdown";
+import { isMac, SAVE_KEY } from "../core/keys";
 import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar } from "../github/Post";
 import { viewerLogin } from "../github/people";
@@ -11,7 +12,6 @@ import { openMenu } from "../ui/contextMenu";
 import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
-import { isMac, SAVE_KEY } from "../workbench/keys";
 import { Conversation } from "./Conversation";
 import { cardItems, moreItems, noteItems } from "./cardMenu";
 import { useLink } from "./linkedAgent";

@@ -1,5 +1,5 @@
+import { isMac } from "../core/keys";
 import { IconButton } from "../ui/icons";
-import { isMac } from "../workbench/keys";
 import { stepZoom } from "./htmlNav";
 
 /** The zoom action for ⌥⌘= / ⌥⌘- / ⌥⌘0 / ⌥⌘9, by key code since ⌥ changes the character. */

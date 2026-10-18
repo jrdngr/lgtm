@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
+import { loadState, saveState } from "../core/savedState";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { prOf, reloadPr } from "../github/pr";
@@ -9,9 +11,7 @@ import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { confirmAction } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
-import { loadState, saveState } from "../workbench/savedState";
 import { type AddKind, onAddRequest } from "./addRequests";
-import { type WorkspaceName, workspaceKey } from "./context";
 import { arrange, forgetPin, usePins } from "./pins";
 import { StackPrs } from "./StackPrs";
 import { clearStackPr } from "./stack";

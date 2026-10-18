@@ -1,5 +1,5 @@
+import type { WorkspaceName } from "../core/workspace";
 import { prOf } from "../github/pr";
-import type { WorkspaceName } from "../workspaces/context";
 import { workspaceStore } from "./workspaceStore";
 
 /** The revset each workspace reviews: the last one a review in it loaded. Review panes and

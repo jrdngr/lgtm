@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { useWorkspace, type WorkspaceName } from "../../core/workspace";
 import { type CurrentReview, useCurrentReview } from "../../review/current";
 import { Busy } from "../../ui/Busy";
 import { Empty, SectionHeader } from "../../ui/SectionHeader";
-import { useWorkspace, type WorkspaceName } from "../../workspaces/context";
 import { useArch } from "../state";
 import { History } from "./History";
 import { Intent } from "./Intent";

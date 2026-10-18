@@ -1,7 +1,7 @@
 import type { DockviewPanelApi } from "dockview-react";
 import { useEffect, useRef } from "react";
-import { inDock } from "../workbench/docks";
-import type { WorkspaceName } from "../workspaces/context";
+import { inDock } from "../core/docks";
+import type { WorkspaceName } from "../core/workspace";
 import { isIdle } from "./idle";
 import {
   isTarget,

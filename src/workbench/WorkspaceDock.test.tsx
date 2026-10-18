@@ -43,9 +43,9 @@ async function mount(workspace: string) {
   vi.resetModules();
   const { WorkspaceDock } = await import("./WorkspaceDock");
   const { FilesPanel } = await import("../review/FilesPanel");
-  const { WorkspaceContext } = await import("../workspaces/context");
-  const { dockOf } = await import("./docks");
-  const { isReviewPanel } = await import("./panels");
+  const { WorkspaceContext } = await import("../core/workspace");
+  const { dockOf } = await import("../core/docks");
+  const { isReviewPanel } = await import("../core/panels");
   const { reopenClosed } = await import("./closedTabs");
   const el = document.createElement("div");
   document.body.append(el);
@@ -157,7 +157,7 @@ describe("Focusing a review pane", { timeout: 20_000 }, () => {
     });
     observer.observe(document.body, { childList: true, subtree: true });
 
-    const { focusPanel } = await import("./panels");
+    const { focusPanel } = await import("../core/panels");
     await act(() => focusPanel(review));
     await settle();
     observer.disconnect();

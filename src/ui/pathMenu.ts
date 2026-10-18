@@ -1,8 +1,8 @@
 import { message } from "@tauri-apps/plugin-dialog";
+import type { WorkspaceName } from "../core/workspace";
 import { revealInFiles } from "../editor/reveal";
 import { commands, errorText, unwrap } from "../ipc";
 import { type Sender, sendItems } from "../terminal/sendItems";
-import type { WorkspaceName } from "../workspaces/context";
 import { workspaceRoot } from "../workspaces/useWorkspaces";
 import { type CtxEntry, copy } from "./contextMenu";
 

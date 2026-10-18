@@ -1,7 +1,7 @@
 import { useRef } from "react";
-import type { WorkspaceName } from "../workspaces/context";
+import { bottom } from "../core/bottom";
+import type { WorkspaceName } from "../core/workspace";
 import { BottomStrip, useBottomDock } from "./BottomStrip";
-import { bottom } from "./bottom";
 
 const MIN_HEIGHT = 80;
 /** Room left above the panel for the toolbar and some of the panes. */

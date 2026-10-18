@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { loadState, saveState } from "../workbench/savedState";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { loadState, saveState } from "../core/savedState";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 
 /** A live terminal pane that text can be pasted into. */
 interface TerminalTarget {

@@ -1,7 +1,7 @@
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { terminalTitle } from "../terminal/registry";
 import { type Running, runningPrograms } from "../terminal/sessions";
 import { tabAgent } from "../workspaces/activity";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { askClose } from "./CloseDialog";
 
 interface Unsaved {

@@ -1,10 +1,10 @@
 import { type RefObject, useRef, useState } from "react";
 import type { CommentDto } from "../bindings";
+import { isMac, SAVE_KEY } from "../core/keys";
 import { GhThread } from "../github/GhThread";
 import { viewerLogin } from "../github/people";
 import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
-import { isMac, SAVE_KEY } from "../workbench/keys";
 import { CombineDialog } from "./CombineDialog";
 import { setCurrentThread, useLink } from "./linkedAgent";
 import { quotesOf } from "./prComments";

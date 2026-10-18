@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef } from "react";
 import { events } from "../bindings";
-import { dockOf, revealPanel } from "../workbench/docks";
-import type { WorkspaceName } from "../workspaces/context";
+import { dockOf, revealPanel } from "../core/docks";
+import type { WorkspaceName } from "../core/workspace";
 
 /** The Settings tab's sections, which panels can open it at. */
 export type SettingsSection = "claude" | "terminal" | "tools" | "prompts";

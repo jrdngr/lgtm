@@ -1,6 +1,6 @@
-import { bottomDockOf, dockOf, dockReady, revealPanel } from "../workbench/docks";
+import { bottomDockOf, dockOf, dockReady, revealPanel } from "../core/docks";
+import type { WorkspaceName } from "../core/workspace";
 import type { AgentInfo } from "./activity";
-import type { WorkspaceName } from "./context";
 
 /** What the agent list calls `agent`: a terminal by its tab's title. */
 export function agentName(workspace: WorkspaceName, agent: AgentInfo) {

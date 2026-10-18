@@ -1,6 +1,6 @@
+import type { WorkspaceName } from "../core/workspace";
 import { unlinkAgent, useLink } from "../review/linkedAgent";
 import { Icon } from "../ui/icons";
-import type { WorkspaceName } from "../workspaces/context";
 
 /** The terminal linked to the PR review: its name, whether its agent is working, and Unlink. */
 export function LinkStrip({ workspace }: { workspace: WorkspaceName }) {

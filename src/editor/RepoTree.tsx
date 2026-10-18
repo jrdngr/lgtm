@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileEntry } from "../bindings";
+import { useSavedSet } from "../core/savedState";
+import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { guideAt, indent, toggled } from "../review/tree";
@@ -7,8 +9,6 @@ import { useSendFromMenu } from "../review/useSendText";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { pathItems } from "../ui/pathMenu";
 import { SectionHeader } from "../ui/SectionHeader";
-import { useSavedSet } from "../workbench/savedState";
-import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
 import { openFile } from "./open";

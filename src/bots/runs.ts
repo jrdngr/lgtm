@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { type BotRun, events } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 /** Reports the window has seen, kept current by the backend's events. */
 const runs = new Map<number, BotRun>();

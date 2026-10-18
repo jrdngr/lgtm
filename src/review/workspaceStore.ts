@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 
 /** One value per workspace, published by the pane that owns it, for views that follow it. */
 export function workspaceStore<T>() {

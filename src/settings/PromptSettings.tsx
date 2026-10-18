@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Prompt, PromptInfo } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
-import { useWorkspace } from "../workspaces/context";
 import { Section } from "./SettingsPanel";
 
 const PROMPTS: Record<Prompt, { name: string; help: string }> = {

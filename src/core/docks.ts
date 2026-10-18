@@ -1,8 +1,8 @@
 import type { DockviewApi } from "dockview-react";
 import { flushSync } from "react-dom";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { bottom } from "./bottom";
 import { activate } from "./panels";
+import { type WorkspaceName, workspaceKey } from "./workspace";
 
 export type DockSlot = "main" | "bottom";
 

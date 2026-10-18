@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { type CommandResult, commands } from "../ipc";
 import { confirmAction } from "../ui/prompt";
-import type { WorkspaceName } from "../workspaces/context";
 import { reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";

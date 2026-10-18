@@ -1,7 +1,7 @@
+import type { WorkspaceName } from "../core/workspace";
 import { prOf } from "../github/pr";
 import { commands } from "../ipc";
 import { focusTerminal, sendTarget, submitNextSend } from "../terminal/registry";
-import type { WorkspaceName } from "../workspaces/context";
 import { linkText } from "./agentText";
 import { currentReview } from "./current";
 import { linkAgent, linkedTerminal, notePasted, relinkable, setCurrentThread } from "./linkedAgent";

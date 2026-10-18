@@ -1,4 +1,5 @@
 import type { WorkspaceDto } from "../bindings";
+import { workspaceKey } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { errorText } from "../ipc";
 import { contextMenu } from "../ui/contextMenu";
@@ -6,7 +7,6 @@ import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
 import { agentName, openAgent } from "./agentTabs";
-import { workspaceKey } from "./context";
 import { COLORS, usePins } from "./pins";
 import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";

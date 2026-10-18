@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
-import type { WorkspaceName } from "../workspaces/context";
 import { fileMoves, type Moves, movesFrom } from "./follow";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 

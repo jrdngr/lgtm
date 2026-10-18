@@ -1,9 +1,9 @@
 import type { CheckState, MarkColor } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { revealInFiles } from "../editor/reveal";
 import type { CtxEntry } from "../ui/contextMenu";
 import { copy } from "../ui/contextMenu";
 import { absolutePath, reveal } from "../ui/pathMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import type { MarkSetup } from "./marks";
 import type { FlatFile } from "./model";
 import type { Progress } from "./state";

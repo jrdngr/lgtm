@@ -1,8 +1,8 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useState } from "react";
+import { useWorkspace } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { saveTabParams } from "../workbench/tabParams";
-import { useWorkspace } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { imageType } from "./image";
 import type { EditorParams } from "./open";

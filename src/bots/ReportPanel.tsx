@@ -1,13 +1,13 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import type { Finding } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
-import { useWorkspace } from "../workspaces/context";
 import { FindingCard } from "./FindingCard";
 import { FindingsView } from "./FindingsView";
 import {

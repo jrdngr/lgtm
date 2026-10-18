@@ -1,7 +1,7 @@
 import type { AnswerInput, SessionEdit } from "../bindings";
+import { remembered } from "../core/remembered";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
-import { remembered } from "../workbench/remembered";
-import type { WorkspaceName } from "../workspaces/context";
 import { dependents, type Session } from "./model";
 import { act, getQa, loadSessions, removeSession, selectSession, setError } from "./store";
 import { runInTerminal } from "./terminalSteps";

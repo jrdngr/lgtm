@@ -1,5 +1,8 @@
 import type { DockviewApi } from "dockview-react";
 import type { PrDto, WorkspaceDto } from "../bindings";
+import { dockReady } from "../core/docks";
+import { activate, addTerminal, focusPanel, isReviewPanel, openReviewTab } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { currentReview } from "../review/current";
 import { setWorkspaceRevset } from "../review/revset";
@@ -7,15 +10,6 @@ import { targetOf } from "../review/target";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { pathItems, run } from "../ui/pathMenu";
-import { dockReady } from "../workbench/docks";
-import {
-  activate,
-  addTerminal,
-  focusPanel,
-  isReviewPanel,
-  openReviewTab,
-} from "../workbench/panels";
-import { type WorkspaceName, workspaceKey } from "./context";
 import { COLORS, type PinColor, setColor, togglePin } from "./pins";
 import { clearStackPr } from "./stack";
 

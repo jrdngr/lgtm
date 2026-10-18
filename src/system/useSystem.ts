@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useCallback, useEffect, useState } from "react";
 import { events, type SystemDto } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 /** The workspace's system map, loaded again when a terminal agent describes it or on `reload`.
  * Keeps the last map while the next loads. */

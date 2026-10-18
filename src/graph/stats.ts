@@ -1,7 +1,7 @@
 import type { GraphDto, GraphNode } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import type { CurrentReview } from "../review/current";
-import type { WorkspaceName } from "../workspaces/context";
 import { nodeRisk, rowsDone, showNode, worseRisk } from "./nodes";
 import type { Box, Tree } from "./tree";
 

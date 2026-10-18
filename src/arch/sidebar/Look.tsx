@@ -1,6 +1,6 @@
 import type { LookDto } from "../../bindings";
+import type { WorkspaceName } from "../../core/workspace";
 import { commands } from "../../ipc";
-import type { WorkspaceName } from "../../workspaces/context";
 import { type ArchSelection, reloadArch } from "../state";
 import { bySeverity } from "./logic";
 import { Box, Row, Sec, showInTab } from "./parts";

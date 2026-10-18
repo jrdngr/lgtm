@@ -1,12 +1,12 @@
 import type { DockviewApi, DockviewGroupPanel } from "dockview-react";
 import { useEffect, useReducer, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { bottom } from "../core/bottom";
+import { dockOf } from "../core/docks";
+import { activate, focusPanel } from "../core/panels";
+import { useWorkspace, type WorkspaceName } from "../core/workspace";
 import { useSendTarget } from "../terminal/registry";
-import { useWorkspace, type WorkspaceName } from "../workspaces/context";
-import { bottom } from "./bottom";
-import { dockOf } from "./docks";
 import { fold, foldAxis, foldOf, neighbor, subscribeFolds, unfold } from "./fold";
-import { activate, focusPanel } from "./panels";
 import "./fold.css";
 
 /** Re-renders on folds and on the group's tabs changing. */

@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { currentReview } from "../review/current";
-import type { WorkspaceName } from "../workspaces/context";
 import { openFile } from "./open";
 
 /** Opens files agents ask to see in the editor while the workspace's review hasn't loaded,

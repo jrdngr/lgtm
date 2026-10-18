@@ -1,10 +1,10 @@
 import { useMemo } from "react";
+import { useSavedSet } from "../core/savedState";
+import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Ring } from "../ui/Ring";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
-import { useSavedSet } from "../workbench/savedState";
-import { useWorkspace } from "../workspaces/context";
 import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { Diffstat } from "./Diffstat";

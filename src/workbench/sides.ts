@@ -1,4 +1,4 @@
-import type { WorkspaceName } from "../workspaces/context";
+import type { WorkspaceName } from "../core/workspace";
 import type { SideState } from "./SidePanel";
 import { movedView } from "./subviews";
 

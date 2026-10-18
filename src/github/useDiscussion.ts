@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DiscussionDto, HeadDto, PrDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
-import type { WorkspaceName } from "../workspaces/context";
 
 /** A PR's conversation and state on GitHub, read when the PR changes and on each sync. */
 export function useDiscussion(workspace: WorkspaceName, pr: PrDto) {

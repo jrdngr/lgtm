@@ -1,8 +1,8 @@
 import { Channel } from "@tauri-apps/api/core";
 import type { Terminal } from "@xterm/xterm";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands, type PtyEvent } from "../ipc";
 import { type ActivityState, pulse, report } from "../workspaces/activity";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 import { onAgentHook } from "./agentHooks";
 import { isAgentTitle, isBusyTitle, titleLabel } from "./title";
 import { createTerminal } from "./xterm";

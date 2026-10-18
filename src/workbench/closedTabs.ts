@@ -1,10 +1,10 @@
 import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import { flushSync } from "react-dom";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
-import { bottom } from "./bottom";
+import { bottom } from "../core/bottom";
+import { bottomDockOf, type DockSlot, dockOf } from "../core/docks";
+import { focusPanel } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { isMoving } from "./crossDock";
-import { bottomDockOf, type DockSlot, dockOf } from "./docks";
-import { focusPanel } from "./panels";
 
 export interface Closed {
   slot: DockSlot;

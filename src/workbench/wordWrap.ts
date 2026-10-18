@@ -1,8 +1,8 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events } from "../bindings";
+import { remembered } from "../core/remembered";
 import { commands } from "../ipc";
-import { remembered } from "./remembered";
 
 /** View > Word Wrap: long lines wrap in reviews and editors instead of scrolling sideways. */
 export const wordWrap = remembered("lgtm:wordWrap", false, [true, false]);

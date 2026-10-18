@@ -1,10 +1,10 @@
 import { message } from "@tauri-apps/plugin-dialog";
+import { bottomDockOf, dockOf } from "../core/docks";
+import { activate } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { run } from "../ui/pathMenu";
 import { confirmAction, promptText } from "../ui/prompt";
-import { bottomDockOf, dockOf } from "../workbench/docks";
-import { activate } from "../workbench/panels";
-import type { WorkspaceName } from "../workspaces/context";
 import { baseName, type EditorParams, editorId, openFile } from "./open";
 import { isUnsaved } from "./unsaved";
 

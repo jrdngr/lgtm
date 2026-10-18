@@ -1,7 +1,7 @@
 import type { DockviewApi, IDockviewPanel } from "dockview-react";
 import { expect, test, vi } from "vitest";
-import { bottom } from "../workbench/bottom";
-import { registerDock } from "../workbench/docks";
+import { bottom } from "../core/bottom";
+import { registerDock } from "../core/docks";
 import { openSettings } from "./open";
 
 /** A panel behind another tab in its pane. */

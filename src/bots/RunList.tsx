@@ -1,11 +1,11 @@
 import type { BotRun } from "../bindings";
+import { remembered } from "../core/remembered";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { confirmAction } from "../ui/prompt";
 import { ago, fullDate } from "../ui/time";
-import { remembered } from "../workbench/remembered";
-import type { WorkspaceName } from "../workspaces/context";
 import { allFindings, report } from "./findings";
 import { reportIdItems, reportLabel } from "./reportId";
 import { forgetRun, useRuns } from "./runs";

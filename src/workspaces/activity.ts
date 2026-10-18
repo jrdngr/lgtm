@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { type WorkspaceName, workspaceKey } from "./context";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 
 /** What an agent reports: `running`, waiting on `input`, ended `done`, `failed` or `stopped`,
  * at its prompt (`idle`), or `gone`. */

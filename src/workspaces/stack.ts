@@ -1,9 +1,9 @@
 import type { PrDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { setPr } from "../github/pr";
 import { commands, unwrap } from "../ipc";
 import { setWorkspaceRevset } from "../review/revset";
 import { targetOf } from "../review/target";
-import type { WorkspaceName } from "./context";
 
 /** Points the workspace's review at `revset`, in its review pane if one is open. */
 function review(workspace: WorkspaceName, revset: string) {

@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { useWorkspace } from "../core/workspace";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { confirmAction } from "../ui/prompt";
-import { useWorkspace } from "../workspaces/context";
 import { archiveLabel, edit, remove } from "./actions";
 import { countable, decisionsText, lastDecided, openQuestions, type Session } from "./model";
 import { busyName, showQa, startFresh, useQa } from "./store";

@@ -1,5 +1,6 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
+import type { WorkspaceName } from "../core/workspace";
 import {
   sendTarget,
   sendToTerminal,
@@ -7,7 +8,6 @@ import {
   workspaceTerminals,
 } from "../terminal/registry";
 import type { Sender } from "../terminal/sendItems";
-import type { WorkspaceName } from "../workspaces/context";
 import { TerminalPicker } from "./TerminalPicker";
 
 /** Where sent text went (the terminal's title, which may be empty), or why it couldn't go. */

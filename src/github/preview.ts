@@ -1,5 +1,5 @@
 import type { DockviewApi } from "dockview-react";
-import { activate, inActivePane } from "../workbench/panels";
+import { activate, inActivePane } from "../core/panels";
 
 /** The one preview tab per dock, which each selected PR replaces. */
 const ID = "pr-preview";

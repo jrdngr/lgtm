@@ -1,6 +1,6 @@
-import { dockOf } from "../workbench/docks";
-import { activate, isReviewPanel, openReviewTab } from "../workbench/panels";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { dockOf } from "../core/docks";
+import { activate, isReviewPanel, openReviewTab } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { type CurrentReview, currentReview, onReviewChange } from "./current";
 
 /** What the idle review published, which review panes take over. */

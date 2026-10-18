@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { dockOf } from "../../workbench/docks";
-import { openArchitecture } from "../../workbench/panels";
-import type { WorkspaceName } from "../../workspaces/context";
+import { dockOf } from "../../core/docks";
+import { openArchitecture } from "../../core/panels";
+import type { WorkspaceName } from "../../core/workspace";
 import { type ArchSelection, setArchView } from "../state";
 import { meterTone } from "./logic";
 

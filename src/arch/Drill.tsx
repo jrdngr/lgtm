@@ -1,6 +1,7 @@
 import { ReactFlowProvider, ViewportPortal } from "@xyflow/react";
 import { useCallback, useMemo } from "react";
 import type { ArchDto, GraphDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import type { Placed } from "../graph/layout";
 import { Flow } from "../graph/SymbolFlow";
 import type { Box } from "../graph/tree";
@@ -9,7 +10,6 @@ import { useView } from "../graph/useView";
 import { nextCallers, setAllExpanded, toggleAllCallers } from "../graph/view";
 import type { CurrentReview } from "../review/current";
 import type { CtxEntry } from "../ui/contextMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import { DRAG_TYPE, droppedItem, startItemDrag } from "./ArchNode";
 import { arrowHead, roundedPath } from "./paths";
 import { moveSource } from "./scene";

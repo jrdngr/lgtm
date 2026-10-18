@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { JjAction, LogLine } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { openMenu } from "../ui/contextMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import { AnsiText } from "./AnsiText";
 import { RevisionsPanelActions } from "./RevisionsPanelActions";
 import { RevisionsPanelFooter } from "./RevisionsPanelFooter";

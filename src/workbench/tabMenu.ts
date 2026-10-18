@@ -1,5 +1,16 @@
 import type { DockviewApi, DockviewGroupPanel, IDockviewPanel } from "dockview-react";
 import { flushSync } from "react-dom";
+import { bottom } from "../core/bottom";
+import { bottomDockOf, dockOf } from "../core/docks";
+import {
+  addTerminal,
+  addToGroup,
+  focusPanel,
+  kindTitle,
+  type PanelKind,
+  splitGroup,
+} from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 import type { EditorParams } from "../editor/open";
 import { confirmClose, isUnsaved, saveEditor } from "../editor/unsaved";
 import { commands, unwrap } from "../ipc";
@@ -9,18 +20,7 @@ import { targetItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { pathItems, run } from "../ui/pathMenu";
 import { confirmAction } from "../ui/prompt";
-import type { WorkspaceName } from "../workspaces/context";
-import { bottom } from "./bottom";
 import { moveAcross } from "./crossDock";
-import { bottomDockOf, dockOf } from "./docks";
-import {
-  addTerminal,
-  addToGroup,
-  focusPanel,
-  kindTitle,
-  type PanelKind,
-  splitGroup,
-} from "./panels";
 import { setRenaming } from "./tabRename";
 
 /** Closes `panels` one by one, each editor asking about unsaved edits. Cancel stops there. */

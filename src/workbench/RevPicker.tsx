@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { RevisionsPanel } from "../review/RevisionsPanel";
 import { RevLabel } from "../review/RevLabel";
 import { onOpenRevisions, type ReviewTarget, useReviewTarget } from "../review/target";
 import { contextMenu } from "../ui/contextMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import { revsetMenu } from "./revsetMenu";
 import "../review/ReviewBar.css";
 

@@ -1,7 +1,7 @@
 import type { DockviewApi } from "dockview-react";
-import { dockOf } from "../workbench/docks";
-import { activate, inActivePane } from "../workbench/panels";
-import type { WorkspaceName } from "../workspaces/context";
+import { dockOf } from "../core/docks";
+import { activate, inActivePane } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 
 export interface EditorParams {
   path: string;

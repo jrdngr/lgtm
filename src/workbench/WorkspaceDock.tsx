@@ -12,6 +12,10 @@ import { ArchPanel } from "../arch/ArchPanel";
 import { useAgentArch } from "../arch/useAgentArch";
 import { ReportPanel } from "../bots/ReportPanel";
 import { useAgentReports } from "../bots/useAgentReports";
+import { bottom } from "../core/bottom";
+import { type DockSlot, registerDock } from "../core/docks";
+import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "../core/panels";
+import { WorkspaceContext, type WorkspaceName } from "../core/workspace";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
@@ -25,16 +29,12 @@ import { SettingsPanel } from "../settings/SettingsPanel";
 import { SystemPanel } from "../system/SystemPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { guarded } from "../ui/Crash";
-import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
-import { bottom } from "./bottom";
 import { trackClosed } from "./closedTabs";
 import { isMoving, takeTabsFrom } from "./crossDock";
-import { type DockSlot, registerDock } from "./docks";
 import { EmptyGroup } from "./EmptyGroup";
 import { savedFolds, trackFolds } from "./fold";
 import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
-import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "./panels";
 import { Tab } from "./Tab";
 
 const components = {

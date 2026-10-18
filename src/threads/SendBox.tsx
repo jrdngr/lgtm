@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Fixed, ThreadDto, Verdict } from "../bindings";
+import { remembered } from "../core/remembered";
 import { commands } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { Busy } from "../ui/Busy";
-import { remembered } from "../workbench/remembered";
 import { canSend, count, planText, sendPlan } from "./stages";
 
 const FIXED: [Fixed, string][] = [

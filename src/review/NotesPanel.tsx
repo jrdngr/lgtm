@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { remembered } from "../core/remembered";
+import { useWorkspace } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
-import { remembered } from "../workbench/remembered";
-import { useWorkspace } from "../workspaces/context";
 import { commentText } from "./comments";
 import { useCurrentReview } from "./current";
 import { NoteList } from "./NoteList";

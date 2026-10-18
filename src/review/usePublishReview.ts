@@ -1,9 +1,9 @@
 import type { DockviewPanelApi } from "dockview-react";
 import { useEffect, useRef } from "react";
 import type { CheckState, ReviewDto } from "../bindings";
+import { inDock } from "../core/docks";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
-import { inDock } from "../workbench/docks";
-import type { WorkspaceName } from "../workspaces/context";
 import {
   type CurrentReview,
   currentReview,

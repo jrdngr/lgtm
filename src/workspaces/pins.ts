@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { loadState, saveState } from "../workbench/savedState";
+import { loadState, saveState } from "../core/savedState";
 
 /** Colors a workspace row can have, in menu order. */
 export const COLORS = {

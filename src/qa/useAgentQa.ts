@@ -1,7 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events } from "../bindings";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { loadSessions, showQa } from "./store";
 
 /** Opens the Q&A tab on a session a terminal agent asked questions in. */

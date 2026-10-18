@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NearbyPrDto } from "../bindings";
+import { dockOf } from "../core/docks";
+import type { WorkspaceName } from "../core/workspace";
 import { prOf, usePr } from "../github/pr";
 import { openPrPreview } from "../github/preview";
 import { type CommandResult, commands, errorText, unwrap } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import { openUrl } from "../ui/pathMenu";
-import { dockOf } from "../workbench/docks";
-import type { WorkspaceName } from "./context";
 import { clearStackPr, showStackPr } from "./stack";
 import { useRepoChanged } from "./useRepoChanged";
 

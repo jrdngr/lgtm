@@ -1,7 +1,7 @@
 import type { DroppedFile } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { confirmAction } from "../ui/prompt";
-import type { WorkspaceName } from "../workspaces/context";
 
 /** A dropped file's contents as base64. */
 function base64(file: File): Promise<string> {

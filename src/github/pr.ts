@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { PrDto } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
-import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
 /** Each workspace's PR, `null` when it has none. Absent until loaded. */
 const prs = new Map<string, PrDto | null>();

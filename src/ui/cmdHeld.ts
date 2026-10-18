@@ -1,4 +1,4 @@
-import { isMac } from "../workbench/keys";
+import { isMac } from "../core/keys";
 
 let tracking = false;
 

@@ -1,5 +1,5 @@
 import type { IWatermarkPanelProps } from "dockview-react";
-import { addToGroup, KINDS, kindTitle } from "./panels";
+import { addToGroup, KINDS, kindTitle } from "../core/panels";
 import "./GroupActions.css";
 
 /** An empty pane: the kinds of tab to open in it, and a way to close it if it's not the last. */

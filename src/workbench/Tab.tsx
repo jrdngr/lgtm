@@ -1,13 +1,13 @@
 import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
+import { activate } from "../core/panels";
+import { useWorkspace } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
 import { hasTerminal, pinTarget, useSendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
 import { Glyph } from "../workspaces/AgentGlyph";
 import { tabState, useActivity } from "../workspaces/activity";
-import { useWorkspace } from "../workspaces/context";
-import { activate } from "./panels";
 import { fitTabs } from "./tabFit";
 import { tabMenu } from "./tabMenu";
 import { setRenaming, useRenaming } from "./tabRename";

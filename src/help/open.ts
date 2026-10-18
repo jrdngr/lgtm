@@ -1,9 +1,9 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef } from "react";
 import { events } from "../bindings";
-import { dockOf } from "../workbench/docks";
-import { activate } from "../workbench/panels";
-import type { WorkspaceName } from "../workspaces/context";
+import { dockOf } from "../core/docks";
+import { activate } from "../core/panels";
+import type { WorkspaceName } from "../core/workspace";
 
 const ID = "shortcuts";
 

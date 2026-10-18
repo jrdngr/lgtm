@@ -1,6 +1,6 @@
 import type { DockviewApi, SerializedDockview } from "dockview-react";
+import { dropStalePanels } from "../core/panels";
 import type { Fold } from "./fold";
-import { dropStalePanels } from "./panels";
 
 /** A workspace's saved docks. The bottom one is left out while it has no panels. */
 export interface SavedLayout {

@@ -1,5 +1,5 @@
 import type { ChangeDto } from "../bindings";
-import type { WorkspaceName } from "../workspaces/context";
+import type { WorkspaceName } from "../core/workspace";
 import { workspaceStore } from "./workspaceStore";
 
 /** What a workspace's active review pane reviews, for the revision picker in the header.

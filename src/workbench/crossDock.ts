@@ -5,8 +5,8 @@ import {
   type Position,
   positionToDirection,
 } from "dockview-react";
+import type { WorkspaceName } from "../core/workspace";
 import { isUnsaved } from "../editor/unsaved";
-import type { WorkspaceName } from "../workspaces/context";
 
 /** Panels being closed only to reopen in the other dock. */
 const moving = new Set<IDockviewPanel>();

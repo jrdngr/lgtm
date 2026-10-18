@@ -1,7 +1,7 @@
 import type { DockviewApi, DockviewPanelApi } from "dockview-react";
 import type { CommentDto, NoteDto } from "../bindings";
+import { activate } from "../core/panels";
 import { openFileIn } from "../editor/open";
-import { activate } from "../workbench/panels";
 import {
   changeTargets,
   commentJumpTarget,

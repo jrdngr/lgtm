@@ -1,12 +1,12 @@
 import { selectAll } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { currentReview } from "../review/current";
 import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { wordWrap } from "../workbench/wordWrap";
-import type { WorkspaceName } from "../workspaces/context";
 import { lineRef } from "./renderedLines";
 import { revealInFiles } from "./reveal";
 

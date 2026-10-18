@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ComponentDto, IntentDto } from "../../bindings";
+import type { WorkspaceName } from "../../core/workspace";
 import { commands } from "../../ipc";
 import type { CurrentReview } from "../../review/current";
 import { useSendText } from "../../review/useSendText";
@@ -7,7 +8,6 @@ import { submitNextSend } from "../../terminal/registry";
 import { contextMenu } from "../../ui/contextMenu";
 import { IconButton } from "../../ui/icons";
 import { PipeButton } from "../../ui/PipeButton";
-import type { WorkspaceName } from "../../workspaces/context";
 import { type ArchSelection, reloadArch } from "../state";
 import { intentText, STATE_LABEL } from "./logic";
 import { Box, Row, Sec, showInTab } from "./parts";

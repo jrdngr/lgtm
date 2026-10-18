@@ -1,10 +1,10 @@
 import type { MarkColor, StateDto } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { type CommandResult, commands, unwrap } from "../ipc";
 import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { absolutePath, pathItems, run } from "../ui/pathMenu";
-import type { WorkspaceName } from "../workspaces/context";
 import type { CurrentReview } from "./current";
 import type { MarkSetup } from "./marks";
 import { dirPaths, type TreeDir } from "./tree";

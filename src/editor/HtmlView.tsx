@@ -1,10 +1,10 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { isMac } from "../core/keys";
+import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
-import { isMac } from "../workbench/keys";
-import type { WorkspaceName } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
 import type { EditorParams } from "./open";

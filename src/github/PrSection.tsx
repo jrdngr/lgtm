@@ -1,11 +1,11 @@
 import { useState } from "react";
 import type { PrDto, ThreadDto } from "../bindings";
+import { useWorkspace } from "../core/workspace";
 import { commands, errorText } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { StageBar } from "../threads/StageBar";
 import { IconButton } from "../ui/icons";
 import { ago } from "../ui/time";
-import { useWorkspace } from "../workspaces/context";
 import { clearStackPr, editBackToStackPr } from "../workspaces/stack";
 import { Avatar } from "./Post";
 import { viewerLogin } from "./people";

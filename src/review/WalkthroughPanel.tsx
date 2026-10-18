@@ -1,9 +1,9 @@
+import { useWorkspace } from "../core/workspace";
 import { openSettings } from "../settings/open";
 import { contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
-import { useWorkspace } from "../workspaces/context";
 import { useCurrentReview } from "./current";
 import { setTourState, useTourState } from "./tour";
 import { WalkthroughTour } from "./WalkthroughPanelTour";

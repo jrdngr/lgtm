@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { isMac } from "../core/keys";
 import { MarkdownView } from "../editor/MarkdownView";
 import { Busy } from "../ui/Busy";
-import { isMac } from "../workbench/keys";
 import type { Question } from "./model";
 
 interface Props {
