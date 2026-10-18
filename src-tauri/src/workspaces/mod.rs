@@ -1,6 +1,9 @@
 //! Workspaces. New ones live under `~/.local/share/lgtm/ws/<repo>-<hash>/<workspace>`.
 
 pub mod gc;
+mod setup;
+
+pub use setup::{Setup, setup_command};
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -13,20 +16,6 @@ use crate::jj::{Jj, WorkspaceInfo};
 use crate::review::RepoCtx;
 use crate::watch;
 use crate::workspace::Workspace;
-
-/// The repo-relative script a new workspace runs in its first terminal.
-pub const SETUP: &str = ".lgtm/setup";
-
-/// The command a new workspace's first terminal runs: its setup script, then a login shell.
-pub fn setup_command() -> Vec<String> {
-    let shell = crate::pty::default_shell();
-    let quoted = format!("'{}'", shell.replace('\'', r"'\''"));
-    let script = format!(
-        "if [ -x {s} ]; then ./{s}; else sh {s}; fi || echo \"lgtm: {s} exited with $?\"; exec {quoted} -l",
-        s = SETUP
-    );
-    vec![shell, "-l".into(), "-c".into(), script]
-}
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -166,13 +155,14 @@ impl RepoCtx {
         }
     }
 
-    /// Adds a workspace on `trunk()`. Returns whether it has a setup script.
-    pub async fn create_workspace(&self, name: &str) -> anyhow::Result<bool> {
-        self.add_workspace(name, "trunk()").await
+    /// Adds a workspace on `trunk()`. Returns whether it has a setup script the user let run.
+    pub async fn create_workspace(&self, name: &str) -> anyhow::Result<Setup> {
+        let root = self.add_workspace(name, "trunk()").await?;
+        Ok(self.setup_state(&root))
     }
 
-    /// Adds a workspace with a new commit on `rev`. Returns whether it has a setup script.
-    pub(crate) async fn add_workspace(&self, name: &str, rev: &str) -> anyhow::Result<bool> {
+    /// Adds a workspace with a new commit on `rev`. Returns its root.
+    pub(crate) async fn add_workspace(&self, name: &str, rev: &str) -> anyhow::Result<PathBuf> {
         validate_name(name)?;
         let path = self.workspace_dir()?.join(name);
         if path.exists() {
@@ -183,7 +173,7 @@ impl RepoCtx {
         // A workspace of this name forgotten some other way (`lgtm gc`, jj) left its history.
         self.store.lock().unwrap().forget_workspace(name)?;
         self.list_workspaces().await?;
-        Ok(path.join(SETUP).is_file())
+        Ok(path)
     }
 
     /// Forgets the workspace and, when lgtm created it, deletes its directory. The

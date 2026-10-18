@@ -37,7 +37,7 @@ export const commands = {
 	saveLayout: (workspace: string | null, layout: string) => typedError<null, string>(__TAURI_INVOKE("save_layout", { workspace, layout })),
 	/**
 	 *  Starts a login shell in the workspace for terminal panel `terminal`. With `setup`, the
-	 *  shell first runs its `.lgtm/setup`.
+	 *  shell first runs its `.lgtm/setup`, if the user let it.
 	 */
 	ptySpawn: (workspace: string | null, terminal: string, cols: number, rows: number, setup: boolean, run: string | null, onEvent: Channel<PtyEvent>) => typedError<number, string>(__TAURI_INVOKE("pty_spawn", { workspace, terminal, cols, rows, setup, run, onEvent })),
 	ptyWrite: (id: number, data: string) => typedError<null, string>(__TAURI_INVOKE("pty_write", { id, data })),
@@ -47,8 +47,10 @@ export const commands = {
 	ptyRunning: (id: number) => __TAURI_INVOKE<string | null>("pty_running", { id }),
 	/**  Every workspace, the repo's main one first. */
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
-	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` to run. */
-	createWorkspace: (name: string) => typedError<boolean, string>(__TAURI_INVOKE("create_workspace", { name })),
+	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run. */
+	createWorkspace: (name: string) => typedError<Setup, string>(__TAURI_INVOKE("create_workspace", { name })),
+	/**  Lets the workspace's `.lgtm/setup` run, and others with the same contents after it. */
+	approveSetup: (workspace: string) => typedError<null, string>(__TAURI_INVOKE("approve_setup", { workspace })),
 	/**  Ends the workspace's terminals, then forgets it and deletes its directory. */
 	deleteWorkspace: (name: string) => typedError<null, string>(__TAURI_INVOKE("delete_workspace", { name })),
 	/**
@@ -1556,6 +1558,9 @@ export type Settings = {
 export type SettingsChanged = {
 	settings: Settings,
 };
+
+/**  Whether a workspace has a setup script, and whether the user let it run. */
+export type Setup = "none" | "approved" | "unapproved";
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 

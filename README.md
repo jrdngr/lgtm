@@ -111,4 +111,4 @@ window = 2       # context lines above and below a marked line
 threshold = 0.5  # minimum context score for a duplicate line to match
 ```
 
-An executable `.lgtm/setup` runs in the first terminal of each new workspace. It never runs for a pull request's workspace.
+An executable `.lgtm/setup` runs in the first terminal of each new workspace. lgtm asks before running it the first time, and again whenever it changes; Skip opens a plain shell. It never runs for a pull request's workspace.

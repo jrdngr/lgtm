@@ -9,6 +9,7 @@ mod notes;
 mod prs;
 mod qa;
 mod sessions;
+mod setup;
 mod threads;
 
 use std::path::Path;
@@ -236,6 +237,7 @@ impl Store {
         notes::create_table(&db)?;
         prs::create_table(&db)?;
         qa::create_table(&db)?;
+        setup::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

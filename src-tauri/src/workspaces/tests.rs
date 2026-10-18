@@ -17,7 +17,7 @@ async fn a_workspace_has_its_own_working_copy() {
     ctx.workspace_base = Some(base.path().to_path_buf());
     write(dir.path(), "main.rs", "fn main() {}\n");
 
-    assert!(!ctx.create_workspace("t1").await.unwrap());
+    assert_eq!(ctx.create_workspace("t1").await.unwrap(), Setup::None);
     let all = ctx.list_workspaces().await.unwrap();
     assert_eq!(all.len(), 2);
     assert_eq!(

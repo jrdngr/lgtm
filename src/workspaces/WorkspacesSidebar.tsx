@@ -7,6 +7,7 @@ import { commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
+import { confirmAction } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
 import { loadState, saveState } from "../workbench/savedState";
 import { type AddKind, onAddRequest } from "./addRequests";
@@ -26,7 +27,8 @@ interface Props {
   /** The repo's workspaces, from `useWorkspaces`. */
   list: Workspaces;
   selected: WorkspaceName;
-  /** `setup` is set for a new workspace whose first terminal runs `.lgtm/setup`. */
+  /** `setup` is set for a new workspace with a `.lgtm/setup`, which its first terminal runs
+   * once approved. */
   onSelect(name: WorkspaceName, setup?: boolean): void;
   onDeleted(name: string): void;
   /** Hides the left panel. */
@@ -85,7 +87,12 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     setNaming(false);
     setName("");
     await reload();
-    onSelect(ws, r.data);
+    // Skipped, the terminal opens as a plain shell: the backend runs only approved scripts.
+    if (r.data === "unapproved" && (await confirmAction(".lgtm/setup", "Run", "Skip"))) {
+      const ok = await commands.approveSetup(ws);
+      if (ok.status === "error") setError(ok.error);
+    }
+    onSelect(ws, r.data !== "none");
   }
 
   async function prOpened(ws: string) {

@@ -6,7 +6,7 @@ use crate::pty::{Owner, PtyEvent, Ptys};
 use crate::workspaces;
 
 /// Starts a login shell in the workspace for terminal panel `terminal`. With `setup`, the
-/// shell first runs its `.lgtm/setup`.
+/// shell first runs its `.lgtm/setup`, if the user let it.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn pty_spawn(
@@ -24,7 +24,8 @@ pub(crate) async fn pty_spawn(
     let ws = ctx.workspace(workspace.as_deref()).await.map_err(err)?;
     let command = match run {
         Some(line) => Some(crate::pty::shell_running(&line)),
-        None => setup.then(workspaces::setup_command),
+        None => (setup && ctx.setup_state(&ws.root) == workspaces::Setup::Approved)
+            .then(workspaces::setup_command),
     };
     let root = ctx.root.to_string_lossy();
     let socket = crate::repo::data_dir(window.app_handle())

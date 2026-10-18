@@ -47,11 +47,16 @@ export function promptText(
   );
 }
 
-/** A native yes/no for a destructive action, `action` naming its button. */
-export async function confirmAction(text: string, action: string): Promise<boolean> {
+/** A native yes/no for a destructive or risky action, `action` and `cancel` naming its
+ * buttons. */
+export async function confirmAction(
+  text: string,
+  action: string,
+  cancel = "Cancel",
+): Promise<boolean> {
   const choice = await message(text, {
     kind: "warning",
-    buttons: { ok: action, cancel: "Cancel" },
+    buttons: { ok: action, cancel },
   });
   return choice === action;
 }
