@@ -46,8 +46,9 @@ export function stepZoom(zoom: number, by: 1 | -1): number {
 export const fitted = (zoom: number) => Math.min(Math.max(zoom, 0.1), 8);
 
 /** The key a page's frame passed up, if it's one the frame script passes: Escape, or a
- * modifier shortcut other than the editing ones, while the frame has focus. Pages can post
- * to the tab themselves, but the frame script only sees keys while focused. */
+ * modifier shortcut other than the editing ones, while the frame has focus. Page scripts can
+ * post keys too, and the tab can't tell theirs from the frame script's, so the focus check
+ * only blocks keys while the page isn't focused: a focused page can send any of these. */
 export function appKey(
   m: Record<string, unknown>,
   focused: boolean,

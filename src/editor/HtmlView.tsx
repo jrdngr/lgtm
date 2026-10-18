@@ -98,6 +98,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   // Latest state for the message listener.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  /** An open confirm is up, so the page's next asks are dropped rather than queued. */
+  const confirming = useRef(false);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -117,7 +119,13 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         case "open": {
           // A page can post this without a click, so the URL is shown before it opens.
           const url = webUrl(m.url);
-          if (url) confirmAction(url, "Open").then((ok) => ok && openUrl(url));
+          if (!url || confirming.current) break;
+          confirming.current = true;
+          confirmAction(url, "Open")
+            .then((ok) => ok && openUrl(url))
+            .finally(() => {
+              confirming.current = false;
+            });
           break;
         }
         case "zoom":
