@@ -122,8 +122,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::take_suggestion,
             commands::comments::dismiss_suggestion,
             commands::comments::set_agent_link,
-            commands::comments::triage_threads,
-            commands::comments::stop_thread_run,
             commands::bots::delete_bots,
             commands::bots::bot_runs,
             commands::bots::bot_run,

@@ -184,14 +184,6 @@ async fn quotes_answer_parts_of_a_pr_comment_in_its_place() {
         (parent, "bot", "Why a 500?")
     );
 
-    // Triage takes the quote in place of the comment it's from.
-    let new: Vec<u32> = ctx
-        .threads_at(review.id, Stage::New)
-        .unwrap()
-        .iter()
-        .map(|c| c.id as u32)
-        .collect();
-    assert_eq!(new, [quote.id]);
 
     // A reply is worked out like one on a GitHub thread, not sent like a new draft.
     let state = ctx
@@ -231,14 +223,15 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     };
     let stage = |state: &StateDto| state.comments[0].thread.as_ref().unwrap().stage;
     let (_, state) = ctx
-        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Agree), None)
+        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Agree), None, None)
         .unwrap();
     assert_eq!(stage(&state), Stage::ToFix);
     let reply = Some("Because.".to_string());
     let (_, state) = ctx
-        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Answer), reply)
+        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Answer), reply, Some(" Why 2 ".into()))
         .unwrap();
     assert_eq!(stage(&state), Stage::Reply);
+    assert_eq!(state.comments[0].thread.as_ref().unwrap().summary, "Why 2");
 
     let mut answered = thread("T1", None);
     answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];

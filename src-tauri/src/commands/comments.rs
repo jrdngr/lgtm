@@ -1,9 +1,7 @@
-use tauri::ipc::Channel;
-use tauri::{Manager, State, WebviewWindow};
+use tauri::{Manager, WebviewWindow};
 use tauri_specta::Event;
 
 use super::{CmdResult, err, repo};
-use crate::agent::Runs;
 use crate::events::ReviewStateChanged;
 use crate::review::{RowRef, StateDto};
 use crate::store::{Author, Stage};
@@ -165,33 +163,4 @@ pub(crate) fn take_suggestion(
     comment: u32,
 ) -> CmdResult<StateDto> {
     repo(&window)?.take_suggestion(review, comment).map_err(err)
-}
-
-/// Triages the new threads on the review's PR, reporting each tool call through `on_tool`.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn triage_threads(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    review: u32,
-    on_tool: Channel<String>,
-) -> CmdResult<StateDto> {
-    repo(&window)?
-        .triage(review, &runs, |t| {
-            on_tool.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-/// Stops the review's triage run.
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn stop_thread_run(
-    window: WebviewWindow,
-    runs: State<Runs>,
-    review: u32,
-) -> CmdResult<()> {
-    repo(&window)?.stop_thread_run(review, &runs);
-    Ok(())
 }

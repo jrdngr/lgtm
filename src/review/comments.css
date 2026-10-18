@@ -830,19 +830,6 @@ button.group-head.fold:hover {
   opacity: 0.8;
 }
 
-/* A thread a triage run will fill in. */
-.thread-block .flow-triaging {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px dashed rgb(215 119 87 / 40%);
-  border-radius: 6px;
-  background: rgb(215 119 87 / 10%);
-  color: rgb(215 119 87);
-  font-size: var(--fs-sm);
-}
-
 /* A note's Done and ⋯ buttons, and its text, which edits on a click. */
 .card-actions .card-done,
 .card-actions .menu > button {

@@ -63,7 +63,7 @@ export function triageText(files: FlatFile[], c: CommentDto, rules: string): str
     "Triage this review thread on my PR. Read the code it points at first.",
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    `Then call lgtm's set_thread_take tool with thread_id ${c.id}, your verdict and why, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
+    `Then call lgtm's set_thread_take tool with thread_id ${c.id}, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
   ]);
 }
 
@@ -79,6 +79,6 @@ export function triageAllText(
       join([`Thread ${t.id} (${threadWhere(t)}):`, ...threadText(files, c)]),
     ),
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    "For each thread, call lgtm's set_thread_take tool with its thread_id, your verdict and why, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Then give me your takes in a few short bullets.",
+    "For each thread, call lgtm's set_thread_take tool with its thread_id, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Then give me your takes in a few short bullets.",
   ]);
 }

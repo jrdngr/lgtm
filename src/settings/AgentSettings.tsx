@@ -9,7 +9,6 @@ import { saveSettings } from "./store";
 const MODELS: [keyof Models, string, string][] = [
   ["ask", "Fixes", "Fix on intents"],
   ["walkthrough", "Assess", "Assessing the architecture"],
-  ["replies", "Replies", "Triage and replies on PR threads"],
   ["qa", "Q&A", "Questions and discussion in Q&A sessions"],
 ];
 

@@ -197,6 +197,8 @@ pub struct SetTake {
     pub question: Option<String>,
     /// The whole reply to post, in the human's voice. Leave it out to keep the current one.
     pub reply: Option<String>,
+    /// Three to six words naming what the thread asks. Leave it out to keep the current one.
+    pub summary: Option<String>,
 }
 
 #[derive(Clone, Copy, Deserialize, JsonSchema)]

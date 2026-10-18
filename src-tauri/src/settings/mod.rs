@@ -64,7 +64,9 @@ pub struct Models {
     pub ask: String,
     /// Assess on the architecture.
     pub walkthrough: String,
-    /// Triage and replies on PR threads.
+    /// Read but unused, so settings files that set it still load.
+    #[serde(default, skip_serializing)]
+    #[specta(skip)]
     pub replies: String,
     /// Q&A questions, their updates, and discussion.
     pub qa: String,
@@ -75,8 +77,6 @@ pub struct Models {
 pub enum Purpose {
     Ask,
     Walkthrough,
-    /// Triage and fixes on GitHub threads.
-    Replies,
     Qa,
 }
 
@@ -85,7 +85,6 @@ impl Models {
         let model = match purpose {
             Purpose::Ask => &self.ask,
             Purpose::Walkthrough => &self.walkthrough,
-            Purpose::Replies => &self.replies,
             Purpose::Qa => &self.qa,
         };
         Some(model.trim()).filter(|m| !m.is_empty())

@@ -1,7 +1,7 @@
 import type { CommentDto } from "../bindings";
 import { Inline, Markdown } from "../bots/Markdown";
 import { TakePill } from "../threads/ThreadBits";
-import { Busy, Spinner } from "../ui/Busy";
+import { Busy } from "../ui/Busy";
 import { PipeButton } from "../ui/PipeButton";
 import { ThreadChat } from "./ThreadChat";
 import type { Comments } from "./useComments";
@@ -9,15 +9,13 @@ import type { Comments } from "./useComments";
 interface Props {
   comment: CommentDto;
   c: Comments;
-  /** A triage run covers this thread, and will set its take, reply and stage. */
-  triaging: boolean;
   /** The reply's editor, shown in place of the reply while it's edited. */
   editor?: React.ReactNode;
 }
 
 /** A GitHub thread's reply workflow under its posts: the take, the reply and the reply an
  * agent suggests, and its chat. */
-export function ThreadFlow({ comment, c, triaging, editor }: Props) {
+export function ThreadFlow({ comment, c, editor }: Props) {
   const id = comment.id;
   const take = comment.thread?.take;
   const body = comment.body;
@@ -25,12 +23,6 @@ export function ThreadFlow({ comment, c, triaging, editor }: Props) {
 
   return (
     <div className="flow">
-      {triaging && (
-        <div className="flow-triaging">
-          <Spinner />
-          Triaging
-        </div>
-      )}
       {take && (
         <section className="flow-sec">
           <h4 className="flow-h">Take</h4>

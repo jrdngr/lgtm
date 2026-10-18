@@ -158,28 +158,6 @@
   gap: 6px;
 }
 
-.threads-run {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--hair);
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-
-.threads-run .spinner {
-  color: var(--accent);
-}
-
-.thread-row.in-run .item-text {
-  color: var(--muted);
-}
-
-.thread-row.in-run .spinner {
-  color: rgb(215 119 87);
-}
-
 .thread-row.sub {
   padding-left: 36px;
 }

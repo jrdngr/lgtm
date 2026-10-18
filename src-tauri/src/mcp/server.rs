@@ -174,7 +174,7 @@ impl Lgtm {
             question: p.question,
         };
         let (review, state) = ctx
-            .agent_set_take(self.workspace(), p.thread_id, take, p.reply)
+            .agent_set_take(self.workspace(), p.thread_id, take, p.reply, p.summary)
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Set the take.".into())

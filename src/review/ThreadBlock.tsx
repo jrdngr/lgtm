@@ -2,7 +2,6 @@ import { type RefObject, useRef, useState } from "react";
 import type { CommentDto } from "../bindings";
 import { GhThread } from "../github/GhThread";
 import { viewerLogin } from "../github/people";
-import { useTriaging } from "../threads/useThreadRun";
 import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
 import { isMac, SAVE_KEY } from "../workbench/keys";
@@ -34,7 +33,6 @@ const typing = (t: EventTarget) =>
 export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const [snippet, setSnippet] = useState(false);
   const [combining, setCombining] = useState(false);
-  const triaging = useTriaging(c.reviewId, comment.id);
   const blockRef = useRef<HTMLDivElement>(null);
   const postsRef = useRef<HTMLDivElement>(null);
   const quoting = useQuoting(comment, c, postsRef, blockRef);
@@ -65,7 +63,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
       return;
     }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (triaging || split) return;
+    if (split) return;
     if (e.key === "e") c.edit(comment);
     else if (e.key === "y" && comment.body.trim() && thread?.stage !== "ready") c.final(id);
     else return;
@@ -154,18 +152,9 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
           </button>
         )}
         <span className="card-ctl">
-          {!split && (
-            <StageStrip stage={thread.stage} locked={triaging} onPick={(s) => c.setStage(id, s)} />
-          )}
+          {!split && <StageStrip stage={thread.stage} onPick={(s) => c.setStage(id, s)} />}
           <span className="spacer" />
-          {!split && (
-            <IconButton
-              icon="retry"
-              label="Reset"
-              disabled={triaging}
-              onClick={() => c.reset(id)}
-            />
-          )}
+          {!split && <IconButton icon="retry" label="Reset" onClick={() => c.reset(id)} />}
           {gh && (
             <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
           )}
@@ -197,7 +186,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
           </button>
         </div>
       ) : (
-        <ThreadFlow comment={comment} c={c} triaging={triaging} editor={editor || undefined} />
+        <ThreadFlow comment={comment} c={c} editor={editor || undefined} />
       )}
       {combining && (
         <CombineDialog

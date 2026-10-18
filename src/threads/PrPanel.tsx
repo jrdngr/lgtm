@@ -12,8 +12,7 @@ import { sendToAgent, startLink } from "../review/linkCommands";
 import { setChatOpen, setCurrentThread, useLink } from "../review/linkedAgent";
 import { prThreads, quoted } from "../review/prComments";
 import { openSettings } from "../settings/open";
-import { useAgentsOff, useGithubOff } from "../tools/agents";
-import { AgentButton } from "../ui/AgentButton";
+import { useGithubOff } from "../tools/agents";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
 import { PipeButton } from "../ui/PipeButton";
@@ -24,10 +23,8 @@ import { LinkStrip } from "./LinkStrip";
 import { SendBox } from "./SendBox";
 import { byStage, STAGES, threadLabel, threadWhere, working } from "./stages";
 import { finalText } from "./text";
-import { useThreadRun } from "./useThreadRun";
 import "../review/comments.css";
 import "./threads.css";
-import { Spinner } from "../ui/Busy";
 
 function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
   const setStage = (s: Stage) =>
@@ -61,7 +58,6 @@ function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
 interface RowProps {
   review: CurrentReview;
   t: ThreadDto;
-  runner: ReturnType<typeof useThreadRun>;
   picked: boolean;
   /** The thread the linked agent hears I'm on. */
   current: boolean;
@@ -72,13 +68,12 @@ interface RowProps {
   dot?: boolean;
 }
 
-function ThreadRow({ review, t, runner, picked, current, onPick, sub, dot }: RowProps) {
+function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
   const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
-  const inRun = runner.run?.threads.has(t.id);
   return (
     <button
       type="button"
-      className={`thread-row${inRun ? " in-run" : ""}${sub ? " sub" : ""}`}
+      className={`thread-row${sub ? " sub" : ""}`}
       aria-current={picked}
       onClick={() => {
         onPick();
@@ -99,7 +94,6 @@ function ThreadRow({ review, t, runner, picked, current, onPick, sub, dot }: Row
             <Icon name="terminal" size={13} />
           </span>
         )}
-        {inRun && <Spinner />}
         {dot && <span className={`dot stage-seg ${tone || "grey"}`} />}
       </span>
     </button>
@@ -109,14 +103,13 @@ function ThreadRow({ review, t, runner, picked, current, onPick, sub, dot }: Row
 interface ListProps {
   review: CurrentReview;
   threads: ThreadDto[];
-  runner: ReturnType<typeof useThreadRun>;
 }
 
 const CONVERSATION = "conversation";
 
 /** Comments on the PR with their quotes, then threads on code grouped by stage in work order,
  * Done folded. Picking a thread shows its comment in the review and makes it the one I'm on. */
-function ThreadGroups({ review, threads, runner }: ListProps) {
+function ThreadGroups({ review, threads }: ListProps) {
   const workspace = useWorkspace();
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set(["done"]));
   const link = useLink(workspace);
@@ -139,7 +132,6 @@ function ThreadGroups({ review, threads, runner }: ListProps) {
       key={t.id}
       review={review}
       t={t}
-      runner={runner}
       picked={link.current === t.id}
       current={!!link.terminal && link.current === t.id}
       onPick={() => setCurrentThread(workspace, t.id)}
@@ -197,11 +189,9 @@ function ThreadGroups({ review, threads, runner }: ListProps) {
 function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }) {
   const workspace = useWorkspace();
   const off = useGithubOff();
-  const agentsOff = useAgentsOff();
   const discussion = useDiscussion(workspace, pr);
   const [confirm, setConfirm] = useState(0);
   const [error, setError] = useState<string>();
-  const runner = useThreadRun(review, setError);
   const threads = review?.threads ?? [];
   const viewer = discussion.d?.viewer ?? (review && viewerLogin(review.comments));
   const sending = review && !off;
@@ -209,12 +199,11 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
   const linked = !!link.terminal;
   const freshThreads = working(threads).filter((t) => t.state.stage === "new");
   const fresh = freshThreads.length;
-  const canTriage = !!review && (linked ? !link.working : !agentsOff) && fresh > 0 && !runner.run;
+  const canTriage = !!review && !link.working && fresh > 0;
   const onError = (message: string) => setError(message);
-  /** Triages the new threads: in the linked terminal when there is one, else headless. */
+  /** Sends the new threads to the linked terminal, or the send target, to triage. */
   async function triage() {
     if (!review) return;
-    if (!linked) return runner.start();
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return setError(rules.error);
     const pairs = freshThreads.flatMap((t) => {
@@ -261,16 +250,11 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
               Sync
             </button>
           )}
-          {canTriage &&
-            (linked ? (
-              <PipeButton className="pr-head-btn" onClick={triage} keys="t">
-                Triage {fresh}
-              </PipeButton>
-            ) : (
-              <AgentButton className="pr-head-btn triage" onClick={triage} keys="t">
-                Triage {fresh}
-              </AgentButton>
-            ))}
+          {canTriage && (
+            <PipeButton className="pr-head-btn" onClick={triage} keys="t">
+              Triage {fresh}
+            </PipeButton>
+          )}
           {review && !linked && (
             <PipeButton
               className="pr-head-btn"
@@ -283,25 +267,11 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
         </SectionHeader>
       </div>
       <LinkStrip workspace={workspace} />
-      {runner.run && (
-        <div className="threads-run">
-          <Spinner />
-          <span>
-            Triaging {runner.run.threads.size}{" "}
-            {runner.run.threads.size === 1 ? "thread" : "threads"}
-            {runner.run.activity && ` · ${runner.run.activity}`}
-          </span>
-          <span className="spacer" />
-          <button type="button" onClick={runner.stop}>
-            Stop
-          </button>
-        </div>
-      )}
       {error && <div className="review-error">{error}</div>}
       <div className="comments-scroll">
         <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
         {review ? (
-          <ThreadGroups review={review} threads={threads} runner={runner} />
+          <ThreadGroups review={review} threads={threads} />
         ) : (
           <Empty>No review open</Empty>
         )}

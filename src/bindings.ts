@@ -119,9 +119,9 @@ export const commands = {
 	stopIntentFix: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_intent_fix", { review })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
-	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
+	getSettings: () => __TAURI_INVOKE<Settings_Serialize>("get_settings"),
 	/**  Saves the settings and tells every window. */
-	saveSettings: (settings: Settings) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
+	saveSettings: (settings: Settings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
 	/**  Why `settings.toml` couldn't be read, while the defaults stand in for it. */
 	settingsLoadError: () => __TAURI_INVOKE<string | null>("settings_load_error"),
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
@@ -180,10 +180,6 @@ export const commands = {
 	/**  One line naming it, for later prompts. */
 	short: string,
 } | null) => typedError<null, string>(__TAURI_INVOKE("set_agent_link", { terminal, linked, thread })),
-	/**  Triages the new threads on the review's PR, reporting each tool call through `on_tool`. */
-	triageThreads: (review: number, onTool: Channel<string>) => typedError<StateDto, string>(__TAURI_INVOKE("triage_threads", { review, onTool })),
-	/**  Stops the review's triage run. */
-	stopThreadRun: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_thread_run", { review })),
 	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
 	/**  The workspace's reports, newest first. */
 	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),
@@ -355,7 +351,7 @@ export const events = {
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
-	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
+	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
@@ -1058,13 +1054,24 @@ export type Minimal = {
 };
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
-export type Models = {
+export type Models = Models_Serialize | Models_Deserialize;
+
+/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
+export type Models_Deserialize = {
 	/**  Fix on intents. */
 	ask: string,
 	/**  Assess on the architecture. */
 	walkthrough: string,
-	/**  Triage and replies on PR threads. */
-	replies: string,
+	/**  Q&A questions, their updates, and discussion. */
+	qa: string,
+};
+
+/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
+export type Models_Serialize = {
+	/**  Fix on intents. */
+	ask: string,
+	/**  Assess on the architecture. */
+	walkthrough: string,
 	/**  Q&A questions, their updates, and discussion. */
 	qa: string,
 };
@@ -1537,7 +1544,22 @@ export type Session_Serialize = {
 	agent: string | null,
 };
 
-export type Settings = {
+export type Settings = Settings_Serialize | Settings_Deserialize;
+
+/**  The settings were saved. */
+export type SettingsChanged = SettingsChanged_Serialize | SettingsChanged_Deserialize;
+
+/**  The settings were saved. */
+export type SettingsChanged_Deserialize = {
+	settings: Settings_Deserialize,
+};
+
+/**  The settings were saved. */
+export type SettingsChanged_Serialize = {
+	settings: Settings_Serialize,
+};
+
+export type Settings_Deserialize = {
 	/**
 	 *  How headless agents start Claude Code: a command line, or an alias or function from the
 	 *  login shell.
@@ -1545,15 +1567,24 @@ export type Settings = {
 	claude: string,
 	/**  What a terminal runs to start Claude Code, typed into its shell. */
 	claudeTerminal: string,
-	models: Models,
+	models: Models_Deserialize,
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot[],
 };
 
-/**  The settings were saved. */
-export type SettingsChanged = {
-	settings: Settings,
+export type Settings_Serialize = {
+	/**
+	 *  How headless agents start Claude Code: a command line, or an alias or function from the
+	 *  login shell.
+	 */
+	claude: string,
+	/**  What a terminal runs to start Claude Code, typed into its shell. */
+	claudeTerminal: string,
+	models: Models_Serialize,
+	terminalFontSize: number,
+	/**  Every mark color, the ones in use first in key order. */
+	marks: MarkSlot[],
 };
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
