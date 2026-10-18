@@ -40,15 +40,13 @@ impl RepoCtx {
         thread: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.thread_review(workspace, thread, pr)?;
-        let state = self.comment_edit(id, |_, store| {
+        self.thread_edit(workspace, thread, pr, |store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;
             anyhow::ensure!(c.thread.is_some(), "that's a note, not a thread");
             anyhow::ensure!(!text.trim().is_empty(), "the reply is empty");
             c.conversation.suggestion = Some(text.trim().to_string());
             Ok(store.set_conversation(c.id, &c.conversation)?)
-        })?;
-        Ok((id, state))
+        })
     }
 
     /// Drops a thread's suggested reply.

@@ -32,6 +32,15 @@ pub struct ThreadDto {
     pub created_at: f64,
 }
 
+/// Moves thread `comment` to `stage`.
+pub(super) fn put_stage(store: &Store, comment: u32, stage: Stage) -> anyhow::Result<()> {
+    let cid = comment as i64;
+    let c = store.comment(cid)?.context("the thread is gone")?;
+    let mut t = c.thread.context("notes have no stage")?;
+    t.stage = stage;
+    Ok(store.set_thread(cid, &Some(t))?)
+}
+
 /// The stage after a thread's reply text changed to `body`. A draft is ready once it says
 /// something; a reply being written, or rewritten after it was final, is being worked out.
 pub fn after_edit(stage: Stage, draft: bool, body: &str) -> Stage {
@@ -74,7 +83,9 @@ fn order(t: &ThreadDto) -> (bool, String, u32, String) {
 impl Review {
     /// The PR of the review's workspace, as `(repo, number)`.
     pub(super) fn pr(&self, store: &Store) -> anyhow::Result<Option<(String, u32)>> {
-        Ok(store.pr(self.ws.key())?.map(|p| (p.repo.to_string(), p.number)))
+        Ok(store
+            .pr(self.ws.key())?
+            .map(|p| (p.repo.to_string(), p.number)))
     }
 
     pub(super) fn rematch_threads(&mut self, store: &Store) -> anyhow::Result<()> {
@@ -128,13 +139,7 @@ impl Review {
 impl RepoCtx {
     /// Moves a thread to `stage` by hand.
     pub fn set_stage(&self, id: u32, comment: u32, stage: Stage) -> anyhow::Result<StateDto> {
-        self.comment_edit(id, |_, store| {
-            let cid = comment as i64;
-            let c = store.comment(cid)?.context("the thread is gone")?;
-            let mut t = c.thread.context("notes have no stage")?;
-            t.stage = stage;
-            Ok(store.set_thread(cid, &Some(t))?)
-        })
+        self.comment_edit(id, |_, store| put_stage(store, comment, stage))
     }
 
     /// Clears a GitHub thread's take, reply and conversation, and puts it back where a

@@ -240,6 +240,10 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     };
     assert!(err.to_string().contains("moved to PR #1"), "{err}");
     assert!(ctx.agent_suggest_reply(Some("pr1"), 2, id, "x").is_err());
+    let (_, t) = ctx
+        .with_current(Some("pr1"), |r| r.threads[0].clone())
+        .unwrap();
+    assert_eq!((t.state.stage, t.suggestion), (Stage::Reply, None), "nothing changed");
 
     let mut answered = thread("T1", None);
     answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];
