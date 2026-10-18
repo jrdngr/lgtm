@@ -29,6 +29,7 @@ mod rowmap;
 #[cfg(test)]
 pub(crate) mod tests;
 mod threads;
+mod untrusted;
 mod views;
 pub(crate) mod walkthrough;
 #[cfg(test)]
