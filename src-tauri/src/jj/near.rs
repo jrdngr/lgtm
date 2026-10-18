@@ -180,7 +180,7 @@ impl Jj {
 
 #[cfg(test)]
 mod tests {
-    use crate::review::tests::{jj, repo, write};
+    use crate::jj::test_support::{jj, repo, write};
 
     fn pushed(got: Vec<super::NearBookmark>) -> Vec<super::NearBookmark> {
         got.into_iter().filter(|b| !b.remote.is_empty()).collect()
@@ -233,7 +233,7 @@ mod tests {
             .output()
             .unwrap();
         assert!(out.status.success());
-        let (dir, ctx) = repo();
+        let (dir, j) = repo();
         let d = dir.path();
         let url = remote.path().to_string_lossy();
         jj(d, &["git", "remote", "add", "origin", &url]);
@@ -267,7 +267,7 @@ mod tests {
         push("five");
 
         // A bookmark the remote lacks, or that moved past it, is marked unpushed.
-        let marks = async |rev: &str| ctx.main.jj.changes(rev).await.unwrap()[0].bookmarks.clone();
+        let marks = async |rev: &str| j.changes(rev).await.unwrap()[0].bookmarks.clone();
         assert_eq!(marks("one").await, ["one"]);
         assert_eq!(marks("local-only").await, ["local-only*"]);
         jj(d, &["bookmark", "set", "one", "-r", "local-only"]);
@@ -277,7 +277,7 @@ mod tests {
         // From the middle of the stack: `three` is on @, `one` two below, `four` and `five`
         // above. `main` is trunk and `local-only` was never pushed.
         jj(d, &["edit", "three"]);
-        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
+        let got = pushed(j.bookmarks_near().await.unwrap());
         assert_eq!(
             names(&got),
             [("three", 0), ("four", 1), ("one", 2), ("five", 2)]
@@ -286,7 +286,7 @@ mod tests {
 
         // A new change on `three` still sees the stack above it, through `three`.
         jj(d, &["new", "three"]);
-        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
+        let got = pushed(j.bookmarks_near().await.unwrap());
         assert_eq!(
             names(&got),
             [("three", 1), ("four", 2), ("one", 3), ("five", 3)]
@@ -302,7 +302,7 @@ mod tests {
         jj(d, &["edit", "solo"]);
         write(d, "solo", "edited");
         jj(d, &["util", "snapshot"]);
-        let got = pushed(ctx.main.jj.bookmarks_near().await.unwrap());
+        let got = pushed(j.bookmarks_near().await.unwrap());
         assert_eq!(
             got.iter()
                 .map(|b| (b.name.as_str(), b.remote.as_str()))
@@ -312,6 +312,6 @@ mod tests {
 
         // At trunk, other branches aren't near.
         jj(d, &["new", "main"]);
-        assert!(pushed(ctx.main.jj.bookmarks_near().await.unwrap()).is_empty());
+        assert!(pushed(j.bookmarks_near().await.unwrap()).is_empty());
     }
 }

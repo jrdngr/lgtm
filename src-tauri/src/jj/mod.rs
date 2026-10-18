@@ -16,6 +16,8 @@ pub mod init;
 mod log;
 mod near;
 mod rewrite;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub mod workspace;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;

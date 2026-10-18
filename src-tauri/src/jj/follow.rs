@@ -32,13 +32,13 @@ impl Jj {
 #[cfg(test)]
 mod tests {
     use crate::jj::JjAction;
-    use crate::review::tests::{jj, repo, write};
+    use crate::jj::test_support::{jj, repo, write};
 
     #[tokio::test]
     async fn reports_moves_made_outside_the_app_only() {
-        let (dir, ctx) = repo();
+        let (dir, j) = repo();
         let d = dir.path();
-        let j = &ctx.main.jj;
+        let j = &j;
         write(d, "a.txt", "a\n");
         jj(d, &["commit", "-m", "base"]);
         let base = j.changes("@-").await.unwrap()[0].change_id.clone();

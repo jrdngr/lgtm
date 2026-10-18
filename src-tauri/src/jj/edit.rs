@@ -90,7 +90,7 @@ impl Jj {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::review::tests::{jj, write};
+    use crate::jj::test_support::{jj, repo, write};
 
     async fn change_id(j: &Jj, rev: &str) -> String {
         j.changes(rev).await.unwrap()[0].change_id.clone()
@@ -98,9 +98,9 @@ mod tests {
 
     #[tokio::test]
     async fn actions_move_the_working_copy_and_squash() {
-        let (dir, ctx) = crate::review::tests::repo();
+        let (dir, j) = repo();
         let d = dir.path();
-        let j = &ctx.main.jj;
+        let j = &j;
         write(d, "a.txt", "a\n");
         jj(d, &["describe", "-m", "base"]);
         let base = j.commit_ids("@").await.unwrap();
