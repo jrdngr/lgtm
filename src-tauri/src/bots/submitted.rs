@@ -70,8 +70,8 @@ impl RepoCtx {
     /// fixes when it gives them. With `report`, it replaces that reviewer's section of that
     /// report, or adds one, and the user's dismissals follow findings with the same title and
     /// locations. Without, it's a new report against the workspace's current review. Either
-    /// must be of `revset`, the revset the agent reviewed. Returns the report and whether it's
-    /// new.
+    /// must be of `revset`, the revset the agent reviewed, and of the commits it resolves to
+    /// now. Returns the report and whether it's new.
     pub async fn publish_findings(
         &self,
         workspace: Option<&str>,
@@ -99,6 +99,13 @@ impl RepoCtx {
             run.label(),
             run.revset
         );
+        let now = self.workspace(workspace).await?.jj.resolve(revset).await?;
+        anyhow::ensure!(
+            (run.from.as_ref(), &run.to) == (now.from.as_ref(), &now.to),
+            "report {} is of other commits than `{revset}` is now, so nothing was published; \
+             publish a new report",
+            run.label()
+        );
         let id = run.id;
         self.edit_run(id, |run| {
             replace_section(run, reviewer, output);
@@ -115,15 +122,16 @@ impl RepoCtx {
         output: Output,
         filter: Option<Minimal>,
     ) -> anyhow::Result<BotRun> {
-        self.current_review_at(workspace, revset).await?;
-        let (_, (shown, from, to)) = self.with_current(workspace, |r| r.target())?;
+        let at = self.current_review_at(workspace, revset).await?;
+        // Of the revset's commits as the review shows them, whichever view is open.
+        self.ensure_at(&at)?;
         let mut run = BotRun {
             id: 0,
             name: None,
             workspace: workspace.map(str::to_string),
-            revset: shown,
-            from,
-            to,
+            revset: revset.to_string(),
+            from: at.whole.from,
+            to: at.whole.to,
             personas: vec![persona(reviewer)],
             parts: vec![Part {
                 persona: Some(reviewer.to_string()),

@@ -187,11 +187,6 @@ impl Review {
         rows.map(|r| self.lines(fi as usize, r.start as usize, r.end as usize))
     }
 
-    /// The revset and the diff's endpoints.
-    pub fn target(&self) -> (String, Option<String>, String) {
-        (self.revset.clone(), self.from.clone(), self.to.clone())
-    }
-
     pub(super) fn summary(&self) -> Summary {
         let slots = settings::get().marks;
         let mut total = Counts::default();
@@ -402,8 +397,9 @@ impl RepoCtx {
         end: u32,
         body: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review_at(workspace, revset).await?;
-        let state = self.comment_edit(id, |review, store| {
+        let at = self.current_review_at(workspace, revset).await?;
+        let state = self.comment_edit(at.id, |review, store| {
+            self.check_at(review, &at)?;
             let (lo, hi) = (start.min(end), start.max(end));
             let rows = review
                 .rows_for(path, lo, hi)
@@ -429,18 +425,19 @@ impl RepoCtx {
             })?;
             Ok(())
         })?;
-        Ok((id, state))
+        Ok((at.id, state))
     }
 
     /// Adds a terminal agent's reply to a comment's conversation, from the review of `revset`.
-    pub async fn agent_reply(
+    /// Replies aren't on lines, so they don't wait for the review to show new commits.
+    pub fn agent_reply(
         &self,
         workspace: Option<&str>,
         revset: &str,
         comment: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review_at(workspace, revset).await?;
+        let id = self.current_review_of(workspace, revset)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store
                 .comment(comment as i64)?

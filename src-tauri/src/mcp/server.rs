@@ -156,7 +156,6 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
             .agent_reply(self.workspace(), &p.revset, p.comment_id, &p.text)
-            .await
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Replied.".into())
@@ -278,13 +277,14 @@ impl Lgtm {
         let inputs: Vec<NoteInput> =
             serde_json::from_value(serde_json::to_value(&p.notes).map_err(|e| e.to_string())?)
                 .map_err(|e| e.to_string())?;
-        let review = ctx
+        let at = ctx
             .current_review_at(self.workspace(), &p.revset)
             .await
             .map_err(failed)?;
         let (state, skipped) = ctx
-            .save_notes(review, &inputs, Source::Terminal)
+            .save_notes_at(&at, &inputs, Source::Terminal)
             .map_err(failed)?;
+        let review = at.id;
         let n = state.notes.len();
         self.changed(&label, review, state);
         Ok(format!(

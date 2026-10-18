@@ -1,6 +1,6 @@
 use super::tests::{jj, repo, write};
 use super::*;
-use crate::store::{Author, MarkColor};
+use crate::store::{Author, MarkColor, Source};
 
 #[tokio::test]
 async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
@@ -35,7 +35,7 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     assert!(c.review.ends_with("terminal agent"), "{}", c.review);
     assert_eq!(c.snippet, "@@ -0,0 +3,1 @@\n+fn c() {}");
 
-    let (_, state) = ctx.agent_reply(None, "@", c.id, "because").await.unwrap();
+    let (_, state) = ctx.agent_reply(None, "@", c.id, "because").unwrap();
     assert_eq!(state.comments[0].messages[0].author, Author::Agent);
     let listed = ctx.agent_comments(None).unwrap();
     assert_eq!(listed[0].lines.as_deref(), Some("3"));
@@ -59,28 +59,47 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
         panic!("a comment about another revset was added");
     };
     assert!(err.to_string().contains("moved to `@`"), "{err}");
-    assert!(ctx.agent_reply(None, "@-", c.id, "x").await.is_err());
+    assert!(ctx.agent_reply(None, "@-", c.id, "x").is_err());
     assert_eq!(ctx.agent_comments(None).unwrap()[0].conversation.len(), 1);
 
-    // Once the revset moves to other commits, writes wait until the review loads them.
+    let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
+    let (report, _) = ctx
+        .publish_findings(None, "@", None, "x", empty(), None)
+        .await
+        .unwrap();
+
+    // Once the revset moves to other commits (the file watcher snapshots edits), writes wait
+    // until the review loads them. Replies aren't on lines, so they go ahead.
     write(
         d,
         "a.rs",
         "fn a() {}\nfn b() {}\nfn c() {}\nfn e() {}\nfn f() {}\n",
     );
+    jj(d, &["util", "snapshot"]);
     let Err(err) = ctx.agent_comment(None, "@", "a.rs", 3, 3, "x").await else {
         panic!("a comment on an out-of-date review was added");
     };
-    assert!(err.to_string().contains("call get_review again"), "{err}");
-    assert!(ctx.agent_reply(None, "@", c.id, "x").await.is_err());
-    let empty = serde_json::json!({ "verdict": "ok", "findings": [] });
+    assert!(err.to_string().contains("is reloading"), "{err}");
+    let notes = ctx.current_review_at(None, "@").await.unwrap();
+    assert!(ctx.save_notes_at(&notes, &[], Source::Terminal).is_err());
+    ctx.agent_reply(None, "@", c.id, "x").unwrap();
     assert!(
-        ctx.publish_findings(None, "@", None, "x", empty, None)
+        ctx.publish_findings(None, "@", None, "x", empty(), None)
             .await
             .is_err()
     );
+    let label = report.label();
+    let Err(err) = ctx
+        .publish_findings(None, "@", Some(&label), "x", empty(), None)
+        .await
+    else {
+        panic!("findings went into a report of other commits");
+    };
+    assert!(err.to_string().contains("other commits"), "{err}");
     ctx.refresh(review.id, None).await.unwrap();
-    ctx.agent_reply(None, "@", c.id, "x").await.unwrap();
+    ctx.agent_comment(None, "@", "a.rs", 5, 5, "x")
+        .await
+        .unwrap();
 }
 
 #[tokio::test]

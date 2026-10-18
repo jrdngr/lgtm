@@ -4,6 +4,7 @@ mod agent;
 #[cfg(test)]
 mod agent_tests;
 pub(crate) mod arch;
+mod at;
 mod build;
 mod cache;
 mod chat;
@@ -48,6 +49,7 @@ use crate::ctx::{RepoCtx, now_ms};
 use crate::jj::Range;
 use crate::store::{Edit, Mark, MarkColor, Session, Store};
 use crate::workspace::Workspace;
+pub use at::At;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
@@ -234,33 +236,6 @@ impl RepoCtx {
             .get(workspace.unwrap_or(""))
             .copied()
             .context("no review is open in lgtm for this workspace")
-    }
-
-    /// The review open in `workspace`, for an agent's write about `revset`. The focus may have
-    /// moved to another review since the agent was asked, or the revset to other commits than
-    /// the review shows, so then the write is refused.
-    pub async fn current_review_at(
-        &self,
-        workspace: Option<&str>,
-        revset: &str,
-    ) -> anyhow::Result<u32> {
-        let id = self.current_review(workspace)?;
-        let (ws, shown, whole) = {
-            let r = self.review(id)?;
-            let r = r.lock().unwrap();
-            (r.ws.clone(), r.revset.clone(), r.whole.clone())
-        };
-        anyhow::ensure!(
-            shown == revset,
-            "lgtm's review moved to `{shown}`, not `{revset}`, so nothing was changed"
-        );
-        ws.snapshot().await?;
-        anyhow::ensure!(
-            ws.jj.resolve(revset).await? == whole,
-            "lgtm's review of `{revset}` changed since it was loaded, so nothing was changed; \
-             call get_review again"
-        );
-        Ok(id)
     }
 
     /// Opens `revset` in the Combined view. Starts a review session, or with `resume`

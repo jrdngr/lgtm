@@ -6,7 +6,7 @@ use specta::Type;
 
 use super::comments::RowSpan;
 use super::matching::Remaps;
-use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
+use super::{At, RepoCtx, Review, RowRef, StateDto, now_ms};
 use crate::anchor::Side;
 use crate::diff::FileStatus;
 use crate::store::{Category, FlowStep, Level, Note, Source, Store};
@@ -129,16 +129,41 @@ impl Review {
 }
 
 impl RepoCtx {
-    /// Replaces the review's notes with `inputs`. Returns the new state and how many notes
-    /// were left out for being outside the review's files or on rows that can't be anchored.
+    /// Replaces the review's notes with `inputs`, unchecked.
+    #[cfg(test)]
     pub fn save_notes(
         &self,
         id: u32,
         inputs: &[NoteInput],
         source: Source,
     ) -> anyhow::Result<(StateDto, usize)> {
+        self.notes_saved(id, None, inputs, source)
+    }
+
+    /// Replaces the review's notes with an agent's, once the review passes
+    /// [`Self::check_at`]. Returns the new state and how many notes were left out for being
+    /// outside the review's files or on rows that can't be anchored.
+    pub fn save_notes_at(
+        &self,
+        at: &At,
+        inputs: &[NoteInput],
+        source: Source,
+    ) -> anyhow::Result<(StateDto, usize)> {
+        self.notes_saved(at.id, Some(at), inputs, source)
+    }
+
+    fn notes_saved(
+        &self,
+        id: u32,
+        at: Option<&At>,
+        inputs: &[NoteInput],
+        source: Source,
+    ) -> anyhow::Result<(StateDto, usize)> {
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
+        if let Some(at) = at {
+            self.check_at(&review, at)?;
+        }
         let mut store = self.store.lock().unwrap();
         let notes = review.anchor_notes(&store, inputs, source)?;
         store.replace_notes(&review.label, &notes)?;
