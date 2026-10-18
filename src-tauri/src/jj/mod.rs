@@ -228,20 +228,15 @@ impl Jj {
         commit: Option<&str>,
         path: &str,
     ) -> anyhow::Result<Option<Vec<u8>>> {
-        let Some(commit) = commit else {
-            return Ok(None);
-        };
-        let literal = fileset_literal(path);
-        // `file show` fails on a missing literal path; `file list` prints nothing.
-        if self
-            .read(&["file", "list", "-r", commit, &literal])
-            .await?
-            .trim()
-            .is_empty()
-        {
+        if commit.is_none() {
             return Ok(None);
         }
-        Ok(Some(self.file(Some(commit), path).await?))
+        match self.file(commit, path).await {
+            Ok(bytes) => Ok(Some(bytes)),
+            // `file show` fails this way on a missing literal path.
+            Err(e) if e.to_string().contains("No such path") => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -272,6 +267,22 @@ mod tests {
             (got[1].change_id.as_str(), got[1].description.as_str()),
             ("xyz", "")
         );
+    }
+
+    #[tokio::test]
+    async fn file_if_any_reads_a_file_or_finds_none() {
+        let (dir, j) = test_support::repo();
+        test_support::write(dir.path(), "a.txt", "a\n");
+        j.snapshot().await.unwrap();
+        let at = j.commit_ids("@").await.unwrap();
+        let at = Some(at[0].as_str());
+        assert_eq!(
+            j.file_if_any(at, "a.txt").await.unwrap(),
+            Some(b"a\n".to_vec())
+        );
+        assert_eq!(j.file_if_any(at, "nope.txt").await.unwrap(), None);
+        assert_eq!(j.file_if_any(None, "a.txt").await.unwrap(), None);
+        assert!(j.file_if_any(Some("no_such_rev"), "a.txt").await.is_err());
     }
 
     #[test]

@@ -32,7 +32,7 @@ impl RepoCtx {
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
         let whole = ws.jj.resolve(revset).await?;
-        let config = Config::at_base(&ws.jj, revset).await?;
+        let config = Config::at_base(&ws.jj, whole.from.as_deref()).await?;
         let stack = views::stack(&ws.jj, revset, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
         let view = match view {

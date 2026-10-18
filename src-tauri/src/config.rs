@@ -42,11 +42,10 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads the config at the base of `revset`, so the changes under review can't set what
-    /// it skips. A missing file gives the defaults.
-    pub async fn at_base(jj: &Jj, revset: &str) -> anyhow::Result<Self> {
-        let base = jj.resolve(revset).await?.from;
-        let Some(bytes) = jj.file_if_any(base.as_deref(), PATH).await? else {
+    /// Reads the config at `base`, a review's base commit, so the changes under review can't
+    /// set what it skips. A missing file gives the defaults.
+    pub async fn at_base(jj: &Jj, base: Option<&str>) -> anyhow::Result<Self> {
+        let Some(bytes) = jj.file_if_any(base, PATH).await? else {
             return Ok(Self::default());
         };
         let text = String::from_utf8(bytes).with_context(|| format!("{PATH} is not UTF-8"))?;
