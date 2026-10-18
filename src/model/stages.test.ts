@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Stage, ThreadDto } from "../bindings";
-import { prThreads } from "../review/prComments";
+import { prThreads } from "./prComments";
 import { byStage, needsYou, planText, sendPlan, threadLabel } from "./stages";
 
 function thread(id: number, stage: Stage, body = "", gh = true, path = "a.rs"): ThreadDto {

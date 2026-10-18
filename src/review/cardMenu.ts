@@ -1,6 +1,6 @@
 import type { CommentDto } from "../bindings";
+import { STAGES } from "../model/stages";
 import { openUrl } from "../services/pathMenu";
-import { STAGES } from "../threads/stages";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { confirmAction } from "../ui/prompt";

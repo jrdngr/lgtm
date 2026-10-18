@@ -1,6 +1,6 @@
 import type { GhLink } from "../bindings";
+import { authorName } from "../model/people";
 import { Post } from "./Post";
-import { authorName } from "./people";
 
 /** A GitHub review thread's posts, above the reply being written for it. */
 export function GhThread({ link, viewer }: { link: GhLink; viewer?: string }) {

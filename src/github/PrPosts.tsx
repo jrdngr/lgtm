@@ -1,6 +1,6 @@
 import type { PostDto } from "../bindings";
+import { authorName } from "../model/people";
 import { Post } from "./Post";
-import { authorName } from "./people";
 import "../review/comments.css";
 import "./github.css";
 

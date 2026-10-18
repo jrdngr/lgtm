@@ -5,6 +5,7 @@ import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useWorkspace, workspaceKey } from "../core/workspace";
 import { RepoTree } from "../editor/RepoTree";
+import { needsYou } from "../model/stages";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
@@ -13,7 +14,6 @@ import { FilesPanel } from "../review/FilesPanel";
 import { NotesPanel } from "../review/NotesPanel";
 import { WalkthroughPanel } from "../review/WalkthroughPanel";
 import { PrPanel } from "../threads/PrPanel";
-import { needsYou } from "../threads/stages";
 import { SidePanel, type SideState } from "./SidePanel";
 
 function RepoTab() {

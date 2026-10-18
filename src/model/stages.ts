@@ -1,5 +1,5 @@
 import type { Fixed, Stage, TakeVerdict, ThreadDto } from "../bindings";
-import { quoted } from "../review/prComments";
+import { quoted } from "./prComments";
 
 /** Stages in work order, with their name and color. New sits first: it needs triage. */
 export const STAGES: [Stage, string, string][] = [

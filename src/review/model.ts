@@ -232,8 +232,6 @@ function splitRows(rows: RowDto[], start: number, end: number, file: number, hun
   return out;
 }
 
-export const SIGN = { context: " ", added: "+", removed: "-" } as const;
-
 /** The first rows line from `from` in direction `dir`, or `from` when there is none. */
 export function nextRowLine(lines: DisplayLine[], from: number, dir: 1 | -1): number {
   for (let i = from + dir; i >= 0 && i < lines.length; i += dir) {

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CommentDto } from "../bindings";
+import { quotedReply } from "../model/prComments";
 import { Busy } from "../ui/Busy";
-import { quotedReply } from "./prComments";
 import type { Comments } from "./useComments";
 import "./combine.css";
 

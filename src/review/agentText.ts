@@ -1,5 +1,5 @@
 import type { CommentDto, PrDto, ThreadDto } from "../bindings";
-import { threadWhere } from "../threads/stages";
+import { threadWhere } from "../model/stages";
 import { codeText } from "./comments";
 import type { FlatFile } from "./model";
 import { UNTRUSTED_NOTE, untrusted } from "./untrusted";

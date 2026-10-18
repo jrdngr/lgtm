@@ -1,5 +1,5 @@
 import type { Stage } from "../bindings";
-import { STAGES } from "../threads/stages";
+import { STAGES } from "../model/stages";
 
 interface Props {
   stage: Stage;

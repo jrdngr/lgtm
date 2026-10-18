@@ -2,13 +2,13 @@ import { useState } from "react";
 import type { PrDto, ThreadDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { commands, errorText } from "../ipc";
+import { viewerLogin } from "../model/people";
 import type { CurrentReview } from "../review/current";
 import { StageBar } from "../threads/StageBar";
 import { IconButton } from "../ui/icons";
 import { ago } from "../ui/time";
 import { clearStackPr, editBackToStackPr } from "../workspaces/stack";
 import { Avatar } from "./Post";
-import { viewerLogin } from "./people";
 import type { Discussion } from "./useDiscussion";
 import "./github.css";
 

@@ -1,5 +1,5 @@
 import type { RowDto } from "../bindings";
-import { SIGN } from "./model";
+import { SIGN } from "../model/sign";
 
 /** Rows as unified diff hunks: a `@@ -old +new @@` header wherever the line numbers jump,
  * then each row with its sign. Matches the snippets the backend writes. */

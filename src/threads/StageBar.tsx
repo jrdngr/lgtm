@@ -1,5 +1,5 @@
 import type { ThreadDto } from "../bindings";
-import { STAGES } from "./stages";
+import { STAGES } from "../model/stages";
 
 /** How far a PR's threads are: one segment per stage, sized by its count. */
 export function StageBar({ threads }: { threads: ThreadDto[] }) {

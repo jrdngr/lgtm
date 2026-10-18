@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Markdown } from "../bots/Markdown";
+import { hue } from "../model/people";
 import { ago, fullDate } from "../ui/time";
-import { hue } from "./people";
 import "./github.css";
 
 /** A person's initial on a disc in their color. */

@@ -1,6 +1,7 @@
 import { HIGHLIGHT_NAMES, type MarkDto, type RowDto } from "../bindings";
+import { SIGN } from "../model/sign";
 import { type MarkSetup, markVar } from "./marks";
-import { type FlatFile, markKey, SIGN } from "./model";
+import { type FlatFile, markKey } from "./model";
 import type { MarkIndex } from "./state";
 import "./syntax.css";
 

@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import type { Hunk, PreviewFileDto, PreviewThreadDto, Row } from "../bindings";
-import { SIGN } from "../review/model";
+import { SIGN } from "../model/sign";
 import { GhThread } from "./GhThread";
 import "../review/comments.css";
 import "../review/FileHeader.css";

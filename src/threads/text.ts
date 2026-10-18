@@ -1,5 +1,5 @@
 import type { GhPost, ThreadDto } from "../bindings";
-import { threadLabel, threadWhere } from "./stages";
+import { threadLabel, threadWhere } from "../model/stages";
 
 /** A thread's posts split at the viewer's last one: what came before, and what's unanswered
  * since. With no unanswered post, the last post is the one shown. */

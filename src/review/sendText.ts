@@ -1,4 +1,5 @@
-import { type DisplayLine, type FlatFile, SIGN } from "./model";
+import { SIGN } from "../model/sign";
+import type { DisplayLine, FlatFile } from "./model";
 
 /** Where the selected rows are, for an agent to read itself: per file and hunk, the path with
  * the new side's line range, and the old side's range for any removed rows. */

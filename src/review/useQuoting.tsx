@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useLayoutEffect, useState } from "react";
 import type { CommentDto } from "../bindings";
-import { quotesOf } from "./prComments";
+import { quotesOf } from "../model/prComments";
 import { markQuotes } from "./quoteMarks";
 import type { Comments } from "./useComments";
 

@@ -1,5 +1,5 @@
 import type { Take } from "../bindings";
-import { VERDICTS } from "./stages";
+import { VERDICTS } from "../model/stages";
 
 /** The agent's verdict on a thread, as a colored pill. */
 export function TakePill({ take }: { take: Take | null }) {
