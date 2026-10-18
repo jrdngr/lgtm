@@ -10,8 +10,6 @@ use crate::ctx::RepoCtx;
 
 /// The repo-relative script a new workspace runs in its first terminal.
 pub const SETUP: &str = ".lgtm/setup";
-/// How much of a script the approval shows.
-const SHOWN_CHARS: usize = 4000;
 
 /// The command a new workspace's first terminal runs: its setup script, then a login shell.
 pub fn setup_command() -> Vec<String> {
@@ -30,8 +28,8 @@ pub fn setup_command() -> Vec<String> {
 pub enum Setup {
     None,
     Approved,
-    /// The script to ask about: its text, cut short when long, and the hash of all of it,
-    /// which approving it must name.
+    /// The script to ask about: its text, shown whole, and its hash, which approving it must
+    /// name.
     Unapproved {
         script: String,
         hash: String,
@@ -45,15 +43,6 @@ fn script(root: &Path) -> Option<(Vec<u8>, String)> {
     Some((bytes, hash))
 }
 
-/// `bytes` as text, its first `SHOWN_CHARS` characters and an ellipsis when longer.
-fn shown(bytes: &[u8]) -> String {
-    let text = String::from_utf8_lossy(bytes);
-    match text.char_indices().nth(SHOWN_CHARS) {
-        Some((end, _)) => format!("{}\n…", &text[..end]),
-        None => text.into_owned(),
-    }
-}
-
 impl RepoCtx {
     pub fn setup_state(&self, root: &Path) -> Setup {
         let Some((bytes, hash)) = script(root) else {
@@ -62,7 +51,7 @@ impl RepoCtx {
         match self.store.lock().unwrap().approved_setup() {
             Ok(Some(approved)) if approved == hash => Setup::Approved,
             _ => Setup::Unapproved {
-                script: shown(&bytes),
+                script: String::from_utf8_lossy(&bytes).into_owned(),
                 hash,
             },
         }
@@ -129,11 +118,15 @@ mod tests {
     }
 
     #[test]
-    fn a_long_script_is_cut_short() {
-        let long = "é".repeat(SHOWN_CHARS + 10);
-        let s = shown(long.as_bytes());
-        assert_eq!(s.chars().count(), SHOWN_CHARS + 2);
-        assert!(s.ends_with("é\n…"));
-        assert_eq!(shown(b"ok"), "ok");
+    fn a_long_script_is_shown_whole() {
+        let (dir, ctx) = repo();
+        let root = dir.path();
+        std::fs::create_dir(root.join(".lgtm")).unwrap();
+        let long = "echo é\n".repeat(2000);
+        write(root, SETUP, &long);
+        let Setup::Unapproved { script, .. } = ctx.setup_state(root) else {
+            panic!("not asked");
+        };
+        assert_eq!(script, long);
     }
 }

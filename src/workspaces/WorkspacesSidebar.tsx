@@ -9,7 +9,7 @@ import { commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
-import { confirmAction } from "../ui/prompt";
+import { confirmShown } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { arrange, forgetPin, usePins } from "./pins";
@@ -91,7 +91,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     const setup = r.data;
     if (
       setup.kind === "unapproved" &&
-      (await confirmAction(setup.script, "Run", "Skip", ".lgtm/setup"))
+      (await confirmShown(".lgtm/setup", setup.script, "Run", "Skip"))
     ) {
       const ok = await commands.approveSetup(ws, setup.hash);
       if (ok.status === "error") setError(ok.error);

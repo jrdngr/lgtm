@@ -10,6 +10,9 @@ interface Ask {
   multiline?: boolean;
   /** Submitting it empty gives "" rather than undefined. */
   allowEmpty?: boolean;
+  /** Text shown whole and read-only in place of a box, as `confirmShown` asks. */
+  shown?: string;
+  cancel?: string;
   /** Where focus was, to go back to after. */
   from: Element | null;
   /** Tells one ask's box from the next, so a new one starts with its own text. */
@@ -47,6 +50,31 @@ export function promptText(
   );
 }
 
+/** Shows `text` whole in a scrolling block and asks whether to go ahead, `action` and
+ * `cancel` naming the buttons. In the window, so a long text can't push the buttons away. */
+export async function confirmShown(
+  title: string,
+  text: string,
+  action: string,
+  cancel = "Cancel",
+): Promise<boolean> {
+  current?.done(undefined);
+  const value = await new Promise<string | undefined>((done) =>
+    set({
+      title,
+      value: "",
+      action,
+      cancel,
+      allowEmpty: true,
+      shown: text,
+      from: document.activeElement,
+      id: ++asks,
+      done,
+    }),
+  );
+  return value !== undefined;
+}
+
 /** A native yes/no for a destructive or risky action, `action` and `cancel` naming its
  * buttons. */
 export async function confirmAction(
@@ -73,7 +101,9 @@ export function PromptHost() {
     () => current,
   );
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const shownRef = useRef<HTMLPreElement>(null);
   useEffect(() => {
+    shownRef.current?.focus();
     const el = ref.current;
     if (!el) return;
     el.focus();
@@ -93,7 +123,7 @@ export function PromptHost() {
   const keys = (e: KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") finish(undefined);
-    else if (e.key === "Enter" && (!ask.multiline || e.metaKey)) {
+    else if (e.key === "Enter" && ((!ask.multiline && ask.shown === undefined) || e.metaKey)) {
       e.preventDefault();
       submit();
     }
@@ -104,14 +134,18 @@ export function PromptHost() {
       onPointerDown={(e) => e.target === e.currentTarget && finish(undefined)}
     >
       <form
-        className="prompt"
+        className={ask.shown === undefined ? "prompt" : "prompt wide"}
         onSubmit={(e) => {
           e.preventDefault();
           submit();
         }}
       >
         <label htmlFor="prompt-text">{ask.title}</label>
-        {ask.multiline ? (
+        {ask.shown !== undefined ? (
+          <pre key={ask.id} id="prompt-text" ref={shownRef} tabIndex={-1} onKeyDown={keys}>
+            {ask.shown}
+          </pre>
+        ) : ask.multiline ? (
           <textarea
             key={ask.id}
             id="prompt-text"
@@ -132,7 +166,7 @@ export function PromptHost() {
         )}
         <div className="prompt-buttons">
           <button type="button" className="quiet" onClick={() => finish(undefined)}>
-            Cancel
+            {ask.cancel ?? "Cancel"}
           </button>
           <button type="submit" className="primary">
             {ask.action}

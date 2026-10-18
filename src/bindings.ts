@@ -1567,8 +1567,8 @@ export type SettingsChanged = {
 /**  Whether a workspace has a setup script, and whether the user let it run. */
 export type Setup = { kind: "none" } | { kind: "approved" } | 
 /**
- *  The script to ask about: its text, cut short when long, and the hash of all of it,
- *  which approving it must name.
+ *  The script to ask about: its text, shown whole, and its hash, which approving it must
+ *  name.
  */
 { kind: "unapproved"; script: string; hash: string };
 

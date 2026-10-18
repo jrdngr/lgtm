@@ -825,6 +825,19 @@ kbd {
   font-family: var(--mono);
   resize: vertical;
 }
+.prompt.wide {
+  width: min(720px, 90vw);
+}
+.prompt pre {
+  margin: 0;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  white-space: pre;
+}
 .prompt-buttons {
   display: flex;
   justify-content: flex-end;
