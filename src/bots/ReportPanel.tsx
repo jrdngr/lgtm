@@ -226,8 +226,8 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
         <span className="pill green">
           Published · {n} {n === 1 ? "finding" : "findings"}
         </span>
-        {review && review.to !== run.to && (
-          <span className="pill amber">Open review is at {review.to.slice(0, 8)}</span>
+        {review && review.head !== run.to && (
+          <span className="pill amber">Open review is at {review.head.slice(0, 8)}</span>
         )}
         <span className="spacer" />
         <Menu label="Report actions" items={reportIdItems(run, setError)} />

@@ -70,8 +70,7 @@ impl RepoCtx {
     /// fixes when it gives them. With `report`, it replaces that reviewer's section of that
     /// report, or adds one, and the user's dismissals follow findings with the same title and
     /// locations. Without, it's a new report against the workspace's current review. Either
-    /// must be of `revset`, the revset the agent reviewed, and of the commits it resolves to
-    /// now. Returns the report and whether it's new.
+    /// must be of `revset`, the revset the agent reviewed, and of the head it resolves to now. Returns the report and whether it's new.
     pub async fn publish_findings(
         &self,
         workspace: Option<&str>,
@@ -102,10 +101,11 @@ impl RepoCtx {
         let ws = self.workspace(workspace).await?;
         ws.snapshot().await?;
         let now = ws.jj.resolve(revset).await?;
-        // Checked under the store's lock, so it holds for the write.
+        // Checked under the store's lock, so it holds for the write. Reports stored before
+        // they took the whole range may have the open view's base, so only the head must match.
         self.edit_run(run.id, |run| {
             anyhow::ensure!(
-                (run.from.as_ref(), &run.to) == (now.from.as_ref(), &now.to),
+                run.to == now.to,
                 "report {} is of other commits than `{revset}` is now, so nothing was \
                  published; publish a new report",
                 run.label()

@@ -62,7 +62,7 @@ export function usePublishReview(
       published.current = {
         id: review?.id ?? 0,
         revset: review?.revset ?? "",
-        to: review?.to ?? "",
+        head: review?.head ?? "",
         files,
         progress,
         rowState,

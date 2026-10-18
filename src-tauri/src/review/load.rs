@@ -50,6 +50,7 @@ impl RepoCtx {
         let cfg = config.matching;
         let (files, dtos) = self.build(sides, interdiff, diffs, config).await?;
         let (from, to) = spec.endpoints();
+        let head = whole.to.clone();
         Ok(Loaded {
             files,
             commits: stack.changes.iter().map(|c| c.commit_id.clone()).collect(),
@@ -61,6 +62,7 @@ impl RepoCtx {
                 view: view.clone(),
                 from,
                 to,
+                head,
                 interdiff,
                 files: dtos,
                 state: StateDto::default(),

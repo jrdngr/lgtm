@@ -94,6 +94,8 @@ pub struct ReviewDto {
     pub view: View,
     pub from: Option<String>,
     pub to: String,
+    /// The whole review's head, whichever view is open.
+    pub head: String,
     /// True when the view is an interdiff, whose old side is `from` rebased, not `from`.
     pub interdiff: bool,
     pub files: Vec<FileDto>,

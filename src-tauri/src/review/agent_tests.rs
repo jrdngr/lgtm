@@ -194,6 +194,15 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         2,
         "the old suggestions no longer match the findings"
     );
+
+    // A report stored with an open view's base, before reports took the whole range, still
+    // takes findings while its head is the revset's.
+    let mut legacy = run.clone();
+    legacy.from = Some("view-base".into());
+    ctx.store.lock().unwrap().save_bot_run(&legacy).unwrap();
+    ctx.publish_findings(None, "@", Some(&label), "codex", review_of(vec![]), None)
+        .await
+        .unwrap();
     assert!(
         ctx.publish_findings(None, "@", Some("R999"), "x", review_of(vec![]), None)
             .await

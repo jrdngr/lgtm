@@ -80,7 +80,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
     published.current = markIdle<CurrentReview>({
       id: review.id,
       revset: review.revset,
-      to: review.to,
+      head: review.head,
       files,
       progress,
       rowState,

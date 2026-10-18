@@ -11,8 +11,8 @@ export interface CurrentReview {
   /** The backend's review id. */
   id: number;
   revset: string;
-  /** The commit on the new side of the diff. */
-  to: string;
+  /** The whole review's head commit, whichever view is open. */
+  head: string;
   files: FlatFile[];
   progress: Progress[];
   rowState: RowStateFn;

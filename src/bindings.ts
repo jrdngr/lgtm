@@ -1425,6 +1425,8 @@ export type ReviewDto = {
 	view: View,
 	from: string | null,
 	to: string,
+	/**  The whole review's head, whichever view is open. */
+	head: string,
 	/**  True when the view is an interdiff, whose old side is `from` rebased, not `from`. */
 	interdiff: boolean,
 	files: FileDto[],

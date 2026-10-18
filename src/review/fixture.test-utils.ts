@@ -65,6 +65,7 @@ export function review(files: FileDto[]): ReviewDto {
     view: { kind: "combined" },
     from: null,
     to: "x",
+    head: "x",
     interdiff: false,
     files,
     state: {
