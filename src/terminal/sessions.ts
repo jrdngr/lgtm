@@ -16,7 +16,7 @@ export interface Session {
   title(): string;
   /** The program in the foreground, when it isn't the shell. */
   running(): Promise<string | null>;
-  /** Whether an agent runs in it. */
+  /** Whether an agent runs in it: its hooks say so, or the title does in a Claude tab. */
   hasAgent(): boolean;
   /** Whether its agent is working or waiting on the user. */
   agentBusy(): boolean;
@@ -115,6 +115,9 @@ function startSession(
   let agent: ActivityState = "gone";
   /** Whether Claude Code's hooks report for it, which then wins over the title. */
   let hooked = false;
+  /** Whether it was started to run Claude Code. Only then does the title count without hooks,
+   * since any program can set the title. */
+  let launched = false;
   const set = (state: ActivityState) => {
     agent = state;
     report(workspace, activity, state, titleLabel(title), { stays: true, tab: id });
@@ -144,6 +147,7 @@ function startSession(
   const started = (command ?? Promise.resolve(undefined)).then((run) => {
     refit();
     ({ cols, rows } = term);
+    launched = run !== undefined;
     return commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel);
   });
   started.catch((e) => term.write(`failed to start shell: ${e}\r\n`));
@@ -168,7 +172,7 @@ function startSession(
     }),
     term.onTitleChange((t) => {
       title = t;
-      if (hooked) set(agent);
+      if (hooked || !launched) set(agent);
       else if (isBusyTitle(t)) set("running");
       else if (isAgentTitle(t)) set(agent === "running" ? "done" : "idle");
       else set("gone");

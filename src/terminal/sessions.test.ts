@@ -16,12 +16,18 @@ vi.mock("../ipc", () => ({
 vi.mock("./agentHooks", () => ({ onAgentHook: () => () => {} }));
 vi.mock("./xterm", () => ({
   createTerminal: () => ({
-    term: { cols: 80, rows: 24, onData: sub, onTitleChange: sub, onResize: sub, dispose() {} },
+    term: { cols: 80, rows: 24, onData: sub, onTitleChange, onResize: sub, dispose() {} },
     refit() {},
     unwatch() {},
   }),
 }));
 const sub = () => ({ dispose() {} });
+/** The last session's title listener. */
+let setTitle = (_: string) => {};
+const onTitleChange = (l: (t: string) => void) => {
+  setTitle = l;
+  return sub();
+};
 
 const { openSession, releaseSession } = await import("./sessions");
 const box = () => document.body.appendChild(document.createElement("div"));
@@ -62,5 +68,16 @@ describe("terminal sessions", () => {
     releaseSession("t3");
     await vi.advanceTimersByTimeAsync(5000);
     expect(killed).toEqual([0]);
+  });
+
+  it("trust an agent title only in a terminal started to run Claude Code", async () => {
+    const shell = openSession("t4", box(), null, false);
+    await settle();
+    setTitle("\u2802 spoofed");
+    expect(shell.hasAgent()).toBe(false);
+    const claude = openSession("t5", box(), null, false, Promise.resolve("claude"));
+    await settle();
+    setTitle("\u2802 working");
+    expect(claude.hasAgent()).toBe(true);
   });
 });

@@ -10,7 +10,7 @@ interface TerminalTarget {
   /** False when the program in it can't take a paste safely. */
   canPaste(): boolean;
   paste(text: string): void;
-  /** Whether an agent like Claude Code runs in it, by its hooks or its title. */
+  /** Whether an agent like Claude Code runs in it, by its hooks or, in a Claude tab, its title. */
   hasAgent(): boolean;
   /** Whether its agent is working or waiting on the user. */
   agentBusy(): boolean;
