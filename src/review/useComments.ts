@@ -7,7 +7,7 @@ import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
 import { type FlatFile, NEW_COMMENT } from "./model";
 import { prComments } from "./prComments";
-import { resumable, startSync, stopSync } from "./syncedChat";
+import { currentSync, resumable, startSync, stopSync } from "./syncedChat";
 import { reviewText, syncText, triageText } from "./syncText";
 
 const NONE: CommentDto[] = [];
@@ -211,8 +211,12 @@ export function useComments({
     const id = review.id;
     const to = target();
     if (to && resumable(c.id, to)) return startSync(to, id, c.id);
+    // A sync on another thread in the same terminal ends here, so its agent hears it's over.
+    const prev = currentSync();
+    const dropped =
+      prev && prev.comment !== c.id && (!to || prev.terminal === to) ? prev.comment : undefined;
     submitNextSend();
-    send(syncText(files, c), (terminal) => startSync(terminal, id, c.id));
+    send(syncText(files, c, dropped), (terminal) => startSync(terminal, id, c.id));
   }
 
   /** Pastes a new thread and my rules for replies into the send target, for its agent to make

@@ -22,10 +22,13 @@ const takeText = (id: number) =>
   `Whenever your take on the thread changes, call lgtm's set_thread_take tool with thread_id ${id}, the verdict and why, and no reply.`;
 
 /** What starts a synced chat on a thread: the thread, the reply so far, and how the agent
- * hands back a reply. */
-export function syncText(files: FlatFile[], c: CommentDto): string {
+ * hands back a reply. `dropped` is the thread the chat was synced with until now. */
+export function syncText(files: FlatFile[], c: CommentDto, dropped?: number): string {
   const take = c.thread?.take;
   return [
+    dropped === undefined
+      ? ""
+      : `I'm no longer syncing this chat with ${syncMarker(dropped)}. Don't suggest replies or set takes for it anymore.`,
     `This chat is synced with ${syncMarker(c.id)}, a review thread on my PR. What we say here shows in the thread.`,
     ...threadText(files, c),
     `When I ask for a reply, call lgtm's suggest_reply tool with thread_id ${c.id}. It never posts to GitHub.`,

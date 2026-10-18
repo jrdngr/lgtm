@@ -65,6 +65,11 @@ export function stopSync() {
   set(undefined);
 }
 
+/** The sync running now, if any. */
+export function currentSync(): Pick<Sync, "terminal" | "comment"> | undefined {
+  return sync && { terminal: sync.terminal, comment: sync.comment };
+}
+
 /** Whether comment `comment` was last synced with `terminal`, so syncing it there again
  * needs no new start text. */
 export function resumable(comment: number, terminal: string | undefined): boolean {

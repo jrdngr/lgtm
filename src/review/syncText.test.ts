@@ -25,6 +25,19 @@ describe("syncText", () => {
     expect(text).toContain("set_thread_take tool with thread_id 12");
   });
 
+  it("tells the agent the thread it was synced with before is no longer synced", () => {
+    const c = {
+      id: 12,
+      path: "",
+      body: "",
+      messages: [],
+      github: { posts: [post("mkosta", "Rename this?")] },
+      thread: { quote: null },
+    } as unknown as CommentDto;
+    expect(syncText([], c, 4)).toMatch(/^I'm no longer syncing this chat with lgtm thread 4\./);
+    expect(syncText([], c)).not.toContain("no longer syncing");
+  });
+
   it("gives a triaged thread's take instead of asking for one", () => {
     const c = {
       id: 3,
