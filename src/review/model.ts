@@ -1,6 +1,6 @@
 import type { CodeSymbol, ContextLine, FileDto, ReviewDto, RowDto } from "../bindings";
 import type { DoneFn } from "./marks";
-import { type Filter, type RowStateFn, rowMatches } from "./state";
+import { type Filter, type RowStateFn, rowMatches } from "./rowState";
 
 export type ViewMode = "unified" | "split";
 

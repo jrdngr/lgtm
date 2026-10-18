@@ -3,7 +3,7 @@ import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import type { CurrentReview } from "../review/current";
 import { needsReview } from "../review/model";
-import { stateDone } from "../review/state";
+import { stateDone } from "../review/rowState";
 
 /** How many of a node's changed rows are done, and how many it has. */
 export function rowsDone(review: CurrentReview, n: GraphNode): [number, number] {

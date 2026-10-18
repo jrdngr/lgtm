@@ -15,7 +15,8 @@ import {
 import { isIdle } from "./idle";
 import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
-import type { Filter, Progress, RowStateFn } from "./state";
+import type { Filter, RowStateFn } from "./rowState";
+import type { Progress } from "./state";
 
 interface Data {
   files: FlatFile[];

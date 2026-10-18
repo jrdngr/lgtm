@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Settings } from "../bindings";
-import { Row, Section } from "./SettingsPanel";
+import { Row, Section } from "./parts";
 import { saveSettings } from "./store";
 
 const MIN = 9;

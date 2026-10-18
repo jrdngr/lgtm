@@ -1,7 +1,8 @@
 import type { CheckState, CommentDto, NoteDto, StateDto, ThreadDto } from "../bindings";
 import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
-import type { Filter, Progress, RowStateFn } from "./state";
+import type { Filter, RowStateFn } from "./rowState";
+import type { Progress } from "./state";
 import type { SendOutcome } from "./useSendText";
 import { workspaceStore } from "./workspaceStore";
 

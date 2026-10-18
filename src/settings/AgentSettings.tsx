@@ -3,7 +3,7 @@ import type { ClaudeCommand, Settings } from "../bindings";
 import { commands } from "../ipc";
 import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
-import { Row, Section } from "./SettingsPanel";
+import { Row, Section } from "./parts";
 import { saveSettings } from "./store";
 
 /** A text field that saves when it loses focus or Enter is pressed. */

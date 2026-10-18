@@ -5,7 +5,8 @@ import { Menu } from "../ui/Menu";
 import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
-import { type Filter, type Progress, progressTitle } from "./state";
+import type { Filter } from "./rowState";
+import { type Progress, progressTitle } from "./state";
 import "./ReviewBar.css";
 
 const SINCE_LABEL = {

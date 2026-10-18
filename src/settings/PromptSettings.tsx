@@ -3,7 +3,7 @@ import type { Prompt, PromptInfo } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
-import { Section } from "./SettingsPanel";
+import { Section } from "./parts";
 
 const PROMPTS: Record<Prompt, { name: string; help: string }> = {
   walkthrough: { name: "Walkthrough", help: "What the walkthrough agent looks for and writes." },

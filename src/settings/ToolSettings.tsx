@@ -5,7 +5,7 @@ import { setToolProblems } from "../tools/agents";
 import { refreshMcpStatus, useMcpStatus } from "../tools/mcp";
 import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
-import { Section } from "./SettingsPanel";
+import { Section } from "./parts";
 import { useSettings } from "./store";
 
 const MCP_TEXT: Record<McpStatus["setup"], string> = {

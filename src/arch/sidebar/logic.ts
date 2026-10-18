@@ -9,7 +9,7 @@ import type {
 } from "../../bindings";
 import type { CurrentReview } from "../../review/current";
 import { markKey, needsReview } from "../../review/model";
-import { stateDone } from "../../review/state";
+import { stateDone } from "../../review/rowState";
 
 /** 1–2 red, 3 amber, 4–5 green. */
 export const meterTone = (score: number) => (score >= 4 ? "hi" : score === 3 ? "mid" : "lo");

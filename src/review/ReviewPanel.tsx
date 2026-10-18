@@ -21,7 +21,8 @@ import { buildLines, changedRows, type DisplayLine, type ViewMode } from "./mode
 import { PrCommentsHead, prLines } from "./PrCommentsHead";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, workspaceRevset } from "./revset";
-import { type Filter, filterLabel, plural, sumProgress } from "./state";
+import type { Filter } from "./rowState";
+import { filterLabel, plural, sumProgress } from "./state";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { HistoryDto, LayerDto, MarkColor } from "../../bindings";
 import { rows } from "../../review/fixture.test-utils";
-import type { RowState } from "../../review/state";
+import type { RowState } from "../../review/rowState";
 import { clickRange, layerDone, meterTone, pickedCommits, rowsInLines } from "./logic";
 
 test("meter is red to 2, amber at 3, green from 4", () => {
