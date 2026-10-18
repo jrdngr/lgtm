@@ -277,7 +277,7 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
               onClick={() => startLink(workspace, onError)}
               keys="l"
             >
-              Link Agent
+              Link
             </PipeButton>
           )}
         </SectionHeader>

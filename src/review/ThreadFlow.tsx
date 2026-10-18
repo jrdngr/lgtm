@@ -9,8 +9,6 @@ import type { Comments } from "./useComments";
 interface Props {
   comment: CommentDto;
   c: Comments;
-  /** The thread the linked agent hears I'm on. */
-  current: boolean;
   /** A triage run covers this thread, and will set its take, reply and stage. */
   triaging: boolean;
   /** The reply's editor, shown in place of the reply while it's edited. */
@@ -19,7 +17,7 @@ interface Props {
 
 /** A GitHub thread's reply workflow under its posts: the take, the reply and the reply an
  * agent suggests, and its chat. */
-export function ThreadFlow({ comment, c, current, triaging, editor }: Props) {
+export function ThreadFlow({ comment, c, triaging, editor }: Props) {
   const id = comment.id;
   const take = comment.thread?.take;
   const body = comment.body;
@@ -109,11 +107,6 @@ export function ThreadFlow({ comment, c, current, triaging, editor }: Props) {
                 )}
                 {!take && comment.thread?.stage === "new" && (
                   <PipeButton onClick={() => c.triage(comment)}>Triage</PipeButton>
-                )}
-                {!current && (
-                  <PipeButton keys="⌘>" onClick={() => c.talk(comment)}>
-                    Talk
-                  </PipeButton>
                 )}
               </>
             )}

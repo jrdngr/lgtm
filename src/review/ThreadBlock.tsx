@@ -197,13 +197,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
           </button>
         </div>
       ) : (
-        <ThreadFlow
-          comment={comment}
-          c={c}
-          current={current}
-          triaging={triaging}
-          editor={editor || undefined}
-        />
+        <ThreadFlow comment={comment} c={c} triaging={triaging} editor={editor || undefined} />
       )}
       {combining && (
         <CombineDialog
