@@ -5,7 +5,7 @@
 /* Score: meter, risk, Assess; why under them. */
 .arch-score {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
   gap: 2px 10px;
   align-items: center;
   padding: 10px;
@@ -35,6 +35,11 @@
 }
 
 .arch-score .pill {
+  display: block;
+  max-width: max-content;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--fs-xs);
   font-weight: 400;
   line-height: 18px;
@@ -45,10 +50,12 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  min-width: 0;
 }
 
 .arch-meter i {
-  width: 20px;
+  flex: 0 1 20px;
+  min-width: 6px;
   height: 8px;
   border-radius: 2px;
   background: #333;
@@ -67,6 +74,7 @@
 }
 
 .arch-meter b {
+  flex: none;
   margin-left: 6px;
   font: 600 var(--fs-sm) var(--mono);
   font-variant-numeric: tabular-nums;
