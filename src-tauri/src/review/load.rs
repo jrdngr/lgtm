@@ -29,7 +29,7 @@ impl RepoCtx {
         view: &View,
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
-        let config = Config::load(&ws.root)?;
+        let config = Config::at_base(&ws.jj, revset).await?;
         let stack = views::stack(&ws.jj, revset, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
         let view = match view {

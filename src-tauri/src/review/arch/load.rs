@@ -66,7 +66,7 @@ impl RepoCtx {
                 };
                 (
                     range.clone(),
-                    self.files_of(&ws, &range).await?,
+                    self.files_of(&ws, &revset, &range).await?,
                     false,
                     extra,
                 )
@@ -163,15 +163,20 @@ impl RepoCtx {
         Ok(out)
     }
 
-    /// Builds the files `range` changes.
-    async fn files_of(&self, ws: &Workspace, range: &Range) -> anyhow::Result<Vec<ReviewFile>> {
+    /// Builds the files `range` changes, skipping by the config at `revset`'s base.
+    async fn files_of(
+        &self,
+        ws: &Workspace,
+        revset: &str,
+        range: &Range,
+    ) -> anyhow::Result<Vec<ReviewFile>> {
         let diffs = ws.jj.diff(range).await?;
         let sides = Sides {
             old: range.from.clone(),
             new: range.to.clone(),
         };
         Ok(self
-            .build(sides, false, diffs, Config::load(&ws.root)?)
+            .build(sides, false, diffs, Config::at_base(&ws.jj, revset).await?)
             .await?
             .0)
     }

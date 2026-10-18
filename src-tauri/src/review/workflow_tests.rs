@@ -148,22 +148,35 @@ async fn rows_replacing_a_lost_mark_turn_amber_in_the_next_session() {
     assert!(state.amber.is_empty());
 }
 
+fn skipped(review: &ReviewDto) -> Vec<(&str, bool)> {
+    let files = review.files.iter();
+    files.map(|f| (f.path.as_str(), f.skipped)).collect()
+}
+
 #[tokio::test]
-async fn skip_globs_from_config_flag_files() {
+async fn skip_globs_from_the_base_config_flag_files() {
     let (dir, ctx) = repo();
     let d = dir.path();
     std::fs::create_dir_all(d.join(".lgtm")).unwrap();
     write(d, ".lgtm/config.toml", "skip = [\"*.lock\"]\n");
+    jj(d, &["new"]);
     write(d, "Cargo.lock", "x\n");
     write(d, "main.rs", "fn main() {}\n");
     let review = ctx.open(None, "@", false).await.unwrap();
-    let skipped: Vec<_> = review
-        .files
-        .iter()
-        .map(|f| (f.path.as_str(), f.skipped))
-        .collect();
+    let skipped = skipped(&review);
     assert!(skipped.contains(&("Cargo.lock", true)));
     assert!(skipped.contains(&("main.rs", false)));
+}
+
+#[tokio::test]
+async fn the_reviewed_changes_cannot_set_skip_globs() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    std::fs::create_dir_all(d.join(".lgtm")).unwrap();
+    write(d, ".lgtm/config.toml", "skip = [\"*.rs\"]\n");
+    write(d, "main.rs", "fn main() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    assert!(skipped(&review).contains(&("main.rs", false)));
 }
 
 #[tokio::test]

@@ -149,7 +149,7 @@ Line marks never collapse anything. Hunks collapse only by hand (`za` or the hun
 - Other colors on a whole-file selection apply to its lines. Files have no status but checked, and other colors never collapse a file.
 - When every changed line in a file is done, its checkbox gets an accent ring. It is never checked automatically.
 - Checking stores the anchors of the file's changed rows at that moment. It also stores the file's status, rename source, exec bits, and binary contents. If later changes bring in rows outside that set or change any of those, the file unchecks itself, expands, and its header shows "changed since reviewed". New rows are amber. A rebase that doesn't change the code keeps it checked.
-- Files matching `skip` globs in `.lgtm/config.toml` (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
+- Files matching `skip` globs in `.lgtm/config.toml` at the review's base (e.g. `*.lock`, `**/generated/**`) are skipped and start collapsed. Files skipped by hand don't collapse.
 - Any file can be collapsed or expanded with its collapse button regardless of status.
 
 #### Scope

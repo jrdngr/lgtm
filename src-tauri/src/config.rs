@@ -1,4 +1,4 @@
-//! Per-repo settings from `.lgtm/config.toml`.
+//! Per-repo settings from `.lgtm/config.toml`, read at a review's base.
 //!
 //! ```toml
 //! skip = ["*.lock", "**/generated/**"]
@@ -8,13 +8,12 @@
 //! threshold = 0.5
 //! ```
 
-use std::path::Path;
-
 use anyhow::Context;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
 use crate::anchor::MatchConfig;
+use crate::jj::Jj;
 
 pub const PATH: &str = ".lgtm/config.toml";
 
@@ -43,14 +42,15 @@ pub struct Config {
 }
 
 impl Config {
-    /// Reads the repo's config. A missing file gives the defaults.
-    pub fn load(root: &Path) -> anyhow::Result<Self> {
-        let path = root.join(PATH);
-        match std::fs::read_to_string(&path) {
-            Ok(text) => Self::parse(&text).with_context(|| format!("read {}", path.display())),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
-            Err(e) => Err(e).with_context(|| format!("read {}", path.display())),
-        }
+    /// Reads the config at the base of `revset`, so the changes under review can't set what
+    /// it skips. A missing file gives the defaults.
+    pub async fn at_base(jj: &Jj, revset: &str) -> anyhow::Result<Self> {
+        let base = jj.resolve(revset).await?.from;
+        let Some(bytes) = jj.file_if_any(base.as_deref(), PATH).await? else {
+            return Ok(Self::default());
+        };
+        let text = String::from_utf8(bytes).with_context(|| format!("{PATH} is not UTF-8"))?;
+        Self::parse(&text).with_context(|| format!("read {PATH}"))
     }
 
     pub fn parse(text: &str) -> anyhow::Result<Self> {

@@ -100,7 +100,7 @@ Debug builds regenerate `src/bindings.ts` from the Rust commands. `cargo test` f
 
 App settings are in `~/.config/lgtm/settings.toml` (lgtm › Settings…, ⌘,). The Claude command (an alias like `cc` works, since the terminal's shell runs it) starts Claude Code in a new Claude tab (New Tab › Claude) and resumes sessions. lgtm also runs it to check Claude Code's version and register its MCP server. Prompt overrides go in `~/.config/lgtm/`.
 
-Optional, in the repo at `.lgtm/config.toml`:
+Optional, in the repo at `.lgtm/config.toml`. lgtm reads it from the review's base, so the changes under review can't change it:
 
 ```toml
 # Files to skip: they start collapsed and count as done.

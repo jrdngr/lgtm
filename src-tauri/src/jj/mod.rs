@@ -219,6 +219,28 @@ impl Jj {
         )
         .await
     }
+
+    /// File contents at `commit`, or `None` when the file isn't there or `commit` is the root.
+    pub async fn file_if_any(
+        &self,
+        commit: Option<&str>,
+        path: &str,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let Some(commit) = commit else {
+            return Ok(None);
+        };
+        let literal = fileset_literal(path);
+        // `file show` fails on a missing literal path; `file list` prints nothing.
+        if self
+            .read(&["file", "list", "-r", commit, &literal])
+            .await?
+            .trim()
+            .is_empty()
+        {
+            return Ok(None);
+        }
+        Ok(Some(self.file(Some(commit), path).await?))
+    }
 }
 
 /// A fileset matching exactly `path`, relative to the repo root.
