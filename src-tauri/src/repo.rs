@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use specta::Type;
@@ -8,7 +8,6 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 
 use tauri_specta::Event as _;
 
-use crate::agent::Runs;
 use crate::events::{RepoChanged, WorkingCopyMoved, WorkingCopyStale};
 use crate::jj::Jj;
 use crate::review::{Emit, RepoCtx};
@@ -19,8 +18,6 @@ use crate::watch;
 #[derive(Default)]
 pub struct RepoWindows {
     open: Mutex<HashMap<String, Arc<RepoCtx>>>,
-    /// Closed repos whose agent runs were stopped, until their cleanup lets go of them.
-    closing: Mutex<Vec<Weak<RepoCtx>>>,
 }
 
 impl RepoWindows {
@@ -28,31 +25,9 @@ impl RepoWindows {
         self.open.lock().unwrap().get(label).cloned()
     }
 
-    /// Forgets the window's repo and stops its agent runs.
-    pub fn remove(&self, label: &str, runs: &Runs) {
-        let Some(ctx) = self.open.lock().unwrap().remove(label) else {
-            return;
-        };
-        if runs.stop_all(&ctx.agent_key("")) {
-            self.closing.lock().unwrap().push(Arc::downgrade(&ctx));
-        }
-    }
-
-    /// Whether every stopped run has cleaned up after itself, like `jj` putting `@` back.
-    pub fn settled(&self) -> bool {
-        let mut closing = self.closing.lock().unwrap();
-        closing.retain(|ctx| ctx.strong_count() > 0);
-        closing.is_empty()
-    }
-
-    /// Waits until `settled`, for a few seconds at most.
-    pub async fn settle(&self) {
-        for _ in 0..100 {
-            if self.settled() {
-                return;
-            }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        }
+    /// Forgets the window's repo.
+    pub fn remove(&self, label: &str) {
+        self.open.lock().unwrap().remove(label);
     }
 
     /// The window and state of the repo whose main workspace is at `root`.
@@ -287,39 +262,5 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join(".jj"), "").unwrap();
         assert_eq!(find_root(dir.path()), None);
-    }
-
-    #[tokio::test]
-    async fn closing_a_window_stops_only_its_runs_and_waits_for_their_cleanup() {
-        let (dir, ctx) = crate::review::tests::repo();
-        let (_other_dir, other) = crate::review::tests::repo();
-        let (ctx, other) = (Arc::new(ctx), Arc::new(other));
-        let windows = RepoWindows::default();
-        windows.insert("a".into(), ctx.clone());
-        windows.insert("b".into(), other.clone());
-        let runs = Runs::default();
-        let run = runs.register(&ctx.agent_key("fix")).unwrap();
-        let _other_run = runs.register(&other.agent_key("fix")).unwrap();
-
-        windows.remove("a", &runs);
-        let task = crate::agent::Task {
-            cwd: dir.path(),
-            prompt: "",
-            resume: None,
-            fork: false,
-            edit: false,
-            schema: None,
-            purpose: crate::agent::Purpose::Qa,
-        };
-        let reply = crate::agent::run_registered(run, task, |_| {}).await;
-        assert!(reply.unwrap().stopped);
-        assert!(
-            runs.register(&other.agent_key("fix")).is_err(),
-            "b's run goes on"
-        );
-        // The run's command still holds the repo while it cleans up.
-        assert!(!windows.settled());
-        drop(ctx);
-        assert!(windows.settled());
     }
 }

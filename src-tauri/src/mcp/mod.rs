@@ -7,6 +7,8 @@ mod arch;
 mod bridge;
 pub mod hook;
 mod inputs;
+mod qa;
+mod qa_inputs;
 pub mod register;
 mod reports;
 mod server;

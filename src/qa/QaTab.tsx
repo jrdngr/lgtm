@@ -1,10 +1,11 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { commands } from "../ipc";
 import { type SendOutcome, useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
+import { focusTerminal } from "../terminal/registry";
 import { useAgentsOff } from "../tools/agents";
 import { copy } from "../ui/contextMenu";
+import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { useWorkspace } from "../workspaces/context";
 import { ApplyView } from "./ApplyView";
@@ -23,6 +24,7 @@ import {
 import { PromptView } from "./PromptView";
 import { QuestionsView } from "./QuestionsView";
 import { busyName, setError, setView, useQa } from "./store";
+import { stopStep } from "./terminalSteps";
 import "./qa.css";
 import "./auto.css";
 import "./forms.css";
@@ -132,7 +134,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
           ]}
         />
       </header>
-      {d && busy && busy.kind !== "answer" && (
+      {d && busy && (busy.kind !== "answer" || busy.activity) && (
         <div className="qa-busy">
           <span className="qa-spin" />
           <span>
@@ -140,7 +142,15 @@ export function QaTab({ api }: IDockviewPanelProps) {
             {busy.activity && ` · ${busy.activity}`}
           </span>
           <span className="spacer" />
-          <button type="button" onClick={() => commands.stopQa(ws, d.id)}>
+          {busy.terminal && (
+            <IconButton
+              icon="terminal"
+              className="pipe-icon"
+              label="Terminal"
+              onClick={() => busy.terminal && focusTerminal(busy.terminal)}
+            />
+          )}
+          <button type="button" onClick={() => stopStep(d.id)}>
             Stop
           </button>
         </div>
@@ -168,7 +178,6 @@ export function QaTab({ api }: IDockviewPanelProps) {
             ws={ws}
             d={d}
             busy={busy}
-            streams={state.streams}
             focusKey={focusKey}
             jump={state.jump}
           />

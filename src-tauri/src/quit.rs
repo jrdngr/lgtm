@@ -8,7 +8,6 @@ use objc2::runtime::{AnyClass, AnyObject, Imp, Sel};
 use objc2::{class, ffi, msg_send, sel};
 use tauri::{AppHandle, Manager};
 
-use crate::agent::Runs;
 use crate::repo::{RepoWindows, START_LABEL};
 
 static APP: OnceLock<AppHandle> = OnceLock::new();
@@ -19,7 +18,7 @@ const NS_TERMINATE_LATER: usize = 2;
 enum Quit {
     /// Repo windows still to ask. The first is asking now.
     Asking(VecDeque<String>),
-    /// Every window agreed. The app ends once stopped agent runs have cleaned up.
+    /// Every window agreed, and the app is ending.
     Ending,
 }
 
@@ -91,17 +90,10 @@ fn ask_next() {
         }
     }
     *QUIT.lock().unwrap() = Some(Quit::Ending);
-    let (windows, runs) = (app.state::<RepoWindows>(), app.state::<Runs>());
-    for (label, window) in app.webview_windows() {
-        // Destroying finishes later, so the runs stop here for `settle` to wait on.
-        windows.remove(&label, &runs);
+    for window in app.webview_windows().into_values() {
         window.destroy().ok();
     }
-    let app = app.clone();
-    tauri::async_runtime::spawn(async move {
-        app.state::<RepoWindows>().settle().await;
-        reply(true);
-    });
+    reply(true);
 }
 
 /// Answers the `NSTerminateLater` that `should_terminate` gave.

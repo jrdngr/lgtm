@@ -8,7 +8,6 @@ import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { RunsPanel } from "../agents/RunsPanel";
 import { ArchPanel } from "../arch/ArchPanel";
 import { useAgentArch } from "../arch/useAgentArch";
 import { ReportPanel } from "../bots/ReportPanel";
@@ -46,15 +45,15 @@ const components = {
   prPreview: guarded(PrPreview),
   settings: guarded(SettingsPanel),
   shortcuts: guarded(ShortcutsPanel),
-  runs: guarded(RunsPanel),
   qa: guarded(QaTab),
-  // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads and Graph panels
-  // are then closed.
+  // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
+  // runs panels are then closed.
   tasks: () => null,
   threads: () => null,
   files: () => null,
   design: () => null,
   graph: () => null,
+  runs: () => null,
 };
 
 interface Props {

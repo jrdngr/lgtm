@@ -1,27 +1,21 @@
 import { useEffect, useState } from "react";
-import type { ClaudeCommand, Models, Settings } from "../bindings";
+import type { ClaudeCommand, Settings } from "../bindings";
 import { commands } from "../ipc";
 import { Busy } from "../ui/Busy";
 import { IconButton } from "../ui/icons";
 import { Row, Section } from "./SettingsPanel";
 import { saveSettings } from "./store";
 
-const MODELS: [keyof Models, string, string][] = [
-  ["qa", "Q&A", "Questions and discussion in Q&A sessions"],
-];
-
 /** A text field that saves when it loses focus or Enter is pressed. */
 function SavedInput({
   id,
   value,
   placeholder,
-  list,
   onSave,
 }: {
   id: string;
   value: string;
   placeholder?: string;
-  list?: string;
   onSave(value: string): Promise<string | undefined>;
 }) {
   const [draft, setDraft] = useState(value);
@@ -40,7 +34,6 @@ function SavedInput({
         className="settings-input"
         value={draft}
         placeholder={placeholder}
-        list={list}
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"
@@ -102,62 +95,19 @@ function Resolved({ setting }: { setting: string }) {
   );
 }
 
-/** The Claude command and the model for each kind of agent run. */
+/** The Claude command. */
 export function AgentSettings({ settings }: { settings: Settings }) {
-  const saveModel = (key: keyof Models) => (value: string) =>
-    saveSettings({ models: { ...settings.models, [key]: value.trim() } });
-
   return (
-    <>
-      <Section id="claude" title="Claude Code">
-        <Row label="Claude command" htmlFor="settings-claude-terminal">
-          <SavedInput
-            id="settings-claude-terminal"
-            value={settings.claudeTerminal}
-            placeholder="claude"
-            onSave={(c) => saveSettings({ claudeTerminal: c.trim() || "claude" })}
-          />
-        </Row>
-        <Row
-          label="Headless Claude command"
-          htmlFor="settings-claude"
-          help={
-            <>
-              What runs Claude Code for headless agents: a command, or an alias or function from
-              your login shell like <code>cc</code>. LGTM adds its own arguments after it.
-            </>
-          }
-        >
-          <SavedInput
-            id="settings-claude"
-            value={settings.claude}
-            placeholder="claude"
-            onSave={(claude) => saveSettings({ claude: claude.trim() || "claude" })}
-          />
-          <Resolved setting={settings.claude} />
-        </Row>
-      </Section>
-      <Section id="models" title="Models">
-        <p className="settings-help">
-          Passed to <code>--model</code>. Leave one empty for Claude Code's default.
-        </p>
-        <datalist id="settings-model-names">
-          <option value="opus" />
-          <option value="sonnet" />
-          <option value="haiku" />
-        </datalist>
-        {MODELS.map(([key, label, help]) => (
-          <Row key={key} label={label} help={help} htmlFor={`settings-model-${key}`}>
-            <SavedInput
-              id={`settings-model-${key}`}
-              value={settings.models[key]}
-              placeholder="Default"
-              list="settings-model-names"
-              onSave={saveModel(key)}
-            />
-          </Row>
-        ))}
-      </Section>
-    </>
+    <Section id="claude" title="Claude Code">
+      <Row label="Claude command" htmlFor="settings-claude-terminal">
+        <SavedInput
+          id="settings-claude-terminal"
+          value={settings.claudeTerminal}
+          placeholder="claude"
+          onSave={(c) => saveSettings({ claudeTerminal: c.trim() || "claude" })}
+        />
+        <Resolved setting={settings.claudeTerminal} />
+      </Row>
+    </Section>
   );
 }

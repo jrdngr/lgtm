@@ -319,15 +319,10 @@ export const commands = {
 	editQa: (workspace: string | null, id: string, edit: SessionEdit) => typedError<Session_Serialize, string>(__TAURI_INVOKE("edit_qa", { workspace, id, edit })),
 	deleteQa: (workspace: string | null, id: string) => typedError<null, string>(__TAURI_INVOKE("delete_qa", { workspace, id })),
 	actOnQuestion: (workspace: string | null, session: string, act: QuestionAct) => typedError<Session_Serialize, string>(__TAURI_INVOKE("act_on_question", { workspace, session, act })),
-	/**  Applies the answer to question `id` to the rest of the queue. */
-	applyAnswer: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("apply_answer", { workspace, session, id })),
-	/**  A discussion turn on a question, streaming the agent's reply through `on_text`. */
-	discussQuestion: (workspace: string | null, session: string, id: string, message: string, onText: Channel<string>) => typedError<Session_Serialize, string>(__TAURI_INVOKE("discuss_question", { workspace, session, id, message, onText })),
-	/**  Rewrites a question after its discussion. */
-	reaskQuestion: (workspace: string | null, session: string, id: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("reask_question", { workspace, session, id })),
+	/**  Adds a turn to question `id`'s discussion: the user's message, or the agent's reply. */
+	addQaTurn: (workspace: string | null, session: string, id: string, you: boolean, text: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("add_qa_turn", { workspace, session, id, you, text })),
 	/**  The open questions deferring question `id` would also defer. */
 	deferPreview: (workspace: string | null, session: string, id: string) => typedError<string[], string>(__TAURI_INVOKE("defer_preview", { workspace, session, id })),
-	stopQa: (workspace: string | null, session: string) => typedError<null, string>(__TAURI_INVOKE("stop_qa", { workspace, session })),
 };
 
 /** Events */
@@ -578,7 +573,7 @@ export type Choice_Serialize = {
 	bullets?: string[],
 };
 
-/**  How the `claude` setting resolved, for the Settings tab. */
+/**  How the `claudeTerminal` setting resolved, for the Settings tab. */
 export type ClaudeCommand = {
 	setting: string,
 	/**  The command line that runs, like `ucode claude` for the alias `cc`. */
@@ -1049,12 +1044,6 @@ export type Minimal = {
 	questions?: Question[],
 };
 
-/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
-export type Models = {
-	/**  Q&A questions, their updates, and discussion. */
-	qa: string,
-};
-
 export type NearbyPrDto = {
 	number: number,
 	title: string,
@@ -1463,7 +1452,9 @@ export type SessionEdit = { kind: "prompt"; prompt: string; attach: string[] } |
 /**  Implemented, or back to active. */
 { kind: "archive"; archived: boolean } | 
 /**  It went to a terminal, named by its title. */
-{ kind: "sent"; terminal: string };
+{ kind: "sent"; terminal: string } | 
+/**  The terminal panel whose agent now runs its steps. */
+{ kind: "terminal"; id: string };
 
 export type Session_Deserialize = {
 	id: string,
@@ -1480,18 +1471,14 @@ export type Session_Deserialize = {
 	sent?: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal?: boolean,
-	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
-	forkFrom?: string | null,
 	/**
-	 *  The terminal panel that agent runs in, which Apply in terminal sends the decisions back
-	 *  to.
+	 *  The terminal panel whose agent asked the questions. It applies each answer and talks
+	 *  questions over, and Apply in terminal sends it the decisions.
 	 */
 	terminal?: string | null,
 	/**  Implemented: marked so after a send. */
 	archived?: boolean,
 	created: number | null,
-	/**  The agent's conversation, resumed by each step. */
-	agent?: string | null,
 };
 
 export type Session_Serialize = {
@@ -1509,29 +1496,22 @@ export type Session_Serialize = {
 	sent: string | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal: boolean,
-	/**  That terminal agent's Claude Code session, which the agent here starts from a copy of. */
-	forkFrom: string | null,
 	/**
-	 *  The terminal panel that agent runs in, which Apply in terminal sends the decisions back
-	 *  to.
+	 *  The terminal panel whose agent asked the questions. It applies each answer and talks
+	 *  questions over, and Apply in terminal sends it the decisions.
 	 */
 	terminal: string | null,
 	/**  Implemented: marked so after a send. */
 	archived: boolean,
 	created: number | null,
-	/**  The agent's conversation, resumed by each step. */
-	agent: string | null,
 };
 
 export type Settings = {
 	/**
-	 *  How headless agents start Claude Code: a command line, or an alias or function from the
-	 *  login shell.
+	 *  What a terminal runs to start Claude Code, typed into its shell. lgtm also runs it to
+	 *  check Claude Code and register its MCP server.
 	 */
-	claude: string,
-	/**  What a terminal runs to start Claude Code, typed into its shell. */
 	claudeTerminal: string,
-	models: Models,
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot[],

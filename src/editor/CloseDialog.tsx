@@ -131,11 +131,7 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                         <Icon name="terminal" size={12} />
                       </span>
                     )}
-                    <span
-                      className={`close-name${agent ? (agent.headless ? " headless" : " in-terminal") : ""}`}
-                    >
-                      {name}
-                    </span>
+                    <span className={`close-name${agent ? " in-terminal" : ""}`}>{name}</span>
                     {agent && <span className="close-ago">{since(agent.since)}</span>}
                   </div>
                 ))}

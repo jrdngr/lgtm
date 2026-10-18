@@ -9,6 +9,7 @@ import {
   decide as decideQuestion,
   discuss as discussQuestion,
   explain as explainOption,
+  reask as reaskQuestion,
 } from "./actions";
 import { Bars } from "./Bars";
 import { DeferModal } from "./DeferModal";
@@ -28,7 +29,7 @@ import {
 } from "./model";
 import { QuestionCard } from "./QuestionCard";
 import { Rail } from "./Rail";
-import { act, type Busy, clearJump, runStep, setError, setView } from "./store";
+import { act, type Busy, clearJump, setError, setView } from "./store";
 
 const isEditable = (t: EventTarget) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
@@ -37,7 +38,6 @@ interface Props {
   ws: WorkspaceName;
   d: Session;
   busy?: Busy;
-  streams: Record<string, string>;
   /** Moves keyboard focus into the view. */
   focusKey: number;
   /** A question to show, picked on Apply. */
@@ -47,7 +47,7 @@ interface Props {
 /** The session's questions, one at a time in the qqueue template. The first open one is
  * answered; the rest, auto answers among them, can be looked at with [ ]. Number keys pick an
  * option, ↵ decides it, and the agent then updates the questions that depend on it. */
-export function QuestionsView({ ws, d, busy, streams, focusKey, jump }: Props) {
+export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
   const [want, setWant] = useState(jump);
   const [sel, setSel] = useState(0);
   const [mode, setMode] = useState<Mode>();
@@ -186,9 +186,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey, jump }: Props) {
     const qid = q.id;
     setMode(undefined);
     focusRoot();
-    runStep(ws, id, { kind: "reask", about: qid, subject: `${d.title}: ask ${qid} again` }, () =>
-      commands.reaskQuestion(ws, id, qid),
-    );
+    reaskQuestion(ws, d, qid);
   }
 
   function onKey(e: React.KeyboardEvent) {
@@ -321,7 +319,7 @@ export function QuestionsView({ ws, d, busy, streams, focusKey, jump }: Props) {
                 key={q.id}
                 q={q}
                 busy={agentBusy}
-                streaming={busy?.kind === "discuss" ? streams[`${id}:${q.id}`] : undefined}
+                thinking={busy?.kind === "discuss" && busy.about === q.id}
                 onSend={discuss}
                 onReask={reask}
                 onClose={() => {

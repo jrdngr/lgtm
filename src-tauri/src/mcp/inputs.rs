@@ -1,6 +1,5 @@
 //! Tool parameters, with the JSON schemas agents see.
 
-use crate::qa::queue::Choice;
 use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 
@@ -236,102 +235,4 @@ pub struct SuggestReply {
     pub thread_id: u32,
     /// The whole reply, in the human's voice.
     pub text: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct QaSession {
-    /// The session's id, from list_qa or qa_ask.
-    pub session: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct QaChoice {
-    pub label: String,
-    /// What it means, in a line.
-    pub means: String,
-    /// What it gets you, a short line each.
-    #[serde(default)]
-    pub pros: Vec<String>,
-    /// What it costs, a short line each.
-    #[serde(default)]
-    pub cons: Vec<String>,
-    /// Downsides worse than a con: what could go badly wrong.
-    #[serde(default)]
-    pub risks: Vec<String>,
-}
-
-impl From<QaChoice> for Choice {
-    fn from(o: QaChoice) -> Self {
-        Choice {
-            label: o.label,
-            means: o.means,
-            pros: o.pros,
-            cons: o.cons,
-            risks: o.risks,
-            bullets: vec![],
-        }
-    }
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct QaQuestion {
-    /// A subquestion of the top-level question before it.
-    #[serde(default)]
-    pub sub: bool,
-    /// A few words naming the decision.
-    pub subject: String,
-    /// Only the facts that change the answer, one per bullet.
-    pub context: Vec<String>,
-    /// The recommended option first, always.
-    pub options: Vec<QaChoice>,
-    /// Why option 1 is recommended, in a line or two.
-    pub why: String,
-    /// Files you read to build the question.
-    #[serde(default)]
-    pub sources: Vec<String>,
-    /// Ids of questions whose answers could change this one; leave it empty when none could.
-    /// Questions in this call are numbered in the order given, on from the session's last
-    /// number (Q1, Q2, ... in a new session), with subquestions lettered under the question
-    /// before them (Q2a, Q2b). lgtm moves each question after the ones it depends on, so
-    /// the returned ids can differ.
-    #[serde(default)]
-    pub depends: Vec<String>,
-    /// Only when option 1 is obvious and the other options are non-starters: why, in a short
-    /// line. lgtm records option 1 as the answer, and the human can reopen it.
-    pub auto: Option<String>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct QaAsk {
-    /// The session to add to, from list_qa. Leave it out to start one.
-    pub session: Option<String>,
-    /// For a new session: what it's deciding, in a line.
-    pub title: Option<String>,
-    /// For a new session: everything from this conversation that lgtm's agent can't look up
-    /// in the repo, since it updates the questions after each answer without seeing this
-    /// chat: the goal, what's settled and why, what was ruled out, and the human's
-    /// constraints. Leave out what the repo says.
-    pub brief: Option<String>,
-    /// For a new session: workspace paths lgtm's agent reads before it updates questions.
-    #[serde(default)]
-    pub read_first: Vec<String>,
-    /// In the order to ask them.
-    pub questions: Vec<QaQuestion>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct QaRewrite {
-    /// The session, from list_qa or qa_ask.
-    pub session: String,
-    /// The question's id, like Q3.
-    pub id: String,
-    /// What changed, in a few words.
-    pub what: String,
-    pub subject: String,
-    /// Only the facts that change the answer, one per bullet.
-    pub context: Vec<String>,
-    /// The recommended option first, always.
-    pub options: Vec<QaChoice>,
-    /// Why option 1 is recommended, in a line or two.
-    pub why: String,
 }

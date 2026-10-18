@@ -12,8 +12,12 @@ interface TerminalTarget {
   paste(text: string): void;
   /** Whether an agent like Claude Code runs in it, by its hooks or its title. */
   hasAgent(): boolean;
+  /** Whether its agent is working or waiting on the user. */
+  agentBusy(): boolean;
   /** Presses Enter. */
   submit(): void;
+  /** Stops its agent's turn. */
+  interrupt(): void;
   /** Brings the pane forward and focuses it. */
   focus(): void;
 }
@@ -151,3 +155,22 @@ export function sendToTerminal(workspace: WorkspaceName, text: string, id?: stri
   target.focus();
   return "sent";
 }
+
+/** Pastes `text` into terminal `id` and presses Enter, without focusing it. Returns false when
+ * no agent runs there or it can't take a paste. */
+export function promptAgent(id: string, text: string): boolean {
+  const t = terminals.get(id);
+  if (!t?.hasAgent() || !t.canPaste()) return false;
+  t.paste(text.replace(CONTROLS, ""));
+  t.submit();
+  return true;
+}
+
+/** Whether an agent runs in terminal `id`. */
+export const terminalHasAgent = (id: string) => !!terminals.get(id)?.hasAgent();
+
+/** Whether terminal `id`'s agent is working or waiting on the user. */
+export const terminalAgentBusy = (id: string) => !!terminals.get(id)?.agentBusy();
+
+/** Stops the turn of terminal `id`'s agent. */
+export const interruptAgent = (id: string) => terminals.get(id)?.interrupt();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   pinTarget,
+  promptAgent,
   registerTerminal,
   sendTarget,
   sendToTerminal,
@@ -15,6 +16,8 @@ function fake(workspace: string | null, canPaste = true, agent = false) {
     got,
     target: {
       hasAgent: () => agent,
+      agentBusy: () => false,
+      interrupt() {},
       submit: () => got.push("\r"),
       workspace,
       title: () => "",
@@ -106,5 +109,18 @@ describe("submitNextSend", () => {
     sendToTerminal("s2", "ls");
     off2();
     expect(shell.got).toEqual(["ls"]);
+  });
+});
+
+describe("promptAgent", () => {
+  it("submits only to a terminal running an agent", () => {
+    const shell = fake("w", true, false);
+    const agent = fake("w", true, true);
+    const off = [registerTerminal("s", shell.target), registerTerminal("a", agent.target)];
+    expect(promptAgent("s", "go")).toBe(false);
+    expect(shell.got).toEqual([]);
+    expect(promptAgent("a", "go\x1b")).toBe(true);
+    expect(agent.got).toEqual(["go", "\r"]);
+    for (const f of off) f();
   });
 });

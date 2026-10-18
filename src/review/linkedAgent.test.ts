@@ -48,7 +48,9 @@ const target = {
   canPaste: () => true,
   paste() {},
   hasAgent: () => true,
+  agentBusy: () => false,
   submit() {},
+  interrupt() {},
   focus() {},
 };
 const report = (

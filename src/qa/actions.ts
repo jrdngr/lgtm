@@ -3,7 +3,8 @@ import { commands } from "../ipc";
 import { remembered } from "../workbench/remembered";
 import type { WorkspaceName } from "../workspaces/context";
 import { dependents, type Session } from "./model";
-import { act, removeSession, runStep, selectSession, setError } from "./store";
+import { act, getQa, loadSessions, removeSession, selectSession, setError } from "./store";
+import { runInTerminal } from "./terminalSteps";
 
 /** Decides question `id`, then has the agent update the questions still open. */
 export async function decide(ws: WorkspaceName, d: Session, id: string, answer: AnswerInput) {
@@ -13,20 +14,17 @@ export async function decide(ws: WorkspaceName, d: Session, id: string, answer: 
   return true;
 }
 
-/** Each session's last queued update, so updates run one at a time in one conversation. */
-const updates = new Map<string, Promise<unknown>>();
+const about = (d: Session) => `lgtm Q&A "${d.title}" (session ${d.id})`;
 
 /** Has the agent update the questions that depend on `id` after it was decided. Nothing runs
- * when none do. Updates queue behind the one running. */
+ * when none do. */
 export function updateAfter(ws: WorkspaceName, d: Session, id: string) {
   if (!dependents(d, id).length) return;
-  const run = () =>
-    runStep(ws, d.id, { kind: "answer", about: id, subject: `${d.title}: after ${id}` }, () =>
-      commands.applyAnswer(ws, d.id, id),
-    );
-  const next = (updates.get(d.id) ?? Promise.resolve()).then(run, run);
-  updates.set(d.id, next);
-  return next;
+  return runInTerminal(ws, d, {
+    kind: "answer",
+    about: id,
+    prompt: `${about(d)}: I answered ${id}. Read what depends on it with qa_dependents and apply it with qa_update.`,
+  });
 }
 
 /** Asks the agent to explain option `option` of question `id`, in its discussion. */
@@ -46,15 +44,28 @@ export function explain(ws: WorkspaceName, d: Session, id: string, option: numbe
 export async function discuss(ws: WorkspaceName, d: Session, id: string, message: string) {
   const state = (s: Session) => s.queue.questions.find((q) => q.id === id)?.state;
   const wasOpen = state(d) === "open";
-  const r = await runStep(
-    ws,
-    d.id,
-    { kind: "discuss", about: id, subject: `${d.title}: ${id}`, streams: true },
-    (ch) => commands.discussQuestion(ws, d.id, id, message, ch),
-  );
-  const decided = wasOpen && r.status === "ok" && state(r.data) === "decided";
-  if (decided) updateAfter(ws, r.data, id);
+  const mine = await act(ws, commands.addQaTurn(ws, d.id, id, true, message));
+  if (mine.status === "error") return false;
+  const reply = await runInTerminal(ws, d, {
+    kind: "discuss",
+    about: id,
+    prompt: `${about(d)}, about ${id}: ${message}\n\n(qa_question has ${id}, our discussion and how we discuss it.)`,
+  });
+  if (reply?.trim()) await act(ws, commands.addQaTurn(ws, d.id, id, false, reply.trim()));
+  else await loadSessions(ws);
+  const now = getQa(ws).sessions.find((x) => x.id === d.id);
+  const decided = wasOpen && !!now && state(now) === "decided";
+  if (decided && now) updateAfter(ws, now, id);
   return decided;
+}
+
+/** Has the agent rewrite question `id` with what came out of its discussion. */
+export function reask(ws: WorkspaceName, d: Session, id: string) {
+  return runInTerminal(ws, d, {
+    kind: "reask",
+    about: id,
+    prompt: `${about(d)}: rewrite ${id} with what came out of our discussion, with qa_rewrite. qa_question has it and the discussion.`,
+  });
 }
 
 /** Saves a prompt as a new session, or into session `d`. Returns the session's id. */

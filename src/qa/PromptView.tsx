@@ -18,7 +18,7 @@ interface Props {
 
 /** The terminal prompt for asking through an agent the user drives. */
 const terminalText = (id: string, prompt: string, attach: string[], auto: boolean) =>
-  `${prompt.trim()}${attach.length ? `\n\nRead these first: ${attach.join(", ")}` : ""}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), then wait and read my answers with qa_answers.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
+  `${prompt.trim()}${attach.length ? `\n\nRead these first: ${attach.join(", ")}` : ""}\n\nBefore writing anything, ask me every decision you need with lgtm's qa_ask tool (session "${id}"), built by the rules qa_rules returns. Then wait: lgtm sends you prompts to update and discuss questions as I answer, and my decisions at the end.${auto ? " Answer the obvious questions yourself with their `auto` field." : ""}`;
 
 /** What the session is for, files the agent reads first and whether it answers the obvious
  * questions itself, then starting it in a terminal. */

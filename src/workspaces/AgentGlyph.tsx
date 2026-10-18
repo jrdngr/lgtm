@@ -130,9 +130,7 @@ export function AgentGlyph({ a, name, onOpen }: Props) {
                 }}
               >
                 <Glyph state={g.state} />
-                <span className={`ws-agent-name ${g.headless ? "headless" : "in-terminal"}`}>
-                  {name(g)}
-                </span>
+                <span className="ws-agent-name in-terminal">{name(g)}</span>
                 <span className="ws-agent-ago">{since(g.since)}</span>
               </button>
             ))}

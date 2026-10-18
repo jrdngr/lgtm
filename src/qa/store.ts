@@ -1,7 +1,5 @@
-import { Channel } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useSyncExternalStore } from "react";
-import { endFrom, startRun } from "../agents/runs";
 import { events } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { dockOf } from "../workbench/docks";
@@ -17,8 +15,10 @@ export interface Busy {
   kind: BusyKind;
   /** The question it's about. */
   about?: string;
-  /** The tool it's using now. */
+  /** What it waits on, if anything. */
   activity: string;
+  /** The terminal its agent runs in. */
+  terminal?: string;
 }
 
 export interface QaState {
@@ -33,8 +33,6 @@ export interface QaState {
   /** A question to show next time Questions opens. */
   jump?: string;
   busy: Record<string, Busy>;
-  /** Text the agent is writing, by `id:about`, until its run ends. */
-  streams: Record<string, string>;
   error?: string;
 }
 
@@ -43,7 +41,6 @@ const EMPTY: QaState = {
   loaded: false,
   fresh: false,
   busy: {},
-  streams: {},
 };
 const states = new Map<string, QaState>();
 const listeners = new Set<() => void>();
@@ -145,59 +142,12 @@ export async function act(ws: WorkspaceName, r: Promise<CommandResult<Session>>)
   return got;
 }
 
-interface RunOptions {
-  kind: BusyKind;
-  about?: string;
-  /** What the Agent runs list says it's about. */
-  subject: string;
-  /** The channel carries the reply's text, kept in `streams`, rather than tool calls. */
-  streams?: boolean;
-}
-
-/** Runs an agent step for session `id`, showing it as busy and in Agent runs. */
-export async function runStep(
-  ws: WorkspaceName,
-  id: string,
-  o: RunOptions,
-  go: (channel: Channel<string>) => Promise<CommandResult<Session>>,
-): Promise<CommandResult<Session>> {
-  const key = `${id}:${o.about ?? ""}`;
-  set(ws, (s) => ({
-    ...s,
-    error: undefined,
-    busy: { ...s.busy, [id]: { kind: o.kind, about: o.about, activity: "" } },
-    streams: o.streams ? { ...s.streams, [key]: "" } : s.streams,
-  }));
-  const handle = startRun(ws, {
-    kind: "qa",
-    subject: o.subject,
-    stop: () => commands.stopQa(ws, id),
-    retry: () => runStep(ws, id, o, go),
-    open: () => showQa(ws, id),
-  });
-  const channel = new Channel<string>();
-  channel.onmessage = (text) => {
-    if (o.streams)
-      set(ws, (s) => ({ ...s, streams: { ...s.streams, [key]: (s.streams[key] ?? "") + text } }));
-    else {
-      handle.activity(text);
-      set(ws, (s) => {
-        const b = s.busy[id];
-        if (!b) return s;
-        return { ...s, busy: { ...s.busy, [id]: { ...b, activity: text } } };
-      });
-    }
-  };
-  const r = await go(channel);
-  endFrom(handle, r);
+/** Shows the agent working on session `id`, or with `undefined`, done. */
+export function setBusy(ws: WorkspaceName, id: string, busy: Busy | undefined) {
   set(ws, (s) => {
-    const { [id]: _, ...busy } = s.busy;
-    const { [key]: __, ...streams } = s.streams;
-    return { ...s, busy, streams };
+    const { [id]: _, ...rest } = s.busy;
+    return { ...s, busy: busy ? { ...rest, [id]: busy } : rest };
   });
-  if (r.status === "error") setError(ws, r.error);
-  else applySession(ws, r.data);
-  return r;
 }
 
 function watch(ws: WorkspaceName) {

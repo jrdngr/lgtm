@@ -1,12 +1,10 @@
 use serde::Deserialize;
 use specta::Type;
-use tauri::ipc::Channel;
-use tauri::{State, WebviewWindow};
+use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::agent::Runs;
 use crate::qa::Session;
-use crate::qa::queue::Answer;
+use crate::qa::queue::{Answer, Turn};
 
 /// The workspace's Q&A sessions, oldest first.
 #[tauri::command]
@@ -63,6 +61,10 @@ pub enum SessionEdit {
     Sent {
         terminal: String,
     },
+    /// The terminal panel whose agent now runs its steps.
+    Terminal {
+        id: String,
+    },
 }
 
 #[tauri::command]
@@ -84,6 +86,7 @@ pub(crate) async fn edit_qa(
             SessionEdit::Note { note } => s.note = note,
             SessionEdit::Archive { archived } => s.archived = archived,
             SessionEdit::Sent { terminal } => s.sent = Some(terminal),
+            SessionEdit::Terminal { id } => s.terminal = Some(id),
         }
         Ok(())
     })
@@ -174,70 +177,19 @@ pub(crate) async fn defer_preview(
     Ok(s.queue.defer_preview(&id))
 }
 
-/// Applies the answer to question `id` to the rest of the queue.
+/// Adds a turn to question `id`'s discussion: the user's message, or the agent's reply.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn apply_answer(
+pub(crate) async fn add_qa_turn(
     window: WebviewWindow,
-    runs: State<'_, Runs>,
     workspace: Option<String>,
     session: String,
     id: String,
+    you: bool,
+    text: String,
 ) -> CmdResult<Session> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     repo(&window)?
-        .apply_answer(&ws, &session, &id, &runs)
-        .await
+        .add_qa_turn(&ws, &session, &id, Turn { you, text })
         .map_err(err)
-}
-
-/// A discussion turn on a question, streaming the agent's reply through `on_text`.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn discuss_question(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-    id: String,
-    message: String,
-    on_text: Channel<String>,
-) -> CmdResult<Session> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?
-        .discuss_question(&ws, &session, &id, &message, &runs, |t| {
-            on_text.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-/// Rewrites a question after its discussion.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn reask_question(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-    id: String,
-) -> CmdResult<Session> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?
-        .reask_question(&ws, &session, &id, &runs)
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn stop_qa(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    workspace: Option<String>,
-    session: String,
-) -> CmdResult<()> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    repo(&window)?.stop_qa(&ws, &session, &runs);
-    Ok(())
 }

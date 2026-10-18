@@ -1,4 +1,5 @@
-//! The command that starts Claude Code, from the `claude` setting. A command on PATH runs as
+//! The command that starts Claude Code, from the `claudeTerminal` setting, for running it
+//! outside a terminal. A command on PATH runs as
 //! is. Otherwise the login shell says what the name is: an alias is expanded once and run
 //! directly, and a function runs through the shell on every call.
 
@@ -20,7 +21,7 @@ struct Resolved {
     via_shell: bool,
 }
 
-/// How the `claude` setting resolved, for the Settings tab.
+/// How the `claudeTerminal` setting resolved, for the Settings tab.
 #[derive(Clone, Debug, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeCommand {
@@ -169,13 +170,13 @@ fn resolve_setting(setting: &str) -> Result<Resolved, String> {
 
 /// Resolves the current setting again, after it changed or the shell's config did.
 pub fn refresh() {
-    let setting = super::get().claude;
+    let setting = super::get().claude_terminal;
     let resolved = resolve_setting(&setting);
     *RESOLVED.write().unwrap() = Some((setting, resolved));
 }
 
 fn current() -> Result<Resolved, String> {
-    let setting = super::get().claude;
+    let setting = super::get().claude_terminal;
     if let Some((s, r)) = RESOLVED.read().unwrap().as_ref()
         && *s == setting
     {
@@ -194,7 +195,7 @@ pub fn command() -> anyhow::Result<tokio::process::Command> {
 }
 
 pub fn status() -> ClaudeCommand {
-    let setting = super::get().claude;
+    let setting = super::get().claude_terminal;
     let (resolved, via_shell, error) = match current() {
         Ok(r) if r.via_shell => (Some(setting.clone()), true, None),
         Ok(r) => {

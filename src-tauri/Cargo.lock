@@ -2291,7 +2291,6 @@ dependencies = [
  "futures",
  "globset",
  "ignore",
- "libc",
  "notify",
  "objc2",
  "percent-encoding",

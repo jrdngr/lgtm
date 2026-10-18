@@ -16,8 +16,6 @@ export interface AgentInfo {
   state: AgentState;
   /** When it took that state. */
   since: number;
-  /** A headless run rather than an agent in a terminal. */
-  headless: boolean;
   /** The panel it runs in, or `REVIEW_TAB` for any review tab. */
   tab?: string;
 }
@@ -28,13 +26,9 @@ export interface Activity {
   agents: AgentInfo[];
 }
 
-/** An agent's `tab` that stands for every review tab. */
-export const REVIEW_TAB = "review";
-
 export interface ReportOptions {
   /** Stays as idle once its ending is seen, like Claude in a terminal. Others go. */
   stays?: boolean;
-  headless?: boolean;
   tab?: string;
 }
 
@@ -51,7 +45,6 @@ interface Agent {
   /** When it took its state. */
   since: number;
   stays: boolean;
-  headless: boolean;
   tab?: string;
 }
 
@@ -81,7 +74,7 @@ export function report(
   id: string,
   state: ActivityState,
   label: string,
-  { stays = false, headless = false, tab }: ReportOptions = {},
+  { stays = false, tab }: ReportOptions = {},
 ) {
   const key = workspaceKey(workspace);
   const a = agents.get(id);
@@ -89,7 +82,7 @@ export function report(
     if (a?.key === key && a.state === s && a.label === label && a.tab === tab) return;
     const now = Date.now();
     const since = a?.state === s ? a.since : now;
-    agents.set(id, { key, label, state: s, pulse: now, since, stays, headless, tab });
+    agents.set(id, { key, label, state: s, pulse: now, since, stays, tab });
     changed();
   };
   switch (state) {
@@ -170,7 +163,6 @@ function info(id: string, a: Agent, now: number): AgentInfo {
     label: a.label,
     state: stalled ? "stalled" : a.state,
     since: stalled ? a.pulse + STALL_MS : a.since,
-    headless: a.headless,
     tab: a.tab,
   };
 }
@@ -184,9 +176,9 @@ export function tabAgent(id: string): AgentInfo | undefined {
     .sort((a, b) => rank(a.state) - rank(b.state))[0];
 }
 
-/** The most urgent state of the agents running in panel `id`, a review tab when `review`. */
-export function tabState(a: Activity, id: string, review: boolean): AgentState | undefined {
-  return a.agents.find((g) => g.tab === id || (review && g.tab === REVIEW_TAB))?.state;
+/** The most urgent state of the agents running in panel `id`. */
+export function tabState(a: Activity, id: string): AgentState | undefined {
+  return a.agents.find((g) => g.tab === id)?.state;
 }
 
 function subscribe(l: () => void) {

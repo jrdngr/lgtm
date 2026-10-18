@@ -1,4 +1,4 @@
-import { AgentButton } from "../ui/AgentButton";
+import { PipeButton } from "../ui/PipeButton";
 import type { Question, UndoKind } from "./model";
 
 /** What's being written under the question. */
@@ -94,9 +94,9 @@ export function ActionBar({ q, next, ahead, auto, canAnswer, agentBusy, sel, las
         </>
       )}
       {q.state !== "dropped" && q.state !== "deferred" && (
-        <AgentButton className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
+        <PipeButton className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
           Discuss
-        </AgentButton>
+        </PipeButton>
       )}
       {q.state === "open" && (
         <button type="button" className="qq-btn ghost" disabled={!canAnswer} onClick={p.onDefer}>

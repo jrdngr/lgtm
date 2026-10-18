@@ -145,12 +145,12 @@ export function QuestionCard({
               {p.onExplain && (
                 <button
                   type="button"
-                  className="qq-explain agent-icon"
+                  className="qq-explain pipe-icon"
                   title={`Explain option ${i + 1}`}
                   aria-label={`Explain option ${i + 1}`}
                   onClick={() => p.onExplain?.(i)}
                 >
-                  <Icon name="agent" size={15} />
+                  <Icon name="terminal" size={15} />
                 </button>
               )}
             </div>

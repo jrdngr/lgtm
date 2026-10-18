@@ -18,8 +18,12 @@ export interface Session {
   running(): Promise<string | null>;
   /** Whether an agent runs in it. */
   hasAgent(): boolean;
+  /** Whether its agent is working or waiting on the user. */
+  agentBusy(): boolean;
   /** Presses Enter, after a paste has landed. */
   submit(): void;
+  /** Presses Escape, which stops an agent's turn. */
+  interrupt(): void;
   dispose(): void;
 }
 
@@ -178,10 +182,12 @@ function startSession(
     refit,
     title: () => title,
     hasAgent: () => agent !== "gone",
+    agentBusy: () => agent === "running" || agent === "input",
     submit() {
       // After the paste has landed, or the agent takes the Enter as part of it.
       window.setTimeout(() => pty !== undefined && commands.ptyWrite(pty, "\r"), SUBMIT_DELAY_MS);
     },
+    interrupt: () => pty !== undefined && commands.ptyWrite(pty, "\x1b"),
     running: async () => (pty === undefined ? null : commands.ptyRunning(pty)),
     dispose() {
       disposed = true;

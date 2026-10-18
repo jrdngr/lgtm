@@ -1,265 +1,166 @@
-//! Talking a question over with the agent. A reply can end with tags that act on the
-//! question: `<rewrite>` when the talk changes it, `<decide>` when the user settles it.
+//! Talking a question over with the terminal agent. The user writes in the question's card,
+//! the agent answers in its terminal, and both land in the question's discussion. The agent's
+//! tools rewrite or decide the question.
 
 use anyhow::Context;
-use serde::Deserialize;
 
 use super::Session;
-use super::agent::{REAUTO_RULE, Step, parse, rewrite};
-use super::queue::{Answer, QState, QaQuestion, Rewrite, Turn};
+use super::queue::{Answer, QState, QaQuestion, Turn};
 use super::text;
-use crate::agent::{Progress, Runs};
+use super::update::REAUTO_RULE;
 use crate::review::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
-
-/// How a discussion reply acts on question `q`.
-fn rules(q: &QaQuestion) -> String {
-    let qid = &q.id;
-    let auto = if is_auto(q) {
-        format!(", and auto. {qid} is auto-answered. {REAUTO_RULE}")
-    } else {
-        ".".into()
-    };
-    format!(
-        "If this changes {qid}'s context, options or recommendation, end your reply with the \
-         rewritten question by the same rules, between <rewrite> and </rewrite>, as JSON with \
-         the fields id, what (what changed, in a few words), subject, context, options, why\
-         {auto} If I pick an option or otherwise settle {qid}, end your reply with \
-         {{\"option\": the option's number from 1, or null for an answer outside them, \
-         \"note\": what I added to it or null, \"other\": my answer in my words when option is \
-         null, else null}} between <decide> and </decide>. Don't ask me new questions here: \
-         after I decide, you update the open questions and add new ones there."
-    )
-}
 
 fn is_auto(q: &QaQuestion) -> bool {
     q.state == QState::Decided && q.answer.as_ref().is_some_and(Answer::is_auto)
 }
 
-/// The question's discussion, a paragraph a turn.
-fn talk(q: &QaQuestion) -> String {
-    q.discussion
+/// How to discuss question `q`.
+fn rules(q: &QaQuestion) -> String {
+    let qid = &q.id;
+    let auto = if is_auto(q) {
+        format!(" {qid} is auto-answered. {REAUTO_RULE}")
+    } else {
+        String::new()
+    };
+    format!(
+        "We're discussing {qid}: answer briefly. If the discussion changes its context, options \
+         or recommendation, rewrite it with qa_rewrite.{auto} If I pick an option or otherwise \
+         settle it, record that with qa_decide. Don't ask me new questions here: after I decide, \
+         you update the open questions."
+    )
+}
+
+/// Question `qid`, its discussion so far and how to discuss it, for the agent.
+pub fn question_text(s: &Session, qid: &str) -> anyhow::Result<String> {
+    let q = s
+        .queue
+        .get(qid)
+        .with_context(|| format!("no question {qid}"))?;
+    let talk: Vec<String> = q
+        .discussion
         .iter()
         .map(|t| format!("{}: {}", if t.you { "Me" } else { "You" }, t.text))
-        .collect::<Vec<_>>()
-        .join("\n\n")
+        .collect();
+    let talk = if talk.is_empty() {
+        String::new()
+    } else {
+        format!("\n\nOur discussion so far:\n\n{}", talk.join("\n\n"))
+    };
+    let state = match q.state {
+        QState::Decided => format!("Decided: {}", text::answer_text(q)),
+        QState::Open => "Open".into(),
+        QState::Deferred => "Deferred".into(),
+        QState::Dropped => "Dropped".into(),
+    };
+    Ok(format!(
+        "{}\n\n{state}{talk}\n\n{}",
+        text::question_text(q),
+        rules(q)
+    ))
 }
 
 /// A decision made in a discussion. `option` counts from 1.
-#[derive(Debug, PartialEq, Eq, Deserialize)]
-struct Decision {
-    option: Option<u32>,
-    #[serde(default)]
-    note: Option<String>,
-    #[serde(default)]
-    other: Option<String>,
-}
-
-/// What a discussion reply says and does.
-#[derive(Debug, PartialEq, Eq)]
-struct Parsed<'a> {
-    text: &'a str,
-    rewrite: Option<Rewrite>,
-    decide: Option<Decision>,
-}
-
-/// The JSON between `<tag>` and `</tag>`. One that isn't valid is reported and skipped.
-fn tagged<T: serde::de::DeserializeOwned>(reply: &str, tag: &str) -> Option<T> {
-    let (_, rest) = reply.split_once(&format!("<{tag}>"))?;
-    let json = rest.split(&format!("</{tag}>")).next()?.trim();
-    let json = json
-        .trim_start_matches("```json")
-        .trim_start_matches("```")
-        .trim_end_matches("```");
-    serde_json::from_str(json)
-        .inspect_err(|e| eprintln!("lgtm: discussion {tag}: {e}"))
-        .ok()
-}
-
-/// The reply's text is everything before its first tag.
-fn split(reply: &str) -> Parsed<'_> {
-    let end = ["<rewrite>", "<decide>"]
-        .iter()
-        .filter_map(|t| reply.find(t))
-        .min()
-        .unwrap_or(reply.len());
-    Parsed {
-        text: reply[..end].trim(),
-        rewrite: tagged(reply, "rewrite"),
-        decide: tagged(reply, "decide"),
-    }
+pub struct Decision {
+    pub option: Option<u32>,
+    pub note: Option<String>,
+    pub other: Option<String>,
 }
 
 impl RepoCtx {
-    /// A discussion turn on question `qid`, which can rewrite or decide it. Streams the reply.
-    pub async fn discuss_question(
+    /// Adds a turn to question `qid`'s discussion.
+    pub fn add_qa_turn(
         &self,
         ws: &Workspace,
         id: &str,
         qid: &str,
-        message: &str,
-        runs: &Runs,
-        on_text: impl Fn(String),
+        turn: Turn,
     ) -> anyhow::Result<Session> {
-        let s = self.qa_session(ws, id)?;
-        let question = s
-            .queue
-            .get(qid)
-            .with_context(|| format!("no question {qid}"))?;
-        let so_far = if question.discussion.is_empty() {
-            String::new()
-        } else {
-            format!("Our discussion so far:\n\n{}\n\n", talk(question))
-        };
-        let opening = format!(
-            "Let's discuss this question. It's a discussion: answer briefly. {}\n\n{}\n\n\
-             {so_far}{message}",
-            rules(question),
-            text::question_text(question)
-        );
-        let (turn, restart) = if question.discussion.is_empty() {
-            (opening, None)
-        } else {
-            (
-                format!("About {qid}: {message}\n\n({})", rules(question)),
-                Some(opening),
-            )
-        };
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    schema: None,
-                    fresh: false,
-                    restart,
-                },
-                |p| {
-                    if let Progress::Text(t) = p {
-                        on_text(t)
-                    }
-                },
-            )
-            .await?;
-        if reply.stopped {
-            return self.qa_session(ws, id);
-        }
-        let parsed = split(&reply.text);
-        self.edit_qa(ws, id, |s| {
-            s.queue.discuss(
-                qid,
-                Turn {
-                    you: true,
-                    text: message.to_string(),
-                },
-            )?;
-            if !parsed.text.is_empty() {
-                s.queue.discuss(
-                    qid,
-                    Turn {
-                        you: false,
-                        text: parsed.text.to_string(),
-                    },
-                )?;
-            }
-            if let Some(mut r) = parsed.rewrite {
-                r.id = qid.to_string();
-                s.queue.reask(r)?;
-            }
-            if let Some(d) = parsed.decide
-                && (d.option.is_some_and(|o| o >= 1)
-                    || d.other.as_deref().is_some_and(|o| !o.trim().is_empty()))
-                && s.queue.get(qid).is_some_and(|q| q.state == QState::Open)
-            {
-                s.queue
-                    .decide(
-                        qid,
-                        Answer {
-                            option: d.option.and_then(|o| o.checked_sub(1)),
-                            note: d.note.filter(|n| !n.trim().is_empty()),
-                            other: d.other.filter(|o| !o.trim().is_empty()),
-                            at: now_ms() as f64,
-                            auto: None,
-                        },
-                    )
-                    .inspect_err(|e| eprintln!("lgtm: discussion decide: {e:#}"))
-                    .ok();
-            }
-            Ok(())
-        })?;
+        self.edit_qa(ws, id, |s| s.queue.discuss(qid, turn))?;
         self.qa_session(ws, id)
     }
 
-    /// Rewrites question `qid` with what came out of its discussion.
-    pub async fn reask_question(
+    /// Decides open question `qid` with what the user settled in its discussion.
+    pub fn decide_in_discussion(
         &self,
         ws: &Workspace,
         id: &str,
         qid: &str,
-        runs: &Runs,
-    ) -> anyhow::Result<Session> {
-        let q = self.qa_session(ws, id)?.queue;
-        let question = q.get(qid).with_context(|| format!("no question {qid}"))?;
-        let auto = is_auto(question);
-        let rule = if auto {
-            format!(" {qid} is auto-answered. {REAUTO_RULE}")
-        } else {
-            String::new()
-        };
-        let turn = format!(
-            "Rewrite {qid} with what came out of our discussion, by the same rules, keeping its \
-             id. Say in a few words what changed.{rule}\n\n{}\n\nOur discussion:\n\n{}",
-            text::question_text(question),
-            talk(question)
+        d: Decision,
+    ) -> anyhow::Result<()> {
+        let other = d.other.filter(|o| !o.trim().is_empty());
+        anyhow::ensure!(
+            d.option.is_some_and(|o| o >= 1) || other.is_some(),
+            "give an option from 1, or `other` with the answer in the user's words"
         );
-        let reply = self
-            .qa_step(
-                ws,
-                id,
-                runs,
-                Step {
-                    turn,
-                    schema: Some(rewrite(auto)),
-                    fresh: false,
-                    restart: None,
+        self.edit_qa(ws, id, |s| {
+            let q = s
+                .queue
+                .get(qid)
+                .with_context(|| format!("no question {qid}"))?;
+            anyhow::ensure!(q.state == QState::Open, "{qid} isn't open");
+            s.queue.decide(
+                qid,
+                Answer {
+                    option: d.option.and_then(|o| o.checked_sub(1)),
+                    note: d.note.filter(|n| !n.trim().is_empty()),
+                    other,
+                    at: now_ms() as f64,
+                    auto: None,
                 },
-                |_| {},
             )
-            .await?;
-        if !reply.stopped {
-            let mut r: Rewrite = parse(&reply, "re-ask")?;
-            r.id = qid.to_string();
-            self.edit_qa(ws, id, |s| s.queue.reask(r))?;
-        }
-        self.qa_session(ws, id)
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::qa::queue::{Choice, NewQuestion};
 
-    #[test]
-    fn a_reply_splits_into_text_rewrite_and_decision() {
-        assert_eq!(split(" Sure. ").text, "Sure.");
-        let reply = "Adding C and going with it.\n\n<rewrite>\n```json\n{\"id\":\"Q2\",\
-                     \"what\":\"added C\",\"subject\":\"s\",\"context\":[],\"options\":[{\"label\":\
-                     \"C\",\"means\":\"m\",\"pros\":[],\"cons\":[],\"risks\":[]}],\"why\":\"w\"}\n```\n</rewrite>\n<decide>{\"option\":1,\
-                     \"note\":\"keep it small\",\"other\":null}</decide>";
-        let p = split(reply);
-        assert_eq!(p.text, "Adding C and going with it.");
-        assert_eq!(p.rewrite.unwrap().what, "added C");
-        assert_eq!(
-            p.decide,
-            Some(Decision {
-                option: Some(1),
-                note: Some("keep it small".into()),
-                other: None
-            })
+    fn question(subject: &str) -> NewQuestion {
+        NewQuestion {
+            sub: false,
+            subject: subject.into(),
+            context: vec![],
+            options: ["a", "b"]
+                .map(|l| Choice {
+                    label: l.into(),
+                    ..Choice::default()
+                })
+                .to_vec(),
+            why: "w".into(),
+            sources: vec![],
+            depends: vec![],
+            auto: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_discussion_decides_only_an_open_question_with_an_answer() {
+        let (_dir, ctx) = crate::review::tests::repo();
+        let ws = ctx.workspace(None).await.unwrap();
+        let id = ctx.create_qa(&ws, "p", vec![]).unwrap().id;
+        ctx.edit_qa(&ws, &id, |s| Ok(s.queue.add_round(vec![question("x")])))
+            .unwrap();
+        let pick = |option, other: Option<&str>| Decision {
+            option,
+            note: Some(" ".into()),
+            other: other.map(Into::into),
+        };
+        assert!(
+            ctx.decide_in_discussion(&ws, &id, "Q1", pick(None, Some(" ")))
+                .is_err()
         );
-        let p = split("Hm.\n<decide>{not json</decide>");
-        assert_eq!((p.text, p.rewrite, p.decide), ("Hm.", None, None));
+        ctx.decide_in_discussion(&ws, &id, "Q1", pick(Some(2), None))
+            .unwrap();
+        let q = ctx.qa_session(&ws, &id).unwrap().queue;
+        let answer = q.get("Q1").unwrap().answer.clone().unwrap();
+        assert_eq!((answer.option, answer.note), (Some(1), None));
+        assert!(
+            ctx.decide_in_discussion(&ws, &id, "Q1", pick(Some(1), None))
+                .is_err(),
+            "already decided"
+        );
     }
 }

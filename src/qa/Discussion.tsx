@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { MarkdownView } from "../editor/MarkdownView";
 import { Busy } from "../ui/Busy";
 import { isMac } from "../workbench/keys";
-import { type Question, shownReply } from "./model";
+import type { Question } from "./model";
 
 interface Props {
   q: Question;
-  /** The agent's reply as it streams in. */
-  streaming?: string;
+  /** The agent is answering. */
+  thinking: boolean;
   busy: boolean;
   onSend(message: string): void;
   onReask(): void;
@@ -16,7 +16,7 @@ interface Props {
 
 /** Talking a question over with the agent. Nothing is decided. When the talk changes the
  * question, the agent rewrites it; ⌘↵ asks it to. */
-export function Discussion({ q, streaming, busy, onSend, onReask, onClose }: Props) {
+export function Discussion({ q, thinking, busy, onSend, onReask, onClose }: Props) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => ref.current?.focus(), []);
@@ -43,13 +43,9 @@ export function Discussion({ q, streaming, busy, onSend, onReask, onClose }: Pro
           {t.you ? t.text : <MarkdownView text={t.text} />}
         </div>
       ))}
-      {streaming !== undefined && (
+      {thinking && (
         <div className="qq-turn">
-          {shownReply(streaming) ? (
-            <MarkdownView text={shownReply(streaming)} />
-          ) : (
-            <Busy className="qq-thinking">Thinking…</Busy>
-          )}
+          <Busy className="qq-thinking">Thinking…</Busy>
         </div>
       )}
       <textarea

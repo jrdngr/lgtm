@@ -16,9 +16,7 @@ use tauri_specta::Event as _;
 
 use super::{Hello, inputs, reports};
 use crate::bots::Summary;
-use crate::events::{AgentRevset, AgentShow, BotRunChanged, QaChanged, ReviewStateChanged};
-use crate::qa::queue::{Choice, NewQuestion, QState, Rewrite};
-use crate::qa::text::answer_text;
+use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
 use crate::repo::RepoWindows;
 use crate::review::{NoteInput, RepoCtx, StateDto};
 use crate::store::Source;
@@ -32,19 +30,20 @@ to a report; and point the review \
 at code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
-answer in lgtm and send their decisions back to this terminal. When they talk a queued \
-question over here instead and that changes it, rewrite it there with qa_rewrite.";
+answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
+questions, and sends their decisions back to this terminal. When they talk a queued question \
+over here instead and that changes it, rewrite it there with qa_rewrite.";
 
 pub(super) type Out = Result<String, String>;
 
 #[derive(Clone)]
 pub struct Lgtm {
-    app: AppHandle,
-    hello: Hello,
+    pub(super) app: AppHandle,
+    pub(super) hello: Hello,
     tool_router: ToolRouter<Self>,
 }
 
-fn json(value: &impl Serialize) -> Out {
+pub(super) fn json(value: &impl Serialize) -> Out {
     serde_json::to_string_pretty(value).map_err(|e| e.to_string())
 }
 
@@ -77,7 +76,7 @@ impl Lgtm {
         Self {
             app,
             hello,
-            tool_router: Self::tool_router() + Self::arch_router(),
+            tool_router: Self::tool_router() + Self::arch_router() + Self::qa_router(),
         }
     }
 
@@ -409,160 +408,6 @@ impl Lgtm {
         .emit_to(&self.app, &label)
         .map_err(|e| e.to_string())?;
         Ok("The review pane is loading it.".into())
-    }
-
-    #[tool(
-        description = "The workspace's active Q&A sessions (not yet implemented), with how many \
-        of their questions are open and decided."
-    )]
-    async fn list_qa(&self) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let sessions = ctx.qa_sessions(&ws).map_err(failed)?;
-        let list: Vec<_> = sessions
-            .iter()
-            .filter(|s| !s.archived)
-            .map(|s| {
-                let count = |st| s.queue.questions.iter().filter(|q| q.state == st).count();
-                serde_json::json!({
-                    "session": s.id,
-                    "title": s.title,
-                    "open": count(QState::Open),
-                    "decided": count(QState::Decided),
-                })
-            })
-            .collect();
-        json(&list)
-    }
-
-    #[tool(
-        description = "A Q&A session's prompt and question queue: every question, its \
-        state and answer."
-    )]
-    async fn qa_questions(&self, Parameters(p): Parameters<inputs::QaSession>) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let s = ctx.qa_session(&ws, &p.session).map_err(failed)?;
-        json(&serde_json::json!({ "prompt": s.prompt, "queue": s.queue }))
-    }
-
-    #[tool(
-        description = "Ask the human questions through lgtm's Q&A. They show one at a time in \
-        the Q&A tab, in the qqueue format: context bullets, options with the recommended one \
-        first, and why. A question with `auto` is answered with option 1 and skipped unless the \
-        human reopens it. The Q&A tab opens on the session. Returns the session and the new \
-        questions' ids in the order given. The human sends the decisions back to this terminal; \
-        qa_answers reads them too."
-    )]
-    async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let id = match p.session {
-            Some(id) => id,
-            None => {
-                let title = p.title.unwrap_or_default();
-                let prompt = match p.brief {
-                    Some(b) => format!("{title}\n\n{b}"),
-                    None => title,
-                };
-                let id = ctx
-                    .create_qa(&ws, &prompt, p.read_first)
-                    .map_err(failed)?
-                    .id;
-                ctx.edit_qa(&ws, &id, |s| {
-                    s.from_terminal = true;
-                    s.fork_from = self.hello.claude_session.clone();
-                    s.terminal = self.hello.terminal.clone();
-                    Ok(())
-                })
-                .map_err(failed)?;
-                id
-            }
-        };
-        let questions = p
-            .questions
-            .into_iter()
-            .map(|q| NewQuestion {
-                sub: q.sub,
-                subject: q.subject,
-                context: q.context,
-                options: q.options.into_iter().map(Choice::from).collect(),
-                why: q.why,
-                sources: q.sources,
-                depends: q.depends,
-                auto: q.auto,
-            })
-            .collect();
-        let ids = ctx
-            .edit_qa(&ws, &id, |s| Ok(s.queue.add_round(questions)))
-            .map_err(failed)?;
-        QaChanged {
-            workspace: self.hello.workspace.clone(),
-            id: id.clone(),
-            show: true,
-        }
-        .emit_to(&self.app, &label)
-        .ok();
-        Ok(format!(
-            "Queued {} (in the order given) in session {id}, now showing in lgtm's Q&A tab. \
-             Stop here: the human answers there and sends the decisions to this terminal.",
-            ids.join(", ")
-        ))
-    }
-
-    #[tool(
-        description = "Rewrite a queued question when talking it over in this terminal changes \
-        its context, options or recommendation. lgtm's Q&A tab shows the new version; a \
-        decided question opens again, with what it said before."
-    )]
-    async fn qa_rewrite(&self, Parameters(p): Parameters<inputs::QaRewrite>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let r = Rewrite {
-            id: p.id.clone(),
-            what: p.what,
-            subject: p.subject,
-            context: p.context,
-            options: p.options.into_iter().map(Choice::from).collect(),
-            why: p.why,
-            auto: None,
-        };
-        ctx.edit_qa(&ws, &p.session, |s| s.queue.reask(r))
-            .map_err(failed)?;
-        QaChanged {
-            workspace: self.hello.workspace.clone(),
-            id: p.session,
-            show: true,
-        }
-        .emit_to(&self.app, &label)
-        .ok();
-        Ok(format!("Rewrote {}; lgtm's Q&A tab shows it.", p.id))
-    }
-
-    #[tool(description = "The decisions on a Q&A session's questions so far, in ask order.")]
-    async fn qa_answers(&self, Parameters(p): Parameters<inputs::QaSession>) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let queue = ctx.qa_session(&ws, &p.session).map_err(failed)?.queue;
-        let list: Vec<_> = queue
-            .questions
-            .iter()
-            .filter(|q| q.state != QState::Open)
-            .map(|q| {
-                serde_json::json!({
-                    "id": q.id,
-                    "subject": q.text.subject,
-                    "answer": match q.state {
-                        QState::Dropped => format!("dropped: {}", q.dropped.as_deref().unwrap_or("")),
-                        QState::Deferred => "deferred".into(),
-                        _ => answer_text(q),
-                    },
-                    "auto": q.answer.as_ref().is_some_and(|a| a.is_auto()),
-                })
-            })
-            .collect();
-        let open = queue.open_count();
-        json(&serde_json::json!({ "decided": list, "stillOpen": open }))
     }
 }
 

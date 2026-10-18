@@ -444,10 +444,6 @@
   color: var(--violet-text);
 }
 
-.ws-agent-name.headless {
-  color: var(--agent-text);
-}
-
 .ws-agent-ago {
   min-width: 22px;
   text-align: right;

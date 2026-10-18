@@ -106,10 +106,6 @@
   color: var(--violet-text);
 }
 
-.close-name.headless {
-  color: var(--agent-text);
-}
-
 .close-ago {
   min-width: 22px;
   text-align: right;

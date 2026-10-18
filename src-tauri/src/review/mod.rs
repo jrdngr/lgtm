@@ -225,11 +225,6 @@ impl RepoCtx {
         }
     }
 
-    /// Scopes an agent run key to this repo, since ids from different repos' stores collide.
-    pub(crate) fn agent_key(&self, key: &str) -> String {
-        format!("{}:{key}", crate::repo::key(&self.root))
-    }
-
     fn review(&self, id: u32) -> anyhow::Result<Arc<Mutex<Review>>> {
         self.reviews
             .lock()

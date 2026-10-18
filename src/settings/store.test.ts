@@ -1,6 +1,6 @@
 import { expect, test, vi } from "vitest";
 
-const settings = { claude: "claude", claudeTerminal: "cc" };
+const settings = { claudeTerminal: "cc" };
 vi.mock("../ipc", () => ({ commands: { getSettings: vi.fn(async () => settings) } }));
 vi.mock("../bindings", () => ({ events: { settingsChanged: { listen: vi.fn() } } }));
 

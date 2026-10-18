@@ -1,12 +1,12 @@
-//! Q&A: working through decisions with an agent before a terminal agent writes them into the
-//! repo. A session is a prompt and the question queue built from it. Sessions live in the
-//! store, never in the repo.
+//! Q&A: working through decisions with a terminal agent before it writes them into the repo.
+//! A session is a prompt and the question queue built from it. Sessions live in the store,
+//! never in the repo.
 
-pub mod agent;
-mod discuss;
+pub mod discuss;
 mod order;
 pub mod queue;
 pub mod text;
+pub mod update;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -39,20 +39,14 @@ pub struct Session {
     /// A terminal agent asked its questions, and waits for the decisions.
     #[serde(default)]
     pub from_terminal: bool,
-    /// That terminal agent's Claude Code session, which the agent here starts from a copy of.
-    #[serde(default)]
-    pub fork_from: Option<String>,
-    /// The terminal panel that agent runs in, which Apply in terminal sends the decisions back
-    /// to.
+    /// The terminal panel whose agent asked the questions. It applies each answer and talks
+    /// questions over, and Apply in terminal sends it the decisions.
     #[serde(default)]
     pub terminal: Option<String>,
     /// Implemented: marked so after a send.
     #[serde(default)]
     pub archived: bool,
     pub created: f64,
-    /// The agent's conversation, resumed by each step.
-    #[serde(default)]
-    pub agent: Option<String>,
 }
 
 /// A title from the prompt's first line, until the agent names it.
@@ -87,7 +81,7 @@ impl RepoCtx {
         Ok(serde_json::from_str(&data)?)
     }
 
-    /// Changes a session in the store. Answers and agent steps both go through here.
+    /// Changes a session in the store. Answers and the agent's tools both go through here.
     pub fn edit_qa<T>(
         &self,
         ws: &Workspace,
@@ -121,11 +115,9 @@ impl RepoCtx {
             note: String::new(),
             sent: None,
             from_terminal: false,
-            fork_from: None,
             terminal: None,
             archived: false,
             created: created as f64,
-            agent: None,
         };
         self.store.lock().unwrap().save_qa_session(
             ws_key(ws),

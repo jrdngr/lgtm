@@ -1,13 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  activity,
-  pulse,
-  REVIEW_TAB,
-  report,
-  STALL_MS,
-  selectActivity,
-  tabState,
-} from "./activity";
+import { activity, pulse, report, STALL_MS, selectActivity, tabState } from "./activity";
 
 const stays = { stays: true };
 
@@ -51,12 +43,9 @@ describe("workspace activity", () => {
     selectActivity("other");
     report("u", "1", "idle", "one", { stays: true, tab: "term-1" });
     report("u", "2", "input", "two", { stays: true, tab: "term-1" });
-    report("u", "3", "running", "Triage", { headless: true, tab: REVIEW_TAB });
     const a = activity("u");
-    expect(tabState(a, "term-1", false)).toBe("input");
-    expect(tabState(a, "review-9", true)).toBe("working");
-    expect(tabState(a, "review-9", false)).toBeUndefined();
-    expect(tabState(a, "term-2", false)).toBeUndefined();
+    expect(tabState(a, "term-1")).toBe("input");
+    expect(tabState(a, "term-2")).toBeUndefined();
   });
 
   it("keeps endings until the workspace is seen, then a terminal agent idles and a run goes", () => {

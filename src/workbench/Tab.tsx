@@ -7,7 +7,7 @@ import { Icon } from "../ui/icons";
 import { Glyph } from "../workspaces/AgentGlyph";
 import { tabState, useActivity } from "../workspaces/activity";
 import { useWorkspace } from "../workspaces/context";
-import { activate, isReviewPanel } from "./panels";
+import { activate } from "./panels";
 import { fitTabs } from "./tabFit";
 import { tabMenu } from "./tabMenu";
 import { setRenaming, useRenaming } from "./tabRename";
@@ -89,7 +89,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   }, [api]);
   const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
   const panel = containerApi.getPanel(api.id);
-  const agents = tabState(useActivity(workspace), api.id, !!panel && isReviewPanel(panel));
+  const agents = tabState(useActivity(workspace), api.id);
   const glyph = agents && <Glyph state={agents} className="tab-glyph" />;
   async function close() {
     if (await confirmClose(workspace, api.id)) api.close();
@@ -114,7 +114,6 @@ export function Tab(props: IDockviewPanelHeaderProps) {
       title={title}
       closeActionOverride={close}
       onContextMenu={(e) => {
-        const panel = containerApi.getPanel(api.id);
         if (!panel) return;
         // Active first, so the review tab's items act on its own review.
         activate(panel);

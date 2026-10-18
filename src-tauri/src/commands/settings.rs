@@ -25,7 +25,7 @@ pub(crate) fn settings_load_error() -> Option<String> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn save_settings(app: AppHandle, settings: Settings) -> CmdResult<()> {
-    let claude_changed = settings.claude != settings::get().claude;
+    let claude_changed = settings.claude_terminal != settings::get().claude_terminal;
     settings::save(settings.clone()).map_err(err)?;
     if claude_changed {
         tokio::task::spawn_blocking(claude::refresh)

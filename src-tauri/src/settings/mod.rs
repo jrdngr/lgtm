@@ -1,12 +1,8 @@
 //! App-wide settings from `settings.toml` in lgtm's config dir, edited on the Settings tab.
 //!
 //! ```toml
-//! claude = "cc"
 //! claudeTerminal = "cc"
 //! terminalFontSize = 13
-//!
-//! [models]
-//! qa = "sonnet"
 //! ```
 
 pub mod claude;
@@ -33,12 +29,9 @@ pub fn config_dir() -> Option<PathBuf> {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Settings {
-    /// How headless agents start Claude Code: a command line, or an alias or function from the
-    /// login shell.
-    pub claude: String,
-    /// What a terminal runs to start Claude Code, typed into its shell.
+    /// What a terminal runs to start Claude Code, typed into its shell. lgtm also runs it to
+    /// check Claude Code and register its MCP server.
     pub claude_terminal: String,
-    pub models: Models,
     pub terminal_font_size: u16,
     /// Every mark color, the ones in use first in key order.
     pub marks: Vec<marks::MarkSlot>,
@@ -47,35 +40,10 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            claude: "claude".into(),
             claude_terminal: "claude".into(),
-            models: Models::default(),
             terminal_font_size: 13,
             marks: marks::defaults(),
         }
-    }
-}
-
-/// The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Models {
-    /// Q&A questions, their updates, and discussion.
-    pub qa: String,
-}
-
-/// What an agent run is for, which picks its model.
-#[derive(Clone, Copy, Debug)]
-pub enum Purpose {
-    Qa,
-}
-
-impl Models {
-    pub fn for_purpose(&self, purpose: Purpose) -> Option<&str> {
-        let model = match purpose {
-            Purpose::Qa => &self.qa,
-        };
-        Some(model.trim()).filter(|m| !m.is_empty())
     }
 }
 
@@ -103,11 +71,8 @@ fn merge(base: &mut toml::Table, file: toml::Table) {
 /// save leaves them out. Any other unknown key is an error, to catch typos.
 const RETIRED: &[(&[&str], &str)] = &[
     (&[], "designDir"),
-    (&["models"], "design"),
-    (&["models"], "reviewers"),
-    (&["models"], "ask"),
-    (&["models"], "walkthrough"),
-    (&["models"], "replies"),
+    (&[], "claude"),
+    (&[], "models"),
 ];
 
 fn drop_retired(file: &mut toml::Table) {
@@ -199,13 +164,12 @@ mod tests {
 
         std::fs::write(
             &file,
-            "claude = \"cc\"\n[models]\nqa = \"sonnet\"\n",
+            "claudeTerminal = \"cc\"\n",
         )
         .unwrap();
         let s = load_from(&file).unwrap();
-        assert_eq!(s.claude, "cc");
+        assert_eq!(s.claude_terminal, "cc");
         assert_eq!(s.terminal_font_size, 13);
-        assert_eq!(s.models.for_purpose(Purpose::Qa), Some("sonnet"));
 
         std::fs::write(&file, toml::to_string(&s).unwrap()).unwrap();
         assert_eq!(load_from(&file).unwrap(), s);
@@ -217,12 +181,13 @@ mod tests {
     #[test]
     fn keys_from_earlier_versions_are_dropped() {
         let s = parse(
-            "designDir = \"docs\"\n[models]\ndesign = \"opus\"\nwalkthrough = \"opus\"\nqa = \"opus\"\n",
+            "designDir = \"docs\"\nclaude = \"cc\"\nclaudeTerminal = \"ct\"\n[models]\nqa = \"opus\"\n",
         )
         .unwrap();
-        assert_eq!(s.models.for_purpose(Purpose::Qa), Some("opus"));
+        assert_eq!(s.claude_terminal, "ct");
         let saved = toml::to_string(&s).unwrap();
-        assert!(!saved.contains("design") && !saved.contains("walkthrough"));
+        assert!(!saved.contains("design") && !saved.contains("models"));
+        assert!(!saved.contains("claude ="));
     }
 
     #[test]

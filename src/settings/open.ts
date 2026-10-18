@@ -5,7 +5,7 @@ import { dockOf, revealPanel } from "../workbench/docks";
 import type { WorkspaceName } from "../workspaces/context";
 
 /** The Settings tab's sections, which panels can open it at. */
-export type SettingsSection = "claude" | "models" | "terminal" | "tools" | "prompts";
+export type SettingsSection = "claude" | "terminal" | "tools" | "prompts";
 
 export interface SettingsParams {
   section?: SettingsSection;

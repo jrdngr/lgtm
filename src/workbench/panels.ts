@@ -6,14 +6,7 @@ import type {
 } from "dockview-react";
 
 /** The kinds of tab. A Claude tab is a terminal that starts Claude Code. */
-export type PanelKind =
-  | "review"
-  | "terminal"
-  | "claude"
-  | "report"
-  | "architecture"
-  | "runs"
-  | "qa";
+export type PanelKind = "review" | "terminal" | "claude" | "report" | "architecture" | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -21,12 +14,11 @@ const TITLES: Record<PanelKind, string> = {
   claude: "Claude",
   report: "Report",
   architecture: "Architecture",
-  runs: "Agent runs",
   qa: "Q&A",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa", "runs"];
+export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -135,12 +127,13 @@ export function defaultLayout(api: DockviewApi) {
   addPanel(api, "review");
 }
 
-/** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads, Graph) and panes
+/** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads, Graph, Agent
+ * runs) and panes
  * that belonged to other workspaces. */
 export function dropStalePanels(api: DockviewApi) {
   for (const p of [...api.panels]) {
     const task = (p.params as { task?: unknown } | undefined)?.task;
-    const moved = ["tasks", "files", "design", "threads", "graph"].includes(
+    const moved = ["tasks", "files", "design", "threads", "graph", "runs"].includes(
       p.view.contentComponent,
     );
     if (moved || typeof task === "string") p.api.close();

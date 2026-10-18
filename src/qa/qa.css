@@ -861,19 +861,8 @@
   background: rgb(163 113 247 / 26%);
 }
 
-.qq .qq-btn.agent-run {
-  color: var(--agent-text);
-  background: var(--agent-soft);
-  border-color: var(--agent-line);
-}
-
-.qq .qq-btn.agent-run:hover:not(:disabled) {
-  border-color: var(--agent);
-  background: rgb(215 119 87 / 24%);
-}
-
-.qq .qq-explain.agent-icon {
-  color: var(--agent-text);
+.qq .qq-explain.pipe-icon {
+  color: var(--violet-text);
 }
 
 .qq .qq-btn.primary {

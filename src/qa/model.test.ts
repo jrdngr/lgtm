@@ -10,7 +10,6 @@ import {
   type Question,
   qqText,
   type Session,
-  shownReply,
   step,
 } from "./model";
 
@@ -48,11 +47,9 @@ function session(over: Partial<Session> = {}): Session {
     note: "",
     sent: null,
     fromTerminal: false,
-    forkFrom: null,
     terminal: null,
     archived: false,
     created: 1,
-    agent: null,
     ...over,
   };
 }
@@ -161,15 +158,6 @@ describe("applyText", () => {
         "Also: Keep it small",
       ].join("\n\n"),
     );
-  });
-});
-
-describe("shownReply", () => {
-  it("hides the rewrite, even while its tag is still streaming in", () => {
-    expect(shownReply('Fair.\n<rewrite>{"id":')).toBe("Fair.\n");
-    expect(shownReply("Fair.\n<rew")).toBe("Fair.\n");
-    expect(shownReply("Going with 2.\n<deci")).toBe("Going with 2.\n");
-    expect(shownReply("a < b")).toBe("a < b");
   });
 });
 

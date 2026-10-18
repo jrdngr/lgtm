@@ -64,7 +64,7 @@ function Mcp() {
 /** Where jj, claude and gh were found and their versions, rechecked after the Claude command
  * changes. */
 export function ToolSettings() {
-  const claude = useSettings()?.claude;
+  const claude = useSettings()?.claudeTerminal;
   const [tools, setTools] = useState<ToolStatus[]>();
   const [busy, setBusy] = useState(false);
 

@@ -57,7 +57,9 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
       canPaste: () => term.modes.bracketedPasteMode,
       paste: (text) => term.paste(text),
       hasAgent: session.hasAgent,
+      agentBusy: session.agentBusy,
       submit: session.submit,
+      interrupt: session.interrupt,
       focus: () => {
         // A terminal in the hidden bottom panel shows it first, or it can't take focus.
         if (container.closest(".bottom-panel")) flushSync(() => bottom.set({ open: true }));
