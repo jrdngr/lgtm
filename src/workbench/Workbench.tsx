@@ -65,7 +65,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
   useFollowWorkingCopy();
-  useFollowWorkingCopy();
   useWordWrapMenu();
   useSettingsMenu(selected);
   useShortcutsMenu(selected);
