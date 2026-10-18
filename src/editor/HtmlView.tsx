@@ -38,9 +38,9 @@ type FrameMessage =
   | { type: "scrolled"; x: number; y: number }
   | ({ type: "key" } & KeyboardEventInit);
 
-/** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts and
- * the network but an opaque origin, so it can't reach the app. Reloads when a file it
- * loaded changes. */
+/** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts but
+ * an opaque origin, so it can't reach the app, and the scheme's CSP keeps it from sending
+ * anything out. Reloads when a file it loaded changes. */
 export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   { workspace, path, toggle, saved, save },
   ref,

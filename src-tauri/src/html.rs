@@ -6,7 +6,6 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 
 use percent_encoding::percent_decode_str;
@@ -18,6 +17,19 @@ use crate::files;
 pub const SCHEME: &str = "lgtmhtml";
 const MAX_BYTES: u64 = 64 * 1024 * 1024;
 const FRAME_SCRIPT: &str = include_str!("html_frame.js");
+/// Pages run scripts and styles from anywhere, so CDN libraries work, but load everything
+/// else from their own files and can't send anything out: no fetches, beacons or forms off
+/// the scheme. The frame's origin is opaque, so `'self'` alone may match nothing.
+const CSP: &str = "default-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
+    script-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline' 'unsafe-eval' https:; \
+    style-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline' https:; \
+    img-src 'self' lgtmhtml: http://lgtmhtml.localhost data: blob:; \
+    font-src 'self' lgtmhtml: http://lgtmhtml.localhost data:; \
+    media-src 'self' lgtmhtml: http://lgtmhtml.localhost data: blob:; \
+    connect-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
+    frame-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
+    child-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
+    form-action 'none'";
 
 struct Root {
     dir: PathBuf,
@@ -29,14 +41,13 @@ struct Root {
 /// The roots HTML tabs serve from.
 #[derive(Default)]
 pub struct HtmlRoots {
-    next: AtomicU64,
     roots: Mutex<HashMap<String, Root>>,
 }
 
 impl HtmlRoots {
-    /// A new root id serving `dir` to `window`.
+    /// A new root id serving `dir` to `window`. Random, so a page can't guess another's.
     pub fn add(&self, window: &str, dir: PathBuf) -> String {
-        let id = format!("r{}", self.next.fetch_add(1, Ordering::Relaxed));
+        let id = random_id();
         let root = Root {
             dir,
             window: window.into(),
@@ -86,6 +97,13 @@ impl HtmlRoots {
     }
 }
 
+/// 128 random bits in hex.
+fn random_id() -> String {
+    let mut bytes = [0u8; 16];
+    getrandom::fill(&mut bytes).expect("OS randomness");
+    bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
 fn modified(path: &Path) -> Option<SystemTime> {
     std::fs::metadata(path).and_then(|m| m.modified()).ok()
 }
@@ -115,6 +133,7 @@ fn serve(roots: &HtmlRoots, window: &str, url_path: &str) -> Response<Cow<'stati
         Err(status) => {
             return Response::builder()
                 .status(status)
+                .header(header::CONTENT_SECURITY_POLICY, CSP)
                 .body(Cow::Borrowed(&[][..]))
                 .unwrap();
         }
@@ -126,7 +145,9 @@ fn serve(roots: &HtmlRoots, window: &str, url_path: &str) -> Response<Cow<'stati
     };
     Response::builder()
         .header(header::CONTENT_TYPE, kind)
-        // The frame's origin is opaque, so module scripts and fetches need this.
+        .header(header::CONTENT_SECURITY_POLICY, CSP)
+        // The frame's origin is opaque, so module scripts and fetches of its own files need
+        // this. Only the app's webviews can reach the scheme; the CSP stops sending out.
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
         .header(header::CACHE_CONTROL, "no-store")
         .body(Cow::Owned(body))
@@ -232,9 +253,43 @@ mod tests {
             StatusCode::FORBIDDEN
         );
         assert_eq!(
-            served(&roots, "/r99/docs/a%20b.css").0,
+            served(&roots, "/r0/docs/a%20b.css").0,
             StatusCode::NOT_FOUND
         );
+    }
+
+    #[test]
+    fn root_ids_are_random_128_bit_hex() {
+        let roots = HtmlRoots::default();
+        let (a, b) = (roots.add("w", "/a".into()), roots.add("w", "/a".into()));
+        assert_ne!(a, b);
+        for id in [a, b] {
+            assert_eq!(id.len(), 32);
+            assert!(
+                id.bytes()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+            );
+        }
+    }
+
+    #[test]
+    fn every_response_carries_the_csp() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("p.html"), "<p>hi</p>").unwrap();
+        let roots = HtmlRoots::default();
+        let id = roots.add("repo-1", dir.path().into());
+        for url in [format!("/{id}/p.html"), format!("/{id}/gone.html")] {
+            let r = serve(&roots, "repo-1", &url);
+            let csp = r.headers()[header::CONTENT_SECURITY_POLICY]
+                .to_str()
+                .unwrap();
+            assert!(csp.contains("connect-src 'self' lgtmhtml: http://lgtmhtml.localhost;"));
+            assert!(csp.contains("form-action 'none'"));
+            assert!(csp.contains("script-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline' 'unsafe-eval' https:;"));
+            assert!(
+                csp.contains("img-src 'self' lgtmhtml: http://lgtmhtml.localhost data: blob:;")
+            );
+        }
     }
 
     #[cfg(unix)]

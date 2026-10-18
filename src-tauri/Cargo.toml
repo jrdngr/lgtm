@@ -25,6 +25,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 portable-pty = "0.9"
 anyhow = "1"
 blake3 = "1"
+getrandom = "0.4"
 tokio = { version = "1", features = ["process", "sync", "macros", "rt-multi-thread", "time", "net", "io-util", "io-std"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 similar = "3"
