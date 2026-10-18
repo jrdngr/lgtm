@@ -350,12 +350,16 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         "look": [{ "source": "agent", "severity": "medium", "title": "Coupling",
                    "from": "src/web", "to": "src/db" }]
     });
+    ctx.assess_prompt(review.id).await.unwrap();
     let wrong = ctx.save_assessment(review.id, "@-", reply.clone()).await;
     assert!(wrong.is_err(), "the review shows another revset");
     // The revset moves before the reply, but the assessment is of the commits the review loaded.
     write(d, &[("src/web/extra.rs", "pub fn x() {}\n")]);
     jj(d, &["status"]);
-    let a = ctx.save_assessment(review.id, "@", reply).await.unwrap();
+    let a = ctx
+        .save_assessment(review.id, "@", reply.clone())
+        .await
+        .unwrap();
     assert_eq!(a.score, 2);
     assert!(!a.stale);
 
@@ -377,6 +381,9 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         arch.assessment.unwrap().stale,
         "the review now shows other commits"
     );
+    // A reply after a refresh is of the commits the prompt named.
+    let a = ctx.save_assessment(review.id, "@", reply).await.unwrap();
+    assert!(a.stale, "the prompt named the commits before the refresh");
 }
 
 #[cfg(unix)]

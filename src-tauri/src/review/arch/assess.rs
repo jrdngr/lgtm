@@ -87,11 +87,16 @@ pub fn save_assessed(store: &Store, ws: &str, revset: &str, a: &Assessed) -> any
 impl RepoCtx {
     /// The prompt asking a terminal agent to assess the review's architecture change.
     pub async fn assess_prompt(&self, review: u32) -> anyhow::Result<String> {
-        let (revset, whole) = {
+        let (ws, revset, whole) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
-            (r.revset.clone(), r.whole.clone())
+            (r.ws.clone(), r.revset.clone(), r.whole.clone())
         };
+        self.reviews
+            .assess_asked
+            .lock()
+            .unwrap()
+            .insert((ws.key().to_string(), revset.clone()), whole.clone());
         let arch = self.arch(review, false, None).await?;
         // The whole review as loaded, like the architecture diff, whichever view is open.
         let from = whole.from.as_deref().unwrap_or("root()");
@@ -134,8 +139,13 @@ impl RepoCtx {
             files: &files,
         };
         let mut assessed = validate(reply, &known, now_ms() as f64);
-        // The commits the review loaded, which the prompt and the architecture diff are of.
-        assessed.commits = Some((&whole).into());
+        // The commits the last Assess prompt named, else those the review loaded.
+        let asked = (self.reviews.assess_asked.lock().unwrap())
+            .get(&(ws.key().to_string(), revset.to_string()))
+            .cloned()
+            .unwrap_or_else(|| whole.clone());
+        assessed.commits = Some((&asked).into());
+        assessed.assessment.stale = asked != whole;
         let store = self.store.lock().unwrap();
         save_assessed(&store, ws.key(), revset, &assessed)?;
         state::uncheck_assessed(&store, ws.key(), revset)?;

@@ -72,6 +72,8 @@ pub struct Reviews {
     cache: Mutex<cache::FileCache>,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
+    /// The commits the last Assess prompt named, by workspace key and revset.
+    assess_asked: Mutex<HashMap<(String, String), Range>>,
 }
 
 impl Default for Reviews {
@@ -82,6 +84,7 @@ impl Default for Reviews {
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
             links: Mutex::default(),
+            assess_asked: Mutex::default(),
         }
     }
 }
