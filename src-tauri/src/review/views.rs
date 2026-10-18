@@ -206,7 +206,8 @@ impl Spec {
     }
 }
 
-pub async fn spec(jj: &Jj, revset: &str, view: &View, stack: &Stack) -> anyhow::Result<Spec> {
+/// The spec of `view`, where `whole` is the review's revset resolved.
+pub async fn spec(jj: &Jj, whole: &Range, view: &View, stack: &Stack) -> anyhow::Result<Spec> {
     let find = |change: &str| {
         stack
             .changes
@@ -215,7 +216,7 @@ pub async fn spec(jj: &Jj, revset: &str, view: &View, stack: &Stack) -> anyhow::
             .ok_or_else(|| anyhow::anyhow!("change {change} is no longer in the review"))
     };
     match view {
-        View::Combined => Ok(Spec::Trees(jj.resolve(revset).await?)),
+        View::Combined => Ok(Spec::Trees(whole.clone())),
         View::Change { change } => {
             let c = &stack.changes[find(change)?];
             Ok(Spec::Trees(jj.resolve(&c.commit_id).await?))

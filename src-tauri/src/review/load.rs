@@ -3,7 +3,7 @@
 use crate::anchor::MatchConfig;
 use crate::config::Config;
 use crate::diff::FileStatus;
-use crate::jj::FileDiff;
+use crate::jj::{FileDiff, Range};
 use crate::store::Session;
 use crate::workspace::Workspace;
 
@@ -18,6 +18,8 @@ pub(super) struct Loaded {
     pub files: Vec<ReviewFile>,
     pub dto: ReviewDto,
     pub commits: Vec<String>,
+    /// The revset's base and head.
+    pub whole: Range,
     pub cfg: MatchConfig,
 }
 
@@ -29,6 +31,7 @@ impl RepoCtx {
         view: &View,
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
+        let whole = ws.jj.resolve(revset).await?;
         let config = Config::at_base(&ws.jj, revset).await?;
         let stack = views::stack(&ws.jj, revset, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
@@ -40,7 +43,7 @@ impl RepoCtx {
             }
             view => view,
         };
-        let spec = views::spec(&ws.jj, revset, view, &stack).await?;
+        let spec = views::spec(&ws.jj, &whole, view, &stack).await?;
         let diffs = spec.diff(&ws.jj).await?;
         let sides = spec.sides();
         let interdiff = matches!(spec, views::Spec::Interdiff { .. });
@@ -50,6 +53,7 @@ impl RepoCtx {
         Ok(Loaded {
             files,
             commits: stack.changes.iter().map(|c| c.commit_id.clone()).collect(),
+            whole,
             cfg,
             dto: ReviewDto {
                 id: 0,

@@ -20,7 +20,7 @@ pub struct Revset {
 #[derive(Deserialize, JsonSchema)]
 pub struct AddComment {
     /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another.
+    /// its review shows another, or the revset moves to commits the review hasn't loaded.
     pub revset: String,
     /// Repository-relative path of a file in the review.
     pub path: String,
@@ -35,7 +35,7 @@ pub struct AddComment {
 #[derive(Deserialize, JsonSchema)]
 pub struct Reply {
     /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another.
+    /// its review shows another, or the revset moves to commits the review hasn't loaded.
     pub revset: String,
     /// The comment's id, from list_comments.
     pub comment_id: u32,
@@ -93,7 +93,7 @@ pub struct Note {
 #[derive(Deserialize, JsonSchema)]
 pub struct Notes {
     /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another.
+    /// its review shows another, or the revset moves to commits the review hasn't loaded.
     pub revset: String,
     /// In reading order, starting with a context note on the entry point. These replace the
     /// review's current walkthrough.
@@ -140,7 +140,7 @@ pub struct Finding {
 #[serde(rename_all = "camelCase")]
 pub struct Publish {
     /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another.
+    /// its review shows another, or the revset moves to commits the review hasn't loaded.
     pub revset: String,
     /// The report to publish to, by the id the human gave you, like `R12` or `auth-pass`.
     /// Leave it out to start a new report on the open review.

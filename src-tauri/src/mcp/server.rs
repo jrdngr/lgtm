@@ -145,6 +145,7 @@ impl Lgtm {
                 p.end_line,
                 &p.body,
             )
+            .await
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Added the comment.".into())
@@ -155,6 +156,7 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
             .agent_reply(self.workspace(), &p.revset, p.comment_id, &p.text)
+            .await
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Replied.".into())
@@ -277,6 +279,7 @@ impl Lgtm {
                 .map_err(|e| e.to_string())?;
         let review = ctx
             .current_review_at(self.workspace(), &p.revset)
+            .await
             .map_err(failed)?;
         let (state, skipped) = ctx
             .save_notes(review, &inputs, Source::Terminal)
@@ -376,6 +379,7 @@ impl Lgtm {
                 review,
                 summary,
             )
+            .await
             .map_err(failed)?;
         BotRunChanged {
             run: run.id,
@@ -387,7 +391,10 @@ impl Lgtm {
         Ok(if created {
             format!("Published {n} findings to new report {}.", run.label())
         } else {
-            format!("Published {n} findings to report {} as {reviewer}.", run.label())
+            format!(
+                "Published {n} findings to report {} as {reviewer}.",
+                run.label()
+            )
         })
     }
 

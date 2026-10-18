@@ -3,6 +3,7 @@
 mod agent;
 #[cfg(test)]
 mod agent_tests;
+pub(crate) mod arch;
 mod build;
 mod cache;
 mod chat;
@@ -14,7 +15,6 @@ mod edits;
 mod github;
 #[cfg(test)]
 mod github_tests;
-pub(crate) mod arch;
 mod graph;
 mod link;
 pub use link::LinkThread;
@@ -44,6 +44,7 @@ use specta::Type;
 
 use crate::anchor::MatchConfig;
 use crate::ctx::{RepoCtx, now_ms};
+use crate::jj::Range;
 use crate::store::{Edit, Mark, MarkColor, Session, Store};
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
@@ -54,8 +55,8 @@ pub use graph::GraphDto;
 use load::Loaded;
 use matching::MatchedCheck;
 pub use notes::{NoteDto, NoteInput};
-pub use rowmap::RowMove;
 pub use quotes::quoted_reply;
+pub use rowmap::RowMove;
 pub use threads::{ThreadDto, pulled_stage};
 pub use views::{ChangeDto, View};
 
@@ -188,6 +189,8 @@ pub struct Review {
     /// The diff's endpoints as last loaded.
     from: Option<String>,
     to: String,
+    /// The revset's base and head as last loaded, whichever view is open.
+    whole: Range,
     /// The commits of the review's changes as last loaded, oldest first.
     commits: Vec<String>,
     prev: Option<Session>,
@@ -233,13 +236,28 @@ impl RepoCtx {
     }
 
     /// The review open in `workspace`, for an agent's write about `revset`. The focus may have
-    /// moved to another review since the agent was asked, so then the write is refused.
-    pub fn current_review_at(&self, workspace: Option<&str>, revset: &str) -> anyhow::Result<u32> {
+    /// moved to another review since the agent was asked, or the revset to other commits than
+    /// the review shows, so then the write is refused.
+    pub async fn current_review_at(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+    ) -> anyhow::Result<u32> {
         let id = self.current_review(workspace)?;
-        let shown = self.review(id)?.lock().unwrap().revset.clone();
+        let (ws, shown, whole) = {
+            let r = self.review(id)?;
+            let r = r.lock().unwrap();
+            (r.ws.clone(), r.revset.clone(), r.whole.clone())
+        };
         anyhow::ensure!(
             shown == revset,
             "lgtm's review moved to `{shown}`, not `{revset}`, so nothing was changed"
+        );
+        ws.snapshot().await?;
+        anyhow::ensure!(
+            ws.jj.resolve(revset).await? == whole,
+            "lgtm's review of `{revset}` changed since it was loaded, so nothing was changed; \
+             call get_review again"
         );
         Ok(id)
     }
@@ -373,6 +391,10 @@ impl Review {
             session: 0,
             from: None,
             to: String::new(),
+            whole: Range {
+                from: None,
+                to: String::new(),
+            },
             commits: vec![],
             prev: None,
             undo: vec![],
@@ -394,6 +416,7 @@ impl Review {
         self.commits = loaded.commits;
         self.from = loaded.dto.from.clone();
         self.to = loaded.dto.to.clone();
+        self.whole = loaded.whole;
         self.rematch(store)?;
         self.save_session(store)?;
         let mut dto = loaded.dto;

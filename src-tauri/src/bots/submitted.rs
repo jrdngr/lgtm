@@ -19,7 +19,11 @@ pub struct Summary {
 impl Summary {
     /// The suggested fixes, with places turned into the finding ids `Review::parse` gives them
     /// once it sorts them by severity.
-    pub(super) fn to_filter(&self, reviewer: &str, review: &serde_json::Value) -> anyhow::Result<Minimal> {
+    pub(super) fn to_filter(
+        &self,
+        reviewer: &str,
+        review: &serde_json::Value,
+    ) -> anyhow::Result<Minimal> {
         let given: Review = serde_json::from_value(review.clone())?;
         let mut order: Vec<usize> = (0..given.findings.len()).collect();
         order.sort_by_key(|&i| given.findings[i].severity);
@@ -68,7 +72,7 @@ impl RepoCtx {
     /// locations. Without, it's a new report against the workspace's current review. Either
     /// must be of `revset`, the revset the agent reviewed. Returns the report and whether it's
     /// new.
-    pub fn publish_findings(
+    pub async fn publish_findings(
         &self,
         workspace: Option<&str>,
         revset: &str,
@@ -83,7 +87,8 @@ impl RepoCtx {
         let output = Output::Review(Review::parse(reviewer, review)?);
         let Some(label) = report else {
             return Ok((
-                self.new_report(workspace, revset, reviewer, output, filter)?,
+                self.new_report(workspace, revset, reviewer, output, filter)
+                    .await?,
                 true,
             ));
         };
@@ -102,7 +107,7 @@ impl RepoCtx {
         Ok((self.bot_run(id)?, false))
     }
 
-    fn new_report(
+    async fn new_report(
         &self,
         workspace: Option<&str>,
         revset: &str,
@@ -110,11 +115,8 @@ impl RepoCtx {
         output: Output,
         filter: Option<Minimal>,
     ) -> anyhow::Result<BotRun> {
+        self.current_review_at(workspace, revset).await?;
         let (_, (shown, from, to)) = self.with_current(workspace, |r| r.target())?;
-        anyhow::ensure!(
-            shown == revset,
-            "lgtm's review moved to `{shown}`, not `{revset}`, so nothing was published"
-        );
         let mut run = BotRun {
             id: 0,
             name: None,
@@ -181,7 +183,12 @@ fn replace_section(run: &mut BotRun, reviewer: &str, output: Output) {
         .iter()
         .position(|p| p.persona.as_deref() == Some(reviewer));
     let old: HashMap<String, Key> = at
-        .map(|i| findings(&run.parts[i]).iter().map(|f| (f.id.clone(), key(f))).collect())
+        .map(|i| {
+            findings(&run.parts[i])
+                .iter()
+                .map(|f| (f.id.clone(), key(f)))
+                .collect()
+        })
         .unwrap_or_default();
     let new: HashMap<Key, String> = findings(&part)
         .iter()
