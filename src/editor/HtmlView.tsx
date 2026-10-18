@@ -133,7 +133,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
           saveRef.current({ pageScroll: [Math.round(m.x), Math.round(m.y)] });
           break;
         case "key": {
-          const init = appKey(m);
+          const init = appKey(m, document.activeElement === frame.current);
           if (!init) break;
           frame.current.dispatchEvent(
             new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }),

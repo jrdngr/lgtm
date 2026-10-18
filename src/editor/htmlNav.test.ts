@@ -62,19 +62,24 @@ describe("appKey", () => {
   });
 
   it("passes Escape and modifier shortcuts, with only the key fields", () => {
-    expect(appKey(key("Escape", {}))).toEqual(key("Escape", {}));
-    expect(appKey({ ...key("w", { metaKey: true }), bubbles: false })).toEqual(
+    expect(appKey(key("Escape", {}), true)).toEqual(key("Escape", {}));
+    expect(appKey({ ...key("w", { metaKey: true }), bubbles: false }, true)).toEqual(
       key("w", { metaKey: true }),
     );
-    expect(appKey(key("c", { metaKey: true, shiftKey: true }))).toBeDefined();
+    expect(appKey(key("c", { metaKey: true, shiftKey: true }), true)).toBeDefined();
   });
 
   it("drops plain keys, editing shortcuts and malformed messages", () => {
-    expect(appKey(key("w", {}))).toBeUndefined();
-    expect(appKey(key("Enter", { shiftKey: true }))).toBeUndefined();
-    expect(appKey(key("C", { ctrlKey: true }))).toBeUndefined();
-    expect(appKey({ key: "w", metaKey: true })).toBeUndefined();
-    expect(appKey({ ...key("w", {}), metaKey: "yes" })).toBeUndefined();
+    expect(appKey(key("w", {}), true)).toBeUndefined();
+    expect(appKey(key("Enter", { shiftKey: true }), true)).toBeUndefined();
+    expect(appKey(key("C", { ctrlKey: true }), true)).toBeUndefined();
+    expect(appKey({ key: "w", metaKey: true }, true)).toBeUndefined();
+    expect(appKey({ ...key("w", {}), metaKey: "yes" }, true)).toBeUndefined();
+  });
+
+  it("drops keys while the frame doesn't have focus", () => {
+    expect(appKey(key("w", { metaKey: true }), false)).toBeUndefined();
+    expect(appKey(key("Escape", {}), false)).toBeUndefined();
   });
 });
 

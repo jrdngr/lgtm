@@ -46,8 +46,13 @@ export function stepZoom(zoom: number, by: 1 | -1): number {
 export const fitted = (zoom: number) => Math.min(Math.max(zoom, 0.1), 8);
 
 /** The key a page's frame passed up, if it's one the frame script passes: Escape, or a
- * modifier shortcut other than the editing ones. Pages can post to the tab themselves. */
-export function appKey(m: Record<string, unknown>): KeyboardEventInit | undefined {
+ * modifier shortcut other than the editing ones, while the frame has focus. Pages can post
+ * to the tab themselves, but the frame script only sees keys while focused. */
+export function appKey(
+  m: Record<string, unknown>,
+  focused: boolean,
+): KeyboardEventInit | undefined {
+  if (!focused) return undefined;
   const { key, code, metaKey, ctrlKey, shiftKey, altKey } = m;
   if (typeof key !== "string" || typeof code !== "string") return undefined;
   const flags = [metaKey, ctrlKey, shiftKey, altKey];
