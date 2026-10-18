@@ -93,10 +93,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::arch::remove_intent,
             commands::arch::check_look,
             commands::arch::intent_prompt,
-            commands::arch::run_assess,
-            commands::arch::stop_assess,
-            commands::arch::fix_intents,
-            commands::arch::stop_intent_fix,
+            commands::arch::assess_prompt,
             commands::review::focus_review,
             commands::settings::get_settings,
             commands::settings::save_settings,
@@ -181,6 +178,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::AgentRevset,
             events::ReviewStateChanged,
             events::QaChanged,
+            events::ArchChanged,
             events::TerminalAgent
         ])
 }

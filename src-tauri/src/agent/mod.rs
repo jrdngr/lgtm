@@ -42,12 +42,6 @@ pub struct Runs(Arc<Mutex<HashMap<String, Entry>>>);
 type Entry = (u64, oneshot::Sender<()>);
 
 impl Runs {
-    pub fn stop(&self, key: &str) {
-        if let Some((_, tx)) = self.0.lock().unwrap().remove(key) {
-            tx.send(()).ok();
-        }
-    }
-
     /// Stops every run whose key starts with `prefix`, returning whether there were any.
     pub fn stop_all(&self, prefix: &str) -> bool {
         let mut map = self.0.lock().unwrap();
@@ -134,8 +128,8 @@ pub struct Task<'a> {
 pub enum Progress {
     /// A piece of the reply.
     Text(String),
-    /// A tool call, summed up like "Read src/a.rs".
-    Tool(String),
+    /// A tool call.
+    Tool,
 }
 
 /// Runs the agent on `task`, reporting the reply and tool calls through `on` as they arrive.
@@ -241,7 +235,7 @@ pub async fn run_registered(
                 streamed.push_str("\n\n");
                 on(Progress::Text("\n\n".into()));
             }
-            Line::Tool(t) => on(Progress::Tool(t)),
+            Line::Tool => on(Progress::Tool),
             Line::Session(id) => session = Some(id),
             Line::Done { text, error, .. } if error => bail!("the agent failed: {text}"),
             Line::Done {
@@ -277,10 +271,10 @@ mod tests {
     fn a_stopped_run_ending_late_leaves_the_restarted_run_stoppable() {
         let runs = Runs::default();
         let old = runs.register("k").unwrap();
-        runs.stop("k");
+        runs.stop_all("k");
         let mut new = runs.register("k").unwrap();
         drop(old);
-        runs.stop("k");
+        runs.stop_all("k");
         assert!(new.stop.try_recv().is_ok());
     }
 
@@ -303,7 +297,7 @@ mod tests {
             fork: false,
             edit: true,
             schema: None,
-            purpose: Purpose::Ask,
+            purpose: Purpose::Qa,
         };
         let first = run(
             &runs,

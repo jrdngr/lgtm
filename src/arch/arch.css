@@ -440,18 +440,6 @@ button.apill {
   cursor: pointer;
 }
 
-.abtn.primary {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.abtn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 /* Graph: containers, trust boundaries and edges */
 .aedges {
   position: absolute;

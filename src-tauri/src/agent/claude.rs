@@ -67,8 +67,8 @@ pub enum Line {
     Text(String),
     /// A block of text starts, as each assistant message does.
     TextStart,
-    /// A tool call, summed up like "Read src/a.rs".
-    Tool(String),
+    /// A tool call.
+    Tool,
     /// The run's session, given as it starts.
     Session(String),
     /// The run finished. `text` is the final reply, or the error.
@@ -104,7 +104,7 @@ pub fn parse(line: &str) -> Line {
             .pointer("/message/content")
             .and_then(Value::as_array)
             .and_then(|c| c.iter().rev().find(|b| b["type"] == "tool_use"))
-            .map_or(Line::Other, |b| Line::Tool(tool_summary(b))),
+            .map_or(Line::Other, |_| Line::Tool),
         Some("result") => {
             let error = v.get("is_error").and_then(Value::as_bool).unwrap_or(false)
                 || str_at("/subtype").is_some_and(|s| s != "success");
@@ -131,22 +131,6 @@ pub fn parse(line: &str) -> Line {
             None => Line::Other,
         },
         _ => Line::Other,
-    }
-}
-
-/// A tool call as a few words: its name and the file or pattern it's about.
-fn tool_summary(block: &Value) -> String {
-    let name = block["name"].as_str().unwrap_or("Tool");
-    if name == "StructuredOutput" {
-        return "Writing up".to_string();
-    }
-    let input = &block["input"];
-    let target = ["file_path", "pattern", "path"]
-        .iter()
-        .find_map(|k| input[k].as_str());
-    match target {
-        Some(t) => format!("{name} {t}"),
-        None => name.to_string(),
     }
 }
 
@@ -182,7 +166,7 @@ mod tests {
         let structured = r#"{"type":"result","subtype":"success","is_error":false,"result":"{}","structured_output":{"a":1},"session_id":"s1"}"#;
         assert!(matches!(parse(structured), Line::Done { structured: Some(v), .. } if v["a"] == 1));
         let tool = r#"{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"src/a.rs"}}]}}"#;
-        assert_eq!(parse(tool), Line::Tool("Read src/a.rs".into()));
+        assert_eq!(parse(tool), Line::Tool);
         let failed = r#"{"type":"result","subtype":"error_during_execution","is_error":true,"errors":["boom"],"session_id":"s1"}"#;
         assert!(matches!(parse(failed), Line::Done { error: true, text, .. } if text == "boom"));
         let init = r#"{"type":"system","subtype":"init","session_id":"s1","tools":[]}"#;

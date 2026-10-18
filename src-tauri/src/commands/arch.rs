@@ -1,11 +1,7 @@
-use tauri::ipc::Channel;
-use tauri::{State, WebviewWindow};
+use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::agent::Runs;
-use crate::review::arch::{
-    ArchDto, ArchRange, AssessmentDto, HistoryDto, IntentKind, LensEdit,
-};
+use crate::review::arch::{ArchDto, ArchRange, HistoryDto, IntentKind, LensEdit};
 
 /// The review's architecture diff, or the diff between two of its commits.
 #[tauri::command]
@@ -64,55 +60,9 @@ pub(crate) async fn intent_prompt(
     repo(&window)?.intent_prompt(review, &ids).await.map_err(err)
 }
 
-/// Sends each tool call the agent makes through `activity`. `null` when it was stopped.
+/// The prompt asking a terminal agent to assess the review's architecture change.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn run_assess(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    review: u32,
-    activity: Channel<String>,
-) -> CmdResult<Option<AssessmentDto>> {
-    repo(&window)?
-        .run_assess(review, &runs, move |t| {
-            activity.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn stop_assess(window: WebviewWindow, runs: State<Runs>, review: u32) -> CmdResult<()> {
-    repo(&window)?.stop_assess(review, &runs);
-    Ok(())
-}
-
-/// The agent's reply, `null` when it was stopped.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn fix_intents(
-    window: WebviewWindow,
-    runs: State<'_, Runs>,
-    review: u32,
-    ids: Vec<u32>,
-    activity: Channel<String>,
-) -> CmdResult<Option<String>> {
-    repo(&window)?
-        .fix_intents(review, &ids, &runs, move |t| {
-            activity.send(t).ok();
-        })
-        .await
-        .map_err(err)
-}
-
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn stop_intent_fix(
-    window: WebviewWindow,
-    runs: State<Runs>,
-    review: u32,
-) -> CmdResult<()> {
-    repo(&window)?.stop_intent_fix(review, &runs);
-    Ok(())
+pub(crate) async fn assess_prompt(window: WebviewWindow, review: u32) -> CmdResult<String> {
+    repo(&window)?.assess_prompt(review).await.map_err(err)
 }

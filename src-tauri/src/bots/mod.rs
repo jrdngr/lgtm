@@ -1,7 +1,6 @@
 //! Reports: review findings agents publish through the MCP server, a section per reviewer, with
 //! the agent's suggested fixes when it gives them.
 
-mod describe;
 pub mod output;
 mod reports;
 mod submitted;
@@ -11,7 +10,6 @@ mod tests;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-pub use describe::describe;
 pub use output::Output;
 pub use submitted::Summary;
 

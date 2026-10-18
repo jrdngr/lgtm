@@ -314,3 +314,56 @@ async fn review_diff_history_and_checks_come_from_the_repo() {
     assert_eq!(status("src/db"), super::CompStatus::Unchanged);
     assert!(a.edges.iter().all(|e| e.to != "src/auth"));
 }
+
+#[tokio::test]
+async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
+    use crate::review::tests::{jj, repo};
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(
+        d,
+        &[
+            ("Cargo.toml", "[package]\nname = \"app\"\n"),
+            ("src/lib.rs", "mod db;\nmod web;\n"),
+            ("src/db/mod.rs", "pub fn query() {}\n"),
+            ("src/web/mod.rs", "pub fn page() {}\n"),
+        ],
+    );
+    jj(d, &["commit", "-m", "base"]);
+    write(
+        d,
+        &[(
+            "src/web/mod.rs",
+            "pub fn page() {\n    crate::db::query()\n}\n",
+        )],
+    );
+    let review = ctx.open(None, "@", false).await.unwrap();
+    let rule = "rule:new-edge:src/web>src/db";
+    ctx.check_look(review.id, rule, true).unwrap();
+    ctx.check_look(review.id, "agent:1", true).unwrap();
+
+    let reply = serde_json::json!({
+        "revset": "@", "score": 2, "risk": "high", "reason": "Web reaches into db.",
+        "boundaries": [],
+        "layers": [{ "title": "Page", "summary": "s", "components": ["src/web", "src/ghost"],
+                     "ranges": [{ "path": "src/web/mod.rs", "start": 1, "end": 3 }] }],
+        "look": [{ "source": "agent", "severity": "medium", "title": "Coupling",
+                   "from": "src/web", "to": "src/db" }]
+    });
+    let wrong = ctx.save_assessment(review.id, "@-", reply.clone()).await;
+    assert!(wrong.is_err(), "the review shows another revset");
+    let a = ctx.save_assessment(review.id, "@", reply).await.unwrap();
+    assert_eq!(a.score, 2);
+
+    let arch = ctx.arch(review.id, false, None).await.unwrap();
+    assert_eq!(arch.assessment, Some(a));
+    let layers: Vec<_> = arch
+        .layers
+        .iter()
+        .map(|l| (l.title.as_str(), l.components.clone(), l.ranges[0].file))
+        .collect();
+    assert_eq!(layers, [("Page", vec!["src/web".to_string()], Some(0))]);
+    let checked = |key: &str| arch.look.iter().find(|l| l.key == key).unwrap().checked;
+    assert!(checked(rule));
+    assert!(!checked("agent:1"));
+}

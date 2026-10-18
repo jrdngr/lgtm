@@ -1,13 +1,12 @@
 //! The architecture review: components and the imports between them at the review's base and
 //! head, the user's lens and intent edits over them, rule and agent items to look at, and the
-//! Assess pass that scores the change.
+//! assessment that scores the change.
 
 pub mod assess;
 mod compute;
 #[cfg(test)]
 mod diff_tests;
 mod extract;
-mod fix;
 mod group;
 mod inputs;
 mod intents;

@@ -3,13 +3,13 @@ import { type CurrentReview, useCurrentReview } from "../../review/current";
 import { Busy } from "../../ui/Busy";
 import { Empty, SectionHeader } from "../../ui/SectionHeader";
 import { useWorkspace, type WorkspaceName } from "../../workspaces/context";
-import { useArchRun } from "../runs";
 import { useArch } from "../state";
 import { History } from "./History";
 import { Intent } from "./Intent";
 import { Layers } from "./Layers";
 import { Look } from "./Look";
 import { Score } from "./Score";
+import "../../review/notes.css";
 import "./sidebar.css";
 
 /** The current review's architecture: Assess's score, the change stack, what to look at, your
@@ -31,16 +31,14 @@ export function ArchSection() {
 
 function Body({ workspace, review }: { workspace: WorkspaceName; review: CurrentReview }) {
   const { arch, error, view } = useArch(review);
-  const assess = useArchRun("assess", review.id);
   const [actionError, setActionError] = useState<string>();
   return (
     <div className="side-split-body arch-side">
       <Score
         workspace={workspace}
         review={review.id}
-        revset={review.revset}
         assessment={arch?.assessment}
-        run={assess}
+        onError={setActionError}
       />
       {(error || actionError) && <div className="note-run error">{error ?? actionError}</div>}
       {!arch ? (
@@ -51,22 +49,20 @@ function Body({ workspace, review }: { workspace: WorkspaceName; review: Current
         )
       ) : (
         <>
-          <div className={assess?.running ? "arch-stale" : undefined}>
-            <Layers
-              workspace={workspace}
-              review={review}
-              layers={arch.layers}
-              assessed={!!arch.assessment}
-              selection={view.selection}
-            />
-            <Look
-              workspace={workspace}
-              review={review.id}
-              look={arch.look}
-              selection={view.selection}
-              onError={setActionError}
-            />
-          </div>
+          <Layers
+            workspace={workspace}
+            review={review}
+            layers={arch.layers}
+            assessed={!!arch.assessment}
+            selection={view.selection}
+          />
+          <Look
+            workspace={workspace}
+            review={review.id}
+            look={arch.look}
+            selection={view.selection}
+            onError={setActionError}
+          />
           <Intent
             workspace={workspace}
             review={review}

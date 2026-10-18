@@ -309,7 +309,7 @@ mod tests {
             fork: false,
             edit: false,
             schema: None,
-            purpose: crate::agent::Purpose::Ask,
+            purpose: crate::agent::Purpose::Qa,
         };
         let reply = crate::agent::run_registered(run, task, |_| {}).await;
         assert!(reply.unwrap().stopped);

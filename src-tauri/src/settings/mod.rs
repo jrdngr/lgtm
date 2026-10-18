@@ -6,7 +6,7 @@
 //! terminalFontSize = 13
 //!
 //! [models]
-//! walkthrough = "sonnet"
+//! qa = "sonnet"
 //! ```
 
 pub mod claude;
@@ -60,14 +60,6 @@ impl Default for Settings {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Models {
-    /// Fix on intents.
-    pub ask: String,
-    /// Assess on the architecture.
-    pub walkthrough: String,
-    /// Read but unused, so settings files that set it still load.
-    #[serde(default, skip_serializing)]
-    #[specta(skip)]
-    pub replies: String,
     /// Q&A questions, their updates, and discussion.
     pub qa: String,
 }
@@ -75,16 +67,12 @@ pub struct Models {
 /// What an agent run is for, which picks its model.
 #[derive(Clone, Copy, Debug)]
 pub enum Purpose {
-    Ask,
-    Walkthrough,
     Qa,
 }
 
 impl Models {
     pub fn for_purpose(&self, purpose: Purpose) -> Option<&str> {
         let model = match purpose {
-            Purpose::Ask => &self.ask,
-            Purpose::Walkthrough => &self.walkthrough,
             Purpose::Qa => &self.qa,
         };
         Some(model.trim()).filter(|m| !m.is_empty())
@@ -117,6 +105,9 @@ const RETIRED: &[(&[&str], &str)] = &[
     (&[], "designDir"),
     (&["models"], "design"),
     (&["models"], "reviewers"),
+    (&["models"], "ask"),
+    (&["models"], "walkthrough"),
+    (&["models"], "replies"),
 ];
 
 fn drop_retired(file: &mut toml::Table) {
@@ -208,14 +199,13 @@ mod tests {
 
         std::fs::write(
             &file,
-            "claude = \"cc\"\n[models]\nwalkthrough = \"sonnet\"\n",
+            "claude = \"cc\"\n[models]\nqa = \"sonnet\"\n",
         )
         .unwrap();
         let s = load_from(&file).unwrap();
         assert_eq!(s.claude, "cc");
         assert_eq!(s.terminal_font_size, 13);
-        assert_eq!(s.models.for_purpose(Purpose::Walkthrough), Some("sonnet"));
-        assert_eq!(s.models.for_purpose(Purpose::Ask), None);
+        assert_eq!(s.models.for_purpose(Purpose::Qa), Some("sonnet"));
 
         std::fs::write(&file, toml::to_string(&s).unwrap()).unwrap();
         assert_eq!(load_from(&file).unwrap(), s);
@@ -226,10 +216,13 @@ mod tests {
 
     #[test]
     fn keys_from_earlier_versions_are_dropped() {
-        let s =
-            parse("designDir = \"docs\"\n[models]\ndesign = \"opus\"\nqa = \"opus\"\n").unwrap();
+        let s = parse(
+            "designDir = \"docs\"\n[models]\ndesign = \"opus\"\nwalkthrough = \"opus\"\nqa = \"opus\"\n",
+        )
+        .unwrap();
         assert_eq!(s.models.for_purpose(Purpose::Qa), Some("opus"));
-        assert!(!toml::to_string(&s).unwrap().contains("design"));
+        let saved = toml::to_string(&s).unwrap();
+        assert!(!saved.contains("design") && !saved.contains("walkthrough"));
     }
 
     #[test]

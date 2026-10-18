@@ -77,33 +77,8 @@
   font-weight: 400;
 }
 
-.arch-busy {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  color: var(--muted);
-  font-size: var(--fs-xs);
-}
-
-.arch-busy .note-spin {
-  width: 10px;
-  height: 10px;
-}
-
-.arch-busy-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .arch-loading {
   height: auto;
-}
-
-/* Agent sections while Assess replaces them. */
-.arch-stale {
-  opacity: 0.45;
 }
 
 .arch-sec {

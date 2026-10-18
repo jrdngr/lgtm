@@ -1,13 +1,13 @@
-//! Assess: a read-only agent pass that scores the review's architecture change.
+//! Assess: an agent in a terminal scores the review's architecture change and hands the
+//! assessment back through lgtm's set_assessment tool.
 
 use std::collections::HashSet;
 
-use anyhow::Context;
+use anyhow::{Context, ensure};
 use serde::{Deserialize, Serialize};
 
-use super::reply::{Known, Reply, SCHEMA, validate};
+use super::reply::{Known, Reply, validate};
 use super::{AssessmentDto, LayerDto, LookDto, prompt, state};
-use crate::agent::{self, Progress, Runs};
 use crate::review::{RepoCtx, now_ms};
 use crate::store::Store;
 
@@ -18,7 +18,8 @@ breaks. Then make a security pass: for each way the change lets untrusted input 
 sensitive or crosses a trust boundary unchecked, add a security look item whose detail gives the \
 attack path and its sites as path:line.
 
-Use the component ids above wherever the format asks for a component. Answer with:
+Use the component ids above wherever a component is asked for. Then call lgtm's set_assessment \
+tool with the revset and:
 
 - score: 1 to 5, where 5 is safe to merge as is and 1 needs rework.
 - risk, and reason: one line on why.
@@ -28,9 +29,11 @@ has a title, a summary of a sentence or two, the components it touches, and the 
 make it up (repository-relative paths, 1-based lines on the new side). A layer may span \
 components.
 - look: what a reviewer should scrutinize, most severe first. Point each at a component, an edge \
-(from and to), or a path and line where you can. Leave out anything a reviewer wouldn't act on.";
+(from and to), or a path and line where you can. Leave out anything a reviewer wouldn't act on.
 
-/// The last Assess run on a revset, stored whole.
+Then tell me the score and why in a line or two.";
+
+/// The last assessment of a revset, stored whole.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Assessed {
     pub assessment: AssessmentDto,
@@ -43,7 +46,7 @@ fn key(revset: &str) -> String {
     format!("assess:{revset}")
 }
 
-/// The last Assess run on `revset`.
+/// The last assessment of `revset`.
 pub fn assessed(store: &Store, revset: &str) -> anyhow::Result<Option<Assessed>> {
     Ok(match store.arch_state(&key(revset))? {
         Some(data) => Some(serde_json::from_str(&data)?),
@@ -55,59 +58,48 @@ pub fn save_assessed(store: &Store, revset: &str, a: &Assessed) -> anyhow::Resul
     Ok(store.save_arch_state(&key(revset), &serde_json::to_string(a)?)?)
 }
 
-fn run_key(review: u32) -> String {
-    format!("arch-assess-{review}")
-}
-
 impl RepoCtx {
-    /// Runs Assess over the review, replacing its last assessment. `activity` hears each tool
-    /// call. `None` when stopped.
-    pub async fn run_assess(
-        &self,
-        review: u32,
-        runs: &Runs,
-        activity: impl Fn(String) + Send + Sync + 'static,
-    ) -> anyhow::Result<Option<AssessmentDto>> {
-        let run = runs.register(&self.agent_key(&run_key(review)))?;
-        let (ws, revset, files) = {
+    /// The prompt asking a terminal agent to assess the review's architecture change.
+    pub async fn assess_prompt(&self, review: u32) -> anyhow::Result<String> {
+        let (ws, revset) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
-            let files: Vec<String> = r.files.iter().map(|f| f.path.clone()).collect();
-            (r.ws.clone(), r.revset.clone(), files)
+            (r.ws.clone(), r.revset.clone())
         };
         let arch = self.arch(review, false, None).await?;
         // The whole review, like the architecture diff, whichever view is open.
         let whole = ws.jj.resolve(&revset).await?;
-        let context = crate::bots::describe(&ws, &revset, whole.from, whole.to).await?;
-        let prompt = format!(
-            "{context}\n\nThe architecture diff from the review's base to its head:\n\n{}\n\n\
-             You're in the repository and can read any file. Don't edit files.\n\n{INSTRUCTIONS}",
+        let from = whole.from.as_deref().unwrap_or("root()");
+        Ok(format!(
+            "The change under review is `{revset}` in this jj repository. Read its diff with \
+             `jj diff --from {from} --to {}`. Don't edit files.\n\nThe architecture diff from \
+             the review's base to its head:\n\n{}\n\n{INSTRUCTIONS}",
+            whole.to,
             prompt::arch_text(&arch)
-        );
-        let task = agent::Task {
-            cwd: &ws.root,
-            prompt: &prompt,
-            resume: None,
-            fork: false,
-            edit: false,
-            schema: Some(SCHEMA),
-            purpose: agent::Purpose::Walkthrough,
+        ))
+    }
+
+    /// Stores `reply`, in set_assessment's format, as the assessment of review `review`,
+    /// replacing the last one. It must be about `revset`, the revset the review shows.
+    pub async fn save_assessment(
+        &self,
+        review: u32,
+        revset: &str,
+        reply: serde_json::Value,
+    ) -> anyhow::Result<AssessmentDto> {
+        let (shown, files) = {
+            let r = self.review(review)?;
+            let r = r.lock().unwrap();
+            let files: Vec<String> = r.files.iter().map(|f| f.path.clone()).collect();
+            (r.revset.clone(), files)
         };
-        let reply = agent::run_registered(run, task, |p| {
-            if let Progress::Tool(t) = p {
-                activity(t)
-            }
-        })
-        .await?;
-        if reply.stopped {
-            return Ok(None);
-        }
-        let reply: Reply = serde_json::from_value(
-            reply
-                .structured
-                .context("the agent didn't return an assessment")?,
-        )
-        .context("the agent's assessment doesn't match the format")?;
+        ensure!(
+            shown == revset,
+            "lgtm's review now shows `{shown}`, not `{revset}`, so the assessment wasn't stored"
+        );
+        let reply: Reply =
+            serde_json::from_value(reply).context("the assessment doesn't match the format")?;
+        let arch = self.arch(review, false, None).await?;
         let known = Known {
             components: arch
                 .components
@@ -118,12 +110,8 @@ impl RepoCtx {
         };
         let assessed = validate(reply, &known, now_ms() as f64);
         let store = self.store.lock().unwrap();
-        save_assessed(&store, &revset, &assessed)?;
-        state::uncheck_assessed(&store, &revset)?;
-        Ok(Some(assessed.assessment))
-    }
-
-    pub fn stop_assess(&self, review: u32, runs: &Runs) {
-        runs.stop(&self.agent_key(&run_key(review)));
+        save_assessed(&store, revset, &assessed)?;
+        state::uncheck_assessed(&store, revset)?;
+        Ok(assessed.assessment)
     }
 }

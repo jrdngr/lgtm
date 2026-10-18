@@ -61,9 +61,6 @@ pub use quotes::quoted_reply;
 pub use threads::{ThreadDto, pulled_stage};
 pub use views::{ChangeDto, View};
 
-pub const NOT_AT_WORKING_COPY: &str = "The agent edits the working copy (@), which this review \
-doesn't include, so its changes wouldn't show here. Review a revset that includes @ first.";
-
 /// Reports a workspace's watch events, with the workspace's name.
 pub type Emit = Arc<dyn Fn(Option<String>, watch::Event) + Send + Sync>;
 

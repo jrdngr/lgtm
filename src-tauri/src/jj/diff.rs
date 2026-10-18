@@ -82,30 +82,6 @@ impl Jj {
         .concat()
     }
 
-    /// The range's diff as `jj diff --git` prints it.
-    pub async fn git_diff(&self, range: &Range) -> anyhow::Result<String> {
-        self.read_lossy(&Self::range_args(range, &["--git"])).await
-    }
-
-    pub async fn diff_stat(&self, range: &Range) -> anyhow::Result<String> {
-        self.read_lossy(&Self::range_args(range, &["--stat"])).await
-    }
-
-    /// Each commit in the range, oldest first: its short change id and full description.
-    pub async fn descriptions(&self, range: &Range) -> anyhow::Result<String> {
-        let revset = format!("{}..{}", range.base(), range.to);
-        self.read(&[
-            "log",
-            "--no-graph",
-            "--reversed",
-            "-r",
-            &revset,
-            "-T",
-            r#"change_id.short(8) ++ " " ++ if(description, description, "(no description)\n") ++ "\n""#,
-        ])
-        .await
-    }
-
     /// What `from`'s changes do differently from `to`'s: `from` rebased onto `to`'s parents,
     /// compared with `to`.
     pub async fn interdiff(&self, from: &str, to: &str) -> anyhow::Result<Vec<FileDiff>> {
@@ -179,16 +155,5 @@ mod tests {
         let paths: Vec<_> = files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["quo\"te", "üni"]);
         assert!(files.iter().all(|f| !f.hunks.is_empty()));
-    }
-
-    #[tokio::test]
-    async fn stat_paths_are_repo_relative() {
-        let dir = init();
-        std::fs::create_dir(dir.path().join("src")).unwrap();
-        std::fs::write(dir.path().join("src/a.rs"), "x\n").unwrap();
-        let jj = Jj::new(dir.path());
-        jj.snapshot().await.unwrap();
-        let stat = jj.diff_stat(&jj.resolve("@").await.unwrap()).await.unwrap();
-        assert!(stat.starts_with("src/a.rs"), "{stat}");
     }
 }

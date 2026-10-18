@@ -3,16 +3,14 @@ import type { ComponentDto, IntentDto } from "../../bindings";
 import { commands } from "../../ipc";
 import type { CurrentReview } from "../../review/current";
 import { useSendText } from "../../review/useSendText";
-import { AgentButton } from "../../ui/AgentButton";
+import { submitNextSend } from "../../terminal/registry";
 import { contextMenu } from "../../ui/contextMenu";
-import { Icon, IconButton } from "../../ui/icons";
+import { IconButton } from "../../ui/icons";
+import { PipeButton } from "../../ui/PipeButton";
 import type { WorkspaceName } from "../../workspaces/context";
-import { fixIntents, stopIntentFix, useArchRun } from "../runs";
 import { type ArchSelection, reloadArch } from "../state";
 import { intentText, STATE_LABEL } from "./logic";
 import { Box, Row, Sec, showInTab } from "./parts";
-import "../../review/notes.css";
-import { PipeButton } from "../../ui/PipeButton";
 
 interface Props {
   workspace: WorkspaceName;
@@ -23,11 +21,9 @@ interface Props {
   onError(error: string | undefined): void;
 }
 
-/** Your marks and whether the code meets them, picked to Fix, send, or unmark. */
+/** Your marks and whether the code meets them, picked to fix, send, or unmark. */
 export function Intent({ workspace, review, intents, components, selection, onError }: Props) {
   const [checked, setChecked] = useState<Set<number>>(new Set());
-  const run = useArchRun("intentFix", review.id);
-  const running = !!run?.running;
   const { sendText, picker } = useSendText(workspace, onError, () => {});
   const picked = intents.filter((i) => checked.has(i.id)).map((i) => i.id);
   /** Tags and met marks have nothing to fix. */
@@ -50,11 +46,6 @@ export function Intent({ workspace, review, intents, components, selection, onEr
     sendText(r.data, clear);
   }
 
-  function fix(ids: number[]) {
-    fixIntents(workspace, review.id, review.revset, ids);
-    clear();
-  }
-
   async function unmark(ids: number[]) {
     for (const id of ids) {
       const r = await commands.removeIntent(id);
@@ -75,8 +66,11 @@ export function Intent({ workspace, review, intents, components, selection, onEr
     contextMenu(() => [
       {
         label: "Fix",
-        disabled: running || (it.state !== "broken" && it.state !== "open"),
-        onSelect: () => fix([it.id]),
+        disabled: it.state !== "broken" && it.state !== "open",
+        onSelect: () => {
+          submitNextSend();
+          send([it.id]);
+        },
       },
       {
         label: "Send to Terminal",
@@ -91,17 +85,6 @@ export function Intent({ workspace, review, intents, components, selection, onEr
   return (
     <div onKeyDown={onKeyDown}>
       <Sec title="Intent" count={intents.length} />
-      {running && (
-        <div className="note-run">
-          <span className="note-spin" />
-          <span className="note-run-text">{run?.note}</span>
-          <button type="button" className="quiet" onClick={() => stopIntentFix(review.id)}>
-            <Icon name="stop" size={12} />
-            Stop
-          </button>
-        </div>
-      )}
-      {!running && run?.error && <div className="note-run error">{run.error}</div>}
       <ul className="arch-items">
         {intents.map((it) => {
           const [what, why] = intentText(it, name);
@@ -127,10 +110,9 @@ export function Intent({ workspace, review, intents, components, selection, onEr
           <button type="button" onClick={() => unmark(picked)}>
             Unmark
           </button>
-          <PipeButton onClick={() => send(picked)}>Intents</PipeButton>
-          <AgentButton disabled={running || fixable.length === 0} onClick={() => fix(fixable)}>
+          <PipeButton disabled={fixable.length === 0} onClick={() => send(fixable)}>
             Fix
-          </AgentButton>
+          </PipeButton>
           <IconButton icon="x" label="Clear picks" onClick={clear} />
         </div>
       )}

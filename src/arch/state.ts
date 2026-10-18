@@ -39,7 +39,7 @@ export function setArchView(review: number, change: Partial<ArchView>) {
   for (const l of listeners) l();
 }
 
-/** Loads the review's architecture again, after an edit or an Assess run. */
+/** Loads the review's architecture again, after an edit or an assessment. */
 export function reloadArch(review: number) {
   setArchView(review, { version: archView(review).version + 1 });
 }

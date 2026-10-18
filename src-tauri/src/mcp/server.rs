@@ -27,14 +27,15 @@ use crate::store::{Stage, Take, TakeVerdict};
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
 this terminal's workspace: read its state, comments, walkthrough, symbol graph and reports; \
-add comments; write a walkthrough; publish review findings to a report; and point the review \
+add comments; write a walkthrough; store an architecture assessment; publish review findings \
+to a report; and point the review \
 at code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
 answer in lgtm and send their decisions back to this terminal. When they talk a queued \
 question over here instead and that changes it, rewrite it there with qa_rewrite.";
 
-type Out = Result<String, String>;
+pub(super) type Out = Result<String, String>;
 
 #[derive(Clone)]
 pub struct Lgtm {
@@ -67,7 +68,7 @@ fn workspace_path(root: &Path, path: &str) -> anyhow::Result<String> {
     Ok(rel.to_string())
 }
 
-fn failed(e: anyhow::Error) -> String {
+pub(super) fn failed(e: anyhow::Error) -> String {
     format!("{e:#}")
 }
 
@@ -76,16 +77,20 @@ impl Lgtm {
         Self {
             app,
             hello,
-            tool_router: Self::tool_router(),
+            tool_router: Self::tool_router() + Self::arch_router(),
         }
     }
 
-    fn workspace(&self) -> Option<&str> {
+    pub(super) fn app(&self) -> &AppHandle {
+        &self.app
+    }
+
+    pub(super) fn workspace(&self) -> Option<&str> {
         self.hello.workspace.as_deref()
     }
 
     /// The repo's state and its window's label.
-    fn repo(&self) -> anyhow::Result<(String, Arc<RepoCtx>)> {
+    pub(super) fn repo(&self) -> anyhow::Result<(String, Arc<RepoCtx>)> {
         self.app
             .state::<RepoWindows>()
             .find(Path::new(&self.hello.root))

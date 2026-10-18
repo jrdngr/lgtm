@@ -1,4 +1,5 @@
 import type { ArchDto, ComponentDto, EdgeDto, FileRefDto } from "../bindings";
+import { commands, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { PipeButton } from "../ui/PipeButton";
 import { startItemDrag } from "./ArchNode";
@@ -19,8 +20,6 @@ export interface DetailProps {
   send(text: Promise<string>): void;
   markWrong(e: EdgeDto): void;
   unmark(id: number): void;
-  fix(ids: number[]): void;
-  fixing: boolean;
 }
 
 /** The selected component, edge, layer, Look item or intent, beside the graph. */
@@ -240,15 +239,12 @@ function DetailEdge(p: DetailProps & { e: EdgeDto }) {
       <div className="aacts">
         {intent ? (
           <>
-            <button
-              type="button"
-              className="abtn primary"
-              disabled={p.fixing}
-              onClick={() => p.fix([intent.id])}
+            <PipeButton
+              className="abtn"
+              onClick={() => p.send(unwrap(commands.intentPrompt(p.review.id, [intent.id])))}
             >
               Fix
-            </button>
-            <SendButton {...p} />
+            </PipeButton>
             <button type="button" className="abtn" onClick={() => p.unmark(intent.id)}>
               Unmark
             </button>

@@ -92,7 +92,7 @@
   color: var(--github);
 }
 
-/* The agent at work, or how it failed. */
+/* Why an action failed. */
 .note-run {
   display: flex;
   align-items: center;
@@ -109,39 +109,6 @@
   color: var(--error);
   background: rgb(248 81 73 / 10%);
   overflow-wrap: anywhere;
-}
-
-.note-run-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.note-run button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 6px;
-  font-size: var(--fs-sm);
-}
-
-.note-spin {
-  flex: none;
-  width: 12px;
-  height: 12px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 2px solid rgb(79 140 201 / 30%);
-  border-top-color: var(--accent);
-  animation: note-spin 0.8s linear infinite;
-}
-
-@keyframes note-spin {
-  to {
-    rotate: 360deg;
-  }
 }
 
 .note-empty {

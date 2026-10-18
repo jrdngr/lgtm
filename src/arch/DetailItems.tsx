@@ -121,22 +121,12 @@ export function DetailIntent(p: DetailProps & { id: number }) {
         </div>
       )}
       <div className="aacts">
-        {checked && it.state !== "met" && (
-          <button
-            type="button"
-            className="abtn primary"
-            disabled={p.fixing}
-            onClick={() => p.fix([it.id])}
-          >
-            Fix
-          </button>
-        )}
         {checked && (
           <PipeButton
             className="abtn"
             onClick={() => p.send(unwrap(commands.intentPrompt(p.review.id, [it.id])))}
           >
-            Intent
+            {it.state === "met" ? "Intent" : "Fix"}
           </PipeButton>
         )}
         <button type="button" className="abtn" onClick={() => p.unmark(it.id)}>

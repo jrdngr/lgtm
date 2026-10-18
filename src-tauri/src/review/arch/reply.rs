@@ -1,5 +1,5 @@
-//! Assess's reply format, and turning a reply into an assessment the rest of the review can
-//! trust: a score in range, and only components and files that exist.
+//! Assess's reply, as set_assessment takes it, and turning it into an assessment the rest of
+//! the review can trust: a score in range, and only components and files that exist.
 
 use std::collections::HashSet;
 
@@ -9,74 +9,6 @@ use super::assess::Assessed;
 use super::{
     AssessmentDto, BoundaryDto, LayerDto, LookDto, LookSeverity, LookSource, RangeDto, RiskLevel,
 };
-
-pub(super) const SCHEMA: &str = r#"{
-  "type": "object",
-  "properties": {
-    "score": { "type": "integer", "minimum": 1, "maximum": 5 },
-    "risk": { "enum": ["minimal", "low", "moderate", "high", "critical"] },
-    "reason": { "type": "string" },
-    "boundaries": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string" },
-          "components": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["name", "components"],
-        "additionalProperties": false
-      }
-    },
-    "layers": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "title": { "type": "string" },
-          "summary": { "type": "string" },
-          "components": { "type": "array", "items": { "type": "string" } },
-          "ranges": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "path": { "type": "string" },
-                "start": { "type": "integer" },
-                "end": { "type": "integer" }
-              },
-              "required": ["path", "start", "end"],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": ["title", "summary", "components", "ranges"],
-        "additionalProperties": false
-      }
-    },
-    "look": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "source": { "enum": ["agent", "security"] },
-          "severity": { "enum": ["low", "medium", "high"] },
-          "title": { "type": "string" },
-          "detail": { "type": "string" },
-          "component": { "type": "string" },
-          "from": { "type": "string" },
-          "to": { "type": "string" },
-          "path": { "type": "string" },
-          "line": { "type": "integer" }
-        },
-        "required": ["source", "severity", "title"],
-        "additionalProperties": false
-      }
-    }
-  },
-  "required": ["score", "risk", "reason", "boundaries", "layers", "look"],
-  "additionalProperties": false
-}"#;
 
 #[derive(Deserialize)]
 pub(super) struct Reply {

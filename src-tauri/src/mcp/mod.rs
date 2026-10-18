@@ -3,6 +3,7 @@
 //! `lgtm mcp`, which bridges its stdio to that socket. Its hooks run `lgtm hook`, which reports
 //! the terminal agent's state over the same socket and gets back what to add to a prompt.
 
+mod arch;
 mod bridge;
 pub mod hook;
 mod inputs;

@@ -104,24 +104,13 @@ export const commands = {
 	removeIntent: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_intent", { id })),
 	checkLook: (review: number, key: string, checked: boolean) => typedError<null, string>(__TAURI_INVOKE("check_look", { review, key, checked })),
 	intentPrompt: (review: number, ids: number[]) => typedError<string, string>(__TAURI_INVOKE("intent_prompt", { review, ids })),
-	/**  Sends each tool call the agent makes through `activity`. `null` when it was stopped. */
-	runAssess: (review: number, activity: Channel<string>) => typedError<{
-	/**  1 (risky) to 5 (safe to merge). */
-	score: number,
-	risk: RiskLevel,
-	reason: string,
-	boundaries: BoundaryDto[],
-	createdAt: number | null,
-} | null, string>(__TAURI_INVOKE("run_assess", { review, activity })),
-	stopAssess: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_assess", { review })),
-	/**  The agent's reply, `null` when it was stopped. */
-	fixIntents: (review: number, ids: number[], activity: Channel<string>) => typedError<string | null, string>(__TAURI_INVOKE("fix_intents", { review, ids, activity })),
-	stopIntentFix: (review: number) => typedError<null, string>(__TAURI_INVOKE("stop_intent_fix", { review })),
+	/**  The prompt asking a terminal agent to assess the review's architecture change. */
+	assessPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("assess_prompt", { review })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
-	getSettings: () => __TAURI_INVOKE<Settings_Serialize>("get_settings"),
+	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
 	/**  Saves the settings and tells every window. */
-	saveSettings: (settings: Settings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
+	saveSettings: (settings: Settings) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
 	/**  Why `settings.toml` couldn't be read, while the defaults stand in for it. */
 	settingsLoadError: () => __TAURI_INVOKE<string | null>("settings_load_error"),
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
@@ -345,13 +334,14 @@ export const commands = {
 export const events = {
 	agentRevset: makeEvent<AgentRevset>("agent-revset"),
 	agentShow: makeEvent<AgentShow>("agent-show"),
+	archChanged: makeEvent<ArchChanged>("arch-changed"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
-	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
+	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
@@ -424,6 +414,12 @@ export type Answer_Serialize = {
 	 *  the questions, so undo leaves them.
 	 */
 	auto?: string | null,
+};
+
+/**  A terminal agent assessed review `review`'s architecture. */
+export type ArchChanged = {
+	workspace: string | null,
+	review: number,
 };
 
 export type ArchDto = {
@@ -1054,24 +1050,7 @@ export type Minimal = {
 };
 
 /**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
-export type Models = Models_Serialize | Models_Deserialize;
-
-/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
-export type Models_Deserialize = {
-	/**  Fix on intents. */
-	ask: string,
-	/**  Assess on the architecture. */
-	walkthrough: string,
-	/**  Q&A questions, their updates, and discussion. */
-	qa: string,
-};
-
-/**  The model for each kind of agent run, passed to `--model`. Empty is Claude Code's default. */
-export type Models_Serialize = {
-	/**  Fix on intents. */
-	ask: string,
-	/**  Assess on the architecture. */
-	walkthrough: string,
+export type Models = {
 	/**  Q&A questions, their updates, and discussion. */
 	qa: string,
 };
@@ -1544,22 +1523,7 @@ export type Session_Serialize = {
 	agent: string | null,
 };
 
-export type Settings = Settings_Serialize | Settings_Deserialize;
-
-/**  The settings were saved. */
-export type SettingsChanged = SettingsChanged_Serialize | SettingsChanged_Deserialize;
-
-/**  The settings were saved. */
-export type SettingsChanged_Deserialize = {
-	settings: Settings_Deserialize,
-};
-
-/**  The settings were saved. */
-export type SettingsChanged_Serialize = {
-	settings: Settings_Serialize,
-};
-
-export type Settings_Deserialize = {
+export type Settings = {
 	/**
 	 *  How headless agents start Claude Code: a command line, or an alias or function from the
 	 *  login shell.
@@ -1567,24 +1531,15 @@ export type Settings_Deserialize = {
 	claude: string,
 	/**  What a terminal runs to start Claude Code, typed into its shell. */
 	claudeTerminal: string,
-	models: Models_Deserialize,
+	models: Models,
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot[],
 };
 
-export type Settings_Serialize = {
-	/**
-	 *  How headless agents start Claude Code: a command line, or an alias or function from the
-	 *  login shell.
-	 */
-	claude: string,
-	/**  What a terminal runs to start Claude Code, typed into its shell. */
-	claudeTerminal: string,
-	models: Models_Serialize,
-	terminalFontSize: number,
-	/**  Every mark color, the ones in use first in key order. */
-	marks: MarkSlot[],
+/**  The settings were saved. */
+export type SettingsChanged = {
+	settings: Settings,
 };
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";

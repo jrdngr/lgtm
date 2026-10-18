@@ -2,22 +2,18 @@ import { useSyncExternalStore } from "react";
 import { pulse, REVIEW_TAB, report } from "../workspaces/activity";
 import { type WorkspaceName, workspaceKey } from "../workspaces/context";
 
-export type AgentKind = "triage" | "qa" | "assess" | "intentFix";
+export type AgentKind = "triage" | "qa";
 export type Outcome = "running" | "done" | "failed" | "stopped";
 
 export const KIND_NAMES: Record<AgentKind, string> = {
   triage: "Triage",
   qa: "Q&A",
-  assess: "Assess",
-  intentFix: "Fix intents",
 };
 
 /** The tab each kind of run works for. */
 const TABS: Record<AgentKind, string> = {
   triage: REVIEW_TAB,
   qa: "qa",
-  assess: "architecture",
-  intentFix: "architecture",
 };
 
 /** A headless agent run the window started. */

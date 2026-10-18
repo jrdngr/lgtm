@@ -7,8 +7,6 @@ import { Row, Section } from "./SettingsPanel";
 import { saveSettings } from "./store";
 
 const MODELS: [keyof Models, string, string][] = [
-  ["ask", "Fixes", "Fix on intents"],
-  ["walkthrough", "Assess", "Assessing the architecture"],
   ["qa", "Q&A", "Questions and discussion in Q&A sessions"],
 ];
 

@@ -78,6 +78,13 @@ pub struct ReviewStateChanged {
     pub state: crate::review::StateDto,
 }
 
+/// A terminal agent assessed review `review`'s architecture.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct ArchChanged {
+    pub workspace: Option<String>,
+    pub review: u32,
+}
+
 /// A terminal agent changed a Q&A session's questions.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct QaChanged {

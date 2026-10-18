@@ -13,7 +13,6 @@ import { ArchGraph } from "./ArchGraph";
 import { componentView, containerView, droppedItem, type NodeView } from "./ArchNode";
 import { addIntent, componentItems, edgeItems, edgeText, markWrong, removeIntent } from "./actions";
 import { Drill } from "./Drill";
-import { fixIntents, useArchRun } from "./runs";
 import { buildScene, containerEdges, focusOf, type Mode, type SceneEdge } from "./scene";
 import { type ArchSelection, type ArchView, setArchView, useArch } from "./state";
 import "../graph/graph.css";
@@ -58,7 +57,6 @@ function Loaded({ review, arch, view, workspace }: LoadedProps) {
   const [mode, setMode] = useState<Mode>("changed");
   const [center, setCenter] = useState<string[]>();
   const { sendText, picker } = useSendFromMenu(workspace);
-  const fixing = useArchRun("intentFix", id)?.running ?? false;
   const scene = useMemo(() => buildScene(arch, mode), [arch, mode]);
   const sel = view.selection;
   const focus = useMemo(
@@ -256,8 +254,6 @@ function Loaded({ review, arch, view, workspace }: LoadedProps) {
             send={send}
             markWrong={(e) => markWrong(id, e.from, e.to)}
             unmark={(i) => removeIntent(id, i)}
-            fix={(ids) => fixIntents(workspace, id, review.revset, ids)}
-            fixing={fixing}
           />
         )}
       </div>
