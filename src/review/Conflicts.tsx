@@ -1,5 +1,5 @@
 import type { ChangeDto } from "../bindings";
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 
 interface Props {
   changes: ChangeDto[];

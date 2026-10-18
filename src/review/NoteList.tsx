@@ -1,9 +1,9 @@
 import type { CommentDto, StateDto } from "../bindings";
 import { Inline } from "../bots/Markdown";
 import { type CommandResult, commands, unwrap } from "../ipc";
+import { run } from "../services/pathMenu";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
-import { run } from "../ui/pathMenu";
 import { confirmAction, promptText } from "../ui/prompt";
 import { Empty } from "../ui/SectionHeader";
 import { commentText } from "./comments";

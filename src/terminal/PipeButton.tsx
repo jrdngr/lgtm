@@ -1,5 +1,5 @@
-import { submitNextSend } from "../terminal/registry";
-import { Icon } from "./icons";
+import { Icon } from "../ui/icons";
+import { submitNextSend } from "./registry";
 import "./pipe.css";
 
 interface Props extends React.ButtonHTMLAttributes<HTMLButtonElement> {

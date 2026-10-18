@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { commands, unwrap } from "../ipc";
-import { run } from "../ui/pathMenu";
+import { run } from "../services/pathMenu";
 import { foldersOf, moveInto } from "./treeActions";
 import { dropInto } from "./treeDrop";
 

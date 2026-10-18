@@ -23,7 +23,7 @@ import { refreshRun, useRun } from "./runs";
 import { SettledFold } from "./SettledFold";
 import { SuggestedView } from "./SuggestedView";
 import "./bots.css";
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 
 type View = "suggested" | "findings";
 

@@ -8,7 +8,7 @@ import { useCurrentReview } from "./current";
 import { setTourState, useTourState } from "./tour";
 import { WalkthroughTour } from "./WalkthroughPanelTour";
 import "./notes.css";
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 
 /** The current review's walkthrough: its notes along the chosen tour, filtered by category.
  * Click a note to go to it; `n` and `N` in the review step through the tour. */

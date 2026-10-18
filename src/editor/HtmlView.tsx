@@ -3,8 +3,8 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
+import { openUrl } from "../services/pathMenu";
 import { IconButton } from "../ui/icons";
-import { openUrl } from "../ui/pathMenu";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
 import type { EditorParams } from "./open";

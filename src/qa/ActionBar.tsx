@@ -1,4 +1,4 @@
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 import type { Question, UndoKind } from "./model";
 
 /** What's being written under the question. */

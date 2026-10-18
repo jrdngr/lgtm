@@ -2,7 +2,7 @@ import type { AssessmentDto, RiskLevel } from "../../bindings";
 import type { WorkspaceName } from "../../core/workspace";
 import { commands } from "../../ipc";
 import { useSendText } from "../../review/useSendText";
-import { PipeButton } from "../../ui/PipeButton";
+import { PipeButton } from "../../terminal/PipeButton";
 import { Meter } from "./parts";
 
 const RISK: Record<RiskLevel, [string, string]> = {

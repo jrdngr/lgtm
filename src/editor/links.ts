@@ -1,5 +1,5 @@
 import type { WorkspaceName } from "../core/workspace";
-import { openUrl } from "../ui/pathMenu";
+import { openUrl } from "../services/pathMenu";
 import { openFile } from "./open";
 
 /** A link in a line of markdown: where it sits and where it goes. */

@@ -5,9 +5,9 @@ import type { WorkspaceName } from "../core/workspace";
 import { prOf, usePr } from "../github/pr";
 import { openPrPreview } from "../github/preview";
 import { type CommandResult, commands, errorText, unwrap } from "../ipc";
+import { openUrl } from "../services/pathMenu";
 import { useGithubOff } from "../tools/agents";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
-import { openUrl } from "../ui/pathMenu";
 import { clearStackPr, showStackPr } from "./stack";
 import { useRepoChanged } from "./useRepoChanged";
 

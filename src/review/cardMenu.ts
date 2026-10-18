@@ -1,8 +1,8 @@
 import type { CommentDto } from "../bindings";
+import { openUrl } from "../services/pathMenu";
 import { STAGES } from "../threads/stages";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
-import { openUrl } from "../ui/pathMenu";
 import { confirmAction } from "../ui/prompt";
 import type { Comments } from "./useComments";
 

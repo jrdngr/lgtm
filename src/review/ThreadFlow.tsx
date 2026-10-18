@@ -1,8 +1,8 @@
 import type { CommentDto } from "../bindings";
 import { Inline, Markdown } from "../bots/Markdown";
+import { PipeButton } from "../terminal/PipeButton";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy } from "../ui/Busy";
-import { PipeButton } from "../ui/PipeButton";
 import { ThreadChat } from "./ThreadChat";
 import type { Comments } from "./useComments";
 

@@ -1,7 +1,7 @@
 import type { ArchDto, ComponentDto, EdgeDto, FileRefDto } from "../bindings";
 import { commands, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 import { startItemDrag } from "./ArchNode";
 import { edgeText } from "./actions";
 import { DetailIntent, DetailLayer, DetailLook } from "./DetailItems";

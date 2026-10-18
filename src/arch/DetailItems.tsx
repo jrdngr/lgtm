@@ -1,5 +1,5 @@
 import { commands, unwrap } from "../ipc";
-import { PipeButton } from "../ui/PipeButton";
+import { PipeButton } from "../terminal/PipeButton";
 import type { DetailProps } from "./ArchDetail";
 import { Pill, Sec, Site, Top } from "./DetailParts";
 import { intentText, STATE_LABEL } from "./sidebar/logic";

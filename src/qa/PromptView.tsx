@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
+import { PipeButton } from "../terminal/PipeButton";
 import { submitNextSend } from "../terminal/registry";
-import { PipeButton } from "../ui/PipeButton";
 import { autoAnswer, savePrompt } from "./actions";
 import type { Session } from "./model";
 import { ReadFirst } from "./ReadFirst";

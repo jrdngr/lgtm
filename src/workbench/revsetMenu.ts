@@ -10,8 +10,8 @@ import {
   reviewAfter,
 } from "../review/RevisionsPanelMenu";
 import type { ReviewTarget } from "../review/target";
+import { run } from "../services/pathMenu";
 import { type CtxEntry, copy } from "../ui/contextMenu";
-import { run } from "../ui/pathMenu";
 
 /** Runs a jj action, then reloads the review as the revisions panel does. */
 async function act(workspace: WorkspaceName, target: ReviewTarget, [action, , next]: RevAction) {

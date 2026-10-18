@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { linksIn, resolveLink } from "./links";
 
 vi.mock("./open", () => ({ openFile() {} }));
-vi.mock("../ui/pathMenu", () => ({ openUrl() {} }));
+vi.mock("../services/pathMenu", () => ({ openUrl() {} }));
 
 describe("linksIn", () => {
   it("finds markdown links, autolinks and bare addresses with their spans", () => {

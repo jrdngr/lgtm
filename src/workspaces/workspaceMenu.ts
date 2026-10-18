@@ -7,9 +7,9 @@ import { commands, unwrap } from "../ipc";
 import { currentReview } from "../review/current";
 import { setWorkspaceRevset } from "../review/revset";
 import { targetOf } from "../review/target";
+import { pathItems, run } from "../services/pathMenu";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
-import { pathItems, run } from "../ui/pathMenu";
 import { COLORS, type PinColor, setColor, togglePin } from "./pins";
 import { clearStackPr } from "./stack";
 

@@ -3,8 +3,8 @@ import type { WorkspaceName } from "../core/workspace";
 import { revealInFiles } from "../editor/reveal";
 import { commands, errorText, unwrap } from "../ipc";
 import { type Sender, sendItems } from "../terminal/sendItems";
+import { type CtxEntry, copy } from "../ui/contextMenu";
 import { workspaceRoot } from "../workspaces/useWorkspaces";
-import { type CtxEntry, copy } from "./contextMenu";
 
 /** Shows what went wrong with a menu action that can fail. */
 export function run(p: Promise<unknown>) {

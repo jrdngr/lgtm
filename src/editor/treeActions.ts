@@ -3,7 +3,7 @@ import { bottomDockOf, dockOf } from "../core/docks";
 import { activate } from "../core/panels";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
-import { run } from "../ui/pathMenu";
+import { run } from "../services/pathMenu";
 import { confirmAction, promptText } from "../ui/prompt";
 import { baseName, type EditorParams, editorId, openFile } from "./open";
 import { isUnsaved } from "./unsaved";
