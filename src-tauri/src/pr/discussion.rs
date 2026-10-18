@@ -5,9 +5,9 @@ use serde::Serialize;
 use specta::Type;
 
 use super::PrDto;
+use crate::ctx::RepoCtx;
 use crate::github;
 use crate::github::threads::{Comment, Review};
-use crate::review::RepoCtx;
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

@@ -9,8 +9,8 @@ use specta::Type;
 use super::describe::{self, SystemDescDto};
 use super::group::Grouping;
 use super::{inputs, model, roots, scan, state};
+use crate::ctx::RepoCtx;
 use crate::jj::Range;
-use crate::review::RepoCtx;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

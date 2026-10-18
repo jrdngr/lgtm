@@ -2,7 +2,7 @@
 //! and the fork remote lgtm added for it, once no other PR workspace uses that.
 
 use super::{PrRecord, fallback_bookmark};
-use crate::review::RepoCtx;
+use crate::ctx::RepoCtx;
 
 impl RepoCtx {
     /// Cleans up after PR workspace `name`, if it is one. Failures are reported, not fatal: the

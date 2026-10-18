@@ -146,7 +146,7 @@ pub(crate) async fn act_on_question(
                     option: answer.option,
                     note: answer.note.filter(|n| !n.trim().is_empty()),
                     other: answer.other.filter(|o| !o.trim().is_empty()),
-                    at: crate::review::now_ms() as f64,
+                    at: crate::ctx::now_ms() as f64,
                     auto: None,
                 },
             ),
@@ -154,8 +154,8 @@ pub(crate) async fn act_on_question(
                 q.undo();
                 Ok(())
             }
-            QuestionAct::Defer { id } => q.defer(&id, crate::review::now_ms() as f64).map(|_| ()),
-            QuestionAct::Reopen { id } => q.change_answer(&id, crate::review::now_ms() as f64),
+            QuestionAct::Defer { id } => q.defer(&id, crate::ctx::now_ms() as f64).map(|_| ()),
+            QuestionAct::Reopen { id } => q.change_answer(&id, crate::ctx::now_ms() as f64),
             QuestionAct::Seen { id } => q.seen(&id),
         }
     })

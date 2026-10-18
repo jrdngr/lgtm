@@ -32,7 +32,7 @@ impl RepoCtx {
     /// Links `terminal`'s agent, with `thread` as the user's thread, or with `linked` false
     /// unlinks it.
     pub fn set_agent_link(&self, terminal: &str, linked: bool, thread: Option<LinkThread>) {
-        let mut links = self.links.lock().unwrap();
+        let mut links = self.reviews.links.lock().unwrap();
         let told = match links.get_mut(terminal) {
             Some(Link::Linked { told, .. }) => told.take(),
             _ => None,
@@ -47,7 +47,9 @@ impl RepoCtx {
     /// Forgets what `terminal`'s agent was told, for a new session there, which starts with
     /// none of it.
     pub fn new_agent_session(&self, terminal: &str) {
-        if let Some(Link::Linked { told, .. }) = self.links.lock().unwrap().get_mut(terminal) {
+        if let Some(Link::Linked { told, .. }) =
+            self.reviews.links.lock().unwrap().get_mut(terminal)
+        {
             *told = None;
         }
     }
@@ -55,7 +57,7 @@ impl RepoCtx {
     /// What to add to a prompt submitted in `terminal`: the user's thread, whole when the
     /// agent hasn't had it as it is now, else one line naming it.
     pub fn prompt_context(&self, terminal: &str) -> Option<String> {
-        let mut links = self.links.lock().unwrap();
+        let mut links = self.reviews.links.lock().unwrap();
         match links.get_mut(terminal)? {
             Link::Unlinked => {
                 links.remove(terminal);

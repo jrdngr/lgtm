@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::Serialize;
 use specta::Type;
 
-use crate::review::RepoCtx;
+use crate::ctx::RepoCtx;
 
 /// The repo-relative script a new workspace runs in its first terminal.
 pub const SETUP: &str = ".lgtm/setup";

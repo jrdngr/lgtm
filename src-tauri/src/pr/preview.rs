@@ -7,9 +7,10 @@ use specta::Type;
 use super::discussion::{PostDto, posts};
 use super::pull::pulled;
 use crate::anchor::Side;
+use crate::ctx::RepoCtx;
 use crate::diff::{GitFileDiff, Hunk, parse_git};
 use crate::github::{self, GhRepo, gh, remote};
-use crate::review::{PulledThread, RepoCtx};
+use crate::review::PulledThread;
 use crate::store::GhLink;
 
 #[derive(Clone, Serialize, Type)]

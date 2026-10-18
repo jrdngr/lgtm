@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::diff::RowKind;
+use crate::jj::Jj;
 use std::path::Path;
 use std::process::Command;
 

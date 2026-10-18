@@ -6,10 +6,10 @@ use std::sync::Mutex;
 use serde::Serialize;
 use specta::Type;
 
+use crate::ctx::RepoCtx;
 use crate::github::heads::{self, HeadPr};
 use crate::github::{GhRepo, login, remote};
 use crate::jj::{NearBookmark, StackSide};
-use crate::review::RepoCtx;
 
 /// At most this many bookmarks are looked up, nearest first.
 const MAX_BOOKMARKS: usize = 30;

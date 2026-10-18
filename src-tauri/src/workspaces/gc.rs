@@ -104,7 +104,7 @@ pub fn run(base: &Path, repos: &[PathBuf], force: bool) -> Vec<String> {
 /// Entry point for `lgtm gc [--force] [repo]`. Also checks the repo containing the current
 /// directory.
 pub fn main(args: &[String]) -> i32 {
-    let Some(base) = super::ws_base() else {
+    let Some(base) = crate::ctx::ws_base() else {
         eprintln!("lgtm gc: no home directory");
         return 1;
     };

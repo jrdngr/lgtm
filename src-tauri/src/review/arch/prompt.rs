@@ -3,7 +3,7 @@
 use std::fmt::Write;
 
 use super::{ArchDto, ComponentDto, EdgeDto, EdgeStatus, IntentDto, IntentKind, IntentState};
-use crate::review::RepoCtx;
+use crate::ctx::RepoCtx;
 
 /// Import sites listed per edge in the architecture diff before the rest are counted.
 const MAX_SITES: usize = 5;

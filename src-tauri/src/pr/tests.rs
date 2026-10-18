@@ -152,7 +152,7 @@ async fn checks_out_and_pulls_a_real_fork_pr() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    let mut ctx = crate::review::RepoCtx::new(
+    let mut ctx = crate::ctx::RepoCtx::new(
         root.clone(),
         Jj::new(&root),
         crate::store::Store::in_memory(),

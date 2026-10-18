@@ -1,7 +1,7 @@
 //! The stored lens, intents and Look checks.
 
 use super::{IntentKind, Lens, LensEdit, group};
-use crate::review::RepoCtx;
+use crate::ctx::RepoCtx;
 use crate::store::Store;
 
 const LENS: &str = "lens";

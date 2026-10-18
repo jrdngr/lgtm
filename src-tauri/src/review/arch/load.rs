@@ -8,9 +8,10 @@ use super::inputs::{self, Built};
 use super::model::{self, Model};
 use super::{ArchDto, ArchRange, HistoryDto, IntentKind, assess, state};
 use crate::config::Config;
+use crate::ctx::RepoCtx;
 use crate::jj::Range;
+use crate::review::View;
 use crate::review::build::{ReviewFile, Sides};
-use crate::review::{RepoCtx, View};
 use crate::workspace::Workspace;
 
 impl RepoCtx {

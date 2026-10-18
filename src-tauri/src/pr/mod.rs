@@ -14,8 +14,8 @@ mod stack;
 use serde::Serialize;
 use specta::Type;
 
+use crate::ctx::RepoCtx;
 use crate::jj::git::remote_bookmark;
-use crate::review::RepoCtx;
 use crate::store::PrRecord;
 
 pub use discussion::DiscussionDto;

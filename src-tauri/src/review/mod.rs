@@ -35,7 +35,6 @@ pub(crate) mod walkthrough;
 mod workflow_tests;
 
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -44,9 +43,8 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::anchor::MatchConfig;
-use crate::jj::Jj;
+use crate::ctx::{RepoCtx, now_ms};
 use crate::store::{Edit, Mark, MarkColor, Session, Store};
-use crate::watch;
 use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
@@ -61,27 +59,27 @@ pub use quotes::quoted_reply;
 pub use threads::{ThreadDto, pulled_stage};
 pub use views::{ChangeDto, View};
 
-/// Reports a workspace's watch events, with the workspace's name.
-pub type Emit = Arc<dyn Fn(Option<String>, watch::Event) + Send + Sync>;
-
-pub struct RepoCtx {
-    /// The main workspace's root.
-    pub root: PathBuf,
-    pub main: Arc<Workspace>,
-    /// The other workspaces, by name.
-    pub(crate) workspaces: Mutex<HashMap<String, Arc<Workspace>>>,
-    /// Set once the window exists. Workspaces start being watched from then on.
-    pub emit: Mutex<Option<Emit>>,
-    /// Where new workspaces go.
-    pub workspace_base: Option<PathBuf>,
-    pub store: Mutex<Store>,
-    reviews: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
+/// The open reviews and what they share, kept on the [`RepoCtx`].
+pub struct Reviews {
+    open: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
     /// The review each workspace's last active review pane shows, by workspace key.
     current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
+}
+
+impl Default for Reviews {
+    fn default() -> Self {
+        Self {
+            open: Mutex::default(),
+            current: Mutex::default(),
+            next_id: AtomicU32::new(1),
+            cache: Mutex::default(),
+            links: Mutex::default(),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -202,31 +200,10 @@ pub struct Review {
 /// A refresh's error when a later one overtook it. The UI drops it.
 pub const SUPERSEDED: &str = "superseded by a later refresh";
 
-pub(crate) fn now_ms() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64)
-}
-
 impl RepoCtx {
-    pub fn new(root: PathBuf, jj: Jj, store: Store) -> Self {
-        Self {
-            main: Arc::new(Workspace::new(None, root.clone(), jj)),
-            root,
-            workspaces: Mutex::default(),
-            emit: Mutex::default(),
-            workspace_base: crate::workspaces::ws_base(),
-            store: Mutex::new(store),
-            reviews: Mutex::default(),
-            current: Mutex::default(),
-            next_id: AtomicU32::new(1),
-            cache: Mutex::default(),
-            links: Mutex::default(),
-        }
-    }
-
     fn review(&self, id: u32) -> anyhow::Result<Arc<Mutex<Review>>> {
         self.reviews
+            .open
             .lock()
             .unwrap()
             .get(&id)
@@ -235,18 +212,19 @@ impl RepoCtx {
     }
 
     pub fn close(&self, id: u32) {
-        self.reviews.lock().unwrap().remove(&id);
-        self.current.lock().unwrap().retain(|_, r| *r != id);
+        self.reviews.open.lock().unwrap().remove(&id);
+        self.reviews.current.lock().unwrap().retain(|_, r| *r != id);
     }
 
     /// Records the review a workspace's active review pane shows, for agents to act on.
     pub fn focus(&self, workspace: Option<&str>, id: u32) {
         let key = workspace.unwrap_or("").to_string();
-        self.current.lock().unwrap().insert(key, id);
+        self.reviews.current.lock().unwrap().insert(key, id);
     }
 
     pub fn current_review(&self, workspace: Option<&str>) -> anyhow::Result<u32> {
-        self.current
+        self.reviews
+            .current
             .lock()
             .unwrap()
             .get(workspace.unwrap_or(""))
@@ -300,7 +278,7 @@ impl RepoCtx {
                 .unwrap()
                 .start_session(&label, ws.key(), revset, now_ms())?,
         };
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.reviews.next_id.fetch_add(1, Ordering::Relaxed);
         let mut review = Review::new(ws, revset, label, loaded.cfg);
         review.baseline = prev
             .iter()
@@ -314,6 +292,7 @@ impl RepoCtx {
             review.swap_in(&store, loaded, id)?.0
         };
         self.reviews
+            .open
             .lock()
             .unwrap()
             .insert(id, Arc::new(Mutex::new(review)));

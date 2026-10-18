@@ -4,7 +4,7 @@
 use anyhow::{Context, bail, ensure};
 
 use super::BotRun;
-use crate::review::RepoCtx;
+use crate::ctx::RepoCtx;
 
 impl BotRun {
     /// The id the user sees and tells agents: its name, or `R<id>`.

@@ -8,9 +8,9 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 
 use tauri_specta::Event as _;
 
+use crate::ctx::{Emit, RepoCtx};
 use crate::events::{RepoChanged, WorkingCopyMoved, WorkingCopyStale};
 use crate::jj::Jj;
-use crate::review::{Emit, RepoCtx};
 use crate::store::Store;
 use crate::watch;
 

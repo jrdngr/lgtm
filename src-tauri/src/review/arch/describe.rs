@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::system::SystemDto;
-use crate::review::{RepoCtx, now_ms};
+use crate::ctx::{RepoCtx, now_ms};
 use crate::store::Store;
 
 const KEY: &str = "system";

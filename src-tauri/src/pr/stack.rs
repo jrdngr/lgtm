@@ -8,8 +8,8 @@ use anyhow::{Context, bail};
 
 use super::nearby::NearbyPrDto;
 use super::{PrDto, PrRecord};
+use crate::ctx::RepoCtx;
 use crate::github::{self, remote};
-use crate::review::RepoCtx;
 
 /// The bookmark of a PR deselected in a workspace, by repo and workspace. It isn't picked
 /// again until another PR is nearest `@`.

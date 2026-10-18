@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use super::reply::{Known, Reply, validate};
 use super::{AssessmentDto, LayerDto, LookDto, prompt, state};
+use crate::ctx::{RepoCtx, now_ms};
 use crate::jj::Range;
-use crate::review::{RepoCtx, now_ms};
 use crate::store::Store;
 
 const INSTRUCTIONS: &str = "Assess the architecture of this change. Check its structural \

@@ -8,7 +8,7 @@ use super::Session;
 use super::queue::{Answer, QState, QaQuestion, Turn};
 use super::text;
 use super::update::REAUTO_RULE;
-use crate::review::{RepoCtx, now_ms};
+use crate::ctx::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
 
 fn is_auto(q: &QaQuestion) -> bool {

@@ -12,8 +12,8 @@ use anyhow::{Context, bail};
 use serde::Serialize;
 use specta::Type;
 
+use crate::ctx::RepoCtx;
 use crate::jj::{Jj, WorkspaceInfo};
-use crate::review::RepoCtx;
 use crate::watch;
 use crate::workspace::Workspace;
 
@@ -29,15 +29,6 @@ pub struct WorkspaceDto {
     /// Length of the shortest prefix of `change_id` that's unique in the repo.
     pub unique: u32,
     pub description: String,
-}
-
-/// Where lgtm puts new workspaces: `$XDG_DATA_HOME/lgtm/ws`, else `~/.local/share/lgtm/ws`.
-pub fn ws_base() -> Option<PathBuf> {
-    let data = std::env::var_os("XDG_DATA_HOME")
-        .filter(|d| !d.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| Path::new(&h).join(".local/share")))?;
-    Some(data.join("lgtm/ws"))
 }
 
 /// A path component without spaces or shell metacharacters.

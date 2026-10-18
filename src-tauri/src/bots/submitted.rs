@@ -6,7 +6,7 @@ use anyhow::Context;
 
 use super::output::{Action, Finding, Location, Minimal, Output, Question, Review};
 use super::{BotRun, Part, Persona};
-use crate::review::{RepoCtx, now_ms};
+use crate::ctx::{RepoCtx, now_ms};
 
 /// An agent's own suggested fixes, naming findings by their 1-based place in what it published.
 pub struct Summary {

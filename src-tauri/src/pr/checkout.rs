@@ -5,9 +5,9 @@
 use anyhow::{Context, bail};
 
 use super::{PrRecord, fallback_bookmark, workspace_name};
+use crate::ctx::RepoCtx;
 use crate::github::{self, GhRepo, PrInfo, remote};
 use crate::jj::Jj;
-use crate::review::RepoCtx;
 
 /// Where a PR's base comes from.
 pub(super) struct Base {

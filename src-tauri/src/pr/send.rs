@@ -8,8 +8,9 @@ use specta::Type;
 
 use super::PrRecord;
 use crate::anchor::Side;
+use crate::ctx::{RepoCtx, now_ms};
 use crate::github::{self, Verdict, publish::Spot};
-use crate::review::{RepoCtx, StateDto, now_ms, quoted_reply};
+use crate::review::{StateDto, quoted_reply};
 use crate::store::{Comment, GhLink, GhPost, Stage};
 
 /// What happens to a ready thread with no reply: one that was fixed as asked.

@@ -2,6 +2,7 @@ pub mod anchor;
 mod bots;
 mod commands;
 mod config;
+mod ctx;
 pub mod diff;
 mod dragged;
 mod events;

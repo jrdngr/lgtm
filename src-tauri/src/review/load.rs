@@ -81,7 +81,7 @@ impl RepoCtx {
             .map(|d| cache::key(&sides, interdiff, d, &config))
             .collect();
         let mut built: Vec<Option<(ReviewFile, FileDto)>> = {
-            let mut cache = self.cache.lock().unwrap();
+            let mut cache = self.reviews.cache.lock().unwrap();
             keys.iter().map(|k| cache.take(k, &sides.new)).collect()
         };
         let misses: Vec<(usize, FileDiff)> = diffs
@@ -103,7 +103,8 @@ impl RepoCtx {
             built[i] = Some(b);
         }
         let built: Vec<(ReviewFile, FileDto)> = built.into_iter().map(Option::unwrap).collect();
-        self.cache
+        self.reviews
+            .cache
             .lock()
             .unwrap()
             .put(keys.into_iter().zip(built.iter().cloned()));

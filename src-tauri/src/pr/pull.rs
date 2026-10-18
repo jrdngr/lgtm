@@ -4,9 +4,10 @@
 use std::collections::HashMap;
 
 use crate::anchor::Side;
+use crate::ctx::RepoCtx;
 use crate::github::threads::{Comment, Review};
 use crate::github::{self, threads::Thread};
-use crate::review::{PulledThread, RepoCtx, StateDto};
+use crate::review::{PulledThread, StateDto};
 use crate::store::{GhLink, GhPost};
 
 pub(super) fn pulled(t: Thread, repo: &str, pr: u32, viewer: &str) -> PulledThread {

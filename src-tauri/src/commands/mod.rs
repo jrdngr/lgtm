@@ -19,8 +19,8 @@ use std::sync::Arc;
 
 use tauri::{Manager, WebviewWindow};
 
+use crate::ctx::RepoCtx;
 use crate::repo::RepoWindows;
-use crate::review::RepoCtx;
 use crate::workspace::Workspace;
 
 type CmdResult<T> = Result<T, String>;
