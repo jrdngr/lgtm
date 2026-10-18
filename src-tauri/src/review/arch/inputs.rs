@@ -298,7 +298,10 @@ pub fn add_symbols(model: &mut Model, root: &Path, paths: &[String]) {
         if model.symbols.contains_key(p) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(root.join(p)) else {
+        let Ok(path) = crate::files::resolve(root, p) else {
+            continue;
+        };
+        let Ok(text) = std::fs::read_to_string(path) else {
             continue;
         };
         if let Some(parsed) = crate::syntax::parse(p, &text) {

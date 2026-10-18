@@ -43,6 +43,7 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
     };
     let depth = Path::new(dir).components().count() + 1;
     let target = path.clone();
+    let real_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let walk = ignore::WalkBuilder::new(root)
         .max_depth(Some(depth))
         .hidden(false)
@@ -54,6 +55,7 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
             e.file_name() != ".jj"
                 && e.file_name() != ".git"
                 && (target.starts_with(p) || p.parent() == Some(target.as_path()))
+                && !(e.path_is_symlink() && leaves(&real_root, p))
         })
         .build();
     let mut out = Vec::new();
@@ -73,6 +75,11 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
     }
     out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.cmp(&b.name)));
     Ok(out)
+}
+
+/// Whether `path` resolves outside `root`, which must be canonical. A dangling link doesn't.
+fn leaves(root: &Path, path: &Path) -> bool {
+    path.canonicalize().is_ok_and(|real| !real.starts_with(root))
 }
 
 /// A text file's contents, named `name` in errors.
@@ -133,10 +140,14 @@ pub fn contain(root: &Path, path: &Path) -> anyhow::Result<()> {
 }
 
 /// Writes `bytes` to a new file, or over a file when `replace`. Returns false, writing
-/// nothing, when something is there and it can't replace it.
+/// nothing, when something is there and it can't replace it. Refuses a symlink, since the
+/// write would land wherever it points.
 pub fn put(path: &Path, name: &str, bytes: &[u8], replace: bool) -> anyhow::Result<bool> {
     if path.is_dir() || (path.exists() && !replace) {
         return Ok(false);
+    }
+    if path.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+        bail!("{name} is a symlink");
     }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).with_context(|| format!("can't create {name}"))?;
@@ -186,6 +197,22 @@ mod tests {
         assert!(put(&file, "a.png", b"two", true).unwrap());
         assert_eq!(std::fs::read(&file).unwrap(), b"two");
         assert!(!put(dir.path(), "new", b"x", true).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn put_refuses_symlinks_even_dangling_ones() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let rc = outside.path().join("rc");
+        std::fs::write(&rc, "old").unwrap();
+        std::os::unix::fs::symlink(&rc, root.join("a")).unwrap();
+        std::os::unix::fs::symlink(outside.path().join("new"), root.join("b")).unwrap();
+        assert!(put(&root.join("a"), "a", b"x", true).is_err());
+        assert!(put(&root.join("b"), "b", b"x", false).is_err());
+        assert_eq!(std::fs::read(&rc).unwrap(), b"old");
+        assert!(!outside.path().join("new").exists());
     }
 
     #[test]
@@ -250,6 +277,26 @@ mod tests {
             .map(|e| e.path)
             .collect();
         assert_eq!(inside, ["docs/a.md"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn doesnt_list_through_links_that_leave_the_workspace() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(outside.path().join("secret"), "").unwrap();
+        std::fs::write(root.join("a.md"), "").unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.join("out")).unwrap();
+        std::os::unix::fs::symlink(outside.path().join("secret"), root.join("s")).unwrap();
+        std::os::unix::fs::symlink("a.md", root.join("b.md")).unwrap();
+        let names: Vec<_> = list(root, "")
+            .unwrap()
+            .into_iter()
+            .map(|e| e.path)
+            .collect();
+        assert_eq!(names, ["a.md", "b.md"]);
+        assert!(list(root, "out").unwrap().is_empty());
     }
 
     #[test]
