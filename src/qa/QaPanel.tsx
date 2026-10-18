@@ -13,8 +13,7 @@ function status(d: Session) {
   const open = openQuestions(d).length;
   const all = countable(d).length;
   if (!all && !d.asked) return "Not asked yet";
-  if (open) return `${all - open} of ${all} decided`;
-  if (d.sent != null) return "Sent to a terminal";
+  if (open || d.sent != null) return `${all - open} of ${all} decided`;
   return "Ready to apply";
 }
 
