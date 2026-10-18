@@ -27,7 +27,9 @@ reviews a change there and marks rows with colors they label, like reviewed or f
 this terminal's workspace: read its state, comments, walkthrough, symbol graph and reports; \
 add comments; write a walkthrough; store an architecture assessment; publish review findings \
 to a report; and point the review \
-at code or a revset. You can't mark code. Lines are on the new side of the diff. To work \
+at code or a revset. Tools that write to the review take its revset, from your prompt or \
+get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
+or list_threads; lgtm refuses a write once the review or PR has moved on. You can't mark code. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
 answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
@@ -134,7 +136,14 @@ impl Lgtm {
     async fn add_comment(&self, Parameters(p): Parameters<inputs::AddComment>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
-            .agent_comment(self.workspace(), &p.path, p.start_line, p.end_line, &p.body)
+            .agent_comment(
+                self.workspace(),
+                &p.revset,
+                &p.path,
+                p.start_line,
+                p.end_line,
+                &p.body,
+            )
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Added the comment.".into())
@@ -144,7 +153,7 @@ impl Lgtm {
     async fn reply_to_comment(&self, Parameters(p): Parameters<inputs::Reply>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
-            .agent_reply(self.workspace(), p.comment_id, &p.text)
+            .agent_reply(self.workspace(), &p.revset, p.comment_id, &p.text)
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Replied.".into())
@@ -179,7 +188,14 @@ impl Lgtm {
             question: p.question,
         };
         let (review, state) = ctx
-            .agent_set_take(self.workspace(), p.thread_id, take, p.reply, p.summary)
+            .agent_set_take(
+                self.workspace(),
+                p.pr,
+                p.thread_id,
+                take,
+                p.reply,
+                p.summary,
+            )
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Set the take.".into())
@@ -200,7 +216,7 @@ impl Lgtm {
             inputs::ThreadStage::Done => Stage::Done,
         };
         let (review, state) = ctx
-            .agent_set_stage(self.workspace(), p.thread_id, stage)
+            .agent_set_stage(self.workspace(), p.pr, p.thread_id, stage)
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Moved it.".into())
@@ -227,7 +243,7 @@ impl Lgtm {
     async fn suggest_reply(&self, Parameters(p): Parameters<inputs::SuggestReply>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
-            .agent_suggest_reply(self.workspace(), p.thread_id, &p.text)
+            .agent_suggest_reply(self.workspace(), p.pr, p.thread_id, &p.text)
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Suggested it.".into())
@@ -258,7 +274,9 @@ impl Lgtm {
         let inputs: Vec<NoteInput> =
             serde_json::from_value(serde_json::to_value(&p.notes).map_err(|e| e.to_string())?)
                 .map_err(|e| e.to_string())?;
-        let review = ctx.current_review(self.workspace()).map_err(failed)?;
+        let review = ctx
+            .current_review_at(self.workspace(), &p.revset)
+            .map_err(failed)?;
         let (state, skipped) = ctx
             .save_notes(review, &inputs, Source::Terminal)
             .map_err(failed)?;
@@ -349,7 +367,14 @@ impl Lgtm {
             _ => return Err("Give task and fixes together, or neither.".into()),
         };
         let (run, created) = ctx
-            .publish_findings(self.workspace(), p.report.as_deref(), reviewer, review, summary)
+            .publish_findings(
+                self.workspace(),
+                &p.revset,
+                p.report.as_deref(),
+                reviewer,
+                review,
+                summary,
+            )
             .map_err(failed)?;
         BotRunChanged {
             run: run.id,

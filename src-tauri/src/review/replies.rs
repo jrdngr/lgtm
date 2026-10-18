@@ -26,6 +26,30 @@ fn triaged_stage(verdict: TakeVerdict, reply: bool) -> Stage {
 }
 
 impl RepoCtx {
+    /// The review open in `workspace`, for an agent's write on thread `thread` of PR `pr`.
+    /// Threads aren't tied to a revset but to their PR, so the write is refused unless the
+    /// thread is on `pr` and `pr` is still the workspace's PR.
+    pub(super) fn thread_review(
+        &self,
+        workspace: Option<&str>,
+        thread: u32,
+        pr: u32,
+    ) -> anyhow::Result<u32> {
+        let (id, ours) = self.with_current(workspace, |r| r.pr(&self.store.lock().unwrap()))?;
+        let (repo, number) = ours?.context("this workspace has no PR")?;
+        anyhow::ensure!(
+            number == pr,
+            "lgtm's workspace moved to PR #{number}, not #{pr}, so nothing was changed"
+        );
+        let c = self.store.lock().unwrap().comment(thread as i64)?;
+        let t = c.and_then(|c| c.thread).context("no such thread")?;
+        anyhow::ensure!(
+            t.pr == pr && t.repo == repo,
+            "thread {thread} isn't on PR #{pr}"
+        );
+        Ok(id)
+    }
+
     /// The threads of the review open in `workspace`, for a terminal agent.
     pub fn agent_threads(&self, workspace: Option<&str>) -> anyhow::Result<Vec<ThreadDto>> {
         let (_, threads) = self.with_current(workspace, |r| r.threads.clone())?;
@@ -41,12 +65,13 @@ impl RepoCtx {
     pub fn agent_set_take(
         &self,
         workspace: Option<&str>,
+        pr: u32,
         thread: u32,
         take: Take,
         reply: Option<String>,
         summary: Option<String>,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review(workspace)?;
+        let id = self.thread_review(workspace, thread, pr)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;
             anyhow::ensure!(c.thread.is_some(), "that's a note, not a thread");
@@ -76,11 +101,12 @@ impl RepoCtx {
     pub fn agent_set_stage(
         &self,
         workspace: Option<&str>,
+        pr: u32,
         thread: u32,
         stage: Stage,
     ) -> anyhow::Result<(u32, StateDto)> {
         anyhow::ensure!(stage != Stage::Ready, "only the human marks a reply ready");
-        let id = self.current_review(workspace)?;
+        let id = self.thread_review(workspace, thread, pr)?;
         Ok((id, self.set_stage(id, thread, stage)?))
     }
 }

@@ -65,11 +65,13 @@ impl RepoCtx {
     /// Stores `review` (a verdict and findings) from `reviewer`, with the agent's own suggested
     /// fixes when it gives them. With `report`, it replaces that reviewer's section of that
     /// report, or adds one, and the user's dismissals follow findings with the same title and
-    /// locations. Without, it's a new report against the workspace's current review. Returns
-    /// the report and whether it's new.
+    /// locations. Without, it's a new report against the workspace's current review. Either
+    /// must be of `revset`, the revset the agent reviewed. Returns the report and whether it's
+    /// new.
     pub fn publish_findings(
         &self,
         workspace: Option<&str>,
+        revset: &str,
         report: Option<&str>,
         reviewer: &str,
         review: serde_json::Value,
@@ -80,9 +82,19 @@ impl RepoCtx {
             .transpose()?;
         let output = Output::Review(Review::parse(reviewer, review)?);
         let Some(label) = report else {
-            return Ok((self.new_report(workspace, reviewer, output, filter)?, true));
+            return Ok((
+                self.new_report(workspace, revset, reviewer, output, filter)?,
+                true,
+            ));
         };
-        let id = self.find_report(workspace, label)?.id;
+        let run = self.find_report(workspace, label)?;
+        anyhow::ensure!(
+            run.revset == revset,
+            "report {} is of `{}`, not `{revset}`, so nothing was published",
+            run.label(),
+            run.revset
+        );
+        let id = run.id;
         self.edit_run(id, |run| {
             replace_section(run, reviewer, output);
             set_filter(run, filter);
@@ -93,16 +105,21 @@ impl RepoCtx {
     fn new_report(
         &self,
         workspace: Option<&str>,
+        revset: &str,
         reviewer: &str,
         output: Output,
         filter: Option<Minimal>,
     ) -> anyhow::Result<BotRun> {
-        let (_, (revset, from, to)) = self.with_current(workspace, |r| r.target())?;
+        let (_, (shown, from, to)) = self.with_current(workspace, |r| r.target())?;
+        anyhow::ensure!(
+            shown == revset,
+            "lgtm's review moved to `{shown}`, not `{revset}`, so nothing was published"
+        );
         let mut run = BotRun {
             id: 0,
             name: None,
             workspace: workspace.map(str::to_string),
-            revset,
+            revset: shown,
             from,
             to,
             personas: vec![persona(reviewer)],

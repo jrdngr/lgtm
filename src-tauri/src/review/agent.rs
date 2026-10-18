@@ -391,17 +391,18 @@ impl RepoCtx {
         Ok(self.with_current(workspace, Review::agent_notes)?.1)
     }
 
-    /// Comments as a terminal agent on lines `start..=end` of `path` (new side). Returns the
-    /// review and its new state.
+    /// Comments as a terminal agent on lines `start..=end` of `path` (new side) in the review
+    /// of `revset`. Returns the review and its new state.
     pub fn agent_comment(
         &self,
         workspace: Option<&str>,
+        revset: &str,
         path: &str,
         start: u32,
         end: u32,
         body: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review(workspace)?;
+        let id = self.current_review_at(workspace, revset)?;
         let state = self.comment_edit(id, |review, store| {
             let (lo, hi) = (start.min(end), start.max(end));
             let rows = review
@@ -431,14 +432,15 @@ impl RepoCtx {
         Ok((id, state))
     }
 
-    /// Adds a terminal agent's reply to a comment's conversation.
+    /// Adds a terminal agent's reply to a comment's conversation, from the review of `revset`.
     pub fn agent_reply(
         &self,
         workspace: Option<&str>,
+        revset: &str,
         comment: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review(workspace)?;
+        let id = self.current_review_at(workspace, revset)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store
                 .comment(comment as i64)?

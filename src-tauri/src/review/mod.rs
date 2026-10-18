@@ -254,6 +254,18 @@ impl RepoCtx {
             .context("no review is open in lgtm for this workspace")
     }
 
+    /// The review open in `workspace`, for an agent's write about `revset`. The focus may have
+    /// moved to another review since the agent was asked, so then the write is refused.
+    pub fn current_review_at(&self, workspace: Option<&str>, revset: &str) -> anyhow::Result<u32> {
+        let id = self.current_review(workspace)?;
+        let shown = self.review(id)?.lock().unwrap().revset.clone();
+        anyhow::ensure!(
+            shown == revset,
+            "lgtm's review moved to `{shown}`, not `{revset}`, so nothing was changed"
+        );
+        Ok(id)
+    }
+
     /// Opens `revset` in the Combined view. Starts a review session, or with `resume`
     /// continues the revset's latest one, as when the same revset is loaded again.
     pub async fn open(

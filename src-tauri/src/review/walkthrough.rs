@@ -11,8 +11,8 @@ impl RepoCtx {
         let instructions = prompts::load(Prompt::Walkthrough)?;
         Ok(format!(
             "Write a walkthrough of the review of `{revset}` open in lgtm. Read it with lgtm's \
-             get_review MCP tool and save the notes with its set_notes tool, which replaces the \
-             last walkthrough. Don't edit files.\n\n{instructions}"
+             get_review MCP tool and save the notes with its set_notes tool and revset \
+             `{revset}`, which replaces the last walkthrough. Don't edit files.\n\n{instructions}"
         ))
     }
 }

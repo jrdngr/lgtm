@@ -19,6 +19,9 @@ export function threadText(files: FlatFile[], c: CommentDto): string[] {
 
 const join = (parts: string[]) => parts.filter(Boolean).join("\n\n");
 
+/** How a prompt names a thread to lgtm's thread tools. */
+const ids = (c: CommentDto) => `thread_id ${c.id} and pr ${c.thread?.pr}`;
+
 /** How the brief a linked agent gets starts, so its prompt isn't filed in a thread's chat. */
 export const LINK_START = "You're linked to lgtm's review of PR";
 
@@ -29,7 +32,7 @@ export function linkText(pr: PrDto, rules: string): string {
     `${LINK_START} #${pr.number}. lgtm's list_threads tool lists its threads. Its title:\n${untrusted(pr.title, pr.author)}`,
     UNTRUSTED_NOTE,
     "Each prompt I send names the thread I'm on. Read the code it points at before you answer.",
-    "Use set_thread_take for your verdict, suggest_reply for a reply in my voice, and set_thread_stage to move a thread. Stop at a drafted reply: only I mark one ready. Nothing you do posts to GitHub.",
+    `Use set_thread_take for your verdict, suggest_reply for a reply in my voice, and set_thread_stage to move a thread, each with pr ${pr.number}. Stop at a drafted reply: only I mark one ready. Nothing you do posts to GitHub.`,
     `My rules for takes and replies:\n\n${rules.trim()}`,
     "Say you're ready and wait for me.",
   ]);
@@ -56,8 +59,8 @@ export function reviewText(files: FlatFile[], c: CommentDto, rules: string): str
     UNTRUSTED_NOTE,
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    `Tell me in a few short bullets what you'd change and why. If you'd change the reply, call lgtm's suggest_reply tool with thread_id ${c.id} and the whole new reply. It never posts to GitHub.`,
-    `Whenever your take on the thread changes, call lgtm's set_thread_take tool with thread_id ${c.id}, the verdict and why, and no reply.`,
+    `Tell me in a few short bullets what you'd change and why. If you'd change the reply, call lgtm's suggest_reply tool with ${ids(c)} and the whole new reply. It never posts to GitHub.`,
+    `Whenever your take on the thread changes, call lgtm's set_thread_take tool with ${ids(c)}, the verdict and why, and no reply.`,
   ]);
 }
 
@@ -68,7 +71,7 @@ export function triageText(files: FlatFile[], c: CommentDto, rules: string): str
     UNTRUSTED_NOTE,
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    `Then call lgtm's set_thread_take tool with thread_id ${c.id}, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
+    `Then call lgtm's set_thread_take tool with ${ids(c)}, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
   ]);
 }
 
@@ -85,6 +88,6 @@ export function triageAllText(
       join([`Thread ${t.id} (${threadWhere(t)}):`, ...threadText(files, c)]),
     ),
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    "For each thread, call lgtm's set_thread_take tool with its thread_id, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Then give me your takes in a few short bullets.",
+    `For each thread, call lgtm's set_thread_take tool with its thread_id and pr ${threads[0]?.[0].state.pr}, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Then give me your takes in a few short bullets.`,
   ]);
 }

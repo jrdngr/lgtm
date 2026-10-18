@@ -19,6 +19,9 @@ pub struct Revset {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct AddComment {
+    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
+    /// its review shows another.
+    pub revset: String,
     /// Repository-relative path of a file in the review.
     pub path: String,
     /// First line on the new side of the diff (the old side for a deleted file).
@@ -31,6 +34,9 @@ pub struct AddComment {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct Reply {
+    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
+    /// its review shows another.
+    pub revset: String,
     /// The comment's id, from list_comments.
     pub comment_id: u32,
     pub text: String,
@@ -86,6 +92,9 @@ pub struct Note {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct Notes {
+    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
+    /// its review shows another.
+    pub revset: String,
     /// In reading order, starting with a context note on the entry point. These replace the
     /// review's current walkthrough.
     pub notes: Vec<Note>,
@@ -130,6 +139,9 @@ pub struct Finding {
 #[derive(Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Publish {
+    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
+    /// its review shows another.
+    pub revset: String,
     /// The report to publish to, by the id the human gave you, like `R12` or `auth-pass`.
     /// Leave it out to start a new report on the open review.
     pub report: Option<String>,
@@ -187,6 +199,9 @@ pub enum Verdict {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct SetTake {
+    /// The thread's PR number, as the prompt or list_threads gives it. lgtm refuses the call
+    /// when the thread or the workspace is on another PR.
+    pub pr: u32,
     /// The thread's id, from list_threads.
     pub thread_id: u32,
     pub verdict: Verdict,
@@ -216,6 +231,9 @@ pub enum ThreadStage {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct SetStage {
+    /// The thread's PR number, as the prompt or list_threads gives it. lgtm refuses the call
+    /// when the thread or the workspace is on another PR.
+    pub pr: u32,
     /// The thread's id, from list_threads.
     pub thread_id: u32,
     pub stage: ThreadStage,
@@ -223,6 +241,9 @@ pub struct SetStage {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct SuggestReply {
+    /// The thread's PR number, as the prompt or list_threads gives it. lgtm refuses the call
+    /// when the thread or the workspace is on another PR.
+    pub pr: u32,
     /// The thread's id, from list_threads.
     pub thread_id: u32,
     /// The whole reply, in the human's voice.

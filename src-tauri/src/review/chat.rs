@@ -36,10 +36,11 @@ impl RepoCtx {
     pub fn agent_suggest_reply(
         &self,
         workspace: Option<&str>,
+        pr: u32,
         thread: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review(workspace)?;
+        let id = self.thread_review(workspace, thread, pr)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;
             anyhow::ensure!(c.thread.is_some(), "that's a note, not a thread");

@@ -15,7 +15,7 @@ export function reportText(prompt: string, revset: string, root: string | undefi
   return `${prompt.trim()}
 
 The change is the lgtm review of \`${revset}\`${where}. Read it with lgtm's get_review MCP tool.
-When you're done, publish what you found with lgtm's publish_findings MCP tool: one reviewer per pass or persona you used, with your suggested fixes. lgtm shows it as a report.`;
+When you're done, publish what you found with lgtm's publish_findings MCP tool and revset \`${revset}\`: one reviewer per pass or persona you used, with your suggested fixes. lgtm shows it as a report.`;
 }
 
 /** The review prompt, kept per repo, and the button that pastes it into the send target. */

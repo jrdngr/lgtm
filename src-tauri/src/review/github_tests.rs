@@ -223,17 +223,23 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     };
     let stage = |state: &StateDto| state.comments[0].thread.as_ref().unwrap().stage;
     let (_, state) = ctx
-        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Agree), None, None)
+        .agent_set_take(Some("pr1"), 1, id, take(TakeVerdict::Agree), None, None)
         .unwrap();
     assert_eq!(stage(&state), Stage::ToFix);
     let reply = Some("Because.".to_string());
     let (_, state) = ctx
-        .agent_set_take(Some("pr1"), id, take(TakeVerdict::Answer), reply, Some(" Why 2 ".into()))
+        .agent_set_take(Some("pr1"), 1, id, take(TakeVerdict::Answer), reply, Some(" Why 2 ".into()))
         .unwrap();
     assert_eq!(stage(&state), Stage::Reply);
     assert_eq!(state.comments[0].thread.as_ref().unwrap().summary, "Why 2");
     // Only the human marks a reply ready.
-    assert!(ctx.agent_set_stage(Some("pr1"), id, Stage::Ready).is_err());
+    assert!(ctx.agent_set_stage(Some("pr1"), 1, id, Stage::Ready).is_err());
+    // Thread writes name the thread's PR, and a thread of another PR is refused.
+    let Err(err) = ctx.agent_set_stage(Some("pr1"), 2, id, Stage::Done) else {
+        panic!("a write about another PR went through");
+    };
+    assert!(err.to_string().contains("moved to PR #1"), "{err}");
+    assert!(ctx.agent_suggest_reply(Some("pr1"), 2, id, "x").is_err());
 
     let mut answered = thread("T1", None);
     answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];
@@ -266,7 +272,7 @@ async fn a_terminal_agent_suggests_a_reply_that_becomes_the_thread_reply() {
     assert_eq!(state.comments[0].messages.len(), 1, "blank text adds nothing");
 
     let (_, state) = ctx
-        .agent_suggest_reply(Some("pr1"), id, "Good catch.\n")
+        .agent_suggest_reply(Some("pr1"), 1, id, "Good catch.\n")
         .unwrap();
     assert_eq!(state.comments[0].suggestion.as_deref(), Some("Good catch."));
 
@@ -278,7 +284,7 @@ async fn a_terminal_agent_suggests_a_reply_that_becomes_the_thread_reply() {
     assert_eq!(c.messages.len(), 1, "the chat stays");
     assert!(ctx.take_suggestion(review.id, id).is_err());
 
-    ctx.agent_suggest_reply(Some("pr1"), id, "Done.").unwrap();
+    ctx.agent_suggest_reply(Some("pr1"), 1, id, "Done.").unwrap();
     let state = ctx.dismiss_suggestion(review.id, id).unwrap();
     assert_eq!(state.comments[0].suggestion, None);
     assert_eq!(state.comments[0].body, "Good catch.");
