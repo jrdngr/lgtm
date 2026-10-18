@@ -22,23 +22,17 @@ impl RepoCtx {
         transitive: bool,
         range: Option<ArchRange>,
     ) -> anyhow::Result<ArchDto> {
-        let (ws, revset, own) = {
+        // `whole` is the review's base and head as loaded, which the assessment must be of to
+        // be current.
+        let (ws, revset, whole, own) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
-            let own = (r.view == View::Combined && range.is_none()).then(|| {
-                let range = Range {
-                    from: r.from.clone(),
-                    to: r.to.clone(),
-                };
-                (range, r.files.clone())
-            });
-            (r.ws.clone(), r.revset.clone(), own)
+            let own = (r.view == View::Combined && range.is_none()).then(|| r.files.clone());
+            (r.ws.clone(), r.revset.clone(), r.whole.clone(), own)
         };
-        // `whole` is the review's base and head, which the assessment must be of to be current.
-        let (range, whole, files, indexed, extra) = match own {
-            Some((range, files)) => (range.clone(), range, files, true, vec![]),
+        let (range, files, indexed, extra) = match own {
+            Some(files) => (whole.clone(), files, true, vec![]),
             None => {
-                let whole = ws.jj.resolve(&revset).await?;
                 let (range, extra) = match range {
                     Some(r) => {
                         let range = Range {
@@ -68,7 +62,6 @@ impl RepoCtx {
                 };
                 (
                     range.clone(),
-                    whole,
                     self.files_of(&ws, &revset, &range).await?,
                     false,
                     extra,

@@ -352,8 +352,12 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
     });
     let wrong = ctx.save_assessment(review.id, "@-", reply.clone()).await;
     assert!(wrong.is_err(), "the review shows another revset");
+    // The revset moves before the reply, but the assessment is of the commits the review loaded.
+    write(d, &[("src/web/extra.rs", "pub fn x() {}\n")]);
+    jj(d, &["status"]);
     let a = ctx.save_assessment(review.id, "@", reply).await.unwrap();
     assert_eq!(a.score, 2);
+    assert!(!a.stale);
 
     let arch = ctx.arch(review.id, false, None).await.unwrap();
     assert_eq!(arch.assessment, Some(a));
@@ -366,4 +370,11 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
     let checked = |key: &str| arch.look.iter().find(|l| l.key == key).unwrap().checked;
     assert!(checked(rule));
     assert!(!checked("agent:1"));
+
+    ctx.refresh(review.id, None).await.unwrap();
+    let arch = ctx.arch(review.id, false, None).await.unwrap();
+    assert!(
+        arch.assessment.unwrap().stale,
+        "the review now shows other commits"
+    );
 }

@@ -87,14 +87,13 @@ pub fn save_assessed(store: &Store, ws: &str, revset: &str, a: &Assessed) -> any
 impl RepoCtx {
     /// The prompt asking a terminal agent to assess the review's architecture change.
     pub async fn assess_prompt(&self, review: u32) -> anyhow::Result<String> {
-        let (ws, revset) = {
+        let (revset, whole) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
-            (r.ws.clone(), r.revset.clone())
+            (r.revset.clone(), r.whole.clone())
         };
         let arch = self.arch(review, false, None).await?;
-        // The whole review, like the architecture diff, whichever view is open.
-        let whole = ws.jj.resolve(&revset).await?;
+        // The whole review as loaded, like the architecture diff, whichever view is open.
         let from = whole.from.as_deref().unwrap_or("root()");
         Ok(format!(
             "The change under review is `{revset}` in this jj repository. Read its diff with \
@@ -113,11 +112,11 @@ impl RepoCtx {
         revset: &str,
         reply: serde_json::Value,
     ) -> anyhow::Result<AssessmentDto> {
-        let (ws, shown, files) = {
+        let (ws, shown, whole, files) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
             let files: Vec<String> = r.files.iter().map(|f| f.path.clone()).collect();
-            (r.ws.clone(), r.revset.clone(), files)
+            (r.ws.clone(), r.revset.clone(), r.whole.clone(), files)
         };
         ensure!(
             shown == revset,
@@ -135,7 +134,8 @@ impl RepoCtx {
             files: &files,
         };
         let mut assessed = validate(reply, &known, now_ms() as f64);
-        assessed.commits = Some((&ws.jj.resolve(revset).await?).into());
+        // The commits the review loaded, which the prompt and the architecture diff are of.
+        assessed.commits = Some((&whole).into());
         let store = self.store.lock().unwrap();
         save_assessed(&store, ws.key(), revset, &assessed)?;
         state::uncheck_assessed(&store, ws.key(), revset)?;
