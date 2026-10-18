@@ -350,14 +350,24 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         "look": [{ "source": "agent", "severity": "medium", "title": "Coupling",
                    "from": "src/web", "to": "src/db" }]
     });
-    ctx.assess_prompt(review.id).await.unwrap();
-    let wrong = ctx.save_assessment(review.id, "@-", reply.clone()).await;
+    let prompt = ctx.assess_prompt(review.id).await.unwrap();
+    let whole = ctx.review(review.id).unwrap().lock().unwrap().whole.clone();
+    let from = whole.from.clone().unwrap();
+    assert!(prompt.contains(&format!("from {from} to {}", whole.to)));
+    let asked = (from.as_str(), whole.to.as_str());
+    let wrong = ctx
+        .save_assessment(review.id, "@-", asked, reply.clone())
+        .await;
     assert!(wrong.is_err(), "the review shows another revset");
+    let wrong = ctx
+        .save_assessment(review.id, "@", (&from, "x"), reply.clone())
+        .await;
+    assert!(wrong.is_err(), "the prompt named other commits");
     // The revset moves before the reply, but the assessment is of the commits the review loaded.
     write(d, &[("src/web/extra.rs", "pub fn x() {}\n")]);
     jj(d, &["status"]);
     let a = ctx
-        .save_assessment(review.id, "@", reply.clone())
+        .save_assessment(review.id, "@", asked, reply.clone())
         .await
         .unwrap();
     assert_eq!(a.score, 2);
@@ -381,9 +391,11 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         arch.assessment.unwrap().stale,
         "the review now shows other commits"
     );
-    // A reply after a refresh is of the commits the prompt named.
-    let a = ctx.save_assessment(review.id, "@", reply).await.unwrap();
-    assert!(a.stale, "the prompt named the commits before the refresh");
+    // A reply to a prompt from before the refresh is refused.
+    let Err(err) = ctx.save_assessment(review.id, "@", asked, reply).await else {
+        panic!("an assessment of the old commits was stored");
+    };
+    assert!(err.to_string().contains("Assess again"), "{err}");
 }
 
 #[cfg(unix)]

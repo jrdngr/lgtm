@@ -20,7 +20,7 @@ sensitive or crosses a trust boundary unchecked, add a security look item whose 
 attack path and its sites as path:line.
 
 Use the component ids above wherever a component is asked for. Then call lgtm's set_assessment \
-tool with the revset and:
+tool with the revset, from and to, and:
 
 - score: 1 to 5, where 5 is safe to merge as is and 1 needs rework.
 - risk, and reason: one line on why.
@@ -87,34 +87,31 @@ pub fn save_assessed(store: &Store, ws: &str, revset: &str, a: &Assessed) -> any
 impl RepoCtx {
     /// The prompt asking a terminal agent to assess the review's architecture change.
     pub async fn assess_prompt(&self, review: u32) -> anyhow::Result<String> {
-        let (ws, revset, whole) = {
+        let (revset, whole) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
-            (r.ws.clone(), r.revset.clone(), r.whole.clone())
+            (r.revset.clone(), r.whole.clone())
         };
-        self.reviews
-            .assess_asked
-            .lock()
-            .unwrap()
-            .insert((ws.key().to_string(), revset.clone()), whole.clone());
         let arch = self.arch(review, false, None).await?;
         // The whole review as loaded, like the architecture diff, whichever view is open.
-        let from = whole.from.as_deref().unwrap_or("root()");
+        let from = base(&whole);
+        let to = &whole.to;
         Ok(format!(
-            "The change under review is `{revset}` in this jj repository. Read its diff with \
-             `jj diff --from {from} --to {}`. Don't edit files.\n\nThe architecture diff from \
-             the review's base to its head:\n\n{}\n\n{INSTRUCTIONS}",
-            whole.to,
+            "The change under review is `{revset}` in this jj repository, from {from} to {to}. \
+             Read its diff with `jj diff --from {from} --to {to}`. Don't edit files.\n\nThe \
+             architecture diff from the review's base to its head:\n\n{}\n\n{INSTRUCTIONS}",
             prompt::arch_text(&arch)
         ))
     }
 
     /// Stores `reply`, in set_assessment's format, as the assessment of review `review`,
-    /// replacing the last one. It must be about `revset`, the revset the review shows.
+    /// replacing the last one. It must be about `revset`, the revset the review shows, from
+    /// `from` to `to`, the commits it shows, as the Assess prompt named them.
     pub async fn save_assessment(
         &self,
         review: u32,
         revset: &str,
+        (from, to): (&str, &str),
         reply: serde_json::Value,
     ) -> anyhow::Result<AssessmentDto> {
         let (ws, shown, whole, files) = {
@@ -126,6 +123,11 @@ impl RepoCtx {
         ensure!(
             shown == revset,
             "lgtm's review now shows `{shown}`, not `{revset}`, so the assessment wasn't stored"
+        );
+        ensure!(
+            (from, to) == (base(&whole), whole.to.as_str()),
+            "lgtm's review of `{revset}` moved to other commits since the Assess prompt, so the \
+             assessment wasn't stored; tell the user to Assess again"
         );
         let reply: Reply =
             serde_json::from_value(reply).context("the assessment doesn't match the format")?;
@@ -139,18 +141,17 @@ impl RepoCtx {
             files: &files,
         };
         let mut assessed = validate(reply, &known, now_ms() as f64);
-        // The commits the last Assess prompt named, else those the review loaded.
-        let asked = (self.reviews.assess_asked.lock().unwrap())
-            .get(&(ws.key().to_string(), revset.to_string()))
-            .cloned()
-            .unwrap_or_else(|| whole.clone());
-        assessed.commits = Some((&asked).into());
-        assessed.assessment.stale = asked != whole;
+        assessed.commits = Some((&whole).into());
         let store = self.store.lock().unwrap();
         save_assessed(&store, ws.key(), revset, &assessed)?;
         state::uncheck_assessed(&store, ws.key(), revset)?;
         Ok(assessed.assessment)
     }
+}
+
+/// A range's base as the Assess prompt names it.
+fn base(r: &Range) -> &str {
+    r.from.as_deref().unwrap_or("root()")
 }
 
 #[cfg(test)]

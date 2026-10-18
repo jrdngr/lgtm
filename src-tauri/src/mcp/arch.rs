@@ -87,6 +87,10 @@ pub struct Look {
 pub struct Assessment {
     /// The revset the prompt named.
     pub revset: String,
+    /// The base commit the prompt named.
+    pub from: String,
+    /// The head commit the prompt named.
+    pub to: String,
     /// 1 to 5: 5 is safe to merge as is, 1 needs rework.
     pub score: u8,
     pub risk: Risk,
@@ -158,14 +162,15 @@ impl Lgtm {
     #[tool(
         description = "Store your assessment of the review's architecture change in lgtm, \
         replacing the last one. Its Architecture tab shows the score, risk, layers and look \
-        items. Components are the ids the prompt listed; others are dropped."
+        items. Components are the ids the prompt listed; others are dropped. It's refused once \
+        the review has moved off the from and to commits the prompt named."
     )]
     async fn set_assessment(&self, Parameters(p): Parameters<Assessment>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let review = ctx.current_review(self.workspace()).map_err(failed)?;
         let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
         let a = ctx
-            .save_assessment(review, &p.revset, reply)
+            .save_assessment(review, &p.revset, (&p.from, &p.to), reply)
             .await
             .map_err(failed)?;
         ArchChanged {
