@@ -5,7 +5,6 @@
 //! terminalFontSize = 13
 //! ```
 
-pub mod claude;
 pub mod marks;
 
 use std::path::{Path, PathBuf};

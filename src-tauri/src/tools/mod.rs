@@ -1,13 +1,13 @@
 //! Checks that the command-line tools the app runs are installed and new enough.
 
+pub mod claude;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::Serialize;
 use specta::Type;
 use tokio::process::Command;
-
-use crate::settings;
 
 /// A tool that's missing or too old.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
@@ -129,7 +129,7 @@ pub fn which(name: &str) -> Option<PathBuf> {
 /// installed.
 async fn version(name: &str) -> Result<String, Option<String>> {
     let mut cmd = if name == "claude" {
-        settings::claude::command().map_err(|e| Some(format!("{e:#}")))?
+        claude::command().map_err(|e| Some(format!("{e:#}")))?
     } else {
         Command::new(name)
     };
@@ -153,14 +153,12 @@ async fn version(name: &str) -> Result<String, Option<String>> {
 /// Every tool, found or not.
 pub async fn status() -> Vec<ToolStatus> {
     // The Claude command may have been installed or changed in the shell since it resolved.
-    tokio::task::spawn_blocking(settings::claude::refresh)
-        .await
-        .ok();
+    tokio::task::spawn_blocking(claude::refresh).await.ok();
     let mut found = Vec::new();
     for tool in &TOOLS {
         let out = version(tool.name).await;
         let location = if tool.name == "claude" {
-            settings::claude::status().resolved
+            claude::status().resolved
         } else {
             which(tool.name).map(|p| p.to_string_lossy().into_owned())
         };

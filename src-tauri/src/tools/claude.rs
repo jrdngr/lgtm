@@ -70,7 +70,7 @@ fn interpret(out: &str) -> Lookup {
 }
 
 fn on_path(name: &str) -> bool {
-    crate::tools::which(name).is_some()
+    super::which(name).is_some()
 }
 
 /// How long the login shell gets to say what a name is. Shell startup can hang without a
@@ -170,13 +170,13 @@ fn resolve_setting(setting: &str) -> Result<Resolved, String> {
 
 /// Resolves the current setting again, after it changed or the shell's config did.
 pub fn refresh() {
-    let setting = super::get().claude_terminal;
+    let setting = crate::settings::get().claude_terminal;
     let resolved = resolve_setting(&setting);
     *RESOLVED.write().unwrap() = Some((setting, resolved));
 }
 
 fn current() -> Result<Resolved, String> {
-    let setting = super::get().claude_terminal;
+    let setting = crate::settings::get().claude_terminal;
     if let Some((s, r)) = RESOLVED.read().unwrap().as_ref()
         && *s == setting
     {
@@ -195,7 +195,7 @@ pub fn command() -> anyhow::Result<tokio::process::Command> {
 }
 
 pub fn status() -> ClaudeCommand {
-    let setting = super::get().claude_terminal;
+    let setting = crate::settings::get().claude_terminal;
     let (resolved, via_shell, error) = match current() {
         Ok(r) if r.via_shell => (Some(setting.clone()), true, None),
         Ok(r) => {

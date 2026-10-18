@@ -10,7 +10,6 @@ use serde_json::{Value, json};
 use specta::Type;
 
 use super::hook;
-use crate::settings;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -145,7 +144,7 @@ fn setup_in(config: &str, exe: &str) -> McpSetup {
 
 pub fn status() -> anyhow::Result<McpStatus> {
     let exe = exe()?;
-    let claude = settings::claude::status()
+    let claude = crate::tools::claude::status()
         .resolved
         .unwrap_or_else(|| "claude".into());
     let config = claude_json()
@@ -169,12 +168,12 @@ pub fn status() -> anyhow::Result<McpStatus> {
 pub async fn register() -> anyhow::Result<()> {
     let exe = exe()?;
     // Fails when there's nothing to remove, which is fine.
-    settings::claude::command()?
+    crate::tools::claude::command()?
         .args(["mcp", "remove", "-s", "user", "lgtm"])
         .output()
         .await
         .context("couldn't run Claude Code")?;
-    let out = settings::claude::command()?
+    let out = crate::tools::claude::command()?
         .args(["mcp", "add", "-s", "user", "lgtm", "--", &exe, "mcp"])
         .output()
         .await?;

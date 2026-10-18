@@ -4,8 +4,8 @@ use tauri_specta::Event as _;
 use super::{CmdResult, err};
 use crate::events::SettingsChanged;
 use crate::prompts::{self, Prompt, PromptInfo};
-use crate::settings::claude::{self, ClaudeCommand};
 use crate::settings::{self, Settings};
+use crate::tools::claude::{self, ClaudeCommand};
 use crate::tools::{self, ToolStatus};
 
 #[tauri::command]
