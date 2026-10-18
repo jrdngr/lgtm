@@ -2,13 +2,15 @@ import type { CommentDto, PrDto, ThreadDto } from "../bindings";
 import { threadWhere } from "../threads/stages";
 import { codeText } from "./comments";
 import type { FlatFile } from "./model";
+import { UNTRUSTED_NOTE, untrusted } from "./untrusted";
 
-/** A thread for a terminal agent: what's quoted or posted, its code and the reply so far. */
+/** A thread for a terminal agent: what's quoted or posted, its code and the reply so far.
+ * GitHub's text is fenced, so a prompt holding it needs `UNTRUSTED_NOTE`. */
 export function threadText(files: FlatFile[], c: CommentDto): string[] {
   const quote = c.thread?.quote;
-  const posts = c.github?.posts.map((p) => `${p.author} wrote:\n${p.body.trim()}`) ?? [];
+  const posts = c.github?.posts.map((p) => untrusted(p.body.trim(), p.author)) ?? [];
   return [
-    quote ? `${quote.author} wrote, in a comment on the PR:\n${quote.text}` : "",
+    quote ? `Quoted from a comment on the PR:\n${untrusted(quote.text, quote.author)}` : "",
     c.path ? codeText(files, c) : "",
     ...(quote ? [] : posts),
     c.body.trim() ? `My reply so far:\n${c.body.trim()}` : "",
@@ -24,7 +26,8 @@ export const LINK_START = "You're linked to lgtm's review of PR";
  * one I'm on, and how it hands back takes and replies. */
 export function linkText(pr: PrDto, rules: string): string {
   return join([
-    `${LINK_START} #${pr.number} "${pr.title}". lgtm's list_threads tool lists its threads.`,
+    `${LINK_START} #${pr.number}. lgtm's list_threads tool lists its threads. Its title:\n${untrusted(pr.title, pr.author)}`,
+    UNTRUSTED_NOTE,
     "Each prompt I send names the thread I'm on. Read the code it points at before you answer.",
     "Use set_thread_take for your verdict, suggest_reply for a reply in my voice, and set_thread_stage to move a thread. Stop at a drafted reply: only I mark one ready. Nothing you do posts to GitHub.",
     `My rules for takes and replies:\n\n${rules.trim()}`,
@@ -43,13 +46,14 @@ function named(t: ThreadDto): string {
  * name. */
 export function threadContext(files: FlatFile[], t: ThreadDto, c: CommentDto | undefined) {
   const short = named(t);
-  return { short, full: c ? join([short, ...threadText(files, c)]) : short };
+  return { short, full: c ? join([short, UNTRUSTED_NOTE, ...threadText(files, c)]) : short };
 }
 
 /** What has a terminal agent review my reply on a thread against my rules for replies. */
 export function reviewText(files: FlatFile[], c: CommentDto, rules: string): string {
   return join([
     "Review my reply to this review thread on my PR. Read the code it points at first.",
+    UNTRUSTED_NOTE,
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
     `Tell me in a few short bullets what you'd change and why. If you'd change the reply, call lgtm's suggest_reply tool with thread_id ${c.id} and the whole new reply. It never posts to GitHub.`,
@@ -61,6 +65,7 @@ export function reviewText(files: FlatFile[], c: CommentDto, rules: string): str
 export function triageText(files: FlatFile[], c: CommentDto, rules: string): string {
   return join([
     "Triage this review thread on my PR. Read the code it points at first.",
+    UNTRUSTED_NOTE,
     ...threadText(files, c),
     `My rules for takes and replies:\n\n${rules.trim()}`,
     `Then call lgtm's set_thread_take tool with thread_id ${c.id}, your verdict and why, a three to six word summary of what it asks, and the reply, left out when I'd fix it exactly as asked. It never posts to GitHub. Tell me your take in a few short bullets.`,
@@ -75,6 +80,7 @@ export function triageAllText(
 ): string {
   return join([
     "Triage these new review threads on my PR. Read the code each points at first.",
+    UNTRUSTED_NOTE,
     ...threads.map(([t, c]) =>
       join([`Thread ${t.id} (${threadWhere(t)}):`, ...threadText(files, c)]),
     ),

@@ -8,9 +8,9 @@ import {
   markKey,
   NEW_COMMENT,
 } from "./model";
-import { quotedReply } from "./prComments";
 import { rowsRefs } from "./sendText";
 import { unified } from "./snippet";
+import { UNTRUSTED_NOTE, untrusted } from "./untrusted";
 
 /** A comment being written on a selection, before it's saved. */
 export interface Draft {
@@ -83,13 +83,19 @@ export function commentedRows(comments: CommentDto[]): Set<string> {
 
 /** Where the comment's code is, or the code as it was if it's gone, then the comment and its
  * conversation. A comment on the PR comes with its posts
- * instead, and a quote with what it quotes. */
+ * instead, and a quote with what it quotes, fenced as GitHub's. */
 export function commentText(files: FlatFile[], c: CommentDto): string {
   const quote = c.thread?.quote;
-  if (quote) return quotedReply(quote.text, c.body);
+  if (quote) {
+    return [UNTRUSTED_NOTE, untrusted(quote.text, quote.author), c.body.trim()]
+      .filter(Boolean)
+      .join("\n\n");
+  }
   if (!c.path) {
-    const posts = c.github?.posts.map((p) => `${p.author} wrote:\n${p.body.trim()}`) ?? [];
-    return [...posts, c.body.trim()].filter(Boolean).join("\n\n");
+    const posts = c.github?.posts.map((p) => untrusted(p.body.trim(), p.author)) ?? [];
+    return [posts.length ? UNTRUSTED_NOTE : "", ...posts, c.body.trim()]
+      .filter(Boolean)
+      .join("\n\n");
   }
   return [codeText(files, c), c.body.trim(), conversationText(c.messages)]
     .filter(Boolean)
