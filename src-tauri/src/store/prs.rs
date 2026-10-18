@@ -1,9 +1,43 @@
 //! The PR each PR workspace was checked out for, stored whole as JSON.
 
 use rusqlite::{OptionalExtension, params};
+use serde::{Deserialize, Serialize};
 
 use super::{Store, json_err};
-use crate::pr::PrRecord;
+use crate::github::GhRepo;
+
+/// A workspace's PR, as stored: the one it was checked out for, or one picked from its stack.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrRecord {
+    pub workspace: String,
+    /// The repo the PR is in.
+    pub repo: GhRepo,
+    pub number: u32,
+    /// The PR's node id, which mutations take.
+    pub id: String,
+    pub title: String,
+    pub url: String,
+    pub author: String,
+    pub base_ref: String,
+    /// The remote for `repo`, which the base branch is fetched from.
+    pub base_remote: String,
+    pub head_ref: String,
+    /// The remote the head branch was fetched from: the base remote, `gh-<owner>` for a
+    /// fork, or `None` when it came from `pull/N/head`.
+    pub head_remote: Option<String>,
+    /// A fork remote lgtm added for this PR, which goes when the workspace does.
+    #[serde(default)]
+    pub added_remote: Option<String>,
+    /// The head commit as last fetched.
+    pub head: String,
+    /// Picked from the workspace's stack, which it follows `@` along, rather than checked out.
+    #[serde(default)]
+    pub stack: bool,
+    /// A stack PR `@` no longer builds on. It stays picked until the user edits back onto it
+    /// or deselects it.
+    #[serde(default)]
+    pub off: bool,
+}
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS prs (

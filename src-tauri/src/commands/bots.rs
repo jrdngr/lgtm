@@ -1,7 +1,7 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::bots::BotRun;
+use crate::store::BotRun;
 
 #[tauri::command]
 #[specta::specta]

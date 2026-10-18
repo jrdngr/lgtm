@@ -3,8 +3,7 @@
 use rusqlite::{OptionalExtension, params};
 use serde_json::Value;
 
-use super::Store;
-use crate::bots::BotRun;
+use super::{BotRun, Store};
 
 const SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS bot_runs (

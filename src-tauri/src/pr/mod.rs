@@ -11,51 +11,18 @@ mod refetch;
 mod send;
 mod stack;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use specta::Type;
 
-use crate::github::GhRepo;
 use crate::jj::git::remote_bookmark;
 use crate::review::RepoCtx;
+use crate::store::PrRecord;
 
 pub use discussion::DiscussionDto;
 pub use nearby::NearbyPrsDto;
 pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
 pub use send::Fixed;
-
-/// A workspace's PR, as stored: the one it was checked out for, or one picked from its stack.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PrRecord {
-    pub workspace: String,
-    /// The repo the PR is in.
-    pub repo: GhRepo,
-    pub number: u32,
-    /// The PR's node id, which mutations take.
-    pub id: String,
-    pub title: String,
-    pub url: String,
-    pub author: String,
-    pub base_ref: String,
-    /// The remote for `repo`, which the base branch is fetched from.
-    pub base_remote: String,
-    pub head_ref: String,
-    /// The remote the head branch was fetched from: the base remote, `gh-<owner>` for a
-    /// fork, or `None` when it came from `pull/N/head`.
-    pub head_remote: Option<String>,
-    /// A fork remote lgtm added for this PR, which goes when the workspace does.
-    #[serde(default)]
-    pub added_remote: Option<String>,
-    /// The head commit as last fetched.
-    pub head: String,
-    /// Picked from the workspace's stack, which it follows `@` along, rather than checked out.
-    #[serde(default)]
-    pub stack: bool,
-    /// A stack PR `@` no longer builds on. It stays picked until the user edits back onto it
-    /// or deselects it.
-    #[serde(default)]
-    pub off: bool,
-}
 
 impl PrRecord {
     /// What the workspace reviews: the PR's commits and the working copy above them, which

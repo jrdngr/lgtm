@@ -36,7 +36,7 @@ async fn pr_workspace(
 ) -> Arc<crate::workspace::Workspace> {
     ctx.workspace_base = Some(base.to_path_buf());
     ctx.create_workspace("pr1").await.unwrap();
-    let record = crate::pr::PrRecord {
+    let record = crate::store::PrRecord {
         workspace: "pr1".into(),
         repo: crate::github::GhRepo {
             owner: "o".into(),

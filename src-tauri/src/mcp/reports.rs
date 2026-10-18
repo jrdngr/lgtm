@@ -2,8 +2,8 @@
 
 use serde_json::{Value, json};
 
-use crate::bots::BotRun;
-use crate::bots::output::{Finding, Output};
+use crate::store::BotRun;
+use crate::store::report::output::{Finding, Output};
 
 /// Every reviewer's findings.
 fn findings(run: &BotRun) -> Vec<&Finding> {

@@ -8,6 +8,7 @@ mod marks;
 mod notes;
 mod prs;
 mod qa;
+pub mod report;
 mod sessions;
 mod setup;
 mod threads;
@@ -20,6 +21,8 @@ pub use checks::FileCheck;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use marks::{Mark, MarkColor};
 pub use notes::{Category, FlowStep, Level, Note, Source};
+pub use prs::PrRecord;
+pub use report::{BotRun, Part, Persona};
 pub use sessions::Session;
 pub use threads::{Quote, Stage, Take, TakeVerdict, ThreadState};
 

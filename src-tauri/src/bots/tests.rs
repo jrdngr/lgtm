@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use super::output::{Finding, Review, Severity};
+use super::output::{Finding, Output, Review, Severity};
 use super::submitted::Summary;
 use super::*;
 use crate::store::Store;

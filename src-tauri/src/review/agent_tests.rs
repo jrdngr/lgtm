@@ -68,8 +68,8 @@ async fn published_findings_start_a_report_then_replace_their_section() {
             "facts": [], "explanation": "e", "fix": null })
     };
     let review_of = |fs: Vec<serde_json::Value>| serde_json::json!({ "verdict": "ok", "findings": fs });
-    let ids = |run: &crate::bots::BotRun, i: usize| {
-        let crate::bots::Output::Review(r) = &run.parts[i].output else {
+    let ids = |run: &crate::store::BotRun, i: usize| {
+        let crate::store::report::Output::Review(r) = &run.parts[i].output else {
             panic!("no review");
         };
         r.findings.iter().map(|f| format!("{} {}", f.id, f.title)).collect::<Vec<_>>()
@@ -105,7 +105,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     assert_eq!(run.personas[1].name, "codex");
     assert!(matches!(
         &run.parts[2].output,
-        crate::bots::Output::Minimal(m) if m.fixes[0].closes == ["codex#1"]
+        crate::store::report::Output::Minimal(m) if m.fixes[0].closes == ["codex#1"]
     ));
 
     let (run, _) = ctx
