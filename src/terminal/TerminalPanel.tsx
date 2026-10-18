@@ -58,6 +58,7 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
       paste: (text) => term.paste(text),
       hasAgent: session.hasAgent,
       agentBusy: session.agentBusy,
+      prompted: session.prompted,
       submit: session.submit,
       interrupt: session.interrupt,
       focus: () => {

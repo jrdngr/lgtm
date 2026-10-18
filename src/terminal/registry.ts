@@ -12,8 +12,10 @@ interface TerminalTarget {
   paste(text: string): void;
   /** Whether an agent like Claude Code runs in it, by its hooks or, in a Claude tab, its title. */
   hasAgent(): boolean;
-  /** Whether its agent is working or waiting on the user. */
+  /** Whether its agent is working or waiting on the user, or was just prompted. */
   agentBusy(): boolean;
+  /** Marks its agent busy until its hooks report on the prompt. */
+  prompted(): void;
   /** Presses Enter. */
   submit(): void;
   /** Stops its agent's turn. */
@@ -163,6 +165,7 @@ export function promptAgent(id: string, text: string): boolean {
   if (!t?.hasAgent() || !t.canPaste()) return false;
   t.paste(text.replace(CONTROLS, ""));
   t.submit();
+  t.prompted();
   return true;
 }
 

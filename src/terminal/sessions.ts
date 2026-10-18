@@ -18,8 +18,10 @@ export interface Session {
   running(): Promise<string | null>;
   /** Whether an agent runs in it: its hooks say so, or the title does in a Claude tab. */
   hasAgent(): boolean;
-  /** Whether its agent is working or waiting on the user. */
+  /** Whether its agent is working or waiting on the user, or was just prompted. */
   agentBusy(): boolean;
+  /** Marks its agent busy until its hooks report or the prompt has had time to land. */
+  prompted(): void;
   /** Presses Enter, after a paste has landed. */
   submit(): void;
   /** Presses Escape, which stops an agent's turn. */
@@ -95,6 +97,8 @@ export function releaseSession(id: string) {
 
 /** How long Enter waits after a paste. */
 const SUBMIT_DELAY_MS = 150;
+/** How long a prompt counts as busy before the agent's hooks report on it. */
+const PROMPTED_MS = 15_000;
 
 function startSession(
   id: string,
@@ -118,6 +122,10 @@ function startSession(
   /** Whether it was started to run Claude Code. Only then does the title count without hooks,
    * since any program can set the title. */
   let launched = false;
+  /** Until when a prompt that hooks haven't reported on yet counts as busy. */
+  let promptedUntil = 0;
+  /** Whether the PTY exited. */
+  let exited = false;
   const set = (state: ActivityState) => {
     agent = state;
     report(workspace, activity, state, titleLabel(title), { stays: true, tab: id });
@@ -130,12 +138,15 @@ function startSession(
       pulse(activity);
     } else {
       term.write(`\r\n[process exited with code ${e.code}]\r\n`);
+      exited = true;
+      promptedUntil = 0;
       const busy = agent === "running" || agent === "input";
       set(busy && e.code !== 0 ? "failed" : "gone");
     }
   };
   const unhook = onAgentHook(id, (state) => {
     hooked = true;
+    promptedUntil = 0;
     set(state === "working" ? "running" : state);
     pulse(activity);
   });
@@ -185,8 +196,11 @@ function startSession(
     term,
     refit,
     title: () => title,
-    hasAgent: () => agent !== "gone",
-    agentBusy: () => agent === "running" || agent === "input",
+    hasAgent: () => !exited && agent !== "gone",
+    agentBusy: () => agent === "running" || agent === "input" || Date.now() < promptedUntil,
+    prompted() {
+      promptedUntil = Date.now() + PROMPTED_MS;
+    },
     submit() {
       // After the paste has landed, or the agent takes the Enter as part of it.
       window.setTimeout(() => pty !== undefined && commands.ptyWrite(pty, "\r"), SUBMIT_DELAY_MS);

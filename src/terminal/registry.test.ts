@@ -17,6 +17,7 @@ function fake(workspace: string | null, canPaste = true, agent = false) {
     target: {
       hasAgent: () => agent,
       agentBusy: () => false,
+      prompted() {},
       interrupt() {},
       submit: () => got.push("\r"),
       workspace,

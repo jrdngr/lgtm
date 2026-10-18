@@ -49,6 +49,7 @@ const target = {
   paste() {},
   hasAgent: () => true,
   agentBusy: () => false,
+  prompted() {},
   submit() {},
   interrupt() {},
   focus() {},

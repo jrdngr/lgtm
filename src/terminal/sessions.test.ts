@@ -80,4 +80,14 @@ describe("terminal sessions", () => {
     setTitle("\u2802 working");
     expect(claude.hasAgent()).toBe(true);
   });
+
+  it("count as busy once prompted, until the prompt has had time to land", async () => {
+    const s = openSession("t6", box(), null, false);
+    await settle();
+    expect(s.agentBusy()).toBe(false);
+    s.prompted();
+    expect(s.agentBusy()).toBe(true);
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(s.agentBusy()).toBe(false);
+  });
 });
