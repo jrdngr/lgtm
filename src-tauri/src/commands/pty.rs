@@ -28,7 +28,7 @@ pub(crate) async fn pty_spawn(
             .then(workspaces::setup_command),
     };
     let root = ctx.root.to_string_lossy();
-    let socket = crate::repo::data_dir(window.app_handle())
+    let socket = crate::paths::data_dir(window.app_handle())
         .map(|d| crate::mcp::socket_path(&d).to_string_lossy().into_owned())
         .unwrap_or_default();
     let env = [

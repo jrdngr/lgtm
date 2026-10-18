@@ -45,6 +45,6 @@ fn err(e: anyhow::Error) -> String {
 }
 
 fn layout_path(window: &WebviewWindow, workspace: Option<&str>) -> CmdResult<PathBuf> {
-    let repo_dir = crate::repo::repo_dir(&crate::repo::data_dir(window)?, &repo_root(window)?);
+    let repo_dir = crate::paths::repo_dir(&crate::paths::data_dir(window)?, &repo_root(window)?);
     Ok(crate::layout::path(&repo_dir, workspace))
 }

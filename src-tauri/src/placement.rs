@@ -48,7 +48,7 @@ pub struct Placements {
 impl Placements {
     /// The saved placements. A missing or unreadable file has none.
     pub fn load(app: &AppHandle) -> Self {
-        let file = crate::repo::data_dir(app)
+        let file = crate::paths::data_dir(app)
             .ok()
             .map(|d| d.join("windows.json"));
         let saved = file

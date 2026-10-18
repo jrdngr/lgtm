@@ -9,7 +9,7 @@ use crate::jj::git::worktree_prune_blocking;
 use crate::jj::workspace::{
     bookmark_delete_blocking, bookmarks_blocking, forget_blocking, workspaces_blocking,
 };
-use crate::repo::main_root;
+use crate::paths::main_root;
 
 fn remove(dir: &Path, why: &str, log: &mut Vec<String>) {
     match std::fs::remove_dir_all(dir) {
@@ -115,7 +115,7 @@ pub fn main(args: &[String]) -> i32 {
         .filter(|a| *a != "--force")
         .map(|a| cwd.join(a))
         .chain([cwd.clone()])
-        .filter_map(|p| crate::repo::find_root(&p))
+        .filter_map(|p| crate::paths::find_root(&p))
         .collect();
     let log = run(&base, &repos, force);
     if log.is_empty() {

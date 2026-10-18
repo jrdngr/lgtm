@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, WebviewWindow};
 use super::{CmdResult, err, layout_path, repo_root};
 use crate::jj::init;
 use crate::menu::WordWrapItem;
+use crate::paths::{data_dir, find_root};
 use crate::repo::{self, RepoInfo};
 use crate::{layout, recent};
 
@@ -66,7 +67,7 @@ pub(crate) fn keep_window(window: WebviewWindow) {
 #[specta::specta]
 pub(crate) fn git_root(path: String) -> Option<String> {
     let path = Path::new(&path);
-    if repo::find_root(path).is_some() {
+    if find_root(path).is_some() {
         return None;
     }
     Some(init::git_root(path)?.display().to_string())
@@ -89,7 +90,7 @@ pub(crate) async fn init_jj(app: AppHandle, root: String) -> CmdResult<()> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
-    Ok(recent::load(&recent::path(&repo::data_dir(&app)?))
+    Ok(recent::load(&recent::path(&data_dir(&app)?))
         .iter()
         .map(|root| RepoInfo::new(root))
         .collect())

@@ -16,6 +16,7 @@ mod mcp;
 mod menu;
 mod placement;
 mod par;
+mod paths;
 mod pr;
 mod prompts;
 mod pty;
@@ -251,7 +252,7 @@ pub fn run() {
             app.manage(Placements::load(app.handle()));
             #[cfg(target_os = "macos")]
             quit::intercept(app.handle());
-            match repo::data_dir(app) {
+            match paths::data_dir(app) {
                 Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
                 Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
             }
