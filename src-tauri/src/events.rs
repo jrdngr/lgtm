@@ -1,6 +1,6 @@
 //! Events the backend sends to a repo window.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri_specta::Event;
 
@@ -105,7 +105,7 @@ pub struct QaChanged {
 pub struct TerminalAgent {
     /// The terminal's panel id.
     pub terminal: String,
-    pub state: crate::mcp::hook::AgentHookState,
+    pub state: AgentHookState,
     /// The prompt the user submitted, when this is a prompt.
     pub prompt: Option<String>,
     /// The agent's last message, when it stopped.
@@ -114,4 +114,16 @@ pub struct TerminalAgent {
     pub session: Option<String>,
     /// The user ended the session.
     pub ended: bool,
+}
+
+/// How a terminal's agent stands after a hook event.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentHookState {
+    Working,
+    Input,
+    Done,
+    Failed,
+    Idle,
+    Gone,
 }

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
-use crate::events::TerminalAgent;
+use crate::events::{AgentHookState, TerminalAgent};
 use crate::repo::RepoWindows;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
@@ -83,7 +83,7 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     if let Some(hook) = first.get("hook") {
         let report: hook::HookReport = serde_json::from_value(hook.clone())?;
         if let Some((label, ctx)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
-            if report.state == hook::AgentHookState::Idle {
+            if report.state == AgentHookState::Idle {
                 ctx.new_agent_session(&report.terminal);
             }
             if report.prompt.is_some() {

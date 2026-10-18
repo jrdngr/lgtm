@@ -8,7 +8,8 @@ use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
+
+use crate::events::AgentHookState;
 
 /// The hook events lgtm listens to.
 pub const EVENTS: [&str; 9] = [
@@ -22,18 +23,6 @@ pub const EVENTS: [&str; 9] = [
     "StopFailure",
     "SessionEnd",
 ];
-
-/// How a terminal's agent stands after a hook event.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum AgentHookState {
-    Working,
-    Input,
-    Done,
-    Failed,
-    Idle,
-    Gone,
-}
 
 /// What the hook sends the app, as the connection's only line.
 #[derive(Debug, Serialize, Deserialize)]
