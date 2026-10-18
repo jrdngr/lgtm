@@ -49,8 +49,11 @@ export const commands = {
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
 	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run. */
 	createWorkspace: (name: string) => typedError<Setup, string>(__TAURI_INVOKE("create_workspace", { name })),
-	/**  Lets the workspace's `.lgtm/setup` run, and others with the same contents after it. */
-	approveSetup: (workspace: string) => typedError<null, string>(__TAURI_INVOKE("approve_setup", { workspace })),
+	/**
+	 *  Lets the workspace's `.lgtm/setup` run, and others with the same contents after it, if it
+	 *  still has `hash`, the hash of the script the user was shown.
+	 */
+	approveSetup: (workspace: string, hash: string) => typedError<null, string>(__TAURI_INVOKE("approve_setup", { workspace, hash })),
 	/**  Ends the workspace's terminals, then forgets it and deletes its directory. */
 	deleteWorkspace: (name: string) => typedError<null, string>(__TAURI_INVOKE("delete_workspace", { name })),
 	/**
@@ -1562,7 +1565,12 @@ export type SettingsChanged = {
 };
 
 /**  Whether a workspace has a setup script, and whether the user let it run. */
-export type Setup = "none" | "approved" | "unapproved";
+export type Setup = { kind: "none" } | { kind: "approved" } | 
+/**
+ *  The script to ask about: its text, cut short when long, and the hash of all of it,
+ *  which approving it must name.
+ */
+{ kind: "unapproved"; script: string; hash: string };
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 

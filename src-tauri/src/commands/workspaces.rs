@@ -19,13 +19,18 @@ pub(crate) async fn create_workspace(window: WebviewWindow, name: String) -> Cmd
     repo(&window)?.create_workspace(&name).await.map_err(err)
 }
 
-/// Lets the workspace's `.lgtm/setup` run, and others with the same contents after it.
+/// Lets the workspace's `.lgtm/setup` run, and others with the same contents after it, if it
+/// still has `hash`, the hash of the script the user was shown.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn approve_setup(window: WebviewWindow, workspace: String) -> CmdResult<()> {
+pub(crate) async fn approve_setup(
+    window: WebviewWindow,
+    workspace: String,
+    hash: String,
+) -> CmdResult<()> {
     let ctx = repo(&window)?;
     let ws = ctx.workspace(Some(&workspace)).await.map_err(err)?;
-    ctx.approve_setup(&ws.root).map_err(err)
+    ctx.approve_setup(&ws.root, &hash).map_err(err)
 }
 
 /// Ends the workspace's terminals, then forgets it and deletes its directory.
@@ -46,4 +51,3 @@ pub(crate) async fn delete_workspace(
         .map_err(err)?;
     layout::remove(&layout_path(&window, Some(&name))?).map_err(|e| e.to_string())
 }
-

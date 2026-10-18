@@ -53,8 +53,10 @@ export async function confirmAction(
   text: string,
   action: string,
   cancel = "Cancel",
+  title?: string,
 ): Promise<boolean> {
   const choice = await message(text, {
+    title,
     kind: "warning",
     buttons: { ok: action, cancel },
   });

@@ -88,11 +88,15 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     setName("");
     await reload();
     // Skipped, the terminal opens as a plain shell: the backend runs only approved scripts.
-    if (r.data === "unapproved" && (await confirmAction(".lgtm/setup", "Run", "Skip"))) {
-      const ok = await commands.approveSetup(ws);
+    const setup = r.data;
+    if (
+      setup.kind === "unapproved" &&
+      (await confirmAction(setup.script, "Run", "Skip", ".lgtm/setup"))
+    ) {
+      const ok = await commands.approveSetup(ws, setup.hash);
       if (ok.status === "error") setError(ok.error);
     }
-    onSelect(ws, r.data !== "none");
+    onSelect(ws, setup.kind !== "none");
   }
 
   async function prOpened(ws: string) {
