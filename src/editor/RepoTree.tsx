@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileEntry } from "../bindings";
+import { onRevealInFiles } from "../core/reveal";
 import { useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
@@ -12,7 +13,6 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
 import { openFile } from "./open";
-import { onRevealInFiles } from "./reveal";
 import { create, foldersOf, openToSide, rename, trash } from "./treeActions";
 import { useTreeDrag } from "./useTreeDrag";
 import "../review/FilesPanel.css";

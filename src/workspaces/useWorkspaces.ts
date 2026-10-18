@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
-import { type WorkspaceName, workspaceKey } from "../core/workspace";
+import { setWorkspaceRoot } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { useRepoChanged } from "./useRepoChanged";
-
-const roots = new Map<string, string>();
-
-/** A workspace's directory, once the workspace list has loaded. */
-export const workspaceRoot = (name: WorkspaceName) => roots.get(workspaceKey(name));
 
 /** The repo's workspaces, kept current as the repo changes.
  * Reloads requested while one runs coalesce into one more, a second later. `error` is the
@@ -29,7 +24,7 @@ export function useWorkspaces() {
     try {
       const list = await unwrap(commands.listWorkspaces());
       setWorkspaces(list);
-      for (const w of list) roots.set(workspaceKey(w.name), w.root);
+      for (const w of list) setWorkspaceRoot(w.name, w.root);
       setLoadError(undefined);
     } catch (e) {
       setLoadError(errorText(e));

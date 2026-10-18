@@ -1,6 +1,6 @@
 import type { CheckState, MarkColor } from "../bindings";
+import { revealInFiles } from "../core/reveal";
 import type { WorkspaceName } from "../core/workspace";
-import { revealInFiles } from "../editor/reveal";
 import { absolutePath, reveal } from "../services/pathMenu";
 import type { CtxEntry } from "../ui/contextMenu";
 import { copy } from "../ui/contextMenu";

@@ -1,4 +1,4 @@
-import { type WorkspaceName, workspaceKey } from "../core/workspace";
+import { type WorkspaceName, workspaceKey } from "./workspace";
 
 interface Reveal {
   workspace: WorkspaceName;

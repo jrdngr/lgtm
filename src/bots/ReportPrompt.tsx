@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { isMac } from "../core/keys";
 import { loadState, saveState } from "../core/savedState";
-import type { WorkspaceName } from "../core/workspace";
+import { type WorkspaceName, workspaceRoot } from "../core/workspace";
 import type { CurrentReview } from "../review/current";
 import { PipeButton } from "../terminal/PipeButton";
 import { submitNextSend } from "../terminal/registry";
-import { workspaceRoot } from "../workspaces/useWorkspaces";
 
 const SAVED = "report-prompt";
 
