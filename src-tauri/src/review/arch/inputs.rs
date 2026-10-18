@@ -278,7 +278,14 @@ fn symbol_graph(files: &[ReviewFile], root: &Path) -> Arc<GraphDto> {
     let mut h = std::hash::DefaultHasher::new();
     root.hash(&mut h);
     for f in files {
-        (&f.path, f.fingerprint, &f.old.commit, &f.new.commit, &f.texts).hash(&mut h);
+        (
+            &f.path,
+            f.fingerprint,
+            &f.old.commit,
+            &f.new.commit,
+            &f.texts,
+        )
+            .hash(&mut h);
     }
     let key = h.finish();
     if let Some((k, g)) = &*GRAPH.lock().unwrap()
@@ -292,7 +299,7 @@ fn symbol_graph(files: &[ReviewFile], root: &Path) -> Arc<GraphDto> {
 }
 
 /// Adds the symbols of files Move intents name that the diff doesn't change, read from the
-/// working copy.
+/// working copy. Links out of the workspace are skipped.
 pub fn add_symbols(model: &mut Model, root: &Path, paths: &[String]) {
     for p in paths {
         if model.symbols.contains_key(p) {
@@ -301,6 +308,9 @@ pub fn add_symbols(model: &mut Model, root: &Path, paths: &[String]) {
         let Ok(path) = crate::files::resolve(root, p) else {
             continue;
         };
+        if crate::files::contain(root, &path).is_err() {
+            continue;
+        }
         let Ok(text) = std::fs::read_to_string(path) else {
             continue;
         };

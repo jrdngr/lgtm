@@ -378,3 +378,22 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         "the review now shows other commits"
     );
 }
+
+#[cfg(unix)]
+#[test]
+fn move_symbols_skip_links_out_of_the_workspace() {
+    let dir = tempfile::tempdir().unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    write(dir.path(), &[("src/in.rs", "fn inside() {}\n")]);
+    write(outside.path(), &[("secret.rs", "fn secret() {}\n")]);
+    let link = dir.path().join("src/link.rs");
+    std::os::unix::fs::symlink(outside.path().join("secret.rs"), link).unwrap();
+    let mut m = super::model::Model::default();
+    let paths = ["src/in.rs".to_string(), "src/link.rs".to_string()];
+    super::inputs::add_symbols(&mut m, dir.path(), &paths);
+    assert_eq!(
+        m.symbols.get("src/in.rs"),
+        Some(&vec!["inside".to_string()])
+    );
+    assert!(!m.symbols.contains_key("src/link.rs"));
+}
