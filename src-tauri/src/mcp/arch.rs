@@ -1,4 +1,5 @@
-//! The architecture tool: storing an agent's assessment of the review's architecture change.
+//! The architecture tools: storing an agent's assessment of the review's architecture change,
+//! and its description of the system map.
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed};
-use crate::events::ArchChanged;
+use crate::events::{ArchChanged, SystemChanged};
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -98,6 +99,60 @@ pub struct Assessment {
     pub look: Vec<Look>,
 }
 
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Actor {
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct External {
+    pub name: String,
+    /// Like CLI, API or Database.
+    pub kind: String,
+    pub description: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Container {
+    /// A container id from the prompt, or a new one for a container without code here.
+    pub id: String,
+    pub name: String,
+    pub tech: String,
+    pub description: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Component {
+    /// A component id from the prompt.
+    pub id: String,
+    pub description: String,
+    /// One of `tiers`.
+    pub tier: Option<String>,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Relation {
+    /// A person's or external's name, or a container id.
+    pub from: String,
+    pub to: String,
+    /// A few words, like "Reads diffs".
+    pub label: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct System {
+    /// What the system does, in a sentence.
+    pub summary: String,
+    pub people: Vec<Actor>,
+    pub externals: Vec<External>,
+    pub containers: Vec<Container>,
+    /// Row names for components, from entry points down to foundations.
+    pub tiers: Vec<String>,
+    pub components: Vec<Component>,
+    pub relations: Vec<Relation>,
+}
+
 #[tool_router(router = arch_router, vis = "pub(super)")]
 impl Lgtm {
     #[tool(
@@ -120,5 +175,30 @@ impl Lgtm {
         .emit_to(self.app(), &label)
         .ok();
         Ok(format!("Stored it: {}/5.", a.score))
+    }
+
+    #[tool(
+        description = "Store your description of the system map in lgtm, replacing the last \
+        one. Its System tab shows it as C4 context, container and component diagrams. \
+        Components and containers are the ids the prompt listed; unknown components are \
+        dropped."
+    )]
+    async fn set_system(&self, Parameters(p): Parameters<System>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
+        let d = ctx
+            .save_description(self.workspace(), reply)
+            .await
+            .map_err(failed)?;
+        SystemChanged {
+            workspace: self.workspace().map(str::to_string),
+        }
+        .emit_to(self.app(), &label)
+        .ok();
+        Ok(format!(
+            "Stored it: {} containers described, {} components.",
+            d.containers.len(),
+            d.components.len()
+        ))
     }
 }

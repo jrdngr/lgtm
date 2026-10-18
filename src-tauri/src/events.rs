@@ -85,6 +85,12 @@ pub struct ArchChanged {
     pub review: u32,
 }
 
+/// A terminal agent described the system map.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct SystemChanged {
+    pub workspace: Option<String>,
+}
+
 /// A terminal agent changed a Q&A session's questions.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct QaChanged {

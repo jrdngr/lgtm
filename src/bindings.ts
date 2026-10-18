@@ -106,6 +106,10 @@ export const commands = {
 	intentPrompt: (review: number, ids: number[]) => typedError<string, string>(__TAURI_INVOKE("intent_prompt", { review, ids })),
 	/**  The prompt asking a terminal agent to assess the review's architecture change. */
 	assessPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("assess_prompt", { review })),
+	/**  The system map of a workspace's working copy. */
+	systemMap: (workspace: string | null) => typedError<SystemDto, string>(__TAURI_INVOKE("system_map", { workspace })),
+	/**  The prompt asking a terminal agent to describe the system map. */
+	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
@@ -338,6 +342,7 @@ export const events = {
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
+	systemChanged: makeEvent<SystemChanged>("system-changed"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
 	workingCopyMoved: makeEvent<WorkingCopyMoved>("working-copy-moved"),
@@ -351,6 +356,11 @@ export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","
 export type Action = {
 	action: string,
 	closes: string[],
+};
+
+export type ActorDto = {
+	name: string,
+	description: string,
 };
 
 /**  How a terminal's agent stands after a hook event. */
@@ -629,6 +639,12 @@ export type CompStatus =
 /**  Unchanged, but uses a changed or removed symbol of a changed component. */
 "impacted" | "unchanged";
 
+export type ComponentDescDto = {
+	id: string,
+	description: string,
+	tier: string | null,
+};
+
 export type ComponentDto = {
 	/**
 	 *  Stable across lens renames: the folder (or root, for loose files) it was grouped from,
@@ -651,6 +667,13 @@ export type ComponentDto = {
 	misplaced: string[],
 	/**  The worst open Look item on it. */
 	severity: LookSeverity | null,
+};
+
+export type ContainerDescDto = {
+	id: string,
+	name: string,
+	tech: string,
+	description: string,
 };
 
 /**  A source root, like a crate's `src/` or a package root. */
@@ -735,6 +758,12 @@ export type Effect_Serialize = {
 	after: string,
 	before: QaQuestion_Serialize[],
 	added: string[],
+};
+
+export type ExternalDto = {
+	name: string,
+	kind: string,
+	description: string,
 };
 
 export type FileDto = {
@@ -1350,6 +1379,12 @@ export type RefreshDto = {
 	moves: RowMove[],
 };
 
+export type RelationDto = {
+	from: string,
+	to: string,
+	label: string,
+};
+
 export type Reopen = Reopen_Serialize | Reopen_Deserialize;
 
 export type Reopen_Deserialize = {
@@ -1581,6 +1616,56 @@ export type StateDto = {
 export type SwitchRepo = Record<string, never>;
 
 export type SymbolKind = "function" | "class" | "module" | "section";
+
+export type SysComponentDto = {
+	id: string,
+	name: string,
+	container: string,
+	files: number,
+};
+
+export type SysContainerDto = {
+	/**  The source root's repo-relative path, "" for files outside every root. */
+	id: string,
+	name: string,
+	files: number,
+};
+
+/**  `from` imports from `to` at `imports` sites. */
+export type SysEdgeDto = {
+	from: string,
+	to: string,
+	imports: number,
+};
+
+/**  A terminal agent described the system map. */
+export type SystemChanged = {
+	workspace: string | null,
+};
+
+export type SystemDescDto = {
+	summary: string,
+	people: ActorDto[],
+	externals: ExternalDto[],
+	containers: ContainerDescDto[],
+	/**  Top to bottom. */
+	tiers: string[],
+	components: ComponentDescDto[],
+	relations: RelationDto[],
+	/**  The working copy's commit when it was written. */
+	commit: string,
+	createdAt: number | null,
+};
+
+export type SystemDto = {
+	repo: string,
+	containers: SysContainerDto[],
+	components: SysComponentDto[],
+	edges: SysEdgeDto[],
+	description: SystemDescDto | null,
+	/**  Components with files changed since the description was written. */
+	stale: string[],
+};
 
 export type Take = {
 	verdict: TakeVerdict,

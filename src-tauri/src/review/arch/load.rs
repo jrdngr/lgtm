@@ -186,7 +186,7 @@ impl RepoCtx {
     }
 }
 
-fn repo_name(root: &std::path::Path) -> String {
+pub(super) fn repo_name(root: &std::path::Path) -> String {
     root.file_name()
         .map_or(String::new(), |n| n.to_string_lossy().into_owned())
 }

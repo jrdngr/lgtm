@@ -6,7 +6,14 @@ import type {
 } from "dockview-react";
 
 /** The kinds of tab. A Claude tab is a terminal that starts Claude Code. */
-export type PanelKind = "review" | "terminal" | "claude" | "report" | "architecture" | "qa";
+export type PanelKind =
+  | "review"
+  | "terminal"
+  | "claude"
+  | "report"
+  | "architecture"
+  | "system"
+  | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -14,11 +21,12 @@ const TITLES: Record<PanelKind, string> = {
   claude: "Claude",
   report: "Report",
   architecture: "Architecture",
+  system: "System",
   qa: "Q&A",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa"];
+export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "system", "qa"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -95,9 +103,9 @@ export function openQa(api: DockviewApi) {
 }
 
 /** Tabs a dock has one of. */
-const SINGLE: PanelKind[] = ["architecture", "qa"];
+const SINGLE: PanelKind[] = ["architecture", "system", "qa"];
 
-/** Opens a `kind` tab in `group`. Architecture and Q&A are one per dock, so an open one moves
+/** Opens a `kind` tab in `group`. Architecture, System and Q&A are one per dock, so an open one moves
  * here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;

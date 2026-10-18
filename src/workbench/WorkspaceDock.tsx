@@ -22,6 +22,7 @@ import { useAgentQa } from "../qa/useAgentQa";
 import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
+import { SystemPanel } from "../system/SystemPanel";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { guarded } from "../ui/Crash";
 import { WorkspaceContext, type WorkspaceName } from "../workspaces/context";
@@ -46,6 +47,7 @@ const components = {
   settings: guarded(SettingsPanel),
   shortcuts: guarded(ShortcutsPanel),
   qa: guarded(QaTab),
+  system: guarded(SystemPanel),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
   // runs panels are then closed.
   tasks: () => null,

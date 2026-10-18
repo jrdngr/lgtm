@@ -4,6 +4,7 @@
 
 pub mod assess;
 mod compute;
+pub mod describe;
 #[cfg(test)]
 mod diff_tests;
 mod extract;
@@ -20,6 +21,7 @@ mod resolve;
 mod roots;
 mod scan;
 mod state;
+pub mod system;
 #[cfg(test)]
 mod tests;
 
