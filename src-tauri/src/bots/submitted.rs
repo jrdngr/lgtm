@@ -99,19 +99,22 @@ impl RepoCtx {
             run.label(),
             run.revset
         );
-        let now = self.workspace(workspace).await?.jj.resolve(revset).await?;
-        anyhow::ensure!(
-            (run.from.as_ref(), &run.to) == (now.from.as_ref(), &now.to),
-            "report {} is of other commits than `{revset}` is now, so nothing was published; \
-             publish a new report",
-            run.label()
-        );
-        let id = run.id;
-        self.edit_run(id, |run| {
+        let ws = self.workspace(workspace).await?;
+        ws.snapshot().await?;
+        let now = ws.jj.resolve(revset).await?;
+        // Checked under the store's lock, so it holds for the write.
+        self.edit_run(run.id, |run| {
+            anyhow::ensure!(
+                (run.from.as_ref(), &run.to) == (now.from.as_ref(), &now.to),
+                "report {} is of other commits than `{revset}` is now, so nothing was \
+                 published; publish a new report",
+                run.label()
+            );
             replace_section(run, reviewer, output);
             set_filter(run, filter);
-        })?;
-        Ok((self.bot_run(id)?, false))
+            Ok(())
+        })??;
+        Ok((self.bot_run(run.id)?, false))
     }
 
     async fn new_report(

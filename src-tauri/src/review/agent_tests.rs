@@ -68,14 +68,13 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
         .await
         .unwrap();
 
-    // Once the revset moves to other commits (the file watcher snapshots edits), writes wait
-    // until the review loads them. Replies aren't on lines, so they go ahead.
+    // Once the revset moves to other commits, even before the file watcher snapshots the edit,
+    // writes wait until the review loads them. Replies aren't on lines, so they go ahead.
     write(
         d,
         "a.rs",
         "fn a() {}\nfn b() {}\nfn c() {}\nfn e() {}\nfn f() {}\n",
     );
-    jj(d, &["util", "snapshot"]);
     let Err(err) = ctx.agent_comment(None, "@", "a.rs", 3, 3, "x").await else {
         panic!("a comment on an out-of-date review was added");
     };

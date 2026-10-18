@@ -25,8 +25,8 @@ impl RepoCtx {
     }
 
     /// [`Self::current_review_of`], with the commits `revset` resolves to now, for the write
-    /// to pass to [`Self::check_at`] under the review's lock. The file watcher snapshots
-    /// edits, so this reads without one.
+    /// to pass to [`Self::check_at`] under the review's lock. It snapshots first, as the file
+    /// watcher may not have yet.
     pub async fn current_review_at(
         &self,
         workspace: Option<&str>,
@@ -34,6 +34,7 @@ impl RepoCtx {
     ) -> anyhow::Result<At> {
         let id = self.current_review_of(workspace, revset)?;
         let ws = self.review(id)?.lock().unwrap().ws.clone();
+        ws.snapshot().await?;
         let whole = ws.jj.resolve(revset).await?;
         Ok(At { id, whole })
     }
