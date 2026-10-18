@@ -6,7 +6,7 @@ import { openUrl } from "../ui/pathMenu";
 import { isMac } from "../workbench/keys";
 import type { WorkspaceName } from "../workspaces/context";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
-import { fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
+import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit } from "./htmlNav";
 import type { EditorParams } from "./open";
 import { ZoomControls, zoomKey } from "./ZoomControls";
 
@@ -36,7 +36,7 @@ type FrameMessage =
   | { type: "found"; found: boolean }
   | { type: "scroll"; x: number; y: number }
   | { type: "scrolled"; x: number; y: number }
-  | ({ type: "key" } & KeyboardEventInit);
+  | ({ type: "key" } & Record<string, unknown>);
 
 /** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts but
  * an opaque origin, so it can't reach the app, and the scheme's CSP keeps it from sending
@@ -128,7 +128,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
           saveRef.current({ pageScroll: [Math.round(m.x), Math.round(m.y)] });
           break;
         case "key": {
-          const { type: _, ...init } = m;
+          const init = appKey(m);
+          if (!init) break;
           frame.current.dispatchEvent(
             new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }),
           );

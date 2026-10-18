@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitted, pagePath, pageUrl, stepZoom, visit } from "./htmlNav";
+import { appKey, fitted, pagePath, pageUrl, stepZoom, visit } from "./htmlNav";
 
 const base = "lgtmhtml://localhost/";
 
@@ -44,5 +44,36 @@ describe("stepZoom", () => {
     expect(stepZoom(8, 1)).toBe(8);
     expect(stepZoom(0.2, -1)).toBe(0.2);
     expect(fitted(0.01)).toBe(0.1);
+  });
+});
+
+describe("appKey", () => {
+  const key = (
+    k: string,
+    mods: Partial<Record<"metaKey" | "ctrlKey" | "shiftKey" | "altKey", boolean>>,
+  ) => ({
+    key: k,
+    code: "KeyX",
+    metaKey: false,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mods,
+  });
+
+  it("passes Escape and modifier shortcuts, with only the key fields", () => {
+    expect(appKey(key("Escape", {}))).toEqual(key("Escape", {}));
+    expect(appKey({ ...key("w", { metaKey: true }), bubbles: false })).toEqual(
+      key("w", { metaKey: true }),
+    );
+    expect(appKey(key("c", { metaKey: true, shiftKey: true }))).toBeDefined();
+  });
+
+  it("drops plain keys, editing shortcuts and malformed messages", () => {
+    expect(appKey(key("w", {}))).toBeUndefined();
+    expect(appKey(key("Enter", { shiftKey: true }))).toBeUndefined();
+    expect(appKey(key("C", { ctrlKey: true }))).toBeUndefined();
+    expect(appKey({ key: "w", metaKey: true })).toBeUndefined();
+    expect(appKey({ ...key("w", {}), metaKey: "yes" })).toBeUndefined();
   });
 });

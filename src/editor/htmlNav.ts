@@ -1,4 +1,4 @@
-/** Paths, history and zoom for HTML tabs, which show pages from the `lgtmhtml:` scheme. */
+/** Paths, history, zoom and keys for HTML tabs, which show pages from the `lgtmhtml:` scheme. */
 
 export const isHtml = (path: string) => /\.html?$/i.test(path);
 
@@ -44,3 +44,18 @@ export function stepZoom(zoom: number, by: 1 | -1): number {
 
 /** A fitted zoom kept in a usable range. */
 export const fitted = (zoom: number) => Math.min(Math.max(zoom, 0.1), 8);
+
+/** The key a page's frame passed up, if it's one the frame script passes: Escape, or a
+ * modifier shortcut other than the editing ones. Pages can post to the tab themselves. */
+export function appKey(m: Record<string, unknown>): KeyboardEventInit | undefined {
+  const { key, code, metaKey, ctrlKey, shiftKey, altKey } = m;
+  if (typeof key !== "string" || typeof code !== "string") return undefined;
+  const flags = [metaKey, ctrlKey, shiftKey, altKey];
+  if (!flags.every((f) => typeof f === "boolean")) return undefined;
+  const mod = metaKey || ctrlKey;
+  if (!mod && key !== "Escape") return undefined;
+  if (mod && !shiftKey && !altKey && ["a", "c", "v", "x", "z"].includes(key.toLowerCase())) {
+    return undefined;
+  }
+  return { key, code, metaKey, ctrlKey, shiftKey, altKey } as KeyboardEventInit;
+}

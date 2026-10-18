@@ -22,7 +22,8 @@
     true,
   );
 
-  // App shortcuts and Escape go to the tab. Editing shortcuts stay in the page.
+  // App shortcuts and Escape go to the tab. Editing shortcuts stay in the page. The tab checks
+  // the same rule (appKey in htmlNav.ts), since a page can post to it too.
   addEventListener(
     "keydown",
     (e) => {
