@@ -3,9 +3,9 @@
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use super::{same_path, under};
+use crate::jj::git::worktree_prune_blocking;
 use crate::jj::workspace::{
     bookmark_delete_blocking, bookmarks_blocking, forget_blocking, workspaces_blocking,
 };
@@ -92,16 +92,7 @@ pub fn run(base: &Path, repos: &[PathBuf], force: bool) -> Vec<String> {
             }
         }
         clean_prs(root, &mut log);
-        if root.join(".git").exists() {
-            Command::new("git")
-                .arg("-C")
-                .arg(root)
-                .args(["worktree", "prune"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-                .ok();
-        }
+        worktree_prune_blocking(root);
     }
     for repo_dir in subdirs(base) {
         // Fails unless empty, which is the point.

@@ -1,6 +1,6 @@
 //! Git remotes, fetching, and bookmarks, for checking out PRs.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use tokio::process::Command;
@@ -112,6 +112,21 @@ impl Jj {
             .await
             .is_ok_and(|c| !c.is_empty())
     }
+}
+
+/// Prunes stale git worktree entries in the repo at `root`, if it has a `.git`. Best effort.
+pub fn worktree_prune_blocking(root: &Path) {
+    if !root.join(".git").exists() {
+        return;
+    }
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["worktree", "prune"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .ok();
 }
 
 #[cfg(test)]
