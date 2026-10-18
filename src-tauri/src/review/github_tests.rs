@@ -252,7 +252,7 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
 }
 
 #[tokio::test]
-async fn a_synced_chat_suggests_a_reply_that_becomes_the_thread_reply() {
+async fn a_terminal_agent_suggests_a_reply_that_becomes_the_thread_reply() {
     let (_dir, mut ctx) = repo();
     let base = tempfile::tempdir().unwrap();
     let ws = pr_workspace(&mut ctx, base.path()).await;
@@ -283,9 +283,8 @@ async fn a_synced_chat_suggests_a_reply_that_becomes_the_thread_reply() {
     assert_eq!(c.messages.len(), 1, "the chat stays");
     assert!(ctx.take_suggestion(review.id, id).is_err());
 
-    ctx.allow_suggestions(id, false);
-    let err = ctx.agent_suggest_reply(Some("pr1"), id, "Done.").err().unwrap();
-    assert!(err.to_string().contains("stopped syncing"));
-    ctx.allow_suggestions(id, true);
-    assert!(ctx.agent_suggest_reply(Some("pr1"), id, "Done.").is_ok());
+    ctx.agent_suggest_reply(Some("pr1"), id, "Done.").unwrap();
+    let state = ctx.dismiss_suggestion(review.id, id).unwrap();
+    assert_eq!(state.comments[0].suggestion, None);
+    assert_eq!(state.comments[0].body, "Good catch.");
 }

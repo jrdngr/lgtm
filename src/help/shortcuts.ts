@@ -131,6 +131,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["y"], action: "Mark the reply final (in a focused comment)" },
       { keys: ["q"], action: "Quote the selected text of a comment on the PR" },
       { keys: ["t"], action: "Triage new threads (in the PR panel)" },
+      { keys: ["l"], action: "Link the send target's agent to the PR review (in the PR panel)" },
+      { keys: ["⌘>"], action: "Talk about the thread with the linked agent" },
     ],
   },
   {

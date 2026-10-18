@@ -129,15 +129,30 @@ pub(crate) fn add_chat_message(
         .map_err(|e| e.to_string())
 }
 
-/// Lets terminal agents suggest replies to a thread, or stops them.
+/// Drops a thread's suggested reply.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn allow_suggestions(
+pub(crate) fn dismiss_suggestion(
     window: WebviewWindow,
+    review: u32,
     comment: u32,
-    allowed: bool,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .dismiss_suggestion(review, comment)
+        .map_err(err)
+}
+
+/// Links terminal `terminal`'s agent to the review, with `thread` as the thread the user is on,
+/// or with `linked` false, unlinks it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn set_agent_link(
+    window: WebviewWindow,
+    terminal: String,
+    linked: bool,
+    thread: Option<crate::review::LinkThread>,
 ) -> CmdResult<()> {
-    repo(&window)?.allow_suggestions(comment, allowed);
+    repo(&window)?.set_agent_link(&terminal, linked, thread);
     Ok(())
 }
 

@@ -1,5 +1,5 @@
-//! A thread's synced chat: what the user and the agent in a synced terminal say, and the reply
-//! the agent suggests.
+//! A thread's chat: what the user and the linked terminal agent said while it was the current
+//! thread, and the reply the agent suggests.
 
 use anyhow::Context;
 
@@ -32,17 +32,6 @@ impl RepoCtx {
         })
     }
 
-    /// Lets terminal agents suggest replies to a thread, or stops them once the user stops
-    /// syncing its chat.
-    pub fn allow_suggestions(&self, comment: u32, allowed: bool) {
-        let mut stopped = self.stopped_chats.lock().unwrap();
-        if allowed {
-            stopped.remove(&comment);
-        } else {
-            stopped.insert(comment);
-        }
-    }
-
     /// Sets a thread's suggested reply, for a terminal agent. It replaces any earlier one.
     pub fn agent_suggest_reply(
         &self,
@@ -50,11 +39,6 @@ impl RepoCtx {
         thread: u32,
         text: &str,
     ) -> anyhow::Result<(u32, StateDto)> {
-        anyhow::ensure!(
-            !self.stopped_chats.lock().unwrap().contains(&thread),
-            "The user has stopped syncing this thread. Don't suggest a reply to it unless they \
-             sync it again."
-        );
         let id = self.current_review(workspace)?;
         let state = self.comment_edit(id, |_, store| {
             let mut c = store.comment(thread as i64)?.context("no such thread")?;
@@ -64,6 +48,17 @@ impl RepoCtx {
             Ok(store.set_conversation(c.id, &c.conversation)?)
         })?;
         Ok((id, state))
+    }
+
+    /// Drops a thread's suggested reply.
+    pub fn dismiss_suggestion(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
+        self.comment_edit(id, |_, store| {
+            let mut c = store
+                .comment(comment as i64)?
+                .context("the thread is gone")?;
+            c.conversation.suggestion = None;
+            Ok(store.set_conversation(c.id, &c.conversation)?)
+        })
     }
 
     /// Makes a thread's suggested reply its reply, moving it along as an edit would.

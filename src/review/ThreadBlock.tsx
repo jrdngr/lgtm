@@ -7,10 +7,10 @@ import { IconButton } from "../ui/icons";
 import { openUrl } from "../ui/pathMenu";
 import { isMac, SAVE_KEY } from "../workbench/keys";
 import { CombineDialog } from "./CombineDialog";
+import { setCurrentThread, useLink } from "./linkedAgent";
 import { quotesOf } from "./prComments";
 import { SnippetDiff } from "./SnippetDiff";
 import { StageStrip } from "./StageStrip";
-import { useSyncedChat } from "./syncedChat";
 import { ThreadFlow } from "./ThreadFlow";
 import type { Comments } from "./useComments";
 import { useQuoting } from "./useQuoting";
@@ -38,12 +38,14 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const blockRef = useRef<HTMLDivElement>(null);
   const postsRef = useRef<HTMLDivElement>(null);
   const quoting = useQuoting(comment, c, postsRef, blockRef);
-  const chat = useSyncedChat(comment.id);
+  const link = useLink(c.workspace);
   const gh = comment.github;
   const thread = comment.thread;
   const quote = thread?.quote;
   if (!thread || (!gh && !quote)) return null;
   const id = comment.id;
+  /** The thread the linked agent hears I'm on. */
+  const current = !!link.terminal && link.current === id;
   const editing = c.edits.get(id);
   const viewer = viewerLogin(c.comments);
   const changed = !!comment.path && !comment.rows;
@@ -56,6 +58,12 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const number = quote ? quotesOf(c.onPr, quote.of).findIndex((q) => q.id === id) + 1 : 0;
 
   function onKey(e: React.KeyboardEvent) {
+    if ((isMac ? e.metaKey : e.ctrlKey) && e.shiftKey && (e.key === ">" || e.key === ".")) {
+      c.talk(comment);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (triaging || split) return;
     if (e.key === "e") c.edit(comment);
@@ -104,7 +112,8 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   return (
     <div
       ref={blockRef}
-      className={`comment-block thread-block${comment.file === -1 ? " on-pr" : ""}${quote ? " quote-block" : ""}${done ? " resolved" : ""}`}
+      className={`comment-block thread-block${comment.file === -1 ? " on-pr" : ""}${quote ? " quote-block" : ""}${done ? " resolved" : ""}${current ? " current" : ""}`}
+      onClick={() => setCurrentThread(c.workspace, id)}
       onContextMenu={p.onContextMenu}
       onKeyDown={onKey}
     >
@@ -131,9 +140,6 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
             <span className="card-path"> · {comment.path}</span>
           )}
         </span>
-        {!split && (
-          <StageStrip stage={thread.stage} locked={triaging} onPick={(s) => c.setStage(id, s)} />
-        )}
         {gh?.resolved && <span className="pill green">✓ Resolved</span>}
         {gh?.outdated && <span className="pill">Outdated</span>}
         {changed && (
@@ -147,20 +153,30 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
             Code changed {snippet ? "▾" : "▸"}
           </button>
         )}
-        <span className="spacer" />
-        {!split && (
-          <IconButton icon="retry" label="Reset" disabled={triaging} onClick={() => c.reset(id)} />
-        )}
-        {gh && (
-          <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
-        )}
-        <IconButton
-          icon="terminal"
-          className={`pipe-icon${chat.synced ? " on" : ""}`}
-          label={chat.synced ? "Stop Chat" : "Synced Chat"}
-          aria-pressed={chat.synced}
-          onClick={() => (chat.synced ? c.stopSync() : c.sync(comment))}
-        />
+        <span className="card-ctl">
+          {!split && (
+            <StageStrip stage={thread.stage} locked={triaging} onPick={(s) => c.setStage(id, s)} />
+          )}
+          <span className="spacer" />
+          {!split && (
+            <IconButton
+              icon="retry"
+              label="Reset"
+              disabled={triaging}
+              onClick={() => c.reset(id)}
+            />
+          )}
+          {gh && (
+            <IconButton icon="external" label="Open on GitHub" onClick={() => openUrl(gh.url)} />
+          )}
+          <IconButton
+            icon="terminal"
+            className={`pipe-icon${current ? " on" : ""}`}
+            label="Talk"
+            aria-pressed={current}
+            onClick={() => c.talk(comment)}
+          />
+        </span>
       </div>
       {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
       {gh && (
@@ -184,7 +200,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
         <ThreadFlow
           comment={comment}
           c={c}
-          chat={chat}
+          current={current}
           triaging={triaging}
           editor={editor || undefined}
         />

@@ -6,7 +6,6 @@ import { openFileIn } from "../editor/open";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
-import { sendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { openArchitecture } from "../workbench/panels";
 import { remembered } from "../workbench/remembered";
@@ -95,8 +94,8 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     moves: loaded?.moves,
     onState: setState,
     onError: setError,
+    workspace,
     send: sendText,
-    target: () => sendTarget(workspace),
     onDone: focusRoot,
     canDraft: !!pr.pr,
   });

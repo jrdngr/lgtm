@@ -583,6 +583,22 @@ button.group-head.fold:hover {
   border-left: 3px solid var(--github);
 }
 
+/* The thread the linked agent hears I'm on. */
+.thread-block.current {
+  border-color: var(--mark-violet);
+  border-left-color: var(--github);
+  box-shadow: 0 0 0 1px var(--violet-line);
+}
+
+/* The stage strip and the buttons after it, kept on one line. */
+.thread-block .card-ctl {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
 .thread-block > .card-bar::before {
   display: none;
 }
@@ -596,7 +612,8 @@ button.group-head.fold:hover {
   font-weight: 500;
 }
 
-/* Never squeezed: the bar wraps it onto a line of its own instead. */
+/* Never squeezed: the bar wraps it, with the buttons after it, onto a line of its own
+ * instead. */
 .comment-block .stage-strip {
   display: inline-flex;
   flex: none;
@@ -610,8 +627,8 @@ button.group-head.fold:hover {
 .comment-block .stage-strip button {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 1px 9px;
+  gap: 4px;
+  padding: 1px 6px;
   border: none;
   border-right: 1px solid var(--hair);
   border-radius: 0;
@@ -632,8 +649,8 @@ button.group-head.fold:hover {
 }
 
 .comment-block .stage-strip i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
   opacity: 0.5;

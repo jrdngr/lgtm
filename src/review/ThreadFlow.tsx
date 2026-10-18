@@ -9,16 +9,17 @@ import type { Comments } from "./useComments";
 interface Props {
   comment: CommentDto;
   c: Comments;
-  /** Whether its chat is synced with a terminal, and whether the agent there is working. */
-  chat: { synced: boolean; working: boolean };
+  /** The thread the linked agent hears I'm on. */
+  current: boolean;
   /** A triage run covers this thread, and will set its take, reply and stage. */
   triaging: boolean;
   /** The reply's editor, shown in place of the reply while it's edited. */
   editor?: React.ReactNode;
 }
 
-/** A GitHub thread's reply workflow under its posts: the take, the reply, and its chat. */
-export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
+/** A GitHub thread's reply workflow under its posts: the take, the reply and the reply an
+ * agent suggests, and its chat. */
+export function ThreadFlow({ comment, c, current, triaging, editor }: Props) {
   const id = comment.id;
   const take = comment.thread?.take;
   const body = comment.body;
@@ -53,6 +54,22 @@ export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
       {editor ?? (
         <section className="flow-sec">
           <h4 className="flow-h">Reply {final && <span className="flow-ver"> · final</span>}</h4>
+          {comment.suggestion && (
+            <div className="chat-sug">
+              <span className="chat-sug-label">Suggested reply</span>
+              <div className="msg-md">
+                <Markdown>{comment.suggestion}</Markdown>
+              </div>
+              <div className="flow-buttons">
+                <button type="button" onClick={() => c.takeSuggestion(id)}>
+                  Use
+                </button>
+                <button type="button" onClick={() => c.dismissSuggestion(id)}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
           {body.trim() ? (
             <div className={`flow-draft-text${final ? " final" : ""}`}>
               <Markdown>{body}</Markdown>
@@ -93,12 +110,17 @@ export function ThreadFlow({ comment, c, chat, triaging, editor }: Props) {
                 {!take && comment.thread?.stage === "new" && (
                   <PipeButton onClick={() => c.triage(comment)}>Triage</PipeButton>
                 )}
+                {!current && (
+                  <PipeButton keys="⌘>" onClick={() => c.talk(comment)}>
+                    Talk
+                  </PipeButton>
+                )}
               </>
             )}
           </div>
         </section>
       )}
-      <ThreadChat comment={comment} c={c} {...chat} />
+      <ThreadChat comment={comment} />
     </div>
   );
 }

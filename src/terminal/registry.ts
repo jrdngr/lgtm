@@ -91,6 +91,9 @@ export function subscribeTerminals(l: () => void) {
 /** Terminal `id`'s tab title, if it's open. */
 export const terminalTitle = (id: string) => terminals.get(id)?.title();
 
+/** Brings terminal `id` forward and focuses it, if it's open. */
+export const focusTerminal = (id: string) => terminals.get(id)?.focus();
+
 /** Whether terminal `id` is open. */
 export const hasTerminal = (id: string) => terminals.has(id);
 

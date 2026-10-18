@@ -1,25 +1,28 @@
 import { useState } from "react";
-import type { PrDto, Stage, ThreadDto } from "../bindings";
+import type { CommentDto, PrDto, Stage, ThreadDto } from "../bindings";
 import { PrSection } from "../github/PrSection";
 import { viewerLogin } from "../github/people";
 import { usePr } from "../github/pr";
 import { useDiscussion } from "../github/useDiscussion";
 import { commands, unwrap } from "../ipc";
+import { triageAllText } from "../review/agentText";
 import type { CurrentReview } from "../review/current";
 import { useCurrentReview } from "../review/current";
+import { sendToAgent, startLink } from "../review/linkCommands";
+import { setChatOpen, setCurrentThread, useLink } from "../review/linkedAgent";
 import { prThreads, quoted } from "../review/prComments";
-import { useSyncedChat } from "../review/syncedChat";
 import { openSettings } from "../settings/open";
 import { useAgentsOff, useGithubOff } from "../tools/agents";
 import { AgentButton } from "../ui/AgentButton";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
+import { PipeButton } from "../ui/PipeButton";
 import { openUrl, run } from "../ui/pathMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
+import { LinkStrip } from "./LinkStrip";
 import { SendBox } from "./SendBox";
 import { byStage, STAGES, threadLabel, threadWhere, working } from "./stages";
-import { TakePill } from "./ThreadBits";
 import { finalText } from "./text";
 import { useThreadRun } from "./useThreadRun";
 import "../review/comments.css";
@@ -33,6 +36,13 @@ function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
     {
       label: t.path ? "Show Code" : "Show Comment",
       onSelect: () => review.jumpToComment(t.id),
+    },
+    t.messages.length > 0 && {
+      label: "Show Chat",
+      onSelect: () => {
+        setChatOpen(t.id, true);
+        review.jumpToComment(t.id);
+      },
     },
     {
       label: "Move to Stage",
@@ -53,6 +63,8 @@ interface RowProps {
   t: ThreadDto;
   runner: ReturnType<typeof useThreadRun>;
   picked: boolean;
+  /** The thread the linked agent hears I'm on. */
+  current: boolean;
   onPick(): void;
   /** A quote, under the comment it's from. */
   sub?: boolean;
@@ -60,10 +72,9 @@ interface RowProps {
   dot?: boolean;
 }
 
-function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
+function ThreadRow({ review, t, runner, picked, current, onPick, sub, dot }: RowProps) {
   const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
   const inRun = runner.run?.threads.has(t.id);
-  const { synced } = useSyncedChat(t.id);
   return (
     <button
       type="button"
@@ -81,9 +92,9 @@ function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
         {threadLabel(t)}
       </span>
       <span className="thread-where">
-        <TakePill take={t.state.take} />
         {t.path && threadWhere(t)}
-        {synced && (
+        {t.suggestion && <span className="row-suggested" />}
+        {current && (
           <span className="row-synced">
             <Icon name="terminal" size={13} />
           </span>
@@ -104,10 +115,11 @@ interface ListProps {
 const CONVERSATION = "conversation";
 
 /** Comments on the PR with their quotes, then threads on code grouped by stage in work order,
- * Done folded. Picking a thread shows its comment in the review. */
+ * Done folded. Picking a thread shows its comment in the review and makes it the one I'm on. */
 function ThreadGroups({ review, threads, runner }: ListProps) {
+  const workspace = useWorkspace();
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set(["done"]));
-  const [picked, setPicked] = useState<number>();
+  const link = useLink(workspace);
   if (threads.length === 0) {
     return (
       <Empty>
@@ -128,8 +140,9 @@ function ThreadGroups({ review, threads, runner }: ListProps) {
       review={review}
       t={t}
       runner={runner}
-      picked={picked === t.id}
-      onPick={() => setPicked(t.id)}
+      picked={link.current === t.id}
+      current={!!link.terminal && link.current === t.id}
+      onPick={() => setCurrentThread(workspace, t.id)}
       {...extra}
     />
   );
@@ -192,8 +205,24 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
   const threads = review?.threads ?? [];
   const viewer = discussion.d?.viewer ?? (review && viewerLogin(review.comments));
   const sending = review && !off;
-  const fresh = working(threads).filter((t) => t.state.stage === "new").length;
-  const canTriage = !!review && !agentsOff && fresh > 0 && !runner.run;
+  const link = useLink(workspace);
+  const linked = !!link.terminal;
+  const freshThreads = working(threads).filter((t) => t.state.stage === "new");
+  const fresh = freshThreads.length;
+  const canTriage = !!review && (linked ? !link.working : !agentsOff) && fresh > 0 && !runner.run;
+  const onError = (message: string) => setError(message);
+  /** Triages the new threads: in the linked terminal when there is one, else headless. */
+  async function triage() {
+    if (!review) return;
+    if (!linked) return runner.start();
+    const rules = await commands.promptText("reply");
+    if (rules.status === "error") return setError(rules.error);
+    const pairs = freshThreads.flatMap((t) => {
+      const c = review.comments.find((c) => c.id === t.id);
+      return c ? [[t, c] as [ThreadDto, CommentDto]] : [];
+    });
+    sendToAgent(workspace, review.send, triageAllText(review.files, pairs, rules.data), null);
+  }
   const sync = () => {
     review?.refetchPr();
     discussion.load();
@@ -216,9 +245,11 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
   function onKey(e: React.KeyboardEvent) {
     const t = e.target;
     if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
-    if (e.key !== "t" || e.metaKey || e.ctrlKey || e.altKey || !canTriage) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === "t" && canTriage) triage();
+    else if (e.key === "l" && review && !linked) startLink(workspace, onError);
+    else return;
     e.preventDefault();
-    runner.start();
   }
 
   return (
@@ -230,13 +261,28 @@ function PrBody({ pr, review }: { pr: PrDto; review: CurrentReview | undefined }
               Sync
             </button>
           )}
-          {canTriage && (
-            <AgentButton className="pr-head-btn triage" onClick={() => runner.start()} keys="t">
-              Triage {fresh}
-            </AgentButton>
+          {canTriage &&
+            (linked ? (
+              <PipeButton className="pr-head-btn" onClick={triage} keys="t">
+                Triage {fresh}
+              </PipeButton>
+            ) : (
+              <AgentButton className="pr-head-btn triage" onClick={triage} keys="t">
+                Triage {fresh}
+              </AgentButton>
+            ))}
+          {review && !linked && (
+            <PipeButton
+              className="pr-head-btn"
+              onClick={() => startLink(workspace, onError)}
+              keys="l"
+            >
+              Link Agent
+            </PipeButton>
           )}
         </SectionHeader>
       </div>
+      <LinkStrip workspace={workspace} />
       {runner.run && (
         <div className="threads-run">
           <Spinner />

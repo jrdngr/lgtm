@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
-import { submitNextSend } from "../terminal/registry";
 import { confirmAction } from "../ui/prompt";
+import type { WorkspaceName } from "../workspaces/context";
+import { reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
+import { sendToAgent, talk as talkTo } from "./linkCommands";
 import { type FlatFile, NEW_COMMENT } from "./model";
 import { prComments } from "./prComments";
-import { currentSync, resumable, startSync, stopSync } from "./syncedChat";
-import { reviewText, syncText, triageText } from "./syncText";
 
 const NONE: CommentDto[] = [];
 
@@ -39,10 +39,15 @@ interface Deps {
   /** Shows a new state after a comment on `review` changed. */
   onState(state: StateDto, review?: number): void;
   onError(message: string): void;
-  /** Pastes text into one of the workspace's terminals, then calls `onSent` with it. */
-  send(text: string, onSent: (terminal: string) => void): void;
-  /** The terminal `send` pastes into now. */
-  target(): string | undefined;
+  workspace: WorkspaceName;
+  /** Pastes text into terminal `preferred` when it can take it, else one of the workspace's
+   * terminals, then calls `onSent` with it. */
+  send(
+    text: string,
+    onSent?: (terminal: string) => void,
+    report?: undefined,
+    preferred?: string,
+  ): void;
   /** Called when the user is done in a comment block, to give keys back to the review. */
   onDone(): void;
   /** The review is in a PR workspace, so drafts for GitHub can be written. */
@@ -56,8 +61,8 @@ export function useComments({
   moves,
   onState,
   onError,
+  workspace,
   send,
-  target,
   onDone,
   canDraft,
 }: Deps) {
@@ -204,35 +209,25 @@ export function useComments({
     send(commentText(files, c), onDone);
   }
 
-  /** Syncs a thread's chat with the send target, pasting the thread there unless it was
-   * synced there last. */
-  function sync(c: CommentDto) {
-    if (!review) return;
-    const id = review.id;
-    const to = target();
-    if (to && resumable(c.id, to)) return startSync(to, id, c.id);
-    // A sync on another thread in the same terminal ends here, so its agent hears it's over.
-    const prev = currentSync();
-    const dropped =
-      prev && prev.comment !== c.id && (!to || prev.terminal === to) ? prev.comment : undefined;
-    submitNextSend();
-    send(syncText(files, c, dropped), (terminal) => startSync(terminal, id, c.id));
+  /** Makes the thread the one I'm on and focuses the linked agent's terminal. */
+  function talk(c: CommentDto) {
+    talkTo(workspace, c.id, onError);
   }
 
-  /** Pastes a new thread and my rules for replies into the send target, for its agent to make
-   * the first take and reply. */
+  /** Pastes a new thread and my rules for replies into the linked or send target terminal,
+   * for its agent to make the first take and reply. */
   async function triage(c: CommentDto) {
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return onError(rules.error);
-    send(triageText(files, c, rules.data), () => {});
+    sendToAgent(workspace, send, triageText(files, c, rules.data), c.id);
   }
 
-  /** Pastes a thread and my rules for replies into the send target, for its agent to review
-   * the reply and suggest a better one. */
+  /** Pastes a thread and my rules for replies into the linked or send target terminal, for its
+   * agent to review the reply and suggest a better one. */
   async function reviewReply(c: CommentDto) {
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return onError(rules.error);
-    send(reviewText(files, c, rules.data), () => commands.allowSuggestions(c.id, true));
+    sendToAgent(workspace, send, reviewText(files, c, rules.data), c.id);
   }
 
   /** Makes a thread's suggested reply its reply. */
@@ -240,6 +235,10 @@ export function useComments({
     if (!review) return;
     setEdits((m) => without(m, id));
     await apply(commands.takeSuggestion(review.id, id));
+  }
+
+  async function dismissSuggestion(id: number) {
+    if (review) await apply(commands.dismissSuggestion(review.id, id));
   }
 
   /** Starts a thread on `text`, quoted from comment `of` on the PR. */
@@ -270,11 +269,12 @@ export function useComments({
     edit,
     remove,
     send: sendComment,
-    sync,
-    stopSync,
+    workspace,
+    talk,
     reviewReply,
     triage,
     takeSuggestion,
+    dismissSuggestion,
     final,
     sending,
     sendOne,

@@ -51,8 +51,14 @@ export interface CurrentReview {
   refetchPr(): void;
   /** `quiet` skips the error when the review isn't the whole PR. */
   pullPr(quiet?: boolean): void;
-  /** Pastes text into one of the workspace's terminals, asking which when there are several. */
-  send(text: string, onSent?: () => void, report?: (outcome: SendOutcome) => void): void;
+  /** Pastes text into terminal `preferred` when it can take it, else one of the workspace's
+   * terminals, asking which when there are several. `onSent` gets the terminal. */
+  send(
+    text: string,
+    onSent?: (terminal: string) => void,
+    report?: (outcome: SendOutcome) => void,
+    preferred?: string,
+  ): void;
 }
 
 /** One current review per workspace, since each has its own panes. */

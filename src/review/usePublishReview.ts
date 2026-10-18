@@ -81,7 +81,8 @@ export function usePublishReview(
         show: (path, line) => latest.current.show(path, line),
         commentOn: (file, rows, body, snippet, draft) =>
           latest.current.commentOn(file, rows, body, snippet, draft),
-        send: (text, onSent, report) => latest.current.send(text, onSent, report),
+        send: (text, onSent, report, preferred) =>
+          latest.current.send(text, onSent, report, preferred),
       };
       publishReview(workspace, published.current);
       // Agents in the workspace's terminals act on this review.

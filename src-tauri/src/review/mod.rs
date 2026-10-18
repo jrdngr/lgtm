@@ -16,6 +16,8 @@ mod github;
 mod github_tests;
 pub(crate) mod arch;
 mod graph;
+mod link;
+pub use link::LinkThread;
 mod load;
 mod matching;
 #[cfg(test)]
@@ -81,9 +83,8 @@ pub struct RepoCtx {
     current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
-    /// Threads whose synced chat the user stopped, so a terminal agent can't suggest replies
-    /// to them until they sync or review it again.
-    stopped_chats: Mutex<HashSet<u32>>,
+    /// Terminals linked to a PR review, by terminal panel id.
+    links: Mutex<HashMap<String, link::Link>>,
 }
 
 #[derive(Clone, Serialize, Type)]
@@ -223,7 +224,7 @@ impl RepoCtx {
             current: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
-            stopped_chats: Mutex::default(),
+            links: Mutex::default(),
         }
     }
 

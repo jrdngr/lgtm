@@ -1,7 +1,7 @@
 //! The MCP server agents in lgtm's terminals use to read the review and add to it. The app
 //! listens on a Unix socket, and terminals get its path as `LGTM_SOCKET`. Claude Code starts
 //! `lgtm mcp`, which bridges its stdio to that socket. Its hooks run `lgtm hook`, which reports
-//! the terminal agent's state over the same socket.
+//! the terminal agent's state over the same socket and gets back what to add to a prompt.
 
 mod bridge;
 pub mod hook;
@@ -18,7 +18,7 @@ use tauri_specta::Event;
 
 use crate::events::TerminalAgent;
 use crate::repo::RepoWindows;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 
 pub use bridge::main as bridge_main;
@@ -79,7 +79,16 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     let first: serde_json::Value = serde_json::from_str(&line)?;
     if let Some(hook) = first.get("hook") {
         let report: hook::HookReport = serde_json::from_value(hook.clone())?;
-        if let Some((label, _)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
+        if let Some((label, ctx)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
+            if report.state == hook::AgentHookState::Idle {
+                ctx.new_agent_session(&report.terminal);
+            }
+            if report.prompt.is_some() {
+                let context = ctx.prompt_context(&report.terminal);
+                let line = serde_json::json!({ "context": context });
+                let mut write = write;
+                write.write_all(format!("{line}\n").as_bytes()).await.ok();
+            }
             TerminalAgent {
                 terminal: report.terminal,
                 state: report.state,

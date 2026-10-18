@@ -1,113 +1,45 @@
-/* A thread's synced chat: its header, the conversation, and the suggested reply. */
-.flow-chat .flow-h button.pipe {
-  height: 22px;
-  padding: 0 9px;
-  border-radius: 4px;
-  font-size: var(--fs-sm);
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.chat-synced {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--violet-text);
-}
-
-.chat-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--github);
-  animation: chat-pulse 1.6s ease-out infinite;
-}
-
-.chat-dot.still {
-  animation: none;
-}
-
-@keyframes chat-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgb(163 113 247 / 60%);
-  }
-  100% {
-    box-shadow: 0 0 0 7px rgb(163 113 247 / 0%);
-  }
-}
-
-.flow-chat .flow-h button.chat-stop {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 18px;
-  padding: 0 6px;
-  border: 1px solid rgb(248 81 73 / 40%);
-  border-radius: 4px;
-  background: rgb(248 81 73 / 10%);
-  color: #ff9b94;
-  font-size: 11px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
-.flow-chat .flow-h button.chat-stop:hover {
-  background: rgb(248 81 73 / 18%);
-}
-
-.chat-stop i {
-  width: 6px;
-  height: 6px;
-  border-radius: 1px;
-  background: currentColor;
-}
-
-.chat-conv {
+/* A thread's chat, folded under its reply, and the reply an agent suggests. */
+.flow-chat {
   display: grid;
   gap: 6px;
+  margin: 0 -12px -12px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--hair);
 }
 
-.chat-conv .conversation {
-  padding-top: 0;
+.flow-chat .chat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.flow-chat .chat-toggle[aria-expanded="true"],
+.flow-chat .chat-toggle:hover {
+  color: var(--fg);
+}
+
+.flow-chat .chevron {
+  width: 10px;
+  font-size: 9px;
+}
+
+.chat-count {
+  color: var(--faint);
+}
+
+.flow-chat .conversation {
+  padding: 0 0 6px;
 }
 
 .flow-chat .msg-md,
 .flow-chat .msg-text {
   line-height: 1.5;
-}
-
-.chat-work {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-
-.chat-spin {
-  width: 10px;
-  height: 10px;
-  box-sizing: border-box;
-  border: 1.5px solid rgb(163 113 247 / 30%);
-  border-top-color: var(--github);
-  border-radius: 50%;
-  animation: chat-spin 0.9s linear infinite;
-}
-
-@keyframes chat-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-dot,
-  .chat-spin {
-    animation: none;
-  }
 }
 
 .chat-sug {
@@ -123,8 +55,8 @@
   color: var(--violet-text);
 }
 
-/* The folded bar of a synced thread. */
-.card-synced {
+/* The folded bar of the thread the linked agent hears I'm on. */
+.card-linked {
   display: inline-grid;
   place-items: center;
   width: 24px;
@@ -132,38 +64,4 @@
   border-radius: 4px;
   color: var(--violet-text);
   background: var(--violet-soft);
-}
-
-/* The toggle for messages before the latest exchange: a rule with the count in its middle. */
-.chat-fold {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.chat-fold::before,
-.chat-fold::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid var(--hair);
-}
-
-.chat-fold button {
-  padding: 1px 6px;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  font: inherit;
-  color: inherit;
-}
-
-.chat-fold button:hover {
-  color: var(--fg);
-  background: var(--hover);
-}
-
-.msg-old {
-  opacity: 0.75;
 }

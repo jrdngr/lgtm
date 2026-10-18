@@ -189,3 +189,58 @@
   height: 7px;
   border-radius: 50%;
 }
+
+/* The terminal linked to the PR review, under the PR header. */
+.link-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--violet-line);
+  background: var(--violet-soft);
+  color: var(--violet-text);
+}
+
+.link-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--fs-sm) var(--mono);
+}
+
+.link-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid var(--violet-line);
+  border-radius: 50%;
+}
+
+.link-dot.working {
+  width: 7px;
+  height: 7px;
+  border: none;
+  background: var(--mark-violet);
+  animation: link-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes link-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link-dot.working {
+    animation: none;
+  }
+}
+
+/* A thread with a reply an agent suggests. */
+.thread-row .row-suggested {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mark-violet);
+}

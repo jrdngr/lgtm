@@ -280,6 +280,7 @@ impl RepoCtx {
             if c.body != before {
                 store.set_comment_body(c.id, &c.body, super::now_ms())?;
             }
+            store.set_conversation(c.id, &c.conversation)?;
             Ok(store.set_thread(c.id, &c.thread)?)
         })?;
         Ok((id, state))
@@ -311,16 +312,26 @@ impl RepoCtx {
     }
 }
 
-/// Gives a thread a new take, and a new reply when one is given.
+/// Gives a thread a new take, and a new reply when one is given. A reply on a thread that has
+/// one becomes its suggested reply, so the agent never overwrites mine, and a done thread keeps
+/// the reply it has.
 fn set_take(c: &mut Comment, new: Take, reply: Option<String>) {
     let draft = c.is_draft();
     let Some(t) = c.thread.as_mut() else {
         return;
     };
     t.take = Some(take(new.verdict, new.why, new.question));
-    if let Some(reply) = reply.filter(|r| !r.trim().is_empty() && *r != c.body) {
+    let Some(reply) = reply.filter(|r| !r.trim().is_empty() && r.trim() != c.body.trim()) else {
+        return;
+    };
+    if t.stage == Stage::Done {
+        return;
+    }
+    if c.body.trim().is_empty() {
         c.body = reply;
         t.stage = super::threads::after_edit(t.stage, draft, &c.body);
+    } else {
+        c.conversation.suggestion = Some(reply.trim().to_string());
     }
 }
 
@@ -341,7 +352,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_take_rewrites_take_and_reply_together() {
+    fn a_new_take_suggests_a_reply_instead_of_overwriting_mine() {
         let mut c = Comment {
             id: 1,
             path: "a.rs".into(),
@@ -361,14 +372,21 @@ mod tests {
             why: "2 is enough".into(),
             question: Some(" ".into()),
         };
-        set_take(&mut c, new(), Some("new".into()));
+        set_take(&mut c, new(), Some("new\n".into()));
         let t = c.thread.as_ref().unwrap();
-        assert_eq!(c.body, "new");
+        assert_eq!(c.body, "old");
+        assert_eq!(c.conversation.suggestion.as_deref(), Some("new"));
         assert_eq!(t.take.as_ref().unwrap().question, None);
-        // A draft with text stays ready.
         assert_eq!(t.stage, Stage::Ready);
-        // No reply leaves the one there is.
+        // No reply, or the same one, leaves the suggestion there is.
         set_take(&mut c, new(), None);
-        assert_eq!(c.body, "new");
+        set_take(&mut c, new(), Some("old".into()));
+        assert_eq!(c.conversation.suggestion.as_deref(), Some("new"));
+        // With no reply yet, it's the reply.
+        c.body = String::new();
+        c.conversation.suggestion = None;
+        set_take(&mut c, new(), Some("first".into()));
+        assert_eq!(c.body, "first");
+        assert_eq!(c.conversation.suggestion, None);
     }
 }

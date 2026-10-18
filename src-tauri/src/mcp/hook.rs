@@ -1,8 +1,9 @@
 //! `lgtm hook`: what Claude Code runs on its hook events. Inside an lgtm terminal it tells the
-//! app how the terminal's agent stands, for its workspace's row. Anywhere else it does nothing.
-//! It never fails or prints, so it can't get in Claude Code's way.
+//! app how the terminal's agent stands, for its workspace's row, and on a prompt prints the
+//! context the app adds when the terminal is linked to a PR review. Anywhere else it does
+//! nothing. It never fails, so it can't get in Claude Code's way.
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::net::UnixStream;
 use std::time::Duration;
 
@@ -155,12 +156,35 @@ pub fn main() -> i32 {
         session: input["session_id"].as_str().map(str::to_string),
         ended: ended(&input),
     };
-    if let Ok(mut stream) = UnixStream::connect(socket) {
-        stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
-        let line = serde_json::json!({ "hook": report });
-        writeln!(stream, "{line}").ok();
+    let asks = report.prompt.is_some();
+    let Ok(mut stream) = UnixStream::connect(socket) else {
+        return 0;
+    };
+    stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
+    let line = serde_json::json!({ "hook": report });
+    if writeln!(stream, "{line}").is_err() || !asks {
+        return 0;
+    }
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    let mut answer = String::new();
+    BufReader::new(stream).read_line(&mut answer).ok();
+    if let Some(output) = prompt_output(&answer) {
+        println!("{output}");
     }
     0
+}
+
+/// What Claude Code reads from a `UserPromptSubmit` hook to add context, from the app's
+/// answer, if it has any to add.
+fn prompt_output(answer: &str) -> Option<serde_json::Value> {
+    let answer: serde_json::Value = serde_json::from_str(answer).ok()?;
+    let context = answer["context"].as_str()?;
+    Some(serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": context,
+        }
+    }))
 }
 
 #[cfg(test)]
@@ -187,6 +211,18 @@ mod tests {
         assert_eq!(of(r#"{"hook_event_name":"StopFailure"}"#), Some(Failed));
         assert_eq!(of(r#"{"hook_event_name":"SubagentStop"}"#), None);
         assert_eq!(of("{}"), None);
+    }
+
+    #[test]
+    fn adds_the_apps_context_to_a_prompt_only_when_there_is_some() {
+        let out = prompt_output(r#"{"context":"lgtm: thread 3"}"#).unwrap();
+        assert_eq!(
+            out["hookSpecificOutput"]["additionalContext"],
+            "lgtm: thread 3"
+        );
+        assert_eq!(out["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit");
+        assert!(prompt_output(r#"{"context":null}"#).is_none());
+        assert!(prompt_output("").is_none());
     }
 
     #[test]
