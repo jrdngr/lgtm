@@ -1,6 +1,6 @@
 //! Questions and answers as plain text, for the agent and for copying.
 
-use super::queue::QaQuestion;
+use super::queue::{QState, QaQuestion};
 
 /// An answer in words, for the agent and for copying.
 pub fn answer_text(q: &QaQuestion) -> String {
@@ -23,6 +23,15 @@ pub fn answer_text(q: &QaQuestion) -> String {
         out.push_str(&format!(" (note: {})", note.trim()));
     }
     out
+}
+
+/// What became of a question that isn't open: its answer, or that it was dropped or deferred.
+pub fn decision_text(q: &QaQuestion) -> String {
+    match q.state {
+        QState::Dropped => format!("dropped: {}", q.dropped.as_deref().unwrap_or("")),
+        QState::Deferred => "deferred".into(),
+        _ => answer_text(q),
+    }
 }
 
 /// A question in the qqueue template, as plain text.

@@ -1,43 +1,45 @@
 //! Q&A tools: the agent asks the human questions in lgtm's Q&A tab, then works through the
 //! steps the tab sends it as prompts starting with `lgtm Q&A`.
 
+use std::sync::Arc;
+
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router};
 use tauri_specta::Event as _;
 
 use super::qa_inputs as inputs;
 use super::server::{Lgtm, Out, failed, json};
+use crate::ctx::RepoCtx;
 use crate::events::QaChanged;
 use crate::prompts::{self, Prompt};
 use crate::qa::discuss::{self, Decision};
 use crate::qa::queue::{QState, Rewrite, Update};
-use crate::qa::text::answer_text;
+use crate::qa::text::decision_text;
 use crate::qa::update::dependents_text;
-use crate::qa::{Session, queue};
+use crate::qa::{AskIn, Session, queue};
+use crate::workspace::Workspace;
 
 impl Lgtm {
-    /// Changes session `id` and has the Q&A tab show it.
-    async fn edit_session<T>(
-        &self,
-        id: &str,
-        f: impl FnOnce(&mut Session) -> anyhow::Result<T>,
-    ) -> Result<T, String> {
+    /// The repo's window label, the repo, and this terminal's workspace.
+    async fn qa_repo(&self) -> Result<(String, Arc<RepoCtx>, Arc<Workspace>), String> {
         let (label, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let out = ctx.edit_qa(&ws, id, f).map_err(failed)?;
+        Ok((label, ctx, ws))
+    }
+
+    /// Has the Q&A tab show session `id`.
+    fn show_session(&self, label: &str, id: &str) {
         QaChanged {
             workspace: self.hello.workspace.clone(),
             id: id.to_string(),
             show: true,
         }
-        .emit_to(&self.app, &label)
+        .emit_to(&self.app, label)
         .ok();
-        Ok(out)
     }
 
     async fn session(&self, id: &str) -> Result<Session, String> {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let (_, ctx, ws) = self.qa_repo().await?;
         ctx.qa_session(&ws, id).map_err(failed)
     }
 }
@@ -49,19 +51,17 @@ impl Lgtm {
         of their questions are open and decided."
     )]
     async fn list_qa(&self) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let (_, ctx, ws) = self.qa_repo().await?;
         let sessions = ctx.qa_sessions(&ws).map_err(failed)?;
         let list: Vec<_> = sessions
             .iter()
             .filter(|s| !s.archived)
             .map(|s| {
-                let count = |st| s.queue.questions.iter().filter(|q| q.state == st).count();
                 serde_json::json!({
                     "session": s.id,
                     "title": s.title,
-                    "open": count(QState::Open),
-                    "decided": count(QState::Decided),
+                    "open": s.count(QState::Open),
+                    "decided": s.count(QState::Decided),
                 })
             })
             .collect();
@@ -98,32 +98,25 @@ impl Lgtm {
         qa_answers reads them too."
     )]
     async fn qa_ask(&self, Parameters(p): Parameters<inputs::QaAsk>) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
-        let (id, new) = match p.session {
-            Some(id) => (id, false),
+        let (label, ctx, ws) = self.qa_repo().await?;
+        let into = match p.session {
+            Some(id) => AskIn::Session(id),
             None => {
                 let title = p.title.unwrap_or_default();
                 let prompt = match p.brief {
                     Some(b) => format!("{title}\n\n{b}"),
                     None => title,
                 };
-                let s = ctx.create_qa(&ws, &prompt, p.read_first).map_err(failed)?;
-                (s.id, true)
+                AskIn::New {
+                    prompt,
+                    attach: p.read_first,
+                }
             }
         };
         let questions = p.questions.into_iter().map(Into::into).collect();
         let terminal = self.hello.terminal.clone();
-        let ids = self
-            .edit_session(&id, |s| {
-                s.from_terminal |= new;
-                // The agent that asked runs the session's steps.
-                if terminal.is_some() {
-                    s.terminal = terminal;
-                }
-                Ok(s.queue.add_round(questions))
-            })
-            .await?;
+        let (id, ids) = ctx.ask_qa(&ws, into, terminal, questions).map_err(failed)?;
+        self.show_session(&label, &id);
         Ok(format!(
             "Queued {} (in the order given) in session {id}, now showing in lgtm's Q&A tab. \
              Stop here: the human answers there. lgtm sends you prompts starting with `lgtm Q&A` \
@@ -149,7 +142,9 @@ impl Lgtm {
     async fn qa_rewrite(&self, Parameters(p): Parameters<inputs::QaRewrite>) -> Out {
         let r: Rewrite = p.question.into();
         let qid = r.id.clone();
-        self.edit_session(&p.session, |s| s.queue.reask(r)).await?;
+        let (label, ctx, ws) = self.qa_repo().await?;
+        ctx.reask_qa(&ws, &p.session, r).map_err(failed)?;
+        self.show_session(&label, &p.session);
         Ok(format!("Rewrote {qid}; lgtm's Q&A tab shows it."))
     }
 
@@ -158,8 +153,7 @@ impl Lgtm {
         discussing it. lgtm then asks you to update the questions that depend on it."
     )]
     async fn qa_decide(&self, Parameters(p): Parameters<inputs::QaDecide>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
+        let (label, ctx, ws) = self.qa_repo().await?;
         let decision = Decision {
             option: p.option,
             note: p.note,
@@ -167,13 +161,7 @@ impl Lgtm {
         };
         ctx.decide_in_discussion(&ws, &p.session, &p.id, decision)
             .map_err(failed)?;
-        QaChanged {
-            workspace: self.hello.workspace.clone(),
-            id: p.session,
-            show: true,
-        }
-        .emit_to(&self.app, &label)
-        .ok();
+        self.show_session(&label, &p.session);
         Ok(format!("Decided {}.", p.id))
     }
 
@@ -204,12 +192,10 @@ impl Lgtm {
             rewrite: p.rewrite.into_iter().map(Into::into).collect(),
             add: p.add.into_iter().map(Into::into).collect(),
         };
-        self.edit_session(&p.session, |s| {
-            anyhow::ensure!(s.queue.get(&p.after).is_some(), "no question {}", p.after);
-            s.queue.apply(&p.after, update);
-            Ok(())
-        })
-        .await?;
+        let (label, ctx, ws) = self.qa_repo().await?;
+        ctx.update_qa(&ws, &p.session, &p.after, update)
+            .map_err(failed)?;
+        self.show_session(&label, &p.session);
         Ok("Updated; lgtm's Q&A tab shows it.".into())
     }
 
@@ -225,11 +211,7 @@ impl Lgtm {
                 serde_json::json!({
                     "id": q.id,
                     "subject": q.text.subject,
-                    "answer": match q.state {
-                        QState::Dropped => format!("dropped: {}", q.dropped.as_deref().unwrap_or("")),
-                        QState::Deferred => "deferred".into(),
-                        _ => answer_text(q),
-                    },
+                    "answer": decision_text(q),
                     "auto": q.answer.as_ref().is_some_and(|a| a.is_auto()),
                 })
             })

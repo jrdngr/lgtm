@@ -2,7 +2,11 @@
 //! A session is a prompt and the question queue built from it. Sessions live in the store,
 //! never in the repo.
 
+mod ask;
 pub mod discuss;
+mod edit;
+#[cfg(test)]
+mod edit_tests;
 mod order;
 pub mod queue;
 pub mod text;
@@ -14,7 +18,10 @@ use specta::Type;
 
 use crate::ctx::{RepoCtx, now_ms};
 use crate::workspace::Workspace;
-use queue::Queue;
+use queue::{QState, Queue};
+
+pub use ask::AskIn;
+pub use edit::{QuestionAct, SessionEdit};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -47,6 +54,17 @@ pub struct Session {
     #[serde(default)]
     pub archived: bool,
     pub created: f64,
+}
+
+impl Session {
+    /// How many of its questions are in `state`.
+    pub fn count(&self, state: QState) -> usize {
+        self.queue
+            .questions
+            .iter()
+            .filter(|q| q.state == state)
+            .count()
+    }
 }
 
 /// A title from the prompt's first line, until the agent names it.
@@ -82,7 +100,7 @@ impl RepoCtx {
     }
 
     /// Changes a session in the store. Answers and the agent's tools both go through here.
-    pub fn edit_qa<T>(
+    fn edit_qa<T>(
         &self,
         ws: &Workspace,
         id: &str,
