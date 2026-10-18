@@ -31,6 +31,8 @@
 }
 
 .arch-score-mid {
+  display: flex;
+  gap: 4px;
   min-width: 0;
 }
 

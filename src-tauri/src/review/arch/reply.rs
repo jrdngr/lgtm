@@ -161,11 +161,13 @@ pub(super) fn validate(reply: Reply, known: &Known, created_at: f64) -> Assessed
         reason: reply.reason.lines().next().unwrap_or("").trim().to_string(),
         boundaries,
         created_at,
+        stale: false,
     };
     Assessed {
         assessment,
         layers,
         look,
+        commits: None,
     }
 }
 

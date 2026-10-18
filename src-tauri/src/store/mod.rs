@@ -242,11 +242,11 @@ impl Store {
         Ok(Self { db })
     }
 
-    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions and review sessions, so a new
-    /// workspace with its name starts empty.
+    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions, review sessions, assessments and
+    /// Look checks, so a new workspace with its name starts empty.
     pub fn forget_workspace(&mut self, name: &str) -> rusqlite::Result<()> {
         let tx = self.db.transaction()?;
-        for table in ["bot_runs", "qa_sessions", "sessions"] {
+        for table in ["bot_runs", "qa_sessions", "sessions", "arch_reviews"] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }
         tx.commit()

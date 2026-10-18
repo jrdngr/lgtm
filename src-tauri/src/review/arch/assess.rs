@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use super::reply::{Known, Reply, validate};
 use super::{AssessmentDto, LayerDto, LookDto, prompt, state};
+use crate::jj::Range;
 use crate::review::{RepoCtx, now_ms};
 use crate::store::Store;
 
@@ -33,29 +34,54 @@ components.
 
 Then tell me the score and why in a line or two.";
 
-/// The last assessment of a revset, stored whole.
+/// The last assessment of a revset in a workspace, stored whole.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Assessed {
     pub assessment: AssessmentDto,
     pub layers: Vec<LayerDto>,
     /// Agent and Security items, unchecked.
     pub look: Vec<LookDto>,
+    /// The commits the revset resolved to when it was stored. Absent from older assessments.
+    #[serde(default)]
+    pub commits: Option<Commits>,
 }
 
-fn key(revset: &str) -> String {
-    format!("assess:{revset}")
+/// A revset's base and head commits. `from` is `None` at the root.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Commits {
+    pub from: Option<String>,
+    pub to: String,
 }
 
-/// The last assessment of `revset`.
-pub fn assessed(store: &Store, revset: &str) -> anyhow::Result<Option<Assessed>> {
-    Ok(match store.arch_state(&key(revset))? {
-        Some(data) => Some(serde_json::from_str(&data)?),
-        None => None,
-    })
+impl From<&Range> for Commits {
+    fn from(r: &Range) -> Self {
+        Self {
+            from: r.from.clone(),
+            to: r.to.clone(),
+        }
+    }
 }
 
-pub fn save_assessed(store: &Store, revset: &str, a: &Assessed) -> anyhow::Result<()> {
-    Ok(store.save_arch_state(&key(revset), &serde_json::to_string(a)?)?)
+const KIND: &str = "assess";
+
+/// The last assessment of `revset` in workspace `ws`, marked stale unless it was of `now`'s
+/// commits.
+pub fn assessed(
+    store: &Store,
+    ws: &str,
+    revset: &str,
+    now: &Range,
+) -> anyhow::Result<Option<Assessed>> {
+    let Some(data) = store.arch_review(ws, revset, KIND)? else {
+        return Ok(None);
+    };
+    let mut a: Assessed = serde_json::from_str(&data)?;
+    a.assessment.stale = a.commits != Some(now.into());
+    Ok(Some(a))
+}
+
+pub fn save_assessed(store: &Store, ws: &str, revset: &str, a: &Assessed) -> anyhow::Result<()> {
+    Ok(store.save_arch_review(ws, revset, KIND, &serde_json::to_string(a)?)?)
 }
 
 impl RepoCtx {
@@ -87,11 +113,11 @@ impl RepoCtx {
         revset: &str,
         reply: serde_json::Value,
     ) -> anyhow::Result<AssessmentDto> {
-        let (shown, files) = {
+        let (ws, shown, files) = {
             let r = self.review(review)?;
             let r = r.lock().unwrap();
             let files: Vec<String> = r.files.iter().map(|f| f.path.clone()).collect();
-            (r.revset.clone(), files)
+            (r.ws.clone(), r.revset.clone(), files)
         };
         ensure!(
             shown == revset,
@@ -108,10 +134,54 @@ impl RepoCtx {
                 .collect::<HashSet<_>>(),
             files: &files,
         };
-        let assessed = validate(reply, &known, now_ms() as f64);
+        let mut assessed = validate(reply, &known, now_ms() as f64);
+        assessed.commits = Some((&ws.jj.resolve(revset).await?).into());
         let store = self.store.lock().unwrap();
-        save_assessed(&store, revset, &assessed)?;
-        state::uncheck_assessed(&store, revset)?;
+        save_assessed(&store, ws.key(), revset, &assessed)?;
+        state::uncheck_assessed(&store, ws.key(), revset)?;
         Ok(assessed.assessment)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::review::arch::RiskLevel;
+
+    #[test]
+    fn an_assessment_of_other_commits_is_stale() {
+        let store = Store::in_memory();
+        let range = |to: &str| Range {
+            from: Some("base".into()),
+            to: to.into(),
+        };
+        let mut a = Assessed {
+            assessment: AssessmentDto {
+                score: 4,
+                risk: RiskLevel::Low,
+                reason: String::new(),
+                boundaries: vec![],
+                created_at: 0.0,
+                stale: false,
+            },
+            layers: vec![],
+            look: vec![],
+            commits: Some((&range("head")).into()),
+        };
+        save_assessed(&store, "w", "@", &a).unwrap();
+        let stale = |r: &Range| {
+            assessed(&store, "w", "@", r)
+                .unwrap()
+                .unwrap()
+                .assessment
+                .stale
+        };
+        assert!(!stale(&range("head")));
+        assert!(stale(&range("moved")));
+        assert!(assessed(&store, "", "@", &range("head")).unwrap().is_none());
+        // One stored before commits were recorded can't be shown current.
+        a.commits = None;
+        save_assessed(&store, "w", "@", &a).unwrap();
+        assert!(stale(&range("head")));
     }
 }

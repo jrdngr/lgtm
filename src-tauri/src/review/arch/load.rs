@@ -33,8 +33,9 @@ impl RepoCtx {
             });
             (r.ws.clone(), r.revset.clone(), own)
         };
-        let (range, files, indexed, extra) = match own {
-            Some((range, files)) => (range, files, true, vec![]),
+        // `whole` is the review's base and head, which the assessment must be of to be current.
+        let (range, whole, files, indexed, extra) = match own {
+            Some((range, files)) => (range.clone(), range, files, true, vec![]),
             None => {
                 let whole = ws.jj.resolve(&revset).await?;
                 let (range, extra) = match range {
@@ -62,17 +63,18 @@ impl RepoCtx {
                             .collect();
                         (range, extra)
                     }
-                    None => (whole, vec![]),
+                    None => (whole.clone(), vec![]),
                 };
                 (
                     range.clone(),
+                    whole,
                     self.files_of(&ws, &revset, &range).await?,
                     false,
                     extra,
                 )
             }
         };
-        let stored = self.stored(&revset)?;
+        let stored = self.stored(&ws, &revset, &whole)?;
         let move_paths: Vec<String> = stored
             .intents
             .iter()
@@ -181,12 +183,14 @@ impl RepoCtx {
             .0)
     }
 
-    fn stored(&self, revset: &str) -> anyhow::Result<Stored> {
+    fn stored(&self, ws: &Workspace, revset: &str, whole: &Range) -> anyhow::Result<Stored> {
         let store = self.store.lock().unwrap();
         Ok(Stored {
             intents: state::intents(&store)?,
-            checked: state::checked(&store, revset)?.into_iter().collect(),
-            assessed: assess::assessed(&store, revset)?,
+            checked: state::checked(&store, ws.key(), revset)?
+                .into_iter()
+                .collect(),
+            assessed: assess::assessed(&store, ws.key(), revset, whole)?,
         })
     }
 }

@@ -235,6 +235,9 @@ pub struct AssessmentDto {
     pub reason: String,
     pub boundaries: Vec<BoundaryDto>,
     pub created_at: f64,
+    /// Whether the revset has moved to other commits since.
+    #[serde(default)]
+    pub stale: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Type)]

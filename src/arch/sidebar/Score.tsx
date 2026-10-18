@@ -20,8 +20,8 @@ interface Props {
   onError(error: string | undefined): void;
 }
 
-/** The score from the last assessment with its risk and why, and Assess, which sends the
- * prompt to the send target. */
+/** The score from the last assessment with its risk and why, whether the revset has moved
+ * since, and Assess, which sends the prompt to the send target. */
 export function Score({ workspace, review, assessment, onError }: Props) {
   const { sendText, picker } = useSendText(workspace, onError, () => {});
   const [risk, tone] = assessment ? RISK[assessment.risk] : [];
@@ -37,6 +37,7 @@ export function Score({ workspace, review, assessment, onError }: Props) {
       <Meter score={assessment?.score ?? 0} />
       <span className="arch-score-mid">
         {risk && <span className={`pill ${tone}`}>{risk}</span>}
+        {assessment?.stale && <span className="pill">Stale</span>}
       </span>
       <PipeButton onClick={assess}>Assess</PipeButton>
       {assessment && <span className="arch-why">{assessment.reason}</span>}

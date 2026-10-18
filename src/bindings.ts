@@ -455,6 +455,8 @@ export type AssessmentDto = {
 	reason: string,
 	boundaries: BoundaryDto[],
 	createdAt: number | null,
+	/**  Whether the revset has moved to other commits since. */
+	stale?: boolean,
 };
 
 export type Author = "user" | "agent";

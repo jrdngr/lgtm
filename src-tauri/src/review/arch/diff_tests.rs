@@ -287,6 +287,7 @@ fn assessed_layers_point_at_the_current_review_files() {
             reason: String::new(),
             boundaries: vec![],
             created_at: 0.0,
+            stale: false,
         },
         layers: vec![LayerDto {
             n: 1,
@@ -296,6 +297,7 @@ fn assessed_layers_point_at_the_current_review_files() {
             ranges: vec![range("api/client.ts"), range("gone.ts")],
         }],
         look: vec![],
+        commits: None,
     };
     let stored = Stored {
         intents: vec![],
