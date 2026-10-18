@@ -130,6 +130,16 @@
   color: var(--muted);
 }
 
+.row-synced {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: var(--violet-text);
+  background: var(--violet-soft);
+}
+
 .send-fixed {
   display: flex;
   align-items: center;

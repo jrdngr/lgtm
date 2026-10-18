@@ -8,10 +8,12 @@ import { commands, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
 import { useCurrentReview } from "../review/current";
 import { prThreads, quoted } from "../review/prComments";
+import { useSyncedChat } from "../review/syncedChat";
 import { openSettings } from "../settings/open";
 import { useAgentsOff, useGithubOff } from "../tools/agents";
 import { AgentButton } from "../ui/AgentButton";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
+import { Icon } from "../ui/icons";
 import { openUrl, run } from "../ui/pathMenu";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { useWorkspace } from "../workspaces/context";
@@ -61,6 +63,7 @@ interface RowProps {
 function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
   const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
   const inRun = runner.run?.threads.has(t.id);
+  const { synced } = useSyncedChat(t.id);
   return (
     <button
       type="button"
@@ -80,6 +83,11 @@ function ThreadRow({ review, t, runner, picked, onPick, sub, dot }: RowProps) {
       <span className="thread-where">
         <TakePill take={t.state.take} />
         {t.path && threadWhere(t)}
+        {synced && (
+          <span className="row-synced">
+            <Icon name="terminal" size={13} />
+          </span>
+        )}
         {inRun && <Spinner />}
         {dot && <span className={`dot stage-seg ${tone || "grey"}`} />}
       </span>
