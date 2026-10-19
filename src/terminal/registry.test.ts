@@ -30,7 +30,7 @@ function fake(workspace: string | null, canPaste = true, agent = false) {
 }
 
 describe("sendToTerminal", () => {
-  it("pastes into the workspace's most recently focused terminal", () => {
+  it("pastes into the workspace's send target, or a chosen terminal", () => {
     const a = fake("t1");
     const b = fake("t1");
     const main = fake(null);
@@ -66,21 +66,26 @@ describe("sendToTerminal", () => {
 });
 
 describe("send target", () => {
-  it("is the pinned terminal while it's open, else the most recently focused", () => {
+  it("is the first opened terminal until another is pinned, whatever was focused", () => {
     const a = fake("w");
     const b = fake("w");
+    const c = fake("w");
     const off = [registerTerminal("pa", a.target), registerTerminal("pb", b.target)];
-    expect(sendTarget("w")).toBe("pb");
-    pinTarget("w", "pa");
     touchTerminal("pb");
     expect(sendTarget("w")).toBe("pa");
-    expect(workspaceTerminals("w").map((t) => t.id)).toEqual(["pa", "pb"]);
-    expect(sendToTerminal("w", "x")).toBe("sent");
-    expect(a.got).toEqual(["x"]);
-    off[0]();
+    pinTarget("w", "pb");
+    off.push(registerTerminal("pc", c.target));
+    touchTerminal("pc");
     expect(sendTarget("w")).toBe("pb");
-    pinTarget("w", null);
+    expect(workspaceTerminals("w").map((t) => t.id)).toEqual(["pb", "pc", "pa"]);
+    expect(sendToTerminal("w", "x")).toBe("sent");
+    expect(b.got).toEqual(["x"]);
     off[1]();
+    expect(sendTarget("w")).toBe("pa");
+    off[0]();
+    expect(sendTarget("w")).toBe("pc");
+    off[2]();
+    expect(sendTarget("w")).toBeUndefined();
   });
 
   it("ignores a pin on another workspace's terminal", () => {
@@ -89,7 +94,6 @@ describe("send target", () => {
     const off = [registerTerminal("qa", a.target), registerTerminal("qb", b.target)];
     pinTarget("w2", "qa");
     expect(sendTarget("w2")).toBe("qb");
-    pinTarget("w2", null);
     for (const f of off) f();
   });
 });

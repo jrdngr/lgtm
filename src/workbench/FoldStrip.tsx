@@ -43,9 +43,8 @@ export function FoldIcon({ out }: { out?: boolean }) {
 
 /** How a strip marks the send target's title, as its tab does. */
 export function useSendMark(workspace: WorkspaceName) {
-  const send = useSendTarget(workspace);
-  return (id: string) =>
-    id === send.pinned ? "pinned" : id === send.target ? "target" : undefined;
+  const target = useSendTarget(workspace);
+  return (id: string) => (id === target ? "pinned" : undefined);
 }
 
 /** The group's collapse button, and the strip it collapses to: every tab's title, which

@@ -4,7 +4,7 @@ import { activate } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
 import { useAtOutside } from "../review/workingCopy";
-import { hasTerminal, pinTarget, useSendTarget } from "../terminal/registry";
+import { hasTerminal, useSendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
 import { Glyph } from "../workspaces/AgentGlyph";
@@ -20,10 +20,7 @@ window.addEventListener(
   (e) => {
     if (!(e.target instanceof Element)) return;
     // The tab's own buttons click without moving it.
-    if (
-      e.target.closest(".tab-pin, .tab-rename") ||
-      (e.button !== 0 && e.target.closest(".dv-tab"))
-    ) {
+    if (e.target.closest(".tab-rename") || (e.button !== 0 && e.target.closest(".dv-tab"))) {
       e.stopPropagation();
     }
   },
@@ -66,15 +63,14 @@ function RenameField({ title, onDone }: { title: string; onDone(title?: string):
 }
 
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
- * selects it and opens its menu. The send target's tab is marked, and a terminal's tab leads
- * with a ›_ that pins it as the send target, shown while the tab is selected. A tab running
+ * selects it and opens its menu. A terminal's tab leads with a ›_, violet on the send target,
+ * whose title is violet too. A tab running
  * agents shows their most urgent state before its title. */
 export function Tab(props: IDockviewPanelHeaderProps) {
   const { api, containerApi } = props;
   const workspace = useWorkspace();
-  const send = useSendTarget(workspace);
   const renaming = useRenaming(api.id);
-  const pinned = send.pinned === api.id;
+  const pinned = useSendTarget(workspace) === api.id;
   const [title, setTitle] = useState(api.title ?? "");
   useEffect(() => {
     // A tab coming, going or retitled changes how much room its pane's titles have.
@@ -88,7 +84,6 @@ export function Tab(props: IDockviewPanelHeaderProps) {
       fitTabs();
     };
   }, [api]);
-  const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
   const panel = containerApi.getPanel(api.id);
   const agents = tabState(useActivity(workspace), api.id);
   const atOutside = useAtOutside(workspace);
@@ -123,7 +118,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   ) : (
     <DockviewDefaultTab
       {...props}
-      data-send={mark}
+      data-send={pinned ? "pinned" : undefined}
       title={title}
       closeActionOverride={close}
       onContextMenu={(e) => {
@@ -146,16 +141,9 @@ export function Tab(props: IDockviewPanelHeaderProps) {
     );
   return (
     <div className="tab-row">
-      <button
-        type="button"
-        className={`tab-pin${pinned ? " on" : ""}`}
-        aria-pressed={pinned}
-        aria-label={pinned ? "Unpin Send Target" : "Pin as Send Target"}
-        title={pinned ? "Unpin Send Target" : "Pin as Send Target"}
-        onClick={() => pinTarget(workspace, pinned ? null : api.id)}
-      >
+      <span className={`tab-pin${pinned ? " on" : ""}`}>
         <Icon name="terminal" size={13} />
-      </button>
+      </span>
       {glyph}
       {tab}
     </div>

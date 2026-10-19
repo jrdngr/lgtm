@@ -26,6 +26,9 @@ interface TerminalTarget {
 
 /** Terminals by panel id, most recently focused last. */
 const terminals = new Map<string, TerminalTarget>();
+/** When each terminal opened, as a running count. */
+const opened = new Map<string, number>();
+let opens = 0;
 
 /** Each workspace's pinned send target, by workspace key. Saved per repo. */
 type Pins = Record<string, string>;
@@ -48,9 +51,11 @@ function changed() {
 
 export function registerTerminal(id: string, target: TerminalTarget) {
   terminals.set(id, target);
+  opened.set(id, opens++);
   changed();
   return () => {
     terminals.delete(id);
+    opened.delete(id);
     changed();
   };
 }
@@ -64,28 +69,25 @@ export function touchTerminal(id: string) {
   changed();
 }
 
-/** Pins terminal `id` as the workspace's send target, or with `null`, unpins it. */
-export function pinTarget(workspace: WorkspaceName, id: string | null) {
-  const next = { ...pinsNow() };
-  if (id === null) delete next[workspaceKey(workspace)];
-  else next[workspaceKey(workspace)] = id;
+/** Pins terminal `id` as the workspace's send target. */
+export function pinTarget(workspace: WorkspaceName, id: string) {
+  const next = { ...pinsNow(), [workspaceKey(workspace)]: id };
   pins = next;
   saveState(PINS, next);
   changed();
 }
 
-/** The workspace's pinned terminal, while it's open. */
-export function pinnedTarget(workspace: WorkspaceName): string | undefined {
-  const id = pinsNow()[workspaceKey(workspace)];
-  return id !== undefined && terminals.get(id)?.workspace === workspace ? id : undefined;
-}
-
-/** Where sends go: the pinned terminal, else the most recently focused. */
+/** Where sends go: the workspace's pinned terminal while it's open, else its first opened.
+ * Undefined only when it has no terminal. */
 export function sendTarget(workspace: WorkspaceName): string | undefined {
-  return (
-    pinnedTarget(workspace) ??
-    [...terminals].reverse().find(([, t]) => t.workspace === workspace)?.[0]
-  );
+  const id = pinsNow()[workspaceKey(workspace)];
+  if (id !== undefined && terminals.get(id)?.workspace === workspace) return id;
+  let first: string | undefined;
+  for (const [t, term] of terminals) {
+    if (term.workspace !== workspace) continue;
+    if (first === undefined || (opened.get(t) ?? 0) < (opened.get(first) ?? 0)) first = t;
+  }
+  return first;
 }
 
 /** Calls `l` on every change to the terminals, their order or the pins. */
@@ -103,10 +105,10 @@ export const focusTerminal = (id: string) => terminals.get(id)?.focus();
 /** Whether terminal `id` is open. */
 export const hasTerminal = (id: string) => terminals.has(id);
 
-/** The workspace's send target and whether it's pinned, kept current. */
+/** The workspace's send target, kept current. */
 export function useSendTarget(workspace: WorkspaceName) {
   useSyncExternalStore(subscribeTerminals, () => version);
-  return { target: sendTarget(workspace), pinned: pinnedTarget(workspace) };
+  return sendTarget(workspace);
 }
 
 export interface TerminalChoice {

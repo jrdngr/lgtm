@@ -47,7 +47,7 @@
   color: var(--violet-text);
 }
 
-/* A terminal tab's ›_: gray, violet when it pins the tab as the send target. */
+/* A terminal tab's ›_: dim, violet on the send target. */
 .dock .tab-row {
   position: relative;
   display: flex;
@@ -63,16 +63,7 @@
   width: 18px;
   height: 18px;
   margin-right: 4px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: none;
   color: var(--faint);
-}
-
-.dock .tab-pin:hover {
-  color: var(--fg);
-  background: var(--hover);
 }
 
 .dock .tab-pin.on {
@@ -93,10 +84,4 @@
 /* An agent's state glyph, before the tab's title. */
 .dock .tab-glyph {
   margin-right: 6px;
-}
-
-/* Only the focused pane's selected tab offers its ›_. */
-.dock .dv-tab:not(.dv-active-tab) .tab-pin,
-.dock .dv-groupview:not(.dv-active-group) .tab-pin {
-  display: none;
 }

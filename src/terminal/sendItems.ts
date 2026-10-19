@@ -1,6 +1,6 @@
 import type { WorkspaceName } from "../core/workspace";
 import type { CtxEntry } from "../ui/contextMenu";
-import { pinnedTarget, pinTarget, workspaceTerminals } from "./registry";
+import { pinTarget, sendTarget, workspaceTerminals } from "./registry";
 
 /** Sends text to the send target, or to a chosen one. */
 export interface Sender {
@@ -30,12 +30,13 @@ export function sendItems(
   ];
 }
 
-/** Pins terminal `id` as its workspace's send target, or unpins it. Without a pin, the
- * target is the last terminal focused. */
+/** Pins terminal `id` as its workspace's send target. */
 export function targetItems(ws: WorkspaceName, id: string): CtxEntry[] {
   return [
-    pinnedTarget(ws) === id
-      ? { label: "Unpin Send Target", onSelect: () => pinTarget(ws, null) }
-      : { label: "Pin as Send Target", onSelect: () => pinTarget(ws, id) },
+    {
+      label: "Pin as Send Target",
+      checked: sendTarget(ws) === id,
+      onSelect: () => pinTarget(ws, id),
+    },
   ];
 }

@@ -42,7 +42,7 @@ The header shows what the workspace reviews and where `@` is. A PR's review is b
 
 Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them. The PR button in the Workspaces header shows or hides the stack's PR list; hiding it clears the selected PRs.
 
-Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the last terminal you focused, whose tab title is violet. Click the ›_ before the focused terminal tab's title (or pick Pin as Send Target from its menu) to keep sends going there; it turns violet while pinned. Rename on a terminal tab's menu edits its title in place. Violet buttons also press Enter when an agent runs in the target, so it starts right away; ⌘> and Send Path only paste.
+Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the workspace's first terminal until you pick Pin as Send Target from another terminal tab's menu. Every terminal tab leads with a ›_, violet on the send target (whose title is violet too) and dim on the rest. When the send target closes, the first terminal still open takes over. Rename on a terminal tab's menu edits its title in place. Violet buttons also press Enter when an agent runs in the target, so it starts right away; ⌘> and Send Path only paste.
 
 ## Requirements
 
