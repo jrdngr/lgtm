@@ -5,7 +5,7 @@ import "./ReviewBox.css";
 const MAX_DOTS = 8;
 
 /** A dot per reviewed commit, oldest first, with `@` ringed where it is: on its commit, or
- * past a dashed line when it builds on the review. */
+ * past a dashed line when it sits right on the review. */
 function Rail({ n, at, onTop }: { n: number; at: number; onTop: boolean }) {
   const shown = Math.min(n, MAX_DOTS);
   const ring = at < 0 || n <= MAX_DOTS ? at : Math.round((at * (shown - 1)) / (n - 1));

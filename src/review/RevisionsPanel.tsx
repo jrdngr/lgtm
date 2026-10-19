@@ -64,11 +64,13 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
   /** The commit ids jj lists for a picked range. */
   const [chain, setChain] = useState<{ revset: string; ids: Set<string> }>();
   const rootRef = useRef<HTMLDivElement>(null);
+  /** The commits of a review being loaded, until it's loaded. */
+  const [pending, setPending] = useState<Set<string>>();
   /** The commit a drag across rows started on. */
   const drag = useRef<number>(undefined);
 
   const { commits, owner } = layout(lines ?? []);
-  const bk = lines && bracket(lines, owner, commits, new Set(reviewed));
+  const bk = lines && bracket(lines, owner, commits, pending ?? new Set(reviewed));
   const atCommit = lines ? owner[lines.findIndex((l) => l.workingCopy)] : undefined;
   const changeAt = (k: number) => lines?.[commits[k]]?.changeId ?? undefined;
 
@@ -147,11 +149,30 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
     return () => window.removeEventListener("mouseup", up);
   });
 
+  /** The commit ids of rows `lo` to `hi` that jj lists for the range. */
+  function pickedIds() {
+    const ids = new Set<string>();
+    for (let c = lo; c <= hi; c++) {
+      const id = lines?.[commits[c]]?.commitId;
+      if (id && (!inChain || inChain.has(id))) ids.add(id);
+    }
+    return ids;
+  }
+
+  /** Loads `target` as the review, bracketing its commits dashed until it's loaded. */
   async function review(target: string | undefined) {
     if (!target) return;
+    setError(undefined);
+    const shown = target === picked() ? pickedIds() : new Set<string>();
+    setPending(shown);
+    if (!shown.size) {
+      commands.revsetCommits(workspace, target).then((r) => {
+        if (r.status === "ok") setPending((p) => (p === shown ? new Set(r.data) : p));
+      });
+    }
     const failed = await onLoad(target);
+    setPending(undefined);
     if (failed) setError(failed);
-    else onClose();
   }
 
   async function act(action: JjAction, label: string, follow?: boolean) {
@@ -277,7 +298,7 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
               >
                 {edge && (
                   <span
-                    className={`log-bk${i === bk.first ? " top" : ""}${i === bk.last ? " bot" : ""}`}
+                    className={`log-bk${i === bk.first ? " top" : ""}${i === bk.last ? " bot" : ""}${pending ? " loading" : ""}`}
                   />
                 )}
                 <AnsiText text={l.text} />
@@ -286,7 +307,7 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
             );
           })}
         </pre>
-        <RevisionsPanelFooter last={last} busy={busy} />
+        <RevisionsPanelFooter last={last} busy={busy} loading={!!pending} />
       </div>
     </>
   );

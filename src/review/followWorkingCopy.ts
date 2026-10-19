@@ -21,13 +21,13 @@ async function prAfterMove(workspace: WorkspaceName): Promise<PrDto | null> {
   return r.data;
 }
 
-/** Whether `@` is in the review of `revset` or builds on it. */
+/** Whether `@` is in the review of `revset` or sits right on it. */
 async function holdsAt(workspace: WorkspaceName, revset: string) {
   const r = await commands.workingCopy(workspace, revset);
   return r.status === "ok" && r.data.place !== "outside";
 }
 
-/** Keeps a review `@` is in or builds on, unless the workspace's PR changed. Any other goes
+/** Keeps a review `@` is in or sits right on, unless the workspace's PR changed. Any other goes
  * to the PR's commits, or to `@` without a PR. A review already on it refreshes on its own. */
 async function followOnce(workspace: WorkspaceName) {
   const before = (await prOf(workspace))?.number;

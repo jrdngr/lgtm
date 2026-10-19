@@ -465,7 +465,7 @@ export type AssessmentDto = {
 	stale?: boolean,
 };
 
-/**  Where `@` is: in the review, built on it, or elsewhere. */
+/**  Where `@` is: in the review, right on top of it, or elsewhere. */
 export type AtPlace = "inside" | "onTop" | "outside";
 
 export type Author = "user" | "agent";

@@ -6,8 +6,15 @@ const HINTS: [string[], string][] = [
   [["e"], "edit"],
 ];
 
+interface Props {
+  last?: string;
+  busy: boolean;
+  /** A review is loading. */
+  loading: boolean;
+}
+
 /** The revisions panel's keys, and the last action with its undo key. */
-export function RevisionsPanelFooter({ last, busy }: { last?: string; busy: boolean }) {
+export function RevisionsPanelFooter({ last, busy, loading }: Props) {
   return (
     <div className="picker-footer">
       {HINTS.map(([keys, label]) => (
@@ -21,6 +28,8 @@ export function RevisionsPanelFooter({ last, busy }: { last?: string; busy: bool
       <span className="spacer" />
       {busy ? (
         <Busy>Working…</Busy>
+      ) : loading ? (
+        <Busy>Loading review…</Busy>
       ) : (
         last && (
           <span className="picker-last">

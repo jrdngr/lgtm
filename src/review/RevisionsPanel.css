@@ -71,6 +71,13 @@
   border-bottom-left-radius: 4px;
 }
 
+/* Dashed until the review it marks has loaded. */
+.log-bk.loading {
+  border-left-style: dashed;
+  border-top-style: dashed;
+  border-bottom-style: dashed;
+}
+
 .log-line.pickable {
   cursor: pointer;
 }

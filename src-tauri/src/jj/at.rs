@@ -4,7 +4,7 @@ use anyhow::Context;
 
 use super::Jj;
 
-/// Where `@` is: in the review, built on it, or elsewhere.
+/// Where `@` is: in the review, right on top of it, or elsewhere.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum AtPlace {
@@ -27,15 +27,15 @@ pub struct WorkingCopyDto {
 }
 
 impl Jj {
-    /// `@`, and whether it's in `revset`, builds on it through mutable commits, or neither.
+    /// `@`, and whether it's in `revset`, sits right on it, or neither.
     pub async fn working_copy(&self, revset: &str) -> anyhow::Result<WorkingCopyDto> {
         let at = self.changes("@").await?.pop().context("no working copy")?;
         let has = async |r: String| self.commit_ids(&r).await.map(|c| !c.is_empty());
         let place = if has(format!("@ & ({revset})")).await? {
             AtPlace::Inside
         } else if has(format!("@ & ({revset})::")).await?
-            // Built on the review, not on history that landed since.
-            && !has(format!("(({revset})::@ ~ ({revset})) & immutable()")).await?
+            // Right on the review, with no commits between.
+            && !has(format!("({revset})::@ ~ ({revset}) ~ @")).await?
         {
             AtPlace::OnTop
         } else {
@@ -76,20 +76,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn landed_history_between_puts_the_working_copy_outside() {
+    async fn commits_between_put_the_working_copy_outside() {
         let (dir, j) = repo();
         let d = dir.path();
         write(d, "a.txt", "a\n");
-        jj(d, &["commit", "-m", "old"]);
-        jj(d, &["bookmark", "create", "old", "-r", "@-"]);
-        write(d, "b.txt", "b\n");
-        jj(d, &["commit", "-m", "landed"]);
-        jj(d, &["bookmark", "create", "landed", "-r", "@-"]);
-        let place = async || j.working_copy("old").await.unwrap().place;
+        jj(d, &["commit", "-m", "reviewed"]);
+        jj(d, &["bookmark", "create", "reviewed", "-r", "@-"]);
+        let place = async || j.working_copy("reviewed").await.unwrap().place;
 
         assert_eq!(place().await, AtPlace::OnTop);
-        let alias = r#"revset-aliases."immutable_heads()""#;
-        jj(d, &["config", "set", "--repo", alias, "landed"]);
+        write(d, "b.txt", "b\n");
+        jj(d, &["commit", "-m", "between"]);
         assert_eq!(place().await, AtPlace::Outside);
     }
 }
