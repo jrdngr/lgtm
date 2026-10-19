@@ -80,6 +80,7 @@ export function revsetMenu({
         ...choices.map(([label, revset]) => ({
           label,
           checked: target?.revset === revset,
+          keys: revset === "@" ? "⇧⌘J" : undefined,
           onSelect: review(revset),
         })),
         "-",

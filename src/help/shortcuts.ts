@@ -44,6 +44,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧O"], action: "Reports" },
       { keys: ["⌘⇧I"], action: "Q&A" },
       { keys: ["⌘J"], action: "Revisions list" },
+      { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
       { keys: ["⇧⌘N"], action: "New workspace" },
       { keys: ["⌥⌘N"], action: "Review a PR by URL or number, in its own workspace" },
       {

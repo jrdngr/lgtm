@@ -14,7 +14,7 @@ import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { forgetWorkspaceRevset } from "../review/revset";
-import { openRevisions } from "../review/target";
+import { openRevisions, targetOf } from "../review/target";
 import { useAtOutside } from "../review/workingCopy";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
@@ -28,6 +28,7 @@ import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
+import { reviewRevset } from "./revsetMenu";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
 import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
@@ -174,6 +175,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
     "Mod+J": () => openRevisions(selected),
+    "Mod+Shift+J": () => {
+      const target = targetOf(selected);
+      if (target) reviewRevset(target, "@");
+    },
     "Mod+Shift+N": () => addFromPanel("workspace"),
     "Mod+Alt+N": () => addFromPanel("pr"),
     toggle: () => toggleBottom(),
