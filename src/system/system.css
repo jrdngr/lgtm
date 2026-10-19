@@ -23,17 +23,32 @@
 
 /* Canvas */
 .sys-canvas {
-  display: flex;
+  position: relative;
   flex: 1;
   min-width: 0;
-  overflow: auto;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
   background-color: var(--bg);
   background-image: radial-gradient(#2a2a2a 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
+.sys-canvas:active {
+  cursor: grabbing;
+}
+
+.sys-zoom {
+  z-index: 1;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+}
+
 .sys-world {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   transform-origin: 0 0;
 }
 
