@@ -11,6 +11,7 @@ import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
 import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
+import { SystemTree } from "../system/SystemTree";
 import { CommentsPanel } from "../threads/CommentsPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 
@@ -26,7 +27,7 @@ interface Props {
   onHide(): void;
 }
 
-/** The right side panel: the repo's files; the review's changes, comments, architecture and
+/** The right side panel: the repo's files and system; the review's changes, comments, architecture and
  * reports; and Q&A. A tab turns amber for threads that need you, broken intents and open high
  * Look items, and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
@@ -40,6 +41,13 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       {...props}
       views={[
         { id: "repo", group: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
+        {
+          id: "system",
+          group: "repo",
+          title: "System",
+          icon: "system",
+          render: () => <SystemTree />,
+        },
         {
           id: "changes",
           group: "review",

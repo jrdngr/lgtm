@@ -151,6 +151,14 @@ const PATHS = {
   star: (
     <path d="m12 2.7 2.85 5.85 6.45.9-4.65 4.5 1.05 6.45L12 17.4l-5.7 3 1.05-6.45L2.7 9.45l6.45-.9z" />
   ),
+  system: (
+    <>
+      <rect x="3" y="3.75" width="7.5" height="6" rx="1.5" />
+      <rect x="13.5" y="3.75" width="7.5" height="6" rx="1.5" />
+      <rect x="8.25" y="15" width="7.5" height="6" rx="1.5" />
+      <path d="M6.75 9.75v3h10.5v-3M12 12.75V15" />
+    </>
+  ),
   architecture: (
     <>
       <rect x="9" y="2.5" width="6" height="6" rx="1" />

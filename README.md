@@ -36,7 +36,7 @@ This program may or may not be safe to run. Use it at your own risk.
 
 ![jj workspaces with their own terminals and layout](docs/screenshots/20-terminals.png)
 
-The right panel's tabs are Files; Changes, Comments, Architecture and Reports; then Q&A. A tab's icon turns amber when something there waits on you: threads to triage or decide, broken intents or open high Look items, or open questions. Comments (⌘⇧M or ⌘⇧P) holds a PR workspace's PR, its threads by stage, then your notes by file, with All, PR and Notes filters. Without a PR it holds your notes.
+The right panel's tabs are Files and System; Changes, Comments, Architecture and Reports; then Q&A. A tab's icon turns amber when something there waits on you: threads to triage or decide, broken intents or open high Look items, or open questions. Comments (⌘⇧M or ⌘⇧P) holds a PR workspace's PR, its threads by stage, then your notes by file, with All, PR and Notes filters. Without a PR it holds your notes. System lists the workspace's people, external systems, and containers with their components (stale ones marked); a row shows it in the System tab, and Describe is there too.
 
 Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them. The PR button in the Workspaces header shows or hides the stack's PR list; hiding it clears the selected PRs.
 
