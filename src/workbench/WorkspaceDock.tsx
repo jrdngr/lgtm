@@ -27,6 +27,7 @@ import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
 import { SystemPanel } from "../system/SystemPanel";
+import { useAgentSystem } from "../system/useAgentSystem";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { guarded } from "../ui/Crash";
 import { trackClosed } from "./closedTabs";
@@ -85,6 +86,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   useAgentQa(workspace);
   useAgentReports(workspace);
   useAgentArch(workspace);
+  useAgentSystem(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
     gone.current = false;
