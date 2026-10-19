@@ -14,10 +14,9 @@ use crate::store::Store;
 
 const INSTRUCTIONS: &str = "Assess the architecture of this change. Check its structural \
 soundness against the existing architecture: layering and dependency direction, coupling and \
-cohesion, and trust boundaries. Weigh the reviewer's decisions above, and flag any the change \
-breaks. Then make a security pass: for each way the change lets untrusted input reach something \
-sensitive or crosses a trust boundary unchecked, add a security look item whose detail gives the \
-attack path and its sites as path:line.
+cohesion, and trust boundaries. Then make a security pass: for each way the change lets \
+untrusted input reach something sensitive or crosses a trust boundary unchecked, add a security \
+look item whose detail gives the attack path and its sites as path:line.
 
 Use the component ids above wherever a component is asked for. Then call lgtm's set_assessment \
 tool with the revset, from and to, and:

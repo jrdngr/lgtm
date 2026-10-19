@@ -9,7 +9,8 @@ use specta::Type;
 
 use super::describe::{self, SystemDescDto};
 use super::group::Grouping;
-use super::{Lens, inputs, model, roots, scan, state};
+use super::tour::{self, TourDto};
+use super::{inputs, model, roots, scan};
 use crate::ctx::RepoCtx;
 use crate::jj::Range;
 
@@ -63,6 +64,8 @@ pub struct SystemDto {
     pub description: Option<SystemDescDto>,
     /// Components with files changed since the description was written.
     pub stale: Vec<String>,
+    /// The overview and features tours, then container and component tours in map order.
+    pub tours: Vec<TourDto>,
 }
 
 /// How many entry files a component lists.
@@ -151,11 +154,11 @@ pub(super) fn structure(snap: &model::Snapshot, g: &Grouping) -> Structure {
 }
 
 /// The working copy under `root`: its source files with their imports, and how they group.
-pub(super) fn scanned(root: &Path, lens: Lens, repo: &str) -> (model::Snapshot, Grouping) {
+pub(super) fn scanned(root: &Path, repo: &str) -> (model::Snapshot, Grouping) {
     let wc = scan::scan(root, &HashSet::new());
     let roots = roots::detect(&wc.paths, &wc.manifests, repo);
     let snap = inputs::snapshot(&wc.paths, &wc.imports, &wc.manifests);
-    (snap, Grouping::new(roots, lens, repo))
+    (snap, Grouping::new(roots, repo))
 }
 
 impl RepoCtx {
@@ -163,12 +166,14 @@ impl RepoCtx {
     pub async fn system_map(&self, workspace: Option<&str>) -> anyhow::Result<SystemDto> {
         let ws = self.workspace(workspace).await?;
         let repo = super::load::repo_name(&self.root);
-        let lens = state::lens(&self.store.lock().unwrap())?;
-        let description = describe::described(&self.store.lock().unwrap())?;
+        let (description, stored) = {
+            let store = self.store.lock().unwrap();
+            (describe::described(&store)?, tour::stored(&store)?)
+        };
         let root = ws.root.clone();
         let repo_name = repo.clone();
         let (st, path_comps) = tokio::task::spawn_blocking(move || {
-            let (snap, g) = scanned(&root, lens, &repo_name);
+            let (snap, g) = scanned(&root, &repo_name);
             let st = structure(&snap, &g);
             (st, move |p: &str| g.comp(p))
         })
@@ -199,6 +204,7 @@ impl RepoCtx {
             }
             None => vec![],
         };
+        let tours = tour::tours(description.as_ref(), &stored, &containers, &components);
         Ok(SystemDto {
             repo,
             containers,
@@ -207,6 +213,7 @@ impl RepoCtx {
             files,
             description,
             stale,
+            tours,
         })
     }
 }
@@ -214,8 +221,8 @@ impl RepoCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::review::arch::model::Import;
     use crate::review::arch::roots::Root;
-    use crate::review::arch::{Lens, model::Import};
 
     #[test]
     fn structure_counts_files_import_sites_and_entry_files_per_component() {
@@ -224,8 +231,14 @@ mod tests {
             line,
         };
         let snap: model::Snapshot = [
-            ("src/ui/a.ts", vec![import("src/db/x.ts", 1), import("src/db/y.ts", 2)]),
-            ("src/ui/b.ts", vec![import("src/db/x.ts", 4), import("src/ui/a.ts", 5)]),
+            (
+                "src/ui/a.ts",
+                vec![import("src/db/x.ts", 1), import("src/db/y.ts", 2)],
+            ),
+            (
+                "src/ui/b.ts",
+                vec![import("src/db/x.ts", 4), import("src/ui/a.ts", 5)],
+            ),
             ("src/db/x.ts", vec![]),
             ("src/db/y.ts", vec![]),
             ("build.ts", vec![import("src/ui/a.ts", 1)]),
@@ -237,7 +250,7 @@ mod tests {
             path: "src".into(),
             name: "app".into(),
         }];
-        let g = Grouping::new(roots, Lens::default(), "repo");
+        let g = Grouping::new(roots, "repo");
         let Structure {
             containers,
             components,
@@ -250,7 +263,10 @@ mod tests {
                 .collect()
         };
         assert_eq!(
-            containers.iter().map(|c| (&*c.id, &*c.name, c.files)).collect::<Vec<_>>(),
+            containers
+                .iter()
+                .map(|c| (&*c.id, &*c.name, c.files))
+                .collect::<Vec<_>>(),
             [("", "repo", 1), ("src", "app", 4)]
         );
         assert_eq!(
@@ -262,14 +278,24 @@ mod tests {
             ]
         );
         assert_eq!(
-            edges.iter().map(|e| (&*e.from, &*e.to, e.imports)).collect::<Vec<_>>(),
+            edges
+                .iter()
+                .map(|e| (&*e.from, &*e.to, e.imports))
+                .collect::<Vec<_>>(),
             [("", "src/ui", 1), ("src/ui", "src/db", 3)]
         );
         assert_eq!(
             edges.iter().map(|e| (&*e.path, e.line)).collect::<Vec<_>>(),
             [("build.ts", 1), ("src/ui/a.ts", 1)]
         );
-        let entry = |id: &str| components.iter().find(|c| c.id == id).unwrap().entry.clone();
+        let entry = |id: &str| {
+            components
+                .iter()
+                .find(|c| c.id == id)
+                .unwrap()
+                .entry
+                .clone()
+        };
         assert_eq!(entry("src/db"), ["src/db/x.ts", "src/db/y.ts"]);
         assert_eq!(entry("src/ui"), ["src/ui/a.ts"]);
     }

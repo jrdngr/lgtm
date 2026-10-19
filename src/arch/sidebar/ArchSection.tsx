@@ -1,45 +1,89 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import type { LookDto } from "../../bindings";
 import { useWorkspace, type WorkspaceName } from "../../core/workspace";
+import { commands } from "../../ipc";
 import { type CurrentReview, useCurrentReview } from "../../review/current";
+import { useSendText } from "../../review/useSendText";
+import { lensOf } from "../../system/lens";
+import { SystemTree } from "../../system/SystemTree";
+import { showInSystem } from "../../system/showInSystem";
+import { useSystem } from "../../system/useSystem";
+import { PipeButton } from "../../terminal/PipeButton";
 import { Busy } from "../../ui/Busy";
 import { Empty, SectionHeader } from "../../ui/SectionHeader";
 import { useArch } from "../state";
 import { History } from "./History";
-import { Intent } from "./Intent";
 import { Layers } from "./Layers";
 import { Look } from "./Look";
 import { Score } from "./Score";
 import "./sidebar.css";
 
-/** The current review's architecture: Assess's score, the change stack, what to look at, your
- * intent marks, and the commits that changed it. */
+/** The workspace's architecture. With a review open: Assess's score, what to look at, the
+ * change stack, the map of what it changes and the commits that changed it. Without one: the
+ * system's tours, people, external systems and containers. */
 export function ArchSection() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
+  const [error, setError] = useState<string>();
+  const { sendText, picker } = useSendText(workspace, setError, () => {});
+  const send = async (
+    p: Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
+  ) => {
+    const r = await p;
+    if (r.status === "error") return setError(r.error);
+    setError(undefined);
+    sendText(r.data);
+  };
   return (
     <div className="side-split">
-      <SectionHeader title="Architecture" />
+      <SectionHeader title="Architecture">
+        <PipeButton onClick={() => send(commands.describePrompt(workspace))}>Describe</PipeButton>
+        {review && (
+          <PipeButton onClick={() => send(commands.assessPrompt(review.id))}>Assess</PipeButton>
+        )}
+      </SectionHeader>
+      {error && <div className="arch-error">{error}</div>}
       {review ? (
-        <Body key={review.id} workspace={workspace} review={review} />
+        <Body key={review.id} workspace={workspace} review={review} onError={setError} />
       ) : (
-        <Empty>No review open</Empty>
+        <NoReview workspace={workspace} />
       )}
+      {picker}
     </div>
   );
 }
 
-function Body({ workspace, review }: { workspace: WorkspaceName; review: CurrentReview }) {
-  const { arch, error, view } = useArch(review);
-  const [actionError, setActionError] = useState<string>();
+function NoReview({ workspace }: { workspace: WorkspaceName }) {
+  const { map, error } = useSystem(workspace);
+  if (!map) return <Empty>{error ?? "Loading…"}</Empty>;
   return (
-    <div className="side-split-body arch-side">
-      <Score
-        workspace={workspace}
-        review={review.id}
-        assessment={arch?.assessment}
-        onError={setActionError}
-      />
-      {(error || actionError) && <div className="arch-error">{error ?? actionError}</div>}
+    <div className="side-split-body sys-tree">
+      <SystemTree map={map} />
+    </div>
+  );
+}
+
+function Body({
+  workspace,
+  review,
+  onError,
+}: {
+  workspace: WorkspaceName;
+  review: CurrentReview;
+  onError(e: string | undefined): void;
+}) {
+  const { arch, error, view } = useArch(review);
+  const { map } = useSystem(workspace);
+  const lens = useMemo(() => arch && lensOf(arch, review.files), [arch, review.files]);
+  const showLook = (l: LookDto) => {
+    if (l.path) review.show(l.path, l.line);
+    else if (l.edge) showInSystem(workspace, `k:${l.edge[0]}>k:${l.edge[1]}`);
+    else if (l.component) showInSystem(workspace, `k:${l.component}`);
+  };
+  return (
+    <div className="side-split-body arch-side sys-tree">
+      <Score assessment={arch?.assessment} />
+      {error && <div className="arch-error">{error}</div>}
       {!arch ? (
         !error && (
           <div className="placeholder arch-loading">
@@ -48,28 +92,9 @@ function Body({ workspace, review }: { workspace: WorkspaceName; review: Current
         )
       ) : (
         <>
-          <Layers
-            workspace={workspace}
-            review={review}
-            layers={arch.layers}
-            assessed={!!arch.assessment}
-            selection={view.selection}
-          />
-          <Look
-            workspace={workspace}
-            review={review.id}
-            look={arch.look}
-            selection={view.selection}
-            onError={setActionError}
-          />
-          <Intent
-            workspace={workspace}
-            review={review}
-            intents={arch.intents}
-            components={arch.components}
-            selection={view.selection}
-            onError={setActionError}
-          />
+          <Look review={review.id} look={arch.look} onShow={showLook} onError={onError} />
+          <Layers review={review} layers={arch.layers} assessed={!!arch.assessment} />
+          {map && lens && <SystemTree map={map} lens={lens} />}
         </>
       )}
       <History review={review} view={view} />

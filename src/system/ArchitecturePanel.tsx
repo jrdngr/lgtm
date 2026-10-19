@@ -1,0 +1,601 @@
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { setArchView, useArch } from "../arch/state";
+import type { LookDto, SystemDto, TourDto } from "../bindings";
+import { revealInFiles } from "../core/reveal";
+import { useWorkspace } from "../core/workspace";
+import { openFile } from "../editor/open";
+import { commands } from "../ipc";
+import { useCurrentReview } from "../review/current";
+import { useSendText } from "../review/useSendText";
+import type { CtxEntry } from "../ui/contextMenu";
+import { NEUTRAL } from "./colors";
+import { EdgeDetail } from "./EdgeDetail";
+import { FindPalette } from "./FindPalette";
+import { layout } from "./layout";
+import { lensOf } from "./lens";
+import { Minimap } from "./Minimap";
+import { nodeInfo } from "./names";
+import { ReviewStrip } from "./ReviewStrip";
+import { SymbolsView } from "./SymbolsView";
+import { type Crumb, type EdgeMode, SystemBar } from "./SystemBar";
+import { edgeKey, SystemCanvas } from "./SystemCanvas";
+import { SystemDetail } from "./SystemDetail";
+import {
+  componentId,
+  containerColors,
+  containerId,
+  containerOf,
+  type Level,
+  largestContainer,
+  levelOf,
+  type SEdge,
+  type SNode,
+  SYSTEM,
+  sceneOf,
+} from "./scene";
+import { onShowInSystem, setSelectedNode } from "./showInSystem";
+import { TourCard, TourSteps } from "./Tour";
+import { ToursMenu } from "./ToursMenu";
+import { TracePanel } from "./TracePanel";
+import { stopsOf, tourOf } from "./tours";
+import { drawn, tracePath } from "./trace";
+import { useSystem } from "./useSystem";
+import { askPrompt, neighborhood, visibleEdges } from "./view";
+import "./system.css";
+import "./lens.css";
+
+/** The whole system as C4 context, containers, components and one component's symbols, from
+ * the workspace's working copy and the description a terminal agent wrote, with the current
+ * review's change over it. */
+export function ArchitecturePanel() {
+  const workspace = useWorkspace();
+  const { map, error, reload } = useSystem(workspace);
+  if (error && !map) return <div className="placeholder error">{error}</div>;
+  if (!map) return <div className="placeholder">Reading the system…</div>;
+  if (!map.components.length) return <div className="placeholder">No source files</div>;
+  return <Loaded map={map} error={error} reload={reload} />;
+}
+
+/** The node that stands for `level` when nothing is selected. */
+function subject(map: SystemDto, level: Level): SNode | undefined {
+  if (level.kind === "components" || level.kind === "symbols") {
+    const c =
+      level.kind === "symbols" ? componentId(level.component) : containerId(level.container);
+    const at: Level =
+      level.kind === "symbols"
+        ? { kind: "components", container: containerOf(map, level.component) }
+        : { kind: "containers" };
+    return sceneOf(map, at)
+      .inside.flatMap((r) => r.nodes)
+      .find((n) => n.id === c);
+  }
+  return sceneOf(map, { kind: "context" }).inside[0]?.nodes[0];
+}
+
+interface Trace {
+  from?: string;
+  to?: string;
+}
+
+/** The scene edge for `from>to`, or the one into the door that stands for `to`'s container. */
+function sceneEdge(map: SystemDto, edges: SEdge[], key: string): SEdge | undefined {
+  const [from, to] = key.split(">");
+  const exact = edges.find((e) => e.from === from && e.to === to);
+  if (exact || !to?.startsWith("k:")) return exact;
+  const door = containerId(containerOf(map, to.slice(2)));
+  return edges.find((e) => e.from === from && e.to === door);
+}
+
+function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload(): void }) {
+  const workspace = useWorkspace();
+  const root = useRef<HTMLDivElement>(null);
+  const [level, setLevel] = useState<Level>({ kind: "context" });
+  const [selected, setSelected] = useState<string>();
+  const [edgeSel, setEdgeSel] = useState<string>();
+  const [symSel, setSymSel] = useState<number>();
+  const [mode, setMode] = useState<EdgeMode>("changed");
+  const [lensOn, setLensOn] = useState(true);
+  const [finding, setFinding] = useState(false);
+  const [toursOpen, setToursOpen] = useState(false);
+  const [trace, setTrace] = useState<Trace>();
+  const [touring, setTouring] = useState<{ tour: TourDto; at: number }>();
+  const [sendError, setSendError] = useState<string>();
+  const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
+  const review = useCurrentReview(workspace);
+  const lensReview = lensOn ? review : undefined;
+  const { arch, error: archError, view } = useArch(lensReview);
+  const files = lensReview?.files;
+  const lens = useMemo(() => (arch && files ? lensOf(arch, files) : undefined), [arch, files]);
+  const colors = useMemo(() => containerColors(map), [map]);
+
+  // What a reload or another review can take away.
+  const shown: Level =
+    (level.kind === "components" && !map.containers.some((c) => c.id === level.container)) ||
+    (level.kind === "symbols" && !map.components.some((k) => k.id === level.component))
+      ? { kind: "containers" }
+      : level;
+  const scene = useMemo(() => sceneOf(map, shown, lens), [map, shown, lens]);
+  const placed = useMemo(() => layout(scene), [scene]);
+  const sel = placed.nodes.find((n) => n.id === selected);
+  const detail = sel ?? subject(map, shown);
+  const edgeMode: EdgeMode = mode === "changed" && !lens ? "focus" : mode;
+  const inside = scene.inside.flatMap((r) => r.nodes);
+  /** Nodes the review changes, and those it reaches too. */
+  const changed = new Set(
+    inside
+      .filter((n) => n.status && n.status !== "upstream" && n.status !== "impacted")
+      .map((n) => n.id),
+  );
+  const reached = new Set(inside.filter((n) => n.status).map((n) => n.id));
+  const edges =
+    shown.kind === "context" ? scene.edges : visibleEdges(scene.edges, edgeMode, sel?.id, changed);
+  const edge = edgeSel ? sceneEdge(map, scene.edges, edgeSel) : undefined;
+  const [selFrom = "", selTo = ""] = edgeSel?.split(">") ?? [];
+  const ends = edgeSel ? { from: selFrom, to: selTo } : undefined;
+
+  useEffect(() => setSelectedNode(workspace, selected), [workspace, selected]);
+
+  const go = (next: Level, node?: string, e?: string) => {
+    setLevel(next);
+    setSelected(node);
+    setEdgeSel(e);
+    setSymSel(undefined);
+  };
+  /** Shows `id`, a node or `from>to`, at the level that holds it, staying put when this level
+   * shows it. */
+  const show = (id: string) => {
+    if (id.startsWith("tour:")) {
+      const tour = map.tours.find((t) => t.id === id.slice(5));
+      return tour && startTour(tour);
+    }
+    const [a, b] = id.split(">");
+    if (b !== undefined) {
+      const at = levelOf(map, a);
+      return at && go(at.kind === "context" ? (levelOf(map, b) ?? at) : at, undefined, id);
+    }
+    if (placed.nodes.some((n) => n.id === id && !n.door)) {
+      setEdgeSel(undefined);
+      return setSelected(id);
+    }
+    const at = levelOf(map, id);
+    if (at) go(at, id);
+  };
+  const open = (id: string) => {
+    if (id === SYSTEM) return go({ kind: "containers" });
+    const c = map.containers.find((c) => containerId(c.id) === id);
+    if (c && map.components.some((k) => k.container === c.id)) {
+      go({ kind: "components", container: c.id });
+    }
+    if (id.startsWith("k:")) go({ kind: "symbols", component: id.slice(2) });
+  };
+  const up =
+    shown.kind === "symbols"
+      ? () =>
+          go(
+            { kind: "components", container: containerOf(map, shown.component) },
+            componentId(shown.component),
+          )
+      : shown.kind === "components"
+        ? () => go({ kind: "containers" }, containerId(shown.container))
+        : shown.kind === "containers"
+          ? () => go({ kind: "context" }, SYSTEM)
+          : undefined;
+  const container =
+    shown.kind === "components"
+      ? shown.container
+      : shown.kind === "symbols"
+        ? containerOf(map, shown.component)
+        : largestContainer(map);
+  const symbolsOf =
+    shown.kind === "symbols" ? shown.component : sel?.kind === "component" ? sel.path : undefined;
+  const pickLevel = (kind: Level["kind"]) => {
+    if (kind === "symbols") return symbolsOf !== undefined && go({ kind, component: symbolsOf });
+    if (kind !== "components") return go({ kind });
+    if (container !== undefined) go({ kind, container });
+  };
+
+  useEffect(() => onShowInSystem(workspace, show));
+
+  // Each tour step shows its place.
+  const tour = touring?.tour;
+  const stops = useMemo(() => (tour ? stopsOf(map, colors, tour) : []), [map, colors, tour]);
+  const stop = touring ? stops[touring.at] : undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: moves only when the step does
+  useEffect(() => {
+    if (!stop) return;
+    go(stop.level, stop.node, stop.edge && `${stop.edge.from}>${stop.edge.to}`);
+  }, [stop?.key, tour]);
+  const startTour = (tour: TourDto) => {
+    setTrace(undefined);
+    setToursOpen(false);
+    setTouring({ tour, at: 0 });
+  };
+  const endTour = () => {
+    setTouring(undefined);
+    root.current?.focus();
+  };
+  const tourAt = (at: number) => touring && setTouring({ ...touring, at });
+
+  const hops = trace?.from && trace.to ? (tracePath(map, trace.from, trace.to) ?? []) : undefined;
+  const path = hops && drawn(map, shown, hops);
+  const focus = stop?.node ?? sel?.id;
+  const lit = path
+    ? path.nodes
+    : stop?.node
+      ? new Set([stop.node])
+      : edge
+        ? new Set([edge.from, edge.to])
+        : edgeMode === "focus" && focus && shown.kind !== "context"
+          ? neighborhood(scene.edges, focus)
+          : edgeMode === "changed" && shown.kind !== "context"
+            ? new Set([
+                ...reached,
+                ...(focus ? [focus] : []),
+                ...placed.nodes.filter((n) => n.door).map((n) => n.id),
+              ])
+            : undefined;
+  const hot = new Map<string, number | undefined>();
+  if (path) for (const [k, n] of path.edges) hot.set(k, n);
+  else if (edge) hot.set(edgeKey(edge), undefined);
+  else if (focus) {
+    for (const e of scene.edges)
+      if (e.from === focus || e.to === focus) hot.set(edgeKey(e), undefined);
+  }
+  const hotColor = path
+    ? "#e6e6e6"
+    : focus || edge
+      ? (nodeInfo(map, colors, focus ?? edge?.from ?? "")?.color ?? NEUTRAL)
+      : NEUTRAL;
+  const drawnEdges =
+    path || stop?.node
+      ? scene.edges.filter((e) => hot.has(edgeKey(e)))
+      : edge && !edges.includes(edge)
+        ? [...edges, edge]
+        : edges;
+  const stale = useMemo(() => {
+    if (!map.description) return new Set<string>();
+    const ids = new Set(map.stale.map((id) => `k:${id}`));
+    for (const k of map.components) if (map.stale.includes(k.id)) ids.add(containerId(k.container));
+    return ids;
+  }, [map]);
+
+  const pickNode = (id: string | undefined) => {
+    setToursOpen(false);
+    const door = placed.nodes.find((n) => n.id === id)?.door;
+    if (id && door && !trace) {
+      return map.components.some((k) => containerId(k.container) === id) ? open(id) : show(id);
+    }
+    setEdgeSel(undefined);
+    if (!trace || !id) return setSelected(id);
+    if (!trace.from) setTrace({ ...trace, from: id });
+    else setTrace({ ...trace, to: id });
+  };
+  const crumb = (id: string, onClick?: () => void): Crumb | undefined => {
+    const info = nodeInfo(map, colors, id);
+    return (
+      info && {
+        id,
+        name: info.name,
+        color: info.kind === "container" ? info.color : undefined,
+        onClick,
+      }
+    );
+  };
+  const comp =
+    shown.kind === "symbols"
+      ? componentId(shown.component)
+      : sel?.kind === "component"
+        ? sel.id
+        : undefined;
+  const crumbs: Crumb[] = [
+    { id: SYSTEM, name: map.repo, onClick: () => go({ kind: "context" }, SYSTEM) },
+    ...(shown.kind === "components" || shown.kind === "symbols"
+      ? [
+          crumb(containerId(container ?? ""), () =>
+            go({ kind: "components", container: container ?? "" }),
+          ),
+        ]
+      : []),
+    ...(comp && (shown.kind === "components" || shown.kind === "symbols") ? [crumb(comp)] : []),
+  ].filter((c): c is Crumb => !!c);
+
+  const onFile = (p: string, line?: number) => openFile(workspace, p, line);
+  const send = async (
+    text: Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
+  ) => {
+    const r = await text;
+    if (r.status === "error") return setSendError(r.error);
+    setSendError(undefined);
+    sendText(r.data);
+  };
+  const describe = () => send(commands.describePrompt(workspace));
+  const writeTour = (ref: string) => {
+    setToursOpen(false);
+    send(commands.tourPrompt(workspace, ref));
+  };
+  const assess = () => review && send(commands.assessPrompt(review.id));
+  const ask = (id: string) => {
+    const n = placed.nodes.find((x) => x.id === id) ?? (detail?.id === id ? detail : undefined);
+    if (n) sendText(askPrompt(map, n));
+  };
+  const onLook = (l: LookDto) => {
+    if (l.path && review) review.show(l.path, l.line);
+    else if (l.edge) show(`k:${l.edge[0]}>k:${l.edge[1]}`);
+    else if (l.component) show(componentId(l.component));
+  };
+  const nodeMenu = (id: string): CtxEntry[] => {
+    if (trace) return [];
+    const info = nodeInfo(map, colors, id);
+    const tour = tourOf(map, id);
+    const tourItem = tour
+      ? { label: "Tour", onSelect: () => startTour(tour) }
+      : { label: "Write Tour", onSelect: () => writeTour(id) };
+    const askItem = { label: "Ask", keys: "⌘>", onSelect: () => ask(id) };
+    const traceItem = { label: "Trace From Here", onSelect: () => setTrace({ from: id }) };
+    if (info?.kind === "component") {
+      const path = id.slice(2);
+      return [
+        { label: "Symbols", onSelect: () => go({ kind: "symbols", component: path }) },
+        tourItem,
+        traceItem,
+        "-",
+        { label: "Show in Files", onSelect: () => revealInFiles(workspace, path) },
+        askItem,
+      ];
+    }
+    if (info?.kind === "container") {
+      return [
+        map.components.some((k) => containerId(k.container) === id) && {
+          label: "Components",
+          onSelect: () => open(id),
+        },
+        tourItem,
+        traceItem,
+        "-",
+        askItem,
+      ];
+    }
+    return [askItem];
+  };
+
+  const onKey = (e: KeyboardEvent) => {
+    if (finding) return;
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.shiftKey && (e.key === ">" || e.key === ".")) {
+      if (detail) ask(detail.id);
+    } else if (mod) return;
+    else if (e.key === "/") setFinding(true);
+    else if (stop && e.key === "ArrowRight")
+      tourAt(Math.min(stops.length - 1, (touring?.at ?? 0) + 1));
+    else if (stop && e.key === "ArrowLeft") tourAt(Math.max(0, (touring?.at ?? 0) - 1));
+    else if (e.key === "Escape" && toursOpen) setToursOpen(false);
+    else if (e.key === "Escape" && trace) setTrace(undefined);
+    else if (e.key === "Escape" && touring) endTour();
+    else if (e.key === "Escape" && symSel !== undefined) setSymSel(undefined);
+    else if (e.key === "Escape" && (selected || edgeSel)) go(shown);
+    else if ((e.key === "Escape" || e.key === "Backspace") && up) up();
+    else return;
+    e.preventDefault();
+  };
+
+  const ofSystem = touring?.tour.id === "overview" || touring?.tour.id === "features";
+  const tourInfo = touring && !ofSystem ? nodeInfo(map, colors, touring.tour.id) : undefined;
+  const tourTitle = tourInfo?.name ?? touring?.tour.title ?? "";
+  const tourColor = tourInfo?.color ?? NEUTRAL;
+
+  const steps =
+    touring && stop ? (
+      <TourSteps
+        title={`${tourTitle} tour`}
+        color={tourColor}
+        stops={stops}
+        at={touring.at}
+        onAt={tourAt}
+      />
+    ) : undefined;
+  const card = touring && stop && (
+    <TourCard
+      stops={stops}
+      at={touring.at}
+      onAt={tourAt}
+      onClose={endTour}
+      onOpen={
+        stop.symbol
+          ? () => stop.symbol && onFile(stop.symbol.path, stop.symbol.line ?? undefined)
+          : stop.file
+            ? () => stop.file && onFile(stop.file)
+            : undefined
+      }
+    />
+  );
+  const tours = toursOpen && (
+    <ToursMenu
+      map={map}
+      colors={colors}
+      container={container}
+      onStart={startTour}
+      onWrite={writeTour}
+      onClose={() => setToursOpen(false)}
+    />
+  );
+  const nodeDetail = detail && (
+    <SystemDetail
+      map={map}
+      colors={colors}
+      node={detail}
+      edges={scene.edges}
+      stale={stale.has(detail.id)}
+      openable={!!sel || shown.kind === "context"}
+      onShow={show}
+      onOpen={open}
+      onFile={onFile}
+      onReveal={(p) => revealInFiles(workspace, p)}
+      onAsk={() => sendText(askPrompt(map, detail))}
+      tour={
+        detail.id === SYSTEM ? map.tours.find((t) => t.id === "overview") : tourOf(map, detail.id)
+      }
+      onTour={startTour}
+      onSymbols={(c) => go({ kind: "symbols", component: c })}
+      lens={lens}
+      onLook={onLook}
+      onChangedFile={(p) => review?.show(p, null)}
+    />
+  );
+
+  return (
+    // biome-ignore lint/a11y/noNoninteractiveTabindex: the tab takes its own keys
+    <div className="sys-panel" ref={root} tabIndex={0} onKeyDown={onKey}>
+      <SystemBar
+        crumbs={crumbs}
+        level={shown.kind}
+        onUp={up}
+        onLevel={pickLevel}
+        symbols={symbolsOf !== undefined}
+        modes={
+          shown.kind === "context"
+            ? undefined
+            : lens
+              ? ["focus", "changed", "all"]
+              : ["focus", "all"]
+        }
+        mode={edgeMode}
+        onMode={setMode}
+        trace={
+          trace && {
+            from: trace.from ? crumb(trace.from) : undefined,
+            to: trace.to ? crumb(trace.to) : undefined,
+            onEnd: (end) => setTrace({ ...trace, [end]: undefined }),
+            onClose: () => {
+              setTrace(undefined);
+              root.current?.focus();
+            },
+          }
+        }
+        tour={touring && { name: tourTitle, color: tourColor, onClose: endTour }}
+        finding={finding}
+        onFind={() => setFinding(true)}
+        onTrace={() => {
+          setTouring(undefined);
+          setTrace({ from: selected });
+        }}
+        toursOpen={toursOpen}
+        onTours={() => setToursOpen(!toursOpen)}
+        lens={review ? { on: lensOn, onToggle: () => setLensOn(!lensOn) } : undefined}
+        onDescribe={describe}
+      />
+      {lens && arch && review && !touring && (
+        <ReviewStrip
+          arch={arch}
+          range={
+            view.range
+              ? `${view.range.from?.slice(0, 8) ?? "root"}..${view.range.to.slice(0, 8)}`
+              : review.revset
+          }
+          onClearRange={view.range ? () => setArchView(review.id, { range: undefined }) : undefined}
+          transitive={view.transitive}
+          onTransitive={(transitive) => setArchView(review.id, { transitive })}
+          look={lens.open}
+          onAssess={assess}
+        />
+      )}
+      {(error || sendError || archError) && (
+        <div className="sys-error error">{sendError ?? error ?? archError}</div>
+      )}
+      <div className="sys-work">
+        {shown.kind === "symbols" ? (
+          <SymbolsView
+            workspace={workspace}
+            map={map}
+            colors={colors}
+            component={shown.component}
+            files={lens ? files : undefined}
+            changedOnly={edgeMode === "changed"}
+            tour={stop && { file: stop.file, symbol: stop.symbol }}
+            selected={symSel}
+            onSelect={setSymSel}
+            aside={steps}
+            fallback={nodeDetail}
+            onShow={show}
+            onFile={onFile}
+            onAsk={sendText}
+          >
+            {card}
+            {tours}
+          </SymbolsView>
+        ) : (
+          <>
+            <SystemCanvas
+              layout={placed}
+              edges={drawnEdges}
+              lit={lit}
+              hot={hot}
+              hotColor={hotColor}
+              labels={!focus && !path}
+              selected={trace ? undefined : (stop?.node ?? sel?.id)}
+              selectedEdge={edge && edgeKey(edge)}
+              stale={stale}
+              onSelect={pickNode}
+              onOpen={open}
+              onEdge={(e) => {
+                setToursOpen(false);
+                setSelected(undefined);
+                setEdgeSel(edgeKey(e));
+              }}
+              nodeMenu={nodeMenu}
+              onReload={reload}
+            >
+              {shown.kind === "components" && (
+                <Minimap
+                  map={map}
+                  container={shown.container}
+                  onPick={(c, drill) =>
+                    drill
+                      ? go({ kind: "components", container: c })
+                      : go({ kind: "containers" }, containerId(c))
+                  }
+                />
+              )}
+              {card}
+              {tours}
+            </SystemCanvas>
+            {trace ? (
+              <TracePanel map={map} colors={colors} hops={hops} onShow={show} onFile={onFile} />
+            ) : (
+              (steps ??
+              (edge && !stop?.node ? (
+                <EdgeDetail
+                  workspace={workspace}
+                  map={map}
+                  colors={colors}
+                  edge={edge}
+                  ends={ends}
+                  lens={lens}
+                  onShow={show}
+                  onFile={onFile}
+                  onTrace={() => setTrace(ends ?? { from: edge.from, to: edge.to })}
+                  onAsk={sendText}
+                  onLook={onLook}
+                />
+              ) : (
+                nodeDetail
+              )))
+            )}
+          </>
+        )}
+      </div>
+      {finding && (
+        <FindPalette
+          map={map}
+          colors={colors}
+          onShow={show}
+          onFile={onFile}
+          onClose={() => {
+            setFinding(false);
+            root.current?.focus();
+          }}
+        />
+      )}
+      {picker}
+    </div>
+  );
+}

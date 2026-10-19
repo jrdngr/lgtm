@@ -102,9 +102,11 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Architecture",
     shortcuts: [
-      { keys: ["w"], action: "Mark the selected edge wrong" },
-      { keys: ["⌘>"], action: "Send the selected edge, or the picked intents, to a terminal" },
-      { keys: ["Esc"], action: "Clear the selection" },
+      { keys: ["/"], action: "Find a component, file or symbol" },
+      { keys: ["⌘>"], action: "Ask the send target about the selection" },
+      { keys: ["←", "→"], action: "Previous / next tour step" },
+      { keys: ["Esc"], action: "End the trace or tour, or clear the selection" },
+      { keys: ["⌫"], action: "Up a level" },
     ],
   },
   {

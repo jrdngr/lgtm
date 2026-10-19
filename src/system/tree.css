@@ -99,3 +99,13 @@ div.sys-tr {
   color: var(--amber);
   font-size: 11px;
 }
+
+.sys-tr-n.chg {
+  color: #f0cf7a;
+  font: 600 11px var(--mono);
+}
+
+.sys-tr-n.new {
+  color: #7ee093;
+  font: 600 11px var(--mono);
+}

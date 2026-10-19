@@ -1,14 +1,17 @@
-import type { ArchDto, SysComponentDto, SystemDto } from "../bindings";
+import type { SysComponentDto, SystemDto } from "../bindings";
 import { LOOSE, PALETTE } from "./colors";
+import { addDelta, type Delta, isChanged, type Lens } from "./lens";
 
 export type Level =
   | { kind: "context" }
   | { kind: "containers" }
-  | { kind: "components"; container: string };
+  | { kind: "components"; container: string }
+  | { kind: "symbols"; component: string };
 
 export type NodeKind = "person" | "system" | "external" | "container" | "component";
 
-export type Status = "added" | "changed" | "removed";
+/** What the review does to a node: changes it, or reaches it through what it changes. */
+export type Status = "added" | "changed" | "removed" | "upstream" | "impacted";
 
 export interface SNode {
   /** `p:`, `x:`, `c:` or `k:` and the person's or external's name, or the container's or
@@ -23,13 +26,17 @@ export interface SNode {
   tech?: string;
   /** The container's color, for containers and components. */
   color?: string;
-  /** A container's components' file counts, largest first. */
-  tiles?: number[];
+  /** A container's components, largest first, marked when the review changes them. */
+  tiles?: { files: number; changed: boolean }[];
   /** The system's containers, at the context level. */
   blocks?: { name: string; color: string; files: number }[];
   /** Another container, at the edge of a components view. */
   door?: boolean;
   status?: Status;
+  /** Rows the review adds and removes in it. */
+  delta?: Delta;
+  /** It has open Look items. */
+  flag?: boolean;
 }
 
 export interface SEdge {
@@ -59,13 +66,6 @@ export interface Scene {
   edges: SEdge[];
 }
 
-/** What the review changes, keyed by component id. */
-export interface Overlay {
-  status: Map<string, Status>;
-  removed: SysComponentDto[];
-  edges: { from: string; to: string; status: "added" | "removed" }[];
-}
-
 export const personId = (name: string) => `p:${name}`;
 export const externalId = (name: string) => `x:${name}`;
 export const containerId = (id: string) => `c:${id}`;
@@ -78,29 +78,6 @@ const PER_ROW = 6;
 const CONTAINERS_PER_ROW = 3;
 /** Past this many a container card stops adding tiles. */
 const TILES = 24;
-
-export function overlayOf(arch: ArchDto): Overlay {
-  const status = new Map<string, Status>();
-  const removed: SysComponentDto[] = [];
-  for (const c of arch.components) {
-    if (c.status === "added") status.set(c.id, "added");
-    if (c.status === "changed") status.set(c.id, "changed");
-    if (c.status === "removed") {
-      status.set(c.id, "removed");
-      removed.push({
-        id: c.id,
-        name: c.name,
-        container: c.container,
-        files: c.files.length,
-        entry: [],
-      });
-    }
-  }
-  const edges = arch.edges.flatMap((e) =>
-    e.status === "same" ? [] : [{ from: e.from, to: e.to, status: e.status }],
-  );
-  return { status, removed, edges };
-}
 
 /** A container: one from the code, or one only the description has. */
 export interface ContainerInfo {
@@ -221,7 +198,7 @@ function contextScene(map: SystemDto): Scene {
   };
 }
 
-function containersScene(map: SystemDto, overlay?: Overlay): Scene {
+function containersScene(map: SystemDto, lens?: Lens): Scene {
   // The biggest first, then ones only the description has, then files outside every root.
   const all = containersOf(map).sort(
     (a, b) =>
@@ -230,26 +207,33 @@ function containersScene(map: SystemDto, overlay?: Overlay): Scene {
       b.files - a.files,
   );
   const colors = containerColors(map);
-  const changed = (id: string) =>
-    [...(overlay?.status ?? [])].some(
-      ([comp, s]) =>
-        s !== "removed" && map.components.some((k) => k.id === comp && k.container === id),
-    ) || !!overlay?.removed.some((k) => k.container === id);
-  const nodes: SNode[] = all.map((c) => ({
-    id: containerId(c.id),
-    kind: "container",
-    name: c.name,
-    path: c.id,
-    tech: c.tech || undefined,
-    description: c.description,
-    color: colors.get(c.id),
-    tiles: map.components
-      .filter((k) => k.container === c.id)
-      .map((k) => k.files)
-      .sort((a, b) => b - a)
-      .slice(0, TILES),
-    status: changed(c.id) ? "changed" : undefined,
-  }));
+  const nodes: SNode[] = all.map((c) => {
+    const comps = [
+      ...map.components.filter((k) => k.container === c.id),
+      ...(lens?.removed ?? []).filter((k) => k.container === c.id),
+    ];
+    const changed = comps.filter((k) => isChanged(lens?.status.get(k.id)));
+    return {
+      id: containerId(c.id),
+      kind: "container",
+      name: c.name,
+      path: c.id,
+      tech: c.tech || undefined,
+      description: c.description,
+      color: colors.get(c.id),
+      tiles: comps
+        .filter((k) => lens?.status.get(k.id) !== "removed")
+        .sort((a, b) => b.files - a.files)
+        .slice(0, TILES)
+        .map((k) => ({ files: k.files, changed: changed.includes(k) })),
+      status: changed.length ? "changed" : undefined,
+      delta: changed.reduce<Delta | undefined>(
+        (d, k) => addDelta(d, lens?.delta.get(k.id)),
+        undefined,
+      ),
+      flag: comps.some((k) => lens?.look.has(k.id)),
+    };
+  });
   const of = new Map(map.components.map((k) => [k.id, k.container]));
   const edges = new Map<string, SEdge>();
   for (const e of map.edges) {
@@ -259,6 +243,7 @@ function containersScene(map: SystemDto, overlay?: Overlay): Scene {
       add(edges, { from: containerId(a), to: containerId(b), imports: e.imports });
     }
   }
+  if (lens) lensEdges(map, lens, edges);
   const known = new Set(all.map((c) => c.id));
   for (const e of relations(map, (id) => (known.has(id) ? containerId(id) : undefined))) {
     add(edges, e);
@@ -271,6 +256,34 @@ function containersScene(map: SystemDto, overlay?: Overlay): Scene {
     edges: [...edges.values()],
   };
 }
+
+/** Marks container edges that only the review's new imports make as added, and adds those
+ * only its removed imports made. */
+function lensEdges(map: SystemDto, lens: Lens, edges: Map<string, SEdge>) {
+  const of = new Map(
+    [...map.components, ...lens.removed].map((k) => [k.id, containerId(k.container)]),
+  );
+  const added = new Set(lens.edges.filter((e) => e.status === "added").map(edgeOf));
+  const kept = new Set<string>();
+  for (const e of map.edges) {
+    const a = of.get(e.from);
+    const b = of.get(e.to);
+    if (a && b && a !== b && !added.has(edgeOf(e))) kept.add(`${a}>${b}`);
+  }
+  for (const e of lens.edges) {
+    const a = of.get(e.from);
+    const b = of.get(e.to);
+    if (!a || !b || a === b) continue;
+    const key = `${a}>${b}`;
+    const had = edges.get(key);
+    if (e.status === "added" && had && !kept.has(key)) had.status = "added";
+    if (e.status === "removed" && !had) {
+      edges.set(key, { from: a, to: b, imports: e.imports, status: "removed" });
+    }
+  }
+}
+
+const edgeOf = (e: { from: string; to: string }) => `${e.from}>${e.to}`;
 
 /** Each component's tier by imports, 0 to 2: mostly importing puts it at the top, mostly
  * imported at the bottom. Cycles don't change it. */
@@ -296,24 +309,29 @@ export function computedTiers(
   );
 }
 
-function componentsScene(map: SystemDto, container: string, overlay?: Overlay): Scene {
+function componentsScene(map: SystemDto, container: string, lens?: Lens): Scene {
   const colors = containerColors(map);
   const color = colors.get(container);
   const desc = new Map((map.description?.components ?? []).map((c) => [c.id, c]));
   const comps = map.components.filter((k) => k.container === container);
-  const removed = (overlay?.removed ?? []).filter(
+  const removed = (lens?.removed ?? []).filter(
     (k) => k.container === container && !comps.some((c) => c.id === k.id),
   );
-  const node = (k: SysComponentDto, status?: Status): SNode => ({
-    id: componentId(k.id),
-    kind: "component",
-    name: k.name,
-    path: k.id,
-    description: desc.get(k.id)?.description,
-    color,
-    status,
-  });
-  const nodes = comps.map((k) => node(k, overlay?.status.get(k.id)));
+  const node = (k: SysComponentDto): SNode => {
+    const s = lens?.status.get(k.id);
+    return {
+      id: componentId(k.id),
+      kind: "component",
+      name: k.name,
+      path: k.id,
+      description: desc.get(k.id)?.description,
+      color,
+      status: s === "unchanged" ? undefined : s,
+      delta: lens?.delta.get(k.id),
+      flag: lens?.look.has(k.id),
+    };
+  };
+  const nodes = comps.map(node);
   const tiers = map.description?.tiers ?? [];
   const described = comps.some((k) => desc.get(k.id)?.tier);
   let inside: Row[];
@@ -338,16 +356,11 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
     );
     inside = [0, 1, 2].flatMap((r) => wrap(nodes.filter((n) => ranks.get(n.id.slice(2)) === r)));
   }
-  inside.push(
-    ...wrap(
-      removed.map((k) => node(k, "removed")),
-      removed.length ? "Removed" : undefined,
-    ),
-  );
+  inside.push(...wrap(removed.map(node), removed.length ? "Removed" : undefined));
   const ids = new Set([...comps, ...removed].map((k) => k.id));
   const of = new Map(map.components.map((k) => [k.id, k.container]));
   const edges = new Map<string, SEdge>();
-  const status = new Map((overlay?.edges ?? []).map((e) => [`${e.from}>${e.to}`, e.status]));
+  const status = new Map((lens?.edges ?? []).map((e) => [edgeOf(e), e.status]));
   const doors = new Set<string>();
   for (const e of map.edges) {
     const inFrom = ids.has(e.from);
@@ -371,12 +384,12 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
       });
     }
   }
-  for (const e of overlay?.edges ?? []) {
+  for (const e of lens?.edges ?? []) {
     if (e.status === "removed" && ids.has(e.from) && ids.has(e.to)) {
       add(edges, {
         from: componentId(e.from),
         to: componentId(e.to),
-        imports: 0,
+        imports: e.imports,
         status: "removed",
       });
     }
@@ -402,11 +415,17 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
   };
 }
 
-export function sceneOf(map: SystemDto, level: Level, overlay?: Overlay): Scene {
+export function sceneOf(map: SystemDto, level: Level, lens?: Lens): Scene {
   if (level.kind === "context") return contextScene(map);
-  if (level.kind === "containers") return containersScene(map, overlay);
-  return componentsScene(map, level.container, overlay);
+  if (level.kind === "containers") return containersScene(map, lens);
+  if (level.kind === "symbols")
+    return componentsScene(map, containerOf(map, level.component), lens);
+  return componentsScene(map, level.container, lens);
 }
+
+/** The container a component is in. */
+export const containerOf = (map: SystemDto, component: string) =>
+  map.components.find((k) => k.id === component)?.container ?? "";
 
 /** The container a Components view opens on: the one with the most files. */
 export function largestContainer(map: SystemDto): string | undefined {

@@ -3,19 +3,18 @@
 
 use std::collections::HashSet;
 use std::fmt::Write;
+use std::path::Path;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::system::SystemDto;
+use super::tour;
 use crate::ctx::{RepoCtx, now_ms};
 use crate::store::Store;
 
 const KEY: &str = "system";
-
-/// A tour step's node for the whole system.
-const SYSTEM: &str = "system";
 
 /// Past this many, the prompt lists only the heaviest edges.
 const MAX_EDGES: usize = 150;
@@ -39,7 +38,11 @@ externals, by id for containers), each with a label of a few words like \"Reads 
 out relations between containers that only stand for imports.
 - tour: five to eight steps that walk someone new through the system in reading order, each \
 with a node (\"system\", a container id or a component id) and two or three sentences on what \
-it does and how it connects to the steps before it. Start at \"system\".
+it does and how it connects to the steps before it. Start at \"system\". A step about a file \
+also has its path; about a symbol, its path and the symbol's name; about how the node uses \
+another, that one's id in `to`.
+- features: a tour of every main feature of the app, one or two steps each, ten to twenty \
+steps in all, in the same format. Point each at the component, file or symbol that does it.
 
 Keep every description other than tour text under a dozen words. Then tell me in a line that \
 it's done.";
@@ -81,6 +84,18 @@ pub struct ComponentDescDto {
 pub struct TourStepDto {
     /// "system", a container id or a component id.
     pub node: String,
+    /// A file, for a step about a file or a symbol in it.
+    #[serde(default)]
+    pub path: Option<String>,
+    /// A symbol in `path`.
+    #[serde(default)]
+    pub symbol: Option<String>,
+    /// The symbol's 1-based line.
+    #[serde(default)]
+    pub line: Option<u32>,
+    /// Another node, for a step about how `node` uses it.
+    #[serde(default)]
+    pub to: Option<String>,
     pub text: String,
 }
 
@@ -104,6 +119,8 @@ pub struct Description {
     pub relations: Vec<RelationDto>,
     #[serde(default)]
     pub tour: Vec<TourStepDto>,
+    #[serde(default)]
+    pub features: Vec<TourStepDto>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
@@ -117,9 +134,12 @@ pub struct SystemDescDto {
     pub tiers: Vec<String>,
     pub components: Vec<ComponentDescDto>,
     pub relations: Vec<RelationDto>,
-    /// Stored descriptions from before tours have none.
+    /// The overview tour. Stored descriptions from before tours have none.
     #[serde(default)]
     pub tour: Vec<TourStepDto>,
+    /// A tour of every main feature.
+    #[serde(default)]
+    pub features: Vec<TourStepDto>,
     /// The working copy's commit when it was written.
     pub commit: String,
     pub created_at: f64,
@@ -159,8 +179,8 @@ fn map_text(map: &SystemDto) -> String {
 }
 
 /// Keeps what names something on the map: known component ids, people, externals and
-/// containers in relations.
-fn validate(d: Description, map: &SystemDto, commit: String) -> SystemDescDto {
+/// containers in relations, and tour steps on known nodes and files under `root`.
+fn validate(d: Description, map: &SystemDto, root: &Path, commit: String) -> SystemDescDto {
     let comps: HashSet<&str> = map.components.iter().map(|c| c.id.as_str()).collect();
     let mut containers = d.containers;
     containers.dedup_by(|a, b| a.id == b.id);
@@ -173,18 +193,11 @@ fn validate(d: Description, map: &SystemDto, commit: String) -> SystemDescDto {
         .chain(map.containers.iter().map(|c| c.id.clone()))
         .collect();
     let tiers = d.tiers;
-    let nodes: HashSet<&str> = std::iter::once(SYSTEM)
-        .chain(comps.iter().copied())
-        .chain(map.containers.iter().map(|c| c.id.as_str()))
-        .chain(containers.iter().map(|c| c.id.as_str()))
-        .collect();
-    let tour = d
-        .tour
-        .into_iter()
-        .filter(|t| nodes.contains(t.node.as_str()))
-        .collect();
+    let mut nodes = tour::nodes(map);
+    nodes.extend(containers.iter().map(|c| c.id.as_str()));
     SystemDescDto {
-        tour,
+        tour: tour::check_steps(d.tour, &nodes, map, root),
+        features: tour::check_steps(d.features, &nodes, map, root),
         summary: d.summary,
         people: d.people,
         externals: d.externals,
@@ -237,7 +250,7 @@ impl RepoCtx {
             .into_iter()
             .next()
             .context("no working-copy commit")?;
-        let desc = validate(d, &map, commit);
+        let desc = validate(d, &map, &ws.root, commit);
         self.store
             .lock()
             .unwrap()
@@ -270,6 +283,18 @@ mod tests {
             files: vec![],
             description: None,
             stale: vec![],
+            tours: vec![],
+        }
+    }
+
+    fn step(node: &str) -> TourStepDto {
+        TourStepDto {
+            node: node.into(),
+            path: None,
+            symbol: None,
+            line: None,
+            to: None,
+            text: "Text".into(),
         }
     }
 
@@ -320,33 +345,31 @@ mod tests {
                 relation("src", "Slack"),
                 relation("src", "src"),
             ],
-            tour: vec![
-                TourStepDto {
-                    node: "system".into(),
-                    text: "Start".into(),
-                },
-                TourStepDto {
-                    node: "src/gone".into(),
-                    text: "Old".into(),
-                },
-                TourStepDto {
-                    node: "db".into(),
-                    text: "State".into(),
-                },
-            ],
+            tour: vec![step("system"), step("src/gone"), step("db")],
+            features: vec![step("src/ui"), step("src/gone")],
         };
-        let out = validate(d, &map(), "abc".into());
+        let out = validate(d, &map(), Path::new("/nonexistent"), "abc".into());
         assert_eq!(
-            out.components.iter().map(|c| (&*c.id, c.tier.as_deref())).collect::<Vec<_>>(),
+            out.components
+                .iter()
+                .map(|c| (&*c.id, c.tier.as_deref()))
+                .collect::<Vec<_>>(),
             [("src/ui", None)]
         );
         assert_eq!(
-            out.relations.iter().map(|r| (&*r.from, &*r.to)).collect::<Vec<_>>(),
+            out.relations
+                .iter()
+                .map(|r| (&*r.from, &*r.to))
+                .collect::<Vec<_>>(),
             [("User", "src"), ("src", "db"), ("src", "GitHub")]
         );
         assert_eq!(
             out.tour.iter().map(|t| &*t.node).collect::<Vec<_>>(),
             ["system", "db"]
+        );
+        assert_eq!(
+            out.features.iter().map(|t| &*t.node).collect::<Vec<_>>(),
+            ["src/ui"]
         );
         assert_eq!(out.commit, "abc");
     }

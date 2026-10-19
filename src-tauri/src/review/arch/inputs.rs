@@ -8,7 +8,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use super::RangeDto;
 use super::extract::{self, Raw};
-use super::model::{Changed, Import, Model, Snapshot, Symbol, Use};
+use super::model::{Changed, Import, Model, Snapshot, Use};
 use super::resolve::Resolver;
 use super::roots::{self, Manifests, Root};
 use super::scan;
@@ -240,23 +240,11 @@ pub(super) fn snapshot(
 
 /// Adds the symbol graph of `files`, with uses found under `root`.
 pub fn add_graph(model: &mut Model, files: &[ReviewFile], root: &Path) {
-    for f in files.iter().filter(|f| f.status != FileStatus::Removed) {
-        let names = f.new.symbols.iter().map(|s| s.name.clone()).collect();
-        model.symbols.insert(f.path.clone(), names);
-    }
     if files.is_empty() {
         return;
     }
     let g = symbol_graph(files, root);
     let GraphDto { nodes, edges } = &*g;
-    model.changed_symbols = nodes
-        .iter()
-        .filter(|n| n.hop == 0)
-        .map(|n| Symbol {
-            path: n.path.clone(),
-            name: n.name.clone(),
-        })
-        .collect();
     model.uses = edges
         .iter()
         .map(|e| {
@@ -296,27 +284,4 @@ fn symbol_graph(files: &[ReviewFile], root: &Path) -> Arc<GraphDto> {
     let g = Arc::new(graph::graph(files, Some(root)));
     *GRAPH.lock().unwrap() = Some((key, g.clone()));
     g
-}
-
-/// Adds the symbols of files Move intents name that the diff doesn't change, read from the
-/// working copy. Links out of the workspace are skipped.
-pub fn add_symbols(model: &mut Model, root: &Path, paths: &[String]) {
-    for p in paths {
-        if model.symbols.contains_key(p) {
-            continue;
-        }
-        let Ok(path) = crate::files::resolve(root, p) else {
-            continue;
-        };
-        if crate::files::contain(root, &path).is_err() {
-            continue;
-        }
-        let Ok(text) = std::fs::read_to_string(path) else {
-            continue;
-        };
-        if let Some(parsed) = crate::syntax::parse(p, &text) {
-            let names = parsed.symbols(&text).into_iter().map(|s| s.name).collect();
-            model.symbols.insert(p.clone(), names);
-        }
-    }
 }

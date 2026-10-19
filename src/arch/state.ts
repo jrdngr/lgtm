@@ -3,21 +3,12 @@ import type { ArchDto, ArchRange } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
 
-/** What the sidebar and tab have selected. Edges are `from>to`. */
-export type ArchSelection =
-  | { kind: "component"; id: string }
-  | { kind: "edge"; from: string; to: string }
-  | { kind: "layer"; n: number }
-  | { kind: "look"; key: string }
-  | { kind: "intent"; id: number };
-
 /** One review's view of its architecture, shared by the sidebar section and the tab. */
 export interface ArchView {
-  selection?: ArchSelection;
   transitive: boolean;
   /** Commits picked in History, instead of the review's base and head. */
   range?: ArchRange;
-  /** Bumped to load again after an edit. */
+  /** Bumped to load again after a check or an assessment. */
   version: number;
 }
 
@@ -39,7 +30,7 @@ export function setArchView(review: number, change: Partial<ArchView>) {
   for (const l of listeners) l();
 }
 
-/** Loads the review's architecture again, after an edit or an assessment. */
+/** Loads the review's architecture again, after a check or an assessment. */
 export function reloadArch(review: number) {
   setArchView(review, { version: archView(review).version + 1 });
 }

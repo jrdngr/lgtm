@@ -1,4 +1,4 @@
-import type { ArchDto, ComponentDto, EdgeDto, IntentDto } from "../bindings";
+import type { ArchDto, ComponentDto, EdgeDto } from "../bindings";
 
 type Comp = Partial<ComponentDto> & Pick<ComponentDto, "id">;
 
@@ -8,10 +8,6 @@ export const comp = (c: Comp): ComponentDto => ({
   files: [{ path: `src/${c.id}/mod.rs`, file: null }],
   status: "unchanged",
   layer: null,
-  risk: false,
-  trust: false,
-  note: null,
-  misplaced: [],
   severity: null,
   ...c,
 });
@@ -22,14 +18,12 @@ export const edge = (from: string, to: string, e: Partial<EdgeDto> = {}): EdgeDt
   status: "same",
   impacted: false,
   imports: [],
-  wrong: null,
   ...e,
 });
 
 export function archOf(
   components: ComponentDto[],
   edges: EdgeDto[] = [],
-  intents: IntentDto[] = [],
   extra: Partial<ArchDto> = {},
 ): ArchDto {
   const containers = [...new Set(components.map((c) => c.container))].map((id) => ({
@@ -42,7 +36,6 @@ export function archOf(
     edges,
     layers: [],
     look: [],
-    intents,
     assessment: null,
     counts: { changed: 0, upstream: 0, impacted: 0 },
     ...extra,

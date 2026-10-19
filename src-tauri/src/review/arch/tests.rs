@@ -1,14 +1,13 @@
-//! Import extraction and resolution on real files, and grouping with roots and the lens.
+//! Import extraction and resolution on real files, and grouping with roots.
 
 use std::collections::{BTreeSet, HashSet};
 use std::path::Path;
 
-use super::group::{self, Grouping};
+use super::group::Grouping;
 use super::inputs::snapshot;
 use super::model::Snapshot;
 use super::roots::{self, Root};
 use super::scan::scan;
-use super::{Lens, LensEdit};
 
 fn write(dir: &Path, files: &[(&str, &str)]) {
     for (path, text) in files {
@@ -129,7 +128,7 @@ fn python_and_go_imports_resolve_within_the_repo() {
     );
 }
 
-fn grouping(lens: Lens) -> Grouping {
+fn grouping() -> Grouping {
     let paths: BTreeSet<String> = [
         "core/Cargo.toml",
         "core/src/lib.rs",
@@ -169,12 +168,12 @@ fn grouping(lens: Lens) -> Grouping {
             },
         ]
     );
-    Grouping::new(roots, lens, "repo")
+    Grouping::new(roots, "repo")
 }
 
 #[test]
 fn roots_group_subfolders_and_loose_files() {
-    let g = grouping(Lens::default());
+    let g = grouping();
     let comp = |p: &str| {
         let id = g.comp(p);
         (id.clone(), g.name(&id), g.container(&id))
@@ -189,54 +188,6 @@ fn roots_group_subfolders_and_loose_files() {
     assert_eq!(comp("web/app.ts"), s("web", "site", "web"));
     assert_eq!(comp("docs/gen.py"), s("docs", "docs", ""));
     assert_eq!(comp("top.rs"), s("", "repo", ""));
-}
-
-#[test]
-fn lens_merges_renames_and_splits() {
-    let mut lens = Lens::default();
-    let review = "core/src/review".to_string();
-    group::edit(
-        &mut lens,
-        LensEdit::Merge {
-            component: "core/src/jj".into(),
-            into: review.clone(),
-        },
-    );
-    group::edit(
-        &mut lens,
-        LensEdit::Rename {
-            component: review.clone(),
-            name: "Review".into(),
-        },
-    );
-    let g = grouping(lens.clone());
-    assert_eq!(g.comp("core/src/jj/mod.rs"), review);
-    assert_eq!(g.name(&review), "Review");
-
-    // Merging the target elsewhere carries what was merged into it along.
-    let mut chained = lens.clone();
-    group::edit(
-        &mut chained,
-        LensEdit::Merge {
-            component: review.clone(),
-            into: "core/src".into(),
-        },
-    );
-    assert_eq!(grouping(chained).comp("core/src/jj/mod.rs"), "core/src");
-
-    group::edit(
-        &mut lens,
-        LensEdit::Split {
-            component: review.clone(),
-        },
-    );
-    let g = grouping(lens);
-    assert_eq!(g.comp("core/src/jj/mod.rs"), "core/src/jj");
-    assert_eq!(
-        g.comp("core/src/review/arch/mod.rs"),
-        "core/src/review/arch"
-    );
-    assert_eq!(g.comp("core/src/review/mod.rs"), review);
 }
 
 #[tokio::test]
@@ -396,23 +347,4 @@ async fn an_assessment_replaces_the_layers_and_unchecks_the_agent_items() {
         panic!("an assessment of the old commits was stored");
     };
     assert!(err.to_string().contains("Assess again"), "{err}");
-}
-
-#[cfg(unix)]
-#[test]
-fn move_symbols_skip_links_out_of_the_workspace() {
-    let dir = tempfile::tempdir().unwrap();
-    let outside = tempfile::tempdir().unwrap();
-    write(dir.path(), &[("src/in.rs", "fn inside() {}\n")]);
-    write(outside.path(), &[("secret.rs", "fn secret() {}\n")]);
-    let link = dir.path().join("src/link.rs");
-    std::os::unix::fs::symlink(outside.path().join("secret.rs"), link).unwrap();
-    let mut m = super::model::Model::default();
-    let paths = ["src/in.rs".to_string(), "src/link.rs".to_string()];
-    super::inputs::add_symbols(&mut m, dir.path(), &paths);
-    assert_eq!(
-        m.symbols.get("src/in.rs"),
-        Some(&vec!["inside".to_string()])
-    );
-    assert!(!m.symbols.contains_key("src/link.rs"));
 }

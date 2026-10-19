@@ -1,17 +1,16 @@
 //! The architecture review: components and the imports between them at the review's base and
-//! head, the user's lens and intent edits over them, rule and agent items to look at, and the
-//! assessment that scores the change.
+//! head, rule and agent items to look at, and the assessment that scores the change.
 
 pub mod assess;
 mod compute;
 pub mod describe;
-pub mod explore;
 #[cfg(test)]
 mod diff_tests;
+pub mod edge;
+pub mod explore;
 mod extract;
 mod group;
 mod inputs;
-mod intents;
 mod layers;
 mod load;
 mod look;
@@ -22,11 +21,12 @@ mod resolve;
 mod roots;
 mod scan;
 mod state;
+pub mod symbols;
 pub mod system;
 #[cfg(test)]
 mod tests;
-
-use std::collections::BTreeMap;
+pub mod tour;
+mod tour_prompt;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -75,10 +75,9 @@ pub struct FileRefDto {
 #[derive(Clone, Debug, PartialEq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentDto {
-    /// Stable across lens renames: the folder (or root, for loose files) it was grouped from,
-    /// or the id of the component it was merged into.
+    /// The folder (or root, for loose files) it was grouped from.
     pub id: String,
-    /// The lens name, or the folder's name.
+    /// The folder's name.
     pub name: String,
     pub container: String,
     /// Files at head, plus removed files.
@@ -86,12 +85,6 @@ pub struct ComponentDto {
     pub status: CompStatus,
     /// The first layer that covers it, 1-based.
     pub layer: Option<u32>,
-    /// Tagged by an intent.
-    pub risk: bool,
-    pub trust: bool,
-    pub note: Option<String>,
-    /// Paths (or `path#symbol`) in it that Move intents say belong elsewhere.
-    pub misplaced: Vec<String>,
     /// The worst open Look item on it.
     pub severity: Option<LookSeverity>,
 }
@@ -124,8 +117,6 @@ pub struct EdgeDto {
     /// `from` is impacted through this edge.
     pub impacted: bool,
     pub imports: Vec<ImportDto>,
-    /// The Wrong intent on it.
-    pub wrong: Option<u32>,
 }
 
 /// A new-side line range, or old-side for a removed file.
@@ -173,41 +164,6 @@ pub struct LookDto {
     pub path: Option<String>,
     pub line: Option<u32>,
     pub checked: bool,
-}
-
-/// What an intent says the code should be.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
-pub enum IntentKind {
-    /// `from` must not import from `to`.
-    Wrong { from: String, to: String, reason: Option<String> },
-    /// The file, or the symbol in it, belongs in component `to`.
-    Move { path: String, symbol: Option<String>, to: String },
-    Risk { component: String },
-    Trust { component: String },
-    Note { component: String, text: String },
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum IntentState {
-    /// The review introduces what the intent forbids.
-    Broken,
-    /// The code doesn't match yet, but the review didn't cause it.
-    Open,
-    /// The code matches.
-    Met,
-    /// Risk, Trust and Note, which aren't checked.
-    Tag,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct IntentDto {
-    pub id: u32,
-    #[serde(flatten)]
-    pub kind: IntentKind,
-    pub state: IntentState,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -258,7 +214,6 @@ pub struct ArchDto {
     /// Assess's layers once it has run, else one per changed component in dependency order.
     pub layers: Vec<LayerDto>,
     pub look: Vec<LookDto>,
-    pub intents: Vec<IntentDto>,
     pub assessment: Option<AssessmentDto>,
     pub counts: CountsDto,
 }
@@ -285,24 +240,4 @@ pub struct HistoryDto {
     pub components_removed: u32,
     pub edges_added: u32,
     pub edges_removed: u32,
-}
-
-/// A grouping change that flags nothing.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Type)]
-#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
-pub enum LensEdit {
-    Rename { component: String, name: String },
-    Merge { component: String, into: String },
-    /// Undoes merges into it and groups its subfolders as their own components.
-    Split { component: String },
-}
-
-/// The repo's lens, stored whole.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Lens {
-    pub names: BTreeMap<String, String>,
-    /// Component id to the id it was merged into.
-    pub merged: BTreeMap<String, String>,
-    /// Component ids whose subfolders are components too.
-    pub split: Vec<String>,
 }

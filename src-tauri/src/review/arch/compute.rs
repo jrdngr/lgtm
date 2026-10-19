@@ -1,14 +1,13 @@
-//! Assembling the architecture DTO from a model, the lens, intents and stored review state.
+//! Assembling the architecture DTO from a model and stored review state.
 
 use std::collections::{BTreeSet, HashSet};
 
 use super::assess::Assessed;
 use super::group::Grouping;
 use super::model::{self, Model};
-use super::{ArchDto, CompStatus, CountsDto, IntentKind, intents, layers, look};
+use super::{ArchDto, CompStatus, CountsDto, layers, look};
 
 pub struct Stored {
-    pub intents: Vec<(u32, IntentKind)>,
     /// Checked Look keys.
     pub checked: HashSet<String>,
     pub assessed: Option<Assessed>,
@@ -16,9 +15,7 @@ pub struct Stored {
 
 pub fn compute(m: &Model, g: &Grouping, transitive: bool, stored: Stored) -> ArchDto {
     let mut d = model::diff(m, g, transitive);
-    let intents = intents::check(&stored.intents, &d, m, g);
-    intents::apply(&intents, &mut d, m, g);
-    let mut look = look::rules(&d, m, g, &intents);
+    let mut look = look::rules(&d, m, g);
     let (layers, assessment) = match stored.assessed {
         Some(mut a) => {
             look.extend(a.look);
@@ -62,7 +59,6 @@ pub fn compute(m: &Model, g: &Grouping, transitive: bool, stored: Stored) -> Arc
         edges: d.edges,
         layers,
         look,
-        intents,
         assessment,
         counts,
     }

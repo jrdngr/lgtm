@@ -1,27 +1,23 @@
-import type { ReactNode } from "react";
-import { dockOf } from "../../core/docks";
-import { openArchitecture } from "../../core/panels";
-import type { WorkspaceName } from "../../core/workspace";
-import { type ArchSelection, setArchView } from "../state";
+import { type ReactNode, useState } from "react";
+import { GroupHead } from "../../ui/GroupHead";
 import { meterTone } from "./logic";
 
-/** A list's title and count, with its actions. */
-export function Sec({
+/** A folding list: its name and count, then its rows. */
+export function Fold({
   title,
   count,
   children,
 }: {
   title: string;
   count: number;
-  children?: ReactNode;
+  children: ReactNode;
 }) {
+  const [shut, setShut] = useState(false);
   return (
-    <div className="arch-sec">
-      <span className="arch-sec-title">{title}</span>
-      <span className="arch-sec-count">{count}</span>
-      <span className="spacer" />
-      {children}
-    </div>
+    <>
+      <GroupHead name={title} count={count} shut={shut} onToggle={() => setShut(!shut)} />
+      {!shut && children}
+    </>
   );
 }
 
@@ -61,13 +57,15 @@ export function Row({
   );
 }
 
-/** Five segments, as many filled as `score`, with `n/5` once there's a score. */
+/** Five segments, as many filled as `score`, and `n/5` once there's a score. */
 export function Meter({ score }: { score: number }) {
   return (
     <span className={`arch-meter ${meterTone(score)}`}>
-      {[1, 2, 3, 4, 5].map((k) => (
-        <i key={k} className={k <= score ? "on" : undefined} />
-      ))}
+      <span className="arch-meter-bar">
+        {[1, 2, 3, 4, 5].map((k) => (
+          <i key={k} className={k <= score ? "on" : undefined} />
+        ))}
+      </span>
       {score > 0 && (
         <b>
           {score}
@@ -76,11 +74,4 @@ export function Meter({ score }: { score: number }) {
       )}
     </span>
   );
-}
-
-/** Selects `selection` and shows it in the Architecture tab. */
-export function showInTab(workspace: WorkspaceName, review: number, selection: ArchSelection) {
-  setArchView(review, { selection });
-  const api = dockOf(workspace);
-  if (api) openArchitecture(api);
 }

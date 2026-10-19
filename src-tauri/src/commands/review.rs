@@ -2,7 +2,7 @@ use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
 use crate::jj::{JjAction, LogLine};
-use crate::review::{ContextLine, GraphDto, RefreshDto, ReviewDto, RowRef, StateDto, View};
+use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
 
 /// Loads the review for `revset` after snapshotting the working copy. Starts a review
@@ -159,13 +159,6 @@ pub(crate) fn redo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateD
 #[specta::specta]
 pub(crate) fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.reset(review).map_err(err)
-}
-
-/// The review's symbol graph: changed symbols, their links, and unchanged callers.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn review_graph(window: WebviewWindow, review: u32) -> CmdResult<GraphDto> {
-    repo(&window)?.graph(review).await.map_err(err)
 }
 
 /// Records the review a workspace's active review pane shows, for agents in its terminals.

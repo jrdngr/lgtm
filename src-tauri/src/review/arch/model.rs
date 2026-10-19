@@ -44,22 +44,12 @@ pub struct Use {
     pub to_hop: u32,
 }
 
-/// A changed symbol.
-#[derive(Clone, Debug)]
-pub struct Symbol {
-    pub path: String,
-    pub name: String,
-}
-
 #[derive(Clone, Debug, Default)]
 pub struct Model {
     pub base: Snapshot,
     pub head: Snapshot,
     pub changed: Vec<Changed>,
     pub uses: Vec<Use>,
-    pub changed_symbols: Vec<Symbol>,
-    /// Symbol names at head, for changed files and files Move intents name.
-    pub symbols: HashMap<String, Vec<String>>,
 }
 
 pub type EdgeMap = BTreeMap<(String, String), Vec<ImportDto>>;
@@ -190,10 +180,6 @@ pub fn diff(m: &Model, g: &Grouping, transitive: bool) -> Diff {
                 .collect(),
             status: status[&id],
             layer: None,
-            risk: false,
-            trust: false,
-            note: None,
-            misplaced: vec![],
             severity: None,
             id,
         })
@@ -210,7 +196,6 @@ pub fn diff(m: &Model, g: &Grouping, transitive: bool) -> Diff {
             },
             impacted: impacted_edges.contains(key),
             imports: imports.clone(),
-            wrong: None,
         });
     }
     for (key, imports) in base_edges
@@ -223,7 +208,6 @@ pub fn diff(m: &Model, g: &Grouping, transitive: bool) -> Diff {
             status: EdgeStatus::Removed,
             impacted: false,
             imports: imports.clone(),
-            wrong: None,
         });
     }
     Diff { components, edges }

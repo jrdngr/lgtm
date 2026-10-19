@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import type { HistoryDto } from "../../bindings";
 import { commands } from "../../ipc";
 import type { CurrentReview } from "../../review/current";
-import { IconButton } from "../../ui/icons";
 import { type ArchView, setArchView } from "../state";
 import { clickRange, pickedCommits } from "./logic";
-import { Row, Sec } from "./parts";
+import { Fold, Row } from "./parts";
 
 const count = (n: number, one: string) => `${n} ${n === 1 ? one : `${one}s`}`;
 
@@ -35,16 +34,7 @@ export function History({ review, view }: { review: CurrentReview; view: ArchVie
   if (list.length === 0) return null;
   const picked = pickedCommits(list, view.range);
   return (
-    <>
-      <Sec title="History" count={list.length}>
-        {view.range && (
-          <IconButton
-            icon="x"
-            label="Whole review"
-            onClick={() => setArchView(id, { range: undefined })}
-          />
-        )}
-      </Sec>
+    <Fold title="History" count={list.length}>
       <ul className="arch-items arch-hist">
         {list.map((h) => (
           <li key={h.commitId}>
@@ -67,6 +57,6 @@ export function History({ review, view }: { review: CurrentReview; view: ArchVie
           </li>
         ))}
       </ul>
-    </>
+    </Fold>
   );
 }

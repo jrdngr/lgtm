@@ -95,8 +95,6 @@ export const commands = {
 	redoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("redo_marks", { review })),
 	/**  Removes the marks and file checks this review's revset created. */
 	resetReviewMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_review_marks", { review })),
-	/**  The review's symbol graph: changed symbols, their links, and unchanged callers. */
-	reviewGraph: (review: number) => typedError<GraphDto, string>(__TAURI_INVOKE("review_graph", { review })),
 	/**  The review's architecture diff, or the diff between two of its commits. */
 	reviewArch: (review: number, transitive: boolean, range: {
 	/**  Absent for the root. */
@@ -104,11 +102,7 @@ export const commands = {
 	to: string,
 } | null) => typedError<ArchDto, string>(__TAURI_INVOKE("review_arch", { review, transitive, range })),
 	archHistory: (review: number) => typedError<HistoryDto[], string>(__TAURI_INVOKE("arch_history", { review })),
-	archLens: (edit: LensEdit) => typedError<null, string>(__TAURI_INVOKE("arch_lens", { edit })),
-	addIntent: (kind: IntentKind) => typedError<number, string>(__TAURI_INVOKE("add_intent", { kind })),
-	removeIntent: (id: number) => typedError<null, string>(__TAURI_INVOKE("remove_intent", { id })),
 	checkLook: (review: number, key: string, checked: boolean) => typedError<null, string>(__TAURI_INVOKE("check_look", { review, key, checked })),
-	intentPrompt: (review: number, ids: number[]) => typedError<string, string>(__TAURI_INVOKE("intent_prompt", { review, ids })),
 	/**  The prompt asking a terminal agent to assess the review's architecture change. */
 	assessPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("assess_prompt", { review })),
 	/**  The system map of a workspace's working copy. */
@@ -119,6 +113,12 @@ export const commands = {
 	systemMostUsed: (workspace: string | null, component: string) => typedError<SysSymbolDto[], string>(__TAURI_INVOKE("system_most_used", { workspace, component })),
 	/**  Symbols in a workspace's working copy whose names hold `query`. */
 	systemFind: (workspace: string | null, query: string) => typedError<SysSymbolDto[], string>(__TAURI_INVOKE("system_find", { workspace, query })),
+	/**  The prompt asking a terminal agent to write the tour of a container or component. */
+	tourPrompt: (workspace: string | null, node: string) => typedError<string, string>(__TAURI_INVOKE("tour_prompt", { workspace, node })),
+	/**  A component's symbols, the symbols in other components linked to them, and their uses. */
+	systemSymbols: (workspace: string | null, component: string) => typedError<SymbolsDto, string>(__TAURI_INVOKE("system_symbols", { workspace, component })),
+	/**  Where one component imports another, and the symbols it names there. */
+	systemEdge: (workspace: string | null, from: string, to: string) => typedError<EdgeSitesDto, string>(__TAURI_INVOKE("system_edge", { workspace, from, to })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
@@ -441,7 +441,6 @@ export type ArchDto = {
 	/**  Assess's layers once it has run, else one per changed component in dependency order. */
 	layers: LayerDto[],
 	look: LookDto[],
-	intents: IntentDto[],
 	assessment: AssessmentDto | null,
 	counts: CountsDto,
 };
@@ -650,12 +649,9 @@ export type ComponentDescDto = {
 };
 
 export type ComponentDto = {
-	/**
-	 *  Stable across lens renames: the folder (or root, for loose files) it was grouped from,
-	 *  or the id of the component it was merged into.
-	 */
+	/**  The folder (or root, for loose files) it was grouped from. */
 	id: string,
-	/**  The lens name, or the folder's name. */
+	/**  The folder's name. */
 	name: string,
 	container: string,
 	/**  Files at head, plus removed files. */
@@ -663,12 +659,6 @@ export type ComponentDto = {
 	status: CompStatus,
 	/**  The first layer that covers it, 1-based. */
 	layer: number | null,
-	/**  Tagged by an intent. */
-	risk: boolean,
-	trust: boolean,
-	note: string | null,
-	/**  Paths (or `path#symbol`) in it that Move intents say belong elsewhere. */
-	misplaced: string[],
 	/**  The worst open Look item on it. */
 	severity: LookSeverity | null,
 };
@@ -732,8 +722,13 @@ export type EdgeDto = {
 	/**  `from` is impacted through this edge. */
 	impacted: boolean,
 	imports: ImportDto[],
-	/**  The Wrong intent on it. */
-	wrong: number | null,
+};
+
+export type EdgeSitesDto = {
+	/**  Each import of a `to` file in a `from` file, by path then line. */
+	sites: SiteDto[],
+	/**  `to`'s symbols the importing files name, most used first. */
+	names: SysSymbolDto[],
 };
 
 export type EdgeStatus = "added" | "removed" | "same";
@@ -842,38 +837,6 @@ export type GhPost = {
 	pending: boolean,
 };
 
-export type GraphDto = {
-	nodes: GraphNode[],
-	edges: GraphEdge[],
-};
-
-export type GraphEdge = {
-	/**  The node whose code uses `to`'s name. */
-	from: number,
-	to: number,
-};
-
-export type GraphNode = {
-	id: number,
-	name: string,
-	kind: SymbolKind,
-	status: NodeStatus,
-	path: string,
-	/**  The review file, absent for a caller in a file the review doesn't change. */
-	file: number | null,
-	/**  1-based, on the new side, or the old side for a removed symbol. */
-	line: number,
-	/**
-	 *  Changed rows directly in the symbol, by index among the file's rows, in order. Empty
-	 *  for callers.
-	 */
-	rows: number[],
-	/**  The enclosing symbol's name, like the type of an `impl` for a method. */
-	parent: string | null,
-	/**  0 for a changed symbol. For a caller, how many uses away from a changed symbol it is. */
-	hop: number,
-};
-
 export type HeadDto = {
 	/**  The head on GitHub isn't the fetched one. */
 	moved: boolean,
@@ -925,28 +888,6 @@ export type ImportDto = {
 	line: number,
 };
 
-export type IntentDto = {
-	id: number,
-	state: IntentState,
-} & IntentKind;
-
-/**  What an intent says the code should be. */
-export type IntentKind = 
-/**  `from` must not import from `to`. */
-{ kind: "wrong"; from: string; to: string; reason: string | null } | 
-/**  The file, or the symbol in it, belongs in component `to`. */
-{ kind: "move"; path: string; symbol: string | null; to: string } | { kind: "risk"; component: string } | { kind: "trust"; component: string } | { kind: "note"; component: string; text: string };
-
-export type IntentState = 
-/**  The review introduces what the intent forbids. */
-"broken" | 
-/**  The code doesn't match yet, but the review didn't cause it. */
-"open" | 
-/**  The code matches. */
-"met" | 
-/**  Risk, Trust and Note, which aren't checked. */
-"tag";
-
 /**  A change to the repo, on a revision given by change id. */
 export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: string } | { kind: "newBefore"; rev: string } | 
 /**
@@ -966,11 +907,6 @@ export type LayerDto = {
 	components: string[],
 	ranges: RangeDto[],
 };
-
-/**  A grouping change that flags nothing. */
-export type LensEdit = { kind: "rename"; component: string; name: string } | { kind: "merge"; component: string; into: string } | 
-/**  Undoes merges into it and groups its subfolders as their own components. */
-{ kind: "split"; component: string };
 
 /**  The thread the user is on, as the agent reads it. */
 export type LinkThread = {
@@ -1095,10 +1031,6 @@ export type NearbyPrsDto = {
 	/**  Names of the pushed bookmarks on the stack, nearest first. */
 	bookmarks: string[],
 };
-
-export type NodeStatus = "added" | "modified" | "removed" | 
-/**  Unchanged, but uses a changed symbol. */
-"caller";
 
 /**  lgtm > Settings… was chosen while this window had focus. */
 export type OpenSettings = Record<string, never>;
@@ -1555,6 +1487,12 @@ export type Since =
 /**  In the previous session but not in the review now. */
 "removed";
 
+export type SiteDto = {
+	path: string,
+	/**  1-based. */
+	line: number,
+};
+
 /**  Where a thread is in the reply workflow. */
 export type Stage = 
 /**  Synced, not triaged yet. */
@@ -1595,7 +1533,36 @@ export type StateDto = {
  */
 export type SwitchRepo = Record<string, never>;
 
+/**  `from` uses `to`. */
+export type SymEdgeDto = {
+	from: number,
+	to: number,
+};
+
+export type SymNodeDto = {
+	id: number,
+	name: string,
+	kind: SymbolKind,
+	path: string,
+	/**  1-based, inclusive. */
+	line: number,
+	end: number,
+	component: string,
+	/**  The definition's first line, trimmed. */
+	signature: string,
+};
+
 export type SymbolKind = "function" | "class" | "module" | "section";
+
+export type SymbolsDto = {
+	/**  The component's, by file then line. */
+	symbols: SymNodeDto[],
+	/**  Symbols in other components that use them. */
+	callers: SymNodeDto[],
+	/**  Symbols in other components they use. */
+	calls: SymNodeDto[],
+	edges: SymEdgeDto[],
+};
 
 export type SysComponentDto = {
 	id: string,
@@ -1650,8 +1617,10 @@ export type SystemDescDto = {
 	tiers: string[],
 	components: ComponentDescDto[],
 	relations: RelationDto[],
-	/**  Stored descriptions from before tours have none. */
+	/**  The overview tour. Stored descriptions from before tours have none. */
 	tour?: TourStepDto[],
+	/**  A tour of every main feature. */
+	features?: TourStepDto[],
 	/**  The working copy's commit when it was written. */
 	commit: string,
 	createdAt: number | null,
@@ -1667,6 +1636,8 @@ export type SystemDto = {
 	description: SystemDescDto | null,
 	/**  Components with files changed since the description was written. */
 	stale: string[],
+	/**  The overview and features tours, then container and component tours in map order. */
+	tours: TourDto[],
 };
 
 export type Take = {
@@ -1758,9 +1729,26 @@ export type ToolStatus = {
 	problem: ToolProblem | null,
 };
 
+export type TourDto = {
+	/**  "overview", "features", or the container or component id it tours. */
+	id: string,
+	title: string,
+	/**  A line on what it covers, or empty. */
+	summary: string,
+	steps: TourStepDto[],
+};
+
 export type TourStepDto = {
 	/**  "system", a container id or a component id. */
 	node: string,
+	/**  A file, for a step about a file or a symbol in it. */
+	path?: string | null,
+	/**  A symbol in `path`. */
+	symbol?: string | null,
+	/**  The symbol's 1-based line. */
+	line?: number | null,
+	/**  Another node, for a step about how `node` uses it. */
+	to?: string | null,
 	text: string,
 };
 

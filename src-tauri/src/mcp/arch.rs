@@ -1,5 +1,5 @@
 //! The architecture tools: storing an agent's assessment of the review's architecture change,
-//! and its description of the system map.
+//! its description of the system map, and its tours of the map's containers and components.
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
@@ -148,6 +148,12 @@ pub struct Relation {
 pub struct TourStep {
     /// "system", a container id or a component id.
     pub node: String,
+    /// A repository-relative file, for a step about a file or a symbol in it.
+    pub path: Option<String>,
+    /// A symbol's name in `path`, for a step about a symbol.
+    pub symbol: Option<String>,
+    /// Another node, for a step about how `node` uses it.
+    pub to: Option<String>,
     /// Two or three sentences.
     pub text: String,
 }
@@ -165,6 +171,18 @@ pub struct System {
     pub relations: Vec<Relation>,
     /// A guided tour for someone new to the code, in reading order.
     pub tour: Vec<TourStep>,
+    /// A tour of every main feature, one or two steps each.
+    pub features: Vec<TourStep>,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Tour {
+    /// The node the prompt named, like `k:src/ui` for a component or `c:src` for a container.
+    pub node: String,
+    /// One line on what the tour covers.
+    pub summary: String,
+    /// From zoomed out to zoomed in.
+    pub steps: Vec<TourStep>,
 }
 
 #[tool_router(router = arch_router, vis = "pub(super)")]
@@ -215,5 +233,25 @@ impl Lgtm {
             d.containers.len(),
             d.components.len()
         ))
+    }
+
+    #[tool(
+        description = "Store your tour of one container or component of the system map in \
+        lgtm, replacing that node's last one. Its System tab lists it with the other tours. \
+        Steps on unknown nodes are dropped, and so are unknown files and symbols."
+    )]
+    async fn set_tour(&self, Parameters(p): Parameters<Tour>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
+        let (node, steps) = ctx
+            .save_tour(self.workspace(), reply)
+            .await
+            .map_err(failed)?;
+        SystemChanged {
+            workspace: self.workspace().map(str::to_string),
+        }
+        .emit_to(self.app(), &label)
+        .ok();
+        Ok(format!("Stored the tour of `{node}`: {steps} steps."))
     }
 }

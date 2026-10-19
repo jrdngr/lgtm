@@ -1,12 +1,4 @@
-import type {
-  ArchDto,
-  ArchRange,
-  HistoryDto,
-  IntentDto,
-  LayerDto,
-  LookDto,
-  RowDto,
-} from "../../bindings";
+import type { ArchDto, ArchRange, HistoryDto, LayerDto, LookDto, RowDto } from "../../bindings";
 import type { CurrentReview } from "../../review/current";
 import { markKey, needsReview } from "../../review/model";
 import { stateDone } from "../../review/rowState";
@@ -74,34 +66,12 @@ export function pickedCommits(list: HistoryDto[], range: ArchRange | undefined):
   return own || range.from === null ? [range.to] : [range.from, range.to];
 }
 
-/** What needs a look before merging: broken intents and open high Look items. */
+/** What needs a look before merging: open high Look items. */
 export const archBadge = (arch: ArchDto | undefined) =>
-  arch
-    ? arch.intents.filter((i) => i.state === "broken").length +
-      arch.look.filter((l) => l.severity === "high" && !l.checked).length
-    : 0;
+  arch ? arch.look.filter((l) => l.severity === "high" && !l.checked).length : 0;
 
 const SEVERITY = ["high", "medium", "low"];
 
 /** Look items, worst first. */
 export const bySeverity = (look: LookDto[]) =>
   [...look].sort((a, b) => SEVERITY.indexOf(a.severity) - SEVERITY.indexOf(b.severity));
-
-export const STATE_LABEL = { broken: "Broken", open: "Open", met: "Met", tag: "Tag" } as const;
-
-/** An intent's two lines: what it's about, and what it says. `name` maps a component id to
- * its name. */
-export function intentText(it: IntentDto, name: (id: string) => string): [string, string] {
-  switch (it.kind) {
-    case "wrong":
-      return [`${name(it.from)} → ${name(it.to)}`, it.reason ? `Wrong · ${it.reason}` : "Wrong"];
-    case "move":
-      return [`${it.symbol ?? it.path} → ${name(it.to)}`, `Belongs in ${name(it.to)}`];
-    case "risk":
-      return [name(it.component), "Risk"];
-    case "trust":
-      return [name(it.component), "Trust boundary"];
-    case "note":
-      return [name(it.component), it.text];
-  }
-}

@@ -8,15 +8,15 @@ mod dragged;
 mod events;
 mod files;
 mod github;
-mod html;
 mod gitmeta;
+mod html;
 mod jj;
 mod layout;
 mod mcp;
 mod menu;
-mod placement;
 mod par;
 mod paths;
+mod placement;
 mod pr;
 mod prompts;
 mod pty;
@@ -40,8 +40,8 @@ use std::path::Path;
 use tauri::{Manager, WindowEvent};
 use tauri_specta::{collect_commands, collect_events};
 
-use placement::Placements;
 use html::HtmlRoots;
+use placement::Placements;
 use pty::Ptys;
 use repo::RepoWindows;
 
@@ -86,19 +86,17 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::undo_marks,
             commands::review::redo_marks,
             commands::review::reset_review_marks,
-            commands::review::review_graph,
             commands::arch::review_arch,
             commands::arch::arch_history,
-            commands::arch::arch_lens,
-            commands::arch::add_intent,
-            commands::arch::remove_intent,
             commands::arch::check_look,
-            commands::arch::intent_prompt,
             commands::arch::assess_prompt,
             commands::arch::system_map,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,
             commands::arch::system_find,
+            commands::arch::tour_prompt,
+            commands::arch::system_symbols,
+            commands::arch::system_edge,
             commands::review::focus_review,
             commands::settings::get_settings,
             commands::settings::save_settings,
@@ -237,7 +235,12 @@ pub fn run() {
     tauri::Builder::default()
         // Must be registered first. Later launches hand their arguments to this process.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            repo::open_from_args(app, argv.get(1..).unwrap_or_default(), Path::new(&cwd), false);
+            repo::open_from_args(
+                app,
+                argv.get(1..).unwrap_or_default(),
+                Path::new(&cwd),
+                false,
+            );
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())

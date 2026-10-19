@@ -108,11 +108,12 @@ export function shownAs(map: SystemDto, level: Level, id: string): string | unde
     return c === undefined ? undefined : containerId(c);
   }
   if (id.startsWith("p:") || id.startsWith("x:")) return undefined;
-  if (id === containerId(level.container)) return undefined;
+  const own = level.kind === "symbols" ? container(componentId(level.component)) : level.container;
+  if (id === containerId(own ?? "")) return undefined;
   if (id.startsWith("c:")) return id;
   const c = container(id);
   if (c === undefined) return undefined;
-  return c === level.container ? id : containerId(c);
+  return c === own ? id : containerId(c);
 }
 
 /** A path as `level` draws it: its nodes, and its edges numbered in order. */

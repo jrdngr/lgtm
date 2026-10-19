@@ -9,8 +9,9 @@ use std::time::SystemTime;
 use serde::Serialize;
 use specta::Type;
 
-use super::{model, state, system};
+use super::{model, system};
 use crate::ctx::RepoCtx;
+use crate::syntax::SymbolKind;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +25,7 @@ pub struct SysSymbolDto {
 }
 
 /// Names shorter than this match too much text to count as uses.
-const MIN_NAME: usize = 3;
+pub(super) const MIN_NAME: usize = 3;
 /// How many most used symbols a component lists.
 const MOST_USED: usize = 5;
 /// How many symbols a find returns.
@@ -32,18 +33,31 @@ const FOUND: usize = 20;
 /// Past this many entries the cache starts over.
 const MAX_CACHED: usize = 100_000;
 
+/// A symbol a file defines.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct Sym {
+    pub name: String,
+    pub kind: SymbolKind,
+    /// 1-based, inclusive.
+    pub line: u32,
+    pub end: u32,
+}
+
 type Stamp = (SystemTime, u64);
-type Syms = Arc<Vec<(String, u32)>>;
+pub(super) type Syms = Arc<Vec<Sym>>;
 
 static CACHE: LazyLock<Mutex<HashMap<PathBuf, (Stamp, Syms)>>> = LazyLock::new(Mutex::default);
 
-/// The names and 1-based lines of the symbols `rel` defines.
-fn symbols(root: &Path, rel: &str) -> Syms {
+/// The symbols `rel` defines, by line.
+pub(super) fn symbols(root: &Path, rel: &str) -> Syms {
     let abs = root.join(rel);
     let Ok(meta) = std::fs::metadata(&abs) else {
         return Syms::default();
     };
-    let stamp = (meta.modified().unwrap_or(SystemTime::UNIX_EPOCH), meta.len());
+    let stamp = (
+        meta.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+        meta.len(),
+    );
     if let Some((s, syms)) = CACHE.lock().unwrap().get(&abs)
         && *s == stamp
     {
@@ -58,7 +72,12 @@ fn symbols(root: &Path, rel: &str) -> Syms {
                     parsed
                         .symbols(&text)
                         .into_iter()
-                        .map(|s| (s.name, s.start_line))
+                        .map(|s| Sym {
+                            name: s.name,
+                            kind: s.kind,
+                            line: s.start_line,
+                            end: s.end_line,
+                        })
                         .collect(),
                 )
             })
@@ -73,7 +92,7 @@ fn symbols(root: &Path, rel: &str) -> Syms {
 }
 
 /// Whether `name` appears in `text` as a whole identifier.
-fn names(text: &str, name: &str) -> bool {
+pub(super) fn names(text: &str, name: &str) -> bool {
     let ident = |c: char| c.is_alphanumeric() || c == '_' || c == '$';
     text.match_indices(name).any(|(i, _)| {
         !text[..i].chars().next_back().is_some_and(ident)
@@ -99,11 +118,23 @@ fn most_used(
             importers.entry(&i.to).or_default().push(from);
         }
     }
+    let mut out = named_by(root, &importers, component);
+    out.truncate(MOST_USED);
+    out
+}
+
+/// The symbols of each file in `importers` that the files importing it name, with how many
+/// of those do, most first. All are in `component`.
+pub(super) fn named_by(
+    root: &Path,
+    importers: &BTreeMap<&str, Vec<&str>>,
+    component: &str,
+) -> Vec<SysSymbolDto> {
     let mut texts: HashMap<&str, Option<String>> = HashMap::new();
     let mut out = Vec::new();
     for (file, users) in importers {
-        for (name, line) in symbols(root, file).iter() {
-            if name.len() < MIN_NAME {
+        for s in symbols(root, file).iter() {
+            if s.name.len() < MIN_NAME {
                 continue;
             }
             let n = users
@@ -113,14 +144,14 @@ fn most_used(
                         .entry(u)
                         .or_insert_with(|| std::fs::read_to_string(root.join(u)).ok())
                         .as_deref()
-                        .is_some_and(|t| names(t, name))
+                        .is_some_and(|t| names(t, &s.name))
                 })
                 .count() as u32;
             if n > 0 {
                 out.push(SysSymbolDto {
-                    name: name.clone(),
+                    name: s.name.clone(),
                     path: file.to_string(),
-                    line: *line,
+                    line: s.line,
                     component: component.to_string(),
                     users: n,
                 });
@@ -128,7 +159,6 @@ fn most_used(
         }
     }
     out.sort_by(|a, b| b.users.cmp(&a.users).then(a.name.cmp(&b.name)));
-    out.truncate(MOST_USED);
     out
 }
 
@@ -148,8 +178,8 @@ fn find(
         .zip(all)
         .flat_map(|(path, syms)| {
             syms.iter()
-                .filter_map(|(name, line)| {
-                    let lower = name.to_lowercase();
+                .filter_map(|s| {
+                    let lower = s.name.to_lowercase();
                     let rank = if lower == q {
                         0
                     } else if lower.starts_with(&q) {
@@ -162,9 +192,9 @@ fn find(
                     Some((
                         rank,
                         SysSymbolDto {
-                            name: name.clone(),
+                            name: s.name.clone(),
                             path: path.to_string(),
-                            line: *line,
+                            line: s.line,
                             component: comp(path),
                             users: 0,
                         },
@@ -181,17 +211,18 @@ fn find(
 }
 
 impl RepoCtx {
-    async fn explore<T: Send + 'static>(
+    /// Runs `f` on `workspace`'s working copy: its root, its files' imports and their
+    /// components.
+    pub(super) async fn explore<T: Send + 'static>(
         &self,
         workspace: Option<&str>,
         f: impl FnOnce(&Path, &model::Snapshot, &dyn Fn(&str) -> String) -> T + Send + 'static,
     ) -> anyhow::Result<T> {
         let ws = self.workspace(workspace).await?;
         let repo = super::load::repo_name(&self.root);
-        let lens = state::lens(&self.store.lock().unwrap())?;
         let root = ws.root.clone();
         Ok(tokio::task::spawn_blocking(move || {
-            let (snap, g) = system::scanned(&root, lens, &repo);
+            let (snap, g) = system::scanned(&root, &repo);
             f(&root, &snap, &|p| g.comp(p))
         })
         .await?)
@@ -258,7 +289,10 @@ mod tests {
                 "lib/a.ts",
                 "export function load() {}\nexport function save() {}\nexport function unused() {}\n",
             ),
-            ("ui/x.ts", "import { load, save } from '../lib/a';\nload(); save();\n"),
+            (
+                "ui/x.ts",
+                "import { load, save } from '../lib/a';\nload(); save();\n",
+            ),
             ("ui/y.ts", "import { load } from '../lib/a';\nload();\n"),
             ("lib/b.ts", "import { save } from './a';\nsave();\n"),
         ]);
@@ -279,7 +313,9 @@ mod tests {
         .collect();
         let used = most_used(dir.path(), &snap, comp, "lib");
         assert_eq!(
-            used.iter().map(|s| (&*s.name, s.users, s.line)).collect::<Vec<_>>(),
+            used.iter()
+                .map(|s| (&*s.name, s.users, s.line))
+                .collect::<Vec<_>>(),
             [("load", 2, 1), ("save", 1, 2)]
         );
     }

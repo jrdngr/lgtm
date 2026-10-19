@@ -4,10 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use super::group::Grouping;
 use super::model::{Diff, Model};
-use super::{
-    CompStatus, EdgeDto, EdgeStatus, IntentDto, IntentKind, IntentState, LookDto, LookSeverity,
-    LookSource,
-};
+use super::{CompStatus, EdgeDto, EdgeStatus, LookDto, LookSeverity, LookSource};
 
 fn item(key: String, severity: LookSeverity, title: String) -> LookDto {
     LookDto {
@@ -24,41 +21,9 @@ fn item(key: String, severity: LookSeverity, title: String) -> LookDto {
     }
 }
 
-pub fn rules(d: &Diff, m: &Model, g: &Grouping, intents: &[IntentDto]) -> Vec<LookDto> {
+pub fn rules(d: &Diff, m: &Model, g: &Grouping) -> Vec<LookDto> {
     let name = |id: &str| d.comp(id).map_or_else(|| g.name(id), |c| c.name.clone());
     let mut out = Vec::new();
-    for i in intents.iter().filter(|i| i.state == IntentState::Broken) {
-        let it = match &i.kind {
-            IntentKind::Wrong { from, to, reason } => {
-                let (from, to) = (g.resolve(from), g.resolve(to));
-                let mut it = edge_item(
-                    format!("rule:broken:{}", i.id),
-                    LookSeverity::High,
-                    format!("Broken: {} → {}", name(&from), name(&to)),
-                    d.edge(&from, &to),
-                    &from,
-                    &to,
-                );
-                it.detail = reason.clone();
-                it
-            }
-            IntentKind::Move { path, symbol, to } => {
-                let what = symbol
-                    .as_ref()
-                    .map_or(path.clone(), |s| format!("{path}#{s}"));
-                let mut it = item(
-                    format!("rule:broken:{}", i.id),
-                    LookSeverity::High,
-                    format!("Broken: {what} outside {}", name(&g.resolve(to))),
-                );
-                it.component = Some(g.comp(path));
-                it.path = Some(path.clone());
-                it
-            }
-            _ => continue,
-        };
-        out.push(it);
-    }
     for c in &d.components {
         let (key, severity, verb) = match c.status {
             CompStatus::Added => ("new-comp", LookSeverity::Medium, "New component"),

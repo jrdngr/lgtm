@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { openMenu } from "../ui/contextMenu";
+import { type CtxEntry, openMenu } from "../ui/contextMenu";
 import { NEUTRAL, tint } from "./colors";
 import { Chevron, Fit, Minus, Person, Plus } from "./glyphs";
 import { curve, type Layout, type Placed } from "./layout";
+import { deltaText } from "./lens";
 import { usePanZoom } from "./panZoom";
 import type { SEdge } from "./scene";
 
@@ -17,12 +18,16 @@ interface Props {
   /** Labels every described edge, not only hot ones. */
   labels: boolean;
   selected?: string;
+  /** The selected edge, as `from>to`. */
+  selectedEdge?: string;
   /** Nodes whose description is out of date. */
   stale: Set<string>;
   /** Drawn over the canvas, outside the world. */
   children?: ReactNode;
   onSelect(id: string | undefined): void;
   onOpen(id: string): void;
+  onEdge(e: SEdge): void;
+  nodeMenu(id: string): CtxEntry[];
   onReload(): void;
 }
 
@@ -37,6 +42,12 @@ const width = (e: SEdge) => (e.imports ? Math.min(3.5, 1.4 + Math.log2(e.imports
 const tileWidth = (files: number) => Math.round(Math.min(40, 8 + Math.sqrt(files) * 5));
 
 const STORE = /sql|database|\bdb\b|store|cache|redis/i;
+
+/** What a review-changed edge's pill says. */
+function statusLabel(e: SEdge) {
+  if (e.status === "removed") return "removed";
+  return `new · ${e.label ?? `${e.imports} ${e.imports === 1 ? "site" : "sites"}`}`;
+}
 
 /** A node's content. */
 function Node({ n, stale }: { n: Placed; stale: boolean }) {
@@ -53,18 +64,27 @@ function Node({ n, stale }: { n: Placed; stale: boolean }) {
           n.tech && <span className="sys-chip">{n.tech}</span>}
         {n.door && <Chevron />}
         {stale && <span className="sys-stale" />}
+        {n.kind === "component" && (n.delta || n.status === "added") && (
+          <span className={`sys-delta${n.status === "added" ? " new" : ""}`}>
+            {n.status === "added" ? "new" : deltaText(n.delta)}
+          </span>
+        )}
       </span>
+      {n.kind === "container" && !n.door && n.delta && (
+        <span className="sys-cnt">{deltaText(n.delta)}</span>
+      )}
+      {n.flag && <span className="sys-flag">!</span>}
       {n.kind === "container" && !n.door && (n.tech?.length ?? 0) > 10 && (
         <span className="sys-chip">{n.tech}</span>
       )}
       {!!n.tiles?.length && (
         <span className="sys-tiles">
-          {n.tiles.map((files, i) => (
+          {n.tiles.map((t, i) => (
             <span
               // biome-ignore lint/suspicious/noArrayIndexKey: tiles have no identity
               key={i}
-              className="sys-tile"
-              style={{ width: tileWidth(files), background: tint(color, 0.6) }}
+              className={`sys-tile${t.changed ? " c" : ""}`}
+              style={{ width: tileWidth(t.files), background: tint(color, 0.6) }}
             />
           ))}
         </span>
@@ -97,6 +117,7 @@ function Node({ n, stale }: { n: Placed; stale: boolean }) {
 /** The diagram: fitted to the tab, then dragged to pan and scrolled or pinched to zoom. */
 export function SystemCanvas(props: Props) {
   const { layout, edges, lit, hot, hotColor, labels, selected, stale, onSelect, onOpen } = props;
+  const { selectedEdge, onEdge, nodeMenu } = props;
   const pz = usePanZoom(layout.width, layout.height);
   const { view } = pz;
   const box = new Map(layout.nodes.map((n) => [n.id, n]));
@@ -192,23 +213,46 @@ export function SystemCanvas(props: Props) {
             ))}
           </defs>
           {lines.map(({ e, d, door }) => {
-            const on = hot.has(edgeKey(e));
+            const on = hot.has(edgeKey(e)) || edgeKey(e) === selectedEdge;
             const kind = e.status ?? (on ? "hot" : "base");
             const cls = ["sys-edge", e.status, door && "door", lit && !on && "faint"];
             return (
-              <path
-                key={edgeKey(e)}
-                className={cls.filter(Boolean).join(" ")}
-                d={d}
-                fill="none"
-                style={on && !e.status ? { stroke: hotColor } : undefined}
-                strokeWidth={on ? width(e) + 0.6 : width(e)}
-                markerEnd={`url(#sys-arrow-${kind})`}
-              />
+              <g key={edgeKey(e)}>
+                <path
+                  className={cls.filter(Boolean).join(" ")}
+                  d={d}
+                  fill="none"
+                  style={on && !e.status ? { stroke: hotColor } : undefined}
+                  strokeWidth={on ? width(e) + 0.6 : width(e)}
+                  markerEnd={`url(#sys-arrow-${kind})`}
+                />
+                {!door && (
+                  <path
+                    className="sys-ehit"
+                    d={d}
+                    fill="none"
+                    onClick={(ev) => {
+                      ev.stopPropagation();
+                      if (!pz.dragged()) onEdge(e);
+                    }}
+                  />
+                )}
+              </g>
             );
           })}
         </svg>
         {lines.map(({ e, mid }) => {
+          if (e.status && (!lit || hot.has(edgeKey(e)) || labels)) {
+            return (
+              <span
+                key={edgeKey(e)}
+                className={`sys-epill ${e.status}`}
+                style={{ left: mid.x, top: mid.y }}
+              >
+                {statusLabel(e)}
+              </span>
+            );
+          }
           const n = hot.get(edgeKey(e));
           if (n !== undefined) {
             return (
@@ -242,6 +286,13 @@ export function SystemCanvas(props: Props) {
               if (!pz.dragged()) onSelect(n.id);
             }}
             onDoubleClick={() => onOpen(n.id)}
+            onContextMenu={(ev) => {
+              ev.stopPropagation();
+              const items = nodeMenu(n.id);
+              if (!items.length) return;
+              if (!n.door) onSelect(n.id);
+              openMenu(ev, items);
+            }}
           >
             <Node n={n} stale={stale.has(n.id)} />
           </button>

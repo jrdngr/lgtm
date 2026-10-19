@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { SystemDescDto, SystemDto } from "../bindings";
 import { layout } from "./layout";
-import { computedTiers, type Overlay, type Scene, sceneOf } from "./scene";
+import type { Lens } from "./lens";
+import { computedTiers, type Scene, sceneOf } from "./scene";
 
 const comp = (id: string, container: string, files = 1) => ({
   id,
@@ -29,10 +30,23 @@ function map(description: SystemDescDto | null = null): SystemDto {
       { from: "src/ui", to: "core/src/db", imports: 1, path: "src/ui/a.ts", line: 2 },
     ],
     files: [],
+    tours: [],
     description,
     stale: [],
   };
 }
+
+const lens = (l: Partial<Lens>): Lens => ({
+  status: new Map(),
+  removed: [],
+  edges: [],
+  delta: new Map(),
+  files: new Map(),
+  look: new Map(),
+  edgeLook: new Map(),
+  open: 0,
+  ...l,
+});
 
 function described(): SystemDescDto {
   return {
@@ -86,7 +100,14 @@ describe("sceneOf", () => {
   it("sums imports between containers and adds described ones without code", () => {
     const s = sceneOf(map(described()), { kind: "containers" });
     expect(ids(s).inside).toEqual([[undefined, ["c:src", "c:core/src", "c:store"]]]);
-    expect(s.inside[0].nodes[0]).toMatchObject({ name: "Web", tech: "React", tiles: [3, 2] });
+    expect(s.inside[0].nodes[0]).toMatchObject({
+      name: "Web",
+      tech: "React",
+      tiles: [
+        { files: 3, changed: false },
+        { files: 2, changed: false },
+      ],
+    });
     expect(edges(s)).toEqual([
       ["c:src", "c:core/src", 3],
       ["p:User", "c:src", 0, "Reviews"],
@@ -111,17 +132,18 @@ describe("sceneOf", () => {
   });
 
   it("marks the change and adds what it removed", () => {
-    const overlay: Overlay = {
+    const overlay = lens({
       status: new Map([
         ["src/ui", "changed"],
         ["src/old", "removed"],
       ]),
       removed: [comp("src/old", "src")],
       edges: [
-        { from: "src/ui", to: "src/api", status: "added" },
-        { from: "src/old", to: "src/api", status: "removed" },
+        { from: "src/ui", to: "src/api", status: "added", imports: 6 },
+        { from: "src/old", to: "src/api", status: "removed", imports: 2 },
       ],
-    };
+      delta: new Map([["src/ui", { add: 4, del: 1 }]]),
+    });
     const s = sceneOf(map(), { kind: "components", container: "src" }, overlay);
     expect(ids(s).inside).toEqual([
       [undefined, ["k:src/ui"]],
@@ -131,10 +153,39 @@ describe("sceneOf", () => {
     expect(s.inside[0].nodes[0].status).toBe("changed");
     expect(edges(s).filter(([, to]) => to !== "c:core/src")).toEqual([
       ["k:src/ui", "k:src/api", 6, "added"],
-      ["k:src/old", "k:src/api", 0, "removed"],
+      ["k:src/old", "k:src/api", 2, "removed"],
     ]);
     const c = sceneOf(map(), { kind: "containers" }, overlay);
     expect(c.inside[0].nodes.map((n) => n.status)).toEqual(["changed", undefined]);
+    expect(c.inside[0].nodes[0].delta).toEqual({ add: 4, del: 1 });
+    expect(c.inside[0].nodes[0].tiles?.map((t) => t.changed)).toEqual([true, false]);
+  });
+
+  it("marks a container edge new only when the review's imports alone make it", () => {
+    const only = lens({
+      edges: [{ from: "src/api", to: "core/src/db", status: "added", imports: 2 }],
+    });
+    const m = map();
+    m.edges = m.edges.filter((e) => e.from !== "src/ui" || e.to !== "core/src/db");
+    expect(edges(sceneOf(m, { kind: "containers" }, only))).toEqual([
+      ["c:src", "c:core/src", 2, "added"],
+    ]);
+    // Another import already joins the two containers.
+    expect(edges(sceneOf(map(), { kind: "containers" }, only))).toEqual([
+      ["c:src", "c:core/src", 3],
+    ]);
+  });
+
+  it("adds a container edge only the review's removed imports made", () => {
+    const gone = lens({
+      edges: [{ from: "core/src/db", to: "src/api", status: "removed", imports: 1 }],
+    });
+    expect(edges(sceneOf(map(), { kind: "containers" }, gone))).toContainEqual([
+      "c:core/src",
+      "c:src",
+      1,
+      "removed",
+    ]);
   });
 });
 

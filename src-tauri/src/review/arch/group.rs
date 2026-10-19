@@ -1,21 +1,18 @@
-//! Grouping files into components: a root's subfolders, or its loose files, reshaped by the
-//! lens.
+//! Grouping files into components: a root's subfolders, or its loose files.
 
+use super::ContainerDto;
 use super::roots::{Root, root_of};
-use super::{ContainerDto, Lens, LensEdit};
 
 pub struct Grouping {
     roots: Vec<Root>,
-    lens: Lens,
     /// Names the container of files outside every root.
     repo: String,
 }
 
 impl Grouping {
-    pub fn new(roots: Vec<Root>, lens: Lens, repo: &str) -> Self {
+    pub fn new(roots: Vec<Root>, repo: &str) -> Self {
         Grouping {
             roots,
-            lens,
             repo: repo.to_string(),
         }
     }
@@ -26,29 +23,10 @@ impl Grouping {
         let rel = path
             .strip_prefix(root)
             .map_or(path, |r| r.trim_start_matches('/'));
-        let parts: Vec<&str> = rel.split('/').collect();
-        let mut id = root.to_string();
-        if parts.len() > 1 {
-            id = super::roots::join(root, parts[0]);
-            let mut i = 1;
-            while i + 1 < parts.len() && self.lens.split.contains(&id) {
-                id = format!("{id}/{}", parts[i]);
-                i += 1;
-            }
+        match rel.split_once('/') {
+            Some((dir, _)) => super::roots::join(root, dir),
+            None => root.to_string(),
         }
-        self.resolve(&id)
-    }
-
-    /// The component `id` was merged into, or `id`.
-    pub fn resolve(&self, id: &str) -> String {
-        let mut id = id.to_string();
-        for _ in 0..self.lens.merged.len() {
-            match self.lens.merged.get(&id) {
-                Some(into) => id = into.clone(),
-                None => break,
-            }
-        }
-        id
     }
 
     pub fn container(&self, comp: &str) -> String {
@@ -56,9 +34,6 @@ impl Grouping {
     }
 
     pub fn name(&self, comp: &str) -> String {
-        if let Some(n) = self.lens.names.get(comp) {
-            return n.clone();
-        }
         if comp.is_empty() {
             return self.repo.clone();
         }
@@ -76,38 +51,6 @@ impl Grouping {
         ContainerDto {
             id: id.to_string(),
             name,
-        }
-    }
-}
-
-/// Applies a lens edit.
-pub fn edit(lens: &mut Lens, edit: LensEdit) {
-    match edit {
-        LensEdit::Rename { component, name } => {
-            if name.trim().is_empty() {
-                lens.names.remove(&component);
-            } else {
-                lens.names.insert(component, name.trim().to_string());
-            }
-        }
-        LensEdit::Merge { component, into } => {
-            let grouping = Grouping::new(vec![], lens.clone(), "");
-            let into = grouping.resolve(&into);
-            if into == component {
-                return;
-            }
-            for target in lens.merged.values_mut() {
-                if *target == component {
-                    *target = into.clone();
-                }
-            }
-            lens.merged.insert(component, into);
-        }
-        LensEdit::Split { component } => {
-            lens.merged.retain(|_, into| *into != component);
-            if !lens.split.contains(&component) {
-                lens.split.push(component);
-            }
         }
     }
 }

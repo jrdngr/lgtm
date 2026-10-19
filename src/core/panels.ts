@@ -6,14 +6,7 @@ import type {
 } from "dockview-react";
 
 /** The kinds of tab. A Claude tab is a terminal that starts Claude Code. */
-export type PanelKind =
-  | "review"
-  | "terminal"
-  | "claude"
-  | "report"
-  | "architecture"
-  | "system"
-  | "qa";
+export type PanelKind = "review" | "terminal" | "claude" | "report" | "architecture" | "qa";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -21,12 +14,11 @@ const TITLES: Record<PanelKind, string> = {
   claude: "Claude",
   report: "Report",
   architecture: "Architecture",
-  system: "System",
   qa: "Q&A",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "system", "qa"];
+export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -95,13 +87,6 @@ export function openArchitecture(api: DockviewApi) {
   addPanel(api, "architecture", {}, inActivePane(api), "architecture");
 }
 
-/** Shows the System tab, or brings it forward. */
-export function openSystem(api: DockviewApi) {
-  const open = api.getPanel("system");
-  if (open) return activate(open);
-  addPanel(api, "system", {}, inActivePane(api), "system");
-}
-
 /** Shows the Q&A tab, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");
@@ -110,9 +95,9 @@ export function openQa(api: DockviewApi) {
 }
 
 /** Tabs a dock has one of. */
-const SINGLE: PanelKind[] = ["architecture", "system", "qa"];
+const SINGLE: PanelKind[] = ["architecture", "qa"];
 
-/** Opens a `kind` tab in `group`. Architecture, System and Q&A are one per dock, so an open one moves
+/** Opens a `kind` tab in `group`. Architecture and Q&A are one per dock, so an open one moves
  * here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;
@@ -143,10 +128,17 @@ export function defaultLayout(api: DockviewApi) {
 }
 
 /** Drops panels earlier builds kept in the grid (Tasks, Files, Design, Threads, Graph, Agent
- * runs) and panes
- * that belonged to other workspaces. */
+ * runs) and panes that belonged to other workspaces. A System tab becomes the Architecture
+ * tab. */
 export function dropStalePanels(api: DockviewApi) {
   for (const p of [...api.panels]) {
+    if (p.view.contentComponent === "system") {
+      if (!api.getPanel("architecture")) {
+        addPanel(api, "architecture", {}, { referencePanel: p.id }, "architecture");
+      }
+      p.api.close();
+      continue;
+    }
     const task = (p.params as { task?: unknown } | undefined)?.task;
     const moved = ["tasks", "files", "design", "threads", "graph", "runs"].includes(
       p.view.contentComponent,

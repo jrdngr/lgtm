@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { PipeButton } from "../terminal/PipeButton";
-import { Arrow, Close, Play, Search, Trace, Up } from "./glyphs";
+import { Arrow, Chevron, Close, Play, Search, Trace, Up } from "./glyphs";
 import type { Level } from "./scene";
 
 export interface Crumb {
@@ -17,6 +17,7 @@ const LEVELS = [
   ["context", "Context"],
   ["containers", "Containers"],
   ["components", "Components"],
+  ["symbols", "Symbols"],
 ] as const;
 
 const MODES: Record<EdgeMode, string> = { focus: "Focus", changed: "Changed", all: "All" };
@@ -26,6 +27,8 @@ interface Props {
   level: Level["kind"];
   onUp?(): void;
   onLevel(kind: Level["kind"]): void;
+  /** Whether there's a component to show the Symbols of. */
+  symbols: boolean;
   /** Edge modes this level offers, if any. */
   modes?: EdgeMode[];
   mode: EdgeMode;
@@ -37,13 +40,15 @@ interface Props {
     onEnd(end: "from" | "to"): void;
     onClose(): void;
   };
+  /** While touring, its name replaces the tools. */
+  tour?: { name: string; color: string; onClose(): void };
   finding: boolean;
   onFind(): void;
   onTrace(): void;
-  touring: boolean;
-  /** Absent when there's no tour. */
-  onTour?(): void;
-  change?: { on: boolean; onToggle(): void };
+  toursOpen: boolean;
+  onTours(): void;
+  /** Absent with no review open. */
+  lens?: { on: boolean; onToggle(): void };
   onDescribe(): void;
 }
 
@@ -56,7 +61,7 @@ function Swatch({ c }: { c: Crumb }) {
   );
 }
 
-/** The System tab's toolbar: up a level, where you are, the level, and the tools. */
+/** The Architecture tab's toolbar: up a level, where you are, the level, and the tools. */
 export function SystemBar(p: Props) {
   const at = LEVELS.findIndex(([k]) => k === p.level);
   return (
@@ -93,6 +98,7 @@ export function SystemBar(p: Props) {
               type="button"
               className={`sys-step${i === at ? " on" : i < at ? " past" : ""}`}
               aria-pressed={i === at}
+              disabled={kind === "symbols" && !p.symbols}
               onClick={() => p.onLevel(kind)}
             >
               <i />
@@ -102,7 +108,15 @@ export function SystemBar(p: Props) {
         ))}
       </div>
       <span className="sys-grow" />
-      {p.trace ? (
+      {p.tour ? (
+        <span className="sys-tpill" style={{ ["--c" as string]: p.tour.color }}>
+          <Play size={12} />
+          {p.tour.name} tour
+          <button type="button" className="sys-x" aria-label="End Tour" onClick={p.tour.onClose}>
+            <Close />
+          </button>
+        </span>
+      ) : p.trace ? (
         <div className="sys-trace">
           Trace
           <TraceEnd c={p.trace.from} onClick={() => p.trace?.onEnd("from")} />
@@ -114,6 +128,17 @@ export function SystemBar(p: Props) {
         </div>
       ) : (
         <>
+          {p.lens && (
+            <button
+              type="button"
+              className={`sys-lens${p.lens.on ? " on" : ""}`}
+              aria-pressed={p.lens.on}
+              onClick={p.lens.onToggle}
+            >
+              <span className="sys-trk" />
+              Review
+            </button>
+          )}
           {p.modes && (
             <span className="sys-seg">
               {p.modes.map((m) => (
@@ -129,17 +154,6 @@ export function SystemBar(p: Props) {
               ))}
             </span>
           )}
-          {p.change && (
-            <button
-              type="button"
-              className={`atog${p.change.on ? " on" : ""}`}
-              aria-pressed={p.change.on}
-              onClick={p.change.onToggle}
-            >
-              <span className="atrack" />
-              Change
-            </button>
-          )}
           <button type="button" className={`sys-tool${p.finding ? " on" : ""}`} onClick={p.onFind}>
             <Search />
             Find
@@ -151,14 +165,18 @@ export function SystemBar(p: Props) {
           </button>
           <button
             type="button"
-            className={`sys-tool${p.touring ? " on" : ""}`}
-            disabled={!p.onTour}
-            onClick={p.onTour}
+            className={`sys-tool${p.toursOpen ? " on" : ""}`}
+            aria-expanded={p.toursOpen}
+            data-tours
+            onClick={p.onTours}
           >
             <Play />
-            Tour
+            Tours
+            <span className="sys-down">
+              <Chevron size={10} />
+            </span>
           </button>
-          <PipeButton onClick={p.onDescribe}>Describe</PipeButton>
+          {!p.lens?.on && <PipeButton onClick={p.onDescribe}>Describe</PipeButton>}
         </>
       )}
     </div>

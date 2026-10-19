@@ -6,7 +6,7 @@ use super::compute::{self, Stored};
 use super::group::Grouping;
 use super::inputs::{self, Built};
 use super::model::{self, Model};
-use super::{ArchDto, ArchRange, HistoryDto, IntentKind, assess, state};
+use super::{ArchDto, ArchRange, HistoryDto, assess, state};
 use crate::config::Config;
 use crate::ctx::RepoCtx;
 use crate::jj::Range;
@@ -69,14 +69,6 @@ impl RepoCtx {
             }
         };
         let stored = self.stored(&ws, &revset, &whole)?;
-        let move_paths: Vec<String> = stored
-            .intents
-            .iter()
-            .filter_map(|(_, k)| match k {
-                IntentKind::Move { path, .. } => Some(path.clone()),
-                _ => None,
-            })
-            .collect();
         let changed = inputs::changed_of(&files, indexed);
         let Built { mut model, roots } = inputs::build(
             &ws.jj,
@@ -87,13 +79,11 @@ impl RepoCtx {
             extra,
         )
         .await?;
-        let lens = state::lens(&self.store.lock().unwrap())?;
         let root = ws.root.clone();
         let repo = repo_name(&self.root);
         Ok(tokio::task::spawn_blocking(move || {
             inputs::add_graph(&mut model, &files, &root);
-            inputs::add_symbols(&mut model, &root, &move_paths);
-            let g = Grouping::new(roots, lens, &repo);
+            let g = Grouping::new(roots, &repo);
             compute::compute(&model, &g, transitive, stored)
         })
         .await?)
@@ -106,7 +96,6 @@ impl RepoCtx {
             let r = r.lock().unwrap();
             (r.ws.clone(), r.revset.clone())
         };
-        let lens = state::lens(&self.store.lock().unwrap())?;
         let repo = repo_name(&self.root);
         // Files the review changes differ in the working copy, so each commit reads its
         // unchanged ones at the commit.
@@ -141,7 +130,7 @@ impl RepoCtx {
                 .collect();
             let Built { model, roots } =
                 inputs::build(&ws.jj, &ws.root, &repo, &range, changed, extra).await?;
-            let g = Grouping::new(roots, lens.clone(), &repo);
+            let g = Grouping::new(roots, &repo);
             let d = delta(&model, &g);
             if d != [0; 4] {
                 out.push(HistoryDto {
@@ -180,7 +169,6 @@ impl RepoCtx {
     fn stored(&self, ws: &Workspace, revset: &str, whole: &Range) -> anyhow::Result<Stored> {
         let store = self.store.lock().unwrap();
         Ok(Stored {
-            intents: state::intents(&store)?,
             checked: state::checked(&store, ws.key(), revset)?
                 .into_iter()
                 .collect(),

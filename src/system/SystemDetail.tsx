@@ -1,7 +1,9 @@
-import type { SystemDto } from "../bindings";
+import type { LookDto, SystemDto, TourDto } from "../bindings";
 import { PipeButton } from "../terminal/PipeButton";
 import { tint } from "./colors";
 import { Chevron, Play } from "./glyphs";
+import { ChangedFiles, ChangedInside, LookList } from "./LensSections";
+import { isChanged, type Lens } from "./lens";
 import { MostUsed } from "./MostUsed";
 import { nodeInfo } from "./names";
 import { componentId, containerId, containersOf, type SEdge, type SNode, SYSTEM } from "./scene";
@@ -23,7 +25,16 @@ interface Props {
   onFile(path: string, line?: number): void;
   onReveal(path: string): void;
   onAsk(): void;
-  onTour?(): void;
+  /** The node's tour, or the system's overview. */
+  tour?: TourDto;
+  onTour(tour: TourDto): void;
+  /** Shows a component's symbols. */
+  onSymbols(id: string): void;
+  /** With the Review lens on. */
+  lens?: Lens;
+  onLook(l: LookDto): void;
+  /** Shows a changed file in the review. */
+  onChangedFile(path: string): void;
 }
 
 /** Past this many, a list says how many more. */
@@ -55,13 +66,21 @@ function TalksTo({ map, colors, node, edges, onShow }: Props) {
           <button
             key={`${e.from}>${e.to}`}
             type="button"
-            className="sys-li"
+            className={`sys-li${e.status ? ` ${e.status}` : ""}`}
             onClick={() => onShow(other)}
           >
             <span className="sys-arr">{out ? "→" : "←"}</span>
             <Swatch color={info.color} dashed={info.kind === "external"} />
             <span>{info.name}</span>
-            {e.label && <span className="sys-lbl">{e.label}</span>}
+            {(e.label || e.status) && (
+              <span className="sys-lbl">
+                {e.status === "added"
+                  ? `new${e.label ? ` · ${e.label}` : ""}`
+                  : e.status === "removed"
+                    ? "removed"
+                    : e.label}
+              </span>
+            )}
           </button>
         );
       })}
@@ -154,7 +173,7 @@ function Inside({ map, colors, node, onShow, onOpen }: Props) {
   );
 }
 
-function Neighbors({ map, colors, node, onShow }: Props) {
+function Neighbors({ map, colors, node, onShow, lens }: Props) {
   const ref = node.id.slice(2);
   const pills = (ids: string[]) => (
     <div className="sys-pills">
@@ -167,7 +186,7 @@ function Neighbors({ map, colors, node, onShow }: Props) {
           <button
             key={id}
             type="button"
-            className="sys-pill"
+            className={`sys-pill${isChanged(lens?.status.get(id)) ? " chg" : ""}`}
             onClick={() => onShow(componentId(id))}
           >
             {other && info && <Swatch color={info.color} />}
@@ -201,6 +220,16 @@ function Neighbors({ map, colors, node, onShow }: Props) {
 function ComponentBody(p: Props) {
   const k = p.map.components.find((c) => componentId(c.id) === p.node.id);
   if (!k) return null;
+  if (p.lens) {
+    return (
+      <>
+        <ChangedFiles lens={p.lens} component={k.id} onFile={p.onChangedFile} />
+        <LookList items={p.lens.look.get(k.id) ?? []} onLook={p.onLook} />
+        <Neighbors {...p} />
+        <MostUsed map={p.map} component={k.id} onFile={p.onFile} />
+      </>
+    );
+  }
   return (
     <>
       {!!k.entry.length && (
@@ -232,6 +261,24 @@ export function SystemDetail(p: Props) {
   const chip = tier ?? node.tech;
   const drills =
     p.openable && (node.id === SYSTEM || (node.kind === "container" && !!node.tiles?.length));
+  const ref = node.id.slice(2);
+  const status = p.lens && node.kind === "component" ? p.lens.status.get(ref) : undefined;
+  const statusChip =
+    node.status === "added" || status === "added"
+      ? ["grn", "New"]
+      : node.status === "removed"
+        ? ["red", "Removed"]
+        : node.status === "changed"
+          ? ["amb", "Changed"]
+          : node.status === "impacted"
+            ? ["", "Impacted"]
+            : undefined;
+  const look =
+    p.lens && node.kind === "container"
+      ? [...p.map.components, ...p.lens.removed]
+          .filter((k) => k.container === ref)
+          .flatMap((k) => p.lens?.look.get(k.id) ?? [])
+      : [];
   return (
     <aside className="sys-detail">
       <header className="sys-head">
@@ -252,6 +299,7 @@ export function SystemDetail(p: Props) {
           )}
           {node.name}
           {node.kind === "component" && chip && <span className="sys-chip">{chip}</span>}
+          {statusChip && <span className={`sys-chip ${statusChip[0]}`}>{statusChip[1]}</span>}
           {p.stale && (
             <span className="sys-chip" style={{ color: "var(--amber)" }}>
               Stale
@@ -267,22 +315,43 @@ export function SystemDetail(p: Props) {
               <Chevron />
             </button>
           )}
-          {node.kind === "component" && node.path !== undefined && (
-            <button type="button" className="sys-btn" onClick={() => p.onReveal(node.path ?? "")}>
-              Files
+          {node.kind === "component" && node.status !== "removed" && (
+            <button type="button" className="sys-btn" onClick={() => p.onSymbols(ref)}>
+              Symbols
+              <Chevron />
             </button>
           )}
-          {node.id === SYSTEM && p.onTour && (
-            <button type="button" className="sys-btn" onClick={p.onTour}>
+          {p.tour && (
+            <button type="button" className="sys-btn" onClick={() => p.tour && p.onTour(p.tour)}>
               <Play size={12} />
               Tour
+              <span className="sys-btn-n">{p.tour.steps.length}</span>
+            </button>
+          )}
+          {node.kind === "component" && node.path !== undefined && (
+            <button type="button" className="sys-btn" onClick={() => p.onReveal(node.path ?? "")}>
+              Show in Files
             </button>
           )}
           <PipeButton onClick={p.onAsk}>Ask</PipeButton>
         </div>
       </header>
       {node.id === SYSTEM && <SystemBody {...p} />}
-      {node.kind === "container" && <Inside {...p} />}
+      {node.kind === "container" &&
+        (p.lens ? (
+          <>
+            <ChangedInside
+              map={p.map}
+              lens={p.lens}
+              container={ref}
+              color={node.color ?? "#8b8d93"}
+              onShow={p.onShow}
+            />
+            <LookList items={look} onLook={p.onLook} />
+          </>
+        ) : (
+          <Inside {...p} />
+        ))}
       {node.kind === "component" && <ComponentBody {...p} />}
       {node.kind !== "component" && node.id !== SYSTEM && <TalksTo {...p} />}
     </aside>

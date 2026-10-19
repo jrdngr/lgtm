@@ -27,6 +27,7 @@ const map: SystemDto = {
   components: [comp("web/ui", "web"), comp("web/api", "web"), comp("core/db", "core")],
   edges: [edge("web/ui", "web/api", "web/ui/a.ts"), edge("web/api", "core/db", "web/api/b.ts")],
   files: [],
+  tours: [],
   description: {
     summary: "",
     people: [{ name: "User", description: "" }],

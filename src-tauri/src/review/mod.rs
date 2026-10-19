@@ -49,7 +49,6 @@ use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
 pub use github::PulledThread;
-pub use graph::GraphDto;
 use load::Loaded;
 use matching::MatchedCheck;
 pub use quotes::quoted_reply;

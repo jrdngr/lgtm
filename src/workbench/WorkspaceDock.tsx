@@ -8,7 +8,6 @@ import "dockview-react/dist/styles/dockview.css";
 import "./dock.css";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArchPanel } from "../arch/ArchPanel";
 import { useAgentArch } from "../arch/useAgentArch";
 import { ReportPanel } from "../bots/ReportPanel";
 import { useAgentReports } from "../bots/useAgentReports";
@@ -26,7 +25,7 @@ import { useAgentQa } from "../qa/useAgentQa";
 import { WorkspaceReview } from "../review/IdleReview";
 import { ReviewPanel } from "../review/ReviewPanel";
 import { SettingsPanel } from "../settings/SettingsPanel";
-import { SystemPanel } from "../system/SystemPanel";
+import { ArchitecturePanel } from "../system/ArchitecturePanel";
 import { useAgentSystem } from "../system/useAgentSystem";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { guarded } from "../ui/Crash";
@@ -42,15 +41,15 @@ const components = {
   review: guarded(ReviewPanel),
   terminal: guarded(TerminalPanel),
   report: guarded(ReportPanel),
-  architecture: guarded(ArchPanel),
+  architecture: guarded(ArchitecturePanel),
   editor: guarded(EditorPanel),
   prPreview: guarded(PrPreview),
   settings: guarded(SettingsPanel),
   shortcuts: guarded(ShortcutsPanel),
   qa: guarded(QaTab),
-  system: guarded(SystemPanel),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
-  // runs panels are then closed.
+  // runs panels are then closed, and whose System tab becomes Architecture.
+  system: () => null,
   tasks: () => null,
   threads: () => null,
   files: () => null,

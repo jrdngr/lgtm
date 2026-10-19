@@ -1,4 +1,4 @@
-//! The component diff, intents and the default layers, over hand-built models. Without roots,
+//! The component diff and the default layers, over hand-built models. Without roots,
 //! each top-level folder is a component.
 
 use super::compute::{Stored, compute};
@@ -80,10 +80,9 @@ fn model() -> Model {
     }
 }
 
-fn run(m: &Model, lens: Lens, transitive: bool, intents: Vec<(u32, IntentKind)>) -> ArchDto {
-    let g = Grouping::new(vec![], lens, "repo");
+fn run(m: &Model, transitive: bool) -> ArchDto {
+    let g = Grouping::new(vec![], "repo");
     let stored = Stored {
-        intents,
         checked: Default::default(),
         assessed: None,
     };
@@ -103,7 +102,7 @@ fn edge<'a>(a: &'a ArchDto, from: &str, to: &str) -> &'a EdgeDto {
 
 #[test]
 fn statuses_follow_changes_imports_and_symbol_uses() {
-    let a = run(&model(), Lens::default(), false, vec![]);
+    let a = run(&model(), false);
     let got: Vec<(&str, CompStatus)> = a
         .components
         .iter()
@@ -137,7 +136,7 @@ fn statuses_follow_changes_imports_and_symbol_uses() {
         }
     );
 
-    let a = run(&model(), Lens::default(), true, vec![]);
+    let a = run(&model(), true);
     assert_eq!(status(&a, "app"), Impacted);
     assert!(edge(&a, "app", "ui").impacted);
 }
@@ -146,7 +145,7 @@ fn statuses_follow_changes_imports_and_symbol_uses() {
 fn a_symbol_use_without_an_import_edge_does_not_impact() {
     let mut m = model();
     m.uses.push(caller("misc/x.ts", 1, "api/client.ts"));
-    let a = run(&m, Lens::default(), false, vec![]);
+    let a = run(&m, false);
     assert_eq!(status(&a, "misc"), CompStatus::Unchanged);
     let used = a
         .look
@@ -154,70 +153,6 @@ fn a_symbol_use_without_an_import_edge_does_not_impact() {
         .find(|l| l.key == "rule:symbol:api/client.ts#sym")
         .unwrap();
     assert_eq!(used.title, "sym used by ui");
-}
-
-#[test]
-fn merged_components_join_and_drop_their_internal_edges() {
-    let lens = Lens {
-        merged: [("new".to_string(), "api".to_string())].into(),
-        ..Lens::default()
-    };
-    let a = run(&model(), lens, false, vec![]);
-    assert!(a.components.iter().all(|c| c.id != "new"));
-    let api = a.components.iter().find(|c| c.id == "api").unwrap();
-    let files: Vec<&str> = api.files.iter().map(|f| f.path.as_str()).collect();
-    assert_eq!(files, ["api/client.ts", "new/fresh.ts"]);
-    assert!(a.edges.iter().all(|e| e.from != e.to));
-}
-
-#[test]
-fn intents_are_broken_open_or_met_against_the_diff() {
-    let wrong = |from: &str, to: &str| IntentKind::Wrong {
-        from: from.into(),
-        to: to.into(),
-        reason: None,
-    };
-    let mv = |path: &str, to: &str| IntentKind::Move {
-        path: path.into(),
-        symbol: None,
-        to: to.into(),
-    };
-    let mut m = model();
-    let mut moved = changed("ui/form.ts", FileStatus::Renamed);
-    moved.old_path = Some("app/form.ts".into());
-    m.changed.push(moved);
-    m.base.insert("app/form.ts".into(), vec![]);
-    m.head.insert("ui/form.ts".into(), vec![]);
-    let lens = Lens {
-        merged: [("fresh".to_string(), "new".to_string())].into(),
-        ..Lens::default()
-    };
-    let intents = vec![
-        (1, wrong("api", "fresh")),
-        (2, wrong("ui", "api")),
-        (3, wrong("api", "old")),
-        (4, mv("app/form.ts", "ui")),
-        (5, mv("api/client.ts", "db")),
-        (6, mv("app/main.ts", "db")),
-        (
-            7,
-            IntentKind::Risk {
-                component: "api".into(),
-            },
-        ),
-    ];
-    let a = run(&m, lens, false, intents);
-    let states: Vec<IntentState> = a.intents.iter().map(|i| i.state).collect();
-    use IntentState::*;
-    assert_eq!(states, [Broken, Open, Met, Met, Broken, Open, Tag]);
-    assert_eq!(edge(&a, "api", "new").wrong, Some(1));
-    let comp = |id: &str| a.components.iter().find(|c| c.id == id).unwrap();
-    assert!(comp("api").risk);
-    assert_eq!(comp("api").misplaced, ["api/client.ts"]);
-    assert_eq!(comp("app").misplaced, ["app/main.ts"]);
-    let broken = a.look.iter().find(|l| l.key == "rule:broken:1").unwrap();
-    assert_eq!(broken.severity, LookSeverity::High);
-    assert_eq!(comp("api").severity, Some(LookSeverity::High));
 }
 
 #[test]
@@ -250,7 +185,7 @@ fn default_layers_put_dependencies_first() {
         }];
         m.changed.push(ch);
     }
-    let a = run(&m, Lens::default(), false, vec![]);
+    let a = run(&m, false);
     let order: Vec<(&str, &str)> = a
         .layers
         .iter()
@@ -300,16 +235,10 @@ fn assessed_layers_point_at_the_current_review_files() {
         commits: None,
     };
     let stored = Stored {
-        intents: vec![],
         checked: Default::default(),
         assessed: Some(assessed),
     };
-    let a = compute(
-        &m,
-        &Grouping::new(vec![], Lens::default(), "repo"),
-        false,
-        stored,
-    );
+    let a = compute(&m, &Grouping::new(vec![], "repo"), false, stored);
     let files: Vec<Option<u32>> = a.layers[0].ranges.iter().map(|r| r.file).collect();
     assert_eq!(files, [Some(0), None]);
 }
