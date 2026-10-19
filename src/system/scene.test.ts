@@ -223,4 +223,32 @@ describe("layout", () => {
     expect(x.x).toBeGreaterThan(b.x + b.w);
     expect(l.width).toBeGreaterThan(x.x + x.w);
   });
+
+  it("wraps a long column of doors to the boundary's height, two rows past it at most", () => {
+    const door = (i: number) => ({
+      id: `c:d${i}`,
+      kind: "container" as const,
+      name: `d${i}`,
+      door: true,
+    });
+    const scene: Scene = {
+      left: [],
+      inside: [{ nodes: [{ id: "k:a", kind: "component", name: "a" }] }],
+      right: Array.from({ length: 19 }, (_, i) => door(i)),
+      boundary: "app",
+      edges: [],
+    };
+    const l = layout(scene);
+    const b = l.boundary;
+    if (!b) throw new Error("no boundary");
+    const doors = l.nodes.filter((n) => n.door);
+    const step = doors[1].y - doors[0].y;
+    expect(doors).toHaveLength(19);
+    expect(new Set(doors.map((d) => d.x)).size).toBeGreaterThan(1);
+    for (const d of doors) {
+      expect(d.x).toBeGreaterThan(b.x + b.w);
+      expect(d.y).toBeGreaterThanOrEqual(b.y - 2 * step - 1);
+      expect(d.y + d.h).toBeLessThanOrEqual(b.y + b.h + 2 * step + 1);
+    }
+  });
 });

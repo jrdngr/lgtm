@@ -33,8 +33,13 @@ const GAP_Y = 44;
 const PAD = 40;
 /** Between a side column and the boundary. */
 const COLUMN_GAP = 110;
-/** Between nodes in a side column. */
+/** Between nodes in a side column, and between doors. */
 const COLUMN_Y = 56;
+const DOOR_Y = 14;
+/** Between the columns a long side column wraps into. */
+const WRAP_X = 24;
+/** How many rows a side column may run past the boundary, above and below together. */
+const OVERHANG = 4;
 /** Room for tier names left of the boundary's rows. */
 const TIER_W = 90;
 /** Between the boundary and the rows it holds. */
@@ -62,8 +67,25 @@ const gapX = (nodes: SNode[]) => (nodes.some((n) => n.kind === "container") ? 60
 const rowWidth = (nodes: SNode[]) =>
   nodes.reduce((w, n) => w + size(n)[0], 0) + gapX(nodes) * Math.max(0, nodes.length - 1);
 
+const columnGap = (nodes: SNode[]) => (nodes.every((n) => n.door) ? DOOR_Y : COLUMN_Y);
+
 const columnHeight = (nodes: SNode[]) =>
-  nodes.reduce((h, n) => h + size(n)[1], 0) + COLUMN_Y * Math.max(0, nodes.length - 1);
+  nodes.reduce((h, n) => h + size(n)[1], 0) + columnGap(nodes) * Math.max(0, nodes.length - 1);
+
+/** A side column split into columns about as tall as the boundary, running at most
+ * `OVERHANG` rows past it, the first column nearest the boundary. */
+function wrapColumn(nodes: SNode[], centerH: number): SNode[][] {
+  if (!nodes.length) return [];
+  const step = Math.max(...nodes.map((n) => size(n)[1])) + columnGap(nodes);
+  const rows = Math.max(1, Math.round((centerH + columnGap(nodes)) / step)) + OVERHANG;
+  const out: SNode[][] = [];
+  for (let i = 0; i < nodes.length; i += rows) out.push(nodes.slice(i, i + rows));
+  return out;
+}
+
+const sideWidth = (cols: SNode[][]) =>
+  cols.reduce((w, c) => w + Math.max(...c.map((n) => size(n)[0])), 0) +
+  WRAP_X * Math.max(0, cols.length - 1);
 
 /** Places the scene's rows top to bottom inside the boundary, each centered, with its side
  * columns left and right of it. */
@@ -79,23 +101,29 @@ export function layout(scene: Scene): Layout {
   const inset = framed ? INSET : 0;
   const centerW = rowsW + tierLeft + inset * 2;
   const centerH = rowsH + inset * 2;
-  const leftW = Math.max(0, ...scene.left.map((n) => size(n)[0]));
-  const rightW = Math.max(0, ...scene.right.map((n) => size(n)[0]));
-  const height = Math.max(centerH, columnHeight(scene.left), columnHeight(scene.right)) + PAD * 2;
+  const left = wrapColumn(scene.left, centerH);
+  const right = wrapColumn(scene.right, centerH);
+  const leftW = sideWidth(left);
+  const rightW = sideWidth(right);
+  const height =
+    Math.max(centerH, ...[...left, ...right].map((c) => columnHeight(c))) + PAD * 2;
   const nodes: Placed[] = [];
 
-  const column = (col: SNode[], x: number, w: number) => {
+  const column = (col: SNode[], x: number) => {
+    const w = Math.max(...col.map((n) => size(n)[0]));
     let y = (height - columnHeight(col)) / 2;
     for (const n of col) {
       const [nw, nh] = size(n);
       nodes.push({ ...n, x: x + (w - nw) / 2, y, w: nw, h: nh });
-      y += nh + COLUMN_Y;
+      y += nh + columnGap(col);
     }
+    return w + WRAP_X;
   };
 
   let x = PAD;
-  if (scene.left.length) {
-    column(scene.left, x, leftW);
+  if (left.length) {
+    let lx = x;
+    for (const col of [...left].reverse()) lx += column(col, lx);
     x += leftW + COLUMN_GAP;
   }
   const cx = x;
@@ -126,9 +154,10 @@ export function layout(scene: Scene): Layout {
       ? { name: scene.boundary, color: scene.color, x: cx, y: cy, w: centerW, h: centerH }
       : undefined;
   x += centerW;
-  if (scene.right.length) {
+  if (right.length) {
     x += COLUMN_GAP;
-    column(scene.right, x, rightW);
+    let rx = x;
+    for (const col of right) rx += column(col, rx);
     x += rightW;
   }
   return { nodes, tiers, boundary, width: x + PAD, height };
