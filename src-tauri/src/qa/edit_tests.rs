@@ -76,6 +76,29 @@ async fn the_asking_terminal_runs_the_session() {
 }
 
 #[tokio::test]
+async fn questions_for_a_sent_session_start_a_new_one() {
+    let (_dir, ctx) = crate::review::tests::repo();
+    let ws = ctx.workspace(None).await.unwrap();
+    let old = ctx.create_qa(&ws, "p", vec!["a.md".into()]).unwrap().id;
+    let sent = SessionEdit::Sent {
+        terminal: "t".into(),
+    };
+    ctx.edit_qa_session(&ws, &old, sent).unwrap();
+    let (id, ids) = ctx
+        .ask_qa(&ws, AskIn::Session(old.clone()), None, vec![question("x")])
+        .unwrap();
+    assert_ne!(id, old);
+    assert_eq!(ids, ["Q1"]);
+    let s = ctx.qa_session(&ws, &id).unwrap();
+    assert_eq!(
+        (s.prompt.as_str(), s.attach.as_slice()),
+        ("p", ["a.md".to_string()].as_slice())
+    );
+    assert!(s.from_terminal && s.sent.is_none());
+    assert!(ctx.qa_session(&ws, &old).unwrap().queue.get("Q1").is_none());
+}
+
+#[tokio::test]
 async fn an_update_needs_the_question_it_follows() {
     let (_dir, ctx) = crate::review::tests::repo();
     let ws = ctx.workspace(None).await.unwrap();

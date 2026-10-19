@@ -68,7 +68,8 @@ pub struct QaQuestion {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct QaAsk {
-    /// The session to add to, from list_qa. Leave it out to start one.
+    /// The session to add to, from list_qa. Leave it out to start one. A session already
+    /// sent is done: questions for it start a new session.
     pub session: Option<String>,
     /// For a new session: what it's deciding, in a line.
     pub title: Option<String>,

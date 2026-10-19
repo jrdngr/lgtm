@@ -125,7 +125,15 @@ impl RepoCtx {
         prompt: &str,
         attach: Vec<String>,
     ) -> anyhow::Result<Session> {
-        let created = now_ms();
+        let store = self.store.lock().unwrap();
+        // Ids are creation times; one taken in the same millisecond moves on to the next.
+        let mut created = now_ms();
+        while store
+            .qa_session(ws_key(ws), &format!("{created:013}"))?
+            .is_some()
+        {
+            created += 1;
+        }
         let s = Session {
             id: format!("{created:013}"),
             title: title(prompt),
@@ -141,11 +149,7 @@ impl RepoCtx {
             archived: false,
             created: created as f64,
         };
-        self.store.lock().unwrap().save_qa_session(
-            ws_key(ws),
-            &s.id,
-            &serde_json::to_string(&s)?,
-        )?;
+        store.save_qa_session(ws_key(ws), &s.id, &serde_json::to_string(&s)?)?;
         Ok(s)
     }
 

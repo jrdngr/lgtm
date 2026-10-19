@@ -6,6 +6,8 @@ use crate::workspace::Workspace;
 
 /// Where an agent's questions go.
 pub enum AskIn {
+    /// More questions for a session. A session already sent is done, so they start a new one
+    /// from its prompt.
     Session(String),
     /// A new session from a prompt, with the paths to read first.
     New {
@@ -25,7 +27,14 @@ impl RepoCtx {
         questions: Vec<NewQuestion>,
     ) -> anyhow::Result<(String, Vec<String>)> {
         let (id, new) = match into {
-            AskIn::Session(id) => (id, false),
+            AskIn::Session(id) => {
+                let s = self.qa_session(ws, &id)?;
+                if s.sent.is_some() {
+                    (self.create_qa(ws, &s.prompt, s.attach)?.id, true)
+                } else {
+                    (id, false)
+                }
+            }
             AskIn::New { prompt, attach } => (self.create_qa(ws, &prompt, attach)?.id, true),
         };
         let ids = self.edit_qa(ws, &id, |s| {
