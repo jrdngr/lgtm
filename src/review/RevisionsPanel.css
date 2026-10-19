@@ -23,71 +23,6 @@
   overflow: hidden;
 }
 
-.picker-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
-  border-bottom: 1px solid var(--hair);
-}
-
-.revset-field {
-  flex: 1 1 160px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--bg);
-  font: var(--fs-sm) var(--mono);
-}
-
-.revset-field:focus-within {
-  border-color: var(--accent);
-}
-
-.revset-field span {
-  color: var(--muted);
-}
-
-.revset-field input {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: none;
-  outline: none;
-  background: none;
-  color: var(--fg);
-  font: inherit;
-}
-
-.picker-bar button {
-  white-space: nowrap;
-}
-
-.picker-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--hair);
-}
-
-.picker-presets button {
-  padding: 1px 7px;
-  border-radius: 999px;
-  font: var(--fs-xs) var(--mono);
-  color: var(--muted);
-}
-
-.picker-presets button.on {
-  color: var(--fg);
-  border-color: transparent;
-  background: var(--selection);
-}
-
 .log-lines {
   margin: 0;
   padding: 4px 0;
@@ -99,7 +34,39 @@
 
 .log-line {
   position: relative;
-  padding: 0 8px;
+  padding: 0 8px 0 22px;
+}
+
+/* Reviewed commits are blue, `@` green over them. */
+.log-line.rv {
+  background: rgb(57 197 207 / 9%);
+}
+
+.log-line.at {
+  background: rgb(63 185 80 / 12%);
+}
+
+/* The bracket down the left of the reviewed commits. */
+.log-bk {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 8px;
+  box-sizing: border-box;
+  border-left: 3px solid var(--review);
+}
+
+.log-bk.top {
+  top: 4px;
+  border-top: 3px solid var(--review);
+  border-top-left-radius: 4px;
+}
+
+.log-bk.bot {
+  bottom: 4px;
+  border-bottom: 3px solid var(--review);
+  border-bottom-left-radius: 4px;
 }
 
 .log-line.pickable {
@@ -117,40 +84,6 @@
 .log-line.cursor {
   background: var(--selection);
   box-shadow: inset 2px 0 var(--accent);
-}
-
-.log-actions {
-  position: absolute;
-  top: 0;
-  right: 8px;
-  display: inline-flex;
-  gap: 2px;
-}
-
-.log-actions button {
-  padding: 0 6px;
-  font:
-    var(--fs-xs) / 16px -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  background: var(--raise);
-}
-
-.log-new {
-  position: relative;
-}
-
-.log-new .menu-list {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  min-width: 0;
-}
-
-.log-new .menu-list button {
-  background: none;
-  font-size: var(--fs-sm);
-  line-height: 18px;
 }
 
 .picker-footer {

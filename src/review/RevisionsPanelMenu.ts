@@ -1,17 +1,23 @@
 import type { JjAction } from "../bindings";
+import type { WorkspaceName } from "../core/workspace";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { confirmAction, promptText } from "../ui/prompt";
+import { followWorkingCopy } from "./followWorkingCopy";
 
-/** An action on a commit: the jj action, its label, and the revset to review after it. */
-export type RevAction = [JjAction, string, string?];
+/** An action on a commit: the jj action, its label, and whether the review follows `@` after
+ * it. */
+export type RevAction = [JjAction, string, boolean?];
 
 /** Keys that act on the highlighted commit. */
 export const REV_ACTIONS: Record<string, (rev: string) => RevAction> = {
-  e: (rev) => [{ kind: "edit", rev }, `Editing ${rev}`, "@"],
-  n: (rev) => [{ kind: "newAfter", rev }, `New commit after ${rev}`, `${rev}::@`],
-  N: (rev) => [{ kind: "newBefore", rev }, `New commit before ${rev}`, `@::${rev}`],
+  e: (rev) => [{ kind: "edit", rev }, `Editing ${rev}`, true],
+  n: (rev) => [{ kind: "newAfter", rev }, `New commit after ${rev}`],
+  N: (rev) => [{ kind: "newBefore", rev }, `New commit before ${rev}`],
   s: (rev) => [{ kind: "squash", rev }, `Squashed ${rev}`],
 };
+
+/** The review grown to take in `change`, with the commits between. */
+export const addToReview = (revset: string, change: string) => `connected((${revset}) | ${change})`;
 
 /** Revsets offered for review: `@`, its parent, and everything since trunk, named by trunk's
  * bookmark when it has one. */
@@ -40,17 +46,20 @@ export async function askAbandon(rev: string): Promise<RevAction | undefined> {
   return ok ? [{ kind: "abandon", rev }, `Abandoned ${rev}`] : undefined;
 }
 
-/** Loads the review after a jj action: on `next`, or on `revset` while it still resolves and
- * on `@` once it doesn't. Returns the error of loading `next`. */
+/** Asks for a revset to review, starting from the current one. */
+export const askRevset = (revset: string) =>
+  promptText("Review revset", { value: revset, action: "Review" });
+
+/** Reloads the review after a jj action: on `revset` while it still resolves, on `@` once it
+ * doesn't. With `follow`, the review then follows `@` as it does a move made elsewhere. */
 export async function reviewAfter(
+  workspace: WorkspaceName,
   load: (revset: string) => Promise<string | undefined>,
   revset: string,
-  next?: string,
-): Promise<string | undefined> {
-  const failed = await load(next ?? revset);
-  if (!failed || next) return failed;
-  await load("@");
-  return undefined;
+  follow?: boolean,
+) {
+  if (await load(revset)) await load("@");
+  if (follow) await followWorkingCopy(workspace);
 }
 
 interface Row {
@@ -58,8 +67,8 @@ interface Row {
   commit: string;
   /** Its description, when jj log gave one. */
   description?: string;
-  /** Whether ↵ reviews just this commit, rather than a range it's in. */
-  alone: boolean;
+  /** The review's revset. */
+  revset: string;
   busy: boolean;
   review(revset: string): void;
   act(action: RevAction): void;
@@ -78,14 +87,11 @@ export function revRowMenu(r: Row): CtxEntry[] {
   });
   const ask = (f: () => Promise<RevAction | undefined>) => () => f().then((a) => a && r.act(a));
   return [
-    {
-      label: "Review This Change",
-      keys: r.alone ? "↵" : undefined,
-      onSelect: () => r.review(change),
-    },
+    { label: "Review This Change", keys: "r", onSelect: () => r.review(change) },
+    { label: "Add to Review", keys: "⇧r", onSelect: () => r.review(addToReview(r.revset, change)) },
     { label: "Review from Here to @", onSelect: () => r.review(`${change}::@`) },
     "-",
-    key("e", "Edit"),
+    { ...key("e", "Edit"), keys: "↵" },
     key("n", "New After"),
     key("N", "New Before"),
     key("s", "Squash into Parent"),
@@ -96,14 +102,18 @@ export function revRowMenu(r: Row): CtxEntry[] {
     },
     { label: "Abandon…", disabled: busy, onSelect: ask(() => askAbandon(change)) },
     "-",
-    { label: "Copy Change ID", onSelect: () => copy(change) },
-    { label: "Copy Commit ID", onSelect: () => copy(r.commit) },
-    r.description !== undefined && {
-      label: "Copy Description",
-      onSelect: () => copy(r.description ?? ""),
-    },
+    { label: "Copy", items: copyItems(change, r.commit, r.description) },
     "-",
     { label: "Undo", keys: "u", disabled: busy, onSelect: r.undo },
     { label: "Redo", keys: "U", disabled: busy, onSelect: r.redo },
+  ];
+}
+
+/** Copy items for a commit. */
+export function copyItems(change: string, commit: string, description?: string): CtxEntry[] {
+  return [
+    { label: "Change ID", onSelect: () => copy(change) },
+    { label: "Commit ID", onSelect: () => copy(commit) },
+    description !== undefined && { label: "Description", onSelect: () => copy(description) },
   ];
 }

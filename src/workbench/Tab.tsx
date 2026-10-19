@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { activate } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
+import { useAtOutside } from "../review/workingCopy";
 import { hasTerminal, pinTarget, useSendTarget } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
@@ -90,7 +91,19 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   const mark = pinned ? "pinned" : send.target === api.id ? "target" : undefined;
   const panel = containerApi.getPanel(api.id);
   const agents = tabState(useActivity(workspace), api.id);
-  const glyph = agents && <Glyph state={agents} className="tab-glyph" />;
+  const atOutside = useAtOutside(workspace);
+  const [shown, setShown] = useState(api.isVisible);
+  useEffect(() => {
+    const sub = api.onDidVisibilityChange((e) => setShown(e.isVisible));
+    return () => sub.dispose();
+  }, [api]);
+  // Saving the shown editor writes to `@`, which is outside the review.
+  const wdot = atOutside && shown && panel?.view.contentComponent === "editor";
+  const glyph = agents ? (
+    <Glyph state={agents} className="tab-glyph" />
+  ) : (
+    wdot && <span className="tab-wdot" />
+  );
   async function close() {
     if (await confirmClose(workspace, api.id)) api.close();
   }

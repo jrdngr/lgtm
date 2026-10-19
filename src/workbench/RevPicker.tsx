@@ -1,26 +1,22 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspaceName } from "../core/workspace";
+import { usePr } from "../github/pr";
 import { commands } from "../ipc";
+import { ReviewBox } from "../review/ReviewBox";
 import { RevisionsPanel } from "../review/RevisionsPanel";
-import { RevLabel } from "../review/RevLabel";
-import { onOpenRevisions, type ReviewTarget, useReviewTarget } from "../review/target";
+import { onOpenRevisions, useReviewTarget } from "../review/target";
+import { useTrackWorkingCopy, useWorkingCopy } from "../review/workingCopy";
 import { contextMenu } from "../ui/contextMenu";
 import { revsetMenu } from "./revsetMenu";
-import "../review/ReviewBar.css";
 
-/** The full revset, its change count, and staleness, over the field. */
-function hover({ revset, changes, stale }: ReviewTarget) {
-  const n = changes.length;
-  const count = `${n} change${n === 1 ? "" : "s"}`;
-  return `${revset} · ${count}${stale ? " · working copy is stale" : ""}\nRevisions (⌘J)`;
-}
-
-/** What the workspace reviews, in the header, whether or not a review pane is open. Opens
- * the revisions panel to pick another revset or change commits; `@` in a review opens it
- * too. Amber warns of a conflict, a change with edits but no description, or a stale
- * working copy. */
+/** What the workspace reviews and where `@` is, in the header, whether or not a review pane
+ * is open. Opens the revisions panel to pick another review or change commits; `@` in a
+ * review opens it too. */
 export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
   const target = useReviewTarget(workspace);
+  const pr = usePr(workspace);
+  const wc = useWorkingCopy(workspace);
+  useTrackWorkingCopy(workspace, target);
   const [open, setOpen] = useState(false);
   const [trunk, setTrunk] = useState<string | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
@@ -44,10 +40,7 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
   }, [workspace]);
 
   const loading = !target || (target.loading && target.changes.length === 0);
-  const head = target?.changes.at(-1);
-  const conflict = target?.changes.some((c) => c.conflict);
-  const warn =
-    !loading && (target?.stale || conflict || (head && !head.empty && !head.description));
+  const prReview = pr && target?.revset === pr.revset ? pr : null;
 
   useLayoutEffect(() => {
     if (!loading && ref.current) width.current = ref.current.offsetWidth;
@@ -63,20 +56,22 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
       <button
         ref={ref}
         type="button"
-        className={`rev-chip rev-select${open ? " open" : ""}${warn ? " warn" : ""}`}
+        className={`rev-select${open ? " open" : ""}`}
         disabled={!target}
         aria-busy={loading}
         onClick={() => setOpen(true)}
         onContextMenu={contextMenu(() =>
-          revsetMenu({ workspace, target, trunk, openRevisions: () => setOpen(true) }),
+          revsetMenu({ workspace, target, trunk, pr, wc, openRevisions: () => setOpen(true) }),
         )}
         style={loading ? { width: width.current } : undefined}
-        title={loading || !target ? "Revisions (⌘J)" : hover(target)}
+        title={target?.revset}
       >
         {loading || !target ? (
-          <span className="rev-shimmer" />
+          <span className="rev-box">
+            <span className="rev-shimmer" />
+          </span>
         ) : (
-          <RevLabel revset={target.revset} changes={target.changes} />
+          <ReviewBox changes={target.changes} pr={prReview} wc={wc} stale={target.stale} />
         )}
         <kbd>⌘J</kbd>
       </button>
@@ -84,6 +79,7 @@ export function RevPicker({ workspace }: { workspace: WorkspaceName }) {
         <RevisionsPanel
           workspace={workspace}
           revset={target.revset}
+          reviewed={target.changes.map((c) => c.commitId)}
           head={target.changes.at(-1)?.commitId}
           onLoad={target.load}
           onClose={close}

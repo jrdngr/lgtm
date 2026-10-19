@@ -21,18 +21,27 @@ async function prAfterMove(workspace: WorkspaceName): Promise<PrDto | null> {
   return r.data;
 }
 
-/** Points the workspace's review at the working copy: its PR's view, which ends at `@`, or
- * `@` itself. A review already on it follows `@` when it refreshes. */
+/** Whether `@` is in the review of `revset` or builds on it. */
+async function holdsAt(workspace: WorkspaceName, revset: string) {
+  const r = await commands.workingCopy(workspace, revset);
+  return r.status === "ok" && r.data.place !== "outside";
+}
+
+/** Points the workspace's review at its PR's commits. Without a PR, a review `@` is in or
+ * builds on stays, and any other goes to `@`. A review already on it refreshes on its own. */
 async function followOnce(workspace: WorkspaceName) {
-  const revset = (await prAfterMove(workspace))?.revset ?? "@";
-  if (workspaceRevset(workspace) === revset) return;
+  const pr = await prAfterMove(workspace);
+  const current = workspaceRevset(workspace);
+  if (!pr && current && (await holdsAt(workspace, current))) return;
+  const revset = pr?.revset ?? "@";
+  if (current === revset) return;
   setWorkspaceRevset(workspace, revset);
   await targetOf(workspace)?.load(revset);
 }
 
-/** Runs one follow at a time per workspace. Moves that land meanwhile run one more, for
- * wherever `@` is by then. */
-async function follow(workspace: WorkspaceName) {
+/** Points the workspace's review at the working copy after `@` moved. Runs one follow at a
+ * time per workspace. Moves that land meanwhile run one more, for wherever `@` is by then. */
+export async function followWorkingCopy(workspace: WorkspaceName) {
   const key = workspaceKey(workspace);
   if (running.has(key)) {
     again.add(key);
@@ -54,7 +63,7 @@ export function useFollowWorkingCopy() {
   useEffect(() => {
     const sub = events
       .workingCopyMoved(getCurrentWebviewWindow())
-      .listen((e) => follow(e.payload.workspace));
+      .listen((e) => followWorkingCopy(e.payload.workspace));
     return () => {
       sub.then((un) => un());
     };

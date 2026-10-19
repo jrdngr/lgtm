@@ -299,7 +299,7 @@
 
 .stack-pr.on,
 .stack-pr.on:hover:not(:disabled) {
-  background: rgb(163 113 247 / 16%);
+  background: var(--review-soft);
 }
 
 .stack-radio {
@@ -394,10 +394,10 @@
   color: var(--muted);
 }
 
-/* Shows the stack PRs: violet while they show. */
+/* Shows the stack PRs: blue while they show. */
 .ws-pr-toggle.on {
-  color: var(--violet-text);
-  background: var(--violet-soft);
+  color: var(--review-text);
+  background: var(--review-soft);
 }
 
 .ws-agent-list {

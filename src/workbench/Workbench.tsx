@@ -13,6 +13,7 @@ import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { openRevisions } from "../review/target";
+import { useAtOutside } from "../review/workingCopy";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
@@ -20,6 +21,7 @@ import { selectActivity } from "../workspaces/activity";
 import { type AddKind, requestAdd } from "../workspaces/addRequests";
 import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
+import { AtBanner } from "./AtBanner";
 import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
 import { RevPicker } from "./RevPicker";
@@ -83,6 +85,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   }
 
   const workspaces = useWorkspaces();
+  const atOutside = useAtOutside(selected);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   // The selected workspace, remembered from last time or forgotten from a terminal, may be
@@ -223,7 +226,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   return (
     <div className="workbench">
-      <header className="toolbar">
+      <header className={`toolbar${atOutside ? " warn" : ""}`}>
         <SideToggle
           side="left"
           open={sides.left.open}
@@ -246,6 +249,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           onClick={() => toggle("right")}
         />
       </header>
+      <AtBanner workspace={selected} />
       <McpOffer />
       <PromptHost />
       <div className="workbench-body">

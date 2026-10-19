@@ -1,7 +1,7 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::jj::{JjAction, LogLine};
+use crate::jj::{JjAction, LogLine, WorkingCopyDto};
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
 
@@ -77,6 +77,18 @@ pub(crate) async fn revset_commits(
 ) -> CmdResult<Vec<String>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     ws.jj.commit_ids(&revset).await.map_err(err)
+}
+
+/// The workspace's working copy, and where it sits against the review of `revset`.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn working_copy(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    revset: String,
+) -> CmdResult<WorkingCopyDto> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    ws.jj.working_copy(&revset).await.map_err(err)
 }
 
 /// Runs a revisions panel action in the workspace. Returns how many jj operations it took.

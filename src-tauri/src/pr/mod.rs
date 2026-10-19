@@ -25,15 +25,10 @@ pub use refetch::HeadDto;
 pub use send::Fixed;
 
 impl PrRecord {
-    /// What the workspace reviews: the PR's commits and the working copy above them, which
-    /// matches GitHub's diff.
-    /// Off the stack, it's the PR's own commits.
+    /// What the workspace reviews: the PR's own commits, which match GitHub's diff.
     pub fn revset(&self) -> String {
         let base = remote_bookmark(&self.base_ref, &self.base_remote);
-        match self.off {
-            true => format!("{base}..{}", head_revset(&self.head_ref)),
-            false => pr_revset(&base, &self.head_ref),
-        }
+        format!("{base}..{}", head_revset(&self.head_ref))
     }
 
     /// The commit of the PR's head bookmark: the local one, else where it was fetched.
@@ -44,13 +39,6 @@ impl PrRecord {
 
 fn quoted(name: &str) -> String {
     format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-/// `base..@`, less the commits from any other bookmark above the PR's head bookmark: those
-/// belong to the next branch in the stack.
-fn pr_revset(base: &str, head: &str) -> String {
-    let head = quoted(head);
-    format!("({base}..@) ~ ((bookmarks() & (bookmarks(exact:{head})+::@))::)")
 }
 
 fn head_revset(head: &str) -> String {

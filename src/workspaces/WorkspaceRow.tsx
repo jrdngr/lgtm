@@ -41,7 +41,7 @@ function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void
   if (pr && !pr.stack) {
     return (
       <span className="workspace-title">
-        <span className="pill purple">#{pr.number}</span>
+        <span className="pill pr">#{pr.number}</span>
         <span className="ellipsis">{pr.title}</span>
       </span>
     );
@@ -53,7 +53,7 @@ function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void
         {w.name === null && <span className="pill">main</span>}
         {pr?.off && <span className="pill amber">Off stack</span>}
         {pr && (
-          <span className="pill purple" title={pr.title}>
+          <span className="pill pr" title={pr.title}>
             #{pr.number}
             {/* biome-ignore lint/a11y/useKeyWithClickEvents: the PR tab's menu deselects by keyboard */}
             <span

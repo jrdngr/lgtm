@@ -4,15 +4,16 @@ import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { openMenu } from "../ui/contextMenu";
 import { AnsiText } from "./AnsiText";
-import { RevisionsPanelActions } from "./RevisionsPanelActions";
 import { RevisionsPanelFooter } from "./RevisionsPanelFooter";
-import { presets, REV_ACTIONS, reviewAfter, revRowMenu } from "./RevisionsPanelMenu";
+import { addToReview, REV_ACTIONS, reviewAfter, revRowMenu } from "./RevisionsPanelMenu";
 import "./RevisionsPanel.css";
 
 interface Props {
   workspace: WorkspaceName;
   /** The review's revset. */
   revset: string;
+  /** The review's commit ids. */
+  reviewed: string[];
   /** The review's newest commit, where the cursor starts. */
   head?: string;
   /** Loads a revset as the review. Returns the error message when it fails. */
@@ -36,26 +37,38 @@ function layout(lines: LogLine[]) {
   return { commits, owner };
 }
 
+/** The first and last line of the reviewed commits, for the bracket beside them. */
+function bracket(lines: LogLine[], owner: number[], commits: number[], reviewed: Set<string>) {
+  const inReview = (i: number) => reviewed.has(lines[commits[owner[i]]]?.commitId ?? "");
+  const first = lines.findIndex((_, i) => owner[i] >= 0 && inReview(i));
+  if (first < 0) return undefined;
+  let last = first;
+  lines.forEach((_, i) => {
+    if (owner[i] >= 0 && inReview(i)) last = i;
+  });
+  return { first, last, inReview };
+}
+
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
- * commits. Keys and the cursor row's buttons act on the highlighted commit. */
-export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Props) {
+ * commits. Reviewed commits are blue with a bracket, `@` green over them. Keys act on the
+ * highlighted commit. */
+export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
   const [error, setError] = useState<string>();
   /** Index into `commits` of the highlighted commit, and of the other end of a range. */
   const [cursor, setCursor] = useState(0);
   const [anchor, setAnchor] = useState<number>();
-  const [typed, setTyped] = useState(revset);
   const [last, setLast] = useState<string>();
   /** How many jj operations the last action took, so undo and redo take back all of them. */
   const [steps, setSteps] = useState(1);
   const [busy, setBusy] = useState(false);
-  const [trunk, setTrunk] = useState<string | null>(null);
   /** The commit ids jj lists for a picked range. */
   const [chain, setChain] = useState<{ revset: string; ids: Set<string> }>();
   const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const { commits, owner } = layout(lines ?? []);
+  const bk = lines && bracket(lines, owner, commits, new Set(reviewed));
+  const atCommit = lines ? owner[lines.findIndex((l) => l.workingCopy)] : undefined;
   const changeAt = (k: number) => lines?.[commits[k]]?.changeId ?? undefined;
 
   async function reload(keep?: string) {
@@ -71,7 +84,6 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
     reload();
-    commands.trunkBookmark(workspace).then((r) => r.status === "ok" && setTrunk(r.data));
     rootRef.current?.focus({ preventScroll: true });
   }, []);
 
@@ -112,20 +124,15 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     else review(picked());
   }
 
-  /** Moves the cursor, and the anchor for a range, and shows the pick in the field. */
+  /** Moves the cursor, and the anchor for a range. */
   function move(c: number, a?: number) {
     setCursor(c);
     setAnchor(a);
-    setTyped(rangeOf(c, a) ?? typed);
   }
 
-  /** What the review button loads: the pick while the field shows it, else the field. */
-  function reviewLabel() {
-    if (typed.trim() === "@") return "Review @";
-    if (typed !== picked()) return "Review revset";
-    if (hi > lo) return unrelated ? UNRELATED : `Review ${inChain?.size ?? hi - lo + 1} changes`;
-    const line = lines?.[commits[lo]];
-    return `Review ${line?.workingCopy ? "@" : line?.changeId}`;
+  function addPicked() {
+    const rev = changeAt(cursor);
+    if (rev) review(addToReview(revset, rev));
   }
 
   async function review(target: string | undefined) {
@@ -135,7 +142,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
     else onClose();
   }
 
-  async function act(action: JjAction, label: string, next?: string) {
+  async function act(action: JjAction, label: string, follow?: boolean) {
     if (busy) return;
     setBusy(true);
     try {
@@ -145,9 +152,8 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
       setLast(label);
       if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
       await reload(changeAt(cursor));
-      // Undo, redo and squash keep the review's revset unless it no longer resolves.
-      const failed = await reviewAfter(onLoad, revset, next);
-      if (failed) setError(failed);
+      // The review keeps its revset unless it no longer resolves, or follows `@` after an edit.
+      await reviewAfter(workspace, onLoad, revset, follow);
     } finally {
       setBusy(false);
     }
@@ -174,7 +180,7 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         change: line.changeId,
         commit,
         description: line.description ?? undefined,
-        alone: outside || lo === hi,
+        revset,
         busy,
         review,
         act: (a) => act(...a),
@@ -186,10 +192,6 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
 
   function onKeyDown(e: React.KeyboardEvent) {
     e.stopPropagation();
-    if (e.target === inputRef.current) {
-      if (e.key === "Escape") rootRef.current?.focus();
-      return;
-    }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
     const d = MOVES[e.key];
@@ -208,12 +210,11 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         case "r":
           reviewPicked();
           break;
+        case "R":
+          addPicked();
+          break;
         case "Escape":
           onClose();
-          break;
-        case "/":
-          inputRef.current?.focus();
-          inputRef.current?.select();
           break;
         case "u":
           undo();
@@ -238,38 +239,6 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
         tabIndex={0}
         onKeyDown={onKeyDown}
       >
-        <form
-          className="picker-bar"
-          onSubmit={(e) => {
-            e.preventDefault();
-            review(typed.trim());
-          }}
-        >
-          <label className="revset-field">
-            <span>revset</span>
-            <input
-              ref={inputRef}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-          <button type="submit" className="primary" disabled={unrelated && typed === ranged}>
-            {reviewLabel()}
-          </button>
-        </form>
-        <div className="picker-presets">
-          {presets(trunk).map((p) => (
-            <button
-              type="button"
-              key={p}
-              className={p === revset ? "on" : undefined}
-              onClick={() => review(p)}
-            >
-              {p}
-            </button>
-          ))}
-        </div>
         {error && <div className="review-error">{error}</div>}
         {!lines && !error && <div className="placeholder">Loading</div>}
         <pre className="log-lines">
@@ -278,11 +247,13 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
             const inRange =
               c >= lo && c <= hi && (!inChain || inChain.has(lines[commits[c]].commitId ?? ""));
             const isCursor = c === cursor && !!l.commitId;
+            const tint = c >= 0 && c === atCommit ? " at" : bk?.inReview(i) ? " rv" : "";
+            const edge = bk && i >= bk.first && i <= bk.last;
             return (
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: lines have no identity
                 key={i}
-                className={`log-line${c >= 0 ? " pickable" : ""}${inRange ? " picked" : ""}${isCursor ? " cursor" : ""}`}
+                className={`log-line${tint}${c >= 0 ? " pickable" : ""}${inRange ? " picked" : ""}${isCursor ? " cursor" : ""}`}
                 onMouseDown={(e) => {
                   // A right-click picks in the row's menu, keeping a range it's in.
                   if (c < 0 || e.button !== 0) return;
@@ -291,10 +262,12 @@ export function RevisionsPanel({ workspace, revset, head, onLoad, onClose }: Pro
                 onDoubleClick={() => review(changeAt(c))}
                 onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
               >
-                <AnsiText text={l.text} />
-                {isCursor && !busy && (
-                  <RevisionsPanelActions onReview={reviewPicked} onKey={runKey} />
+                {edge && (
+                  <span
+                    className={`log-bk${i === bk.first ? " top" : ""}${i === bk.last ? " bot" : ""}`}
+                  />
                 )}
+                <AnsiText text={l.text} />
                 {"\n"}
               </div>
             );

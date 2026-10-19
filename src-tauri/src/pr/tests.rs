@@ -185,7 +185,7 @@ async fn checks_out_and_pulls_a_real_fork_pr() {
 }
 
 #[tokio::test]
-async fn the_pr_view_stops_below_the_next_bookmark_up_the_stack() {
+async fn the_pr_view_leaves_out_changes_on_top_of_the_pr() {
     let (dir, ctx) = repo();
     let d = dir.path();
     let commit = |file: &str, bookmark: &str| {
@@ -195,23 +195,13 @@ async fn the_pr_view_stops_below_the_next_bookmark_up_the_stack() {
     };
     commit("base", "main");
     commit("pr", "feat/pr");
-    commit("next", "feat/next");
-    let revset = super::pr_revset("main", "feat/pr");
-    let descriptions = async || {
-        let changes = ctx.main.jj.changes(&revset).await.unwrap();
-        changes
-            .into_iter()
-            .map(|c| c.description)
-            .collect::<Vec<_>>()
-    };
-
-    // `@` is a new change on `feat/next`, the next PR's branch.
-    assert_eq!(descriptions().await, ["pr"]);
-    // A new change on the PR is part of it.
     jj(d, &["new", "feat/pr"]);
     write(d, "fix", "fix");
     jj(d, &["describe", "-m", "fix"]);
-    assert_eq!(descriptions().await, ["pr", "fix"]);
+    let revset = format!("main..{}", super::head_revset("feat/pr"));
+    let changes = ctx.main.jj.changes(&revset).await.unwrap();
+    let got: Vec<_> = changes.into_iter().map(|c| c.description).collect();
+    assert_eq!(got, ["pr"]);
 }
 
 #[tokio::test]

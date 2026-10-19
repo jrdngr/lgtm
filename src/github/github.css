@@ -53,8 +53,14 @@
 }
 
 .pr-number {
-  font: var(--fs-sm) var(--mono);
-  color: var(--muted);
+  flex: none;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgb(57 197 207 / 16%);
+  color: var(--review-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .pr-title {

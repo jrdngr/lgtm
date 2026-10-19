@@ -670,7 +670,7 @@ button.group-head.fold:hover:not(:disabled) {
   background: var(--hover);
 }
 
-/* A GitHub thread: violet edge, its stages in the bar, and the reply workflow under it. */
+/* A GitHub thread: blue edge, its stages in the bar, and the reply workflow under it. */
 .thread-block {
   border-left: 3px solid var(--github);
 }
@@ -792,7 +792,7 @@ button.group-head.fold:hover:not(:disabled) {
 
 .comment-block .stage-strip button.on[data-stage="reply"] {
   color: var(--github);
-  background: rgb(163 113 247 / 14%);
+  background: var(--review-soft);
 }
 
 .comment-block .stage-strip button.on[data-stage="ready"] {
@@ -867,7 +867,7 @@ button.group-head.fold:hover:not(:disabled) {
 }
 
 .thread-block .flow-draft-text {
-  border: 1px solid rgb(163 113 247 / 14%);
+  border: 1px solid var(--review-soft);
 }
 
 .thread-block .flow-draft-text.final {

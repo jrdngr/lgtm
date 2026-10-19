@@ -28,9 +28,9 @@
 }
 
 .sys-lens.on {
-  border-color: rgb(227 179 65 / 55%);
-  background: rgb(227 179 65 / 12%);
-  color: #f0cf7a;
+  border-color: rgb(57 197 207 / 55%);
+  background: rgb(57 197 207 / 12%);
+  color: #8fe6ec;
 }
 
 .sys-trk,
@@ -55,9 +55,12 @@
   content: "";
 }
 
-.sys-lens.on .sys-trk,
 .sys-atog.on .sys-atk {
   background: #e3b341;
+}
+
+.sys-lens.on .sys-trk {
+  background: var(--review);
 }
 
 .sys-lens.on .sys-trk::after,
@@ -65,6 +68,10 @@
   right: 2px;
   left: auto;
   background: #1b1c1f;
+}
+
+.sys-lens.on .sys-trk::after {
+  background: #10292b;
 }
 
 .sys-tpill {

@@ -2,12 +2,11 @@ import { Busy } from "../ui/Busy";
 
 /** Key groups, each as key caps and what they do. */
 const HINTS: [string[], string][] = [
-  [["↵"], "review"],
-  [["⇧J", "⇧K"], "range"],
+  [["r"], "review"],
+  [["⇧r"], "extend review"],
   [["e"], "edit"],
-  [["n", "N"], "new"],
+  [["n"], "new on top"],
   [["s"], "squash"],
-  [["u"], "undo"],
 ];
 
 /** The revisions panel's keys, and the last action with its undo key. */

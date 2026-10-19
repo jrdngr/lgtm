@@ -1,0 +1,74 @@
+//! Where the working copy sits against a review.
+
+use anyhow::Context;
+
+use super::Jj;
+
+/// Where `@` is: in the review, built on it, or elsewhere.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum AtPlace {
+    Inside,
+    OnTop,
+    Outside,
+}
+
+/// The workspace's working-copy commit, and where it sits against a review.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkingCopyDto {
+    pub change_id: String,
+    pub commit_id: String,
+    /// Length of the shortest prefix of `change_id` that's unique in the repo.
+    pub unique: u32,
+    pub empty: bool,
+    pub description: String,
+    pub place: AtPlace,
+}
+
+impl Jj {
+    /// `@`, and whether it's in `revset`, descends from it, or neither.
+    pub async fn working_copy(&self, revset: &str) -> anyhow::Result<WorkingCopyDto> {
+        let at = self.changes("@").await?.pop().context("no working copy")?;
+        let has = async |r: String| self.commit_ids(&r).await.map(|c| !c.is_empty());
+        let place = if has(format!("@ & ({revset})")).await? {
+            AtPlace::Inside
+        } else if has(format!("@ & ({revset})::")).await? {
+            AtPlace::OnTop
+        } else {
+            AtPlace::Outside
+        };
+        Ok(WorkingCopyDto {
+            change_id: at.change_id,
+            commit_id: at.commit_id,
+            unique: at.unique,
+            empty: at.empty,
+            description: at.description,
+            place,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AtPlace;
+    use crate::jj::test_support::{jj, repo, write};
+
+    #[tokio::test]
+    async fn places_the_working_copy_against_a_review() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        write(d, "a.txt", "a\n");
+        jj(d, &["commit", "-m", "one"]);
+        write(d, "b.txt", "b\n");
+        jj(d, &["commit", "-m", "two"]);
+        jj(d, &["bookmark", "create", "pr", "-r", "@-"]);
+        let place = async |r: &str| j.working_copy(r).await.unwrap().place;
+
+        assert_eq!(place("root()..pr").await, AtPlace::OnTop);
+        assert_eq!(place("@").await, AtPlace::Inside);
+        jj(d, &["edit", "pr-"]);
+        assert_eq!(place("root()..pr").await, AtPlace::Inside);
+        assert_eq!(place("pr").await, AtPlace::Outside);
+    }
+}

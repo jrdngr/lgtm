@@ -8,6 +8,7 @@ use anyhow::{Context, bail};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
+mod at;
 mod diff;
 mod edit;
 mod follow;
@@ -19,6 +20,7 @@ mod rewrite;
 #[cfg(test)]
 pub(crate) mod test_support;
 pub mod workspace;
+pub use at::{AtPlace, WorkingCopyDto};
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogLine;

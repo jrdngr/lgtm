@@ -81,6 +81,8 @@ export const commands = {
 	trunkBookmark: (workspace: string | null) => typedError<string | null, string>(__TAURI_INVOKE("trunk_bookmark", { workspace })),
 	/**  The commit ids in `revset`, so the revisions panel can show what a range will review. */
 	revsetCommits: (workspace: string | null, revset: string) => typedError<string[], string>(__TAURI_INVOKE("revset_commits", { workspace, revset })),
+	/**  The workspace's working copy, and where it sits against the review of `revset`. */
+	workingCopy: (workspace: string | null, revset: string) => typedError<WorkingCopyDto, string>(__TAURI_INVOKE("working_copy", { workspace, revset })),
 	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**
@@ -462,6 +464,9 @@ export type AssessmentDto = {
 	/**  Whether the revset has moved to other commits since. */
 	stale?: boolean,
 };
+
+/**  Where `@` is: in the review, built on it, or elsewhere. */
+export type AtPlace = "inside" | "onTop" | "outside";
 
 export type Author = "user" | "agent";
 
@@ -1772,6 +1777,17 @@ export type View =
 /**  View > Word Wrap was turned on or off. */
 export type WordWrap = {
 	on: boolean,
+};
+
+/**  The workspace's working-copy commit, and where it sits against a review. */
+export type WorkingCopyDto = {
+	changeId: string,
+	commitId: string,
+	/**  Length of the shortest prefix of `change_id` that's unique in the repo. */
+	unique: number,
+	empty: boolean,
+	description: string,
+	place: AtPlace,
 };
 
 /**

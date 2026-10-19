@@ -96,7 +96,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [edgeSel, setEdgeSel] = useState<string>();
   const [symSel, setSymSel] = useState<string>();
   const [mode, setMode] = useState<EdgeMode>("changed");
-  /** The user's lens toggle; until they use it, the lens is on only for a PR. */
+  /** The user's lens toggle; until they use it, the lens is on only for a PR's review. */
   const [lensPick, setLensPick] = useState<boolean>();
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
@@ -108,7 +108,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
   const review = useCurrentReview(workspace);
   const pr = usePr(workspace);
-  const lensOn = lensPick ?? !!pr;
+  const lensOn = lensPick ?? (!!pr && review?.revset === pr.revset);
   const lensReview = lensOn ? review : undefined;
   const { arch, error: reviewError, view } = useArch(review);
   const archError = lensOn ? reviewError : undefined;
