@@ -42,64 +42,6 @@ pub struct Reply {
     pub text: String,
 }
 
-#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Level {
-    High,
-    Medium,
-    Low,
-}
-
-#[derive(Clone, Copy, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Category {
-    /// Needs a careful look; give a level.
-    Important,
-    /// A numbered step in a named flow through several places.
-    Flow,
-    /// Intent or background the diff doesn't show.
-    Context,
-    /// Something the reviewer or author should settle.
-    Question,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct FlowStep {
-    /// The flow's short name, the same on each of its steps.
-    pub flow: String,
-    /// From 1.
-    pub step: u32,
-}
-
-#[derive(Deserialize, Serialize, JsonSchema)]
-pub struct Note {
-    /// Repository-relative path of a file in the review.
-    pub path: String,
-    /// First line on the new side of the diff (the old side for a deleted file).
-    pub start: u32,
-    /// Last line, inclusive.
-    pub end: u32,
-    pub category: Category,
-    /// For important notes: high, medium or low.
-    pub level: Option<Level>,
-    /// One line, under 80 characters.
-    pub title: String,
-    /// One to four sentences of markdown.
-    pub body: String,
-    /// For flow notes.
-    pub flow: Option<FlowStep>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct Notes {
-    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another, or the revset moves to commits the review hasn't loaded.
-    pub revset: String,
-    /// In reading order, starting with a context note on the entry point. These replace the
-    /// review's current walkthrough.
-    pub notes: Vec<Note>,
-}
-
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {

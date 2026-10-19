@@ -9,7 +9,6 @@ const NO_STATE: StateDto = {
   checks: [],
   amber: [],
   comments: [],
-  notes: [],
   threads: [],
 };
 

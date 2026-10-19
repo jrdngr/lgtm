@@ -140,8 +140,6 @@ export const commands = {
 	mcpStatus: () => typedError<McpStatus, string>(__TAURI_INVOKE("mcp_status")),
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
 	registerMcp: () => typedError<null, string>(__TAURI_INVOKE("register_mcp")),
-	/**  The prompt that has a terminal agent write the review's walkthrough. */
-	walkthroughPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("walkthrough_prompt", { review })),
 	/**
 	 *  Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
 	 *  makes it a draft for the workspace's PR on GitHub instead of a note.
@@ -496,16 +494,6 @@ export type BoundaryDto = {
 	components: string[],
 };
 
-export type Category = 
-/**  Needs a careful look. Has a level. */
-"important" | 
-/**  A step in a flow through several places. */
-"flow" | 
-/**  Intent or background the diff doesn't show. */
-"context" | 
-/**  Something for the reviewer or author to settle. */
-"question";
-
 /**
  *  A rewrite of a decided question, which opened it again, or an auto answer the user
  *  reopened, that the user hasn't looked at yet.
@@ -824,13 +812,6 @@ export type Finding = {
 /**  What happens to a ready thread with no reply: one that was fixed as asked. */
 export type Fixed = "leave" | "reply" | "resolve" | "replyResolve";
 
-/**  Where a note sits in a flow. */
-export type FlowStep = {
-	flow: string,
-	/**  1-based. */
-	step: number,
-};
-
 /**
  *  The GitHub thread a comment is on: a review thread on code, or a comment or review summary
  *  on the PR, whose comment's path is empty. The comment's body is then a reply not yet sent.
@@ -987,8 +968,6 @@ export type LensEdit = { kind: "rename"; component: string; name: string } | { k
 /**  Undoes merges into it and groups its subfolders as their own components. */
 { kind: "split"; component: string };
 
-export type Level = "high" | "medium" | "low";
-
 /**  The thread the user is on, as the agent reads it. */
 export type LinkThread = {
 	/**  The whole thread, for the first prompt on it. */
@@ -1117,24 +1096,6 @@ export type NodeStatus = "added" | "modified" | "removed" |
 /**  Unchanged, but uses a changed symbol. */
 "caller";
 
-export type NoteDto = {
-	id: number,
-	path: string,
-	file: number,
-	/**  Absent when its code can't be found any more. */
-	rows: RowSpan | null,
-	category: Category,
-	/**  Only for important notes. */
-	level: Level | null,
-	title: string,
-	/**  Markdown. */
-	body: string,
-	flow: FlowStep | null,
-	/**  Its place in the reading order, from 0. */
-	position: number,
-	source: Source,
-};
-
 /**  lgtm > Settings… was chosen while this window had focus. */
 export type OpenSettings = Record<string, never>;
 
@@ -1236,7 +1197,7 @@ export type PreviewThreadDto = {
 };
 
 /**  An editable prompt. */
-export type Prompt = "walkthrough" | 
+export type Prompt = 
 /**  How takes and replies on GitHub threads are written. */
 "reply" | 
 /**  How Q&A questions are built, after the qqueue skill. */
@@ -1445,7 +1406,7 @@ export type ReviewDto = {
 	stale: string | null,
 };
 
-/**  An agent changed review `review`'s comments or walkthrough notes. */
+/**  An agent changed review `review`'s comments or threads. */
 export type ReviewStateChanged = {
 	review: number,
 	state: StateDto,
@@ -1590,13 +1551,6 @@ export type Since =
 /**  In the previous session but not in the review now. */
 "removed";
 
-/**  Which agent wrote a note. */
-export type Source = 
-/**  The app's own headless run. */
-"headless" | 
-/**  An agent in a terminal, through the MCP server. */
-"terminal";
-
 /**  Where a thread is in the reply workflow. */
 export type Stage = 
 /**  Synced, not triaged yet. */
@@ -1624,8 +1578,6 @@ export type StateDto = {
 	amber: RowRef[],
 	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
 	comments: CommentDto[],
-	/**  The review's walkthrough notes, in reading order. Ones whose code is gone have no rows. */
-	notes: NoteDto[],
 	/**
 	 *  In a PR workspace, every thread and draft on the PR, in file order, then comments on
 	 *  the PR by time.

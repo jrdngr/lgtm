@@ -1,6 +1,6 @@
 //! The tools an agent in a terminal gets. Each acts on the review open in the terminal's
-//! workspace. Agents read everything and add comments, walkthrough notes and findings, but can't mark
-//! code reviewed: that's the human's record.
+//! workspace. Agents read everything and add comments and findings, but can't mark code
+//! reviewed: that's the human's record.
 
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -19,14 +19,13 @@ use crate::bots::Summary;
 use crate::ctx::RepoCtx;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
 use crate::repo::RepoWindows;
-use crate::review::{NoteInput, StateDto};
-use crate::store::Source;
+use crate::review::StateDto;
 use crate::store::{Stage, Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
-this terminal's workspace: read its state, comments, walkthrough, symbol graph and reports; \
-add comments; write a walkthrough; store an architecture assessment; publish review findings \
+this terminal's workspace: read its state, comments, symbol graph and reports; \
+add comments; store an architecture assessment; publish review findings \
 to a report; and point the review \
 at code or a revset. Tools that write to the review take its revset, from your prompt or \
 get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
@@ -250,46 +249,6 @@ impl Lgtm {
             .map_err(failed)?;
         self.changed(&label, review, state);
         Ok("Suggested it.".into())
-    }
-
-    #[tool(
-        description = "The review's walkthrough: notes on the code in reading order, each \
-        important (with a level), a step in a named flow, context, or a question."
-    )]
-    async fn list_notes(&self) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        json(&ctx.agent_notes(self.workspace()).map_err(failed)?)
-    }
-
-    #[tool(
-        description = "Replace the review's walkthrough with yours: notes pinned to the code, \
-        in the order the reviewer should read them, starting with a context note on the entry \
-        point that says what the change does. Tell the reviewer what they'd otherwise have to \
-        work out; don't narrate the diff. important: needs a careful look (subtle logic, edge \
-        cases, error handling, security, data changes, untested behavior), with a level: high \
-        (likely wrong or a mistake does serious damage), medium, or low. flow: a numbered step \
-        in a named path through three or more places. context: intent or background the diff \
-        doesn't show. question: something the reviewer or author should settle. Notes outside \
-        the review's files are left out."
-    )]
-    async fn set_notes(&self, Parameters(p): Parameters<inputs::Notes>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let inputs: Vec<NoteInput> =
-            serde_json::from_value(serde_json::to_value(&p.notes).map_err(|e| e.to_string())?)
-                .map_err(|e| e.to_string())?;
-        let at = ctx
-            .current_review_at(self.workspace(), &p.revset)
-            .await
-            .map_err(failed)?;
-        let (state, skipped) = ctx
-            .save_notes_at(&at, &inputs, Source::Terminal)
-            .map_err(failed)?;
-        let review = at.id;
-        let n = state.notes.len();
-        self.changed(&label, review, state);
-        Ok(format!(
-            "Set {n} notes; left out {skipped} outside the review's files."
-        ))
     }
 
     #[tool(

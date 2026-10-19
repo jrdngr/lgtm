@@ -71,8 +71,8 @@ export function McpOffer() {
   return (
     <div className="mcp-offer">
       <span title={status?.command}>
-        Let Claude Code in lgtm's terminals read this review and add comments, walkthrough notes and
-        findings? This registers lgtm as an MCP server for your user.
+        Let Claude Code in lgtm's terminals read this review and add comments and findings? This
+        registers lgtm as an MCP server for your user.
       </span>
       {error && <span className="error">{error}</span>}
       <span className="spacer" />

@@ -1,8 +1,7 @@
-import type { CheckState, MarkColor, MarkDto, NoteDto, StateDto } from "../bindings";
+import type { CheckState, MarkColor, MarkDto, StateDto } from "../bindings";
 import { commentedRows } from "./comments";
 import type { DoneFn, MarkSetup } from "./marks";
 import { type FlatFile, markKey, needsReview } from "./model";
-import { hotRows } from "./notes";
 import { type Filter, type RowStateFn, stateDone } from "./rowState";
 
 export const plural = (n: number) => (n === 1 ? "row" : "rows");
@@ -14,8 +13,6 @@ export interface MarkIndex {
   amber: Set<string>;
   /** Rows inside a comment. */
   commented: Set<string>;
-  /** The worst important note on each row. */
-  hot: Map<string, NoteDto>;
 }
 
 export function indexState(state: StateDto): MarkIndex {
@@ -24,7 +21,6 @@ export function indexState(state: StateDto): MarkIndex {
     checks: state.checks,
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
     commented: commentedRows(state.comments),
-    hot: hotRows(state.notes),
   };
 }
 

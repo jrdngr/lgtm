@@ -2,6 +2,16 @@
   font-size: var(--fs-sm);
 }
 
+.arch-error {
+  margin: 8px 10px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: var(--fs-sm);
+  color: var(--error);
+  background: rgb(248 81 73 / 10%);
+  overflow-wrap: anywhere;
+}
+
 /* Score: meter, risk, Assess; why under them. */
 .arch-score {
   display: grid;

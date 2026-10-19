@@ -55,12 +55,11 @@ export function restoredHunks(files: FlatFile[], saved: [string, number][]): Set
   return out;
 }
 
-/** A line's identity apart from its index: a comment or note by id, a row by its line number,
- * a hunk header by where it starts, and anything else by its file. */
+/** A line's identity apart from its index: a comment by id, a row by its line number, a hunk
+ * header by where it starts, and anything else by its file. */
 export function lineRef(files: FlatFile[], line: DisplayLine | undefined): string | undefined {
   if (!line) return undefined;
   if (line.kind === "comment") return `c${line.comment}`;
-  if (line.kind === "note") return `n${line.note}`;
   const f = files[line.file];
   if (!f) return undefined;
   const path = f.dto.path;

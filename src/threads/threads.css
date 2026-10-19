@@ -39,38 +39,6 @@
   background: var(--faint);
 }
 
-/* Threads grouped by stage in the PR tab. */
-.stage-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px 2px;
-  font-size: var(--fs-xs);
-  color: var(--muted);
-}
-
-.stage-toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: none;
-  background: none;
-  font: inherit;
-  color: inherit;
-  cursor: pointer;
-}
-
-.stage-toggle:hover {
-  color: var(--fg);
-}
-
-.stage-count {
-  min-width: 14px;
-  text-align: right;
-  font-family: var(--mono);
-}
-
 .pr-head-btn {
   padding: 1px 8px;
   font-size: var(--fs-xs);
@@ -81,17 +49,6 @@
   opacity: 0.8;
 }
 
-.stage-head .chevron {
-  width: 10px;
-  font-size: 9px;
-}
-
-.stage-head .dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-}
-
 .thread-row {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -99,7 +56,7 @@
   gap: 8px;
   width: 100%;
   min-height: 26px;
-  padding: 2px 10px 2px 22px;
+  padding: 2px 10px 2px 23px;
   border: none;
   border-radius: 0;
   background: none;
@@ -120,6 +77,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--soft);
+}
+
+.thread-row .pill {
+  margin-right: 6px;
+}
+
+.thread-who {
+  margin-right: 7px;
+  font-weight: 600;
 }
 
 .thread-where {

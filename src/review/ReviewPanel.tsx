@@ -38,7 +38,6 @@ import { useRowMouse } from "./useRowMouse";
 import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
-import { useWalkthrough } from "./useWalkthrough";
 
 /** Rows changed since they were reviewed show amber, in every review. */
 const amberRows = remembered("lgtm:amberRows", true, [true, false]);
@@ -54,7 +53,7 @@ const inHunk = (line: DisplayLine | undefined): line is Exclude<DisplayLine, { k
 /** Clicks on these keep their own focus instead of giving it to the review. */
 function keepsFocus(t: EventTarget) {
   return (
-    (t instanceof Element && !!t.closest(".comment-block, .note-block")) ||
+    (t instanceof Element && !!t.closest(".comment-block")) ||
     t instanceof HTMLInputElement ||
     t instanceof HTMLButtonElement ||
     t instanceof HTMLSelectElement
@@ -101,7 +100,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     canDraft: !!pr.pr,
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
-  const w = useWalkthrough(review, files, commentOn, !!pr.pr);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
   const fileLines = useMemo(
     () =>
@@ -114,7 +112,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         done: setup.done,
         revealed,
         comments: slots,
-        notes: w.slots,
         context: context.lines,
       }),
     [
@@ -127,7 +124,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       setup.done,
       revealed,
       slots,
-      w.slots,
       context.lines,
     ],
   );
@@ -211,12 +207,10 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     focusRoot();
   }
 
-  const { jump, jumpToComment, jumpToRow, stepNote, stepHunk, stepFile, showLine } = useReviewNav({
-    review: review?.id,
+  const { jump, jumpToComment, jumpToRow, stepHunk, stepFile, showLine } = useReviewNav({
     lines,
     files,
     comments: navComments,
-    notes: w.notes,
     cursor,
     place,
     setScrollTo,
@@ -243,13 +237,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     return true;
   }
 
-  async function walkthroughInTerminal() {
-    if (!review) return;
-    const r = await commands.walkthroughPrompt(review.id);
-    if (r.status === "error") return setError(r.error);
-    sendText(r.data, focusRoot);
-  }
-
   function openInEditor() {
     const at = editorAt(files, lines[cursor]);
     if (at) openFileIn(containerApi, at.path, at.line);
@@ -267,7 +254,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       show: showLine,
       commentOn,
       send: sendText,
-      walkthroughInTerminal,
       refetchPr: pr.refetch,
       pullPr: pr.pull,
       apply: setState,
@@ -327,8 +313,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     startDraft: () => a.startComment(true),
     openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
-    walkthroughInTerminal,
-    stepNote,
     stepHunk,
     stepFile,
     toggleFile: fold.toggleFile,
@@ -414,7 +398,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
               />
             </>
           )}
-          renderNote={w.renderNote}
           {...handlers}
         />
       )}

@@ -23,20 +23,3 @@ export function showNode(review: CurrentReview, n: GraphNode, workspace: Workspa
 }
 
 export const STATUS_SIGN = { added: "+", modified: "~", removed: "−", caller: "" } as const;
-
-const RISK_ORDER = ["high", "medium", "low"];
-
-/** The worse of two note levels. */
-export const worseRisk = (a?: string, b?: string) =>
-  a === undefined || (b !== undefined && RISK_ORDER.indexOf(b) < RISK_ORDER.indexOf(a)) ? b : a;
-
-/** The worst level of the important notes on a node's rows, if any. */
-export function nodeRisk(review: CurrentReview, n: GraphNode): string | undefined {
-  let worst: string | undefined;
-  for (const note of review.notes) {
-    const rows = note.rows;
-    if (note.category !== "important" || !note.level || !rows || note.file !== n.file) continue;
-    if (n.rows.some((r) => rows.start <= r && r <= rows.end)) worst = worseRisk(worst, note.level);
-  }
-  return worst;
-}

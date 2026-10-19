@@ -21,9 +21,6 @@ mod link;
 pub use link::LinkThread;
 mod load;
 mod matching;
-#[cfg(test)]
-mod note_tests;
-mod notes;
 mod quotes;
 mod replies;
 mod rowmap;
@@ -32,7 +29,6 @@ pub(crate) mod tests;
 mod threads;
 mod untrusted;
 mod views;
-pub(crate) mod walkthrough;
 #[cfg(test)]
 mod workflow_tests;
 
@@ -49,7 +45,6 @@ use crate::ctx::{RepoCtx, now_ms};
 use crate::jj::Range;
 use crate::store::{Edit, Mark, MarkColor, Session, Store};
 use crate::workspace::Workspace;
-pub use at::At;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
@@ -57,7 +52,6 @@ pub use github::PulledThread;
 pub use graph::GraphDto;
 use load::Loaded;
 use matching::MatchedCheck;
-pub use notes::{NoteDto, NoteInput};
 pub use quotes::quoted_reply;
 pub use rowmap::RowMove;
 pub use threads::{ThreadDto, pulled_stage};
@@ -164,8 +158,6 @@ pub struct StateDto {
     pub amber: Vec<RowRef>,
     /// Comments on the review's files, in file and row order. Ones whose code is gone last.
     pub comments: Vec<CommentDto>,
-    /// The review's walkthrough notes, in reading order. Ones whose code is gone have no rows.
-    pub notes: Vec<NoteDto>,
     /// In a PR workspace, every thread and draft on the PR, in file order, then comments on
     /// the PR by time.
     pub threads: Vec<ThreadDto>,
@@ -185,7 +177,6 @@ pub struct Review {
     checks: Vec<Option<MatchedCheck>>,
     amber: Vec<RowRef>,
     comments: Vec<CommentDto>,
-    notes: Vec<NoteDto>,
     threads: Vec<ThreadDto>,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
@@ -363,7 +354,6 @@ impl Review {
             checks: vec![],
             amber: vec![],
             comments: vec![],
-            notes: vec![],
             threads: vec![],
             baseline: HashSet::new(),
             session: 0,
@@ -437,7 +427,6 @@ impl Review {
             checks,
             amber: self.amber.clone(),
             comments: self.comments.clone(),
-            notes: self.notes.clone(),
             threads: self.threads.clone(),
         }
     }

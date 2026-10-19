@@ -9,7 +9,6 @@ import { Intent } from "./Intent";
 import { Layers } from "./Layers";
 import { Look } from "./Look";
 import { Score } from "./Score";
-import "../../review/notes.css";
 import "./sidebar.css";
 
 /** The current review's architecture: Assess's score, the change stack, what to look at, your
@@ -40,7 +39,7 @@ function Body({ workspace, review }: { workspace: WorkspaceName; review: Current
         assessment={arch?.assessment}
         onError={setActionError}
       />
-      {(error || actionError) && <div className="note-run error">{error ?? actionError}</div>}
+      {(error || actionError) && <div className="arch-error">{error ?? actionError}</div>}
       {!arch ? (
         !error && (
           <div className="placeholder arch-loading">

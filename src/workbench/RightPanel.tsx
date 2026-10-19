@@ -11,9 +11,7 @@ import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
 import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
-import { NotesPanel } from "../review/NotesPanel";
-import { WalkthroughPanel } from "../review/WalkthroughPanel";
-import { PrPanel } from "../threads/PrPanel";
+import { CommentsPanel } from "../threads/CommentsPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 
 function RepoTab() {
@@ -28,10 +26,9 @@ interface Props {
   onHide(): void;
 }
 
-/** The right side panel: the review's changes and symbols, the repo's files, notes, the
- * workspace's PR, the walkthrough, the architecture, reports, and Q&A. Tabs count threads
- * that need you, walkthrough notes, broken intents and open high Look items, and open Q&A
- * questions. */
+/** The right side panel: the repo's files; the review's changes, comments, architecture and
+ * reports; and Q&A. A tab turns amber for threads that need you, broken intents and open high
+ * Look items, and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
@@ -42,44 +39,43 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       side="right"
       {...props}
       views={[
-        { id: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
-        { id: "changes", title: "Changes", icon: "gitTree", render: () => <FilesPanel /> },
-        { id: "comments", title: "Notes", icon: "comments", render: () => <NotesPanel /> },
+        { id: "repo", group: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
         {
-          id: "pr",
-          title: "PR",
-          icon: "pr",
-          badge: needsYou(review?.threads ?? []),
-          badgeTone: "amber",
-          render: () => <PrPanel />,
+          id: "changes",
+          group: "review",
+          title: "Changes",
+          icon: "gitTree",
+          render: () => <FilesPanel />,
         },
         {
-          id: "walkthrough",
-          title: "Walkthrough",
-          icon: "map",
-          badge: review?.notes.length,
-          render: () => <WalkthroughPanel />,
+          id: "comments",
+          group: "review",
+          title: "Comments",
+          icon: "comments",
+          alert: needsYou(review?.threads ?? []) > 0,
+          render: () => <CommentsPanel />,
         },
         {
           id: "architecture",
+          group: "review",
           title: "Architecture",
           icon: "architecture",
-          badge: archBadge(arch),
-          badgeTone: "amber",
+          alert: archBadge(arch) > 0,
           render: () => <ArchSection />,
         },
         {
           id: "reviewers",
+          group: "review",
           title: "Reports",
           icon: "users",
           render: () => <BotsPanel onOpen={onOpenReport} />,
         },
         {
           id: "qa",
+          group: "qa",
           title: "Q&A",
           icon: "help",
-          badge: qa.sessions.reduce((n, d) => n + (d.archived ? 0 : openQuestions(d).length), 0),
-          badgeTone: "amber",
+          alert: qa.sessions.some((d) => !d.archived && openQuestions(d).length > 0),
           render: () => <QaPanel />,
         },
       ]}

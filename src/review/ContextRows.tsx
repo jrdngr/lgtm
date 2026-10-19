@@ -21,7 +21,6 @@ export function MoreBar({ region, onShow }: { region: Region; onShow(): void }) 
 function Side({ ln, side, line }: { ln: number; side?: "left" | "right"; line: ContextLine }) {
   return (
     <div className={`cell${side ? ` ${side}` : ""} kind-context shown-context`}>
-      <span className="risk" />
       <span className="strip" />
       <span className="flag" />
       <span className="ln">{ln}</span>
@@ -45,7 +44,6 @@ export function ContextRow({
     <div className={`row-line ${mode}`}>
       {mode === "unified" ? (
         <div className="cell kind-context shown-context">
-          <span className="risk" />
           <span className="strip" />
           <span className="flag" />
           <span className="ln">{old}</span>

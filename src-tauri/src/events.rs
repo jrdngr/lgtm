@@ -71,7 +71,7 @@ pub struct AgentRevset {
     pub revset: String,
 }
 
-/// An agent changed review `review`'s comments or walkthrough notes.
+/// An agent changed review `review`'s comments or threads.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct ReviewStateChanged {
     pub review: u32,

@@ -27,8 +27,6 @@ interface Ctx {
   /** Opens the agent box of the comment at the cursor. */
   openArchitecture(): void;
   openInEditor(): void;
-  walkthroughInTerminal(): void;
-  stepNote(dir: 1 | -1): void;
   stepHunk(dir: 1 | -1): void;
   stepFile(dir: 1 | -1): void;
   toggleFile(file: number): void;
@@ -153,9 +151,6 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "o":
         ctx.openInEditor();
         break;
-      case "h":
-        if (!e.repeat) ctx.walkthroughInTerminal();
-        break;
       case "]":
       case "[":
         ctx.stepHunk(e.key === "]" ? 1 : -1);
@@ -163,10 +158,6 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "}":
       case "{":
         ctx.stepFile(e.key === "}" ? 1 : -1);
-        break;
-      case "n":
-      case "N":
-        ctx.stepNote(e.key === "n" ? 1 : -1);
         break;
       case "x": {
         const file = lines[cursor]?.file;

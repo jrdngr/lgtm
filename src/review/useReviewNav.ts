@@ -1,5 +1,5 @@
 import type { DockviewApi, DockviewPanelApi } from "dockview-react";
-import type { CommentDto, NoteDto } from "../bindings";
+import type { CommentDto } from "../bindings";
 import { activate } from "../core/panels";
 import { openFileIn } from "../editor/open";
 import {
@@ -13,14 +13,11 @@ import {
   rowJumpTarget,
   stepTarget,
 } from "./model";
-import { stepTour } from "./tour";
 
 interface Nav {
-  review: number | undefined;
   lines: DisplayLine[];
   files: FlatFile[];
   comments: CommentDto[];
-  notes: NoteDto[];
   cursor: number;
   place(line: number): void;
   setScrollTo(to: { line: number }): void;
@@ -29,7 +26,7 @@ interface Nav {
   focusRoot(): void;
 }
 
-/** Moving the review's cursor to files, rows, comments and notes, and scrolling there. */
+/** Moving the review's cursor to files, rows and comments, and scrolling there. */
 export function useReviewNav(n: Nav) {
   const { lines, files } = n;
 
@@ -60,15 +57,6 @@ export function useReviewNav(n: Nav) {
     jumpTo(rowJumpTarget(at));
   }
 
-  /** Goes to the next or previous note of the walkthrough's active tour. */
-  function stepNote(dir: 1 | -1) {
-    if (n.review === undefined) return;
-    const note = stepTour(n.review, n.notes, dir);
-    if (!note) return;
-    if (note.rows) jumpToRow(note.file, note.rows.start);
-    else jump(note.file);
-  }
-
   /** Goes to the next or previous run of changed rows. */
   function stepHunk(dir: 1 | -1) {
     const target = stepTarget(changeTargets(files, lines), n.cursor, dir);
@@ -97,5 +85,5 @@ export function useReviewNav(n: Nav) {
     else jumpToRow(file, best);
   }
 
-  return { jump, jumpToComment, jumpToRow, stepNote, stepHunk, stepFile, showLine };
+  return { jump, jumpToComment, jumpToRow, stepHunk, stepFile, showLine };
 }

@@ -160,29 +160,6 @@
   color: var(--fg);
 }
 
-.gdot {
-  position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--muted);
-}
-
-.gdot.risk-high {
-  background: var(--flagged);
-}
-
-.gdot.risk-medium {
-  background: var(--amber);
-}
-
-.gfile > .gdot {
-  top: 8px;
-  right: 8px;
-}
-
 .gnode {
   position: relative;
   display: flex;

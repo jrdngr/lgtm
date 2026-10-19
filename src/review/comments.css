@@ -475,28 +475,124 @@
   color: var(--muted);
 }
 
-.group-head {
+/* The Comments view's All / PR / Notes filter. */
+.comments-filter {
   display: flex;
-  gap: 6px;
-  padding: 8px 10px 2px;
-  font-size: var(--fs-xs);
+  flex: none;
+  margin: 8px 10px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.comments-filter .option {
+  flex: 1;
+  padding: 3px 0;
+  border: none;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
-.group-path {
-  min-width: 0;
+.comments-filter .option:last-child {
+  border-right: none;
+}
+
+.comments-filter .option:hover:not(:disabled) {
+  color: var(--fg);
+}
+
+.comments-filter .option.on {
+  color: var(--fg);
+  background: var(--raise);
+}
+
+.comments-filter b {
+  margin-left: 4px;
+  font-weight: 600;
+  color: var(--soft);
+}
+
+/* The PR's state, as a card atop its threads. */
+.comments-scroll > .pr-head {
+  margin: 6px 10px;
+  padding: 7px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+/* A group in the Comments view: bright, ruled off from the one above, its count in a pill. */
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 8px 10px 5px;
+  border: none;
+  border-top: 1px solid var(--hair);
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.comments-scroll > .group-head:first-child,
+.comments-scroll > :first-child > .group-head:first-child {
+  border-top: none;
+}
+
+.group-head .chevron {
+  width: 8px;
+  font-size: 10px;
+  color: var(--soft);
+}
+
+.group-head .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.group-count {
+  padding: 0 6px;
+  border-radius: 8px;
+  background: var(--raise);
+  font-size: 10.5px;
+  line-height: 16px;
+  color: var(--soft);
+}
+
+/* A file's notes start under its path: folder quiet, name bright. */
+.note-file {
+  padding: 6px 10px 2px 23px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: var(--fs-xs) var(--mono);
+  color: var(--muted);
+}
+
+.note-file b {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.notes-only .note-file {
+  padding-left: 10px;
 }
 
 .comment-item {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 14px 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  padding: 3px 10px 3px 14px;
+  padding: 3px 10px 3px 13px;
   border: none;
   border-radius: 0;
   background: none;
@@ -566,16 +662,12 @@
   height: 13px;
 }
 
-button.group-head.fold {
-  width: 100%;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
+.notes-only .comment-item {
+  padding-left: 0;
 }
 
-button.group-head.fold:hover {
-  color: var(--fg);
+button.group-head.fold:hover:not(:disabled) {
+  background: var(--hover);
 }
 
 /* A GitHub thread: violet edge, its stages in the bar, and the reply workflow under it. */

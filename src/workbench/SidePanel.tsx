@@ -1,4 +1,4 @@
-import { type ReactNode, useRef } from "react";
+import { Fragment, type ReactNode, useRef } from "react";
 import { contextMenu } from "../ui/contextMenu";
 import { Icon, type IconName } from "../ui/icons";
 
@@ -12,9 +12,10 @@ export interface SideView {
   id: string;
   title: string;
   icon: IconName;
-  /** A count on the tab, such as pending comments. Hidden at 0. */
-  badge?: number;
-  badgeTone?: "amber";
+  /** Views of one group sit together, with a divider between groups. */
+  group?: string;
+  /** Tints the tab's icon amber, for something waiting on you. */
+  alert?: boolean;
   render(): ReactNode;
 }
 
@@ -33,8 +34,8 @@ const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 
 /** A panel docked to one side of the window, outside the pane grid. Holds views behind a row
- * of icon tabs, shown when there's more than one, and resizes by dragging its inner edge. Each
- * view draws its own header. */
+ * of icon tabs, shown when there's more than one and divided by the views' groups, and resizes
+ * by dragging its inner edge. Each view draws its own header. */
 export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Props) {
   const drag = useRef<{ x: number; width: number }>(undefined);
   if (!state.open) return null;
@@ -67,24 +68,24 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Pro
             },
           ])}
         >
-          {views.map((v) => (
-            <button
-              type="button"
-              role="tab"
-              key={v.id}
-              aria-selected={v.id === view.id}
-              aria-label={v.title}
-              title={v.title}
-              className={v.id === view.id ? "selected" : undefined}
-              onClick={() => onChange({ ...state, view: v.id })}
-            >
-              <Icon name={v.icon} />
-              {!!v.badge && (
-                <span className={`side-badge${v.badgeTone ? ` ${v.badgeTone}` : ""}`}>
-                  {v.badge}
-                </span>
-              )}
-            </button>
+          {views.map((v, i) => (
+            <Fragment key={v.id}>
+              {i > 0 && v.group !== views[i - 1].group && <span className="side-divider" />}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={v.id === view.id}
+                aria-label={v.title}
+                title={v.title}
+                className={
+                  [v.id === view.id && "selected", v.alert && "alert"].filter(Boolean).join(" ") ||
+                  undefined
+                }
+                onClick={() => onChange({ ...state, view: v.id })}
+              >
+                <Icon name={v.icon} />
+              </button>
+            </Fragment>
           ))}
         </div>
       )}

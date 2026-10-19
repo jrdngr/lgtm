@@ -1,5 +1,5 @@
 //! What an agent in a terminal sees of a review and can do to it, through the MCP server.
-//! Agents can read everything and add comments and walkthrough notes, but never mark rows.
+//! Agents can read everything and add comments, but never mark rows.
 
 use std::collections::BTreeMap;
 
@@ -96,19 +96,6 @@ pub struct AgentComment {
     /// The review it was made in, and "terminal agent" when an agent made it.
     pub by: String,
     pub conversation: Vec<AgentMessage>,
-}
-
-#[derive(Serialize)]
-pub struct AgentNote {
-    pub path: String,
-    pub lines: Option<String>,
-    pub category: crate::store::Category,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub level: Option<crate::store::Level>,
-    pub title: String,
-    pub body: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub flow: Option<crate::store::FlowStep>,
 }
 
 impl Review {
@@ -263,21 +250,6 @@ impl Review {
             .collect()
     }
 
-    pub(super) fn agent_notes(&self) -> Vec<AgentNote> {
-        self.notes
-            .iter()
-            .map(|n| AgentNote {
-                path: n.path.clone(),
-                lines: self.span_lines(n.file, n.rows),
-                category: n.category,
-                level: n.level,
-                title: n.title.clone(),
-                body: n.body.clone(),
-                flow: n.flow.clone(),
-            })
-            .collect()
-    }
-
     /// The code of `rows` and the context between them, as a unified diff with a `@@` header
     /// wherever the line numbers jump.
     pub(super) fn snippet(&self, rows: &[RowRef]) -> String {
@@ -380,10 +352,6 @@ impl RepoCtx {
 
     pub fn agent_comments(&self, workspace: Option<&str>) -> anyhow::Result<Vec<AgentComment>> {
         Ok(self.with_current(workspace, Review::agent_comments)?.1)
-    }
-
-    pub fn agent_notes(&self, workspace: Option<&str>) -> anyhow::Result<Vec<AgentNote>> {
-        Ok(self.with_current(workspace, Review::agent_notes)?.1)
     }
 
     /// Comments as a terminal agent on lines `start..=end` of `path` (new side) in the review

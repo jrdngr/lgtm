@@ -71,24 +71,21 @@ describe("buildLines", () => {
     expect(buildLines(files, layout({ filter: "gray" }))).toEqual([]);
   });
 
-  it("puts note blocks after their row's comments, and gone ones under the file header", () => {
+  it("puts comment blocks after their row, and gone ones under the file header", () => {
     const lines = buildLines(
       files,
       layout({
-        comments: new Map([["0:1", [5]]]),
-        notes: new Map([
-          ["0:1", [8]],
+        comments: new Map([
+          ["0:1", [5, 8]],
           ["0:file", [9]],
         ]),
       }),
     );
-    const blocks = lines.flatMap((l, i) =>
-      l.kind === "comment" ? [[i, `c${l.comment}`]] : l.kind === "note" ? [[i, `n${l.note}`]] : [],
-    );
+    const blocks = lines.flatMap((l, i) => (l.kind === "comment" ? [[i, l.comment]] : []));
     expect(blocks).toEqual([
-      [1, "n9"],
-      [5, "c5"],
-      [6, "n8"],
+      [1, 9],
+      [5, 5],
+      [6, 8],
     ]);
   });
 
@@ -189,7 +186,7 @@ describe("fileProgress", () => {
     createdAt: 0,
   });
   const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
-    indexState({ marks, checks: [check], amber: [], comments: [], notes: [], threads: [] });
+    indexState({ marks, checks: [check], amber: [], comments: [], threads: [] });
   const done = (c: MarkColor) => c !== "red";
 
   it("counts rows that need review by mark, leaving out a change's removed rows", () => {

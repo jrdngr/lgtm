@@ -118,7 +118,6 @@ export function Flow(p: FlowProps) {
         outside: s?.outside ?? false,
         count: s?.count ?? 0,
         done: s && s.all > 0 ? s.done / s.all : undefined,
-        risk: s?.risk,
         callers,
         callersOpen: own.some((n) => view.callersOpen.has(n)),
         onCallers: () => {

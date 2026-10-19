@@ -2,7 +2,7 @@ import type { GraphDto, GraphNode } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import type { CurrentReview } from "../review/current";
-import { nodeRisk, rowsDone, showNode, worseRisk } from "./nodes";
+import { rowsDone, showNode } from "./nodes";
 import type { Box, Tree } from "./tree";
 
 export interface BoxStats {
@@ -11,7 +11,6 @@ export interface BoxStats {
   /** Its changed rows that are done, and all of them. */
   done: number;
   all: number;
-  risk?: string;
   /** Everything in it is an unchanged caller. */
   outside: boolean;
 }
@@ -28,7 +27,6 @@ export function boxStats(
     if (!present[n.id]) continue;
     const changed = n.hop === 0;
     const [done, all] = changed ? rowsDone(review, n) : [0, 0];
-    const risk = changed ? nodeRisk(review, n) : undefined;
     for (
       let b = tree.boxes.get(tree.boxOf[n.id]);
       b;
@@ -39,7 +37,6 @@ export function boxStats(
         count: s.count + (changed ? 1 : 0),
         done: s.done + done,
         all: s.all + all,
-        risk: worseRisk(s.risk, risk),
         outside: s.outside && !changed,
       });
     }

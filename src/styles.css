@@ -8,6 +8,8 @@
   --panel: #252526;
   --fg: #d4d4d4;
   --muted: #8a8a8a;
+  /* Between --muted and --fg: counts and chevrons that should still read. */
+  --soft: #a8a8a8;
   --border: #3c3c3c;
   --accent: #4f8cc9;
   --add: rgb(46 160 67 / 15%);
@@ -82,7 +84,6 @@ textarea,
 .take-question,
 .note-text,
 .quote-text,
-.note-body,
 .pd-body,
 .bots-context,
 .bots-report-body,
@@ -604,24 +605,16 @@ kbd {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.side-badge {
-  position: absolute;
-  top: 4px;
-  right: 1px;
-  min-width: 14px;
-  padding: 0 3px;
-  border-radius: 7px;
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 14px;
-  text-align: center;
-  color: #fff;
-  background: var(--accent);
+/* Something waits on you in the view. */
+.side-tabs button.alert,
+.side-tabs button.alert:hover:not(:disabled) {
+  color: var(--amber);
 }
 
-.side-badge.amber {
-  color: #111;
-  background: var(--amber);
+.side-divider {
+  width: 1px;
+  margin: 9px 5px;
+  background: var(--border);
 }
 
 /* A side view: its header, then a body that scrolls. */
@@ -772,26 +765,6 @@ kbd {
   height: 12px;
   border-radius: 50%;
   background: conic-gradient(var(--added) var(--done), var(--border) 0);
-}
-
-/* Important note levels, in the Symbols view. */
-.risk-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex: none;
-}
-
-.risk-dot.risk-high {
-  background: var(--flagged);
-}
-
-.risk-dot.risk-medium {
-  background: var(--amber);
-}
-
-.risk-dot.risk-low {
-  background: var(--muted);
 }
 
 /* The text prompt from ui/prompt.tsx, over the whole window. */

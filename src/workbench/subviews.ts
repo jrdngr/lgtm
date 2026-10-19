@@ -13,14 +13,16 @@ const MOVED: Record<string, string> = {
   symbols: "changes",
   bots: "reviewers",
   design: "qa",
+  pr: "comments",
+  walkthrough: "comments",
 };
 
 /** The right panel view for a view id saved by any build. Older builds nested Changes under
- * "diff", and Walkthrough and Reports under "reports", each remembering the one it showed. */
+ * "diff", and Reports under "reports" next to a view that's now gone. */
 export function movedView(view: string, saved: (key: string) => unknown = savedSub): string {
   if (view === "diff") return "changes";
   if (view === "reports") {
-    return saved("lgtm:side:reports") === "reviewers" ? "reviewers" : "walkthrough";
+    return saved("lgtm:side:reports") === "reviewers" ? "reviewers" : "comments";
   }
   return MOVED[view] ?? view;
 }

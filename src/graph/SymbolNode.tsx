@@ -16,8 +16,6 @@ export interface BoxData extends Record<string, unknown> {
   count: number;
   /** Share of its changed rows that are done. */
   done?: number;
-  /** The worst level of the important notes on its rows. */
-  risk?: string;
   /** Callers one hop out from its own symbols, and whether they're shown. */
   callers: number;
   callersOpen: boolean;
@@ -80,14 +78,10 @@ const sign = (status?: NodeStatus) =>
     <span className={`gsign gsign-${status}`}>{STATUS_SIGN[status]}</span>
   ) : null;
 
-/** A dot in the corner for the worst important note in it. */
-const riskDot = (risk?: string) =>
-  risk ? <span className={`gdot risk-${risk}`} title={`Important note, ${risk}`} /> : null;
-
 /** A symbol, or a closed folder, file or group, with a line along its bottom for how much of
  * it is reviewed. */
 export function BoxNode({ data, selected }: NodeProps & { data: BoxData }) {
-  const { box, status, done, risk, count } = data;
+  const { box, status, done, count } = data;
   const kind = status ?? (data.outside ? "caller" : `box gnode-${box.kind}`);
   return (
     <div
@@ -103,7 +97,6 @@ export function BoxNode({ data, selected }: NodeProps & { data: BoxData }) {
         {box.kind !== "symbol" && count > 0 && <span className="gcount">{count}</span>}
         <CallersBadge data={data} />
       </div>
-      {riskDot(risk)}
       {done !== undefined && (
         <div className="gnode-bar">
           <span style={{ width: `${Math.round(done * 100)}%` }} />
@@ -116,7 +109,7 @@ export function BoxNode({ data, selected }: NodeProps & { data: BoxData }) {
 
 /** An open folder, file or group: a box around what's in it, under a header band. */
 export function OpenBoxNode({ data, selected }: NodeProps & { data: BoxData }) {
-  const { box, status, risk } = data;
+  const { box, status } = data;
   return (
     <div
       className={`gfile gfile-${box.kind}${data.outside ? " outside" : ""}${selected ? " selected" : ""}${extraClass(data)}`}
@@ -130,7 +123,6 @@ export function OpenBoxNode({ data, selected }: NodeProps & { data: BoxData }) {
         <span className="glabel">{box.label}</span>
         <CallersBadge data={data} />
       </div>
-      {riskDot(risk)}
       <Handle type="source" position={Position.Right} isConnectable={false} />
     </div>
   );

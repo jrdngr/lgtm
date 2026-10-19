@@ -24,7 +24,6 @@ const HEIGHTS: Record<DisplayLine["kind"], number> = {
   more: ROW_HEIGHT,
   context: ROW_HEIGHT,
   comment: 120,
-  note: 80,
 };
 
 function lineKey(line: DisplayLine): string {
@@ -39,8 +38,6 @@ function lineKey(line: DisplayLine): string {
       return `g:${line.file}:${line.rows[0]}`;
     case "comment":
       return `c:${line.comment}`;
-    case "note":
-      return `n:${line.note}`;
     case "more":
       return `m:${line.file}:${line.region.from}`;
     case "context":
@@ -83,7 +80,6 @@ interface Props extends LineHandlers {
   onClearFile(file: number): void;
   onFileMenu(e: React.MouseEvent, file: number): void;
   renderComment(id: number): ReactNode;
-  renderNote(id: number): ReactNode;
   onShowContext(file: number, region: Region): void;
 }
 
@@ -186,7 +182,6 @@ export function DiffLines(props: Props) {
     const file = files[line.file];
     if (line.kind === "file") return header(line.file);
     if (line.kind === "comment") return props.renderComment(line.comment);
-    if (line.kind === "note") return props.renderNote(line.note);
     if (line.kind === "more")
       return (
         <MoreBar region={line.region} onShow={() => props.onShowContext(line.file, line.region)} />
@@ -289,11 +284,11 @@ export function DiffLines(props: Props) {
         <div style={{ height: virtualizer.getTotalSize(), width, position: "relative" }}>
           {virtualizer.getVirtualItems().map((v) => {
             const selected = v.index >= selection.start && v.index <= selection.end;
-            // Comment and note blocks size to their content, as do rows when they wrap. Every
-            // other line has a fixed height.
+            // Comment blocks size to their content, as do rows when they wrap. Every other line
+            // has a fixed height.
             const kind = lines[v.index].kind;
             const code = kind === "rows" || kind === "context";
-            const sized = kind === "comment" || kind === "note" || (wrap && code);
+            const sized = kind === "comment" || (wrap && code);
             return (
               <div
                 key={v.key}

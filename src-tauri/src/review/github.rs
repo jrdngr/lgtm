@@ -8,7 +8,7 @@ use anyhow::{Context, bail};
 
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms, pulled_stage};
 use crate::anchor::{FileIndex, Side, nearest_lines, norm_for, remap_lines};
-use crate::diff::RowKind;
+use crate::diff::{FileStatus, RowKind};
 use crate::store::{Comment, Conversation, GhLink, ThreadState};
 
 /// A thread pulled from GitHub, to become a comment block.
@@ -44,6 +44,18 @@ fn hashes(text: &str, path: &str) -> Vec<i64> {
 }
 
 impl Review {
+    /// The changed rows a line range covers, on the new side or the old side for a removed
+    /// file: every changed row from the first to the last row inside it, or the nearest
+    /// changed row when none is.
+    pub(super) fn rows_for(&self, path: &str, start: u32, end: u32) -> Option<Vec<RowRef>> {
+        let file = self.files.iter().find(|f| f.path == path)?;
+        let side = match file.status {
+            FileStatus::Removed => Side::Old,
+            _ => Side::New,
+        };
+        self.rows_on_side(path, side, start, end)
+    }
+
     /// The changed rows of `path` with `side` lines in `start..=end`, or the nearest changed
     /// row when there are none.
     pub(super) fn rows_on_side(

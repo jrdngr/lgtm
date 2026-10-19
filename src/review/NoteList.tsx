@@ -3,6 +3,7 @@ import { Inline } from "../bots/Markdown";
 import { type CommandResult, commands, unwrap } from "../ipc";
 import { run } from "../services/pathMenu";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
+import { GroupHead } from "../ui/GroupHead";
 import { Icon } from "../ui/icons";
 import { confirmAction, promptText } from "../ui/prompt";
 import { Empty } from "../ui/SectionHeader";
@@ -99,49 +100,53 @@ interface Props {
   setShowDone(show: boolean): void;
 }
 
-/** The review's notes grouped by file, with done ones folded at the end. Click one to jump to
- * it. */
+/** A file's path, its folder quiet and its name bright. */
+function FilePath({ path }: { path: string }) {
+  const at = path.lastIndexOf("/") + 1;
+  return (
+    <div className="note-file" title={path}>
+      {path.slice(0, at)}
+      <b>{path.slice(at)}</b>
+    </div>
+  );
+}
+
+/** The review's open notes in runs by file, then the done ones folded under Done. Click one to
+ * jump to it. */
 export function NoteList({ review, notes, canDraft, showDone, setShowDone }: Props) {
-  if (notes.length === 0) {
-    return (
-      <Empty>
-        No notes. Select code and press <kbd>c</kbd>
-      </Empty>
-    );
-  }
   const open = notes.filter((c) => !c.done);
   const done = notes.filter((c) => c.done);
   return (
     <>
       {byFile(open).map(([path, group]) => (
-        <div key={path} className="comment-group">
-          <div className="group-head" title={path}>
-            <span className="group-path">{path}</span>
-            <span className="spacer" />
-            <span>{group.length}</span>
-          </div>
+        <div key={path}>
+          <FilePath path={path} />
           {group.map((c) => (
             <NoteItem key={c.id} c={c} review={review} canDraft={canDraft} />
           ))}
         </div>
       ))}
       {done.length > 0 && (
-        <div className="comment-group">
-          <button
-            type="button"
-            className="group-head fold"
-            aria-expanded={showDone}
-            onClick={() => setShowDone(!showDone)}
-          >
-            <span className="chevron">{showDone ? "▾" : "▸"}</span>
-            <span>Done</span>
-            <span className="spacer" />
-            <span>{done.length}</span>
-          </button>
+        <div>
+          <GroupHead
+            name="Done"
+            count={done.length}
+            shut={!showDone}
+            onToggle={() => setShowDone(!showDone)}
+          />
           {showDone &&
             done.map((c) => <NoteItem key={c.id} c={c} review={review} canDraft={canDraft} />)}
         </div>
       )}
     </>
+  );
+}
+
+/** What the Notes list says when there are none. */
+export function NoNotes() {
+  return (
+    <Empty>
+      No notes. Select code and press <kbd>c</kbd>
+    </Empty>
   );
 }

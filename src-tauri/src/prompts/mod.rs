@@ -13,7 +13,6 @@ use crate::settings::config_dir;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum Prompt {
-    Walkthrough,
     /// How takes and replies on GitHub threads are written.
     Reply,
     /// How Q&A questions are built, after the qqueue skill.
@@ -21,11 +20,10 @@ pub enum Prompt {
 }
 
 impl Prompt {
-    pub const ALL: [Prompt; 3] = [Prompt::Walkthrough, Prompt::Reply, Prompt::Qq];
+    pub const ALL: [Prompt; 2] = [Prompt::Reply, Prompt::Qq];
 
     fn file(self) -> &'static str {
         match self {
-            Prompt::Walkthrough => "walkthrough.md",
             Prompt::Reply => "reply.md",
             Prompt::Qq => "qq.md",
         }
@@ -33,7 +31,6 @@ impl Prompt {
 
     pub fn default_text(self) -> &'static str {
         match self {
-            Prompt::Walkthrough => include_str!("walkthrough.md"),
             Prompt::Reply => include_str!("reply.md"),
             Prompt::Qq => include_str!("qq.md"),
         }
@@ -147,37 +144,37 @@ pub fn is_prompt_file(file: &Path) -> bool {
 mod tests {
     use super::*;
 
-    const W: Prompt = Prompt::Walkthrough;
+    const P: Prompt = Prompt::Reply;
 
     #[test]
     fn the_prompt_file_wins_over_the_default() {
         let config = tempfile::tempdir().unwrap();
         let config = Some(config.path());
-        assert_eq!(load_in(W, config).unwrap(), W.default_text());
+        assert_eq!(load_in(P, config).unwrap(), P.default_text());
 
-        let file = edit_in(W, config).unwrap();
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), W.default_text());
+        let file = edit_in(P, config).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), P.default_text());
         std::fs::write(&file, "mine").unwrap();
-        assert_eq!(load_in(W, config).unwrap(), "mine");
-        assert!(info_in(W, config).exists);
+        assert_eq!(load_in(P, config).unwrap(), "mine");
+        assert!(info_in(P, config).exists);
 
         // Opening it again keeps the edits.
-        edit_in(W, config).unwrap();
-        assert_eq!(load_in(W, config).unwrap(), "mine");
+        edit_in(P, config).unwrap();
+        assert_eq!(load_in(P, config).unwrap(), "mine");
 
         std::fs::write(&file, "\n").unwrap();
-        assert!(load_in(W, config).is_err());
+        assert!(load_in(P, config).is_err());
 
-        remove_in(W, config).unwrap();
-        assert_eq!(load_in(W, config).unwrap(), W.default_text());
-        assert!(!info_in(W, config).exists);
+        remove_in(P, config).unwrap();
+        assert_eq!(load_in(P, config).unwrap(), P.default_text());
+        assert!(!info_in(P, config).exists);
     }
 
     #[test]
     fn only_prompt_files_open_for_editing() {
         let dir = tempfile::tempdir().unwrap();
         let config = Some(dir.path());
-        let file = edit_in(W, config).unwrap();
+        let file = edit_in(P, config).unwrap();
         assert!(is_prompt_file_in(config, &file));
         let other = dir.path().join("notes.md");
         std::fs::write(&other, "").unwrap();
@@ -190,7 +187,7 @@ mod tests {
             std::os::unix::fs::symlink(dir.path().join("run.command"), &file).unwrap();
             assert!(!is_prompt_file_in(config, &file));
             // A symlinked prompt isn't used either.
-            assert_eq!(load_in(W, config).unwrap(), W.default_text());
+            assert_eq!(load_in(P, config).unwrap(), P.default_text());
         }
     }
 }

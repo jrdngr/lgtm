@@ -1,4 +1,4 @@
-import type { CheckState, CommentDto, NoteDto, StateDto, ThreadDto } from "../bindings";
+import type { CheckState, CommentDto, StateDto, ThreadDto } from "../bindings";
 import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
 import type { Filter, RowStateFn } from "./rowState";
@@ -21,15 +21,11 @@ export interface CurrentReview {
   checks: CheckState[];
   filter: Filter;
   comments: CommentDto[];
-  /** The walkthrough, in reading order. */
-  notes: NoteDto[];
   /** In a PR workspace, every thread and draft on the PR. */
   threads: ThreadDto[];
   /** Shows a new state, after a side view changed comments or threads. With `review`, only
    * while that review is still the one shown. */
   apply(state: StateDto, review?: number): void;
-  /** Sends a terminal agent the prompt to write the review's walkthrough. */
-  walkthroughInTerminal(): void;
   /** Scrolls the review pane to `file` and puts the cursor there. */
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */

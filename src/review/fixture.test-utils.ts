@@ -73,7 +73,6 @@ export function review(files: FileDto[]): ReviewDto {
       checks: files.map(() => "unchecked"),
       amber: [],
       comments: [],
-      notes: [],
       threads: [],
     },
     changes: [],

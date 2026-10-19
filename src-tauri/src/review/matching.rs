@@ -28,8 +28,7 @@ impl Review {
         self.checks = self.files.iter().map(|f| match_check(f, &checks)).collect();
         self.baseline.extend(self.matched.values().map(|m| m.id));
         self.amber = self.find_amber(store, &marks);
-        self.rematch_comments(store)?;
-        self.rematch_notes(store)
+        self.rematch_comments(store)
     }
 
     /// Every path a mark or check in this review could be stored under.

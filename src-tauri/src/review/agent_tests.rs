@@ -1,6 +1,6 @@
 use super::tests::{jj, repo, write};
 use super::*;
-use crate::store::{Author, MarkColor, Source};
+use crate::store::{Author, MarkColor};
 
 #[tokio::test]
 async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
@@ -79,8 +79,6 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
         panic!("a comment on an out-of-date review was added");
     };
     assert!(err.to_string().contains("is reloading"), "{err}");
-    let notes = ctx.current_review_at(None, "@").await.unwrap();
-    assert!(ctx.save_notes_at(&notes, &[], Source::Terminal).is_err());
     ctx.agent_reply(None, "@", c.id, "x").unwrap();
     assert!(
         ctx.publish_findings(None, "@", None, "x", empty(), None)
@@ -99,6 +97,32 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     ctx.agent_comment(None, "@", "a.rs", 5, 5, "x")
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn comment_ranges_match_new_side_lines_only() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let base: Vec<String> = (1..=20).map(|i| format!("line {i}\n")).collect();
+    write(d, "a.rs", &base.concat());
+    jj(d, &["commit", "-m", "base"]);
+    // Five lines added after line 1 (new lines 2-6), and old line 12 removed.
+    let mut new = base.clone();
+    new.remove(11);
+    for i in (1..=5).rev() {
+        new.insert(1, format!("add {i}\n"));
+    }
+    write(d, "a.rs", &new.concat());
+    let review = ctx.open(None, "@", false).await.unwrap();
+    ctx.focus(None, review.id);
+
+    let (_, state) = ctx
+        .agent_comment(None, "@", "a.rs", 6, 12, "x")
+        .await
+        .unwrap();
+    let snippet = &state.comments[0].snippet;
+    assert!(snippet.ends_with("\n+add 5"), "{snippet}");
+    assert!(!snippet.contains("line 12"), "{snippet}");
 }
 
 #[tokio::test]

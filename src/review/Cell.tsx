@@ -56,7 +56,6 @@ export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
   const color = mark?.color ?? (checked ? setup.primary : undefined);
   const amber = !color && index.amber.has(key);
   const commented = index.commented.has(key);
-  const hot = index.hot.get(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
   return (
     <div
@@ -64,10 +63,6 @@ export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
       style={color ? ({ "--m": markVar(color) } as React.CSSProperties) : undefined}
       title={amber ? "changed since marked" : markTitle(mark, setup)}
     >
-      <span
-        className={`risk${hot?.level ? ` risk-${hot.level}` : ""}`}
-        title={hot ? `${hot.level}: ${hot.title}` : undefined}
-      />
       <span className="strip" />
       <span className="flag" />
       {side ? (

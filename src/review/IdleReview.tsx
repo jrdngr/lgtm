@@ -88,7 +88,6 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       checks: index.checks,
       filter: "all",
       comments: review.state.comments,
-      notes: review.state.notes,
       threads: review.state.threads,
       apply: (state, review) => setStateRef.current(state, review),
       jump: (file) => inPane((r) => r.jump(file)),
@@ -100,7 +99,6 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
         } else openFile(workspace, path, line ?? undefined);
       },
       send: (text, onSent, report) => inPane((r) => r.send(text, onSent, report)),
-      walkthroughInTerminal: () => inPane((r) => r.walkthroughInTerminal()),
       refetchPr: () => inPane((r) => r.refetchPr()),
       pullPr: (quiet) => inPane((r) => r.pullPr(quiet)),
       async commentOn(file, rows, body, snippet, draft = false) {
