@@ -17,23 +17,24 @@ const COMPONENT: &str = "Write a tour of this component for someone new to it, f
 system map. Walk them from zoomed out to zoomed in: its container, the component itself, who \
 uses it (a step with node set to the user and `to` set to this component), its main files \
 (steps with a path), the key symbols in them (steps with a path and the symbol's name), then \
-what it uses (node set to this component and `to` set to the other).";
+what it uses (node set to this component and `to` set to the other). Use six to ten steps.";
 
 const CONTAINER: &str = "Write a tour of this container for someone new to it, for lgtm's \
 system map. Walk them from zoomed out to zoomed in: the container, its main components, the \
 key files and symbols of the most important ones (steps with a path, and the symbol's name for \
 a symbol), then the containers and external systems it talks to (node set to this container \
-and `to` set to the other, when it's on the map).";
+and `to` set to the other, when it's on the map). Use six to ten steps.";
 
 const OVERVIEW: &str = "Write a tour that walks someone new through this system in reading \
 order, for lgtm's system map. Read the README, manifests and entry points first. Start at \
-\"system\", then the containers and components that matter most, and how they connect.";
+\"system\", then the containers and components that matter most, and how they connect. \
+Use six to ten steps.";
 
 const FEATURES: &str = "Write a tour of every main feature of this app, for lgtm's system \
 map: one or two steps each, ten to twenty steps in all. Point each at the component, file or \
 symbol that does it.";
 
-const STEPS: &str = "Use six to ten steps, each with a node (\"system\", a container id or a \
+const STEPS: &str = "Give each step a node (\"system\", a container id or a \
 component id) and two or three sentences on what it does and how it connects to the steps \
 before it. Read the code you need to; don't edit files. Then call lgtm's set_tour tool with \
 node";

@@ -1,6 +1,12 @@
+// @vitest-environment jsdom
+import { act, createElement } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import type { SystemDto } from "../bindings";
+import { TraceView } from "./TraceView";
 import { drawn, shownAs, tracePath, tracePaths } from "./trace";
+
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const comp = (id: string, container: string) => ({
   id,
@@ -61,6 +67,17 @@ describe("tracePath", () => {
       { from: "k:web/ui", to: "k:web/api", path: "web/ui/a.ts", line: 3 },
     ]);
   });
+
+  it("never takes a relation out and straight back", () => {
+    const apart = { ...map, edges: [] };
+    expect(tracePath(apart, "k:web/ui", "k:web/api")).toBeUndefined();
+    expect(tracePaths(apart, "k:web/ui", "k:web/api")).toEqual([]);
+  });
+
+  it("finds no hops between a container and a component in it", () => {
+    expect(tracePath(map, "c:web", "k:web/ui")).toEqual([]);
+    expect(tracePath(map, "k:web/ui", "c:web")).toEqual([]);
+  });
 });
 
 describe("drawn", () => {
@@ -99,5 +116,54 @@ describe("tracePaths", () => {
   it("lists paths up to two hops longer than the shortest, fewest hops first, up to the cap", () => {
     expect(names(tracePaths(grid, "k:a", "k:d"))).toEqual(["ad", "ab bd", "ac cd", "ac ce ed"]);
     expect(names(tracePaths(grid, "k:a", "k:d", 2))).toEqual(["ad", "ab bd"]);
+  });
+
+  it("puts the shortest path first however many longer ones come before it", () => {
+    const bs = Array.from({ length: 60 }, (_, i) => `b${i}`);
+    const fan: SystemDto = {
+      ...grid,
+      components: ["a", "z", ...bs].map((k) => comp(k, "app")),
+      edges: [
+        ...bs.flatMap((b) => [edge("a", b, "a.ts"), edge(b, "z", `${b}.ts`)]),
+        edge("a", "z", "a.ts"),
+      ],
+    };
+    expect(names(tracePaths(fan, "k:a", "k:z"))).toEqual([
+      "az",
+      "ab0 b0z",
+      "ab1 b1z",
+      "ab2 b2z",
+      "ab3 b3z",
+    ]);
+  });
+});
+
+describe("TraceView", () => {
+  const render = (from: string, to: string) => {
+    const el = document.createElement("div");
+    const all = tracePaths(map, from, to);
+    const props = {
+      map,
+      colors: new Map<string, string>(),
+      from,
+      to,
+      hops: all[0] ?? [],
+      all,
+      show: "shortest" as const,
+      onMode() {},
+      onShow() {},
+      onFile() {},
+    };
+    act(() => createRoot(el).render(createElement(TraceView, props)));
+    return el;
+  };
+
+  it("draws a container and a component in it joined, and says when nothing joins two nodes", () => {
+    const held = render("c:web", "k:web/ui");
+    expect(held.querySelector(".sys-via")).toBeNull();
+    expect(held.querySelectorAll(".sys-prow .sys-pn")).toHaveLength(2);
+    expect(held.querySelector(".sys-prow .sys-pin")).not.toBeNull();
+    const apart = render("p:User", "x:Nowhere");
+    expect(apart.querySelector(".sys-via")?.textContent).toBe("No path");
   });
 });

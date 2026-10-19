@@ -8,6 +8,9 @@ const store = workspaceStore<string>();
 
 export const workspaceRevset = store.get;
 export const setWorkspaceRevset = store.publish;
+/** Drops a deleted workspace's revset, so a new workspace of its name starts fresh. */
+export const forgetWorkspaceRevset = (workspace: WorkspaceName) =>
+  store.retract(workspace, store.get(workspace));
 
 /** What a workspace's next review opens: its revset, else its PR, else the working copy. A
  * revset from a past run isn't reused, so one that no longer resolves can't break startup. */

@@ -17,7 +17,6 @@ import { GenerateButton, GeneratePop } from "./GenerateMenu";
 import { type GenKey, generatePrompt, genItems } from "./generate";
 import { layout } from "./layout";
 import { lensOf } from "./lens";
-import { Minimap } from "./Minimap";
 import { nodeInfo } from "./names";
 import { ReviewStrip } from "./ReviewStrip";
 import { SymbolsView } from "./SymbolsView";
@@ -226,7 +225,9 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const tourAt = (at: number) => touring && setTouring({ ...touring, at });
   const startTrace = (ends: { from?: string; to?: string }) => {
     setTouring(undefined);
-    tracing.start(ends);
+    // An edge can end where nothing traces from, like the system at the context level.
+    const ok = (id?: string) => (id && targets.some((t) => t.id === id) ? id : undefined);
+    tracing.start({ from: ok(ends.from), to: ok(ends.to) });
   };
   const endTrace = () => {
     tracing.end();
@@ -448,7 +449,12 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         <GeneratePop items={gen} onGenerate={generate} onClose={() => setGenOpen(false)} />
       )}
       {!touring && !trace && description !== "fresh" && (
-        <div className="sys-desc-state">
+        // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off the canvas; its button takes the keyboard
+        <div
+          className="sys-desc-state"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           {description === "missing" ? "Not described" : "Description stale"}
           <PipeButton className="sm" onClick={() => generate(["description"])}>
             Describe
@@ -624,23 +630,22 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
               nodeMenu={nodeMenu}
               onReload={reload}
             >
-              {shown.kind === "components" && (
-                <Minimap
-                  map={map}
-                  container={shown.container}
-                  onPick={(c, drill) =>
-                    drill
-                      ? go({ kind: "components", container: c })
-                      : go({ kind: "containers" }, containerId(c))
-                  }
-                />
-              )}
               {card}
               {tours}
               {traceModes}
             </SystemCanvas>
             {trace && hops ? (
-              <TracePanel map={map} colors={colors} hops={hops} onShow={show} onFile={onFile} />
+              <TracePanel
+                map={map}
+                colors={colors}
+                hops={
+                  hops?.length || !tracing.all.length || !trace.from || !trace.to
+                    ? hops
+                    : [{ from: trace.from, to: trace.to, label: "inside" }]
+                }
+                onShow={show}
+                onFile={onFile}
+              />
             ) : (
               (steps ??
               (edge && !stop?.node ? (

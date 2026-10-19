@@ -87,30 +87,15 @@ function reach(out: Map<string, Step[]>, from: string[]) {
   return { dist, prev };
 }
 
-/** The fewest hops from `from` to `to`. */
-function search(out: Map<string, Step[]>, from: string, to: string): Hop[] | undefined {
-  const { dist, prev } = reach(out, [from]);
-  const ends = [to, up(to)].filter((n) => dist.has(n));
-  const end = ends.sort((x, y) => (dist.get(x) ?? 0) - (dist.get(y) ?? 0))[0];
-  if (end === undefined) return undefined;
-  const hops: Hop[] = [];
-  for (let at = end; at !== from; ) {
-    const p = prev.get(at);
-    if (!p) return undefined;
-    if (p.link.hop) hops.unshift(p.link.hop);
-    at = p.node;
-  }
-  return hops;
-}
-
 /** Paths at most this many hops longer than the shortest count as alternatives. */
 const SLACK = 2;
-/** The most paths to collect, and the most links to walk collecting them. */
-const COLLECT = 50;
+/** The most links to walk looking for paths. */
 const STEPS = 20_000;
 export const MAX_PATHS = 5;
 
-/** The simple paths from `from` to `to` within SLACK hops of the shortest, fewest hops first. */
+/** Up to `cap` simple paths from `from` to `to` that use no hop twice, fewest hops first: the
+ * shortest, then those up to SLACK hops longer. Searches one length at a time, so a longer path
+ * never crowds out a shorter one. */
 function paths(out: Map<string, Step[]>, from: string, to: string, cap: number) {
   const back = new Map<string, Step[]>();
   for (const [a, steps] of out) {
@@ -120,46 +105,58 @@ function paths(out: Map<string, Step[]>, from: string, to: string, cap: number) 
       back.set(next, list);
     }
   }
-  /** The fewest hops left from each node to `to`. */
+  /** The fewest hops left from each node to `to`, reusing hops or not. */
   const left = reach(back, [to, up(to)]).dist;
   const best = left.get(from);
   if (best === undefined) return undefined;
   const found = new Map<string, Hop[]>();
   const seen = new Set([from]);
+  const used = new Set<Hop>();
   const hops: Hop[] = [];
   let steps = STEPS;
+  let length = best;
   const walk = (node: string) => {
     if (node === to || node === up(to)) {
       const key = hops.map((h) => `${h.from}>${h.to}`).join(" ");
-      if (!found.has(key)) found.set(key, [...hops]);
+      if (hops.length === length && !found.has(key)) found.set(key, [...hops]);
       return;
     }
     for (const { next, link } of out.get(node) ?? []) {
-      if (found.size >= COLLECT || --steps < 0) return;
+      if (found.size >= cap || --steps < 0) return;
       const n = hops.length + (link.hop ? 1 : 0);
       const rest = left.get(next) ?? Number.POSITIVE_INFINITY;
-      if (seen.has(next) || n + rest > best + SLACK) continue;
+      if (seen.has(next) || (link.hop && used.has(link.hop)) || n + rest > length) continue;
       seen.add(next);
-      if (link.hop) hops.push(link.hop);
+      if (link.hop) {
+        hops.push(link.hop);
+        used.add(link.hop);
+      }
       walk(next);
-      if (link.hop) hops.pop();
+      if (link.hop) {
+        hops.pop();
+        used.delete(link.hop);
+      }
       seen.delete(next);
     }
   };
-  walk(from);
-  return [...found.values()].sort((a, b) => a.length - b.length).slice(0, cap);
+  // No path is longer than the hops there are.
+  let longest = new Set([...out.values()].flatMap((s) => s.flatMap((x) => x.link.hop ?? []))).size;
+  for (; length <= longest && found.size < cap && steps > 0; length++) {
+    walk(from);
+    const first = found.values().next().value;
+    if (first) longest = Math.min(longest, first.length + SLACK);
+  }
+  return found.size ? [...found.values()] : undefined;
 }
 
 /** The shortest path of imports and described relations from `from` to `to`, in either
- * direction when no path follows them forward. */
+ * direction when no path follows them forward. Empty when one holds the other. */
 export function tracePath(map: SystemDto, from: string, to: string): Hop[] | undefined {
-  if (from === to) return undefined;
-  const all = links(map);
-  return search(adjacency(all, false), from, to) ?? search(adjacency(all, true), from, to);
+  return tracePaths(map, from, to, 1)[0];
 }
 
 /** Up to `cap` paths from `from` to `to`, the shortest and those a few hops longer, fewest hops
- * first, in the direction tracePath takes. */
+ * first, in the direction tracePath takes. Empty when nothing joins them. */
 export function tracePaths(map: SystemDto, from: string, to: string, cap = MAX_PATHS): Hop[][] {
   if (from === to) return [];
   const all = links(map);

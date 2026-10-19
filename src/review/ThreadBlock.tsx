@@ -177,7 +177,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
       {quoting.quoteButton}
       {split ? (
         <div className="flow quote-bar">
-          <span className="pill purple">
+          <span className="pill pr">
             {quotes.length} {quotes.length === 1 ? "quote" : "quotes"}
           </span>
           <span className="spacer" />

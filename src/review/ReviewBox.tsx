@@ -22,7 +22,7 @@ function Rail({ n, at, onTop }: { n: number; at: number; onTop: boolean }) {
 function atTag(wc: WorkingCopyDto, at: number, n: number) {
   if (wc.place === "outside") return "outside";
   if (wc.place === "onTop") return wc.empty ? "empty, on top" : "on top";
-  if (n > 1) return `${at + 1} of ${n}`;
+  if (n > 1 && at >= 0) return `${at + 1} of ${n}`;
   return wc.empty ? "empty" : undefined;
 }
 
@@ -40,7 +40,8 @@ interface Props {
 export function ReviewBox({ changes, pr, wc, stale }: Props) {
   const head = changes.at(-1);
   const n = changes.length;
-  const at = changes.findIndex((c) => c.workingCopy);
+  // From `wc`, so the ring and the tag agree with the place even while the review reloads.
+  const at = wc ? changes.findIndex((c) => c.commitId === wc.commitId) : -1;
   const outside = wc?.place === "outside";
   const desc = pr ? pr.title : head?.description;
   const flags = [

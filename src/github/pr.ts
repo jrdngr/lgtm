@@ -45,6 +45,13 @@ export function setPr(workspace: WorkspaceName, pr: PrDto | null) {
   for (const l of listeners) l();
 }
 
+/** Drops a deleted workspace's PR, so a new workspace of its name loads its own. */
+export function forgetPr(workspace: WorkspaceName) {
+  const key = workspaceKey(workspace);
+  if (!prs.delete(key)) return;
+  for (const l of listeners) l();
+}
+
 /** Loads the workspace's PR again, after a refetch changed it. The old one shows until then. */
 export async function reloadPr(workspace: WorkspaceName): Promise<PrDto | null> {
   if (!prs.has(workspaceKey(workspace))) return prOf(workspace);

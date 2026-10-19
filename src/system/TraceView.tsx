@@ -10,8 +10,9 @@ interface Props {
   colors: Map<string, string>;
   from: string;
   to: string;
-  /** The shortest path; empty when nothing joins the ends. */
+  /** The shortest path; empty when one end holds the other or nothing joins them. */
   hops: Hop[];
+  /** Every path, fewest hops first; empty when nothing joins the ends. */
   all: Hop[][];
   show: TraceShow;
   onMode(s: TraceShow): void;
@@ -142,7 +143,7 @@ export function TraceView(p: Props) {
     <div className="sys-tview">
       <div className="sys-tscroll">
         <div className="sys-prows">
-          {p.hops.length ? (
+          {p.all.length ? (
             rows.map((hops) => (
               <div key={hops.map((h) => `${h.from}>${h.to}`).join(" ")} className="sys-prow">
                 {row(hops)}

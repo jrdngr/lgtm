@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { SystemDto } from "../bindings";
-import { tracePath, tracePaths } from "./trace";
+import { tracePaths } from "./trace";
 
 export type End = "from" | "to";
 /** The shortest path drawn straight, all of them, or the shortest over the map. */
@@ -23,12 +23,11 @@ export function useTrace(map: SystemDto) {
   const [trace, setTrace] = useState<Trace>();
   const from = trace?.from;
   const to = trace?.to;
-  /** Undefined while an end is unpicked; empty when nothing joins them. */
-  const hops = useMemo(
-    () => (from && to ? (tracePath(map, from, to) ?? []) : undefined),
-    [map, from, to],
-  );
+  /** Fewest hops first; empty when nothing joins the ends. */
   const all = useMemo(() => (from && to ? tracePaths(map, from, to) : []), [map, from, to]);
+  /** The shortest path: undefined while an end is unpicked, and empty when one end holds the
+   * other or nothing joins them, which `all` tells apart. */
+  const hops = from && to ? (all[0] ?? []) : undefined;
 
   /** Starts with any ends known, picking the first unset one. */
   const start = (ends: { from?: string; to?: string }) =>

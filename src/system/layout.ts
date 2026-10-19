@@ -52,12 +52,11 @@ const SYSTEM_TOP = 72;
 /** A block row and the gap below it. */
 const BLOCK_ROW = 34;
 
-/** A system card tall enough for its blocks, three a row, the first two two rows tall. */
+/** A system card tall enough for its blocks, three a row. */
 function systemSize(n: SNode): [number, number] {
   const [w, h] = SIZE.system;
   const count = n.blocks?.length ?? 0;
-  const cells = count + Math.min(2, count > 2 ? count : 0);
-  return [w, Math.max(h, SYSTEM_TOP + Math.ceil(cells / 3) * BLOCK_ROW)];
+  return [w, Math.max(h, SYSTEM_TOP + Math.ceil(count / 3) * BLOCK_ROW)];
 }
 
 const size = (n: SNode) => (n.door ? DOOR : n.kind === "system" ? systemSize(n) : SIZE[n.kind]);
@@ -72,10 +71,11 @@ const columnGap = (nodes: SNode[]) => (nodes.every((n) => n.door) ? DOOR_Y : COL
 const columnHeight = (nodes: SNode[]) =>
   nodes.reduce((h, n) => h + size(n)[1], 0) + columnGap(nodes) * Math.max(0, nodes.length - 1);
 
-/** A side column split into columns about as tall as the boundary, running at most
- * `OVERHANG` rows past it, the first column nearest the boundary. */
+/** A side column of doors split into columns about as tall as the boundary, running at most
+ * `OVERHANG` rows past it, the first column nearest the boundary. Other columns stay whole. */
 function wrapColumn(nodes: SNode[], centerH: number): SNode[][] {
   if (!nodes.length) return [];
+  if (!nodes.every((n) => n.door)) return [nodes];
   const step = Math.max(...nodes.map((n) => size(n)[1])) + columnGap(nodes);
   const rows = Math.max(1, Math.round((centerH + columnGap(nodes)) / step)) + OVERHANG;
   const out: SNode[][] = [];

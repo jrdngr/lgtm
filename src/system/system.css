@@ -558,7 +558,7 @@
   background: var(--amber);
 }
 
-/* Zoom and minimap */
+/* Zoom */
 .sys-zoom {
   display: flex;
   position: absolute;
@@ -587,29 +587,6 @@
 
 .sys-zoom button:last-child {
   border-bottom: none;
-}
-
-.sys-mini {
-  position: absolute;
-  z-index: 1;
-  bottom: 14px;
-  left: 14px;
-  box-sizing: border-box;
-  border: 1px solid #33353a;
-  border-radius: 10px;
-  background: rgb(27 28 31 / 92%);
-}
-
-.sys-mini button {
-  position: absolute;
-  padding: 0;
-  border: none;
-  border-radius: 3px;
-}
-
-.sys-mini button.on {
-  outline: 1.5px solid #e6e6e6;
-  outline-offset: 2px;
 }
 
 /* Detail panel */

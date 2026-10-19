@@ -9,9 +9,11 @@ import { onAnyReveal } from "../core/reveal";
 import { setStateRepo } from "../core/savedState";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
+import { forgetPr } from "../github/pr";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
+import { forgetWorkspaceRevset } from "../review/revset";
 import { openRevisions } from "../review/target";
 import { useAtOutside } from "../review/workingCopy";
 import { useSettingsMenu } from "../settings/open";
@@ -85,6 +87,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
    * was selected. Reads the selection as it is now: a delete finishes renders after it began. */
   function forget(name: string) {
     if (selectedRef.current === name) select(null);
+    forgetPr(name);
+    forgetWorkspaceRevset(name);
     setMounted((m) => m.filter((d) => d.name !== name));
   }
 

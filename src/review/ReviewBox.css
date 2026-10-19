@@ -1,5 +1,8 @@
 /* The header's review box: blue for a PR, neutral otherwise, red while `@` is outside. */
 .toolbar .rev-select {
+  display: flex;
+  align-items: center;
+  min-width: 0;
   gap: 8px;
   max-width: min(760px, 100%);
   padding: 0;

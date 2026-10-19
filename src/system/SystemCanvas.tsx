@@ -96,15 +96,8 @@ function Node({ n, stale }: { n: Placed; stale: boolean }) {
       )}
       {n.blocks && (
         <span className="sys-blocks">
-          {n.blocks.map((b, i) => (
-            <span
-              key={b.name}
-              className="sys-block"
-              style={{
-                background: tint(b.color, 0.35),
-                gridRow: i < 2 && n.blocks && n.blocks.length > 2 ? "span 2" : undefined,
-              }}
-            >
+          {n.blocks.map((b) => (
+            <span key={b.name} className="sys-block" style={{ background: tint(b.color, 0.35) }}>
               {b.name}
             </span>
           ))}

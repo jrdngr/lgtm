@@ -27,12 +27,14 @@ async function holdsAt(workspace: WorkspaceName, revset: string) {
   return r.status === "ok" && r.data.place !== "outside";
 }
 
-/** Points the workspace's review at its PR's commits. Without a PR, a review `@` is in or
- * builds on stays, and any other goes to `@`. A review already on it refreshes on its own. */
+/** Keeps a review `@` is in or builds on, unless the workspace's PR changed. Any other goes
+ * to the PR's commits, or to `@` without a PR. A review already on it refreshes on its own. */
 async function followOnce(workspace: WorkspaceName) {
+  const before = (await prOf(workspace))?.number;
   const pr = await prAfterMove(workspace);
   const current = workspaceRevset(workspace);
-  if (!pr && current && (await holdsAt(workspace, current))) return;
+  const samePr = pr?.number === before;
+  if (samePr && current && (await holdsAt(workspace, current))) return;
   const revset = pr?.revset ?? "@";
   if (current === revset) return;
   setWorkspaceRevset(workspace, revset);
