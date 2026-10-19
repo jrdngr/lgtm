@@ -42,7 +42,20 @@ const INSET = 36;
 /** Around a tier band's rows. */
 const BAND = 14;
 
-const size = (n: SNode) => (n.door ? DOOR : SIZE[n.kind]);
+/** A system card's header, padding and border, above its blocks. */
+const SYSTEM_TOP = 72;
+/** A block row and the gap below it. */
+const BLOCK_ROW = 34;
+
+/** A system card tall enough for its blocks, three a row, the first two two rows tall. */
+function systemSize(n: SNode): [number, number] {
+  const [w, h] = SIZE.system;
+  const count = n.blocks?.length ?? 0;
+  const cells = count + Math.min(2, count > 2 ? count : 0);
+  return [w, Math.max(h, SYSTEM_TOP + Math.ceil(cells / 3) * BLOCK_ROW)];
+}
+
+const size = (n: SNode) => (n.door ? DOOR : n.kind === "system" ? systemSize(n) : SIZE[n.kind]);
 
 const gapX = (nodes: SNode[]) => (nodes.some((n) => n.kind === "container") ? 60 : GAP_X);
 
