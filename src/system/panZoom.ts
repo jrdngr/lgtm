@@ -27,7 +27,7 @@ export function zoomAt(v: View, factor: number, px: number, py: number): View {
 
 /** The view that shows the whole `w` by `h` world centered in a `vw` by `vh` viewport, no
  * larger than its own size. */
-export function fit(w: number, h: number, vw: number, vh: number): View {
+export function fitView(w: number, h: number, vw: number, vh: number): View {
   const k = clamp(Math.min(1, (vw - MARGIN * 2) / w, (vh - MARGIN * 2) / h));
   return { k, x: (vw - w * k) / 2, y: (vh - h * k) / 2 };
 }
@@ -42,7 +42,7 @@ export function usePanZoom(width: number, height: number) {
 
   const fitNow = useCallback(() => {
     const el = ref.current;
-    if (el) setView(fit(width, height, el.clientWidth, el.clientHeight));
+    if (el) setView(fitView(width, height, el.clientWidth, el.clientHeight));
   }, [width, height]);
   useLayoutEffect(fitNow, [fitNow]);
 

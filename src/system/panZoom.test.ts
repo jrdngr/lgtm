@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fit, MAX_ZOOM, MIN_ZOOM, zoomAt } from "./panZoom";
+import { fitView, MAX_ZOOM, MIN_ZOOM, zoomAt } from "./panZoom";
 
 describe("zoomAt", () => {
   it("keeps the world point under the pointer still", () => {
@@ -16,14 +16,14 @@ describe("zoomAt", () => {
   });
 });
 
-describe("fit", () => {
+describe("fitView", () => {
   it("shrinks a large world to the viewport and centers it", () => {
-    const v = fit(2000, 1000, 1048, 648);
+    const v = fitView(2000, 1000, 1048, 648);
     expect(v.k).toBe(0.5);
     expect(v).toMatchObject({ x: 24, y: 74 });
   });
 
   it("doesn't enlarge a small world", () => {
-    expect(fit(200, 100, 1000, 600)).toEqual({ k: 1, x: 400, y: 250 });
+    expect(fitView(200, 100, 1000, 600)).toEqual({ k: 1, x: 400, y: 250 });
   });
 });
