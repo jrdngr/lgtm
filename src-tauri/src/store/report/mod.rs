@@ -34,6 +34,10 @@ pub struct BotRun {
     pub revset: String,
     pub from: Option<String>,
     pub to: String,
+    /// `from` and `to` are the revset's whole range. False for reports stored before they
+    /// were, which may have an open view's base.
+    #[serde(default)]
+    pub whole: bool,
     pub personas: Vec<Persona>,
     pub parts: Vec<Part>,
     pub created_at: f64,

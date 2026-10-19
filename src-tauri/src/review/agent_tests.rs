@@ -195,10 +195,25 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         "the old suggestions no longer match the findings"
     );
 
-    // A report stored with an open view's base, before reports took the whole range, still
-    // takes findings while its head is the revset's.
-    let mut legacy = run.clone();
-    legacy.from = Some("view-base".into());
+    // A report of the whole range takes findings only while its base is the revset's too.
+    assert!(run.whole);
+    let mut moved = run.clone();
+    moved.from = Some("view-base".into());
+    ctx.store.lock().unwrap().save_bot_run(&moved).unwrap();
+    let Err(err) = ctx
+        .publish_findings(None, "@", Some(&label), "codex", review_of(vec![]), None)
+        .await
+    else {
+        panic!("findings went into a report of another base");
+    };
+    assert!(err.to_string().contains("publish a new report"), "{err}");
+
+    // One stored with an open view's base, before reports took the whole range, still takes
+    // findings while its head is the revset's.
+    let legacy = crate::store::BotRun {
+        whole: false,
+        ..moved
+    };
     ctx.store.lock().unwrap().save_bot_run(&legacy).unwrap();
     ctx.publish_findings(None, "@", Some(&label), "codex", review_of(vec![]), None)
         .await

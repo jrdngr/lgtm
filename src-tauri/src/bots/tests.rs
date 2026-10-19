@@ -13,6 +13,7 @@ fn run(parts: Vec<Part>) -> BotRun {
         revset: "@".into(),
         from: Some("a".into()),
         to: "b".into(),
+        whole: true,
         personas: vec![Persona {
             name: "sec".into(),
             description: "d".into(),

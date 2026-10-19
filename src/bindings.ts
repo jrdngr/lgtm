@@ -473,6 +473,11 @@ export type BotRun = {
 	revset: string,
 	from: string | null,
 	to: string,
+	/**
+	 *  `from` and `to` are the revset's whole range. False for reports stored before they
+	 *  were, which may have an open view's base.
+	 */
+	whole?: boolean,
 	personas: Persona[],
 	parts: Part[],
 	createdAt: number | null,

@@ -105,7 +105,7 @@ impl RepoCtx {
         // they took the whole range may have the open view's base, so only the head must match.
         self.edit_run(run.id, |run| {
             anyhow::ensure!(
-                run.to == now.to,
+                run.to == now.to && (!run.whole || run.from == now.from),
                 "report {} is of other commits than `{revset}` is now, so nothing was \
                  published; publish a new report",
                 run.label()
@@ -135,6 +135,7 @@ impl RepoCtx {
             revset: revset.to_string(),
             from: at.whole.from,
             to: at.whole.to,
+            whole: true,
             personas: vec![persona(reviewer)],
             parts: vec![Part {
                 persona: Some(reviewer.to_string()),
