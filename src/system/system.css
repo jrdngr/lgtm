@@ -42,6 +42,13 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--sys-line);
   overflow: hidden;
+  container-type: inline-size;
+}
+
+@container (max-width: 1100px) {
+  .sys-step:not(.on) span {
+    display: none;
+  }
 }
 
 .sys-back {
@@ -67,11 +74,13 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  min-width: 0;
+  min-width: 120px;
+  overflow: hidden;
 }
 
 .sys-crumb {
   display: flex;
+  min-width: 44px;
   align-items: center;
   gap: 7px;
   padding: 5px 9px;
@@ -81,6 +90,11 @@
   color: #a9abb1;
   font-size: 13px;
   white-space: nowrap;
+}
+
+.sys-cn {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sys-crumb:hover:not(.on) {
@@ -95,6 +109,7 @@
 }
 
 .sys-sep {
+  flex: none;
   color: #4f5258;
   font-size: 14px;
 }

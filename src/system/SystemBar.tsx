@@ -85,7 +85,7 @@ export function SystemBar(p: Props) {
               onClick={c.onClick}
             >
               {i < 2 && <Swatch c={c} />}
-              {c.name}
+              <span className="sys-cn">{c.name}</span>
             </button>
           </Fragment>
         ))}
@@ -98,11 +98,12 @@ export function SystemBar(p: Props) {
               type="button"
               className={`sys-step${i === at ? " on" : i < at ? " past" : ""}`}
               aria-pressed={i === at}
+              aria-label={label}
               disabled={kind === "symbols" && !p.symbols}
               onClick={() => p.onLevel(kind)}
             >
               <i />
-              {label}
+              <span>{label}</span>
             </button>
           </Fragment>
         ))}
