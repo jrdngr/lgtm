@@ -173,14 +173,6 @@ impl Jj {
         Ok(out.lines().map(str::to_string).collect())
     }
 
-    /// Whether `revset` includes the workspace's working-copy commit.
-    pub async fn includes_working_copy(&self, revset: &str) -> anyhow::Result<bool> {
-        Ok(!self
-            .commit_ids(&format!("@ & ({revset})"))
-            .await?
-            .is_empty())
-    }
-
     /// The changes in `revset`, oldest first.
     pub async fn changes(&self, revset: &str) -> anyhow::Result<Vec<Change>> {
         let out = self
