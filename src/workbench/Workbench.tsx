@@ -72,22 +72,24 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useShortcutsMenu(selected);
   useEffect(() => selectActivity(selected), [selected]);
 
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
     setMounted((m) => (m.some((d) => d.name === name) ? m : [...m, { name, setup }]));
     saveWorkspace(repo.root, name);
   }
 
-  /** Unmounts a deleted workspace's dock, which ends its terminals. */
+  /** Unmounts a deleted workspace's dock, which ends its terminals, and goes to main if it
+   * was selected. Reads the selection as it is now: a delete finishes renders after it began. */
   function forget(name: string) {
-    if (selected === name) select(null);
+    if (selectedRef.current === name) select(null);
     setMounted((m) => m.filter((d) => d.name !== name));
   }
 
   const workspaces = useWorkspaces();
   const atOutside = useAtOutside(selected);
-  const selectedRef = useRef(selected);
-  selectedRef.current = selected;
   // The selected workspace, remembered from last time or forgotten from a terminal, may be
   // gone. A list fetched before it was created can lack it too, so a fresh one confirms.
   // biome-ignore lint/correctness/useExhaustiveDependencies: check each list as it loads

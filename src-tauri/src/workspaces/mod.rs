@@ -176,6 +176,9 @@ impl RepoCtx {
         claimed();
         self.main.jj.workspace_forget(name).await?;
         self.workspaces.lock().unwrap().remove(name);
+        // Reviews can outlive it, so its watcher stops here rather than when it drops: jj
+        // can't read `@` in a forgotten workspace.
+        ws.watch.lock().unwrap().take();
         let ours = self
             .workspace_base
             .as_ref()
