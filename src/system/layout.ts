@@ -105,8 +105,7 @@ export function layout(scene: Scene): Layout {
   const right = wrapColumn(scene.right, centerH);
   const leftW = sideWidth(left);
   const rightW = sideWidth(right);
-  const height =
-    Math.max(centerH, ...[...left, ...right].map((c) => columnHeight(c))) + PAD * 2;
+  const height = Math.max(centerH, ...[...left, ...right].map((c) => columnHeight(c))) + PAD * 2;
   const nodes: Placed[] = [];
 
   const column = (col: SNode[], x: number) => {
