@@ -1,36 +1,111 @@
+import type { ReactNode } from "react";
 import { openMenu } from "../ui/contextMenu";
-import { IconButton } from "../ui/icons";
-import { curve, type Layout } from "./layout";
+import { NEUTRAL, tint } from "./colors";
+import { Chevron, Fit, Minus, Person, Plus } from "./glyphs";
+import { curve, type Layout, type Placed } from "./layout";
 import { usePanZoom } from "./panZoom";
-import "../graph/graph.css";
 import type { SEdge } from "./scene";
 
 interface Props {
   layout: Layout;
-  /** The edges to draw. */
   edges: SEdge[];
-  /** Labels only the selection's edges. */
-  quiet: boolean;
+  /** Nodes drawn in full; the rest fade. All of them when absent. */
+  lit?: Set<string>;
+  /** Edges drawn in `hotColor`, by `from>to`, some numbered. */
+  hot: Map<string, number | undefined>;
+  hotColor: string;
+  /** Labels every described edge, not only hot ones. */
+  labels: boolean;
   selected?: string;
+  /** Nodes whose description is out of date. */
+  stale: Set<string>;
+  /** Drawn over the canvas, outside the world. */
+  children?: ReactNode;
   onSelect(id: string | undefined): void;
   onOpen(id: string): void;
+  onReload(): void;
 }
 
+const EDGE = "#3c3f45";
+
+export const edgeKey = (e: { from: string; to: string }) => `${e.from}>${e.to}`;
+
 /** An edge's stroke: wider with more import sites. */
-const width = (e: SEdge) => (e.imports ? Math.min(4, 1 + Math.log2(e.imports) / 2) : 1.4);
+const width = (e: SEdge) => (e.imports ? Math.min(3.5, 1.4 + Math.log2(e.imports) / 3) : 1.6);
+
+/** A tile's width for a component of `files` files. */
+const tileWidth = (files: number) => Math.round(Math.min(40, 8 + Math.sqrt(files) * 5));
+
+const STORE = /sql|database|\bdb\b|store|cache|redis/i;
+
+/** A node's content. */
+function Node({ n, stale }: { n: Placed; stale: boolean }) {
+  const color = n.color ?? NEUTRAL;
+  const swatch = n.color && <span className="sys-sw" style={{ background: n.color }} />;
+  return (
+    <>
+      {n.kind === "person" && <Person />}
+      <span className="sys-hd">
+        {n.kind === "system" && <span className="sys-sw round" style={{ background: NEUTRAL }} />}
+        {n.kind !== "component" && !n.door && swatch}
+        <span className="sys-nm">{n.name}</span>
+        {(n.kind === "external" || (n.kind === "container" && (n.tech?.length ?? 0) <= 10)) &&
+          n.tech && <span className="sys-chip">{n.tech}</span>}
+        {n.door && <Chevron />}
+        {stale && <span className="sys-stale" />}
+      </span>
+      {n.kind === "container" && !n.door && (n.tech?.length ?? 0) > 10 && (
+        <span className="sys-chip">{n.tech}</span>
+      )}
+      {!!n.tiles?.length && (
+        <span className="sys-tiles">
+          {n.tiles.map((files, i) => (
+            <span
+              // biome-ignore lint/suspicious/noArrayIndexKey: tiles have no identity
+              key={i}
+              className="sys-tile"
+              style={{ width: tileWidth(files), background: tint(color, 0.6) }}
+            />
+          ))}
+        </span>
+      )}
+      {!!n.tiles?.length && (
+        <span className="sys-go" style={{ background: color }}>
+          <Chevron />
+        </span>
+      )}
+      {n.blocks && (
+        <span className="sys-blocks">
+          {n.blocks.map((b, i) => (
+            <span
+              key={b.name}
+              className="sys-block"
+              style={{
+                background: tint(b.color, 0.35),
+                gridRow: i < 2 && n.blocks && n.blocks.length > 2 ? "span 2" : undefined,
+              }}
+            >
+              {b.name}
+            </span>
+          ))}
+        </span>
+      )}
+    </>
+  );
+}
 
 /** The diagram: fitted to the tab, then dragged to pan and scrolled or pinched to zoom. */
-export function SystemCanvas({ layout, edges, quiet, selected, onSelect, onOpen }: Props) {
+export function SystemCanvas(props: Props) {
+  const { layout, edges, lit, hot, hotColor, labels, selected, stale, onSelect, onOpen } = props;
   const pz = usePanZoom(layout.width, layout.height);
   const { view } = pz;
-
   const box = new Map(layout.nodes.map((n) => [n.id, n]));
   const lines = edges.flatMap((e) => {
     const a = box.get(e.from);
     const b = box.get(e.to);
-    return a && b ? [{ e, ...curve(a, b) }] : [];
+    return a && b ? [{ e, door: !!(a.door || b.door), ...curve(a, b) }] : [];
   });
-  const touches = (e: SEdge) => e.from === selected || e.to === selected;
+  const markers = { base: EDGE, hot: hotColor, added: "#3fb950", removed: "#f85149" };
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape deselects from the panel
@@ -41,7 +116,12 @@ export function SystemCanvas({ layout, edges, quiet, selected, onSelect, onOpen 
       onClick={() => {
         if (!pz.dragged()) onSelect(undefined);
       }}
-      onContextMenu={(e) => openMenu(e, [{ label: "Fit to Window", onSelect: pz.fit }])}
+      onContextMenu={(e) =>
+        openMenu(e, [
+          { label: "Fit to Window", onSelect: pz.fit },
+          { label: "Reload", onSelect: props.onReload },
+        ])
+      }
     >
       <div
         className="sys-world"
@@ -59,23 +139,46 @@ export function SystemCanvas({ layout, edges, quiet, selected, onSelect, onOpen 
               top: layout.boundary.y,
               width: layout.boundary.w,
               height: layout.boundary.h,
+              ...(layout.boundary.color && {
+                border: `1.5px solid ${tint(layout.boundary.color, 0.45)}`,
+                background: tint(layout.boundary.color, 0.03),
+              }),
             }}
           >
-            <span>{layout.boundary.name}</span>
+            <span
+              style={{
+                color: layout.boundary.color ? tint(layout.boundary.color, 0.85) : undefined,
+              }}
+            >
+              <span
+                className={`sys-sw${layout.boundary.color ? "" : " round"}`}
+                style={{ background: layout.boundary.color ?? NEUTRAL }}
+              />
+              {layout.boundary.name}
+            </span>
           </div>
         )}
         {layout.tiers.map((t) => (
-          <div key={t.label} className="sys-tier" style={{ left: t.x, top: t.y }}>
-            {t.label}
+          <div
+            key={t.label}
+            className="sys-band"
+            style={{
+              left: t.x,
+              top: t.y,
+              width: t.w,
+              height: t.h,
+              background: tint(layout.boundary?.color ?? NEUTRAL, 0.04),
+            }}
+          >
+            <span style={{ color: tint(layout.boundary?.color ?? NEUTRAL, 0.7) }}>{t.label}</span>
           </div>
         ))}
         <svg className="sys-edges" width={layout.width} height={layout.height} aria-hidden="true">
           <defs>
-            {["same", "on", "added", "removed"].map((k) => (
+            {Object.entries(markers).map(([k, fill]) => (
               <marker
                 key={k}
                 id={`sys-arrow-${k}`}
-                className={`sys-arrow ${k}`}
                 viewBox="0 0 8 8"
                 refX="7"
                 refY="4"
@@ -84,60 +187,110 @@ export function SystemCanvas({ layout, edges, quiet, selected, onSelect, onOpen 
                 markerUnits="userSpaceOnUse"
                 orient="auto"
               >
-                <path d="M0 0L8 4L0 8z" />
+                <path d="M0 0L8 4L0 8z" fill={fill} />
               </marker>
             ))}
           </defs>
-          {lines.map(({ e, d }) => {
-            const kind = e.status ?? (touches(e) ? "on" : "same");
+          {lines.map(({ e, d, door }) => {
+            const on = hot.has(edgeKey(e));
+            const kind = e.status ?? (on ? "hot" : "base");
+            const cls = ["sys-edge", e.status, door && "door", lit && !on && "faint"];
             return (
               <path
-                key={`${e.from}>${e.to}`}
-                className={`sys-edge ${kind}`}
+                key={edgeKey(e)}
+                className={cls.filter(Boolean).join(" ")}
                 d={d}
                 fill="none"
-                strokeWidth={width(e)}
+                style={on && !e.status ? { stroke: hotColor } : undefined}
+                strokeWidth={on ? width(e) + 0.6 : width(e)}
                 markerEnd={`url(#sys-arrow-${kind})`}
               />
             );
           })}
         </svg>
         {lines.map(({ e, mid }) => {
-          const text = e.label ?? (e.imports || undefined);
-          return text === undefined || (quiet && !touches(e)) ? null : (
-            <div
-              key={`${e.from}>${e.to}`}
-              className={`sys-elabel${e.status ? ` ${e.status}` : ""}${touches(e) ? " on" : ""}`}
-              style={{ left: mid.x, top: mid.y }}
+          const n = hot.get(edgeKey(e));
+          if (n !== undefined) {
+            return (
+              <span key={edgeKey(e)} className="sys-num" style={{ left: mid.x, top: mid.y }}>
+                {n}
+              </span>
+            );
+          }
+          return e.label && (labels || hot.has(edgeKey(e))) ? (
+            <span
+              key={edgeKey(e)}
+              className="sys-elabel"
+              style={{
+                left: mid.x,
+                top: mid.y,
+                color: hot.has(edgeKey(e)) ? tint(hotColor, 0.85) : undefined,
+              }}
             >
-              {text}
-            </div>
-          );
+              {e.label}
+            </span>
+          ) : null;
         })}
         {layout.nodes.map((n) => (
           <button
             key={n.id}
             type="button"
-            className={`sys-node ${n.kind}${n.status ? ` ${n.status}` : ""}${n.id === selected ? " sel" : ""}`}
-            style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
+            className={nodeClass(n, lit)}
+            style={nodeStyle(n, n.id === selected, lit?.has(n.id))}
             onClick={(ev) => {
               ev.stopPropagation();
-              onSelect(n.id);
+              if (!pz.dragged()) onSelect(n.id);
             }}
             onDoubleClick={() => onOpen(n.id)}
           >
-            {n.kind !== "component" && <span className="sys-kind">{n.label}</span>}
-            <span className="sys-name">{n.name}</span>
-            {n.description && <span className="sys-desc">{n.description}</span>}
-            {n.meta && <span className="sys-meta">{n.meta}</span>}
+            <Node n={n} stale={stale.has(n.id)} />
           </button>
         ))}
       </div>
-      <div className="gzoom sys-zoom">
-        <IconButton icon="zoomIn" label="Zoom in" onClick={pz.zoomIn} />
-        <IconButton icon="zoomOut" label="Zoom out" onClick={pz.zoomOut} />
-        <IconButton icon="fit" label="Fit" onClick={pz.fit} />
+      {props.children}
+      <div className="sys-zoom">
+        <button type="button" aria-label="Zoom In" onClick={pz.zoomIn}>
+          <Plus />
+        </button>
+        <button type="button" aria-label="Zoom Out" onClick={pz.zoomOut}>
+          <Minus />
+        </button>
+        <button type="button" aria-label="Fit" onClick={pz.fit}>
+          <Fit />
+        </button>
       </div>
     </div>
   );
+}
+
+function nodeClass(n: Placed, lit: Set<string> | undefined) {
+  const store = n.kind === "container" && !n.tiles?.length && !!n.tech && STORE.test(n.tech);
+  return [
+    "sys-node",
+    n.kind,
+    n.door && "door",
+    store && "store",
+    n.status,
+    lit && !lit.has(n.id) && "dim",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function nodeStyle(n: Placed, selected: boolean, lit: boolean | undefined): React.CSSProperties {
+  const color = n.color ?? NEUTRAL;
+  const style: React.CSSProperties = { left: n.x, top: n.y, width: n.w, height: n.h };
+  if (selected) {
+    style.border = `1.5px solid ${color}`;
+    style.boxShadow = `0 0 0 4px ${tint(color, 0.18)}, 0 8px 20px rgb(0 0 0 / 28%)`;
+    if (n.kind === "component") style.background = tint(color, 0.16);
+  } else if (lit && n.kind === "component") {
+    style.borderColor = tint(color, 0.45);
+    style.background = tint(color, 0.07);
+  } else if (n.door) {
+    style.borderColor = tint(color, 0.6);
+    style.background = tint(color, 0.08);
+    style.color = color;
+  }
+  return style;
 }

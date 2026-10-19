@@ -97,6 +97,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::arch::assess_prompt,
             commands::arch::system_map,
             commands::arch::describe_prompt,
+            commands::arch::system_most_used,
+            commands::arch::system_find,
             commands::review::focus_review,
             commands::settings::get_settings,
             commands::settings::save_settings,

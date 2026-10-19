@@ -14,6 +14,9 @@ use crate::store::Store;
 
 const KEY: &str = "system";
 
+/// A tour step's node for the whole system.
+const SYSTEM: &str = "system";
+
 /// Past this many, the prompt lists only the heaviest edges.
 const MAX_EDGES: usize = 150;
 
@@ -34,8 +37,12 @@ Entry, Features, Platform. Three or four.
 - relations: who uses what, between people, externals and containers (by name for people and \
 externals, by id for containers), each with a label of a few words like \"Reads diffs\". Leave \
 out relations between containers that only stand for imports.
+- tour: five to eight steps that walk someone new through the system in reading order, each \
+with a node (\"system\", a container id or a component id) and two or three sentences on what \
+it does and how it connects to the steps before it. Start at \"system\".
 
-Keep every description under a dozen words. Then tell me in a line that it's done.";
+Keep every description other than tour text under a dozen words. Then tell me in a line that \
+it's done.";
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -71,6 +78,14 @@ pub struct ComponentDescDto {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
+pub struct TourStepDto {
+    /// "system", a container id or a component id.
+    pub node: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct RelationDto {
     pub from: String,
     pub to: String,
@@ -87,6 +102,8 @@ pub struct Description {
     pub tiers: Vec<String>,
     pub components: Vec<ComponentDescDto>,
     pub relations: Vec<RelationDto>,
+    #[serde(default)]
+    pub tour: Vec<TourStepDto>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
@@ -100,6 +117,9 @@ pub struct SystemDescDto {
     pub tiers: Vec<String>,
     pub components: Vec<ComponentDescDto>,
     pub relations: Vec<RelationDto>,
+    /// Stored descriptions from before tours have none.
+    #[serde(default)]
+    pub tour: Vec<TourStepDto>,
     /// The working copy's commit when it was written.
     pub commit: String,
     pub created_at: f64,
@@ -153,7 +173,18 @@ fn validate(d: Description, map: &SystemDto, commit: String) -> SystemDescDto {
         .chain(map.containers.iter().map(|c| c.id.clone()))
         .collect();
     let tiers = d.tiers;
+    let nodes: HashSet<&str> = std::iter::once(SYSTEM)
+        .chain(comps.iter().copied())
+        .chain(map.containers.iter().map(|c| c.id.as_str()))
+        .chain(containers.iter().map(|c| c.id.as_str()))
+        .collect();
+    let tour = d
+        .tour
+        .into_iter()
+        .filter(|t| nodes.contains(t.node.as_str()))
+        .collect();
     SystemDescDto {
+        tour,
         summary: d.summary,
         people: d.people,
         externals: d.externals,
@@ -233,8 +264,10 @@ mod tests {
                 name: "ui".into(),
                 container: "src".into(),
                 files: 3,
+                entry: vec![],
             }],
             edges: vec![],
+            files: vec![],
             description: None,
             stale: vec![],
         }
@@ -249,7 +282,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_drops_unknown_components_tiers_and_relation_ends() {
+    fn validate_drops_unknown_components_tiers_relation_ends_and_tour_steps() {
         let d = Description {
             summary: "An app".into(),
             people: vec![ActorDto {
@@ -287,6 +320,20 @@ mod tests {
                 relation("src", "Slack"),
                 relation("src", "src"),
             ],
+            tour: vec![
+                TourStepDto {
+                    node: "system".into(),
+                    text: "Start".into(),
+                },
+                TourStepDto {
+                    node: "src/gone".into(),
+                    text: "Old".into(),
+                },
+                TourStepDto {
+                    node: "db".into(),
+                    text: "State".into(),
+                },
+            ],
         };
         let out = validate(d, &map(), "abc".into());
         assert_eq!(
@@ -296,6 +343,10 @@ mod tests {
         assert_eq!(
             out.relations.iter().map(|r| (&*r.from, &*r.to)).collect::<Vec<_>>(),
             [("User", "src"), ("src", "db"), ("src", "GitHub")]
+        );
+        assert_eq!(
+            out.tour.iter().map(|t| &*t.node).collect::<Vec<_>>(),
+            ["system", "db"]
         );
         assert_eq!(out.commit, "abc");
     }
@@ -308,6 +359,8 @@ mod tests {
                 from: format!("a{i}"),
                 to: "b".into(),
                 imports: i,
+                path: String::new(),
+                line: 1,
             })
             .collect();
         let text = map_text(&m);

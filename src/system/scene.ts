@@ -1,4 +1,5 @@
 import type { ArchDto, SysComponentDto, SystemDto } from "../bindings";
+import { LOOSE, PALETTE } from "./colors";
 
 export type Level =
   | { kind: "context" }
@@ -15,12 +16,19 @@ export interface SNode {
   id: string;
   kind: NodeKind;
   name: string;
-  /** The kind line above the name. */
-  label: string;
   /** A container's or component's repo-relative path. */
   path?: string;
   description?: string;
-  meta?: string;
+  /** A container's tech, or an external's kind. */
+  tech?: string;
+  /** The container's color, for containers and components. */
+  color?: string;
+  /** A container's components' file counts, largest first. */
+  tiles?: number[];
+  /** The system's containers, at the context level. */
+  blocks?: { name: string; color: string; files: number }[];
+  /** Another container, at the edge of a components view. */
+  door?: boolean;
   status?: Status;
 }
 
@@ -40,12 +48,14 @@ export interface Row {
 }
 
 export interface Scene {
-  /** Rows above the boundary, inside it, and below it. */
-  above: Row[];
+  /** A column left of the boundary, its rows, and a column right of it. */
+  left: SNode[];
   inside: Row[];
-  below: Row[];
+  right: SNode[];
   /** Names the boundary; absent when there's none. */
   boundary?: string;
+  /** The boundary's color. */
+  color?: string;
   edges: SEdge[];
 }
 
@@ -64,6 +74,10 @@ export const SYSTEM = "sys";
 
 /** Past this many nodes a row wraps. */
 const PER_ROW = 6;
+/** Containers are bigger, so their rows wrap sooner. */
+const CONTAINERS_PER_ROW = 3;
+/** Past this many a container card stops adding tiles. */
+const TILES = 24;
 
 export function overlayOf(arch: ArchDto): Overlay {
   const status = new Map<string, Status>();
@@ -73,7 +87,13 @@ export function overlayOf(arch: ArchDto): Overlay {
     if (c.status === "changed") status.set(c.id, "changed");
     if (c.status === "removed") {
       status.set(c.id, "removed");
-      removed.push({ id: c.id, name: c.name, container: c.container, files: c.files.length });
+      removed.push({
+        id: c.id,
+        name: c.name,
+        container: c.container,
+        files: c.files.length,
+        entry: [],
+      });
     }
   }
   const edges = arch.edges.flatMap((e) =>
@@ -111,12 +131,21 @@ export function containersOf(map: SystemDto): ContainerInfo[] {
   return [...code, ...extra];
 }
 
-const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+/** Each container's color, by its id: the biggest first along the palette, files outside
+ * every source root grey. */
+export function containerColors(map: SystemDto): Map<string, string> {
+  const sorted = containersOf(map)
+    .filter((c) => c.id !== "")
+    .sort((a, b) => b.files - a.files || a.id.localeCompare(b.id));
+  const out = new Map(sorted.map((c, i) => [c.id, PALETTE[i % PALETTE.length]]));
+  out.set("", LOOSE);
+  return out;
+}
 
-function wrap(nodes: SNode[], label?: string): Row[] {
+function wrap(nodes: SNode[], label?: string, per = PER_ROW): Row[] {
   const rows: Row[] = [];
-  for (let i = 0; i < nodes.length; i += PER_ROW) {
-    rows.push({ label: i === 0 ? label : undefined, nodes: nodes.slice(i, i + PER_ROW) });
+  for (let i = 0; i < nodes.length; i += per) {
+    rows.push({ label: i === 0 ? label : undefined, nodes: nodes.slice(i, i + per) });
   }
   return rows;
 }
@@ -126,7 +155,6 @@ function people(map: SystemDto): SNode[] {
     id: personId(p.name),
     kind: "person",
     name: p.name,
-    label: "Person",
     description: p.description,
   }));
 }
@@ -136,7 +164,7 @@ function externals(map: SystemDto): SNode[] {
     id: externalId(x.name),
     kind: "external",
     name: x.name,
-    label: x.kind ? `External · ${x.kind}` : "External",
+    tech: x.kind || undefined,
     description: x.description,
   }));
 }
@@ -171,27 +199,37 @@ function relations(map: SystemDto, container: (id: string) => string | undefined
 
 function contextScene(map: SystemDto): Scene {
   const containers = containersOf(map);
+  const colors = containerColors(map);
   const system: SNode = {
     id: SYSTEM,
     kind: "system",
     name: map.repo,
-    label: "Software system",
     description: map.description?.summary,
-    meta: `${plural(containers.length, "container")} · ${plural(map.components.length, "component")}`,
+    blocks: containers
+      .filter((c) => c.id !== "")
+      .map((c) => ({ name: c.name, color: colors.get(c.id) ?? LOOSE, files: c.files }))
+      .sort((a, b) => b.files - a.files),
   };
   const known = new Set(containers.map((c) => c.id));
   const edges = new Map<string, SEdge>();
   for (const e of relations(map, (id) => (known.has(id) ? SYSTEM : undefined))) add(edges, e);
   return {
-    above: wrap(people(map)),
+    left: people(map),
     inside: [{ nodes: [system] }],
-    below: wrap(externals(map)),
+    right: externals(map),
     edges: [...edges.values()],
   };
 }
 
 function containersScene(map: SystemDto, overlay?: Overlay): Scene {
-  const all = containersOf(map);
+  // The biggest first, then ones only the description has, then files outside every root.
+  const all = containersOf(map).sort(
+    (a, b) =>
+      Number(a.id === "") - Number(b.id === "") ||
+      Number(!a.files) - Number(!b.files) ||
+      b.files - a.files,
+  );
+  const colors = containerColors(map);
   const changed = (id: string) =>
     [...(overlay?.status ?? [])].some(
       ([comp, s]) =>
@@ -201,9 +239,15 @@ function containersScene(map: SystemDto, overlay?: Overlay): Scene {
     id: containerId(c.id),
     kind: "container",
     name: c.name,
-    label: [c.tech ? `Container · ${c.tech}` : "Container", c.id].filter(Boolean).join(" · "),
+    path: c.id,
+    tech: c.tech || undefined,
     description: c.description,
-    meta: c.components ? plural(c.components, "component") : undefined,
+    color: colors.get(c.id),
+    tiles: map.components
+      .filter((k) => k.container === c.id)
+      .map((k) => k.files)
+      .sort((a, b) => b - a)
+      .slice(0, TILES),
     status: changed(c.id) ? "changed" : undefined,
   }));
   const of = new Map(map.components.map((k) => [k.id, k.container]));
@@ -220,9 +264,9 @@ function containersScene(map: SystemDto, overlay?: Overlay): Scene {
     add(edges, e);
   }
   return {
-    above: wrap(people(map)),
-    inside: wrap(nodes),
-    below: wrap(externals(map)),
+    left: people(map),
+    inside: wrap(nodes, undefined, CONTAINERS_PER_ROW),
+    right: externals(map),
     boundary: map.repo,
     edges: [...edges.values()],
   };
@@ -253,6 +297,8 @@ export function computedTiers(
 }
 
 function componentsScene(map: SystemDto, container: string, overlay?: Overlay): Scene {
+  const colors = containerColors(map);
+  const color = colors.get(container);
   const desc = new Map((map.description?.components ?? []).map((c) => [c.id, c]));
   const comps = map.components.filter((k) => k.container === container);
   const removed = (overlay?.removed ?? []).filter(
@@ -262,10 +308,9 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
     id: componentId(k.id),
     kind: "component",
     name: k.name,
-    label: "Component",
     path: k.id,
     description: desc.get(k.id)?.description,
-    meta: plural(k.files, "file"),
+    color,
     status,
   });
   const nodes = comps.map((k) => node(k, overlay?.status.get(k.id)));
@@ -300,15 +345,29 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
     ),
   );
   const ids = new Set([...comps, ...removed].map((k) => k.id));
+  const of = new Map(map.components.map((k) => [k.id, k.container]));
   const edges = new Map<string, SEdge>();
   const status = new Map((overlay?.edges ?? []).map((e) => [`${e.from}>${e.to}`, e.status]));
+  const doors = new Set<string>();
   for (const e of map.edges) {
-    if (ids.has(e.from) && ids.has(e.to)) {
+    const inFrom = ids.has(e.from);
+    const inTo = ids.has(e.to);
+    if (inFrom && inTo) {
       add(edges, {
         from: componentId(e.from),
         to: componentId(e.to),
         imports: e.imports,
         status: status.get(`${e.from}>${e.to}`) === "added" ? "added" : undefined,
+      });
+    } else if (inFrom || inTo) {
+      const other = of.get(inFrom ? e.to : e.from);
+      if (other === undefined) continue;
+      doors.add(other);
+      const door = containerId(other);
+      add(edges, {
+        from: inFrom ? componentId(e.from) : door,
+        to: inFrom ? door : componentId(e.to),
+        imports: e.imports,
       });
     }
   }
@@ -322,12 +381,23 @@ function componentsScene(map: SystemDto, container: string, overlay?: Overlay): 
       });
     }
   }
-  const name = containersOf(map).find((c) => c.id === container)?.name ?? container;
+  const containers = containersOf(map);
+  const name = containers.find((c) => c.id === container)?.name ?? container;
   return {
-    above: [],
+    left: [],
     inside: inside.filter((r) => r.nodes.length),
-    below: [],
+    right: containers
+      .filter((c) => doors.has(c.id))
+      .map((c) => ({
+        id: containerId(c.id),
+        kind: "container",
+        name: c.name,
+        path: c.id,
+        color: colors.get(c.id),
+        door: true,
+      })),
     boundary: name,
+    color,
     edges: [...edges.values()],
   };
 }
@@ -341,4 +411,12 @@ export function sceneOf(map: SystemDto, level: Level, overlay?: Overlay): Scene 
 /** The container a Components view opens on: the one with the most files. */
 export function largestContainer(map: SystemDto): string | undefined {
   return [...map.containers].sort((a, b) => b.files - a.files)[0]?.id;
+}
+
+/** Where `id` sits: the level that shows it and the container it's in, if any. */
+export function levelOf(map: SystemDto, id: string): Level | undefined {
+  if (id === SYSTEM || id.startsWith("p:") || id.startsWith("x:")) return { kind: "context" };
+  if (id.startsWith("c:")) return { kind: "containers" };
+  const k = map.components.find((c) => componentId(c.id) === id);
+  return k ? { kind: "components", container: k.container } : undefined;
 }

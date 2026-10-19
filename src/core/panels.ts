@@ -95,6 +95,13 @@ export function openArchitecture(api: DockviewApi) {
   addPanel(api, "architecture", {}, inActivePane(api), "architecture");
 }
 
+/** Shows the System tab, or brings it forward. */
+export function openSystem(api: DockviewApi) {
+  const open = api.getPanel("system");
+  if (open) return activate(open);
+  addPanel(api, "system", {}, inActivePane(api), "system");
+}
+
 /** Shows the Q&A tab, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");

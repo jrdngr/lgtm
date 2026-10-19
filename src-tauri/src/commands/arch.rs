@@ -1,6 +1,7 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
+use crate::review::arch::explore::SysSymbolDto;
 use crate::review::arch::system::SystemDto;
 use crate::review::arch::{ArchDto, ArchRange, HistoryDto, IntentKind, LensEdit};
 
@@ -90,6 +91,34 @@ pub(crate) async fn describe_prompt(
 ) -> CmdResult<String> {
     repo(&window)?
         .describe_prompt(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
+/// A component's symbols other components use most.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn system_most_used(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    component: String,
+) -> CmdResult<Vec<SysSymbolDto>> {
+    repo(&window)?
+        .system_most_used(workspace.as_deref(), component)
+        .await
+        .map_err(err)
+}
+
+/// Symbols in a workspace's working copy whose names hold `query`.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn system_find(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    query: String,
+) -> CmdResult<Vec<SysSymbolDto>> {
+    repo(&window)?
+        .system_find(workspace.as_deref(), query)
         .await
         .map_err(err)
 }

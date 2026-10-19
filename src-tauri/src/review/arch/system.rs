@@ -2,13 +2,14 @@
 //! with the description a terminal agent wrote of the system around them.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::path::Path;
 
 use serde::Serialize;
 use specta::Type;
 
 use super::describe::{self, SystemDescDto};
 use super::group::Grouping;
-use super::{inputs, model, roots, scan, state};
+use super::{Lens, inputs, model, roots, scan, state};
 use crate::ctx::RepoCtx;
 use crate::jj::Range;
 
@@ -28,15 +29,26 @@ pub struct SysComponentDto {
     pub name: String,
     pub container: String,
     pub files: u32,
+    /// Its files other components import most, most first.
+    pub entry: Vec<String>,
 }
 
-/// `from` imports from `to` at `imports` sites.
+/// `from` imports from `to` at `imports` sites, the first of them at `path`:`line`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct SysEdgeDto {
     pub from: String,
     pub to: String,
     pub imports: u32,
+    pub path: String,
+    pub line: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct SysFileDto {
+    pub path: String,
+    pub component: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Type)]
@@ -46,19 +58,37 @@ pub struct SystemDto {
     pub containers: Vec<SysContainerDto>,
     pub components: Vec<SysComponentDto>,
     pub edges: Vec<SysEdgeDto>,
+    /// Every source file.
+    pub files: Vec<SysFileDto>,
     pub description: Option<SystemDescDto>,
     /// Components with files changed since the description was written.
     pub stale: Vec<String>,
 }
 
+/// How many entry files a component lists.
+const ENTRY: usize = 3;
+
+pub(super) struct Structure {
+    pub containers: Vec<SysContainerDto>,
+    pub components: Vec<SysComponentDto>,
+    pub edges: Vec<SysEdgeDto>,
+    pub files: Vec<SysFileDto>,
+}
+
 /// Components and edges of the files in `snap`.
-pub(super) fn structure(
-    snap: &model::Snapshot,
-    g: &Grouping,
-) -> (Vec<SysContainerDto>, Vec<SysComponentDto>, Vec<SysEdgeDto>) {
+pub(super) fn structure(snap: &model::Snapshot, g: &Grouping) -> Structure {
     let mut files: BTreeMap<String, u32> = BTreeMap::new();
     for path in snap.keys() {
         *files.entry(g.comp(path)).or_default() += 1;
+    }
+    let imports = model::edges(snap, g);
+    let mut inbound: BTreeMap<&str, u32> = BTreeMap::new();
+    for site in imports.values().flatten() {
+        *inbound.entry(&site.to_path).or_default() += 1;
+    }
+    let mut entries: BTreeMap<String, Vec<(&str, u32)>> = BTreeMap::new();
+    for (path, n) in inbound {
+        entries.entry(g.comp(path)).or_default().push((path, n));
     }
     let mut containers: BTreeMap<String, u32> = BTreeMap::new();
     let components = files
@@ -71,6 +101,10 @@ pub(super) fn structure(
                 name: g.name(id),
                 container,
                 files: *n,
+                entry: entries.get_mut(id).map_or_else(Vec::new, |e| {
+                    e.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+                    e.iter().take(ENTRY).map(|(p, _)| p.to_string()).collect()
+                }),
             }
         })
         .collect();
@@ -85,15 +119,43 @@ pub(super) fn structure(
             }
         })
         .collect();
-    let edges = model::edges(snap, g)
+    let edges = imports
         .into_iter()
-        .map(|((from, to), imports)| SysEdgeDto {
-            from,
-            to,
-            imports: imports.len() as u32,
+        .map(|((from, to), sites)| {
+            let first = sites
+                .iter()
+                .min_by(|a, b| (&a.from_path, a.line).cmp(&(&b.from_path, b.line)))
+                .expect("an edge has a site");
+            SysEdgeDto {
+                imports: sites.len() as u32,
+                path: first.from_path.clone(),
+                line: first.line,
+                from,
+                to,
+            }
         })
         .collect();
-    (containers, components, edges)
+    let files = snap
+        .keys()
+        .map(|p| SysFileDto {
+            path: p.clone(),
+            component: g.comp(p),
+        })
+        .collect();
+    Structure {
+        containers,
+        components,
+        edges,
+        files,
+    }
+}
+
+/// The working copy under `root`: its source files with their imports, and how they group.
+pub(super) fn scanned(root: &Path, lens: Lens, repo: &str) -> (model::Snapshot, Grouping) {
+    let wc = scan::scan(root, &HashSet::new());
+    let roots = roots::detect(&wc.paths, &wc.manifests, repo);
+    let snap = inputs::snapshot(&wc.paths, &wc.imports, &wc.manifests);
+    (snap, Grouping::new(roots, lens, repo))
 }
 
 impl RepoCtx {
@@ -105,17 +167,18 @@ impl RepoCtx {
         let description = describe::described(&self.store.lock().unwrap())?;
         let root = ws.root.clone();
         let repo_name = repo.clone();
-        let (containers, components, edges, path_comps) =
-            tokio::task::spawn_blocking(move || {
-                let wc = scan::scan(&root, &HashSet::new());
-                let roots = roots::detect(&wc.paths, &wc.manifests, &repo_name);
-                let snap = inputs::snapshot(&wc.paths, &wc.imports, &wc.manifests);
-                let g = Grouping::new(roots, lens, &repo_name);
-                let (containers, components, edges) = structure(&snap, &g);
-                let comp_of = move |p: &str| g.comp(p);
-                (containers, components, edges, comp_of)
-            })
-            .await?;
+        let (st, path_comps) = tokio::task::spawn_blocking(move || {
+            let (snap, g) = scanned(&root, lens, &repo_name);
+            let st = structure(&snap, &g);
+            (st, move |p: &str| g.comp(p))
+        })
+        .await?;
+        let Structure {
+            containers,
+            components,
+            edges,
+            files,
+        } = st;
         let stale = match &description {
             Some(d) => {
                 let range = Range {
@@ -141,6 +204,7 @@ impl RepoCtx {
             containers,
             components,
             edges,
+            files,
             description,
             stale,
         })
@@ -154,7 +218,7 @@ mod tests {
     use crate::review::arch::{Lens, model::Import};
 
     #[test]
-    fn structure_counts_files_and_import_sites_per_component() {
+    fn structure_counts_files_import_sites_and_entry_files_per_component() {
         let import = |to: &str, line| Import {
             to: to.into(),
             line,
@@ -174,7 +238,12 @@ mod tests {
             name: "app".into(),
         }];
         let g = Grouping::new(roots, Lens::default(), "repo");
-        let (containers, components, edges) = structure(&snap, &g);
+        let Structure {
+            containers,
+            components,
+            edges,
+            files: _,
+        } = structure(&snap, &g);
         let files = |cs: &[SysComponentDto]| -> Vec<(String, String, u32)> {
             cs.iter()
                 .map(|c| (c.id.clone(), c.container.clone(), c.files))
@@ -196,5 +265,12 @@ mod tests {
             edges.iter().map(|e| (&*e.from, &*e.to, e.imports)).collect::<Vec<_>>(),
             [("", "src/ui", 1), ("src/ui", "src/db", 3)]
         );
+        assert_eq!(
+            edges.iter().map(|e| (&*e.path, e.line)).collect::<Vec<_>>(),
+            [("build.ts", 1), ("src/ui/a.ts", 1)]
+        );
+        let entry = |id: &str| components.iter().find(|c| c.id == id).unwrap().entry.clone();
+        assert_eq!(entry("src/db"), ["src/db/x.ts", "src/db/y.ts"]);
+        assert_eq!(entry("src/ui"), ["src/ui/a.ts"]);
     }
 }

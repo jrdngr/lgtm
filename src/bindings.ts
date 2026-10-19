@@ -115,6 +115,10 @@ export const commands = {
 	systemMap: (workspace: string | null) => typedError<SystemDto, string>(__TAURI_INVOKE("system_map", { workspace })),
 	/**  The prompt asking a terminal agent to describe the system map. */
 	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
+	/**  A component's symbols other components use most. */
+	systemMostUsed: (workspace: string | null, component: string) => typedError<SysSymbolDto[], string>(__TAURI_INVOKE("system_most_used", { workspace, component })),
+	/**  Symbols in a workspace's working copy whose names hold `query`. */
+	systemFind: (workspace: string | null, query: string) => typedError<SysSymbolDto[], string>(__TAURI_INVOKE("system_find", { workspace, query })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
 	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
@@ -1598,6 +1602,8 @@ export type SysComponentDto = {
 	name: string,
 	container: string,
 	files: number,
+	/**  Its files other components import most, most first. */
+	entry: string[],
 };
 
 export type SysContainerDto = {
@@ -1607,11 +1613,27 @@ export type SysContainerDto = {
 	files: number,
 };
 
-/**  `from` imports from `to` at `imports` sites. */
+/**  `from` imports from `to` at `imports` sites, the first of them at `path`:`line`. */
 export type SysEdgeDto = {
 	from: string,
 	to: string,
 	imports: number,
+	path: string,
+	line: number,
+};
+
+export type SysFileDto = {
+	path: string,
+	component: string,
+};
+
+export type SysSymbolDto = {
+	name: string,
+	path: string,
+	line: number,
+	component: string,
+	/**  Files in other components that name it, for a component's most used symbols. */
+	users: number,
 };
 
 /**  A terminal agent described the system map. */
@@ -1628,6 +1650,8 @@ export type SystemDescDto = {
 	tiers: string[],
 	components: ComponentDescDto[],
 	relations: RelationDto[],
+	/**  Stored descriptions from before tours have none. */
+	tour?: TourStepDto[],
 	/**  The working copy's commit when it was written. */
 	commit: string,
 	createdAt: number | null,
@@ -1638,6 +1662,8 @@ export type SystemDto = {
 	containers: SysContainerDto[],
 	components: SysComponentDto[],
 	edges: SysEdgeDto[],
+	/**  Every source file. */
+	files: SysFileDto[],
 	description: SystemDescDto | null,
 	/**  Components with files changed since the description was written. */
 	stale: string[],
@@ -1730,6 +1756,12 @@ export type ToolStatus = {
 	location: string | null,
 	version: string | null,
 	problem: ToolProblem | null,
+};
+
+export type TourStepDto = {
+	/**  "system", a container id or a component id. */
+	node: string,
+	text: string,
 };
 
 export type Turn = {

@@ -11,80 +11,114 @@ export interface Placed extends SNode, Box {}
 
 export interface Layout {
   nodes: Placed[];
-  /** Tier names, where they start and the y of their row's middle. */
-  tiers: { label: string; x: number; y: number }[];
-  boundary?: Box & { name: string };
+  /** Tier bands: a tier's name and the rows it spans. */
+  tiers: (Box & { label: string })[];
+  boundary?: Box & { name: string; color?: string };
   width: number;
   height: number;
 }
 
 const SIZE: Record<NodeKind, [number, number]> = {
-  person: [180, 84],
-  system: [320, 140],
-  external: [200, 92],
-  container: [240, 124],
-  component: [160, 88],
+  person: [150, 100],
+  system: [340, 240],
+  external: [170, 70],
+  container: [210, 150],
+  component: [140, 48],
 };
+/** Another container at a components view's edge. */
+const DOOR: [number, number] = [150, 48];
 
-const GAP_X = 48;
-const GAP_Y = 72;
+const GAP_X = 30;
+const GAP_Y = 44;
 const PAD = 40;
+/** Between a side column and the boundary. */
+const COLUMN_GAP = 110;
+/** Between nodes in a side column. */
+const COLUMN_Y = 56;
 /** Room for tier names left of the boundary's rows. */
-const TIER_W = 96;
+const TIER_W = 90;
 /** Between the boundary and the rows it holds. */
-const INSET = 28;
+const INSET = 36;
+/** Around a tier band's rows. */
+const BAND = 14;
 
-/** Places the scene's rows top to bottom, each centered. */
+const size = (n: SNode) => (n.door ? DOOR : SIZE[n.kind]);
+
+const gapX = (nodes: SNode[]) => (nodes.some((n) => n.kind === "container") ? 60 : GAP_X);
+
+const rowWidth = (nodes: SNode[]) =>
+  nodes.reduce((w, n) => w + size(n)[0], 0) + gapX(nodes) * Math.max(0, nodes.length - 1);
+
+const columnHeight = (nodes: SNode[]) =>
+  nodes.reduce((h, n) => h + size(n)[1], 0) + COLUMN_Y * Math.max(0, nodes.length - 1);
+
+/** Places the scene's rows top to bottom inside the boundary, each centered, with its side
+ * columns left and right of it. */
 export function layout(scene: Scene): Layout {
-  const groups = [scene.above, scene.inside, scene.below];
   const tiered = scene.inside.some((r) => r.label);
-  const rowWidth = (nodes: SNode[]) =>
-    nodes.reduce((w, n) => w + SIZE[n.kind][0], 0) + GAP_X * Math.max(0, nodes.length - 1);
-  const insideLeft = tiered ? TIER_W : 0;
-  const inner = Math.max(0, ...scene.inside.map((r) => rowWidth(r.nodes))) + insideLeft;
+  const tierLeft = tiered ? TIER_W : 0;
+  const rowsW = Math.max(0, ...scene.inside.map((r) => rowWidth(r.nodes)));
+  const rowH = (nodes: SNode[]) => Math.max(...nodes.map((n) => size(n)[1]));
+  const rowsH =
+    scene.inside.reduce((h, r) => h + rowH(r.nodes), 0) +
+    GAP_Y * Math.max(0, scene.inside.length - 1);
   const framed = scene.boundary !== undefined && scene.inside.length > 0;
-  const width =
-    Math.max(
-      inner + (framed ? INSET * 2 : 0),
-      ...[...scene.above, ...scene.below].map((r) => rowWidth(r.nodes)),
-    ) +
-    PAD * 2;
+  const inset = framed ? INSET : 0;
+  const centerW = rowsW + tierLeft + inset * 2;
+  const centerH = rowsH + inset * 2;
+  const leftW = Math.max(0, ...scene.left.map((n) => size(n)[0]));
+  const rightW = Math.max(0, ...scene.right.map((n) => size(n)[0]));
+  const height = Math.max(centerH, columnHeight(scene.left), columnHeight(scene.right)) + PAD * 2;
   const nodes: Placed[] = [];
+
+  const column = (col: SNode[], x: number, w: number) => {
+    let y = (height - columnHeight(col)) / 2;
+    for (const n of col) {
+      const [nw, nh] = size(n);
+      nodes.push({ ...n, x: x + (w - nw) / 2, y, w: nw, h: nh });
+      y += nh + COLUMN_Y;
+    }
+  };
+
+  let x = PAD;
+  if (scene.left.length) {
+    column(scene.left, x, leftW);
+    x += leftW + COLUMN_GAP;
+  }
+  const cx = x;
+  const cy = (height - centerH) / 2;
   const tiers: Layout["tiers"] = [];
-  let boundary: Layout["boundary"];
-  let y = PAD;
-  // The boundary's rows sit right of the tier names, centered in what's left.
-  const x0 = (width - inner) / 2;
-  groups.forEach((rows, g) => {
-    if (!rows.length) return;
-    const inside = g === 1;
-    const top = y;
-    if (inside && framed) y += INSET;
-    for (const row of rows) {
-      const h = Math.max(...row.nodes.map((n) => SIZE[n.kind][1]));
-      const [from, span] = inside ? [x0 + insideLeft, inner - insideLeft] : [0, width];
-      let x = from + (span - rowWidth(row.nodes)) / 2;
-      for (const n of row.nodes) {
-        const [w, nh] = SIZE[n.kind];
-        nodes.push({ ...n, x, y: y + (h - nh) / 2, w, h: nh });
-        x += w + GAP_X;
-      }
-      if (inside && row.label) tiers.push({ label: row.label, x: x0, y: y + h / 2 });
-      y += h + GAP_Y;
+  let y = cy + inset;
+  for (const row of scene.inside) {
+    const h = rowH(row.nodes);
+    let nx = cx + inset + tierLeft + (rowsW - rowWidth(row.nodes)) / 2;
+    for (const n of row.nodes) {
+      const [w, nh] = size(n);
+      nodes.push({ ...n, x: nx, y: y + (h - nh) / 2, w, h: nh });
+      nx += w + gapX(row.nodes);
     }
-    if (inside && framed && scene.boundary !== undefined) {
-      const bottom = y - GAP_Y + INSET;
-      boundary = {
-        name: scene.boundary,
-        x: x0 - INSET,
-        y: top,
-        w: inner + INSET * 2,
-        h: bottom - top,
-      };
-      y = bottom + GAP_Y;
-    }
-  });
-  return { nodes, tiers, boundary, width, height: y - GAP_Y + PAD };
+    const band = {
+      x: cx + inset - BAND,
+      y: y - BAND,
+      w: tierLeft + rowsW + BAND * 2,
+      h: h + BAND * 2,
+    };
+    const last = tiers.at(-1);
+    if (row.label) tiers.push({ label: row.label, ...band });
+    else if (last && tiered) last.h = band.y + band.h - last.y;
+    y += h + GAP_Y;
+  }
+  const boundary =
+    framed && scene.boundary !== undefined
+      ? { name: scene.boundary, color: scene.color, x: cx, y: cy, w: centerW, h: centerH }
+      : undefined;
+  x += centerW;
+  if (scene.right.length) {
+    x += COLUMN_GAP;
+    column(scene.right, x, rightW);
+    x += rightW;
+  }
+  return { nodes, tiers, boundary, width: x + PAD, height };
 }
 
 /** Where the line from `a`'s center to `b`'s center leaves `a`'s box. */

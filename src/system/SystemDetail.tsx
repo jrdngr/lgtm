@@ -1,118 +1,287 @@
 import type { SystemDto } from "../bindings";
-import {
-  type ContainerInfo,
-  componentId,
-  containerId,
-  containersOf,
-  type Level,
-  type SEdge,
-  type SNode,
-} from "./scene";
+import { PipeButton } from "../terminal/PipeButton";
+import { tint } from "./colors";
+import { Chevron, Play } from "./glyphs";
+import { MostUsed } from "./MostUsed";
+import { nodeInfo } from "./names";
+import { componentId, containerId, containersOf, type SEdge, type SNode, SYSTEM } from "./scene";
 
 interface Props {
   map: SystemDto;
+  colors: Map<string, string>;
   /** The selection, or what the level shows when nothing is selected. */
   node: SNode;
-  /** The level's nodes, for naming the other ends of edges. */
-  nodes: SNode[];
+  /** The level's edges, for what the node talks to. */
   edges: SEdge[];
-  onPick(level: Level, node: string): void;
-  /** Shows a component in the Architecture tab, while the change overlay is on. */
-  onArchitecture?(component: string): void;
+  stale: boolean;
+  /** Shows a node, at the level that holds it. */
+  onShow(id: string): void;
+  /** Opens a container, or the system, a level down. */
+  onOpen(id: string): void;
+  onFile(path: string, line?: number): void;
+  onReveal(path: string): void;
+  onAsk(): void;
+  onTour?(): void;
 }
 
 /** Past this many, a list says how many more. */
-const LIST = 8;
+const LIST = 5;
 
-function Relations({ node, nodes, edges }: Pick<Props, "node" | "nodes" | "edges">) {
-  const name = (id: string) => nodes.find((n) => n.id === id)?.name ?? id;
+function Swatch({ color, dashed }: { color: string; dashed?: boolean }) {
+  return dashed ? (
+    <span className="sys-sw dashed" />
+  ) : (
+    <span className="sys-sw" style={{ background: color }} />
+  );
+}
+
+function TalksTo({ map, colors, node, edges, onShow }: Props) {
   const mine = edges.filter((e) => e.from === node.id || e.to === node.id);
   if (!mine.length) return null;
-  const sorted = [...mine].sort((a, b) => b.imports - a.imports);
+  const sorted = [...mine].sort(
+    (a, b) => Number(b.from === node.id) - Number(a.from === node.id) || b.imports - a.imports,
+  );
   return (
     <section className="sys-sec">
-      <h3>Relations</h3>
+      <h4>Talks to</h4>
       {sorted.map((e) => {
         const out = e.from === node.id;
+        const other = out ? e.to : e.from;
+        const info = nodeInfo(map, colors, other);
+        if (!info) return null;
         return (
-          <div key={`${e.from}>${e.to}`} className={`sys-row${e.status ? ` ${e.status}` : ""}`}>
-            <span className="sys-arrow-glyph">{out ? "→" : "←"}</span>
-            <span className="sys-rname">{name(out ? e.to : e.from)}</span>
-            <span className="sys-count">{e.label ?? (e.imports || "")}</span>
-          </div>
+          <button
+            key={`${e.from}>${e.to}`}
+            type="button"
+            className="sys-li"
+            onClick={() => onShow(other)}
+          >
+            <span className="sys-arr">{out ? "→" : "←"}</span>
+            <Swatch color={info.color} dashed={info.kind === "external"} />
+            <span>{info.name}</span>
+            {e.label && <span className="sys-lbl">{e.label}</span>}
+          </button>
         );
       })}
     </section>
   );
 }
 
-function List<T extends { id: string; name: string }>({
-  title,
-  items,
-  count,
-  onPick,
-}: {
-  title: string;
-  items: T[];
-  count(item: T): number | undefined;
-  onPick(item: T): void;
-}) {
-  if (!items.length) return null;
+function SystemBody({ map, colors, onShow }: Props) {
+  const containers = containersOf(map).filter((c) => c.id !== "");
+  const most = Math.max(1, ...containers.map((c) => c.files));
+  const around = [
+    ...(map.description?.people ?? []).map((p) => `p:${p.name}`),
+    ...(map.description?.externals ?? []).map((x) => `x:${x.name}`),
+  ];
+  return (
+    <>
+      <section className="sys-sec">
+        <h4>Containers</h4>
+        {containers.map((c) => {
+          const color = colors.get(c.id) ?? "#8b8d93";
+          return (
+            <button
+              key={c.id}
+              type="button"
+              className="sys-li"
+              onClick={() => onShow(containerId(c.id))}
+            >
+              <Swatch color={color} />
+              <span>{c.name}</span>
+              <span
+                className="sys-bar2"
+                style={{ width: Math.max(4, (100 * c.files) / most), background: color }}
+              />
+            </button>
+          );
+        })}
+      </section>
+      {!!around.length && (
+        <section className="sys-sec">
+          <h4>Around it</h4>
+          {around.map((id) => (
+            <button key={id} type="button" className="sys-li" onClick={() => onShow(id)}>
+              {id.slice(2)}
+            </button>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
+function Inside({ map, colors, node, onShow, onOpen }: Props) {
+  const ref = node.id.slice(2);
+  const comps = map.components.filter((k) => k.container === ref).sort((a, b) => b.files - a.files);
+  if (!comps.length) return null;
+  const color = colors.get(ref) ?? "#8b8d93";
+  const shade = (i: number) => tint(color, i < LIST ? 1 - i * 0.14 : 0.25);
+  const rest = comps.slice(LIST).reduce((n, k) => n + k.files, 0);
   return (
     <section className="sys-sec">
-      <h3>{title}</h3>
-      {items.slice(0, LIST).map((i) => (
-        <button key={i.id} type="button" className="sys-row link" onClick={() => onPick(i)}>
-          <span className="sys-rname">{i.name}</span>
-          <span className="sys-count">{count(i)}</span>
+      <h4>
+        <span>Inside</span>
+        <span>{comps.length}</span>
+      </h4>
+      <div className="sys-strip">
+        {comps.slice(0, LIST).map((k, i) => (
+          <span key={k.id} style={{ flex: k.files, background: shade(i) }} />
+        ))}
+        {rest > 0 && <span style={{ flex: rest, background: shade(LIST) }} />}
+      </div>
+      {comps.slice(0, LIST).map((k, i) => (
+        <button
+          key={k.id}
+          type="button"
+          className="sys-li"
+          onClick={() => onShow(componentId(k.id))}
+        >
+          <span className="sys-sw" style={{ background: shade(i) }} />
+          <span>{k.name}</span>
+          <span className="sys-n">{k.files}</span>
         </button>
       ))}
-      {items.length > LIST && <div className="sys-more">{items.length - LIST} more</div>}
+      {comps.length > LIST && (
+        <button type="button" className="sys-li more" onClick={() => onOpen(node.id)}>
+          <span className="sys-sw" style={{ background: shade(LIST) }} />
+          {comps.length - LIST} more
+        </button>
+      )}
     </section>
   );
 }
 
-/** The selection's description, what's inside it and its relations. */
-export function SystemDetail({ map, node, nodes, edges, onPick, onArchitecture }: Props) {
+function Neighbors({ map, colors, node, onShow }: Props) {
   const ref = node.id.slice(2);
-  const containers = containersOf(map);
-  const comps = (c: string) =>
-    map.components.filter((k) => k.container === c).sort((a, b) => b.files - a.files);
-  const container = (c: ContainerInfo) =>
-    c.components
-      ? onPick({ kind: "components", container: c.id }, "")
-      : onPick({ kind: "containers" }, containerId(c.id));
+  const pills = (ids: string[]) => (
+    <div className="sys-pills">
+      {ids.map((id) => {
+        const info = nodeInfo(map, colors, componentId(id));
+        const other =
+          info?.container !== undefined &&
+          info.container !== map.components.find((k) => k.id === ref)?.container;
+        return (
+          <button
+            key={id}
+            type="button"
+            className="sys-pill"
+            onClick={() => onShow(componentId(id))}
+          >
+            {other && info && <Swatch color={info.color} />}
+            {info?.name ?? id}
+          </button>
+        );
+      })}
+    </div>
+  );
+  const uses = map.edges.filter((e) => e.from === ref).sort((a, b) => b.imports - a.imports);
+  const usedBy = map.edges.filter((e) => e.to === ref).sort((a, b) => b.imports - a.imports);
+  if (!uses.length && !usedBy.length) return null;
+  return (
+    <section className="sys-sec">
+      {!!uses.length && (
+        <>
+          <h4>Uses</h4>
+          {pills(uses.map((e) => e.to))}
+        </>
+      )}
+      {!!usedBy.length && (
+        <>
+          <h4 style={uses.length ? { marginTop: 8 } : undefined}>Used by</h4>
+          {pills(usedBy.map((e) => e.from))}
+        </>
+      )}
+    </section>
+  );
+}
+
+function ComponentBody(p: Props) {
+  const k = p.map.components.find((c) => componentId(c.id) === p.node.id);
+  if (!k) return null;
+  return (
+    <>
+      {!!k.entry.length && (
+        <section className="sys-sec">
+          <h4>Start here</h4>
+          {k.entry.map((f) => (
+            <button key={f} type="button" className="sys-li mono" onClick={() => p.onFile(f)}>
+              <span>{f.slice(f.lastIndexOf("/") + 1)}</span>
+            </button>
+          ))}
+        </section>
+      )}
+      <MostUsed map={p.map} component={k.id} onFile={p.onFile} />
+      <Neighbors {...p} />
+    </>
+  );
+}
+
+/** The selection's description, what's inside it and what it talks to. */
+export function SystemDetail(p: Props) {
+  const { map, colors, node } = p;
+  const info = nodeInfo(map, colors, node.id);
+  const container = info?.kind === "component" ? info.container : undefined;
+  const where = container !== undefined ? nodeInfo(map, colors, containerId(container)) : undefined;
+  const tier =
+    node.kind === "component"
+      ? map.description?.components.find((c) => componentId(c.id) === node.id)?.tier
+      : undefined;
+  const chip = tier ?? node.tech;
+  const drills = node.id === SYSTEM || (node.kind === "container" && !!node.tiles?.length);
   return (
     <aside className="sys-detail">
       <header className="sys-head">
-        <span className="sys-kind">{node.label}</span>
-        <span className="sys-title">{node.name}</span>
-        {node.path !== undefined && <span className="sys-path">{node.path || "/"}</span>}
-        {node.description && <p>{node.description}</p>}
-        {node.meta && <span className="sys-meta">{node.meta}</span>}
-        {onArchitecture && node.kind === "component" && (
-          <button type="button" className="sys-btn" onClick={() => onArchitecture(ref)}>
-            Open in Architecture
+        {where && container !== undefined && (
+          <button
+            type="button"
+            className="sys-loc"
+            onClick={() => p.onShow(containerId(container))}
+          >
+            <Swatch color={where.color} />
+            {where.name}
           </button>
         )}
+        <span className="sys-title">
+          {node.kind === "container" && node.color && <Swatch color={node.color} />}
+          {node.id === SYSTEM && (
+            <span className="sys-sw round" style={{ background: "#d8d8d8" }} />
+          )}
+          {node.name}
+          {node.kind === "component" && chip && <span className="sys-chip">{chip}</span>}
+          {p.stale && (
+            <span className="sys-chip" style={{ color: "var(--amber)" }}>
+              Stale
+            </span>
+          )}
+        </span>
+        {node.kind !== "component" && chip && <span className="sys-chip">{chip}</span>}
+        {node.description && <p>{node.description}</p>}
+        <div className="sys-acts">
+          {drills && (
+            <button type="button" className="sys-btn" onClick={() => p.onOpen(node.id)}>
+              Open
+              <Chevron />
+            </button>
+          )}
+          {node.kind === "component" && node.path !== undefined && (
+            <button type="button" className="sys-btn" onClick={() => p.onReveal(node.path ?? "")}>
+              Files
+            </button>
+          )}
+          {node.id === SYSTEM && p.onTour && (
+            <button type="button" className="sys-btn" onClick={p.onTour}>
+              <Play size={12} />
+              Tour
+            </button>
+          )}
+          <PipeButton onClick={p.onAsk}>Ask</PipeButton>
+        </div>
       </header>
-      {node.kind === "system" && (
-        <List
-          title="Containers"
-          items={containers}
-          count={(c) => c.components || undefined}
-          onPick={container}
-        />
-      )}
-      {node.kind === "container" && (
-        <List
-          title="Components"
-          items={comps(ref)}
-          count={(k) => k.files}
-          onPick={(k) => onPick({ kind: "components", container: k.container }, componentId(k.id))}
-        />
-      )}
-      <Relations node={node} nodes={nodes} edges={edges} />
+      {node.id === SYSTEM && <SystemBody {...p} />}
+      {node.kind === "container" && <Inside {...p} />}
+      {node.kind === "component" && <ComponentBody {...p} />}
+      {node.kind !== "component" && node.id !== SYSTEM && <TalksTo {...p} />}
     </aside>
   );
 }

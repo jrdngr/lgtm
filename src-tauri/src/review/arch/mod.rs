@@ -5,6 +5,7 @@
 pub mod assess;
 mod compute;
 pub mod describe;
+pub mod explore;
 #[cfg(test)]
 mod diff_tests;
 mod extract;

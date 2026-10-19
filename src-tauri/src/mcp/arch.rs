@@ -145,6 +145,14 @@ pub struct Relation {
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
+pub struct TourStep {
+    /// "system", a container id or a component id.
+    pub node: String,
+    /// Two or three sentences.
+    pub text: String,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
 pub struct System {
     /// What the system does, in a sentence.
     pub summary: String,
@@ -155,6 +163,8 @@ pub struct System {
     pub tiers: Vec<String>,
     pub components: Vec<Component>,
     pub relations: Vec<Relation>,
+    /// A guided tour for someone new to the code, in reading order.
+    pub tour: Vec<TourStep>,
 }
 
 #[tool_router(router = arch_router, vis = "pub(super)")]

@@ -8,6 +8,7 @@ const comp = (id: string, container: string, files = 1) => ({
   name: id.split("/").pop() ?? id,
   container,
   files,
+  entry: [],
 });
 
 function map(description: SystemDescDto | null = null): SystemDto {
@@ -23,10 +24,11 @@ function map(description: SystemDescDto | null = null): SystemDto {
       comp("core/src/db", "core/src", 4),
     ],
     edges: [
-      { from: "src/ui", to: "src/api", imports: 6 },
-      { from: "src/api", to: "core/src/db", imports: 2 },
-      { from: "src/ui", to: "core/src/db", imports: 1 },
+      { from: "src/ui", to: "src/api", imports: 6, path: "src/ui/a.ts", line: 1 },
+      { from: "src/api", to: "core/src/db", imports: 2, path: "src/api/b.ts", line: 1 },
+      { from: "src/ui", to: "core/src/db", imports: 1, path: "src/ui/a.ts", line: 2 },
     ],
+    files: [],
     description,
     stale: [],
   };
@@ -52,15 +54,16 @@ function described(): SystemDescDto {
       { from: "core/src", to: "GitHub", label: "Posts" },
       { from: "src", to: "store", label: "Saves" },
     ],
+    tour: [],
     commit: "c1",
     createdAt: 0,
   };
 }
 
 const ids = (s: Scene) => ({
-  above: s.above.map((r) => r.nodes.map((n) => n.id)),
+  left: s.left.map((n) => n.id),
   inside: s.inside.map((r) => [r.label, r.nodes.map((n) => n.id)]),
-  below: s.below.map((r) => r.nodes.map((n) => n.id)),
+  right: s.right.map((n) => n.id),
 });
 
 const edges = (s: Scene) =>
@@ -70,9 +73,9 @@ describe("sceneOf", () => {
   it("draws context relations to the system, merging what its containers say", () => {
     const s = sceneOf(map(described()), { kind: "context" });
     expect(ids(s)).toEqual({
-      above: [["p:User"]],
+      left: ["p:User"],
       inside: [[undefined, ["sys"]]],
-      below: [["x:GitHub"]],
+      right: ["x:GitHub"],
     });
     expect(edges(s)).toEqual([
       ["p:User", "sys", 0, "Reviews"],
@@ -83,7 +86,7 @@ describe("sceneOf", () => {
   it("sums imports between containers and adds described ones without code", () => {
     const s = sceneOf(map(described()), { kind: "containers" });
     expect(ids(s).inside).toEqual([[undefined, ["c:src", "c:core/src", "c:store"]]]);
-    expect(s.inside[0].nodes[0]).toMatchObject({ name: "Web", label: "Container · React · src" });
+    expect(s.inside[0].nodes[0]).toMatchObject({ name: "Web", tech: "React", tiles: [3, 2] });
     expect(edges(s)).toEqual([
       ["c:src", "c:core/src", 3],
       ["p:User", "c:src", 0, "Reviews"],
@@ -93,13 +96,18 @@ describe("sceneOf", () => {
     ]);
   });
 
-  it("rows a container's components by described tier, the rest under Other", () => {
+  it("rows a container's components by described tier, with containers they import as doors", () => {
     const s = sceneOf(map(described()), { kind: "components", container: "src" });
     expect(ids(s).inside).toEqual([
       ["Entry", ["k:src/ui"]],
       ["Other", ["k:src/api"]],
     ]);
-    expect(edges(s)).toEqual([["k:src/ui", "k:src/api", 6]]);
+    expect(ids(s).right).toEqual(["c:core/src"]);
+    expect(edges(s)).toEqual([
+      ["k:src/ui", "k:src/api", 6],
+      ["k:src/api", "c:core/src", 2],
+      ["k:src/ui", "c:core/src", 1],
+    ]);
   });
 
   it("marks the change and adds what it removed", () => {
@@ -121,7 +129,7 @@ describe("sceneOf", () => {
       ["Removed", ["k:src/old"]],
     ]);
     expect(s.inside[0].nodes[0].status).toBe("changed");
-    expect(edges(s)).toEqual([
+    expect(edges(s).filter(([, to]) => to !== "c:core/src")).toEqual([
       ["k:src/ui", "k:src/api", 6, "added"],
       ["k:src/old", "k:src/api", 0, "removed"],
     ]);
@@ -147,7 +155,7 @@ describe("computedTiers", () => {
 });
 
 describe("layout", () => {
-  it("keeps the boundary's rows inside it and apart", () => {
+  it("keeps the boundary's rows inside it, with people left of it and externals right", () => {
     const l = layout(sceneOf(map(described()), { kind: "containers" }));
     const b = l.boundary;
     if (!b) throw new Error("no boundary");
@@ -160,8 +168,8 @@ describe("layout", () => {
     }
     const [p] = l.nodes.filter((n) => n.kind === "person");
     const [x] = l.nodes.filter((n) => n.kind === "external");
-    expect(p.y + p.h).toBeLessThan(b.y);
-    expect(x.y).toBeGreaterThan(b.y + b.h);
-    expect(l.height).toBeGreaterThan(x.y + x.h);
+    expect(p.x + p.w).toBeLessThan(b.x);
+    expect(x.x).toBeGreaterThan(b.x + b.w);
+    expect(l.width).toBeGreaterThan(x.x + x.w);
   });
 });
