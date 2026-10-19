@@ -51,7 +51,7 @@ function bracket(lines: LogLine[], owner: number[], commits: number[], reviewed:
 
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
  * commits. Reviewed commits are blue with a bracket, `@` green over them. Keys act on the
- * highlighted commit. */
+ * highlighted commit; dragging across commits reviews them. */
 export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
   const [error, setError] = useState<string>();
@@ -65,6 +65,8 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
   /** The commit ids jj lists for a picked range. */
   const [chain, setChain] = useState<{ revset: string; ids: Set<string> }>();
   const rootRef = useRef<HTMLDivElement>(null);
+  /** The commit a drag across rows started on. */
+  const drag = useRef<number>(undefined);
 
   const { commits, owner } = layout(lines ?? []);
   const bk = lines && bracket(lines, owner, commits, new Set(reviewed));
@@ -129,6 +131,22 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
     setCursor(c);
     setAnchor(a);
   }
+
+  // Releasing a drag across commits reviews them; one that stays on its row only moves there.
+  useEffect(() => {
+    const up = async () => {
+      const from = drag.current;
+      drag.current = undefined;
+      if (from === undefined || from === cursor) return;
+      const range = rangeOf(cursor, from);
+      if (!range) return;
+      const r = await commands.revsetCommits(workspace, range);
+      if (r.status === "ok" && r.data.length === 0) setError(UNRELATED);
+      else review(range);
+    };
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
+  });
 
   function addPicked() {
     const rev = changeAt(cursor);
@@ -257,7 +275,11 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
                 onMouseDown={(e) => {
                   // A right-click picks in the row's menu, keeping a range it's in.
                   if (c < 0 || e.button !== 0) return;
+                  if (!e.shiftKey) drag.current = c;
                   move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
+                }}
+                onMouseEnter={() => {
+                  if (drag.current !== undefined && c >= 0) move(c, drag.current);
                 }}
                 onDoubleClick={() => review(changeAt(c))}
                 onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
