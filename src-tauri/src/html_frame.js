@@ -1,7 +1,18 @@
 // Runs first in every HTML page an HTML tab shows. The page sits in a sandboxed frame with an
 // opaque origin, so this only talks to the tab through postMessage.
 (() => {
-  const post = (m) => parent.postMessage({ lgtm: true, ...m }, "*");
+  // A page's scripts can replace `parent`, and anything on a prototype, once they run, so
+  // what the key path calls is kept here first.
+  const host = parent;
+  const apply = Reflect.apply;
+  const getter = (proto, name) => Object.getOwnPropertyDescriptor(proto, name).get;
+  const send = MessagePort.prototype.postMessage;
+  const dataOf = getter(MessageEvent.prototype, "data");
+  const [key, code, metaKey, ctrlKey, shiftKey, altKey] = [
+    "key", "code", "metaKey", "ctrlKey", "shiftKey", "altKey",
+  ].map((name) => getter(KeyboardEvent.prototype, name));
+
+  const post = (m) => host.postMessage({ lgtm: true, ...m }, "*");
   const nav = () => post({ type: "nav", url: location.href, title: document.title });
   addEventListener("DOMContentLoaded", nav);
   addEventListener("hashchange", nav);
@@ -22,17 +33,39 @@
     true,
   );
 
-  // App shortcuts and Escape go to the tab. Editing shortcuts stay in the page. The tab checks
-  // the same rule (appKey in htmlNav.ts), since a page can post to it too.
+  // App shortcuts and Escape the user types go to the tab, over a port only this script
+  // holds, so a page's scripts can't send keys. Editing shortcuts stay in the page. The tab
+  // checks the same rule (appKey in htmlNav.ts). The tab answers the port's offer with a
+  // token, which says this page is leaving, so the next page's offer is taken.
+  const { port1: keys, port2 } = new MessageChannel();
+  let token;
+  keys.onmessage = (e) => {
+    token = apply(dataOf, e, []);
+  };
+  host.postMessage({ lgtm: true, type: "port" }, "*", [port2]);
+  addEventListener("pagehide", (e) => {
+    if (e.isTrusted && token) host.postMessage({ lgtm: true, type: "gone", token }, "*");
+  });
   addEventListener(
     "keydown",
     (e) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (!mod && e.key !== "Escape") return;
-      if (mod && !e.shiftKey && !e.altKey && ["a", "c", "v", "x", "z"].includes(e.key.toLowerCase())) return;
+      if (!e.isTrusted) return;
+      const k = apply(key, e, []);
+      const mod = apply(metaKey, e, []) || apply(ctrlKey, e, []);
+      if (!mod && k !== "Escape") return;
+      const plain = !apply(shiftKey, e, []) && !apply(altKey, e, []);
+      if (mod && plain && ["a", "c", "v", "x", "z"].includes(k.toLowerCase())) return;
       e.preventDefault();
-      const { key, code, metaKey, ctrlKey, shiftKey, altKey } = e;
-      post({ type: "key", key, code, metaKey, ctrlKey, shiftKey, altKey });
+      apply(send, keys, [
+        {
+          key: k,
+          code: apply(code, e, []),
+          metaKey: apply(metaKey, e, []),
+          ctrlKey: apply(ctrlKey, e, []),
+          shiftKey: apply(shiftKey, e, []),
+          altKey: apply(altKey, e, []),
+        },
+      ]);
     },
     true,
   );

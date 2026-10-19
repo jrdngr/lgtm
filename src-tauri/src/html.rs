@@ -31,6 +31,11 @@ const CSP: &str = "default-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
     frame-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
     child-src 'self' lgtmhtml: http://lgtmhtml.localhost; \
     form-action 'none'";
+/// Other files run no scripts, since only HTML gets the frame script, which must run first so
+/// a page's scripts can't take the tab's key port. An SVG shown as a page could otherwise.
+const FILE_CSP: &str = "default-src 'self' lgtmhtml: http://lgtmhtml.localhost data:; \
+    style-src 'self' lgtmhtml: http://lgtmhtml.localhost 'unsafe-inline'; \
+    script-src 'none'; form-action 'none'";
 
 struct Root {
     dir: PathBuf,
@@ -139,14 +144,15 @@ fn serve(roots: &HtmlRoots, window: &str, url_path: &str) -> Response<Cow<'stati
                 .unwrap();
         }
     };
-    let body = if kind.starts_with("text/html") {
-        with_frame_script(&String::from_utf8_lossy(&bytes)).into_bytes()
+    let (body, csp) = if kind.starts_with("text/html") {
+        let page = with_frame_script(&String::from_utf8_lossy(&bytes));
+        (page.into_bytes(), CSP)
     } else {
-        bytes
+        (bytes, FILE_CSP)
     };
     Response::builder()
         .header(header::CONTENT_TYPE, kind)
-        .header(header::CONTENT_SECURITY_POLICY, CSP)
+        .header(header::CONTENT_SECURITY_POLICY, csp)
         // The frame's origin is opaque, so module scripts and fetches of its own files need
         // this. Only the app's webviews can reach the scheme; the CSP stops sending out.
         .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
@@ -165,6 +171,9 @@ fn with_frame_script(html: &str) -> String {
             && lower[at..start].trim().is_empty()
             && lower[start + tag.len()..].starts_with(|c: char| c == '>' || c.is_whitespace())
             && let Some(end) = lower[start..].find('>')
+            // A quoted attribute may hold a `>`, so the script would land inside it. A
+            // doctype ends at any `>`.
+            && (tag == "<!doctype" || !lower[start..start + end].contains(['"', '\'']))
         {
             at = start + end + 1;
         }
@@ -221,6 +230,9 @@ mod tests {
         assert!(out.ends_with("</script><svg></svg><p>&lt;head></p>"));
         let out = with_frame_script("<html><header>h</header>");
         assert!(out.starts_with("<html><script>"));
+        let out = with_frame_script("<html lang=en><head data-x='>'><script>");
+        assert!(out.starts_with("<html lang=en><script>"));
+        assert!(out.ends_with("</script><head data-x='>'><script>"));
     }
 
     fn served(roots: &HtmlRoots, url: &str) -> (StatusCode, String) {
@@ -291,6 +303,20 @@ mod tests {
                 csp.contains("img-src 'self' lgtmhtml: http://lgtmhtml.localhost data: blob:;")
             );
         }
+    }
+
+    #[test]
+    fn files_other_than_html_run_no_scripts() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.svg"), "<svg><script>1</script></svg>").unwrap();
+        let roots = HtmlRoots::default();
+        let id = roots.add("repo-1", dir.path().into());
+        let r = serve(&roots, "repo-1", &format!("/{id}/a.svg"));
+        let csp = r.headers()[header::CONTENT_SECURITY_POLICY]
+            .to_str()
+            .unwrap();
+        assert!(csp.contains("script-src 'none'"));
+        assert!(!r.body().starts_with(SCRIPT.as_bytes()));
     }
 
     #[cfg(unix)]

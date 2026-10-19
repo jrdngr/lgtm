@@ -1,5 +1,12 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
@@ -8,6 +15,7 @@ import { IconButton } from "../ui/icons";
 import { confirmAction } from "../ui/prompt";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { appKey, fitted, pagePath, pageUrl, stepZoom, type Trail, visit, webUrl } from "./htmlNav";
+import { keyPort } from "./keyPort";
 import type { EditorParams } from "./open";
 import { ZoomControls, zoomKey } from "./ZoomControls";
 
@@ -40,7 +48,8 @@ type FrameMessage =
   | { type: "found"; found: boolean }
   | { type: "scroll"; x: number; y: number }
   | { type: "scrolled"; x: number; y: number }
-  | ({ type: "key" } & Record<string, unknown>);
+  | { type: "gone"; token: unknown }
+  | { type: "port" };
 
 /** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts but
  * an opaque origin, so it can't reach the app. The scheme's CSP blocks fetches, XHR,
@@ -71,6 +80,33 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   /** The start of this tab's page URLs, before the page's own path. */
   const prefix = useRef("");
 
+  // App keys come from the frame script over a port; see keyPort.
+  const [keys] = useState(() =>
+    keyPort((m) => {
+      const init = appKey(m, document.activeElement === frame.current);
+      if (!init) return;
+      frame.current?.dispatchEvent(
+        new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }),
+      );
+    }),
+  );
+  useEffect(() => () => keys.reset(), [keys]);
+
+  /** Bumped to show a page in a new frame, so no script from the last one is left to offer
+   * a key port. */
+  const [generation, setGeneration] = useState(0);
+  const next = useRef({ url: "", focus: false });
+  function show(url: string) {
+    next.current = { url, focus: document.activeElement === frame.current };
+    setGeneration((g) => g + 1);
+  }
+  useLayoutEffect(() => {
+    if (generation === 0 || !frame.current) return;
+    keys.reset();
+    frame.current.src = next.current.url;
+    if (next.current.focus) frame.current.focus();
+  }, [generation, keys]);
+
   useEffect(() => {
     let live = true;
     unwrap(commands.htmlRoot(workspace)).then(
@@ -83,7 +119,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         if (back?.pageScroll) scroll.current = { x: back.pageScroll[0], y: back.pageScroll[1] };
         setRoot(r);
         setTrail({ urls: [url], at: 0 });
-        if (frame.current) frame.current.src = url;
+        next.current = { url, focus: false };
+        setGeneration((g) => g + 1);
       },
       (e) => live && setError(errorText(e)),
     );
@@ -91,10 +128,6 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       live = false;
     };
   }, [workspace, path]);
-
-  function show(url: string) {
-    if (frame.current) frame.current.src = url;
-  }
 
   const post = (message: object) => send(frame.current, message);
 
@@ -110,6 +143,12 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       const m = e.data as FrameMessage & { lgtm?: unknown };
       if (m?.lgtm !== true) return;
       switch (m.type) {
+        case "port":
+          if (e.ports[0]) keys.offer(e.ports[0]);
+          break;
+        case "gone":
+          keys.gone(m.token);
+          break;
         case "nav":
           refused.current = false;
           setTrail((t) => visit(t, m.url));
@@ -147,19 +186,11 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         case "scrolled":
           saveRef.current({ pageScroll: [Math.round(m.x), Math.round(m.y)] });
           break;
-        case "key": {
-          const init = appKey(m, document.activeElement === frame.current);
-          if (!init) break;
-          frame.current.dispatchEvent(
-            new KeyboardEvent("keydown", { ...init, bubbles: true, cancelable: true }),
-          );
-          break;
-        }
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [keys]);
 
   useEffect(() => {
     send(frame.current, { type: "zoom", zoom });
@@ -279,7 +310,13 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         </div>
       )}
       {error && <div className="editor-bar error">{error}</div>}
-      <iframe ref={frame} className="html-frame" title={path} sandbox="allow-scripts" />
+      <iframe
+        key={generation}
+        ref={frame}
+        className="html-frame"
+        title={path}
+        sandbox="allow-scripts"
+      />
     </div>
   );
 });
