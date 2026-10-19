@@ -78,4 +78,18 @@ mod tests {
         j.act(&JjAction::Redo { steps: 1 }).await.unwrap();
         assert_eq!(change_id(j, "@").await, base);
     }
+
+    #[tokio::test]
+    async fn undo_fails_with_jjs_error_when_another_workspace_made_the_last_operation() {
+        let (dir, j) = repo();
+        let other = tempfile::tempdir().unwrap();
+        let ws = other.path().join("ws");
+        jj(dir.path(), &["workspace", "add", ws.to_str().unwrap()]);
+        jj(&ws, &["describe", "-m", "theirs"]);
+
+        let err = j.act(&JjAction::Undo { steps: 1 }).await.unwrap_err();
+        let err = format!("{err:#}");
+        assert!(err.contains("Refusing to undo operation"), "{err}");
+        assert!(!err.contains("Attempting to lock"), "{err}");
+    }
 }

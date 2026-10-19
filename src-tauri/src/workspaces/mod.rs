@@ -97,14 +97,25 @@ impl RepoCtx {
             .with_context(|| format!("no workspace named `{name}`"))
     }
 
-    /// Every workspace, main first, and starts watching any not seen before.
+    /// Every workspace, main first. One the UI opened that comes back after leaving the
+    /// list is watched again.
     pub async fn list_workspaces(&self) -> anyhow::Result<Vec<WorkspaceDto>> {
         let listed = self.main.jj.workspaces().await?;
         let (main, others): (Vec<WorkspaceInfo>, Vec<WorkspaceInfo>) = listed
             .into_iter()
             .partition(|w| same_path(&w.root, &self.root));
         let mut map = self.workspaces.lock().unwrap();
-        map.retain(|name, _| others.iter().any(|w| &w.name == name));
+        map.retain(|name, ws| {
+            let kept = others
+                .iter()
+                .any(|w| &w.name == name && same_path(&w.root, &ws.root));
+            if !kept {
+                // Reviews can outlive it, so its watcher stops here rather than when it drops.
+                ws.watch.lock().unwrap().take();
+            }
+            kept
+        });
+        let opened = self.opened.lock().unwrap();
         for w in &others {
             if !map.contains_key(&w.name) {
                 let ws = Arc::new(Workspace::new(
@@ -112,10 +123,14 @@ impl RepoCtx {
                     w.root.clone(),
                     Jj::new(&w.root),
                 ));
-                self.watch(&ws);
+                self.hook(&ws);
+                if opened.contains(&w.name) {
+                    self.watch(&ws);
+                }
                 map.insert(w.name.clone(), ws);
             }
         }
+        drop(opened);
         let dto = |w: WorkspaceInfo, main: bool| WorkspaceDto {
             name: (!main).then(|| w.name.clone()),
             title: w.name,
@@ -131,17 +146,44 @@ impl RepoCtx {
             .collect())
     }
 
-    /// Starts reporting the workspace's snapshots and staleness, once the window is wired up.
+    /// The UI opened the workspace: watches it from now on, and starts its background
+    /// snapshots again if they were paused.
+    pub async fn open_workspace(&self, name: Option<&str>) -> anyhow::Result<()> {
+        if let Some(name) = name {
+            self.opened.lock().unwrap().insert(name.to_string());
+        }
+        let ws = self.workspace(name).await?;
+        self.watch(&ws);
+        ws.jj.resume();
+        Ok(())
+    }
+
+    /// Sends the workspace's jj notices to the window, once it's wired up.
+    pub fn hook(&self, ws: &Workspace) {
+        let Some(emit) = self.emit.lock().unwrap().clone() else {
+            return;
+        };
+        let name = ws.name.clone();
+        ws.jj
+            .set_notify(Arc::new(move |n| emit(name.clone(), watch::Event::Jj(n))));
+    }
+
+    /// Starts reporting the workspace's snapshots and staleness, once the window is wired up,
+    /// unless it's watched already.
     pub fn watch(&self, ws: &Arc<Workspace>) {
         let Some(emit) = self.emit.lock().unwrap().clone() else {
             return;
         };
+        let mut watch = ws.watch.lock().unwrap();
+        if watch.is_some() {
+            return;
+        }
         let name = ws.name.clone();
         let started = watch::start(&ws.root, ws.jj.clone(), ws.stale.clone(), move |e| {
             emit(name.clone(), e)
         });
         match started {
-            Ok(w) => *ws.watch.lock().unwrap() = Some(w),
+            Ok(w) => *watch = Some(w),
             Err(e) => eprintln!("lgtm: watch {}: {e:#}", ws.root.display()),
         }
     }
@@ -176,6 +218,7 @@ impl RepoCtx {
         claimed();
         self.main.jj.workspace_forget(name).await?;
         self.workspaces.lock().unwrap().remove(name);
+        self.opened.lock().unwrap().remove(name);
         // Reviews can outlive it, so its watcher stops here rather than when it drops: jj
         // can't read `@` in a forgotten workspace.
         ws.watch.lock().unwrap().take();

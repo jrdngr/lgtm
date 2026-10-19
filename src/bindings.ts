@@ -47,6 +47,8 @@ export const commands = {
 	ptyRunning: (id: number) => __TAURI_INVOKE<string | null>("pty_running", { id }),
 	/**  Every workspace, the repo's main one first. */
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
+	/**  The UI opened the workspace: watches it, and starts its paused background snapshots again. */
+	openWorkspace: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_workspace", { workspace })),
 	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run. */
 	createWorkspace: (name: string) => typedError<Setup, string>(__TAURI_INVOKE("create_workspace", { name })),
 	/**
@@ -344,6 +346,8 @@ export const events = {
 	agentShow: makeEvent<AgentShow>("agent-show"),
 	archChanged: makeEvent<ArchChanged>("arch-changed"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
+	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
+	jjPaused: makeEvent<JjPaused>("jj-paused"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
@@ -898,6 +902,25 @@ export type JjAction = { kind: "edit"; rev: string } |
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
 
+/**
+ *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes
+ *  that have the lock open, one per line: PID, elapsed time, command. `null` once it stops
+ *  waiting.
+ */
+export type JjBlocked = {
+	workspace: string | null,
+	holders: string | null,
+};
+
+/**
+ *  A workspace's background snapshots paused after giving up on a jj lock twice, or started
+ *  again once the user acted there.
+ */
+export type JjPaused = {
+	workspace: string | null,
+	paused: boolean,
+};
+
 /**  One step of the change stack. */
 export type LayerDto = {
 	/**  1-based. */
@@ -1415,6 +1438,8 @@ export type Session_Deserialize = {
 	note?: string,
 	/**  The terminal it was sent to, when it was. */
 	sent?: string | null,
+	/**  When it was last sent, in ms since the epoch. */
+	sentAt?: number | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal?: boolean,
 	/**
@@ -1440,6 +1465,8 @@ export type Session_Serialize = {
 	note: string,
 	/**  The terminal it was sent to, when it was. */
 	sent: string | null,
+	/**  When it was last sent, in ms since the epoch. */
+	sentAt: number | null,
 	/**  A terminal agent asked its questions, and waits for the decisions. */
 	fromTerminal: boolean,
 	/**

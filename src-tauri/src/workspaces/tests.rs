@@ -167,3 +167,31 @@ async fn adding_a_taken_name_keeps_the_live_workspaces_history() {
         1
     );
 }
+
+#[tokio::test]
+async fn only_workspaces_the_ui_opened_are_watched_and_once_each() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    *ctx.emit.lock().unwrap() = Some(Arc::new(|_, _| {}));
+    ctx.create_workspace("t1").await.unwrap();
+    let first = ctx.workspace(Some("t1")).await.unwrap();
+    assert!(first.watch.lock().unwrap().is_none());
+
+    ctx.open_workspace(Some("t1")).await.unwrap();
+    assert!(first.watch.lock().unwrap().is_some());
+
+    // Forgotten and added again elsewhere, as a terminal might: the old one stops, and the
+    // new one is watched in its place.
+    let again = base.path().join("t1-again");
+    crate::jj::test_support::jj(&ctx.root, &["workspace", "forget", "t1"]);
+    crate::jj::test_support::jj(
+        &ctx.root,
+        &["workspace", "add", "--name", "t1", again.to_str().unwrap()],
+    );
+    ctx.list_workspaces().await.unwrap();
+    let second = ctx.workspace(Some("t1")).await.unwrap();
+    assert!(!Arc::ptr_eq(&first, &second));
+    assert!(first.watch.lock().unwrap().is_none());
+    assert!(second.watch.lock().unwrap().is_some());
+}

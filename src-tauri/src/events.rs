@@ -48,6 +48,23 @@ pub struct WorkingCopyStale {
     pub message: Option<String>,
 }
 
+/// A write in a workspace has waited on a jj lock for a while. `holders` lists the processes
+/// that have the lock open, one per line: PID, elapsed time, command. `null` once it stops
+/// waiting.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct JjBlocked {
+    pub workspace: Option<String>,
+    pub holders: Option<String>,
+}
+
+/// A workspace's background snapshots paused after giving up on a jj lock twice, or started
+/// again once the user acted there.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct JjPaused {
+    pub workspace: Option<String>,
+    pub paused: bool,
+}
+
 /// An agent published findings to report `run`, so the workspace's dock opens it.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct BotRunChanged {

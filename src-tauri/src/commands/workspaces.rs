@@ -12,6 +12,19 @@ pub(crate) async fn list_workspaces(window: WebviewWindow) -> CmdResult<Vec<Work
     repo(&window)?.list_workspaces().await.map_err(err)
 }
 
+/// The UI opened the workspace: watches it, and starts its paused background snapshots again.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn open_workspace(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<()> {
+    repo(&window)?
+        .open_workspace(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
 /// Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run.
 #[tauri::command]
 #[specta::specta]

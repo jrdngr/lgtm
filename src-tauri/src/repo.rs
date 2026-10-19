@@ -9,8 +9,8 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_specta::Event as _;
 
 use crate::ctx::{Emit, RepoCtx};
-use crate::events::{RepoChanged, WorkingCopyMoved, WorkingCopyStale};
-use crate::jj::Jj;
+use crate::events::{JjBlocked, JjPaused, RepoChanged, WorkingCopyMoved, WorkingCopyStale};
+use crate::jj::{Jj, Notice};
 use crate::paths::{data_dir, find_root, key, repo_dir};
 use crate::store::Store;
 use crate::watch;
@@ -78,6 +78,12 @@ fn emitter(app: &AppHandle, label: &str) -> Emit {
                 WorkingCopyStale { workspace, message }.emit_to(&app, &label)
             }
             watch::Event::WorkingCopyMoved => WorkingCopyMoved { workspace }.emit_to(&app, &label),
+            watch::Event::Jj(Notice::Blocked(holders)) => {
+                JjBlocked { workspace, holders }.emit_to(&app, &label)
+            }
+            watch::Event::Jj(Notice::Paused(paused)) => {
+                JjPaused { workspace, paused }.emit_to(&app, &label)
+            }
         };
         sent.ok();
     })
@@ -102,9 +108,11 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         .map_err(|e| format!("open mark store: {e:#}"))?;
     let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
     *ctx.emit.lock().unwrap() = Some(emitter(app, &label));
+    ctx.hook(&ctx.main);
+    // The main workspace's watcher also reports operations made in the other workspaces.
     ctx.watch(&ctx.main);
     let ctx = Arc::new(ctx);
-    // Watch the other workspaces too, without holding up the window.
+    // Lists the other workspaces without holding up the window.
     tauri::async_runtime::spawn({
         let ctx = ctx.clone();
         async move {

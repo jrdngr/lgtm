@@ -1,7 +1,7 @@
 //! The repo's service context: its workspaces, store and open reviews, which every feature
 //! extends with its own `impl RepoCtx` block.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -20,6 +20,8 @@ pub struct RepoCtx {
     pub main: Arc<Workspace>,
     /// The other workspaces, by name.
     pub(crate) workspaces: Mutex<HashMap<String, Arc<Workspace>>>,
+    /// The other workspaces the UI has opened, which are watched.
+    pub(crate) opened: Mutex<HashSet<String>>,
     /// Set once the window exists. Workspaces start being watched from then on.
     pub emit: Mutex<Option<Emit>>,
     /// Where new workspaces go.
@@ -34,6 +36,7 @@ impl RepoCtx {
             main: Arc::new(Workspace::new(None, root.clone(), jj)),
             root,
             workspaces: Mutex::default(),
+            opened: Mutex::default(),
             emit: Mutex::default(),
             workspace_base: ws_base(),
             store: Mutex::new(store),

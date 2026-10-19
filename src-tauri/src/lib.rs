@@ -69,6 +69,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::pty::pty_kill,
             commands::pty::pty_running,
             commands::workspaces::list_workspaces,
+            commands::workspaces::open_workspace,
             commands::workspaces::create_workspace,
             commands::workspaces::approve_setup,
             commands::workspaces::delete_workspace,
@@ -173,6 +174,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::OpenSettings,
             events::OpenShortcuts,
             events::WorkingCopyStale,
+            events::JjBlocked,
+            events::JjPaused,
             events::BotRunChanged,
             events::AgentShow,
             events::AgentRevset,
@@ -282,6 +285,10 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|_, event| {
+            // jj processes the app started don't end with it on their own.
+            if let tauri::RunEvent::Exit = event {
+                jj::end_all();
+            }
             // The last window closed. During a quit, the quit ends the app itself.
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::ExitRequested {

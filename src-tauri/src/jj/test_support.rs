@@ -39,3 +39,24 @@ pub fn repo() -> (tempfile::TempDir, Jj) {
 pub fn write(dir: &Path, path: &str, text: &str) {
     std::fs::write(dir.join(path), text).unwrap();
 }
+
+/// Holds the flock on `path`, as another jj would, until the file drops.
+pub fn hold(path: &Path) -> std::fs::File {
+    let file = std::fs::File::create(path).unwrap();
+    rustix::fs::flock(&file, rustix::fs::FlockOperation::LockExclusive).unwrap();
+    file
+}
+
+/// The repo-wide lock every snapshot and write in a colocated repo takes first.
+pub fn git_lock(root: &Path) -> std::path::PathBuf {
+    root.join(".jj/repo/git_import_export.lock")
+}
+
+/// PIDs with `path` open.
+pub fn openers(path: &Path) -> Vec<u32> {
+    let out = Command::new("lsof").arg("-t").arg(path).output().unwrap();
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| l.trim().parse().ok())
+        .collect()
+}

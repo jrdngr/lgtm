@@ -108,6 +108,10 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   useEffect(() => {
     if (!hidden) hideEmpty();
   }, [hidden]);
+  // Watched once opened, and showing it starts its paused background snapshots again.
+  useEffect(() => {
+    if (!hidden) commands.openWorkspace(workspace);
+  }, [workspace, hidden]);
 
   /** The saved layout, loaded once for both docks. */
   function load() {

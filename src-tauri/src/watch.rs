@@ -1,5 +1,5 @@
-//! Watches a repo. Working-copy edits trigger a debounced `jj util snapshot`; new operations
-//! (`.jj/repo/op_heads/heads/`) are reported as repo changes.
+//! Watches a workspace. Working-copy edits trigger a debounced `jj util snapshot`; new
+//! operations (`.jj/repo/op_heads/heads/`) are reported as repo changes.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use notify::{RecursiveMode, Watcher as _};
 use tokio::sync::mpsc;
 use tokio::time::{Instant, sleep_until};
 
-use crate::jj::Jj;
+use crate::jj::{Jj, Notice, Snapshot};
 
 const SNAPSHOT_DEBOUNCE: Duration = Duration::from_millis(300);
 /// The longest a run of edits holds off a snapshot.
@@ -26,11 +26,20 @@ pub enum Event {
     Stale(Option<String>),
     /// Something other than the app moved `@`.
     WorkingCopyMoved,
+    /// What the workspace's jj is doing.
+    Jj(Notice),
 }
 
 /// Keeps watching until dropped.
 pub struct Watch {
     _watcher: notify::RecommendedWatcher,
+    task: tauri::async_runtime::JoinHandle<()>,
+}
+
+impl Drop for Watch {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -126,8 +135,11 @@ pub fn start(
     if let Some(dir) = &op_heads {
         watcher.watch(dir, RecursiveMode::NonRecursive)?;
     }
-    tauri::async_runtime::spawn(run(rx, jj, stale, emit));
-    Ok(Watch { _watcher: watcher })
+    let task = tauri::async_runtime::spawn(run(rx, jj, stale, emit));
+    Ok(Watch {
+        _watcher: watcher,
+        task,
+    })
 }
 
 async fn run(
@@ -144,20 +156,27 @@ async fn run(
     // When the edits the next snapshot waits on began.
     let mut edits_since: Option<Instant> = None;
     let mut changed_at: Option<Instant> = None;
+    // No snapshot before this, after one gave up waiting on a lock.
+    let mut retry_at: Option<Instant> = None;
     loop {
         let next = snapshot_at.into_iter().chain(changed_at).min();
         tokio::select! {
             ping = rx.recv() => match ping {
                 None => return,
-                // An operation can make the working copy stale, so recheck after one too.
+                // Only a stale working copy is snapshotted after an operation, to see whether
+                // the operation fixed it. Becoming stale shows with the next edit.
                 Some(Ping::Op) => {
                     changed_at.get_or_insert(Instant::now() + CHANGE_DEBOUNCE);
-                    snapshot_at.get_or_insert(Instant::now() + SNAPSHOT_DEBOUNCE);
+                    if stale.lock().unwrap().is_some() {
+                        let at = Instant::now() + SNAPSHOT_DEBOUNCE;
+                        snapshot_at.get_or_insert(retry_at.map_or(at, |r| at.max(r)));
+                    }
                 }
                 Some(Ping::Edit) => {
                     let now = Instant::now();
                     let first = *edits_since.get_or_insert(now);
-                    snapshot_at = Some((now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT));
+                    let at = (now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT);
+                    snapshot_at = Some(retry_at.map_or(at, |r| at.max(r)));
                 }
             },
             _ = sleep_until(next.unwrap_or_else(Instant::now)), if next.is_some() => {
@@ -174,8 +193,17 @@ async fn run(
                 if snapshot_at.is_some_and(|t| t <= now) {
                     snapshot_at = None;
                     edits_since = None;
-                    let now_stale = match jj.snapshot_or_stale().await {
-                        Ok(now_stale) => now_stale,
+                    let now_stale = match jj.background_snapshot().await {
+                        Ok(Snapshot::Done(now_stale)) => {
+                            retry_at = None;
+                            now_stale
+                        }
+                        Ok(Snapshot::Retry(after)) => {
+                            retry_at = Some(Instant::now() + after);
+                            snapshot_at = retry_at;
+                            continue;
+                        }
+                        Ok(Snapshot::Paused) => continue,
                         Err(e) => {
                             eprintln!("lgtm: snapshot: {e:#}");
                             continue;
@@ -256,6 +284,32 @@ mod tests {
         std::fs::write(root.join("a.txt"), "hi\n").unwrap();
         let got = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
         assert_eq!(got.ok().flatten(), Some(Event::RepoChanged));
+    }
+
+    #[tokio::test]
+    async fn dropping_a_watch_ends_its_snapshot_waiting_on_a_lock() {
+        let (dir, jj) = crate::jj::test_support::repo();
+        let root = dir.path().canonicalize().unwrap();
+        let lock = crate::jj::test_support::git_lock(&root);
+        let held = crate::jj::test_support::hold(&lock);
+        let watch = start(&root, Arc::new(jj), Arc::default(), |_| {}).unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        std::fs::write(root.join("a.txt"), "hi\n").unwrap();
+        let openers = async |n: usize| {
+            while crate::jj::test_support::openers(&lock).len() != n {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        };
+        // The test's hold, plus the snapshot's wait.
+        tokio::time::timeout(Duration::from_secs(10), openers(2))
+            .await
+            .unwrap();
+        drop(watch);
+        // Well before the snapshot would give up on its own, a second into its wait in tests.
+        tokio::time::timeout(Duration::from_millis(500), openers(1))
+            .await
+            .unwrap();
+        drop(held);
     }
 
     #[tokio::test]

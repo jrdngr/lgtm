@@ -3,16 +3,20 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::{Context, bail};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
 mod at;
+mod background;
+mod child;
 mod diff;
 mod edit;
 mod follow;
 pub mod git;
+mod holders;
 pub mod init;
 mod log;
 mod near;
@@ -21,6 +25,8 @@ mod rewrite;
 pub(crate) mod test_support;
 pub mod workspace;
 pub use at::WorkingCopyDto;
+pub use background::Snapshot;
+pub use child::end_all;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogLine;
@@ -82,11 +88,25 @@ fn parse_changes(out: &str) -> Vec<Change> {
         .collect()
 }
 
+/// What a workspace's jj is doing that the UI shows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Notice {
+    /// A write has waited on a lock for a while: the processes that have it open, one per
+    /// line. `None` once it stops waiting.
+    Blocked(Option<String>),
+    /// Background snapshots paused after giving up on a lock, or started again.
+    Paused(bool),
+}
+
+pub type Notify = Arc<dyn Fn(Notice) + Send + Sync>;
+
 pub struct Jj {
     root: PathBuf,
     /// Held while the app writes. Holds the working copy's change as of the app's last look,
     /// so a move the app didn't make can be told apart.
     writer: Mutex<Option<String>>,
+    notify: OnceLock<Notify>,
+    background: std::sync::Mutex<background::Strikes>,
 }
 
 impl Jj {
@@ -94,19 +114,23 @@ impl Jj {
         Self {
             root: root.to_path_buf(),
             writer: Mutex::new(None),
+            notify: OnceLock::new(),
+            background: Default::default(),
         }
     }
 
-    async fn exec(&self, args: &[&str], read_only: bool) -> anyhow::Result<Vec<u8>> {
-        self.exec_with(args, read_only, "never").await
+    /// Sets where notices go. Only the first call counts.
+    pub fn set_notify(&self, notify: Notify) {
+        self.notify.set(notify).ok();
     }
 
-    async fn exec_with(
-        &self,
-        args: &[&str],
-        read_only: bool,
-        color: &str,
-    ) -> anyhow::Result<Vec<u8>> {
+    fn notify(&self, notice: Notice) {
+        if let Some(notify) = self.notify.get() {
+            notify(notice);
+        }
+    }
+
+    fn command(&self, args: &[&str], read_only: bool, color: &str) -> Command {
         let mut cmd = Command::new("jj");
         // jj prints paths relative to its cwd, and they should be relative to the repo.
         cmd.current_dir(&self.root)
@@ -117,20 +141,52 @@ impl Jj {
         if read_only {
             cmd.arg("--ignore-working-copy");
         }
-        let out = cmd
-            .args(args)
-            .stdin(Stdio::null())
-            .output()
-            .await
-            .context("run jj (is it installed and on PATH?)")?;
+        cmd.args(args);
+        cmd
+    }
+
+    /// The command's stdout, or its stderr as an error when it failed.
+    fn check(&self, args: &[&str], out: child::Output) -> anyhow::Result<Vec<u8>> {
         if !out.status.success() {
-            bail!(
-                "jj {}: {}",
-                args.join(" "),
-                String::from_utf8_lossy(&out.stderr).trim()
-            );
+            bail!("jj {}: {}", args.join(" "), out.stderr.trim());
         }
         Ok(out.stdout)
+    }
+
+    async fn exec(&self, args: &[&str], read_only: bool) -> anyhow::Result<Vec<u8>> {
+        self.exec_with(args, read_only, "never").await
+    }
+
+    /// Reads take no locks, so they can be killed at any point. Writes are never ended early,
+    /// and one that succeeds starts background snapshots again.
+    async fn exec_with(
+        &self,
+        args: &[&str],
+        read_only: bool,
+        color: &str,
+    ) -> anyhow::Result<Vec<u8>> {
+        let mut cmd = self.command(args, read_only, color);
+        if read_only {
+            let out = cmd
+                .stdin(Stdio::null())
+                .kill_on_drop(true)
+                .output()
+                .await
+                .context("run jj (is it installed and on PATH?)")?;
+            if !out.status.success() {
+                bail!(
+                    "jj {}: {}",
+                    args.join(" "),
+                    String::from_utf8_lossy(&out.stderr).trim()
+                );
+            }
+            return Ok(out.stdout);
+        }
+        let report = |holders: Option<String>| self.notify(Notice::Blocked(holders));
+        let out = child::run(cmd, child::Mode::Foreground(&report)).await?;
+        let stdout = self.check(args, out)?;
+        self.resume();
+        Ok(stdout)
     }
 
     async fn read(&self, args: &[&str]) -> anyhow::Result<String> {

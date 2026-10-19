@@ -26,6 +26,7 @@ import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { AtBanner } from "./AtBanner";
 import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
+import { JjBlockedBanner, JjBusyTag, useTrackJjBusy } from "./JjBusy";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { reviewRevset } from "./revsetMenu";
@@ -70,6 +71,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
   useFollowWorkingCopy();
+  useTrackJjBusy();
   useWordWrapMenu();
   useSettingsMenu(selected);
   useShortcutsMenu(selected);
@@ -249,6 +251,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
           <span className="repo-sep">/</span>
           <span className="repo-workspace">{selected ?? "main"}</span>
         </span>
+        <JjBusyTag workspace={selected} />
         <span className="spacer" />
         <div className="toolbar-center">
           <RevPicker workspace={selected} />
@@ -261,6 +264,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         />
       </header>
       <AtBanner workspace={selected} />
+      <JjBlockedBanner workspace={selected} />
       <McpOffer />
       <PromptHost />
       <div className="workbench-body">
