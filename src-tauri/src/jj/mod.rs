@@ -20,7 +20,7 @@ mod rewrite;
 #[cfg(test)]
 pub(crate) mod test_support;
 pub mod workspace;
-pub use at::{AtPlace, WorkingCopyDto};
+pub use at::WorkingCopyDto;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogLine;
