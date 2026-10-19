@@ -15,7 +15,7 @@ import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { openRevisions } from "../review/target";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
-import { PromptHost } from "../ui/prompt";
+import { PromptHost, promptKeeps } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
 import { type AddKind, requestAdd } from "../workspaces/addRequests";
 import { useWorkspaces } from "../workspaces/useWorkspaces";
@@ -204,8 +204,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
-      // A prompt keeps its keys.
-      if ((e.target as Element).closest?.(".prompt")) return;
+      if (promptKeeps(e)) return;
       const key = bottomKey(e) ?? tabKey(e) ?? chord(e) ?? "";
       if (editorKeys.has(key) && (e.target as Element).closest?.(".cm-editor")) return;
       const run = keyRef.current?.(key);

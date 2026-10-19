@@ -1,5 +1,10 @@
 import { message } from "@tauri-apps/plugin-dialog";
-import { type KeyboardEvent, useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
 
 interface Ask {
   title: string;
@@ -32,6 +37,25 @@ const set = (a: Ask | undefined) => {
 /** Whether `confirmShown` is up. It's answered only by its buttons or Escape, so a new ask is
  * refused while it is, rather than cancelling it. */
 const held = () => current?.shown !== undefined;
+
+/** Answers `ask` and puts focus back where it was. */
+function answer(ask: Ask, value: string | undefined) {
+  set(undefined);
+  if (ask.from instanceof HTMLElement) ask.from.focus();
+  const text = value?.trim();
+  ask.done(text || (text === "" && ask.allowEmpty ? "" : undefined));
+}
+
+/** Whether a prompt takes `e`, so app shortcuts leave it alone: it was typed in the prompt, or
+ * one is up and focus is elsewhere, when the key is swallowed and Escape cancels the prompt. */
+export function promptKeeps(e: KeyboardEvent): boolean {
+  if ((e.target as Element).closest?.(".prompt")) return true;
+  if (!current) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.key === "Escape") answer(current, undefined);
+  return true;
+}
 
 /** Asks for one line of text, or several with `multiline`. Undefined when cancelled, or left
  * empty without `allowEmpty`. One question at a time: a new one cancels the last. */
@@ -124,14 +148,9 @@ export function PromptHost() {
   }, [ask]);
   if (!ask) return null;
 
-  const finish = (value: string | undefined) => {
-    set(undefined);
-    if (ask.from instanceof HTMLElement) ask.from.focus();
-    const text = value?.trim();
-    ask.done(text || (text === "" && ask.allowEmpty ? "" : undefined));
-  };
+  const finish = (value: string | undefined) => answer(ask, value);
   const submit = () => finish(ref.current?.value ?? "");
-  const keys = (e: KeyboardEvent) => {
+  const keys = (e: ReactKeyboardEvent) => {
     e.stopPropagation();
     // Enter on a button presses that button.
     const inBox = e.target === ref.current || e.target === shownRef.current;
@@ -148,6 +167,8 @@ export function PromptHost() {
   return (
     <div
       className="prompt-backdrop"
+      // Focus stays in the prompt, so its keys keep reaching it.
+      onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}
       onPointerDown={(e) =>
         e.target === e.currentTarget && ask.shown === undefined && finish(undefined)
       }
