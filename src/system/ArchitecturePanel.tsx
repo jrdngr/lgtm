@@ -92,7 +92,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [level, setLevel] = useState<Level>({ kind: "context" });
   const [selected, setSelected] = useState<string>();
   const [edgeSel, setEdgeSel] = useState<string>();
-  const [symSel, setSymSel] = useState<number>();
+  const [symSel, setSymSel] = useState<string>();
   const [mode, setMode] = useState<EdgeMode>("changed");
   const [lensOn, setLensOn] = useState(true);
   const [finding, setFinding] = useState(false);

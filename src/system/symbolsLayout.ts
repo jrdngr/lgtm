@@ -1,9 +1,19 @@
 import type { SymbolsDto, SymNodeDto } from "../bindings";
 import type { Box } from "./layout";
 
+/** A symbol: one of the component's, or one outside it that calls in or is called. */
 export interface SymBox extends Box {
+  key: string;
   sym: SymNodeDto;
   side: "in" | "caller" | "call";
+}
+
+/** The outside symbols of one component on one side, as one chip. */
+export interface ChipBox extends Box {
+  key: string;
+  component: string;
+  side: "caller" | "call";
+  ids: number[];
 }
 
 export interface FileBox extends Box {
@@ -11,7 +21,9 @@ export interface FileBox extends Box {
 }
 
 export interface SymLayout {
+  /** The component's symbols, then the outside ones, which sit on their chip. */
   syms: SymBox[];
+  chips: ChipBox[];
   files: FileBox[];
   /** The component's frame around its files. */
   frame: Box;
@@ -25,23 +37,29 @@ export interface SymLayout {
 const PAD = 40;
 const COLUMN_W = 180;
 const COLUMN_GAP = 60;
-/** Between the column titles and the first symbol. */
+/** Between the column titles and the first chip. */
 const TITLE = 36;
 const SYM_H = 32;
 const SYM_STEP = 40;
+const CHIP_H = 34;
+const CHIP_STEP = 48;
 const FILE_W = 240;
 const FILE_HEAD = 30;
 const FILE_PAD = 14;
 const FILE_GAP = 24;
 const INSET = 22;
 
+export const symKey = (id: number) => `s${id}`;
+export const chipKey = (side: ChipBox["side"], component: string) => `${side}:${component}`;
+
 /** How many columns of files the frame holds. */
 const fileColumns = (n: number) => (n <= 2 ? Math.max(1, n) : n <= 6 ? 2 : 3);
 
 const mean = (ns: number[]) => (ns.length ? ns.reduce((a, b) => a + b, 0) / ns.length : 0);
 
-/** Callers left, the component's files with their symbols in its frame, calls right. Each
- * side column is ordered by where its links land, so lines cross less. */
+/** Callers left as one chip per component, the component's files with their symbols in its
+ * frame, calls right. Each chip column is ordered by where its links land, so the faint lines
+ * between them cross less. */
 export function symbolsLayout(dto: SymbolsDto): SymLayout {
   const byFile = new Map<string, SymNodeDto[]>();
   for (const s of dto.symbols) {
@@ -63,6 +81,7 @@ export function symbolsLayout(dto: SymbolsDto): SymLayout {
     files.push({ path, x, y, w: FILE_W, h });
     list.forEach((sym, i) => {
       syms.push({
+        key: symKey(sym.id),
         sym,
         side: "in",
         x: x + FILE_PAD,
@@ -81,30 +100,45 @@ export function symbolsLayout(dto: SymbolsDto): SymLayout {
   };
 
   const yOf = new Map(syms.map((b) => [b.sym.id, b.y]));
-  const order = (list: SymNodeDto[], ends: (id: number) => number[]) =>
-    [...list].sort(
-      (a, b) =>
-        mean(ends(a.id).map((e) => yOf.get(e) ?? 0)) - mean(ends(b.id).map((e) => yOf.get(e) ?? 0)),
-    );
-  const column = (list: SymNodeDto[], x: number, side: SymBox["side"]) =>
-    list.forEach((sym, i) => {
-      syms.push({ sym, side, x, y: PAD + TITLE + i * (SYM_H + 28), w: COLUMN_W, h: SYM_H });
-    });
-  const callers = order(dto.callers, (id) =>
-    dto.edges.filter((e) => e.from === id).map((e) => e.to),
-  );
-  const calls = order(dto.calls, (id) => dto.edges.filter((e) => e.to === id).map((e) => e.from));
-  column(callers, PAD, "caller");
+  const column = (list: SymNodeDto[], side: ChipBox["side"], x: number) => {
+    const groups = new Map<string, SymNodeDto[]>();
+    for (const s of list) groups.set(s.component, [...(groups.get(s.component) ?? []), s]);
+    const ends = (ids: Set<number>) =>
+      dto.edges.flatMap((e) =>
+        side === "caller" ? (ids.has(e.from) ? [e.to] : []) : ids.has(e.to) ? [e.from] : [],
+      );
+    const at = (g: SymNodeDto[]) =>
+      mean(ends(new Set(g.map((s) => s.id))).map((id) => yOf.get(id) ?? 0));
+    const chips = [...groups]
+      .sort((a, b) => at(a[1]) - at(b[1]))
+      .map(([component, g], i) => ({
+        key: chipKey(side, component),
+        component,
+        side,
+        ids: g.map((s) => s.id),
+        x,
+        y: PAD + TITLE + i * CHIP_STEP,
+        w: COLUMN_W,
+        h: CHIP_H,
+      }));
+    for (const c of chips) {
+      for (const sym of groups.get(c.component) ?? []) {
+        syms.push({ key: symKey(sym.id), sym, side, x: c.x, y: c.y, w: c.w, h: SYM_H });
+      }
+    }
+    return chips;
+  };
   const right = frame.x + frame.w + COLUMN_GAP;
-  column(calls, right, "call");
-  const bottom = Math.max(frame.y + frame.h, ...syms.map((s) => s.y + s.h));
+  const chips = [...column(dto.callers, "caller", PAD), ...column(dto.calls, "call", right)];
+  const bottom = Math.max(frame.y + frame.h, ...chips.map((c) => c.y + c.h));
   return {
     syms,
+    chips,
     files,
     frame,
-    callers: callers.length ? { x: PAD, y: PAD } : undefined,
-    calls: calls.length ? { x: right, y: PAD } : undefined,
-    width: (calls.length ? right + COLUMN_W : frame.x + frame.w) + PAD,
+    callers: dto.callers.length ? { x: PAD, y: PAD } : undefined,
+    calls: dto.calls.length ? { x: right, y: PAD } : undefined,
+    width: (dto.calls.length ? right + COLUMN_W : frame.x + frame.w) + PAD,
     height: bottom + PAD,
   };
 }
