@@ -50,6 +50,7 @@ function Row({ d, current, busyLabel }: { d: Session; current: boolean; busyLabe
         onClick={() => showQa(ws, d.id)}
         onContextMenu={menu}
       >
+        {d.sent != null && <span className="qa-sent-dot" />}
         <span>{d.title}</span>
         {open > 0 && <span className="pill amber">{open} open</span>}
         <span className="spacer" />

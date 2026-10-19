@@ -53,6 +53,15 @@ function Stepper({ d, view }: { d?: Session; view: Step }) {
   );
 }
 
+/** `at` as a time, with the date when it isn't today. */
+function sentTime(at: number) {
+  const t = new Date(at);
+  const time = t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return t.toDateString() === new Date().toDateString()
+    ? time
+    : `${t.toLocaleDateString([], { month: "short", day: "numeric" })} ${time}`;
+}
+
 /** The Q&A tab: one session at a time, from its prompt through questions to Apply in
  * terminal. */
 export function QaTab({ api }: IDockviewPanelProps) {
@@ -145,7 +154,10 @@ export function QaTab({ api }: IDockviewPanelProps) {
         </div>
       )}
       {d && d.sent != null && !d.archived && (
-        <div className="qa-sent">Sent to {d.sent || "a terminal"}</div>
+        <div className="qa-sent">
+          ✓ Sent to <span className="qa-sent-term">›_ {d.sent || "a terminal"}</span>
+          {d.sentAt != null && ` · ${sentTime(d.sentAt)}`}
+        </div>
       )}
       {state.error && <div className="review-error">{state.error}</div>}
       {agentsOff && (

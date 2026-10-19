@@ -93,7 +93,7 @@ export function ApplyView({ ws, d, busy, focusKey, onSend }: Props) {
             <div className="qq-actions">
               <span className="spacer" />
               <PipeButton className="qq-btn" disabled={locked} onClick={go} keys="⌘↵">
-                Answers
+                {d.sent != null ? "Send Again" : "Answers"}
               </PipeButton>
             </div>
           </>

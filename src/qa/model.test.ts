@@ -46,6 +46,7 @@ function session(over: Partial<Session> = {}): Session {
     asked: false,
     note: "",
     sent: null,
+    sentAt: null,
     fromTerminal: false,
     terminal: null,
     archived: false,

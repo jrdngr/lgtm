@@ -1077,13 +1077,24 @@
 }
 
 .qa-sent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   font-size: var(--fs-sm);
-  background: rgb(214 168 72 / 10%);
-  border-bottom: 1px solid var(--border);
+  color: #7ee28c;
+  background: rgb(63 185 80 / 12%);
+  border-bottom: 1px solid rgb(63 185 80 / 35%);
+  white-space: pre;
+}
+
+.qa-sent-term {
+  color: var(--violet-text);
+}
+
+.qa-sent-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #3fb950;
 }
 
 /* Side panel */

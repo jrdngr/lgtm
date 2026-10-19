@@ -43,6 +43,9 @@ pub struct Session {
     /// The terminal it was sent to, when it was.
     #[serde(default)]
     pub sent: Option<String>,
+    /// When it was last sent, in ms since the epoch.
+    #[serde(default)]
+    pub sent_at: Option<f64>,
     /// A terminal agent asked its questions, and waits for the decisions.
     #[serde(default)]
     pub from_terminal: bool,
@@ -132,6 +135,7 @@ impl RepoCtx {
             asked: false,
             note: String::new(),
             sent: None,
+            sent_at: None,
             from_terminal: false,
             terminal: None,
             archived: false,

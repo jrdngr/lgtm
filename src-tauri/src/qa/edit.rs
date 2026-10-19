@@ -83,7 +83,10 @@ impl RepoCtx {
                 }
                 SessionEdit::Note { note } => s.note = note,
                 SessionEdit::Archive { archived } => s.archived = archived,
-                SessionEdit::Sent { terminal } => s.sent = Some(terminal),
+                SessionEdit::Sent { terminal } => {
+                    s.sent = Some(terminal);
+                    s.sent_at = Some(now_ms() as f64);
+                }
                 SessionEdit::Terminal { id } => s.terminal = Some(id),
             }
             Ok(())
