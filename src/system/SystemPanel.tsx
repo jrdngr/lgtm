@@ -294,7 +294,11 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
             <Minimap
               map={map}
               container={shown.container}
-              onPick={(c) => go({ kind: "components", container: c })}
+              onPick={(c, drill) =>
+                drill
+                  ? go({ kind: "components", container: c })
+                  : go({ kind: "containers" }, containerId(c))
+              }
             />
           )}
           {step && tourAt !== undefined && (

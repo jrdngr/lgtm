@@ -12,7 +12,8 @@ interface Props {
   map: SystemDto;
   /** The container shown. */
   container: string;
-  onPick(container: string): void;
+  /** `drill` when the container has components to show. */
+  onPick(container: string, drill: boolean): void;
 }
 
 /** The system's containers in small, with the one shown outlined. */
@@ -52,7 +53,6 @@ export function Minimap({ map, container, onPick }: Props) {
           type="button"
           aria-label={b.name}
           className={b.id === container ? "on" : undefined}
-          disabled={!b.drill}
           style={{
             left: b.x,
             top: b.y,
@@ -60,7 +60,7 @@ export function Minimap({ map, container, onPick }: Props) {
             height: b.h,
             background: tint(b.color, b.id === container ? 0.55 : 0.28),
           }}
-          onClick={() => onPick(b.id)}
+          onClick={() => onPick(b.id, b.drill)}
         />
       ))}
     </div>
