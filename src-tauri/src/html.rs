@@ -162,7 +162,7 @@ fn serve(roots: &HtmlRoots, window: &str, url_path: &str) -> Response<Cow<'stati
 }
 
 /// `html` with the frame script first in it: after the doctype and any `<html>` and `<head>`
-/// tags, so the page keeps standards mode.
+/// tags, so the page keeps standards mode and its `<head>` attributes.
 fn with_frame_script(html: &str) -> String {
     let lower = html.to_ascii_lowercase();
     let mut at = 0;
@@ -170,12 +170,9 @@ fn with_frame_script(html: &str) -> String {
         if let Some(start) = lower[at..].find(tag).map(|i| i + at)
             && lower[at..start].trim().is_empty()
             && lower[start + tag.len()..].starts_with(|c: char| c == '>' || c.is_whitespace())
-            && let Some(end) = lower[start..].find('>')
-            // A quoted attribute may hold a `>`, so the script would land inside it. A
-            // doctype ends at any `>`.
-            && (tag == "<!doctype" || !lower[start..start + end].contains(['"', '\'']))
+            && let Some(end) = tag_end(&lower, start)
         {
-            at = start + end + 1;
+            at = end;
         }
     }
     format!(
@@ -183,6 +180,29 @@ fn with_frame_script(html: &str) -> String {
         &html[..at],
         &html[at..]
     )
+}
+
+/// Just past the `>` closing the tag at `start`. A `>` in a quoted attribute value doesn't
+/// close it; a quote opens a value only right after `=`, as the HTML parser reads it.
+fn tag_end(html: &str, start: usize) -> Option<usize> {
+    let mut quote = None;
+    let mut last = b'<';
+    for (i, &b) in html.as_bytes()[start..].iter().enumerate() {
+        match quote {
+            Some(q) if b == q => quote = None,
+            Some(_) => continue,
+            None if b == b'>' => return Some(start + i + 1),
+            None if (b == b'"' || b == b'\'') && last == b'=' => {
+                quote = Some(b);
+                continue;
+            }
+            None => {}
+        }
+        if !b.is_ascii_whitespace() {
+            last = b;
+        }
+    }
+    None
 }
 
 fn content_type(path: &Path) -> &'static str {
@@ -230,9 +250,25 @@ mod tests {
         assert!(out.ends_with("</script><svg></svg><p>&lt;head></p>"));
         let out = with_frame_script("<html><header>h</header>");
         assert!(out.starts_with("<html><script>"));
-        let out = with_frame_script("<html lang=en><head data-x='>'><script>");
-        assert!(out.starts_with("<html lang=en><script>"));
-        assert!(out.ends_with("</script><head data-x='>'><script>"));
+    }
+
+    #[test]
+    fn frame_script_goes_after_tags_with_quoted_attributes() {
+        let out = with_frame_script(r#"<html lang="en"><head data-theme="dark"><title>"#);
+        assert!(out.starts_with(r#"<html lang="en"><head data-theme="dark"><script>"#));
+        assert!(out.ends_with("</script><title>"));
+        let out = with_frame_script(r#"<html lang=en><head data-x='>' b = "a>b"><p>"#);
+        assert!(out.starts_with(r#"<html lang=en><head data-x='>' b = "a>b"><script>"#));
+        assert!(out.ends_with("</script><p>"));
+        let out = with_frame_script(r#"<!doctype html><html data-x="a>b" class=x><body>"#);
+        assert!(out.starts_with(r#"<!doctype html><html data-x="a>b" class=x><script>"#));
+        assert!(out.ends_with("</script><body>"));
+        // A quote opens a value only after `=`.
+        let out = with_frame_script(r#"<html a"b><head>"#);
+        assert!(out.starts_with(r#"<html a"b><head><script>"#));
+        // A quote left open never ends the tag, so the script goes before it.
+        let out = with_frame_script(r#"<html lang="en><head>"#);
+        assert!(out.starts_with(SCRIPT));
     }
 
     fn served(roots: &HtmlRoots, url: &str) -> (StatusCode, String) {
