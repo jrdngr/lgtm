@@ -61,10 +61,11 @@ export function usePanZoom(width: number, height: number) {
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // A press on a node clicks it, whatever the last press did.
+    moved.current = false;
     if (e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
     const start = { x: e.clientX, y: e.clientY };
     let last = start;
-    moved.current = false;
     const move = (ev: PointerEvent) => {
       if (!moved.current && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < SLOP) return;
       moved.current = true;
