@@ -33,19 +33,25 @@
     true,
   );
 
-  // App shortcuts and Escape the user types go to the tab, over a port only this script
-  // holds, so a page's scripts can't send keys. Editing shortcuts stay in the page. The tab
-  // checks the same rule (appKey in htmlNav.ts). The tab answers the port's offer with a
-  // token, which says this page is leaving, so the next page's offer is taken.
-  const { port1: keys, port2 } = new MessageChannel();
-  let token;
-  keys.onmessage = (e) => {
-    token = apply(dataOf, e, []);
-  };
-  host.postMessage({ lgtm: true, type: "port" }, "*", [port2]);
-  addEventListener("pagehide", (e) => {
-    if (e.isTrusted && token) host.postMessage({ lgtm: true, type: "gone", token }, "*");
-  });
+  // App shortcuts and Escape the user types go to the tab, over a port the tab hands this
+  // script each time the frame loads, so a page's scripts can't send keys. This listener is
+  // the page's first, and keeps the port from them. Editing shortcuts stay in the page. The
+  // tab checks the same rule (appKey in htmlNav.ts).
+  const [sourceOf, portsOf] = ["source", "ports"].map((name) =>
+    getter(MessageEvent.prototype, name),
+  );
+  const stop = Event.prototype.stopImmediatePropagation;
+  let keys;
+  addEventListener(
+    "message",
+    (e) => {
+      const m = apply(dataOf, e, []);
+      if (apply(sourceOf, e, []) !== host || m?.lgtm !== true || m.type !== "port") return;
+      apply(stop, e, []);
+      keys = apply(portsOf, e, [])[0];
+    },
+    true,
+  );
   addEventListener(
     "keydown",
     (e) => {
@@ -56,6 +62,7 @@
       const plain = !apply(shiftKey, e, []) && !apply(altKey, e, []);
       if (mod && plain && ["a", "c", "v", "x", "z"].includes(k.toLowerCase())) return;
       e.preventDefault();
+      if (!keys) return;
       apply(send, keys, [
         {
           key: k,

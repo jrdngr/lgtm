@@ -47,9 +47,7 @@ type FrameMessage =
   | { type: "zoom"; zoom: number }
   | { type: "found"; found: boolean }
   | { type: "scroll"; x: number; y: number }
-  | { type: "scrolled"; x: number; y: number }
-  | { type: "gone"; token: unknown }
-  | { type: "port" };
+  | { type: "scrolled"; x: number; y: number };
 
 /** An HTML file and the pages it links to, in a sandboxed frame. The frame gets scripts but
  * an opaque origin, so it can't reach the app. The scheme's CSP blocks fetches, XHR,
@@ -67,6 +65,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   const [find, setFind] = useState<string>();
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string>();
+  /** The user cancelled an open, so the page's asks are dropped until it loads again. */
+  const refused = useRef(false);
   /** Where the page was scrolled before a reload. */
   const scroll = useRef<{ x: number; y: number }>(undefined);
   const current = trail.urls[trail.at];
@@ -90,19 +90,19 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       );
     }),
   );
-  useEffect(() => () => keys.reset(), [keys]);
+  useEffect(() => () => keys.close(), [keys]);
 
-  /** Bumped to show a page in a new frame, so no script from the last one is left to offer
-   * a key port. */
+  /** Bumped to show a page in a new frame, so no script from the last one is left. */
   const [generation, setGeneration] = useState(0);
   const next = useRef({ url: "", focus: false });
   function show(url: string) {
     next.current = { url, focus: document.activeElement === frame.current };
+    refused.current = false;
     setGeneration((g) => g + 1);
   }
   useLayoutEffect(() => {
     if (generation === 0 || !frame.current) return;
-    keys.reset();
+    keys.close();
     frame.current.src = next.current.url;
     if (next.current.focus) frame.current.focus();
   }, [generation, keys]);
@@ -134,8 +134,6 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   // Latest state for the message listener.
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
-  /** The user cancelled an open, so the page's asks are dropped until it loads again. */
-  const refused = useRef(false);
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
@@ -143,14 +141,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
       const m = e.data as FrameMessage & { lgtm?: unknown };
       if (m?.lgtm !== true) return;
       switch (m.type) {
-        case "port":
-          if (e.ports[0]) keys.offer(e.ports[0]);
-          break;
-        case "gone":
-          keys.gone(m.token);
-          break;
         case "nav":
-          refused.current = false;
           setTrail((t) => visit(t, m.url));
           if (m.url.startsWith(prefix.current)) {
             saveRef.current({ page: m.url.slice(prefix.current.length), pageScroll: undefined });
@@ -190,7 +181,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [keys]);
+  }, []);
 
   useEffect(() => {
     send(frame.current, { type: "zoom", zoom });
@@ -201,9 +192,17 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
     if (root && (await commands.htmlChanged(root))) reload();
   });
 
+  /** A page loaded in the frame: a load a page can't fake. */
+  function onLoad() {
+    refused.current = false;
+    const win = frame.current?.contentWindow;
+    keys.connect((port) => win?.postMessage({ lgtm: true, type: "port" }, "*", [port]));
+  }
+
   /** Reloads the page, keeping its scroll position when its script still runs. */
   function reload() {
     scroll.current = undefined;
+    refused.current = false;
     post({ type: "reload" });
   }
 
@@ -316,6 +315,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         className="html-frame"
         title={path}
         sandbox="allow-scripts"
+        onLoad={onLoad}
       />
     </div>
   );
