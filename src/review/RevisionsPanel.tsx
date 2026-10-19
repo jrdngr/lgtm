@@ -51,7 +51,7 @@ function bracket(lines: LogLine[], owner: number[], commits: number[], reviewed:
 
 /** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
  * commits. Reviewed commits are blue with a bracket, `@` green over them. Keys act on the
- * highlighted commit; dragging across commits reviews them. */
+ * highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
 export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
   const [error, setError] = useState<string>();
@@ -281,7 +281,10 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
                 onMouseEnter={() => {
                   if (drag.current !== undefined && c >= 0) move(c, drag.current);
                 }}
-                onDoubleClick={() => review(changeAt(c))}
+                onDoubleClick={() => {
+                  const rev = changeAt(c);
+                  if (rev) act(...REV_ACTIONS.e(rev));
+                }}
                 onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
               >
                 {edge && (
