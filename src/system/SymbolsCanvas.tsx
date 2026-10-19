@@ -7,6 +7,7 @@ import { usePanZoom } from "./panZoom";
 import type { SymStatus } from "./SymbolsView";
 import { KIND_LABEL, type SymLayout, symKey } from "./symbolsLayout";
 import { focusLayout, hairlines, type Link, linksOf, wirePath } from "./symbolsLinks";
+import { useAnimating } from "./useAnimating";
 
 interface Props {
   dto: SymbolsDto;
@@ -30,8 +31,6 @@ interface Props {
 const BLUE = "#5b9bd5";
 const AMBER = "#e3b341";
 const GREEN = "#3fb950";
-/** How long a collapse or its undoing animates. */
-const ANIMATE_MS = 550;
 
 const idOf = (key: string) => (key.startsWith("s") ? Number(key.slice(1)) : undefined);
 
@@ -46,14 +45,9 @@ export function SymbolsCanvas(p: Props) {
     [dto, placed, p.focus],
   );
   const pz = usePanZoom(focus?.width ?? placed.width, focus?.height ?? placed.height);
-  // Animates from the first render with a new focus, since the fit lands in that render.
-  const [settled, setSettled] = useState(p.focus);
-  const anim = settled !== p.focus;
-  useEffect(() => {
-    setHover(undefined);
-    const t = setTimeout(() => setSettled(p.focus), ANIMATE_MS);
-    return () => clearTimeout(t);
-  }, [p.focus]);
+  const anim = useAnimating(p.focus);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new focus drops the hover
+  useEffect(() => setHover(undefined), [p.focus]);
 
   const color = p.colors.get(p.map.components.find((k) => k.id === p.component)?.container ?? "");
   const rest = useMemo(() => {

@@ -180,8 +180,7 @@
   background: #3a3c41;
 }
 
-.sys-tool,
-.sys-seg {
+.sys-tool {
   display: flex;
   flex: none;
   align-items: center;
@@ -220,30 +219,6 @@
   background: #2a2c30;
   color: var(--sys-quiet);
   font: 10.5px var(--mono);
-}
-
-.sys-seg {
-  overflow: hidden;
-}
-
-.sys-seg button {
-  height: 100%;
-  padding: 0 11px;
-  border: none;
-  border-right: 1px solid #33353a;
-  border-radius: 0;
-  background: none;
-  color: var(--sys-quiet);
-  font-size: 12px;
-}
-
-.sys-seg button:last-child {
-  border-right: none;
-}
-
-.sys-seg button.on {
-  background: #2c2e33;
-  color: #f0f0f0;
 }
 
 .sys-x {
@@ -313,14 +288,23 @@
 
 .sys-elabel {
   position: absolute;
-  padding: 1px 6px;
+  max-width: 200px;
+  overflow: hidden;
+  padding: 0 6px;
+  border: 1px solid;
   border-radius: 5px;
-  background: var(--sys-bg);
-  color: var(--sys-quiet);
+  background: #1b1c1f;
   font-size: 11px;
+  line-height: 16px;
   white-space: nowrap;
+  text-overflow: ellipsis;
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+.sys-elabel.faint,
+.sys-epill.faint {
+  opacity: 0.3;
 }
 
 .sys-num {
@@ -398,22 +382,18 @@
   border-color: #4a4d54;
 }
 
+.sys-world .sys-node {
+  top: 0;
+  left: 0;
+}
+
 .sys-node.dim {
   opacity: 0.3;
 }
 
-.sys-node.removed {
-  border-style: dashed;
-  border-color: var(--error);
-  opacity: 0.7;
-}
-
-.sys-node.changed {
-  border-color: var(--amber);
-}
-
-.sys-node.added {
-  border-color: var(--added);
+.sys-node.gone {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sys-hd {
@@ -556,6 +536,20 @@
   margin-left: auto;
   border-radius: 50%;
   background: var(--amber);
+}
+
+.sys-node.removed {
+  border-style: dashed;
+  border-color: var(--error);
+  opacity: 0.7;
+}
+
+.sys-node.changed {
+  border-color: var(--amber);
+}
+
+.sys-node.added {
+  border-color: var(--added);
 }
 
 /* Zoom */
@@ -1093,4 +1087,24 @@
   border-top: 1px solid #33353a;
   color: var(--sys-quiet);
   font-size: 11.5px;
+}
+
+/* A node in a collapsed graph: its header alone. */
+.sys-world .sys-node.compact {
+  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.sys-world .sys-node.compact > :not(.sys-hd),
+.sys-world .sys-node.compact .sys-hd > .sys-chip {
+  display: none;
+}
+
+.sys-world .sys-node.compact .sys-nm {
+  font-size: 13px;
 }

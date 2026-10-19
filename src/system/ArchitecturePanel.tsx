@@ -17,11 +17,12 @@ import { GenerateButton, GeneratePop } from "./GenerateMenu";
 import { type GenKey, generatePrompt, genItems } from "./generate";
 import { layout } from "./layout";
 import { lensOf } from "./lens";
+import { edgeKey } from "./mapWires";
 import { nodeInfo } from "./names";
 import { ReviewStrip } from "./ReviewStrip";
 import { SymbolsView } from "./SymbolsView";
-import { type Crumb, type EdgeMode, SystemBar } from "./SystemBar";
-import { edgeKey, SystemCanvas } from "./SystemCanvas";
+import { type Crumb, SystemBar } from "./SystemBar";
+import { SystemCanvas } from "./SystemCanvas";
 import { SystemDetail } from "./SystemDetail";
 import {
   componentId,
@@ -46,7 +47,7 @@ import { drawn } from "./trace";
 import { traceTargets } from "./traceTargets";
 import { useSystem } from "./useSystem";
 import { useTrace } from "./useTrace";
-import { askPrompt, neighborhood, visibleEdges } from "./view";
+import { askPrompt } from "./view";
 import "./system.css";
 import "./lens.css";
 
@@ -94,7 +95,6 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [selected, setSelected] = useState<string>();
   const [edgeSel, setEdgeSel] = useState<string>();
   const [symSel, setSymSel] = useState<string>();
-  const [mode, setMode] = useState<EdgeMode>("changed");
   /** The user's lens toggle; until they use it, the lens is on only for a PR's review. */
   const [lensPick, setLensPick] = useState<boolean>();
   const [finding, setFinding] = useState(false);
@@ -126,17 +126,6 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const placed = useMemo(() => layout(scene), [scene]);
   const sel = placed.nodes.find((n) => n.id === selected);
   const detail = sel ?? subject(map, shown);
-  const edgeMode: EdgeMode = mode === "changed" && !lens ? "focus" : mode;
-  const inside = scene.inside.flatMap((r) => r.nodes);
-  /** Nodes the review changes, and those it reaches too. */
-  const changed = new Set(
-    inside
-      .filter((n) => n.status && n.status !== "upstream" && n.status !== "impacted")
-      .map((n) => n.id),
-  );
-  const reached = new Set(inside.filter((n) => n.status).map((n) => n.id));
-  const edges =
-    shown.kind === "context" ? scene.edges : visibleEdges(scene.edges, edgeMode, sel?.id, changed);
   const edge = edgeSel ? sceneEdge(map, scene.edges, edgeSel) : undefined;
   const [selFrom = "", selTo = ""] = edgeSel?.split(">") ?? [];
   const ends = edgeSel ? { from: selFrom, to: selTo } : undefined;
@@ -236,40 +225,26 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
 
   const { hops } = tracing;
   const path = hops && drawn(map, shown, hops);
-  const focus = stop?.node ?? sel?.id;
+  const tourNode = stop?.node;
   const lit = path
     ? path.nodes
-    : stop?.node
-      ? new Set([stop.node])
+    : tourNode
+      ? new Set([tourNode])
       : edge
         ? new Set([edge.from, edge.to])
-        : edgeMode === "focus" && focus && shown.kind !== "context"
-          ? neighborhood(scene.edges, focus)
-          : edgeMode === "changed" && shown.kind !== "context"
-            ? new Set([
-                ...reached,
-                ...(focus ? [focus] : []),
-                ...placed.nodes.filter((n) => n.door).map((n) => n.id),
-              ])
-            : undefined;
+        : undefined;
   const hot = new Map<string, number | undefined>();
   if (path) for (const [k, n] of path.edges) hot.set(k, n);
   else if (edge) hot.set(edgeKey(edge), undefined);
-  else if (focus) {
+  else if (tourNode) {
     for (const e of scene.edges)
-      if (e.from === focus || e.to === focus) hot.set(edgeKey(e), undefined);
+      if (e.from === tourNode || e.to === tourNode) hot.set(edgeKey(e), undefined);
   }
   const hotColor = path
     ? "#e6e6e6"
-    : focus || edge
-      ? (nodeInfo(map, colors, focus ?? edge?.from ?? "")?.color ?? NEUTRAL)
+    : tourNode || edge
+      ? (nodeInfo(map, colors, tourNode ?? edge?.from ?? "")?.color ?? NEUTRAL)
       : NEUTRAL;
-  const drawnEdges =
-    path || stop?.node
-      ? scene.edges.filter((e) => hot.has(edgeKey(e)))
-      : edge && !edges.includes(edge)
-        ? [...edges, edge]
-        : edges;
   const stale = useMemo(() => {
     if (!map.description) return new Set<string>();
     const ids = new Set(map.stale.map((id) => `k:${id}`));
@@ -506,15 +481,6 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         onUp={up}
         onLevel={pickLevel}
         symbols={symbolsOf !== undefined}
-        modes={
-          shown.kind === "context"
-            ? undefined
-            : lens
-              ? ["focus", "changed", "all"]
-              : ["focus", "all"]
-        }
-        mode={edgeMode}
-        onMode={setMode}
         trace={
           trace && {
             from: trace.from,
@@ -594,7 +560,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
             colors={colors}
             component={shown.component}
             files={lens ? files : undefined}
-            changedOnly={edgeMode === "changed"}
+            changedOnly={!!lens}
             tour={stop && { file: stop.file, symbol: stop.symbol }}
             selected={symSel}
             onSelect={setSymSel}
@@ -612,19 +578,18 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           <>
             <SystemCanvas
               layout={placed}
-              edges={drawnEdges}
+              edges={scene.edges}
               lit={lit}
               hot={hot}
               hotColor={hotColor}
-              labels={!focus && !path}
               selected={trace ? undefined : (stop?.node ?? sel?.id)}
               selectedEdge={edge && edgeKey(edge)}
+              focus={trace || touring ? undefined : sel?.id}
               stale={stale}
               onSelect={pickNode}
               onOpen={open}
               onEdge={(e) => {
                 setToursOpen(false);
-                setSelected(undefined);
                 setEdgeSel(edgeKey(e));
               }}
               nodeMenu={nodeMenu}

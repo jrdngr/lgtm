@@ -34,14 +34,24 @@ export interface Focus {
   height: number;
 }
 
-const NODE_W = 220;
-const NODE_H = 32;
-const ROW = 42;
-const COL = 300;
+/** A collapsed graph's node size, the step between rows and the step between columns. */
+export interface Dims {
+  w: number;
+  h: number;
+  row: number;
+  col: number;
+}
+
+const SYMBOL_DIMS: Dims = { w: 220, h: 32, row: 42, col: 300 };
 
 /** The small graph `key` collapses into: its callers left, itself, its calls right. */
 export function focusLayout(dto: SymbolsDto, placed: SymLayout, key: string): Focus {
-  const links = linksOf(dto, placed, key, false);
+  return collapse(linksOf(dto, placed, key, false), key, SYMBOL_DIMS);
+}
+
+/** `links` laid out around `key`: the nodes linking to it left, itself, the nodes it links to
+ * right. A node linked both ways sits left. */
+export function collapse(links: Link[], key: string, d: Dims): Focus {
   const callers = [...new Set(links.filter(([, b]) => b === key).map(([a]) => a))];
   const calls = [
     ...new Set(links.filter(([a, b]) => a === key && !callers.includes(b)).map(([, b]) => b)),
@@ -50,17 +60,17 @@ export function focusLayout(dto: SymbolsDto, placed: SymLayout, key: string): Fo
   const pos = new Map<string, Box>();
   const column = (list: string[], x: number) =>
     list.forEach((k, i) => {
-      pos.set(k, { x, y: i * ROW + ((rows - list.length) * ROW) / 2, w: NODE_W, h: NODE_H });
+      pos.set(k, { x, y: i * d.row + ((rows - list.length) * d.row) / 2, w: d.w, h: d.h });
     });
-  const left = callers.length ? COL : 0;
+  const left = callers.length ? d.col : 0;
   column(callers, 0);
-  pos.set(key, { x: left, y: ((rows - 1) * ROW) / 2, w: NODE_W, h: NODE_H });
-  column(calls, left + COL);
+  pos.set(key, { x: left, y: ((rows - 1) * d.row) / 2, w: d.w, h: d.h });
+  column(calls, left + d.col);
   return {
     pos,
     links,
-    width: left + (calls.length ? COL : 0) + NODE_W,
-    height: rows * ROW - (ROW - NODE_H),
+    width: left + (calls.length ? d.col : 0) + d.w,
+    height: rows * d.row - (d.row - d.h),
   };
 }
 
@@ -77,6 +87,14 @@ export function wirePath(a: Box, b: Box): string {
   const [ax, bx, dir] = b.x > a.x ? [a.x + a.w, b.x, 1] : [a.x, b.x + b.w, -1];
   const dx = Math.max(40, Math.abs(bx - ax) / 2) * dir;
   return `M${ax} ${ay}C${ax + dx} ${ay} ${bx - dx} ${by} ${bx} ${by}`;
+}
+
+/** The point halfway along `wirePath(a, b)`. */
+export function wireMid(a: Box, b: Box): { x: number; y: number } {
+  const y = (mid(a) + mid(b)) / 2;
+  if (Math.abs(a.x - b.x) < 20) return { x: (a.x + b.x) / 2 - 27, y };
+  const [ax, bx] = b.x > a.x ? [a.x + a.w, b.x] : [a.x, b.x + b.w];
+  return { x: (ax + bx) / 2, y };
 }
 
 /** One faint line per pair of files, or file and chip, that call each other. */

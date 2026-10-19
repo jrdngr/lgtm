@@ -1,28 +1,5 @@
 import type { SystemDto } from "../bindings";
-import type { EdgeMode } from "./SystemBar";
 import { type SEdge, type SNode, SYSTEM } from "./scene";
-
-/** With nothing selected, Focus shows described relations and this many of the heaviest
- * imports. */
-const HEAVIEST = 12;
-
-/** The edges a level draws in `mode`. Changed draws the review's edges and those of the
- * `changed` nodes. */
-export function visibleEdges(
-  edges: SEdge[],
-  mode: EdgeMode,
-  selected?: string,
-  changed?: Set<string>,
-): SEdge[] {
-  if (mode === "changed") {
-    return edges.filter((e) => e.status || changed?.has(e.from) || changed?.has(e.to));
-  }
-  if (mode === "all") return edges;
-  if (selected) return edges.filter((e) => e.from === selected || e.to === selected);
-  const heavy = edges.filter((e) => !e.label).sort((a, b) => b.imports - a.imports);
-  const keep = new Set(heavy.slice(0, HEAVIEST));
-  return edges.filter((e) => e.label || keep.has(e));
-}
 
 /** `id` and the nodes its edges join it to. */
 export function neighborhood(edges: SEdge[], id: string): Set<string> {

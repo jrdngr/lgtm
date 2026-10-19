@@ -11,16 +11,12 @@ export interface Crumb {
   onClick?(): void;
 }
 
-export type EdgeMode = "focus" | "changed" | "all";
-
 const LEVELS = [
   ["context", "Context"],
   ["containers", "Containers"],
   ["components", "Components"],
   ["symbols", "Symbols"],
 ] as const;
-
-const MODES: Record<EdgeMode, string> = { focus: "Focus", changed: "Changed", all: "All" };
 
 interface Props {
   crumbs: Crumb[];
@@ -29,10 +25,6 @@ interface Props {
   onLevel(kind: Level["kind"]): void;
   /** Whether there's a component to show the Symbols of. */
   symbols: boolean;
-  /** Edge modes this level offers, if any. */
-  modes?: EdgeMode[];
-  mode: EdgeMode;
-  onMode(m: EdgeMode): void;
   /** While tracing, its ends replace the tools. */
   trace?: TraceBarProps;
   /** While touring, its name replaces the tools. */
@@ -127,21 +119,6 @@ export function SystemBar(p: Props) {
               <span className="sys-trk" />
               Review
             </button>
-          )}
-          {p.modes && (
-            <span className="sys-seg">
-              {p.modes.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={p.mode === m ? "on" : undefined}
-                  aria-pressed={p.mode === m}
-                  onClick={() => p.onMode(m)}
-                >
-                  {MODES[m]}
-                </button>
-              ))}
-            </span>
           )}
           <button type="button" className={`sys-tool${p.finding ? " on" : ""}`} onClick={p.onFind}>
             <Search />
