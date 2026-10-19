@@ -44,7 +44,7 @@ lgtm snapshots a workspace's files while it's open, so edits show up live. Works
 
 The maximize button at the end of a pane's header (or ⇧⌘↵, Maximize Pane in its right-click menu, or a double-click on empty space in its tab strip) fills the center with that pane and hides the others; a blue line runs across the top while it does. The same button, now blue, or ⇧⌘↵ again restores every pane, and collapsed panes stay collapsed. Picking a tab in a hidden pane restores them too. ⌃` still opens the bottom panel under it.
 
-Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them. The PR button in the Workspaces header shows or hides the stack's PR list; hiding it clears the selected PRs.
+Right-click a workspace to pin it to the top of the list or give it a color. Drag pinned workspaces to reorder them. The PR button in the Workspaces header shows or hides the stack's PR list. It starts off, and while it's off no stack PR is picked, so nothing reviews a PR on its own; hiding it clears the selected PRs.
 
 Everything sent to a terminal (⌘>, violet buttons, Send Path to Terminal) goes to the send target: the workspace's first terminal until you pick Pin as Send Target from another terminal tab's menu. Every terminal tab leads with a ›_, violet on the send target (whose title is violet too) and dim on the rest. When the send target closes, the first terminal still open takes over. Rename on a terminal tab's menu edits its title in place. Violet buttons also press Enter when an agent runs in the target, so it starts right away; ⌘> and Send Path only paste.
 

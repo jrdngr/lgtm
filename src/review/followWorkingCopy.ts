@@ -5,6 +5,7 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { prOf, setPr } from "../github/pr";
 import { commands } from "../ipc";
 import { githubOff } from "../tools/agents";
+import { stackPrsShown } from "../workspaces/stack";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 import { targetOf } from "./target";
 
@@ -12,9 +13,18 @@ import { targetOf } from "./target";
 const running = new Set<string>();
 const again = new Set<string>();
 
-/** The workspace's PR once its stack PR is in line with the new `@`. */
+/** The workspace's PR once its stack PR is in line with the new `@`. With stack PRs hidden,
+ * none is picked, and one picked earlier is dropped. */
 async function prAfterMove(workspace: WorkspaceName): Promise<PrDto | null> {
   if (githubOff()) return prOf(workspace);
+  if (!stackPrsShown()) {
+    const pr = await prOf(workspace);
+    if (!pr?.stack) return pr;
+    const r = await commands.clearStackPr(workspace);
+    if (r.status === "error") return pr;
+    setPr(workspace, null);
+    return null;
+  }
   const r = await commands.syncStackPr(workspace);
   if (r.status === "error") return prOf(workspace);
   setPr(workspace, r.data);

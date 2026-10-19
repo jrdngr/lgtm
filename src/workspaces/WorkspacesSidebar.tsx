@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
-import { loadState, saveState } from "../core/savedState";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
@@ -14,14 +13,11 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { arrange, forgetPin, usePins } from "./pins";
 import { StackPrs } from "./StackPrs";
-import { clearStackPr } from "./stack";
+import { clearStackPr, setStackPrsShown, stackPrsShown } from "./stack";
 import { usePinDrag } from "./usePinDrag";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
-
-/** Whether stack PRs show under the selected workspace. Saved per repo. */
-const SHOW_PRS = "stack-prs";
 
 interface Props {
   /** The repo's workspaces, from `useWorkspaces`. */
@@ -47,15 +43,13 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   // Bumped by Refresh, so the stack PRs ask GitHub again.
   const [refreshed, setRefreshed] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [showPrs, setShowPrs] = useState(() =>
-    loadState(SHOW_PRS, true, (v): v is boolean => typeof v === "boolean"),
-  );
+  const [showPrs, setShowPrs] = useState(stackPrsShown);
 
   /** Shows or hides the stack PRs. Hiding deselects every workspace's stack PR. */
   async function toggleStackPrs() {
     const show = !showPrs;
     setShowPrs(show);
-    saveState(SHOW_PRS, show);
+    setStackPrsShown(show);
     if (show) return;
     for (const w of workspaces ?? []) {
       const pr = await prOf(w.name);
