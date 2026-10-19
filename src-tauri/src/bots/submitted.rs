@@ -113,7 +113,7 @@ impl RepoCtx {
             replace_section(run, reviewer, output);
             set_filter(run, filter);
             Ok(())
-        })??;
+        })?;
         Ok((self.bot_run(run.id)?, false))
     }
 

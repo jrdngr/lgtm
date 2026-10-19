@@ -157,3 +157,16 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
     assert_eq!(kinds("a"), ["review", "minimal"]);
     assert_eq!(kinds("b"), ["review"], "its fixes named the synthesis's findings");
 }
+
+#[tokio::test]
+async fn a_failed_edit_leaves_the_report_as_it_was() {
+    let (_dir, ctx) = crate::review::tests::repo();
+    let id = ctx.store.lock().unwrap().add_bot_run(&run(vec![])).unwrap();
+    let before = ctx.bot_run(id).unwrap();
+    let out = ctx.edit_run::<()>(id, |run| {
+        run.revset = "other".into();
+        anyhow::bail!("refused")
+    });
+    assert!(out.is_err());
+    assert_eq!(ctx.bot_run(id).unwrap(), before);
+}

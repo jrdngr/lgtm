@@ -207,6 +207,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         panic!("findings went into a report of another base");
     };
     assert!(err.to_string().contains("publish a new report"), "{err}");
+    assert_eq!(ctx.bot_run(run.id).unwrap(), moved);
 
     // One stored with an open view's base, before reports took the whole range, still takes
     // findings while its head is the revset's.

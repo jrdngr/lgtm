@@ -50,15 +50,15 @@ impl RepoCtx {
         Ok(self.store.lock().unwrap().delete_bot_run(id)?)
     }
 
-    /// Applies `f` to the stored report and saves it.
+    /// Applies `f` to the stored report and saves it, unless `f` fails.
     pub(super) fn edit_run<T>(
         &self,
         id: u32,
-        f: impl FnOnce(&mut BotRun) -> T,
+        f: impl FnOnce(&mut BotRun) -> anyhow::Result<T>,
     ) -> anyhow::Result<T> {
         let store = self.store.lock().unwrap();
         let mut run = store.bot_run(id)?.context("the report is gone")?;
-        let out = f(&mut run);
+        let out = f(&mut run)?;
         store.save_bot_run(&run)?;
         Ok(out)
     }
@@ -75,7 +75,7 @@ impl RepoCtx {
             if dismissed {
                 run.dismissed.extend(findings.iter().cloned());
             }
-            run.clone()
+            Ok(run.clone())
         })
     }
 
@@ -115,6 +115,7 @@ impl RepoCtx {
         }
         self.edit_run(id, |run| {
             run.name = name.map(str::to_string);
+            Ok(())
         })?;
         self.bot_run(id)
     }
