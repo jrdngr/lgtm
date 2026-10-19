@@ -1,6 +1,6 @@
 import type { WorkspaceName } from "../core/workspace";
 import { usePr } from "../github/pr";
-import { REV_ACTIONS } from "../review/RevisionsPanelMenu";
+import { editAction } from "../review/RevisionsPanelMenu";
 import { useReviewTarget } from "../review/target";
 import { useAtOutside } from "../review/workingCopy";
 import { run } from "../services/pathMenu";
@@ -26,7 +26,7 @@ export function AtBanner({ workspace }: { workspace: WorkspaceName }) {
         <button
           type="button"
           disabled={target.loading}
-          onClick={() => run(actOn(workspace, target, REV_ACTIONS.e(head.changeId)))}
+          onClick={() => run(actOn(workspace, target, editAction(head.changeId)))}
         >
           {onPr ? `Edit #${pr.number} Head` : "Edit Review Head"}
         </button>

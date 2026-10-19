@@ -55,9 +55,11 @@ mod tests {
         assert!(!moved().await);
 
         // The app's own moves aren't reported.
-        j.act(&JjAction::NewAfter { rev: base.clone() })
+        j.act(&JjAction::Edit { rev: base.clone() })
             .await
             .unwrap();
+        jj(d, &["new", &base]);
+        assert!(moved().await);
         j.edit(&base).await.unwrap();
         assert!(!moved().await);
     }

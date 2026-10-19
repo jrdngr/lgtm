@@ -5,7 +5,7 @@ import { commands } from "../ipc";
 import { openMenu } from "../ui/contextMenu";
 import { AnsiText } from "./AnsiText";
 import { RevisionsPanelFooter } from "./RevisionsPanelFooter";
-import { addToReview, REV_ACTIONS, reviewAfter, revRowMenu } from "./RevisionsPanelMenu";
+import { editAction, reviewAfter, revRowMenu } from "./RevisionsPanelMenu";
 import "./RevisionsPanel.css";
 
 interface Props {
@@ -49,8 +49,7 @@ function bracket(lines: LogLine[], owner: number[], commits: number[], reviewed:
   return { first, last, inReview };
 }
 
-/** `jj log` as the user has it configured, to pick what to review and to edit, add, and squash
- * commits. Reviewed commits are blue with a bracket, `@` green over them. Keys act on the
+/** `jj log` as the user has it configured, to pick what to review and which commit to edit. Reviewed commits are blue with a bracket, `@` green over them. Keys act on the
  * highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
 export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onClose }: Props) {
   const [lines, setLines] = useState<LogLine[]>();
@@ -148,11 +147,6 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
     return () => window.removeEventListener("mouseup", up);
   });
 
-  function addPicked() {
-    const rev = changeAt(cursor);
-    if (rev) review(addToReview(revset, rev));
-  }
-
   async function review(target: string | undefined) {
     if (!target) return;
     const failed = await onLoad(target);
@@ -177,9 +171,9 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
     }
   }
 
-  function runKey(key: string) {
-    const rev = changeAt(cursor);
-    if (rev) act(...REV_ACTIONS[key](rev));
+  function edit(c = cursor) {
+    const rev = changeAt(c);
+    if (rev) act(...editAction(rev));
   }
 
   const undo = () => act({ kind: "undo", steps }, "Undid the last action");
@@ -198,7 +192,6 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
         change: line.changeId,
         commit,
         description: line.description ?? undefined,
-        revset,
         busy,
         review,
         act: (a) => act(...a),
@@ -216,20 +209,18 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
     if (d) {
       const range = e.key === "J" || e.key === "K";
       move(Math.min(Math.max(cursor + d, 0), n - 1), range ? (anchor ?? cursor) : undefined);
-    } else if (e.key in REV_ACTIONS) {
-      runKey(e.key);
     } else {
       switch (e.key) {
         case "Enter":
           // A focused button keeps its own Enter.
           if (e.target instanceof HTMLButtonElement) return;
-          runKey("e");
+          edit();
+          break;
+        case "e":
+          edit();
           break;
         case "r":
           reviewPicked();
-          break;
-        case "R":
-          addPicked();
           break;
         case "Escape":
           onClose();
@@ -281,10 +272,7 @@ export function RevisionsPanel({ workspace, revset, reviewed, head, onLoad, onCl
                 onMouseEnter={() => {
                   if (drag.current !== undefined && c >= 0) move(c, drag.current);
                 }}
-                onDoubleClick={() => {
-                  const rev = changeAt(c);
-                  if (rev) act(...REV_ACTIONS.e(rev));
-                }}
+                onDoubleClick={() => edit(c)}
                 onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
               >
                 {edge && (

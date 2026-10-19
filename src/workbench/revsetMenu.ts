@@ -4,11 +4,10 @@ import { openReviewTab } from "../core/panels";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import {
-  askDescribe,
   askRevset,
   copyItems,
+  editAction,
   presets,
-  REV_ACTIONS,
   type RevAction,
   reviewAfter,
 } from "../review/RevisionsPanelMenu";
@@ -44,8 +43,8 @@ interface Picker {
   openRevisions(): void;
 }
 
-/** The header's menu. Its commit actions act on `@`; Review picks the PR, a preset or any
- * revset. */
+/** The header's menu: Review picks the PR, a preset or any revset; Edit Review Head moves `@`
+ * to the review's newest commit. */
 export function revsetMenu({
   workspace,
   target,
@@ -99,17 +98,10 @@ export function revsetMenu({
       disabled: true,
       onSelect() {},
     },
-    wc && {
-      label: "Describe…",
-      disabled: busy,
-      onSelect: jj(() => askDescribe("@", wc.description)),
-    },
-    { label: "New Change on Top", disabled: busy, onSelect: jj(async () => REV_ACTIONS.n("@")) },
-    { label: "Squash into Parent", disabled: busy, onSelect: jj(async () => REV_ACTIONS.s("@")) },
     head && {
       label: "Edit Review Head",
       disabled: busy || head.workingCopy,
-      onSelect: jj(async () => REV_ACTIONS.e(head.changeId)),
+      onSelect: jj(async () => editAction(head.changeId)),
     },
     "-",
     wc && { label: "Copy", items: copyItems(wc.changeId, wc.commitId, wc.description) },

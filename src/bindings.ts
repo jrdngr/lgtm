@@ -894,12 +894,7 @@ export type ImportDto = {
 };
 
 /**  A change to the repo, on a revision given by change id. */
-export type JjAction = { kind: "edit"; rev: string } | { kind: "newAfter"; rev: string } | { kind: "newBefore"; rev: string } | 
-/**
- *  Squash into the parent, keeping the parent's description so no editor opens. Squashing
- *  `@` leaves `@` on the parent rather than on a new empty commit.
- */
-{ kind: "squash"; rev: string } | { kind: "describe"; rev: string; message: string } | { kind: "abandon"; rev: string } | 
+export type JjAction = { kind: "edit"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
 { kind: "undo"; steps: number } | { kind: "redo"; steps: number };
 
