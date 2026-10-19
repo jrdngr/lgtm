@@ -41,6 +41,12 @@
   background: var(--dv-icon-hover-background-color);
 }
 
+.split-buttons button.on,
+.split-buttons button.on:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
 .empty-group {
   flex-direction: column;
   gap: 16px;

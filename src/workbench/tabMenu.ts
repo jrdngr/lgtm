@@ -21,6 +21,7 @@ import { targetItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { confirmAction } from "../ui/prompt";
 import { moveAcross } from "./crossDock";
+import { canMaximize, toggleMaximize } from "./maximize";
 import { setRenaming } from "./tabRename";
 
 /** Closes `panels` one by one, each editor asking about unsaved edits. Cancel stops there. */
@@ -169,6 +170,12 @@ export function stripMenu({ workspace, api, group, inBottom }: Strip): CtxEntry[
     "-",
     { label: "Split Right", onSelect: () => splitGroup(api, group, "right") },
     { label: "Split Down", onSelect: () => splitGroup(api, group, "below") },
+    {
+      label: api.hasMaximizedGroup() ? "Restore Panes" : "Maximize Pane",
+      keys: "⇧⌘↵",
+      disabled: !canMaximize(api, group),
+      onSelect: () => toggleMaximize(api, group),
+    },
     "-",
     {
       label: "Close All Tabs in Pane",

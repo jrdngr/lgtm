@@ -35,6 +35,7 @@ import { EmptyGroup } from "./EmptyGroup";
 import { savedFolds, trackFolds } from "./fold";
 import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
+import { useMaximized } from "./maximize";
 import { Tab } from "./Tab";
 
 const components = {
@@ -81,6 +82,8 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   const loaded = useRef<SavedLayout>(undefined);
   /** Unknown until the layout is restored. */
   const [hasPane, setHasPane] = useState<boolean>();
+  const [mainApi, setMainApi] = useState<DockviewApi>();
+  const maximized = useMaximized(mainApi);
   useAgentShow(workspace);
   useAgentQa(workspace);
   useAgentReports(workspace);
@@ -146,6 +149,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
 
   async function readyMain({ api }: DockviewReadyEvent) {
     latest.current.main = api;
+    setMainApi(api);
     const saved = await load();
     if (latest.current.main !== api) return;
     restoreLayout(api, saved.main, () => defaultLayout(api));
@@ -187,8 +191,9 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     registerDock(workspace, api, "bottom");
   }
 
-  const dock = (ready: (e: DockviewReadyEvent) => void) => (
+  const dock = (ready: (e: DockviewReadyEvent) => void, edge = false) => (
     <div className="dock" hidden={hidden}>
+      {edge && <div className="max-edge" />}
       <DockviewReact
         components={components}
         defaultTabComponent={Tab}
@@ -205,7 +210,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
 
   return (
     <WorkspaceContext.Provider value={workspace}>
-      {dock(readyMain)}
+      {dock(readyMain, maximized)}
       {bottomEl && createPortal(dock(readyBottom), bottomEl)}
       {hasPane !== undefined && <WorkspaceReview workspace={workspace} hasPane={hasPane} />}
     </WorkspaceContext.Provider>

@@ -36,6 +36,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘]", "⌘["], action: "Next / previous pane (in an editor: indent / outdent)" },
       { keys: ["⌃⇥", "⌃⇧⇥"], action: "Next / previous tab in the focused pane" },
       { keys: ["⌥⇥", "⌥⇧⇥"], action: "Next / previous pane" },
+      { keys: ["⇧⌘↵"], action: "Maximize the focused pane, or restore the panes" },
       { keys: ["⌘B", "⌥⌘B"], action: "Show or hide the left / right panel" },
       { keys: ["⌘⇧K"], action: "Workspaces (in an editor: delete the line)" },
       { keys: ["⌘⇧E"], action: "Changes" },

@@ -27,6 +27,7 @@ import { AtBanner } from "./AtBanner";
 import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
 import { JjBlockedBanner, JjBusyTag, useTrackJjBusy } from "./JjBusy";
+import { toggleMaximize } from "./maximize";
 import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { reviewRevset } from "./revsetMenu";
@@ -180,6 +181,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+J": () => {
       const target = targetOf(selected);
       if (target) reviewRevset(target, "@");
+    },
+    "Mod+Shift+ENTER": () => {
+      const dock = dockOf(selected);
+      if (dock) toggleMaximize(dock, inBottom() ? undefined : dock.activeGroup);
     },
     "Mod+Shift+N": () => addFromPanel("workspace"),
     "Mod+Alt+N": () => addFromPanel("pr"),

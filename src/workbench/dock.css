@@ -85,3 +85,15 @@
 .dock .tab-glyph {
   margin-right: 6px;
 }
+
+/* Across the top of the main dock while a pane fills it. */
+.dock .max-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 5;
+  height: 3px;
+  background: var(--accent);
+  pointer-events: none;
+}

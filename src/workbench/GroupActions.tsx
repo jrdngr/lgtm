@@ -5,6 +5,7 @@ import { addToGroup, KINDS, kindTitle, splitGroup } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { openMenu } from "../ui/contextMenu";
 import { Fold } from "./FoldStrip";
+import { canMaximize, toggleMaximize, useMaximized } from "./maximize";
 import { stripMenu } from "./tabMenu";
 import "../review/MarkMenu.css";
 import "./GroupActions.css";
@@ -74,8 +75,17 @@ function useStripMenu(
       const inBottom = !!target.closest(".bottom-panel");
       openMenu(e as MouseEvent, stripMenu({ workspace, api, group, inBottom }));
     };
+    const onDouble = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.closest(".dv-tab, button, .bottom-panel")) return;
+      toggleMaximize(api, group);
+    };
     header.addEventListener("contextmenu", onMenu);
-    return () => header.removeEventListener("contextmenu", onMenu);
+    header.addEventListener("dblclick", onDouble);
+    return () => {
+      header.removeEventListener("contextmenu", onMenu);
+      header.removeEventListener("dblclick", onDouble);
+    };
   }, [inside, api, group, workspace]);
 }
 
@@ -114,6 +124,50 @@ export function SplitButtons({ containerApi, group }: IDockviewHeaderActionsProp
         <SplitIcon stacked />
       </button>
       <Fold containerApi={containerApi} group={group} />
+      <Maximize containerApi={containerApi} group={group} />
     </div>
+  );
+}
+
+/** Arrows out to the corners, or in from them. */
+function MaximizeIcon({ restore }: { restore: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d={
+          restore
+            ? "M13 7H9V3M9 7l4.5-4.5M3 9h4v4M7 9l-4.5 4.5"
+            : "M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"
+        }
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** Fills the main dock with the group, or restores the panes it hid. Not in the bottom panel. */
+function Maximize({
+  containerApi,
+  group,
+}: Pick<IDockviewHeaderActionsProps, "containerApi" | "group">) {
+  useMaximized(containerApi);
+  if (group.element.closest(".bottom-panel")) return null;
+  const on = group.api.isMaximized();
+  const label = on ? "Restore" : "Maximize";
+  return (
+    <button
+      type="button"
+      className={on ? "on" : undefined}
+      title={label}
+      aria-label={label}
+      disabled={!canMaximize(containerApi, group)}
+      onClick={() => toggleMaximize(containerApi, group)}
+    >
+      <MaximizeIcon restore={on} />
+    </button>
   );
 }

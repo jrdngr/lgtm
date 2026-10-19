@@ -7,6 +7,7 @@ import { activate, focusPanel } from "../core/panels";
 import { useWorkspace, type WorkspaceName } from "../core/workspace";
 import { useSendTarget } from "../terminal/registry";
 import { fold, foldAxis, foldOf, neighbor, subscribeFolds, unfold } from "./fold";
+import { useMaximized } from "./maximize";
 import "./fold.css";
 
 /** Re-renders on folds and on the group's tabs changing. */
@@ -57,6 +58,7 @@ export function Fold({
   group: DockviewGroupPanel;
 }) {
   useGroup(api, group);
+  useMaximized(api);
   const workspace = useWorkspace();
   const sendMark = useSendMark(workspace);
   const folded = foldOf(api, group);
@@ -68,7 +70,7 @@ export function Fold({
         type="button"
         title="Collapse"
         aria-label="Collapse"
-        disabled={!axis && !inBottom}
+        disabled={(!axis && !inBottom) || group.api.isMaximized()}
         onClick={() => {
           if (!axis) {
             bottom.set({ open: false });
