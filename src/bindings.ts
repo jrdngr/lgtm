@@ -1572,7 +1572,9 @@ export type Setup = { kind: "none" } | { kind: "approved" } |
  *  The script to ask about: its text, shown whole, and its hash, which approving it must
  *  name.
  */
-{ kind: "unapproved"; script: string; hash: string };
+{ kind: "unapproved"; script: string; hash: string } | 
+/**  A script that can't be shown, so it can't be approved. */
+{ kind: "unshowable"; why: Unshowable };
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
@@ -1777,6 +1779,8 @@ export type Turn = {
 	you: boolean,
 	text: string,
 };
+
+export type Unshowable = "tooLarge" | "notText";
 
 export type Verdict = "comment" | "approve" | "requestChanges";
 

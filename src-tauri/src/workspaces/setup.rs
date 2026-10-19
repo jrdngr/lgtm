@@ -1,6 +1,7 @@
 //! A new workspace's `.lgtm/setup`. It's the repo's code, so it runs only once the user lets
 //! it, and again without asking until it changes.
 
+use std::io::Read;
 use std::path::Path;
 
 use serde::Serialize;
@@ -10,6 +11,8 @@ use crate::ctx::RepoCtx;
 
 /// The repo-relative script a new workspace runs in its first terminal.
 pub const SETUP: &str = ".lgtm/setup";
+/// The largest script shown, and so the largest that can run.
+const MAX_BYTES: u64 = 64 * 1024;
 
 /// The command a new workspace's first terminal runs: its setup script, then a login shell.
 pub fn setup_command() -> Vec<String> {
@@ -34,33 +37,54 @@ pub enum Setup {
         script: String,
         hash: String,
     },
+    /// A script that can't be shown, so it can't be approved.
+    Unshowable {
+        why: Unshowable,
+    },
 }
 
-/// The workspace's setup script and its hash, if it has one.
-fn script(root: &Path) -> Option<(Vec<u8>, String)> {
-    let bytes = std::fs::read(root.join(SETUP)).ok()?;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Unshowable {
+    TooLarge,
+    NotText,
+}
+
+/// The workspace's setup script, as text, and its hash, if it has one.
+fn script(root: &Path) -> Option<Result<(String, String), Unshowable>> {
+    let file = std::fs::File::open(root.join(SETUP)).ok()?;
+    let mut bytes = vec![];
+    file.take(MAX_BYTES + 1).read_to_end(&mut bytes).ok()?;
+    if bytes.len() as u64 > MAX_BYTES {
+        return Some(Err(Unshowable::TooLarge));
+    }
     let hash = blake3::hash(&bytes).to_hex().to_string();
-    Some((bytes, hash))
+    Some(
+        String::from_utf8(bytes)
+            .map(|text| (text, hash))
+            .map_err(|_| Unshowable::NotText),
+    )
 }
 
 impl RepoCtx {
     pub fn setup_state(&self, root: &Path) -> Setup {
-        let Some((bytes, hash)) = script(root) else {
-            return Setup::None;
+        let (script, hash) = match script(root) {
+            None => return Setup::None,
+            Some(Err(why)) => return Setup::Unshowable { why },
+            Some(Ok(found)) => found,
         };
         match self.store.lock().unwrap().approved_setup() {
             Ok(Some(approved)) if approved == hash => Setup::Approved,
-            _ => Setup::Unapproved {
-                script: String::from_utf8_lossy(&bytes).into_owned(),
-                hash,
-            },
+            _ => Setup::Unapproved { script, hash },
         }
     }
 
     /// Lets the workspace's setup script run, if it's still the one with `hash`, the one the
     /// user was shown.
     pub fn approve_setup(&self, root: &Path, hash: &str) -> anyhow::Result<()> {
-        let (_, now) = script(root).ok_or_else(|| anyhow::anyhow!("no {SETUP}"))?;
+        let found = script(root).ok_or_else(|| anyhow::anyhow!("no {SETUP}"))?;
+        let (_, now) = found
+            .map_err(|_| anyhow::anyhow!("{SETUP} can't be shown, so it can't be approved"))?;
         anyhow::ensure!(
             now == hash,
             "{SETUP} changed since it was shown, so it wasn't approved"
@@ -128,5 +152,26 @@ mod tests {
             panic!("not asked");
         };
         assert_eq!(script, long);
+    }
+
+    #[test]
+    fn a_script_too_large_or_not_text_is_not_shown_or_approved() {
+        let (dir, ctx) = repo();
+        let root = dir.path();
+        std::fs::create_dir(root.join(".lgtm")).unwrap();
+        write(root, SETUP, &"x".repeat(MAX_BYTES as usize));
+        let Setup::Unapproved { hash, .. } = ctx.setup_state(root) else {
+            panic!("not asked");
+        };
+        for (bytes, why) in [
+            (vec![b'x'; MAX_BYTES as usize + 1], Unshowable::TooLarge),
+            (vec![b'x', 0xff], Unshowable::NotText),
+        ] {
+            std::fs::write(root.join(SETUP), &bytes).unwrap();
+            assert_eq!(ctx.setup_state(root), Setup::Unshowable { why });
+            let hash = blake3::hash(&bytes).to_hex().to_string();
+            assert!(ctx.approve_setup(root, &hash).is_err());
+        }
+        assert!(ctx.approve_setup(root, &hash).is_err());
     }
 }

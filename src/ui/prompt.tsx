@@ -81,6 +81,11 @@ export async function confirmShown(
   return value !== undefined;
 }
 
+/** Shows `text` as `confirmShown` does, with only a `button` to close it. */
+export async function showText(title: string, text: string, button: string): Promise<void> {
+  await confirmShown(title, text, "", button);
+}
+
 /** A native yes/no for a destructive or risky action, `action` and `cancel` naming its
  * buttons. */
 export async function confirmAction(
@@ -175,9 +180,11 @@ export function PromptHost() {
           <button type="button" className="quiet" onClick={() => finish(undefined)}>
             {ask.cancel ?? "Cancel"}
           </button>
-          <button type="submit" className="primary">
-            {ask.action}
-          </button>
+          {ask.action && (
+            <button type="submit" className="primary">
+              {ask.action}
+            </button>
+          )}
         </div>
       </form>
     </div>

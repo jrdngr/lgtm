@@ -9,7 +9,7 @@ import { commands, errorText } from "../ipc";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
-import { confirmShown } from "../ui/prompt";
+import { confirmShown, showText } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { arrange, forgetPin, usePins } from "./pins";
@@ -95,6 +95,9 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
     ) {
       const ok = await commands.approveSetup(ws, setup.hash);
       if (ok.status === "error") setError(ok.error);
+    }
+    if (setup.kind === "unshowable") {
+      await showText(".lgtm/setup", setup.why === "tooLarge" ? "Too large" : "Not text", "Skip");
     }
     onSelect(ws, setup.kind !== "none");
   }
