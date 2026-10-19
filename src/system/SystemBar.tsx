@@ -1,5 +1,4 @@
-import { Fragment } from "react";
-import { PipeButton } from "../terminal/PipeButton";
+import { Fragment, type ReactNode } from "react";
 import { Arrow, Chevron, Close, Play, Search, Trace, Up } from "./glyphs";
 import type { Level } from "./scene";
 
@@ -49,7 +48,8 @@ interface Props {
   onTours(): void;
   /** Absent with no review open. */
   lens?: { on: boolean; onToggle(): void };
-  onDescribe(): void;
+  /** The Generate button. */
+  generate: ReactNode;
 }
 
 function Swatch({ c }: { c: Crumb }) {
@@ -177,7 +177,7 @@ export function SystemBar(p: Props) {
               <Chevron size={10} />
             </span>
           </button>
-          {!p.lens?.on && <PipeButton onClick={p.onDescribe}>Describe</PipeButton>}
+          {p.generate}
         </>
       )}
     </div>

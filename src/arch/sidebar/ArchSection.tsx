@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import type { LookDto } from "../../bindings";
 import { useWorkspace, type WorkspaceName } from "../../core/workspace";
-import { commands } from "../../ipc";
 import { type CurrentReview, useCurrentReview } from "../../review/current";
 import { useSendText } from "../../review/useSendText";
+import { GenerateButton, GeneratePop } from "../../system/GenerateMenu";
+import { generatePrompt, genItems } from "../../system/generate";
 import { lensOf } from "../../system/lens";
 import { SystemTree } from "../../system/SystemTree";
 import { showInSystem } from "../../system/showInSystem";
 import { useSystem } from "../../system/useSystem";
-import { PipeButton } from "../../terminal/PipeButton";
 import { Busy } from "../../ui/Busy";
 import { Empty, SectionHeader } from "../../ui/SectionHeader";
 import { useArch } from "../state";
@@ -18,14 +18,18 @@ import { Look } from "./Look";
 import { Score } from "./Score";
 import "./sidebar.css";
 
-/** The workspace's architecture. With a review open: Assess's score, what to look at, the
+/** The workspace's architecture, with Generate. With a review open: the assessment's score, what to look at, the
  * change stack, the map of what it changes and the commits that changed it. Without one: the
  * system's tours, people, external systems and containers. */
 export function ArchSection() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
   const [error, setError] = useState<string>();
+  const [genOpen, setGenOpen] = useState(false);
   const { sendText, picker } = useSendText(workspace, setError, () => {});
+  const { map } = useSystem(workspace);
+  const { arch } = useArch(review);
+  const gen = genItems(map, review && { arch });
   const send = async (
     p: Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
   ) => {
@@ -35,13 +39,21 @@ export function ArchSection() {
     sendText(r.data);
   };
   return (
-    <div className="side-split">
+    <div className="side-split arch-split">
       <SectionHeader title="Architecture">
-        <PipeButton onClick={() => send(commands.describePrompt(workspace))}>Describe</PipeButton>
-        {review && (
-          <PipeButton onClick={() => send(commands.assessPrompt(review.id))}>Assess</PipeButton>
-        )}
+        <GenerateButton items={gen} open={genOpen} onToggle={() => setGenOpen(!genOpen)} />
       </SectionHeader>
+      {genOpen && (
+        <GeneratePop
+          className="side"
+          items={gen}
+          onGenerate={(keys) => {
+            setGenOpen(false);
+            send(generatePrompt(workspace, review?.id, keys));
+          }}
+          onClose={() => setGenOpen(false)}
+        />
+      )}
       {error && <div className="arch-error">{error}</div>}
       {review ? (
         <Body key={review.id} workspace={workspace} review={review} onError={setError} />

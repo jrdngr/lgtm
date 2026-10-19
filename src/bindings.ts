@@ -1617,9 +1617,9 @@ export type SystemDescDto = {
 	tiers: string[],
 	components: ComponentDescDto[],
 	relations: RelationDto[],
-	/**  The overview tour. Stored descriptions from before tours have none. */
+	/**  The overview tour, from descriptions that wrote it. New ones keep the last one's. */
 	tour?: TourStepDto[],
-	/**  A tour of every main feature. */
+	/**  The every-feature tour, likewise. */
 	features?: TourStepDto[],
 	/**  The working copy's commit when it was written. */
 	commit: string,

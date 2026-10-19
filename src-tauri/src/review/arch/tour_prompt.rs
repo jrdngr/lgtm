@@ -1,10 +1,12 @@
-//! The prompt asking a terminal agent to write the tour of one container or component.
+//! The prompt asking a terminal agent to write a tour: the overview, every feature, or one
+//! container or component.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use anyhow::bail;
 
+use super::describe::map_text;
 use super::system::{SysComponentDto, SysContainerDto, SystemDto};
 use crate::ctx::RepoCtx;
 
@@ -22,6 +24,14 @@ system map. Walk them from zoomed out to zoomed in: the container, its main comp
 key files and symbols of the most important ones (steps with a path, and the symbol's name for \
 a symbol), then the containers and external systems it talks to (node set to this container \
 and `to` set to the other, when it's on the map).";
+
+const OVERVIEW: &str = "Write a tour that walks someone new through this system in reading \
+order, for lgtm's system map. Read the README, manifests and entry points first. Start at \
+\"system\", then the containers and components that matter most, and how they connect.";
+
+const FEATURES: &str = "Write a tour of every main feature of this app, for lgtm's system \
+map: one or two steps each, ten to twenty steps in all. Point each at the component, file or \
+symbol that does it.";
 
 const STEPS: &str = "Use six to ten steps, each with a node (\"system\", a container id or a \
 component id) and two or three sentences on what it does and how it connects to the steps \
@@ -144,7 +154,13 @@ fn edges_text(out: &mut String, title: &str, edges: &BTreeMap<String, u32>) {
 fn prompt(map: &SystemDto, node: &str) -> anyhow::Result<String> {
     let container = node.strip_prefix("c:");
     let component = node.strip_prefix("k:");
-    let (context, ask) = if let Some(c) = map.containers.iter().find(|c| Some(&*c.id) == container)
+    let (context, ask) = if node == "overview" || node == "features" {
+        let ask = if node == "overview" { OVERVIEW } else { FEATURES };
+        (
+            format!("The system map, from its imports:\n\n{}", map_text(map)),
+            ask,
+        )
+    } else if let Some(c) = map.containers.iter().find(|c| Some(&*c.id) == container)
     {
         (container_text(map, c), CONTAINER)
     } else if let Some(c) = map.components.iter().find(|c| Some(&*c.id) == component) {
@@ -164,7 +180,8 @@ fn prompt(map: &SystemDto, node: &str) -> anyhow::Result<String> {
 }
 
 impl RepoCtx {
-    /// The prompt asking a terminal agent to write the tour of a container or component.
+    /// The prompt asking a terminal agent to write the overview or features tour, or the tour
+    /// of a container or component.
     pub async fn tour_prompt(&self, workspace: Option<&str>, node: &str) -> anyhow::Result<String> {
         let map = self.system_map(workspace).await?;
         prompt(&map, node)
@@ -226,6 +243,9 @@ mod tests {
         assert!(!src.contains("`web/api`: 1 files"));
         assert!(src.contains("Containers that import from it (id: import sites):\n\n- `web`: 3"));
         assert!(db.contains("set_tour tool with node `k:src/db`,"));
+        let features = prompt(&map, "features").unwrap();
+        assert!(features.contains("- `web/api` in `web`: 1 files"));
+        assert!(features.contains("set_tour tool with node `features`,"));
         // A bare id could be the container or its loose files' component.
         assert!(prompt(&map, "src").is_err());
         assert!(prompt(&map, "nowhere").is_err());

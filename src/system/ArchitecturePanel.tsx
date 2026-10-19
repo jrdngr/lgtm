@@ -8,10 +8,13 @@ import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
+import { PipeButton } from "../terminal/PipeButton";
 import type { CtxEntry } from "../ui/contextMenu";
 import { NEUTRAL } from "./colors";
 import { EdgeDetail } from "./EdgeDetail";
 import { FindPalette } from "./FindPalette";
+import { GenerateButton, GeneratePop } from "./GenerateMenu";
+import { type GenKey, generatePrompt, genItems } from "./generate";
 import { layout } from "./layout";
 import { lensOf } from "./lens";
 import { Minimap } from "./Minimap";
@@ -99,6 +102,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [lensPick, setLensPick] = useState<boolean>();
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
   const [trace, setTrace] = useState<Trace>();
   const [touring, setTouring] = useState<{ tour: TourDto; at: number }>();
   const [sendError, setSendError] = useState<string>();
@@ -107,7 +111,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const pr = usePr(workspace);
   const lensOn = lensPick ?? !!pr;
   const lensReview = lensOn ? review : undefined;
-  const { arch, error: archError, view } = useArch(lensReview);
+  const { arch, error: reviewError, view } = useArch(review);
+  const archError = lensOn ? reviewError : undefined;
   const files = lensReview?.files;
   const lens = useMemo(() => (arch && files ? lensOf(arch, files) : undefined), [arch, files]);
   const colors = useMemo(() => containerColors(map), [map]);
@@ -312,12 +317,15 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     setSendError(undefined);
     sendText(r.data);
   };
-  const describe = () => send(commands.describePrompt(workspace));
+  const gen = genItems(map, review && { arch });
+  const generate = (keys: GenKey[]) => {
+    setGenOpen(false);
+    send(generatePrompt(workspace, review?.id, keys));
+  };
   const writeTour = (ref: string) => {
     setToursOpen(false);
     send(commands.tourPrompt(workspace, ref));
   };
-  const assess = () => review && send(commands.assessPrompt(review.id));
   const ask = (id: string) => {
     const n = placed.nodes.find((x) => x.id === id) ?? (detail?.id === id ? detail : undefined);
     if (n) sendText(askPrompt(map, n));
@@ -373,6 +381,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       tourAt(Math.min(stops.length - 1, (touring?.at ?? 0) + 1));
     else if (stop && e.key === "ArrowLeft") tourAt(Math.max(0, (touring?.at ?? 0) - 1));
     else if (e.key === "Escape" && toursOpen) setToursOpen(false);
+    else if (e.key === "Escape" && genOpen) setGenOpen(false);
     else if (e.key === "Escape" && trace) setTrace(undefined);
     else if (e.key === "Escape" && touring) endTour();
     else if (e.key === "Escape" && symSel !== undefined) setSymSel(undefined);
@@ -412,15 +421,31 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       }
     />
   );
-  const tours = toursOpen && (
-    <ToursMenu
-      map={map}
-      colors={colors}
-      container={container}
-      onStart={startTour}
-      onWrite={writeTour}
-      onClose={() => setToursOpen(false)}
-    />
+  const description = gen[0]?.state;
+  const tours = (
+    <>
+      {toursOpen && (
+        <ToursMenu
+          map={map}
+          colors={colors}
+          container={container}
+          onStart={startTour}
+          onWrite={writeTour}
+          onClose={() => setToursOpen(false)}
+        />
+      )}
+      {genOpen && (
+        <GeneratePop items={gen} onGenerate={generate} onClose={() => setGenOpen(false)} />
+      )}
+      {!touring && !trace && description !== "fresh" && (
+        <div className="sys-desc-state">
+          {description === "missing" ? "Not described" : "Description stale"}
+          <PipeButton className="sm" onClick={() => generate(["description"])}>
+            Describe
+          </PipeButton>
+        </div>
+      )}
+    </>
   );
   const nodeDetail = detail && (
     <SystemDetail
@@ -483,9 +508,22 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           setTrace({ from: selected });
         }}
         toursOpen={toursOpen}
-        onTours={() => setToursOpen(!toursOpen)}
+        onTours={() => {
+          setGenOpen(false);
+          setToursOpen(!toursOpen);
+        }}
         lens={review ? { on: lensOn, onToggle: () => setLensPick(!lensOn) } : undefined}
-        onDescribe={describe}
+        generate={
+          <GenerateButton
+            className="sys-btn"
+            items={gen}
+            open={genOpen}
+            onToggle={() => {
+              setToursOpen(false);
+              setGenOpen(!genOpen);
+            }}
+          />
+        }
       />
       {lens && arch && review && !touring && (
         <ReviewStrip
@@ -499,7 +537,6 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           transitive={view.transitive}
           onTransitive={(transitive) => setArchView(review.id, { transitive })}
           look={lens.open}
-          onAssess={assess}
         />
       )}
       {(error || sendError || archError) && (

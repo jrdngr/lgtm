@@ -1,5 +1,5 @@
-//! Tours of the system map: the description's overview and features tours, and one per
-//! container or component that a terminal agent writes through lgtm's set_tour tool.
+//! Tours of the system map: the overview, every feature, and one per container or component,
+//! each written by a terminal agent through lgtm's set_tour tool.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
@@ -95,8 +95,8 @@ pub(super) fn check_steps(
         .collect()
 }
 
-/// The overview and features tours, then the stored tours of the map's containers and
-/// components, in map order.
+/// The overview and features tours, stored or else from the description, then the stored
+/// tours of the map's containers and components, in map order.
 pub(super) fn tours(
     desc: Option<&SystemDescDto>,
     stored: &BTreeMap<String, StoredTour>,
@@ -104,17 +104,23 @@ pub(super) fn tours(
     components: &[SysComponentDto],
 ) -> Vec<TourDto> {
     let mut out = Vec::new();
-    let described = |id: &str, title: &str, steps: &[TourStepDto]| {
-        (!steps.is_empty()).then(|| TourDto {
-            id: id.into(),
-            title: title.into(),
-            summary: String::new(),
-            steps: steps.to_vec(),
-        })
-    };
-    if let Some(d) = desc {
-        out.extend(described("overview", "Overview", &d.tour));
-        out.extend(described("features", "Every feature", &d.features));
+    for (id, title) in SYSTEM_TOURS {
+        let (summary, steps) = match (stored.get(id), desc) {
+            (Some(t), _) => (t.summary.clone(), t.steps.clone()),
+            (None, Some(d)) => (
+                String::new(),
+                if id == "overview" { &d.tour } else { &d.features }.clone(),
+            ),
+            (None, None) => continue,
+        };
+        if !steps.is_empty() {
+            out.push(TourDto {
+                id: id.into(),
+                title: title.into(),
+                summary,
+                steps,
+            });
+        }
     }
     let names = containers
         .iter()
@@ -138,9 +144,14 @@ pub(super) fn tours(
     out
 }
 
-/// Whether `node` is `c:` and a container's id, or `k:` and a component's.
+/// The system's own tours, by id and title.
+const SYSTEM_TOURS: [(&str, &str); 2] = [("overview", "Overview"), ("features", "Every feature")];
+
+/// Whether `node` is a system tour's id, `c:` and a container's id, or `k:` and a component's.
 pub(super) fn on_map(map: &SystemDto, node: &str) -> bool {
-    if let Some(id) = node.strip_prefix("c:") {
+    if SYSTEM_TOURS.iter().any(|(id, _)| *id == node) {
+        true
+    } else if let Some(id) = node.strip_prefix("c:") {
         map.containers.iter().any(|c| c.id == id)
     } else if let Some(id) = node.strip_prefix("k:") {
         map.components.iter().any(|c| c.id == id)
@@ -287,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn tours_lists_described_tours_then_node_tours_in_map_order() {
+    fn tours_lists_system_tours_stored_or_described_then_node_tours_in_map_order() {
         let m = map();
         let stored_tour = |summary: &str| StoredTour {
             summary: summary.into(),
@@ -298,6 +309,7 @@ mod tests {
             ("k:src/lib".to_string(), stored_tour("The library")),
             ("c:src".to_string(), stored_tour("The app")),
             ("k:src/gone".to_string(), stored_tour("Old")),
+            ("features".to_string(), stored_tour("Each feature")),
         ]
         .into_iter()
         .collect();
@@ -326,6 +338,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             [
                 ("overview", "Overview", ""),
+                ("features", "Every feature", "Each feature"),
                 ("c:src", "Desktop app", "The app"),
                 ("k:src/lib", "lib", "The library"),
             ]

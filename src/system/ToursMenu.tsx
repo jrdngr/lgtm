@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { SystemDto, TourDto } from "../bindings";
 import { PipeButton } from "../terminal/PipeButton";
-import { NEUTRAL, tint } from "./colors";
+import { openMenu } from "../ui/contextMenu";
+import { NEUTRAL } from "./colors";
 import { Play } from "./glyphs";
 import { containersOf } from "./scene";
 import { tourPath } from "./tours";
@@ -12,12 +13,14 @@ interface Props {
   /** The container in view, whose components without a tour offer Write Tour. */
   container?: string;
   onStart(tour: TourDto): void;
-  /** Asks a terminal agent to write the tour of a container or component, by id. */
+  /** Asks a terminal agent to write a tour, by id: `overview`, `features`, or a container's
+   * or component's. */
   onWrite(id: string): void;
   onClose(): void;
 }
 
-/** Every tour: the system's, then each container's and its components'. */
+/** Every tour, each with Play or Write Tour: the system's, then each container's and its
+ * components'. Right-click one to rewrite it. */
 export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }: Props) {
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -30,7 +33,6 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
   }, [onClose]);
 
   const byId = new Map(map.tours.map((t) => [t.id, t]));
-  const system = map.tours.filter((t) => t.id === "overview" || t.id === "features");
   const groups = containersOf(map)
     .filter((c) => c.id !== "" && c.files > 0)
     .map((c) => {
@@ -42,37 +44,32 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
       };
     });
 
-  const row = (t: TourDto | undefined, id: string, name: string, color: string) =>
-    t ? (
-      <button
-        key={id}
-        type="button"
-        className="sys-trow"
-        role="menuitem"
-        onClick={() => onStart(t)}
-      >
-        <span className="sys-tic" style={{ background: tint(color, 0.16), color }}>
-          <Play />
-        </span>
-        <span className="sys-tn2">
-          <span className="sys-tt2">{t.title || name}</span>
-          <span className="sys-tpath">{tourPath(map, colors, t)}</span>
-        </span>
-        <span className="sys-tcount">{t.steps.length} steps</span>
-      </button>
-    ) : (
-      <div key={id} className="sys-trow">
-        <span className="sys-tic none">
-          <Play />
-        </span>
-        <span className="sys-tn2">
-          <span className="sys-tt2 none">{name}</span>
-        </span>
+  const row = (t: TourDto | undefined, id: string, name: string, color: string) => (
+    <div
+      key={id}
+      className="sys-trow"
+      onContextMenu={(e) =>
+        t ? openMenu(e, [{ label: "Rewrite Tour", onSelect: () => onWrite(id) }]) : undefined
+      }
+    >
+      <span className="sys-tdot" style={{ background: color }} />
+      <span className="sys-tn2">
+        <span className={`sys-tt2${t ? "" : " none"}`}>{t?.title || name}</span>
+        {t && <span className="sys-tpath">{tourPath(map, colors, t)}</span>}
+      </span>
+      {t ? (
+        <button type="button" className="sys-tplay" onClick={() => onStart(t)}>
+          <Play size={10} />
+          Play
+          <span className="sys-tplay-n">{t.steps.length}</span>
+        </button>
+      ) : (
         <PipeButton className="sm" onClick={() => onWrite(id)}>
           Write Tour
         </PipeButton>
-      </div>
-    );
+      )}
+    </div>
+  );
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off the canvas under it
@@ -84,12 +81,9 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {!!system.length && (
-        <>
-          <span className="sys-pg">System</span>
-          {system.map((t) => row(t, t.id, t.title, NEUTRAL))}
-        </>
-      )}
+      <span className="sys-pg">System</span>
+      {row(byId.get("overview"), "overview", "Overview", NEUTRAL)}
+      {row(byId.get("features"), "features", "Every feature", NEUTRAL)}
       {groups.map(({ c, own, comps }) => {
         const color = colors.get(c.id) ?? NEUTRAL;
         return (

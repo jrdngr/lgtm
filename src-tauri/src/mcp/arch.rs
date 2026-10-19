@@ -1,5 +1,5 @@
 //! The architecture tools: storing an agent's assessment of the review's architecture change,
-//! its description of the system map, and its tours of the map's containers and components.
+//! its description of the system map, and its tours.
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
@@ -169,15 +169,12 @@ pub struct System {
     pub tiers: Vec<String>,
     pub components: Vec<Component>,
     pub relations: Vec<Relation>,
-    /// A guided tour for someone new to the code, in reading order.
-    pub tour: Vec<TourStep>,
-    /// A tour of every main feature, one or two steps each.
-    pub features: Vec<TourStep>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 pub struct Tour {
-    /// The node the prompt named, like `k:src/ui` for a component or `c:src` for a container.
+    /// The node the prompt named: `overview`, `features`, `k:src/ui` for a component or
+    /// `c:src` for a container.
     pub node: String,
     /// One line on what the tour covers.
     pub summary: String,
@@ -212,7 +209,7 @@ impl Lgtm {
 
     #[tool(
         description = "Store your description of the system map in lgtm, replacing the last \
-        one. Its System tab shows it as C4 context, container and component diagrams. \
+        one. Its Architecture tab shows it as C4 context, container and component diagrams. \
         Components and containers are the ids the prompt listed; unknown components are \
         dropped."
     )]
@@ -236,8 +233,9 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "Store your tour of one container or component of the system map in \
-        lgtm, replacing that node's last one. Its System tab lists it with the other tours. \
+        description = "Store your tour of the system map in lgtm (the overview, every \
+        feature, or one container or component), replacing that tour's last version. Its \
+        Architecture tab lists it with the other tours. \
         Steps on unknown nodes are dropped, and so are unknown files and symbols."
     )]
     async fn set_tour(&self, Parameters(p): Parameters<Tour>) -> Out {

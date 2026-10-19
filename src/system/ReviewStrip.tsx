@@ -1,5 +1,4 @@
 import type { ArchDto } from "../bindings";
-import { PipeButton } from "../terminal/PipeButton";
 
 interface Props {
   arch: ArchDto;
@@ -10,10 +9,9 @@ interface Props {
   onTransitive(on: boolean): void;
   /** Open Look items. */
   look: number;
-  onAssess(): void;
 }
 
-/** Under the bar with the Review lens on: what the review reaches, and Assess. */
+/** Under the bar with the Review lens on: what the review reaches. */
 export function ReviewStrip(p: Props) {
   const added = p.arch.components.filter((c) => c.status === "added").length;
   const changed = p.arch.components.filter((c) => c.status === "changed").length;
@@ -43,9 +41,6 @@ export function ReviewStrip(p: Props) {
       </button>
       <span className="sys-grow" />
       {p.look > 0 && <Count n={p.look} label="to look at" dot="var(--flagged)" />}
-      <PipeButton className="sm" onClick={p.onAssess}>
-        Assess
-      </PipeButton>
     </div>
   );
 }
