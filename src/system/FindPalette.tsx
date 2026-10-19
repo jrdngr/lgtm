@@ -31,7 +31,8 @@ const DEBOUNCE = 150;
 
 const base = (p: string) => p.slice(p.lastIndexOf("/") + 1);
 
-function Marked({ text, q }: { text: string; q: string }) {
+/** `text` with the first match of `q` marked. */
+export function Marked({ text, q }: { text: string; q: string }) {
   const i = text.toLowerCase().indexOf(q.toLowerCase());
   if (!q || i < 0) return <>{text}</>;
   return (

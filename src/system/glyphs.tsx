@@ -28,7 +28,14 @@ export const Up = () =>
 export const Chevron = ({ size = 12 }: { size?: number }) =>
   svg(size, <path d="M6 3.5L10.5 8 6 12.5" />, 2);
 
-export const Arrow = () => svg(14, <path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5" />);
+export const Swap = () =>
+  svg(
+    14,
+    <>
+      <path d="M3 5h10M10 2l3 3-3 3" />
+      <path d="M13 11H3M6 8l-3 3 3 3" />
+    </>,
+  );
 
 export const Search = ({ size = 14 }: { size?: number }) =>
   svg(

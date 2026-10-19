@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
-import { Arrow, Chevron, Close, Play, Search, Trace, Up } from "./glyphs";
+import { Chevron, Close, Play, Search, Trace, Up } from "./glyphs";
 import type { Level } from "./scene";
+import { TraceBar, type TraceBarProps } from "./TraceBar";
 
 export interface Crumb {
   id: string;
@@ -33,12 +34,7 @@ interface Props {
   mode: EdgeMode;
   onMode(m: EdgeMode): void;
   /** While tracing, its ends replace the tools. */
-  trace?: {
-    from?: Crumb;
-    to?: Crumb;
-    onEnd(end: "from" | "to"): void;
-    onClose(): void;
-  };
+  trace?: TraceBarProps;
   /** While touring, its name replaces the tools. */
   tour?: { name: string; color: string; onClose(): void };
   finding: boolean;
@@ -118,15 +114,7 @@ export function SystemBar(p: Props) {
           </button>
         </span>
       ) : p.trace ? (
-        <div className="sys-trace">
-          Trace
-          <TraceEnd c={p.trace.from} onClick={() => p.trace?.onEnd("from")} />
-          <Arrow />
-          <TraceEnd c={p.trace.to} onClick={() => p.trace?.onEnd("to")} />
-          <button type="button" className="sys-x" aria-label="End Trace" onClick={p.trace.onClose}>
-            <Close />
-          </button>
-        </div>
+        <TraceBar {...p.trace} />
       ) : (
         <>
           {p.lens && (
@@ -181,14 +169,5 @@ export function SystemBar(p: Props) {
         </>
       )}
     </div>
-  );
-}
-
-function TraceEnd({ c, onClick }: { c?: Crumb; onClick(): void }) {
-  return (
-    <button type="button" className={`sys-end${c ? "" : " empty"}`} onClick={onClick}>
-      {c && <Swatch c={c} />}
-      {c?.name ?? "…"}
-    </button>
   );
 }

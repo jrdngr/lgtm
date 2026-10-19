@@ -41,9 +41,12 @@ import { onShowInSystem, setSelectedNode } from "./showInSystem";
 import { TourCard, TourSteps } from "./Tour";
 import { ToursMenu } from "./ToursMenu";
 import { TracePanel } from "./TracePanel";
+import { TraceModes, TraceView } from "./TraceView";
 import { stopsOf, tourOf } from "./tours";
-import { drawn, tracePath } from "./trace";
+import { drawn } from "./trace";
+import { traceTargets } from "./traceTargets";
 import { useSystem } from "./useSystem";
+import { useTrace } from "./useTrace";
 import { askPrompt, neighborhood, visibleEdges } from "./view";
 import "./system.css";
 import "./lens.css";
@@ -76,11 +79,6 @@ function subject(map: SystemDto, level: Level): SNode | undefined {
   return sceneOf(map, { kind: "context" }).inside[0]?.nodes[0];
 }
 
-interface Trace {
-  from?: string;
-  to?: string;
-}
-
 /** The scene edge for `from>to`, or the one into the door that stands for `to`'s container. */
 function sceneEdge(map: SystemDto, edges: SEdge[], key: string): SEdge | undefined {
   const [from, to] = key.split(">");
@@ -103,7 +101,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
-  const [trace, setTrace] = useState<Trace>();
+  const tracing = useTrace(map);
+  const { trace } = tracing;
   const [touring, setTouring] = useState<{ tour: TourDto; at: number }>();
   const [sendError, setSendError] = useState<string>();
   const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
@@ -116,6 +115,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const files = lensReview?.files;
   const lens = useMemo(() => (arch && files ? lensOf(arch, files) : undefined), [arch, files]);
   const colors = useMemo(() => containerColors(map), [map]);
+  const targets = useMemo(() => traceTargets(map, colors), [map, colors]);
 
   // What a reload or another review can take away.
   const shown: Level =
@@ -215,7 +215,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     go(stop.level, stop.node, stop.edge && `${stop.edge.from}>${stop.edge.to}`);
   }, [stop?.key, tour]);
   const startTour = (tour: TourDto) => {
-    setTrace(undefined);
+    tracing.end();
     setToursOpen(false);
     setTouring({ tour, at: 0 });
   };
@@ -224,8 +224,16 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     root.current?.focus();
   };
   const tourAt = (at: number) => touring && setTouring({ ...touring, at });
+  const startTrace = (ends: { from?: string; to?: string }) => {
+    setTouring(undefined);
+    tracing.start(ends);
+  };
+  const endTrace = () => {
+    tracing.end();
+    root.current?.focus();
+  };
 
-  const hops = trace?.from && trace.to ? (tracePath(map, trace.from, trace.to) ?? []) : undefined;
+  const { hops } = tracing;
   const path = hops && drawn(map, shown, hops);
   const focus = stop?.node ?? sel?.id;
   const lit = path
@@ -276,8 +284,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     }
     setEdgeSel(undefined);
     if (!trace || !id) return setSelected(id);
-    if (!trace.from) setTrace({ ...trace, from: id });
-    else setTrace({ ...trace, to: id });
+    if (targets.some((t) => t.id === id)) tracing.pick(id);
   };
   const crumb = (id: string, onClick?: () => void): Crumb | undefined => {
     const info = nodeInfo(map, colors, id);
@@ -343,13 +350,15 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       ? { label: "Tour", onSelect: () => startTour(tour) }
       : { label: "Write Tour", onSelect: () => writeTour(id) };
     const askItem = { label: "Ask", keys: "⌘>", onSelect: () => ask(id) };
-    const traceItem = { label: "Trace From Here", onSelect: () => setTrace({ from: id }) };
+    const traceTo = { label: "Trace To…", onSelect: () => startTrace({ from: id }) };
+    const traceFrom = { label: "Trace From…", onSelect: () => startTrace({ to: id }) };
     if (info?.kind === "component") {
       const path = id.slice(2);
       return [
         { label: "Symbols", onSelect: () => go({ kind: "symbols", component: path }) },
         tourItem,
-        traceItem,
+        traceTo,
+        traceFrom,
         "-",
         { label: "Show in Files", onSelect: () => revealInFiles(workspace, path) },
         askItem,
@@ -362,7 +371,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           onSelect: () => open(id),
         },
         tourItem,
-        traceItem,
+        traceTo,
+        traceFrom,
         "-",
         askItem,
       ];
@@ -382,7 +392,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     else if (stop && e.key === "ArrowLeft") tourAt(Math.max(0, (touring?.at ?? 0) - 1));
     else if (e.key === "Escape" && toursOpen) setToursOpen(false);
     else if (e.key === "Escape" && genOpen) setGenOpen(false);
-    else if (e.key === "Escape" && trace) setTrace(undefined);
+    else if (e.key === "Escape" && trace) endTrace();
     else if (e.key === "Escape" && touring) endTour();
     else if (e.key === "Escape" && symSel !== undefined) setSymSel(undefined);
     else if (e.key === "Escape" && (selected || edgeSel)) go(shown);
@@ -447,6 +457,16 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       )}
     </>
   );
+  const traceModes = trace && hops && (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off the canvas only
+    <div
+      className="sys-tmap"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <TraceModes show={trace.show} count={tracing.all.length} onMode={tracing.show} />
+    </div>
+  );
   const nodeDetail = detail && (
     <SystemDetail
       map={map}
@@ -491,22 +511,24 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         onMode={setMode}
         trace={
           trace && {
-            from: trace.from ? crumb(trace.from) : undefined,
-            to: trace.to ? crumb(trace.to) : undefined,
-            onEnd: (end) => setTrace({ ...trace, [end]: undefined }),
-            onClose: () => {
-              setTrace(undefined);
-              root.current?.focus();
+            from: trace.from,
+            to: trace.to,
+            active: trace.active,
+            targets,
+            onEdit: tracing.edit,
+            onPick: (end, id) => {
+              if (!tracing.pick(id, end)?.active) root.current?.focus();
             },
+            onSwap: tracing.swap,
+            onClose: endTrace,
           }
         }
         tour={touring && { name: tourTitle, color: tourColor, onClose: endTour }}
         finding={finding}
         onFind={() => setFinding(true)}
-        onTrace={() => {
-          setTouring(undefined);
-          setTrace({ from: selected });
-        }}
+        onTrace={() =>
+          startTrace({ from: targets.some((t) => t.id === selected) ? selected : undefined })
+        }
         toursOpen={toursOpen}
         onTours={() => {
           setGenOpen(false);
@@ -543,7 +565,23 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         <div className="sys-error error">{sendError ?? error ?? archError}</div>
       )}
       <div className="sys-work">
-        {shown.kind === "symbols" ? (
+        {trace?.from && trace.to && hops && trace.show !== "map" ? (
+          <>
+            <TraceView
+              map={map}
+              colors={colors}
+              from={trace.from}
+              to={trace.to}
+              hops={hops}
+              all={tracing.all}
+              show={trace.show}
+              onMode={tracing.show}
+              onShow={show}
+              onFile={onFile}
+            />
+            {nodeDetail}
+          </>
+        ) : shown.kind === "symbols" ? (
           <SymbolsView
             workspace={workspace}
             map={map}
@@ -562,6 +600,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           >
             {card}
             {tours}
+            {traceModes}
           </SymbolsView>
         ) : (
           <>
@@ -598,8 +637,9 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
               )}
               {card}
               {tours}
+              {traceModes}
             </SystemCanvas>
-            {trace ? (
+            {trace && hops ? (
               <TracePanel map={map} colors={colors} hops={hops} onShow={show} onFile={onFile} />
             ) : (
               (steps ??
@@ -613,7 +653,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
                   lens={lens}
                   onShow={show}
                   onFile={onFile}
-                  onTrace={() => setTrace(ends ?? { from: edge.from, to: edge.to })}
+                  onTrace={() => startTrace(ends ?? { from: edge.from, to: edge.to })}
                   onAsk={sendText}
                   onLook={onLook}
                 />
