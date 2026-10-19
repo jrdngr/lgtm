@@ -34,8 +34,8 @@ const set = (a: Ask | undefined) => {
   for (const l of listeners) l();
 };
 
-/** Whether `confirmShown` is up. It's answered only by its buttons or Escape, so a new ask is
- * refused while it is, rather than cancelling it. */
+/** Whether `confirmShown` is up. It's answered only by its buttons or Escape, so `promptText`
+ * is refused while it is, rather than cancelling it. */
 const held = () => current?.shown !== undefined;
 
 /** Answers `ask` and puts focus back where it was. */
@@ -79,30 +79,36 @@ export function promptText(
   );
 }
 
+/** Settles once the last `confirmShown` asked is answered. */
+let shownDone: Promise<unknown> = Promise.resolve();
+
 /** Shows `text` whole in a scrolling block and asks whether to go ahead, `action` and
- * `cancel` naming the buttons. In the window, so a long text can't push the buttons away. */
-export async function confirmShown(
+ * `cancel` naming the buttons. In the window, so a long text can't push the buttons away.
+ * Waits for one already up to be answered, then shows. */
+export function confirmShown(
   title: string,
   text: string,
   action: string,
   cancel = "Cancel",
 ): Promise<boolean> {
-  if (held()) return false;
-  current?.done(undefined);
-  const value = await new Promise<string | undefined>((done) =>
-    set({
-      title,
-      value: "",
-      action,
-      cancel,
-      allowEmpty: true,
-      shown: text,
-      from: document.activeElement,
-      id: ++asks,
-      done,
-    }),
-  );
-  return value !== undefined;
+  const value = shownDone.then(() => {
+    current?.done(undefined);
+    return new Promise<string | undefined>((done) =>
+      set({
+        title,
+        value: "",
+        action,
+        cancel,
+        allowEmpty: true,
+        shown: text,
+        from: document.activeElement,
+        id: ++asks,
+        done,
+      }),
+    );
+  });
+  shownDone = value;
+  return value.then((v) => v !== undefined);
 }
 
 /** Shows `text` as `confirmShown` does, with only a `button` to close it. */

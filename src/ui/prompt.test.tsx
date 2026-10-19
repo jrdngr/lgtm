@@ -18,9 +18,9 @@ it("keeps a shown confirm up until a button or Escape answers it", async () => {
       answer = a;
     });
   });
+  await act(tick);
 
   expect(await promptText("Rename")).toBeUndefined();
-  expect(await confirmShown("other", "x", "Run")).toBe(false);
   const backdrop = el.querySelector(".prompt-backdrop") as HTMLElement;
   act(() => backdrop.dispatchEvent(new Event("pointerdown", { bubbles: true })));
   await tick();
@@ -44,6 +44,7 @@ it("keeps focus off the backdrop, and swallows keys typed elsewhere while it's u
       answer = a;
     });
   });
+  await act(tick);
   const backdrop = el.querySelector(".prompt-backdrop") as HTMLElement;
   const down = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
   act(() => backdrop.dispatchEvent(down));
@@ -66,4 +67,28 @@ it("keeps focus off the backdrop, and swallows keys typed elsewhere while it's u
   press("w");
   window.removeEventListener("keydown", onKey, true);
   expect(kept).toEqual([true, true, false]);
+});
+
+it("shows a second confirm once the first is answered", async () => {
+  const el = document.createElement("div");
+  document.body.append(el);
+  act(() => createRoot(el).render(<PromptHost />));
+  const answers: boolean[] = [];
+  act(() => {
+    confirmShown("one", "a", "Run", "Skip").then((a) => answers.push(a));
+    confirmShown("two", "b", "Run", "Skip").then((a) => answers.push(a));
+  });
+  await act(tick);
+  expect(el.querySelector("pre")?.textContent).toBe("a");
+
+  const run = () => (el.querySelector("button[type=submit]") as HTMLButtonElement).click();
+  act(run);
+  await act(tick);
+  expect(answers).toEqual([true]);
+  expect(el.querySelector("pre")?.textContent).toBe("b");
+  const skip = el.querySelector("button") as HTMLButtonElement;
+  act(() => skip.click());
+  await act(tick);
+  expect(answers).toEqual([true, false]);
+  expect(el.querySelector(".prompt")).toBeNull();
 });
