@@ -4,6 +4,7 @@ import type { LookDto, SystemDto, TourDto } from "../bindings";
 import { revealInFiles } from "../core/reveal";
 import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
+import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
@@ -94,7 +95,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [edgeSel, setEdgeSel] = useState<string>();
   const [symSel, setSymSel] = useState<string>();
   const [mode, setMode] = useState<EdgeMode>("changed");
-  const [lensOn, setLensOn] = useState(true);
+  /** The user's lens toggle; until they use it, the lens is on only for a PR. */
+  const [lensPick, setLensPick] = useState<boolean>();
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
   const [trace, setTrace] = useState<Trace>();
@@ -102,6 +104,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [sendError, setSendError] = useState<string>();
   const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
   const review = useCurrentReview(workspace);
+  const pr = usePr(workspace);
+  const lensOn = lensPick ?? !!pr;
   const lensReview = lensOn ? review : undefined;
   const { arch, error: archError, view } = useArch(lensReview);
   const files = lensReview?.files;
@@ -480,7 +484,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         }}
         toursOpen={toursOpen}
         onTours={() => setToursOpen(!toursOpen)}
-        lens={review ? { on: lensOn, onToggle: () => setLensOn(!lensOn) } : undefined}
+        lens={review ? { on: lensOn, onToggle: () => setLensPick(!lensOn) } : undefined}
         onDescribe={describe}
       />
       {lens && arch && review && !touring && (
