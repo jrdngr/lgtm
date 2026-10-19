@@ -14,6 +14,8 @@ interface Props {
   /** The level's edges, for what the node talks to. */
   edges: SEdge[];
   stale: boolean;
+  /** False when the node is what the level already shows inside. */
+  openable: boolean;
   /** Shows a node, at the level that holds it. */
   onShow(id: string): void;
   /** Opens a container, or the system, a level down. */
@@ -228,7 +230,8 @@ export function SystemDetail(p: Props) {
       ? map.description?.components.find((c) => componentId(c.id) === node.id)?.tier
       : undefined;
   const chip = tier ?? node.tech;
-  const drills = node.id === SYSTEM || (node.kind === "container" && !!node.tiles?.length);
+  const drills =
+    p.openable && (node.id === SYSTEM || (node.kind === "container" && !!node.tiles?.length));
   return (
     <aside className="sys-detail">
       <header className="sys-head">
@@ -260,7 +263,7 @@ export function SystemDetail(p: Props) {
         <div className="sys-acts">
           {drills && (
             <button type="button" className="sys-btn" onClick={() => p.onOpen(node.id)}>
-              Open
+              {node.id === SYSTEM ? "Containers" : "Components"}
               <Chevron />
             </button>
           )}

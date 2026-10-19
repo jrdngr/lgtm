@@ -322,6 +322,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
               node={detail}
               edges={scene.edges}
               stale={stale.has(detail.id)}
+              openable={!!sel || shown.kind === "context"}
               onShow={show}
               onOpen={open}
               onFile={onFile}
