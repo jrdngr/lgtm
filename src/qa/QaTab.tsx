@@ -9,7 +9,7 @@ import { copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ApplyView } from "./ApplyView";
-import { archiveLabel, edit, remove } from "./actions";
+import { edit, remove } from "./actions";
 import {
   decisionsText,
   lastDecided,
@@ -59,11 +59,6 @@ export function QaTab({ api }: IDockviewPanelProps) {
   const ws = useWorkspace();
   const state = useQa(ws);
   const agentsOff = useAgentsOff();
-  /** Archives the session and closes the tab. */
-  async function archive(d: Session) {
-    await edit(ws, d, { kind: "archive", archived: true });
-    api.close();
-  }
   const [focusKey, setFocusKey] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const { sendText, picker } = useSendText(
@@ -115,12 +110,6 @@ export function QaTab({ api }: IDockviewPanelProps) {
               onSelect: () => copy(decisionsText(d)),
             },
             d && {
-              label: archiveLabel(d),
-              disabled: !!busy,
-              onSelect: () =>
-                d.archived ? edit(ws, d, { kind: "archive", archived: false }) : archive(d),
-            },
-            d && {
               label: "Delete",
               danger: true,
               disabled: !!busy,
@@ -156,13 +145,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
         </div>
       )}
       {d && d.sent != null && !d.archived && (
-        <div className="qa-sent">
-          Sent to {d.sent || "a terminal"}
-          <span className="spacer" />
-          <button type="button" onClick={() => archive(d)}>
-            Archive
-          </button>
-        </div>
+        <div className="qa-sent">Sent to {d.sent || "a terminal"}</div>
       )}
       {state.error && <div className="review-error">{state.error}</div>}
       {agentsOff && (
