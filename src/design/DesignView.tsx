@@ -299,6 +299,7 @@ function DesignMap(p: {
           hot={NO_HOT}
           hotColor={NEUTRAL}
           selected={here.node}
+          focus={placed.nodes.some((n) => n.id === here.node && !n.door) ? here.node : undefined}
           stale={NO_STALE}
           onSelect={pick}
           onOpen={open}
