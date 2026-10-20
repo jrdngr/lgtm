@@ -85,6 +85,11 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   );
   const total = useMemo(() => sumProgress(progress), [progress]);
   const fold = useCollapse(files, index.checks);
+  /** Folds or unfolds a file with its header staying where it is on screen. */
+  const toggleFile = (file: number) => {
+    keepFile.current?.(file);
+    fold.toggleFile(file);
+  };
   const context = useContextLines(review, setError);
   const { sendText, sendRecent, picker } = useSendText(workspace, setError, focusRoot);
   const pr = usePrReview(workspace, review, { onState: setState, onError: setError, load });
@@ -287,7 +292,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       progress,
       collapsedFiles,
       setup,
-      toggleFile: fold.toggleFile,
+      toggleFile,
       setChecked: a.setChecked,
       markFile: a.markFile,
       clearFile: a.clearFile,
@@ -315,7 +320,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     openInEditor,
     stepHunk,
     stepFile,
-    toggleFile: fold.toggleFile,
+    toggleFile,
     toggleHunk: fold.toggleHunk,
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),
   });
@@ -327,7 +332,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     rootRef,
     setMenu,
     toggleHunk: fold.toggleHunk,
-    toggleFile: fold.toggleFile,
+    toggleFile,
     setChecked: a.setChecked,
     reveal: fold.reveal,
   });
