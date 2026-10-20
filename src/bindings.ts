@@ -117,12 +117,12 @@ export const commands = {
 	/**  Every design of the repo, with its state. */
 	designs: (workspace: string | null) => typedError<DesignItemDto[], string>(__TAURI_INVOKE("designs", { workspace })),
 	/**  Creates a design, or with `id` changes one. */
-	saveDesign: (id: string | null, design: DesignInput) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design", { id, design })),
+	saveDesign: (workspace: string | null, id: string | null, design: DesignInput) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design", { workspace, id, design })),
 	deleteDesign: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_design", { id })),
 	/**  The prompt asking a terminal agent to write a design's map. */
 	designPrompt: (workspace: string | null, id: string) => typedError<string, string>(__TAURI_INVOKE("design_prompt", { workspace, id })),
-	/**  Every file at a bookmark. */
-	bookmarkFiles: (workspace: string | null, bookmark: string) => typedError<string[], string>(__TAURI_INVOKE("bookmark_files", { workspace, bookmark })),
+	/**  Every file at a revision. */
+	revisionFiles: (workspace: string | null, revision: string) => typedError<string[], string>(__TAURI_INVOKE("revision_files", { workspace, revision })),
 	/**  Local bookmarks, those on `@`'s stack first. */
 	designBookmarks: (workspace: string | null) => typedError<string[], string>(__TAURI_INVOKE("design_bookmarks", { workspace })),
 	/**  The prompt asking a terminal agent to describe the system map. */
@@ -786,7 +786,8 @@ export type DesignContainerDto = {
 export type DesignDto = {
 	id: string,
 	name: string,
-	bookmark: string,
+	/**  The revision holding the spec files: a bookmark's name, else a change id. */
+	revision: string,
 	/**  Repo-relative files and folders; a folder takes every file under it. */
 	files: string[],
 	prompt: string,
@@ -805,7 +806,8 @@ export type DesignExternalDto = {
 /**  What the create and edit form sends. */
 export type DesignInput = {
 	name: string,
-	bookmark: string,
+	/**  Any revset of one commit, or a bookmark name. */
+	revision: string,
 	files: string[],
 	prompt: string,
 };
@@ -814,7 +816,9 @@ export type DesignInput = {
 export type DesignItemDto = {
 	design: DesignDto,
 	state: DesignState,
-	/**  The files its entries cover at the bookmark. */
+	/**  What its revision resolves to now; none when it doesn't resolve. */
+	resolved: ResolvedDto | null,
+	/**  The files its entries cover at that commit. */
 	fileCount: number,
 };
 
@@ -826,10 +830,12 @@ export type DesignMapDto = {
 	components: DesignComponentDto[],
 	relations: DesignRelationDto[],
 	differences: DifferenceDto[],
-	/**  The bookmark's commit it was written from. */
+	/**  The revision's commit it was written from. */
 	specCommit: string,
 	/**  The working copy's commit it was compared with. */
 	codeCommit: string | null,
+	/**  A hash of the design's files at `spec_commit`; a different one there now means stale. */
+	filesHash: string | null,
 	createdAt: number | null,
 };
 
@@ -1507,6 +1513,15 @@ export type RepoChanged = Record<string, never>;
 export type RepoInfo = {
 	root: string,
 	name: string,
+};
+
+/**  The commit a design's revision resolves to now. */
+export type ResolvedDto = {
+	commit: string,
+	changeId: string,
+	description: string,
+	/**  Set when the revision is a local bookmark's name. */
+	bookmark: string | null,
 };
 
 export type Review = {

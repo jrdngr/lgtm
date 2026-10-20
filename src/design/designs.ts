@@ -110,3 +110,10 @@ export function useEditing(workspace: WorkspaceName) {
   );
   return e?.workspace === workspaceKey(workspace) ? e : undefined;
 }
+
+/** What a design's revision shows as: its bookmark, or its change and description. */
+export function revisionLabel({ design, resolved }: DesignItemDto): string {
+  if (!resolved) return design.revision;
+  if (resolved.bookmark) return resolved.bookmark;
+  return `${resolved.changeId.slice(0, 8)} ${resolved.description || "(no description)"}`;
+}

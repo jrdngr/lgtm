@@ -139,8 +139,10 @@ pub struct Design {
 pub struct NewDesign {
     /// What the user calls it.
     pub name: String,
-    /// The jj bookmark whose commit holds the spec files.
-    pub bookmark: String,
+    /// The jj revision holding the spec files: a change id, `@`, a bookmark name, or any
+    /// revset of one commit. `@` when left out.
+    #[serde(default, alias = "bookmark")]
+    pub revision: Option<String>,
     /// Spec files and folders, relative to the repo root; a folder takes everything under it.
     pub files: Vec<String>,
     /// What to map from them, like one concept or some phases. Empty for all of it.
@@ -184,7 +186,7 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "Make a design in lgtm: a named set of spec files at a bookmark, mapped \
+        description = "Make a design in lgtm: a named set of spec files at a jj revision, mapped \
         as a C4 diagram in the Architecture tab. Returns the instructions for mapping it, which \
         end with calling set_design."
     )]
@@ -192,7 +194,7 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let input = DesignInput {
             name: p.name,
-            bookmark: p.bookmark,
+            revision: p.revision.unwrap_or_else(|| "@".into()),
             files: p.files,
             prompt: p.prompt,
         };
@@ -212,8 +214,9 @@ impl Lgtm {
     }
 
     #[tool(
-        description = "List the repo's designs: id, name, bookmark, files, prompt, and \
-        whether its map is fresh, stale (the bookmark moved over its files) or missing."
+        description = "List the repo's designs: id, name, revision (as stored, and the commit \
+        it resolves to now), files, prompt, and whether its map is fresh, stale (its files \
+        changed since it was mapped) or missing (not mapped, or its revision or files are gone)."
     )]
     async fn list_designs(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
@@ -224,7 +227,8 @@ impl Lgtm {
                 serde_json::json!({
                     "id": i.design.id,
                     "name": i.design.name,
-                    "bookmark": i.design.bookmark,
+                    "revision": i.design.revision,
+                    "commit": i.resolved.as_ref().map(|r| &r.commit),
                     "files": i.design.files,
                     "prompt": i.design.prompt,
                     "state": i.state,

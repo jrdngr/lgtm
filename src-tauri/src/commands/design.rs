@@ -19,13 +19,15 @@ pub(crate) async fn designs(
 /// Creates a design, or with `id` changes one.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn save_design(
+pub(crate) async fn save_design(
     window: WebviewWindow,
+    workspace: Option<String>,
     id: Option<String>,
     design: DesignInput,
 ) -> CmdResult<DesignDto> {
     repo(&window)?
-        .save_design(id.as_deref(), design)
+        .save_design(workspace.as_deref(), id.as_deref(), design)
+        .await
         .map_err(err)
 }
 
@@ -49,16 +51,16 @@ pub(crate) async fn design_prompt(
         .map_err(err)
 }
 
-/// Every file at a bookmark.
+/// Every file at a revision.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn bookmark_files(
+pub(crate) async fn revision_files(
     window: WebviewWindow,
     workspace: Option<String>,
-    bookmark: String,
+    revision: String,
 ) -> CmdResult<Vec<String>> {
     repo(&window)?
-        .bookmark_files(workspace.as_deref(), &bookmark)
+        .revision_files(workspace.as_deref(), &revision)
         .await
         .map_err(err)
 }

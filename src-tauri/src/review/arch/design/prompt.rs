@@ -2,9 +2,9 @@
 
 use std::fmt::Write;
 
-use anyhow::{Context, bail};
+use anyhow::bail;
 
-use super::{covered, exact};
+use super::{covered, rev};
 use crate::ctx::RepoCtx;
 use crate::review::arch::describe::map_text;
 
@@ -39,22 +39,17 @@ impl RepoCtx {
     pub async fn design_prompt(&self, workspace: Option<&str>, id: &str) -> anyhow::Result<String> {
         let d = self.design(id)?;
         let ws = self.workspace(workspace).await?;
-        let commit = ws
-            .jj
-            .commit_ids(&exact(&d.bookmark))
-            .await?
-            .into_iter()
-            .next()
-            .with_context(|| format!("no bookmark `{}`", d.bookmark))?;
+        ws.jj.snapshot_or_stale().await?;
+        let commit = rev::resolve(&ws.jj, &d.revision).await?.commit;
         let files = covered(&ws.jj.files(&commit).await?, &d.files);
         if files.is_empty() {
-            bail!("`{}` has none of the design's files", d.bookmark);
+            bail!("`{}` has none of the design's files", d.revision);
         }
         let map = self.system_map(workspace).await?;
         let mut out = format!(
-            "Design \"{}\". Its spec files are at commit {commit} (bookmark `{}`); read each \
+            "Design \"{}\". Its spec files are at commit {commit} (revision `{}`); read each \
              with `jj file show -r {commit} <path>`:\n\n",
-            d.name, d.bookmark
+            d.name, d.revision
         );
         for f in files.iter().take(MAX_FILES) {
             writeln!(out, "- {f}").unwrap();

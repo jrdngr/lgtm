@@ -59,6 +59,7 @@ function design(built: Container["built"] = null): DesignMapDto {
     differences: [],
     specCommit: "c1",
     codeCommit: "c0",
+    filesHash: null,
     createdAt: 0,
   };
 }

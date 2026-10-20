@@ -133,10 +133,12 @@ pub struct DesignMapDto {
     pub components: Vec<DesignComponentDto>,
     pub relations: Vec<DesignRelationDto>,
     pub differences: Vec<DifferenceDto>,
-    /// The bookmark's commit it was written from.
+    /// The revision's commit it was written from.
     pub spec_commit: String,
     /// The working copy's commit it was compared with.
     pub code_commit: Option<String>,
+    /// A hash of the design's files at `spec_commit`; a different one there now means stale.
+    pub files_hash: Option<String>,
     pub created_at: f64,
 }
 
@@ -222,6 +224,7 @@ pub(super) fn validate(
             .collect(),
         spec_commit,
         code_commit,
+        files_hash: None,
         created_at: now_ms() as f64,
     }
 }

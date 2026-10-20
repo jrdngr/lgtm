@@ -5,6 +5,8 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{Arc, OnceLock};
 
+use std::collections::HashMap;
+
 use anyhow::{Context, bail};
 use tokio::process::Command;
 use tokio::sync::Mutex;
@@ -268,6 +270,42 @@ impl Jj {
         Ok(out.lines().map(str::to_string).collect())
     }
 
+    /// A content hash of each of `paths` at `commit`, in one read. Paths not there are left out.
+    pub async fn file_hashes(
+        &self,
+        commit: &str,
+        paths: &[String],
+    ) -> anyhow::Result<HashMap<String, String>> {
+        if paths.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let fileset = paths
+            .iter()
+            .map(|p| fileset_literal(p))
+            .chain(["none()".to_string()])
+            .collect::<Vec<_>>()
+            .join(" | ");
+        // Each file starts with a marker and its path, so one output splits back into files.
+        let out = self
+            .exec(
+                &[
+                    "file",
+                    "show",
+                    "-r",
+                    commit,
+                    "-T",
+                    FILE_MARK_TEMPLATE,
+                    &fileset,
+                ],
+                true,
+            )
+            .await?;
+        Ok(split_files(&out)
+            .into_iter()
+            .map(|(path, bytes)| (path, blake3::hash(bytes).to_hex().to_string()))
+            .collect())
+    }
+
     /// File contents at `commit`, or empty for the root commit.
     pub async fn file(&self, commit: Option<&str>, path: &str) -> anyhow::Result<Vec<u8>> {
         let Some(commit) = commit else {
@@ -302,6 +340,35 @@ impl Jj {
     }
 }
 
+const FILE_MARK: &[u8] = b"\0lgtm-file\0";
+const FILE_MARK_TEMPLATE: &str = r#""\0lgtm-file\0" ++ path ++ "\0""#;
+
+/// `jj file show` output under `FILE_MARK_TEMPLATE`, as each file's path and bytes.
+fn split_files(out: &[u8]) -> Vec<(String, &[u8])> {
+    let mut starts = Vec::new();
+    let mut i = 0;
+    while let Some(at) = out[i..]
+        .windows(FILE_MARK.len())
+        .position(|w| w == FILE_MARK)
+    {
+        starts.push(i + at);
+        i += at + FILE_MARK.len();
+    }
+    starts
+        .iter()
+        .enumerate()
+        .filter_map(|(n, &start)| {
+            let body =
+                &out[start + FILE_MARK.len()..starts.get(n + 1).copied().unwrap_or(out.len())];
+            let end = body.iter().position(|&b| b == 0)?;
+            Some((
+                String::from_utf8_lossy(&body[..end]).into_owned(),
+                &body[end + 1..],
+            ))
+        })
+        .collect()
+}
+
 /// A fileset matching exactly `path`, relative to the repo root.
 fn fileset_literal(path: &str) -> String {
     format!(
@@ -313,6 +380,20 @@ fn fileset_literal(path: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn splits_marked_file_output_into_paths_and_bytes() {
+        let out = b"\0lgtm-file\0a.md\0one\n\0lgtm-file\0d/b.md\0\0lgtm-file\0c.md\0x";
+        let got: Vec<(String, &[u8])> = split_files(out);
+        assert_eq!(
+            got,
+            [
+                ("a.md".to_string(), &b"one\n"[..]),
+                ("d/b.md".to_string(), &b""[..]),
+                ("c.md".to_string(), &b"x"[..]),
+            ]
+        );
+    }
 
     #[test]
     fn parses_change_lines_with_tabs_in_descriptions() {

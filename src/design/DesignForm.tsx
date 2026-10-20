@@ -17,10 +17,10 @@ interface Props {
   onCancel(): void;
 }
 
-/** Creates or edits a design: its name, bookmark, files and folders, and prompt. */
+/** Creates or edits a design: its name, revision, files and folders, and prompt. */
 export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
   const [name, setName] = useState(design?.name ?? "");
-  const [bookmark, setBookmark] = useState(design?.bookmark ?? "");
+  const [revision, setRevision] = useState(design?.revision ?? "@");
   const [bookmarks, setBookmarks] = useState<string[]>([]);
   const [files, setFiles] = useState<string[]>(design?.files ?? []);
   const [prompt, setPrompt] = useState(design?.prompt ?? "");
@@ -33,25 +33,37 @@ export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
 
   useEffect(() => {
     first.current?.focus();
-    unwrap(commands.designBookmarks(workspace)).then((b) => {
-      setBookmarks(b);
-      setBookmark((now) => now || b[0] || "");
-    }, setError);
+    unwrap(commands.designBookmarks(workspace)).then(setBookmarks, setError);
   }, [workspace]);
 
+  // Typing a revision looks its files up once it settles.
   useEffect(() => {
-    if (!bookmark) return;
-    unwrap(commands.bookmarkFiles(workspace, bookmark)).then(setAll, () => setAll([]));
-  }, [workspace, bookmark]);
+    const rev = revision.trim();
+    if (!rev) return setAll([]);
+    let live = true;
+    const t = setTimeout(() => {
+      unwrap(commands.revisionFiles(workspace, rev)).then(
+        (files) => live && setAll(files),
+        () => live && setAll([]),
+      );
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(t);
+    };
+  }, [workspace, revision]);
 
   const choices = useMemo(() => pathChoices(all, query, files), [all, query, files]);
 
   const save = async (generate: boolean) => {
-    const input: DesignInput = { name: name.trim(), bookmark, files, prompt };
+    const input: DesignInput = { name: name.trim(), revision: revision.trim(), files, prompt };
     if (!input.name) return setError("Name it first");
     if (!files.length) return setError("Add files first");
     try {
-      await onDone(await unwrap(commands.saveDesign(design?.id ?? null, input)), generate);
+      await onDone(
+        await unwrap(commands.saveDesign(workspace, design?.id ?? null, input)),
+        generate,
+      );
     } catch (e) {
       setError(errorText(e));
     }
@@ -84,12 +96,18 @@ export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
           <input ref={first} value={name} onChange={(e) => setName(e.target.value)} />
         </label>
         <label className="dsn-field">
-          <span>Bookmark</span>
-          <select value={bookmark} onChange={(e) => setBookmark(e.target.value)}>
-            {bookmarks.map((b) => (
-              <option key={b}>{b}</option>
+          <span>Revision</span>
+          <input
+            list="dsn-revisions"
+            value={revision}
+            spellCheck={false}
+            onChange={(e) => setRevision(e.target.value)}
+          />
+          <datalist id="dsn-revisions">
+            {["@", ...bookmarks].map((b) => (
+              <option key={b} value={b} />
             ))}
-          </select>
+          </datalist>
         </label>
         <div className="dsn-field top">
           <span>Files</span>

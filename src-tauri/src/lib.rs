@@ -99,7 +99,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::design::save_design,
             commands::design::delete_design,
             commands::design::design_prompt,
-            commands::design::bookmark_files,
+            commands::design::revision_files,
             commands::design::design_bookmarks,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,

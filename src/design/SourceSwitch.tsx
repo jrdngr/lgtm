@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DesignItemDto, DesignMapDto, DesignState } from "../bindings";
-import { setSource, showCode, showDesign, useSource } from "./designs";
+import { revisionLabel, setSource, showCode, showDesign, useSource } from "./designs";
 import "./design.css";
 
 const STATES: Record<DesignState, string> = { fresh: "Fresh", stale: "Stale", missing: "Missing" };
@@ -113,7 +113,7 @@ function DesignPop(p: {
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {p.items.map(({ design, state, fileCount }) => {
+      {p.items.map(({ design, state, fileCount, resolved }) => {
         const differs = differsCount(design.map);
         return (
           <button
@@ -126,7 +126,8 @@ function DesignPop(p: {
             <span className="nm">
               <b>{design.name}</b>
               <span>
-                {design.bookmark} · {fileCount} {fileCount === 1 ? "file" : "files"}
+                {revisionLabel({ design, state, fileCount, resolved })} · {fileCount}{" "}
+                {fileCount === 1 ? "file" : "files"}
               </span>
             </span>
             <span className={`dsn-chip-state ${state}`}>{STATES[state]}</span>

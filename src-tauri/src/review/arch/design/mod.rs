@@ -1,20 +1,22 @@
-//! Designs: C4 maps a terminal agent writes from spec files at a bookmark, laid over the
+//! Designs: C4 maps a terminal agent writes from spec files at a revision, laid over the
 //! system map of the code. Each is a named object of the repo with its files and a prompt, and
 //! can be generated again at will.
 
 mod model;
 mod prompt;
+mod rev;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 pub use model::*;
+pub use rev::ResolvedDto;
 
 use crate::ctx::{RepoCtx, now_ms};
-use crate::jj::Range;
+use crate::jj::Jj;
 use crate::store::Store;
 
 /// A design as stored: what to generate it from, and the map once generated.
@@ -23,7 +25,8 @@ use crate::store::Store;
 pub struct DesignDto {
     pub id: String,
     pub name: String,
-    pub bookmark: String,
+    /// The revision holding the spec files: a bookmark's name, else a change id.
+    pub revision: String,
     /// Repo-relative files and folders; a folder takes every file under it.
     pub files: Vec<String>,
     pub prompt: String,
@@ -36,7 +39,8 @@ pub struct DesignDto {
 #[serde(rename_all = "camelCase")]
 pub struct DesignInput {
     pub name: String,
-    pub bookmark: String,
+    /// Any revset of one commit, or a bookmark name.
+    pub revision: String,
     pub files: Vec<String>,
     pub prompt: String,
 }
@@ -55,15 +59,44 @@ pub enum DesignState {
 pub struct DesignItemDto {
     pub design: DesignDto,
     pub state: DesignState,
-    /// The files its entries cover at the bookmark.
+    /// What its revision resolves to now; none when it doesn't resolve.
+    pub resolved: Option<ResolvedDto>,
+    /// The files its entries cover at that commit.
     pub file_count: u32,
+}
+
+/// A revision's commit and every file there.
+struct At {
+    resolved: ResolvedDto,
+    all: Vec<String>,
+}
+
+/// Snapshots the working copy first, so an edit to a spec file there counts.
+async fn at(jj: &Jj, revision: &str) -> Option<At> {
+    jj.snapshot_or_stale().await.ok()?;
+    let resolved = rev::resolve(jj, revision).await.ok()?;
+    let all = jj.files(&resolved.commit).await.ok()?;
+    Some(At { resolved, all })
+}
+
+/// A stored design. Designs stored before revisions name a `bookmark`, which becomes the
+/// revision.
+fn parse(data: &str) -> anyhow::Result<DesignDto> {
+    let mut v: serde_json::Value = serde_json::from_str(data)?;
+    if let Some(o) = v.as_object_mut()
+        && !o.contains_key("revision")
+        && let Some(b) = o.remove("bookmark")
+    {
+        o.insert("revision".into(), b);
+    }
+    Ok(serde_json::from_value(v)?)
 }
 
 fn load(store: &Store, id: &str) -> anyhow::Result<DesignDto> {
     let data = store
         .design(id)?
         .with_context(|| format!("no design `{id}`"))?;
-    Ok(serde_json::from_str(&data)?)
+    parse(&data)
 }
 
 fn save(store: &Store, d: &DesignDto) -> anyhow::Result<()> {
@@ -91,47 +124,57 @@ impl RepoCtx {
             store
                 .designs()?
                 .iter()
-                .filter_map(|d| serde_json::from_str(d).ok())
+                .filter_map(|d| parse(d).ok())
                 .collect()
         };
         let ws = self.workspace(workspace).await?;
-        let mut out = Vec::new();
-        for design in all {
-            let files = match ws.jj.files(&exact(&design.bookmark)).await {
-                Ok(paths) => covered(&paths, &design.files),
-                Err(_) => vec![],
+        // Designs often share a revision: resolve and hash each one once.
+        let mut by_rev: HashMap<String, Vec<DesignDto>> = HashMap::new();
+        let mut order = Vec::new();
+        for d in all {
+            order.push(d.id.clone());
+            by_rev.entry(d.revision.clone()).or_default().push(d);
+        }
+        let mut items = HashMap::new();
+        for (revision, designs) in by_rev {
+            let at = at(&ws.jj, &revision).await;
+            let covers: Vec<Vec<String>> = designs
+                .iter()
+                .map(|d| at.as_ref().map_or(vec![], |a| covered(&a.all, &d.files)))
+                .collect();
+            let hashes = match &at {
+                Some(a) => {
+                    let mut union: Vec<String> = covers.iter().flatten().cloned().collect();
+                    union.sort();
+                    union.dedup();
+                    ws.jj
+                        .file_hashes(&a.resolved.commit, &union)
+                        .await
+                        .unwrap_or_default()
+                }
+                None => HashMap::new(),
             };
-            let state = match &design.map {
-                None => DesignState::Missing,
-                Some(m) => {
-                    let head = ws.jj.commit_ids(&exact(&design.bookmark)).await;
-                    let moved = match head.ok().and_then(|h| h.into_iter().next()) {
-                        Some(head) if head != m.spec_commit => {
-                            let range = Range {
-                                from: Some(m.spec_commit.clone()),
-                                to: head,
-                            };
-                            let set: HashSet<&String> = files.iter().collect();
-                            ws.jj
-                                .diff(&range)
-                                .await
-                                .map_or(true, |d| d.iter().any(|f| set.contains(&f.path)))
-                        }
-                        _ => false,
-                    };
-                    if moved {
-                        DesignState::Stale
-                    } else {
+            for (design, files) in designs.into_iter().zip(covers) {
+                let state = match &design.map {
+                    _ if files.is_empty() => DesignState::Missing,
+                    None => DesignState::Missing,
+                    Some(m)
+                        if m.files_hash.as_deref() == Some(&rev::files_hash(&files, &hashes)) =>
+                    {
                         DesignState::Fresh
                     }
-                }
-            };
-            out.push(DesignItemDto {
-                design,
-                state,
-                file_count: files.len() as u32,
-            });
+                    Some(_) => DesignState::Stale,
+                };
+                let item = DesignItemDto {
+                    resolved: at.as_ref().map(|a| a.resolved.clone()),
+                    file_count: files.len() as u32,
+                    design,
+                    state,
+                };
+                items.insert(item.design.id.clone(), item);
+            }
         }
+        let out = order.iter().filter_map(|id| items.remove(id)).collect();
         Ok(out)
     }
 
@@ -140,15 +183,22 @@ impl RepoCtx {
     }
 
     /// Creates a design, or with `id` changes one, keeping its map.
-    pub fn save_design(&self, id: Option<&str>, input: DesignInput) -> anyhow::Result<DesignDto> {
+    pub async fn save_design(
+        &self,
+        workspace: Option<&str>,
+        id: Option<&str>,
+        mut input: DesignInput,
+    ) -> anyhow::Result<DesignDto> {
         if input.name.trim().is_empty() {
             bail!("a design needs a name");
         }
+        let ws = self.workspace(workspace).await?;
+        input.revision = rev::stored(&rev::resolve(&ws.jj, &input.revision).await?);
         let store = self.store.lock().unwrap();
         let d = match id {
             Some(id) => DesignDto {
                 name: input.name,
-                bookmark: input.bookmark,
+                revision: input.revision,
                 files: input.files,
                 prompt: input.prompt,
                 ..load(&store, id)?
@@ -158,7 +208,7 @@ impl RepoCtx {
                 DesignDto {
                     id: format!("d{}", created_at as u64),
                     name: input.name,
-                    bookmark: input.bookmark,
+                    revision: input.revision,
                     files: input.files,
                     prompt: input.prompt,
                     created_at,
@@ -170,17 +220,14 @@ impl RepoCtx {
         Ok(d)
     }
 
-    /// Saves a new design an agent asked for, after checking its bookmark and that each entry
+    /// Saves a new design an agent asked for, after checking its revision and that each entry
     /// names a file or folder there. Folders get a trailing `/`, as the design form writes them.
     pub async fn create_design(
         &self,
         workspace: Option<&str>,
         mut input: DesignInput,
     ) -> anyhow::Result<DesignDto> {
-        let all = self
-            .bookmark_files(workspace, &input.bookmark)
-            .await
-            .with_context(|| format!("no bookmark `{}`", input.bookmark))?;
+        let all = self.revision_files(workspace, &input.revision).await?;
         let mut missing = Vec::new();
         for e in &mut input.files {
             let path = e.trim_start_matches("./").trim_end_matches('/').to_string();
@@ -193,26 +240,28 @@ impl RepoCtx {
             }
         }
         if !missing.is_empty() {
-            bail!("not at `{}`: {}", input.bookmark, missing.join(", "));
+            bail!("not at `{}`: {}", input.revision, missing.join(", "));
         }
         if input.files.is_empty() {
             bail!("a design needs files");
         }
-        self.save_design(None, input)
+        self.save_design(workspace, None, input).await
     }
 
     pub fn delete_design(&self, id: &str) -> anyhow::Result<()> {
         Ok(self.store.lock().unwrap().delete_design(id)?)
     }
 
-    /// Every file at `bookmark`, for picking a design's files.
-    pub async fn bookmark_files(
+    /// Every file at `revision`, for picking a design's files.
+    pub async fn revision_files(
         &self,
         workspace: Option<&str>,
-        bookmark: &str,
+        revision: &str,
     ) -> anyhow::Result<Vec<String>> {
         let ws = self.workspace(workspace).await?;
-        ws.jj.files(&exact(bookmark)).await
+        ws.jj.snapshot_or_stale().await?;
+        let r = rev::resolve(&ws.jj, revision).await?;
+        ws.jj.files(&r.commit).await
     }
 
     /// Local bookmarks, those on `@`'s stack first.
@@ -247,31 +296,84 @@ impl RepoCtx {
             serde_json::from_value(reply).context("the design doesn't match the format")?;
         let design = self.design(id)?;
         let ws = self.workspace(workspace).await?;
-        let spec_commit = ws
-            .jj
-            .commit_ids(&exact(&design.bookmark))
-            .await?
-            .into_iter()
-            .next()
-            .with_context(|| format!("no bookmark `{}`", design.bookmark))?;
+        let At { resolved, all } = at(&ws.jj, &design.revision)
+            .await
+            .with_context(|| format!("no revision `{}`", design.revision))?;
+        let files = covered(&all, &design.files);
+        let hashes = ws.jj.file_hashes(&resolved.commit, &files).await?;
         let code_commit = ws.jj.commit_ids("@").await?.into_iter().next();
         let map = self.system_map(workspace).await?;
         let mut d = design;
-        d.map = Some(model::validate(raw, &map, spec_commit, code_commit));
+        let mut m = model::validate(raw, &map, resolved.commit, code_commit);
+        m.files_hash = Some(rev::files_hash(&files, &hashes));
+        d.map = Some(m);
         save(&self.store.lock().unwrap(), &d)?;
         Ok(d)
     }
-}
-
-/// A revset naming exactly local bookmark `name`.
-fn exact(name: &str) -> String {
-    format!("bookmarks(exact:{})", serde_json::to_string(name).unwrap())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::review::tests::{jj, repo, write};
+
+    fn states(items: &[DesignItemDto]) -> Vec<(&str, DesignState)> {
+        items
+            .iter()
+            .map(|i| (i.design.name.as_str(), i.state))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_design_goes_stale_only_when_its_own_files_change_at_its_revision() {
+        let (dir, ctx) = repo();
+        let d = dir.path();
+        std::fs::create_dir_all(d.join("docs")).unwrap();
+        write(d, "docs/phase1.md", "one\n");
+        write(d, "docs/phase2.md", "two\n");
+        write(d, "notes.txt", "x\n");
+        let design = |name: &str, file: &str| DesignInput {
+            name: name.into(),
+            revision: "@".into(),
+            files: vec![file.into()],
+            prompt: String::new(),
+        };
+        let empty = serde_json::json!({"summary": "", "people": [], "externals": [],
+            "containers": [], "components": [], "relations": [], "differences": []});
+        let one = ctx
+            .create_design(None, design("One", "docs/phase1.md"))
+            .await
+            .unwrap();
+        let two = ctx
+            .create_design(None, design("Two", "docs/phase2.md"))
+            .await
+            .unwrap();
+        assert_ne!(one.revision, "@", "stores the change id, not @");
+        assert_eq!(
+            states(&ctx.designs(None).await.unwrap()),
+            [("One", DesignState::Missing), ("Two", DesignState::Missing)]
+        );
+        for id in [&one.id, &two.id] {
+            ctx.save_design_map(None, id, empty.clone()).await.unwrap();
+        }
+        let fresh = [("One", DesignState::Fresh), ("Two", DesignState::Fresh)];
+        assert_eq!(states(&ctx.designs(None).await.unwrap()), fresh);
+
+        // An unrelated file amended into the revision, a new description, and @ moving on.
+        write(d, "notes.txt", "y\n");
+        jj(d, &["describe", "-m", "specs"]);
+        jj(d, &["new"]);
+        assert_eq!(states(&ctx.designs(None).await.unwrap()), fresh);
+
+        jj(d, &["edit", "@-"]);
+        write(d, "docs/phase1.md", "one, changed\n");
+        assert_eq!(
+            states(&ctx.designs(None).await.unwrap()),
+            [("One", DesignState::Stale), ("Two", DesignState::Fresh)]
+        );
+        let listed = ctx.designs(None).await.unwrap();
+        assert_eq!(listed[0].resolved.as_ref().unwrap().description, "specs");
+    }
 
     #[tokio::test]
     async fn create_design_marks_folders_and_refuses_paths_not_at_the_bookmark() {
@@ -283,7 +385,7 @@ mod tests {
         jj(d, &["bookmark", "create", "spec", "-r", "@"]);
         let input = |files: &[&str]| DesignInput {
             name: "Notify".into(),
-            bookmark: "spec".into(),
+            revision: "spec".into(),
             files: files.iter().map(|f| f.to_string()).collect(),
             prompt: String::new(),
         };
@@ -304,13 +406,22 @@ mod tests {
             ctx.create_design(
                 None,
                 DesignInput {
-                    bookmark: "nope".into(),
+                    revision: "nope".into(),
                     ..input(&["docs/plan.md"])
                 }
             )
             .await
             .is_err()
         );
+    }
+
+    #[test]
+    fn a_design_stored_with_a_bookmark_loads_with_it_as_its_revision() {
+        let d = parse(
+            r#"{"id":"d1","name":"N","bookmark":"spec","files":[],"prompt":"","createdAt":0,"map":null}"#,
+        )
+        .unwrap();
+        assert_eq!(d.revision, "spec");
     }
 
     #[test]
