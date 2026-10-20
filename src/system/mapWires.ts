@@ -48,9 +48,9 @@ export function statusLabel(e: SEdge) {
   return `new · ${e.label ?? `${e.imports} ${e.imports === 1 ? "site" : "sites"}`}`;
 }
 
-/** A lit edge's pill: its status, or its description. */
-function litPill(e: SEdge, hot: boolean): Pill | undefined {
-  if (e.status) return { kind: e.status, text: statusLabel(e) };
+/** A lit edge's pill: its status unless `quiet`, else its description. */
+function litPill(e: SEdge, hot: boolean, quiet?: boolean): Pill | undefined {
+  if (e.status && !quiet) return { kind: e.status, text: statusLabel(e) };
   return e.label ? { kind: "label", text: e.label, hot } : undefined;
 }
 
@@ -60,6 +60,8 @@ interface RestState {
   /** Edges a tour or trace draws, some numbered, by key. */
   hot: Map<string, number | undefined>;
   selectedEdge?: string;
+  /** Changed edges keep their color but show only their description, and only when lit. */
+  quiet?: boolean;
 }
 
 /** The map at rest: every edge a hairline, bright only when hovered, hot, selected or, with the
@@ -80,8 +82,8 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
       n !== undefined
         ? { kind: "num", text: String(n) }
         : on
-          ? litPill(e, hot)
-          : e.status && !hovering
+          ? litPill(e, hot, s.quiet)
+          : e.status && !hovering && !s.quiet
             ? { kind: e.status, text: statusLabel(e) }
             : undefined;
     return [
@@ -143,6 +145,7 @@ export function focusWires(
   doors: Set<string>,
   hover: { node?: string; edge?: string },
   selectedEdge: string | undefined,
+  quiet?: boolean,
 ): Wire[] {
   const byKey = new Map(edges.map((e) => [edgeKey(e), e]));
   const mid = focus.pos.get(center);
@@ -164,11 +167,12 @@ export function focusWires(
     const nb = from === center ? to : from;
     const alone = node ? node === nb : hover.edge === key;
     const faint = node ? !alone : !!hover.edge && !alone;
-    const text = e.status ? undefined : both.get(nb);
+    const status = quiet ? undefined : e.status;
+    const text = status ? undefined : both.get(nb);
     const first = !labeled.has(nb);
     labeled.add(nb);
-    const pill: Pill | undefined = e.status
-      ? { kind: e.status, text: statusLabel(e) }
+    const pill: Pill | undefined = status
+      ? { kind: status, text: statusLabel(e) }
       : text && first
         ? { kind: "label", text, hot: false }
         : undefined;

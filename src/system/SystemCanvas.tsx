@@ -36,6 +36,8 @@ interface Props {
   onEdge(e: SEdge): void;
   nodeMenu(id: string): CtxEntry[];
   onReload(): void;
+  /** Changed edges show no status pills, only their labels when lit. */
+  quiet?: boolean;
 }
 
 type Hover = { node: string } | { edge: string };
@@ -81,8 +83,9 @@ export function SystemCanvas(props: Props) {
           doors,
           { node: hoverNode, edge: hoverEdge },
           selectedEdge,
+          props.quiet,
         )
-      : restWires(layout, edges, { hovered, hot, selectedEdge });
+      : restWires(layout, edges, { hovered, hot, selectedEdge, quiet: props.quiet });
   const spot = (n: Placed): Spot => {
     if (!focus) return { box: n, compact: false };
     const at = focus.pos.get(n.id);

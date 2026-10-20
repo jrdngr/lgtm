@@ -305,6 +305,7 @@ function DesignMap(p: {
           onEdge={() => {}}
           nodeMenu={nodeMenu}
           onReload={() => {}}
+          quiet
         >
           {legend && (
             <div className="dsn-legend">

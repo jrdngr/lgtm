@@ -49,6 +49,19 @@ describe("restWires", () => {
     expect(w.find((x) => x.key === "c>a")).toMatchObject({ faint: false, tone: "removed" });
   });
 
+  it("keeps quiet changed edges colored but unlabeled until lit, then shows their label", () => {
+    const quiet = (hovered: string[]) =>
+      restWires(layout, edges, { hovered: new Set(hovered), hot: new Map(), quiet: true });
+    expect(quiet([]).map((x) => x.pill)).toEqual([undefined, undefined, undefined, undefined]);
+    expect(quiet([]).find((x) => x.key === "c>d")?.tone).toBe("added");
+    const lit = edges.map((e) => (e.from === "c" && e.to === "d" ? { ...e, label: "feeds" } : e));
+    const w = restWires(layout, lit, { hovered: new Set(["c>d"]), hot: new Map(), quiet: true });
+    expect(w.find((x) => x.key === "c>d")).toMatchObject({
+      tone: "added",
+      pill: { kind: "label", text: "feeds" },
+    });
+  });
+
   it("gives an unlabeled lit edge no pill", () => {
     expect(rest(["b>d"]).find((x) => x.key === "b>d")?.pill).toBeUndefined();
   });
