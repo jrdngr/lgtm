@@ -6,8 +6,6 @@ import { TraceBar, type TraceBarProps } from "./TraceBar";
 export interface Crumb {
   id: string;
   name: string;
-  /** A container's color; the system's crumb is a white dot. */
-  color?: string;
   onClick?(): void;
 }
 
@@ -39,15 +37,6 @@ interface Props {
   lens?: { on: boolean; onToggle(): void };
   /** The Generate button. */
   generate: ReactNode;
-}
-
-function Swatch({ c }: { c: Crumb }) {
-  return (
-    <span
-      className={`sys-sw${c.color ? "" : " round"}`}
-      style={{ background: c.color ?? "#d8d8d8" }}
-    />
-  );
 }
 
 /** The Architecture tab's toolbar: back and forward, where you are, the level, and the tools. */
@@ -84,28 +73,23 @@ export function SystemBar(p: Props) {
               className={`sys-crumb${i === p.crumbs.length - 1 ? " on" : ""}`}
               onClick={c.onClick}
             >
-              {(i === 0 || c.color) && <Swatch c={c} />}
               <span className="sys-cn">{c.name}</span>
             </button>
           </Fragment>
         ))}
       </div>
-      <div className="sys-depth">
+      <div className="sys-levels">
         {LEVELS.map(([kind, label], i) => (
-          <Fragment key={kind}>
-            {i > 0 && <span className="sys-step-line" />}
-            <button
-              type="button"
-              className={`sys-step${i === at ? " on" : i < at ? " past" : ""}`}
-              aria-pressed={i === at}
-              aria-label={label}
-              disabled={kind === "symbols" && !p.symbols}
-              onClick={() => p.onLevel(kind)}
-            >
-              <i />
-              <span>{label}</span>
-            </button>
-          </Fragment>
+          <button
+            key={kind}
+            type="button"
+            className={i === at ? "on" : undefined}
+            aria-pressed={i === at}
+            disabled={kind === "symbols" && !p.symbols}
+            onClick={() => p.onLevel(kind)}
+          >
+            {label}
+          </button>
         ))}
       </div>
       <span className="sys-grow" />

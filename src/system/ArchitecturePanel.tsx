@@ -308,7 +308,6 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       info && {
         id,
         name: info.name,
-        color: info.kind === "container" ? info.color : undefined,
         onClick,
       }
     );

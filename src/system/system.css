@@ -45,12 +45,6 @@
   container-type: inline-size;
 }
 
-@container (max-width: 1100px) {
-  .sys-step:not(.on) span {
-    display: none;
-  }
-}
-
 .sys-nav {
   display: flex;
   flex: none;
@@ -85,39 +79,35 @@
 }
 
 .sys-crumb {
-  display: flex;
-  min-width: 44px;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 9px;
+  min-width: 0;
+  padding: 2px 3px;
   border: none;
-  border-radius: 7px;
+  border-radius: 4px;
   background: none;
-  color: #a9abb1;
-  font-size: 13px;
+  color: var(--sys-soft);
+  font-size: 12.5px;
   white-space: nowrap;
 }
 
 .sys-cn {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .sys-crumb:hover:not(.on) {
-  background: var(--hover);
   color: var(--sys-text);
 }
 
 .sys-crumb.on {
-  background: #25272b;
-  color: #f2f2f2;
+  color: var(--sys-text);
   font-weight: 600;
 }
 
 .sys-sep {
   flex: none;
-  color: #4f5258;
-  font-size: 14px;
+  color: var(--sys-soft);
+  font-size: 12.5px;
 }
 
 .sys-sw {
@@ -136,54 +126,33 @@
   border: 1px dashed #6f7279;
 }
 
-.sys-depth {
+.sys-levels {
   display: flex;
   flex: none;
-  align-items: center;
-  gap: 7px;
+  gap: 2px;
   margin-left: 10px;
 }
 
-.sys-step {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0;
+.sys-levels button {
+  padding: 2px 9px;
   border: none;
+  border-radius: 5px;
   background: none;
-  color: #6f7279;
-  font-size: 11.5px;
-}
-
-.sys-step:hover:not(:disabled) {
   color: var(--sys-soft);
+  font-size: 12px;
 }
 
-.sys-step i {
-  box-sizing: border-box;
-  width: 7px;
-  height: 7px;
-  border: 1.5px solid #55585f;
-  border-radius: 50%;
+.sys-levels button:hover:not(:disabled, .on) {
+  color: var(--sys-text);
 }
 
-.sys-step.past i {
-  background: #55585f;
+.sys-levels button.on {
+  background: #2a2c31;
+  color: var(--sys-text);
 }
 
-.sys-step.on {
-  color: #e6e6e6;
-}
-
-.sys-step.on i {
-  border-color: #e6e6e6;
-  background: #e6e6e6;
-}
-
-.sys-step-line {
-  width: 18px;
-  height: 1px;
-  background: #3a3c41;
+.sys-levels button:disabled {
+  opacity: 0.4;
 }
 
 .sys-tool {
