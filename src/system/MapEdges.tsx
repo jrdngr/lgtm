@@ -6,6 +6,8 @@ export const BLUE = "#5b9bd5";
 
 interface Props {
   wires: Wire[];
+  /** Under the nodes: hairlines, unlit wires and hit paths. Over them: lit wires. */
+  layer: "under" | "over";
   width: number;
   height: number;
   hotColor: string;
@@ -16,7 +18,8 @@ interface Props {
   onEdge(w: Wire): void;
 }
 
-/** The map's wires in an SVG layer, each with a wide hit path unless it joins a door. */
+/** One of the map's two SVG layers of wires; under the nodes, each wire has a wide hit path
+ * unless it joins a door. */
 export function MapEdges(p: Props) {
   const markers: Record<Tone, string> = {
     blue: BLUE,
@@ -26,24 +29,26 @@ export function MapEdges(p: Props) {
   };
   return (
     <svg className="sys-edges" width={p.width} height={p.height} aria-hidden="true">
-      <defs>
-        {Object.entries(markers).map(([k, fill]) => (
-          <marker
-            key={k}
-            id={`sys-arrow-${k}`}
-            viewBox="0 0 8 8"
-            refX="7"
-            refY="4"
-            markerWidth="8"
-            markerHeight="8"
-            markerUnits="userSpaceOnUse"
-            orient="auto"
-          >
-            <path d="M0 0L8 4L0 8z" fill={fill} />
-          </marker>
-        ))}
-      </defs>
-      {p.hairlines && (
+      {p.layer === "under" && (
+        <defs>
+          {Object.entries(markers).map(([k, fill]) => (
+            <marker
+              key={k}
+              id={`sys-arrow-${k}`}
+              viewBox="0 0 8 8"
+              refX="7"
+              refY="4"
+              markerWidth="8"
+              markerHeight="8"
+              markerUnits="userSpaceOnUse"
+              orient="auto"
+            >
+              <path d="M0 0L8 4L0 8z" fill={fill} />
+            </marker>
+          ))}
+        </defs>
+      )}
+      {p.layer === "under" && p.hairlines && (
         <g className={`sys-hair${p.hovering ? " off" : ""}`}>
           {p.wires.map((w) => (
             <path key={w.key} d={w.d} />
@@ -51,7 +56,7 @@ export function MapEdges(p: Props) {
         </g>
       )}
       {p.wires.map((w) => {
-        if (!w.tone) return null;
+        if (!w.tone || !!w.over !== (p.layer === "over")) return null;
         const cls = ["sys-edge", w.e.status, w.door && "door", w.faint && "faint"];
         return (
           <path
@@ -67,6 +72,7 @@ export function MapEdges(p: Props) {
       })}
       {p.wires.map(
         (w) =>
+          p.layer === "under" &&
           !w.door && (
             <path
               key={w.key}

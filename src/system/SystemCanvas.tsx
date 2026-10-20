@@ -5,7 +5,7 @@ import { NEUTRAL, tint } from "./colors";
 import { Fit, Minus, Plus } from "./glyphs";
 import type { Layout, Placed } from "./layout";
 import { EdgePills, MapEdges } from "./MapEdges";
-import { edgeKey, edgesOf, focusWires, mapFocus, restWires } from "./mapWires";
+import { edgeKey, edgesOf, focusWires, mapFocus, restWires, type Wire } from "./mapWires";
 import { usePanZoom } from "./panZoom";
 import { Node, nodeClass, nodeStyle, type Spot } from "./SystemNode";
 import type { SEdge } from "./scene";
@@ -86,6 +86,18 @@ export function SystemCanvas(props: Props) {
           props.quiet,
         )
       : restWires(layout, edges, { hovered, hot, selectedEdge, quiet: props.quiet });
+  const edgeProps = {
+    wires,
+    width: Math.max(layout.width, focus?.width ?? 0),
+    height: Math.max(layout.height, focus?.height ?? 0),
+    hotColor,
+    hairlines: !focus,
+    hovering: hovered.size > 0,
+    onHover: (edge: string | undefined) => setHover(edge ? { edge } : undefined),
+    onEdge: (w: Wire) => {
+      if (!pz.dragged()) props.onEdge(w.e);
+    },
+  };
   const spot = (n: Placed): Spot => {
     if (!focus) return { box: n, compact: false };
     const at = focus.pos.get(n.id);
@@ -162,25 +174,7 @@ export function SystemCanvas(props: Props) {
         </div>
         {/* Keyed by the focus so a collapsed graph's wires fade in once the nodes have moved. */}
         <div key={props.focus ?? "rest"} className={focus ? "sys-flinks" : undefined}>
-          <MapEdges
-            wires={wires}
-            width={Math.max(layout.width, focus?.width ?? 0)}
-            height={Math.max(layout.height, focus?.height ?? 0)}
-            hotColor={hotColor}
-            hairlines={!focus}
-            hovering={hovered.size > 0}
-            onHover={(edge) => setHover(edge ? { edge } : undefined)}
-            onEdge={(w) => {
-              if (!pz.dragged()) props.onEdge(w.e);
-            }}
-          />
-          <EdgePills
-            wires={wires}
-            labels={props.labels}
-            selectedEdge={selectedEdge}
-            hotColor={hotColor}
-            onHover={focus ? (edge) => setHover(edge ? { edge } : undefined) : undefined}
-          />
+          <MapEdges layer="under" {...edgeProps} />
         </div>
         {layout.nodes.map((n) => {
           const at = spot(n);
@@ -213,6 +207,16 @@ export function SystemCanvas(props: Props) {
             </button>
           );
         })}
+        <div key={`${props.focus ?? "rest"}-over`} className={focus ? "sys-flinks" : undefined}>
+          <MapEdges layer="over" {...edgeProps} />
+          <EdgePills
+            wires={wires}
+            labels={props.labels}
+            selectedEdge={selectedEdge}
+            hotColor={hotColor}
+            onHover={focus ? (edge) => setHover(edge ? { edge } : undefined) : undefined}
+          />
+        </div>
       </div>
       {props.children}
       <div className="sys-zoom">

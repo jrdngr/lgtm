@@ -27,6 +27,8 @@ export interface Wire {
   faint?: boolean;
   /** The selected edge, drawn wider. */
   wide?: boolean;
+  /** Lit, so drawn over the nodes. */
+  over?: boolean;
   pill?: Pill;
   /** The pill's `mid` is its left end, or its right end, instead of its center. */
   anchor?: "start" | "end";
@@ -95,6 +97,7 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
         tone: e.status ?? (hot ? "hot" : on ? "blue" : undefined),
         faint: !on && hovering,
         wide: key === s.selectedEdge,
+        over: on,
         pill,
       },
     ];
@@ -186,6 +189,7 @@ export function focusWires(
         faint,
         alone,
         wide: key === selectedEdge,
+        over: !faint,
         pill,
       },
     ];

@@ -43,9 +43,14 @@ describe("restWires", () => {
     expect(bright(w)).toEqual(["a>b", "c>d", "c>a"]);
     expect(w.find((x) => x.key === "a>b")).toMatchObject({
       tone: "blue",
+      over: true,
       pill: { kind: "label", text: "calls" },
     });
-    expect(w.find((x) => x.key === "c>d")).toMatchObject({ faint: true, pill: undefined });
+    expect(w.find((x) => x.key === "c>d")).toMatchObject({
+      faint: true,
+      over: false,
+      pill: undefined,
+    });
     expect(w.find((x) => x.key === "c>a")).toMatchObject({ faint: false, tone: "removed" });
   });
 
