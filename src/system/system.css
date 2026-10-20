@@ -33,16 +33,28 @@
 }
 
 /* Toolbar */
+/* A bar too narrow for everything wraps its tools onto a second row. */
 .sys-bar {
   display: flex;
   flex: none;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  height: 46px;
-  padding: 0 12px;
+  gap: 8px 10px;
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--sys-line);
   overflow: hidden;
   container-type: inline-size;
+}
+
+.sys-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+  margin-left: auto;
 }
 
 .sys-nav {

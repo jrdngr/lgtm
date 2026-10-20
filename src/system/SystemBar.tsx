@@ -104,61 +104,66 @@ export function SystemBar(p: Props) {
           );
         })}
       </div>
-      <span className="sys-grow" />
-      {p.tour ? (
-        <span className="sys-tpill" style={{ ["--c" as string]: p.tour.color }}>
-          <Play size={12} />
-          {p.tour.name} tour
-          <button type="button" className="sys-x" aria-label="End Tour" onClick={p.tour.onClose}>
-            <Close />
-          </button>
-        </span>
-      ) : p.trace ? (
-        <TraceBar {...p.trace} />
-      ) : p.bare ? (
-        <>
-          {p.view}
-          {p.generate}
-        </>
-      ) : (
-        <>
-          {p.lens && (
+      <div className="sys-tools">
+        {p.tour ? (
+          <span className="sys-tpill" style={{ ["--c" as string]: p.tour.color }}>
+            <Play size={12} />
+            {p.tour.name} tour
+            <button type="button" className="sys-x" aria-label="End Tour" onClick={p.tour.onClose}>
+              <Close />
+            </button>
+          </span>
+        ) : p.trace ? (
+          <TraceBar {...p.trace} />
+        ) : p.bare ? (
+          <>
+            {p.view}
+            {p.generate}
+          </>
+        ) : (
+          <>
+            {p.lens && (
+              <button
+                type="button"
+                className={`sys-lens${p.lens.on ? " on" : ""}`}
+                aria-pressed={p.lens.on}
+                onClick={p.lens.onToggle}
+              >
+                <span className="sys-trk" />
+                Review
+              </button>
+            )}
             <button
               type="button"
-              className={`sys-lens${p.lens.on ? " on" : ""}`}
-              aria-pressed={p.lens.on}
-              onClick={p.lens.onToggle}
+              className={`sys-tool${p.finding ? " on" : ""}`}
+              onClick={p.onFind}
             >
-              <span className="sys-trk" />
-              Review
+              <Search />
+              Find
+              <kbd>/</kbd>
             </button>
-          )}
-          <button type="button" className={`sys-tool${p.finding ? " on" : ""}`} onClick={p.onFind}>
-            <Search />
-            Find
-            <kbd>/</kbd>
-          </button>
-          <button type="button" className="sys-tool" onClick={p.onTrace}>
-            <Trace />
-            Trace
-          </button>
-          {p.view}
-          <button
-            type="button"
-            className={`sys-tool${p.toursOpen ? " on" : ""}`}
-            aria-expanded={p.toursOpen}
-            data-tours
-            onClick={p.onTours}
-          >
-            <Play />
-            Tours
-            <span className="sys-down">
-              <Chevron size={10} />
-            </span>
-          </button>
-          {p.generate}
-        </>
-      )}
+            <button type="button" className="sys-tool" onClick={p.onTrace}>
+              <Trace />
+              Trace
+            </button>
+            {p.view}
+            <button
+              type="button"
+              className={`sys-tool${p.toursOpen ? " on" : ""}`}
+              aria-expanded={p.toursOpen}
+              data-tours
+              onClick={p.onTours}
+            >
+              <Play />
+              Tours
+              <span className="sys-down">
+                <Chevron size={10} />
+              </span>
+            </button>
+            {p.generate}
+          </>
+        )}
+      </div>
     </div>
   );
 }
