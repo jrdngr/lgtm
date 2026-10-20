@@ -62,7 +62,7 @@ interface RestState {
   /** Edges a tour or trace draws, some numbered, by key. */
   hot: Map<string, number | undefined>;
   selectedEdge?: string;
-  /** Changed edges keep their color but show only their description, and only when lit. */
+  /** Changed edges are hairlines until lit, then keep their color and show their description. */
   quiet?: boolean;
 }
 
@@ -94,7 +94,7 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
         key,
         ...curve(a, b),
         door: !!(a.door || b.door),
-        tone: e.status ?? (hot ? "hot" : on ? "blue" : undefined),
+        tone: (on || !s.quiet ? e.status : undefined) ?? (hot ? "hot" : on ? "blue" : undefined),
         faint: !on && hovering,
         wide: key === s.selectedEdge,
         over: on,
