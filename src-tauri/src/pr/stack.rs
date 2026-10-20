@@ -89,7 +89,13 @@ impl RepoCtx {
         number: u32,
     ) -> anyhow::Result<PrDto> {
         let key = workspace.unwrap_or("");
-        if self.store.lock().unwrap().pr(key)?.is_some_and(|p| !p.stack) {
+        if self
+            .store
+            .lock()
+            .unwrap()
+            .pr(key)?
+            .is_some_and(|p| !p.stack)
+        {
             bail!("this workspace was checked out for its own PR");
         }
         let stack = self.nearby_prs(workspace, false).await?.prs;

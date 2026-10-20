@@ -85,9 +85,13 @@ fn with_hooks(config: &str, exe: &str) -> anyhow::Result<String> {
     } else {
         serde_json::from_str(config).context("Claude Code's settings.json isn't valid JSON")?
     };
-    let root = v.as_object_mut().context("Claude Code's settings.json isn't an object")?;
+    let root = v
+        .as_object_mut()
+        .context("Claude Code's settings.json isn't an object")?;
     let hooks = root.entry("hooks").or_insert_with(|| json!({}));
-    let hooks = hooks.as_object_mut().context("`hooks` in settings.json isn't an object")?;
+    let hooks = hooks
+        .as_object_mut()
+        .context("`hooks` in settings.json isn't an object")?;
     for event in hook::EVENTS {
         let groups = hooks.entry(event).or_insert_with(|| json!([]));
         let groups = groups

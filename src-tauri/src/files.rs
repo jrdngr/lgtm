@@ -79,7 +79,8 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
 
 /// Whether `path` resolves outside `root`, which must be canonical. A dangling link doesn't.
 fn leaves(root: &Path, path: &Path) -> bool {
-    path.canonicalize().is_ok_and(|real| !real.starts_with(root))
+    path.canonicalize()
+        .is_ok_and(|real| !real.starts_with(root))
 }
 
 /// A text file's contents, named `name` in errors.
@@ -146,7 +147,10 @@ pub fn put(path: &Path, name: &str, bytes: &[u8], replace: bool) -> anyhow::Resu
     if path.is_dir() || (path.exists() && !replace) {
         return Ok(false);
     }
-    if path.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+    if path
+        .symlink_metadata()
+        .is_ok_and(|m| m.file_type().is_symlink())
+    {
         bail!("{name} is a symlink");
     }
     if let Some(parent) = path.parent() {

@@ -111,6 +111,9 @@ export const commands = {
 	assessPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("assess_prompt", { review })),
 	/**  The system map of a workspace's working copy. */
 	systemMap: (workspace: string | null) => typedError<SystemDto, string>(__TAURI_INVOKE("system_map", { workspace })),
+	/**  What the system map shows. */
+	archView: () => typedError<ArchViewDto, string>(__TAURI_INVOKE("arch_view")),
+	setArchView: (view: ArchViewDto) => typedError<null, string>(__TAURI_INVOKE("set_arch_view", { view })),
 	/**  The prompt asking a terminal agent to describe the system map. */
 	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
 	/**  A component's symbols other components use most. */
@@ -458,6 +461,19 @@ export type ArchRange = {
 	to: string,
 };
 
+export type ArchViewDto = {
+	untracked: boolean,
+	tests: boolean,
+	generated: boolean,
+	/**  Containers with fewer than `SMALL` files. */
+	small: boolean,
+	/**  People and external systems. */
+	outside: boolean,
+	groups: boolean,
+	labels: EdgeLabels,
+	unaffected: Unaffected,
+};
+
 export type AssessmentDto = {
 	/**  1 (risky) to 5 (safe to merge). */
 	score: number,
@@ -732,6 +748,8 @@ export type EdgeDto = {
 	impacted: boolean,
 	imports: ImportDto[],
 };
+
+export type EdgeLabels = "on" | "hover" | "off";
 
 export type EdgeSitesDto = {
 	/**  Each import of a `to` file in a `from` file, by path then line. */
@@ -1678,6 +1696,8 @@ export type SystemDto = {
 	stale: string[],
 	/**  The overview and features tours, then container and component tours in map order. */
 	tours: TourDto[],
+	/**  Whether containers show in groups. */
+	grouped: boolean,
 };
 
 export type Take = {
@@ -1796,6 +1816,8 @@ export type Turn = {
 	you: boolean,
 	text: string,
 };
+
+export type Unaffected = "hide" | "fade";
 
 export type Unshowable = "tooLarge" | "notText";
 

@@ -167,7 +167,11 @@ impl Ptys {
             .ok()?;
         let comm = String::from_utf8_lossy(&out.stdout).trim().to_string();
         let name = comm.rsplit('/').next().unwrap_or_default();
-        Some(if name.is_empty() { "a program".into() } else { name.to_string() })
+        Some(if name.is_empty() {
+            "a program".into()
+        } else {
+            name.to_string()
+        })
     }
 
     /// The reader thread removes the session once the child is gone.
@@ -323,7 +327,14 @@ mod tests {
     fn running_names_the_foreground_program_but_not_the_shell() {
         let ptys = Ptys::default();
         let id = ptys
-            .spawn(owner("w"), Path::new("/"), (80, 24), Some(vec!["sh".into()]), &[], |_| {})
+            .spawn(
+                owner("w"),
+                Path::new("/"),
+                (80, 24),
+                Some(vec!["sh".into()]),
+                &[],
+                |_| {},
+            )
             .unwrap();
         std::thread::sleep(Duration::from_millis(200));
         assert_eq!(ptys.running(id), None);

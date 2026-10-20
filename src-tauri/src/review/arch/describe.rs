@@ -321,6 +321,7 @@ mod tests {
             description: None,
             stale: vec![],
             tours: vec![],
+            grouped: true,
         }
     }
 
@@ -344,7 +345,8 @@ mod tests {
     }
 
     #[test]
-    fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_resolves_group_names_and_keeps_the_last_tours() {
+    fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_resolves_group_names_and_keeps_the_last_tours()
+     {
         let d = Description {
             summary: "An app".into(),
             people: vec![ActorDto {

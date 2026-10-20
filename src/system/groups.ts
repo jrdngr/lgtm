@@ -19,8 +19,10 @@ const OTHER = "Other";
 const FEW = 5;
 
 /** The system's groups: the description's, or else, past a few containers, each container's
- * parent folder. None when that makes fewer than two, since one group is the whole system. */
+ * parent folder. None when that makes fewer than two, since one group is the whole system, or
+ * when the view turns groups off. */
 export function groupsOf(map: SystemDto): Group[] | undefined {
+  if (!map.grouped) return undefined;
   const ids = containersOf(map).map((c) => c.id);
   const described = map.description?.groups ?? [];
   const byName = new Map<string, string[]>();

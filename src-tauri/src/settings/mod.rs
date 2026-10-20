@@ -68,11 +68,7 @@ fn merge(base: &mut toml::Table, file: toml::Table) {
 
 /// Keys earlier versions wrote, as table path and key. They're dropped on read, and the next
 /// save leaves them out. Any other unknown key is an error, to catch typos.
-const RETIRED: &[(&[&str], &str)] = &[
-    (&[], "designDir"),
-    (&[], "claude"),
-    (&[], "models"),
-];
+const RETIRED: &[(&[&str], &str)] = &[(&[], "designDir"), (&[], "claude"), (&[], "models")];
 
 fn drop_retired(file: &mut toml::Table) {
     for (tables, key) in RETIRED {
@@ -161,11 +157,7 @@ mod tests {
         let file = dir.path().join(FILE);
         assert_eq!(load_from(&file).unwrap(), Settings::default());
 
-        std::fs::write(
-            &file,
-            "claudeTerminal = \"cc\"\n",
-        )
-        .unwrap();
+        std::fs::write(&file, "claudeTerminal = \"cc\"\n").unwrap();
         let s = load_from(&file).unwrap();
         assert_eq!(s.claude_terminal, "cc");
         assert_eq!(s.terminal_font_size, 13);

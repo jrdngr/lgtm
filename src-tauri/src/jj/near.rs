@@ -65,7 +65,14 @@ fn parse_near(out: &str) -> Vec<NearBookmark> {
         .lines()
         .filter_map(|line| {
             let mut f = line.splitn(6, '\t');
-            Some([f.next()?, f.next()?, f.next()?, f.next()?, f.next()?, f.next()?])
+            Some([
+                f.next()?,
+                f.next()?,
+                f.next()?,
+                f.next()?,
+                f.next()?,
+                f.next()?,
+            ])
         })
         .collect();
     let ids: HashSet<&str> = rows.iter().map(|r| r[1]).collect();
@@ -92,7 +99,13 @@ fn parse_near(out: &str) -> Vec<NearBookmark> {
     }
     let mut all: Vec<_> = rows
         .iter()
-        .map(|row| (dist.get(row[1]).copied().unwrap_or(u32::MAX), row[0] != "a" && row[0] != "@", row))
+        .map(|row| {
+            (
+                dist.get(row[1]).copied().unwrap_or(u32::MAX),
+                row[0] != "a" && row[0] != "@",
+                row,
+            )
+        })
         .collect();
     all.sort_by_key(|&(d, off, _)| (d, off));
     all.into_iter()
@@ -114,7 +127,10 @@ fn parse_near(out: &str) -> Vec<NearBookmark> {
             let remote = remote
                 .split('\x1e')
                 .filter_map(move |r| r.split_once('\x1f').map(|(n, rm)| at(n, rm)));
-            let local = local.split('\x1e').filter(|n| !n.is_empty()).map(move |n| at(n, ""));
+            let local = local
+                .split('\x1e')
+                .filter(|n| !n.is_empty())
+                .map(move |n| at(n, ""));
             remote.chain(local)
         })
         .collect()
@@ -208,9 +224,19 @@ mod tests {
         let got = super::parse_near(&out);
         assert_eq!(
             names(&got),
-            [("base", 1), ("c1", 1), ("b1", 1), ("side", 2), ("b3", 2), ("b3", 3)]
+            [
+                ("base", 1),
+                ("c1", 1),
+                ("b1", 1),
+                ("side", 2),
+                ("b3", 2),
+                ("b3", 3)
+            ]
         );
-        let at: Vec<_> = got.iter().map(|b| (b.remote.as_str(), b.position())).collect();
+        let at: Vec<_> = got
+            .iter()
+            .map(|b| (b.remote.as_str(), b.position()))
+            .collect();
         assert_eq!(
             at,
             [
@@ -272,7 +298,17 @@ mod tests {
         assert_eq!(marks("local-only").await, ["local-only*"]);
         jj(d, &["bookmark", "set", "one", "-r", "local-only"]);
         assert_eq!(marks("local-only").await, ["local-only*", "one*"]);
-        jj(d, &["bookmark", "set", "one", "-r", "one@origin", "--allow-backwards"]);
+        jj(
+            d,
+            &[
+                "bookmark",
+                "set",
+                "one",
+                "-r",
+                "one@origin",
+                "--allow-backwards",
+            ],
+        );
 
         // From the middle of the stack: `three` is on @, `one` two below, `four` and `five`
         // above. `main` is trunk and `local-only` was never pushed.

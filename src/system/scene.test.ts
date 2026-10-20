@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SystemDescDto, SystemDto } from "../bindings";
 import { layout } from "./layout";
 import type { Lens } from "./lens";
-import { computedTiers, type Scene, sceneOf } from "./scene";
+import { affectedIds, computedTiers, type Scene, sceneOf } from "./scene";
 
 const comp = (id: string, container: string, files = 1) => ({
   id,
@@ -15,6 +15,7 @@ const comp = (id: string, container: string, files = 1) => ({
 function map(description: SystemDescDto | null = null): SystemDto {
   return {
     repo: "app",
+    grouped: true,
     containers: [
       { id: "src", name: "app", files: 5 },
       { id: "core/src", name: "core", files: 4 },
@@ -181,6 +182,18 @@ describe("sceneOf", () => {
     ]);
     const k = sceneOf(map(described()), { kind: "components", container: "src" }, overlay);
     expect(ids(k).inside).toEqual([["Entry", ["k:src/ui"]]]);
+  });
+
+  it("keeps the unaffected nodes when fading and names the ones the lens keeps", () => {
+    const overlay = lens({
+      status: new Map([
+        ["src/ui", "changed"],
+        ["core/src/db", "upstream"],
+      ]),
+    });
+    const s = sceneOf(map(described()), { kind: "containers" }, overlay, true);
+    expect(ids(s).inside.flatMap(([, n]) => n)).toEqual(["c:src", "c:core/src", "c:store"]);
+    expect([...affectedIds(s)].sort()).toEqual(["c:src", "p:User", "x:GitHub"]);
   });
 
   it("shows the whole scene when the review affects nothing in it", () => {

@@ -5,6 +5,7 @@ import { groupsOf } from "./groups";
 function map(ids: string[], groups?: SystemDescDto["groups"]): SystemDto {
   return {
     repo: "mono",
+    grouped: true,
     containers: ids.map((id) => ({ id, name: id.split("/").pop() ?? id, files: 1 })),
     components: [],
     edges: [],

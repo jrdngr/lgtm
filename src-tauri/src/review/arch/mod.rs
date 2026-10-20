@@ -27,6 +27,7 @@ pub mod system;
 mod tests;
 pub mod tour;
 mod tour_prompt;
+pub mod view;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

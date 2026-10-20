@@ -24,6 +24,7 @@ function map(): SystemDto {
   });
   return {
     repo: "mono",
+    grouped: true,
     containers: CONTAINERS.map((id) => ({ id, name: id.split("/")[1], files: 2 })),
     components: CONTAINERS.map((c) => ({
       id: comp(c),

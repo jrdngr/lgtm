@@ -119,9 +119,7 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
         })
         .to_string()
     };
-    let part = |step: &str, status: &str, output: &serde_json::Value| {
-        json!({ "step": step, "persona": "sec", "status": status, "output": output })
-    };
+    let part = |step: &str, status: &str, output: &serde_json::Value| json!({ "step": step, "persona": "sec", "status": status, "output": output });
     store
         .add_bot_run_raw_for_test(
             "a",
@@ -137,7 +135,11 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
             "b",
             &old(json!([
                 part("reports", "done", &review),
-                part("challenges", "done", &json!({ "kind": "challenges", "challenges": [] })),
+                part(
+                    "challenges",
+                    "done",
+                    &json!({ "kind": "challenges", "challenges": [] })
+                ),
                 part("synthesis", "done", &json!({ "kind": "synthesis" })),
                 part("minimal", "done", &minimal),
             ])),
@@ -155,7 +157,11 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
             .collect()
     };
     assert_eq!(kinds("a"), ["review", "minimal"]);
-    assert_eq!(kinds("b"), ["review"], "its fixes named the synthesis's findings");
+    assert_eq!(
+        kinds("b"),
+        ["review"],
+        "its fixes named the synthesis's findings"
+    );
 }
 
 #[tokio::test]

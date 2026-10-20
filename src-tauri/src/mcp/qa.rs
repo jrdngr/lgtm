@@ -81,8 +81,10 @@ impl Lgtm {
         }))
     }
 
-    #[tool(description = "The rules for building and updating Q&A questions. Read them before \
-        qa_ask.")]
+    #[tool(
+        description = "The rules for building and updating Q&A questions. Read them before \
+        qa_ask."
+    )]
     async fn qa_rules(&self) -> Out {
         prompts::load(Prompt::Qq).map_err(failed)
     }

@@ -35,6 +35,8 @@ interface Props {
   onTours(): void;
   /** Absent with no review open. */
   lens?: { on: boolean; onToggle(): void };
+  /** The View button. */
+  view: ReactNode;
   /** The Generate button. */
   generate: ReactNode;
 }
@@ -125,6 +127,7 @@ export function SystemBar(p: Props) {
             <Trace />
             Trace
           </button>
+          {p.view}
           <button
             type="button"
             className={`sys-tool${p.toursOpen ? " on" : ""}`}

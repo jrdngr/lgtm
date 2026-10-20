@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import type { EdgeLabels } from "../bindings";
 import { type CtxEntry, openMenu } from "../ui/contextMenu";
 import { NEUTRAL, tint } from "./colors";
 import { Fit, Minus, Plus } from "./glyphs";
@@ -16,6 +17,7 @@ interface Props {
   edges: SEdge[];
   /** Nodes drawn in full at rest; the rest fade. All of them when absent. */
   lit?: Set<string>;
+  labels: EdgeLabels;
   /** Edges drawn bright in `hotColor` at rest, by `from>to`, some numbered. */
   hot: Map<string, number | undefined>;
   hotColor: string;
@@ -171,6 +173,8 @@ export function SystemCanvas(props: Props) {
           />
           <EdgePills
             wires={wires}
+            labels={props.labels}
+            selectedEdge={selectedEdge}
             hotColor={hotColor}
             onHover={focus ? (edge) => setHover(edge ? { edge } : undefined) : undefined}
           />

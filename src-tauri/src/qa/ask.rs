@@ -10,10 +10,7 @@ pub enum AskIn {
     /// from its prompt.
     Session(String),
     /// A new session from a prompt, with the paths to read first.
-    New {
-        prompt: String,
-        attach: Vec<String>,
-    },
+    New { prompt: String, attach: Vec<String> },
 }
 
 impl RepoCtx {

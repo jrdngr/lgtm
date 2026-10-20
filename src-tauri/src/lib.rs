@@ -93,6 +93,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::arch::check_look,
             commands::arch::assess_prompt,
             commands::arch::system_map,
+            commands::arch::arch_view,
+            commands::arch::set_arch_view,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,
             commands::arch::system_find,

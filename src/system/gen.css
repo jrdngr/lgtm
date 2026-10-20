@@ -113,3 +113,23 @@
   opacity: 1;
   cursor: progress;
 }
+
+/* View */
+.sys-viewpop {
+  width: 280px;
+}
+
+.sys-viewsep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #34363b;
+}
+
+.sys-viewrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  color: #f0f0f0;
+}

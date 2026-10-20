@@ -1,3 +1,4 @@
+import type { EdgeLabels } from "../bindings";
 import { tint } from "./colors";
 import type { Tone, Wire } from "./mapWires";
 
@@ -88,10 +89,15 @@ export function MapEdges(p: Props) {
 /** The wires' numbers, status pills and labels, in the world over the SVG layer. */
 export function EdgePills({
   wires,
+  labels,
+  selectedEdge,
   hotColor,
   onHover,
 }: {
   wires: Wire[];
+  /** Off drops labels; hover keeps a collapsed graph's to the hovered or selected wire. */
+  labels: EdgeLabels;
+  selectedEdge?: string;
   hotColor: string;
   /** In a collapsed graph, labels take hovers like their wires. */
   onHover?(key: string | undefined): void;
@@ -112,6 +118,8 @@ export function EdgePills({
       );
     }
     if (pill.kind === "label") {
+      if (labels === "off") return null;
+      if (labels === "hover" && onHover && !alone && key !== selectedEdge) return null;
       const c = pill.hot ? hotColor : BLUE;
       return (
         <span

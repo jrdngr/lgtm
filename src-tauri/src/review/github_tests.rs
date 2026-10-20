@@ -134,7 +134,14 @@ async fn a_thread_on_a_line_the_working_copy_edited_lands_on_its_replacement() {
     let span = c.rows.expect("the thread is placed");
     assert_eq!(row_text(&review, c.file, span.end), "    three();");
     // A terminal agent finds it among the threads, not the notes.
-    assert!(ctx.review(review.id).unwrap().lock().unwrap().agent_comments().is_empty());
+    assert!(
+        ctx.review(review.id)
+            .unwrap()
+            .lock()
+            .unwrap()
+            .agent_comments()
+            .is_empty()
+    );
 }
 
 #[tokio::test]
@@ -184,7 +191,6 @@ async fn quotes_answer_parts_of_a_pr_comment_in_its_place() {
         (parent, "bot", "Why a 500?")
     );
 
-
     // A reply is worked out like one on a GitHub thread, not sent like a new draft.
     let state = ctx
         .edit_comment(review.id, quote.id, "It isn't now.")
@@ -228,12 +234,22 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     assert_eq!(stage(&state), Stage::ToFix);
     let reply = Some("Because.".to_string());
     let (_, state) = ctx
-        .agent_set_take(Some("pr1"), 1, id, take(TakeVerdict::Answer), reply, Some(" Why 2 ".into()))
+        .agent_set_take(
+            Some("pr1"),
+            1,
+            id,
+            take(TakeVerdict::Answer),
+            reply,
+            Some(" Why 2 ".into()),
+        )
         .unwrap();
     assert_eq!(stage(&state), Stage::Reply);
     assert_eq!(state.comments[0].thread.as_ref().unwrap().summary, "Why 2");
     // Only the human marks a reply ready.
-    assert!(ctx.agent_set_stage(Some("pr1"), 1, id, Stage::Ready).is_err());
+    assert!(
+        ctx.agent_set_stage(Some("pr1"), 1, id, Stage::Ready)
+            .is_err()
+    );
     // Thread writes name the thread's PR, and a thread of another PR is refused.
     let Err(err) = ctx.agent_set_stage(Some("pr1"), 2, id, Stage::Done) else {
         panic!("a write about another PR went through");
@@ -243,7 +259,11 @@ async fn a_reply_posted_from_elsewhere_finishes_its_thread() {
     let (_, t) = ctx
         .with_current(Some("pr1"), |r| r.threads[0].clone())
         .unwrap();
-    assert_eq!((t.state.stage, t.suggestion), (Stage::Reply, None), "nothing changed");
+    assert_eq!(
+        (t.state.stage, t.suggestion),
+        (Stage::Reply, None),
+        "nothing changed"
+    );
 
     let mut answered = thread("T1", None);
     answered.link.posts = vec![post("rev", "why?"), post("me", "Because.")];
@@ -264,16 +284,26 @@ async fn a_terminal_agent_suggests_a_reply_that_becomes_the_thread_reply() {
     write(&ws.root, "a.rs", "fn a() {}\n");
     let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let state = ctx
-        .add_threads(review.id, vec![thread("T1", None)], &HashMap::new(), "PR #1")
+        .add_threads(
+            review.id,
+            vec![thread("T1", None)],
+            &HashMap::new(),
+            "PR #1",
+        )
         .unwrap();
     let id = state.comments[0].id;
     ctx.focus(Some("pr1"), review.id);
 
-    ctx.add_chat_message(review.id, id, Author::User, "  ").unwrap();
+    ctx.add_chat_message(review.id, id, Author::User, "  ")
+        .unwrap();
     let state = ctx
         .add_chat_message(review.id, id, Author::User, "Is that true?")
         .unwrap();
-    assert_eq!(state.comments[0].messages.len(), 1, "blank text adds nothing");
+    assert_eq!(
+        state.comments[0].messages.len(),
+        1,
+        "blank text adds nothing"
+    );
 
     let (_, state) = ctx
         .agent_suggest_reply(Some("pr1"), 1, id, "Good catch.\n")
@@ -288,7 +318,8 @@ async fn a_terminal_agent_suggests_a_reply_that_becomes_the_thread_reply() {
     assert_eq!(c.messages.len(), 1, "the chat stays");
     assert!(ctx.take_suggestion(review.id, id).is_err());
 
-    ctx.agent_suggest_reply(Some("pr1"), 1, id, "Done.").unwrap();
+    ctx.agent_suggest_reply(Some("pr1"), 1, id, "Done.")
+        .unwrap();
     let state = ctx.dismiss_suggestion(review.id, id).unwrap();
     assert_eq!(state.comments[0].suggestion, None);
     assert_eq!(state.comments[0].body, "Good catch.");

@@ -275,7 +275,10 @@ mod tests {
         );
         assert_eq!(tilde.unwrap().program, installed);
         let settings = resolve("claude --settings ~/.claude/s.json", "").unwrap();
-        assert_eq!(settings.args, ["--settings", &format!("{home}/.claude/s.json")]);
+        assert_eq!(
+            settings.args,
+            ["--settings", &format!("{home}/.claude/s.json")]
+        );
 
         assert!(resolve("cc", "").is_err());
         assert!(resolve("  ", "").is_err());

@@ -568,16 +568,24 @@ function componentsScene(map: SystemDto, container: string, lens?: Lens): Scene 
   };
 }
 
-/** With the lens: only what the review changes or impacts, and what wires to it. */
-export function sceneOf(map: SystemDto, level: Level, lens?: Lens): Scene {
+/** With the lens: only what the review changes or impacts, and what wires to it, unless `all`
+ * keeps the rest too. */
+export function sceneOf(map: SystemDto, level: Level, lens?: Lens, all = false): Scene {
   if (level.kind === "context") return contextScene(map);
+  const only = lens && !all;
   if (level.kind === "containers") {
     const scene = containersScene(map, lens, level.group);
-    return lens ? affectedOnly(scene, CONTAINERS_PER_ROW) : scene;
+    return only ? affectedOnly(scene, CONTAINERS_PER_ROW) : scene;
   }
   const container = level.kind === "symbols" ? containerOf(map, level.component) : level.container;
   const scene = componentsScene(map, container, lens);
-  return lens ? affectedOnly(scene, PER_ROW) : scene;
+  return only ? affectedOnly(scene, PER_ROW) : scene;
+}
+
+/** The ids of the nodes the lens keeps in `scene`. */
+export function affectedIds(scene: Scene): Set<string> {
+  const kept = affectedOnly(scene, PER_ROW);
+  return new Set([...nodesOf(kept), ...kept.left, ...kept.right].map((n) => n.id));
 }
 
 /** Whether the review changes a node or reaches it through a change it uses. */

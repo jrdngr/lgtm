@@ -38,7 +38,8 @@ fn upgrade(run: &mut Value) {
 }
 
 fn row_to_run(r: &rusqlite::Row) -> rusqlite::Result<BotRun> {
-    let mut value: Value = serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::json_err)?;
+    let mut value: Value =
+        serde_json::from_str(&r.get::<_, String>(1)?).map_err(super::json_err)?;
     upgrade(&mut value);
     let mut run: BotRun = serde_json::from_value(value).map_err(super::json_err)?;
     run.id = r.get(0)?;

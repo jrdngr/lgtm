@@ -109,7 +109,12 @@ pub(super) fn tours(
             (Some(t), _) => (t.summary.clone(), t.steps.clone()),
             (None, Some(d)) => (
                 String::new(),
-                if id == "overview" { &d.tour } else { &d.features }.clone(),
+                if id == "overview" {
+                    &d.tour
+                } else {
+                    &d.features
+                }
+                .clone(),
             ),
             (None, None) => continue,
         };
@@ -238,6 +243,7 @@ mod tests {
             description: None,
             stale: vec![],
             tours: vec![],
+            grouped: true,
         }
     }
 

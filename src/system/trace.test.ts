@@ -26,6 +26,7 @@ const edge = (from: string, to: string, path: string) => ({
 
 const map: SystemDto = {
   repo: "app",
+  grouped: true,
   containers: [
     { id: "web", name: "Web", files: 2 },
     { id: "core", name: "Core", files: 2 },

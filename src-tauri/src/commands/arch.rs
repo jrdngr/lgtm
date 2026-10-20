@@ -5,6 +5,7 @@ use crate::review::arch::edge::EdgeSitesDto;
 use crate::review::arch::explore::SysSymbolDto;
 use crate::review::arch::symbols::SymbolsDto;
 use crate::review::arch::system::SystemDto;
+use crate::review::arch::view::ArchViewDto;
 use crate::review::arch::{ArchDto, ArchRange, HistoryDto};
 
 /// The review's architecture diff, or the diff between two of its commits.
@@ -59,6 +60,19 @@ pub(crate) async fn system_map(
         .system_map(workspace.as_deref())
         .await
         .map_err(err)
+}
+
+/// What the system map shows.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn arch_view(window: WebviewWindow) -> CmdResult<ArchViewDto> {
+    repo(&window)?.arch_view().map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn set_arch_view(window: WebviewWindow, view: ArchViewDto) -> CmdResult<()> {
+    repo(&window)?.set_arch_view(&view).map_err(err)
 }
 
 /// The prompt asking a terminal agent to describe the system map.

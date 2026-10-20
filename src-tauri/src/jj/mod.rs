@@ -245,6 +245,14 @@ impl Jj {
         Ok(parse_changes(&out))
     }
 
+    /// The repo-relative paths of the files in `rev`, as of the last snapshot.
+    pub async fn files(&self, rev: &str) -> anyhow::Result<Vec<String>> {
+        let out = self
+            .read_lossy(&["file", "list", "-r", rev, "-T", r#"path ++ "\n""#])
+            .await?;
+        Ok(out.lines().map(str::to_string).collect())
+    }
+
     /// Commit IDs `commit` evolved from, newest first, starting with `commit` itself.
     pub async fn evolog(&self, commit: &str) -> anyhow::Result<Vec<String>> {
         let out = self

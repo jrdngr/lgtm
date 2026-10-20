@@ -156,13 +156,16 @@ fn prompt(map: &SystemDto, node: &str) -> anyhow::Result<String> {
     let container = node.strip_prefix("c:");
     let component = node.strip_prefix("k:");
     let (context, ask) = if node == "overview" || node == "features" {
-        let ask = if node == "overview" { OVERVIEW } else { FEATURES };
+        let ask = if node == "overview" {
+            OVERVIEW
+        } else {
+            FEATURES
+        };
         (
             format!("The system map, from its imports:\n\n{}", map_text(map)),
             ask,
         )
-    } else if let Some(c) = map.containers.iter().find(|c| Some(&*c.id) == container)
-    {
+    } else if let Some(c) = map.containers.iter().find(|c| Some(&*c.id) == container) {
         (container_text(map, c), CONTAINER)
     } else if let Some(c) = map.components.iter().find(|c| Some(&*c.id) == component) {
         (component_text(map, c), COMPONENT)
@@ -232,6 +235,7 @@ mod tests {
             description: None,
             stale: vec![],
             tours: vec![],
+            grouped: true,
         };
         let db = prompt(&map, "k:src/db").unwrap();
         assert!(db.contains("- src/db/x.ts"));

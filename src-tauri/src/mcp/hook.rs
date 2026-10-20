@@ -187,8 +187,14 @@ mod tests {
 
     #[test]
     fn maps_hook_events_to_agent_states() {
-        assert_eq!(of(r#"{"hook_event_name":"UserPromptSubmit"}"#), Some(Working));
-        assert_eq!(of(r#"{"hook_event_name":"PermissionRequest"}"#), Some(Input));
+        assert_eq!(
+            of(r#"{"hook_event_name":"UserPromptSubmit"}"#),
+            Some(Working)
+        );
+        assert_eq!(
+            of(r#"{"hook_event_name":"PermissionRequest"}"#),
+            Some(Input)
+        );
         assert_eq!(
             of(r#"{"hook_event_name":"Notification","notification_type":"permission_prompt"}"#),
             Some(Input)
@@ -209,7 +215,10 @@ mod tests {
             out["hookSpecificOutput"]["additionalContext"],
             "lgtm: thread 3"
         );
-        assert_eq!(out["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit");
+        assert_eq!(
+            out["hookSpecificOutput"]["hookEventName"],
+            "UserPromptSubmit"
+        );
         assert!(prompt_output(r#"{"context":null}"#).is_none());
         assert!(prompt_output("").is_none());
     }
@@ -247,7 +256,10 @@ mod tests {
             r#"{"type":"system"}"#,
         ];
         assert_eq!(last_text(&transcript.join("\n")).as_deref(), Some("Yes."));
-        let unanswered = [transcript[1], r#"{"type":"user","message":{"content":"And?"}}"#];
+        let unanswered = [
+            transcript[1],
+            r#"{"type":"user","message":{"content":"And?"}}"#,
+        ];
         assert_eq!(last_text(&unanswered.join("\n")), None);
     }
 }

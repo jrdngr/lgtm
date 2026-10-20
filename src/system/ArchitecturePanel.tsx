@@ -12,6 +12,7 @@ import { useSendText } from "../review/useSendText";
 import { PipeButton } from "../terminal/PipeButton";
 import { keepSubmit } from "../terminal/registry";
 import type { CtxEntry } from "../ui/contextMenu";
+import { useArchView } from "./archView";
 import { NEUTRAL } from "./colors";
 import { EdgeDetail } from "./EdgeDetail";
 import { FindPalette } from "./FindPalette";
@@ -29,6 +30,7 @@ import { type Crumb, SystemBar } from "./SystemBar";
 import { SystemCanvas } from "./SystemCanvas";
 import { SystemDetail } from "./SystemDetail";
 import {
+  affectedIds,
   componentId,
   containerColors,
   containerId,
@@ -52,6 +54,7 @@ import { drawn } from "./trace";
 import { traceTargets } from "./traceTargets";
 import { useSystem } from "./useSystem";
 import { useTrace } from "./useTrace";
+import { ViewButton, ViewPop } from "./ViewMenu";
 import { askPrompt } from "./view";
 import "./system.css";
 import "./lens.css";
@@ -105,6 +108,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const tracing = useTrace(map);
   const { trace } = tracing;
@@ -128,7 +132,10 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     (level.kind === "symbols" && !map.components.some((k) => k.id === level.component))
       ? { kind: "containers" }
       : level;
-  const scene = useMemo(() => sceneOf(map, shown, lens), [map, shown, lens]);
+  const [mapView, setMapView] = useArchView();
+  const fade = !!lens && mapView.unaffected === "fade";
+  const scene = useMemo(() => sceneOf(map, shown, lens, fade), [map, shown, lens, fade]);
+  const affected = useMemo(() => (fade ? affectedIds(scene) : undefined), [fade, scene]);
   const placed = useMemo(() => layout(scene), [scene]);
   const sel = placed.nodes.find((n) => n.id === selected);
   const detail = sel ?? subject(map, shown);
@@ -272,7 +279,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       ? new Set([tourNode])
       : edge
         ? new Set([edge.from, edge.to])
-        : undefined;
+        : affected;
   const hot = new Map<string, number | undefined>();
   if (path) for (const [k, n] of path.edges) hot.set(k, n);
   else if (edge) hot.set(edgeKey(edge), undefined);
@@ -425,6 +432,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     else if (stop && e.key === "ArrowLeft") tourAt(Math.max(0, (touring?.at ?? 0) - 1));
     else if (e.key === "Escape" && toursOpen) setToursOpen(false);
     else if (e.key === "Escape" && genOpen) setGenOpen(false);
+    else if (e.key === "Escape" && viewOpen) setViewOpen(false);
     else if (e.key === "Escape" && trace) endTrace();
     else if (e.key === "Escape" && touring) endTour();
     else if (e.key === "Escape" && symSel !== undefined) setSymSel(undefined);
@@ -475,6 +483,14 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
           onStart={startTour}
           onWrite={writeTour}
           onClose={() => setToursOpen(false)}
+        />
+      )}
+      {viewOpen && (
+        <ViewPop
+          view={mapView}
+          review={!!review}
+          onChange={setMapView}
+          onClose={() => setViewOpen(false)}
         />
       )}
       {genOpen && (
@@ -562,9 +578,20 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         toursOpen={toursOpen}
         onTours={() => {
           setGenOpen(false);
+          setViewOpen(false);
           setToursOpen(!toursOpen);
         }}
         lens={review ? { on: lensOn, onToggle: () => setLensPick(!lensOn) } : undefined}
+        view={
+          <ViewButton
+            open={viewOpen}
+            onToggle={() => {
+              setToursOpen(false);
+              setGenOpen(false);
+              setViewOpen(!viewOpen);
+            }}
+          />
+        }
         generate={
           <GenerateButton
             className="sys-btn"
@@ -573,6 +600,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
             busy={sending}
             onToggle={() => {
               setToursOpen(false);
+              setViewOpen(false);
               setGenOpen(!genOpen);
             }}
           />
@@ -638,6 +666,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
               layout={placed}
               edges={scene.edges}
               lit={lit}
+              labels={mapView.labels}
               hot={hot}
               hotColor={hotColor}
               selected={trace ? undefined : (stop?.node ?? sel?.id)}

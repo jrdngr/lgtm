@@ -38,7 +38,10 @@ impl PrRecord {
         match (self.stack, &self.head_remote) {
             (true, _) => head_revset(&self.head_ref),
             (false, Some(remote)) => remote_bookmark(&self.head_ref, remote),
-            (false, None) => format!("bookmarks(exact:{})", quoted(&fallback_bookmark(self.number))),
+            (false, None) => format!(
+                "bookmarks(exact:{})",
+                quoted(&fallback_bookmark(self.number))
+            ),
         }
     }
 }

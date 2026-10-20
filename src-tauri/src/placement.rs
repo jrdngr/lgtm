@@ -137,7 +137,14 @@ pub fn place<'a, M: Manager<Wry>>(
     label: &str,
     builder: WebviewWindowBuilder<'a, Wry, M>,
 ) -> WebviewWindowBuilder<'a, Wry, M> {
-    let Some(p) = app.state::<Placements>().saved.lock().unwrap().get(label).copied() else {
+    let Some(p) = app
+        .state::<Placements>()
+        .saved
+        .lock()
+        .unwrap()
+        .get(label)
+        .copied()
+    else {
         return builder;
     };
     let r = p.content;

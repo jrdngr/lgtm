@@ -40,7 +40,9 @@ pub fn report(run: &BotRun) -> Result<Value, String> {
         .parts
         .iter()
         .filter_map(|p| match (&p.persona, &p.output) {
-            (Some(who), Output::Review(r)) => Some(json!({ "reviewer": who, "verdict": r.verdict })),
+            (Some(who), Output::Review(r)) => {
+                Some(json!({ "reviewer": who, "verdict": r.verdict }))
+            }
             _ => None,
         })
         .collect();

@@ -221,8 +221,9 @@ impl RepoCtx {
         let ws = self.workspace(workspace).await?;
         let repo = super::load::repo_name(&self.root);
         let root = ws.root.clone();
+        let (_, files) = self.view_files(workspace).await?;
         Ok(tokio::task::spawn_blocking(move || {
-            let (snap, g) = system::scanned(&root, &repo);
+            let (snap, g) = system::scanned(&root, &repo, &files);
             f(&root, &snap, &|p| g.comp(p))
         })
         .await?)

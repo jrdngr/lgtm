@@ -18,13 +18,16 @@ pub fn paths() -> Vec<String> {
             return None;
         }
         let chars: *const c_char = unsafe { msg_send![s, UTF8String] };
-        (!chars.is_null()).then(|| unsafe { CStr::from_ptr(chars) }.to_string_lossy().into_owned())
+        (!chars.is_null()).then(|| {
+            unsafe { CStr::from_ptr(chars) }
+                .to_string_lossy()
+                .into_owned()
+        })
     }
 
     autoreleasepool(|_| unsafe {
         // NSPasteboardNameDrag.
-        let board: *mut AnyObject =
-            msg_send![class!(NSPasteboard), pasteboardWithName: ns_string(c"Apple CFPasteboard drag")];
+        let board: *mut AnyObject = msg_send![class!(NSPasteboard), pasteboardWithName: ns_string(c"Apple CFPasteboard drag")];
         if board.is_null() {
             return Vec::new();
         }

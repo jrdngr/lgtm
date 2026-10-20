@@ -10,6 +10,7 @@ use specta::Type;
 use super::describe::{self, SystemDescDto};
 use super::group::Grouping;
 use super::tour::{self, TourDto};
+use super::view::{ArchViewDto, Files, SMALL};
 use super::{inputs, model, roots, scan};
 use crate::ctx::RepoCtx;
 use crate::jj::Range;
@@ -66,6 +67,8 @@ pub struct SystemDto {
     pub stale: Vec<String>,
     /// The overview and features tours, then container and component tours in map order.
     pub tours: Vec<TourDto>,
+    /// Whether containers show in groups.
+    pub grouped: bool,
 }
 
 /// How many entry files a component lists.
@@ -153,12 +156,71 @@ pub(super) fn structure(snap: &model::Snapshot, g: &Grouping) -> Structure {
     }
 }
 
-/// The working copy under `root`: its source files with their imports, and how they group.
-pub(super) fn scanned(root: &Path, repo: &str) -> (model::Snapshot, Grouping) {
-    let wc = scan::scan(root, &HashSet::new());
+/// The working copy under `root`: the source files `files` keeps with their imports, and how
+/// they group.
+pub(super) fn scanned(root: &Path, repo: &str, files: &Files) -> (model::Snapshot, Grouping) {
+    let mut wc = scan::scan(root, &HashSet::new());
+    wc.paths.retain(|p| files.keeps(p));
+    wc.imports.retain(|p, _| files.keeps(p));
     let roots = roots::detect(&wc.paths, &wc.manifests, repo);
     let snap = inputs::snapshot(&wc.paths, &wc.imports, &wc.manifests);
     (snap, Grouping::new(roots, repo))
+}
+
+/// `st` without small containers, their components and what wires to them, unless `view`
+/// shows them.
+fn without_small(st: Structure, view: &ArchViewDto) -> Structure {
+    if view.small {
+        return st;
+    }
+    let kept: HashSet<String> = st
+        .containers
+        .iter()
+        .filter(|c| c.files >= SMALL)
+        .map(|c| c.id.clone())
+        .collect();
+    let components: Vec<SysComponentDto> = st
+        .components
+        .into_iter()
+        .filter(|k| kept.contains(&k.container))
+        .collect();
+    let comps: HashSet<&str> = components.iter().map(|k| k.id.as_str()).collect();
+    Structure {
+        edges: st
+            .edges
+            .into_iter()
+            .filter(|e| comps.contains(e.from.as_str()) && comps.contains(e.to.as_str()))
+            .collect(),
+        files: st
+            .files
+            .into_iter()
+            .filter(|f| comps.contains(f.component.as_str()))
+            .collect(),
+        containers: st
+            .containers
+            .into_iter()
+            .filter(|c| kept.contains(&c.id))
+            .collect(),
+        components,
+    }
+}
+
+/// `d` without the people and external systems or groups `view` hides.
+fn viewed(mut d: SystemDescDto, view: &ArchViewDto) -> SystemDescDto {
+    if !view.groups {
+        d.groups.clear();
+    }
+    if !view.outside {
+        let outside: HashSet<String> = d
+            .people
+            .drain(..)
+            .map(|p| p.name)
+            .chain(d.externals.drain(..).map(|e| e.name))
+            .collect();
+        d.relations
+            .retain(|r| !outside.contains(&r.from) && !outside.contains(&r.to));
+    }
+    d
 }
 
 impl RepoCtx {
@@ -172,9 +234,10 @@ impl RepoCtx {
         };
         let root = ws.root.clone();
         let repo_name = repo.clone();
+        let (view, files) = self.view_files(workspace).await?;
         let (st, path_comps) = tokio::task::spawn_blocking(move || {
-            let (snap, g) = scanned(&root, &repo_name);
-            let st = structure(&snap, &g);
+            let (snap, g) = scanned(&root, &repo_name, &files);
+            let st = without_small(structure(&snap, &g), &view);
             (st, move |p: &str| g.comp(p))
         })
         .await?;
@@ -205,6 +268,7 @@ impl RepoCtx {
             None => vec![],
         };
         let tours = tour::tours(description.as_ref(), &stored, &containers, &components);
+        let description = description.map(|d| viewed(d, &view));
         Ok(SystemDto {
             repo,
             containers,
@@ -214,6 +278,7 @@ impl RepoCtx {
             description,
             stale,
             tours,
+            grouped: view.groups,
         })
     }
 }
@@ -298,5 +363,111 @@ mod tests {
         };
         assert_eq!(entry("src/db"), ["src/db/x.ts", "src/db/y.ts"]);
         assert_eq!(entry("src/ui"), ["src/ui/a.ts"]);
+    }
+
+    fn view(f: impl FnOnce(&mut ArchViewDto)) -> ArchViewDto {
+        let mut v = ArchViewDto::default();
+        f(&mut v);
+        v
+    }
+
+    #[test]
+    fn hiding_small_containers_drops_their_components_files_and_edges() {
+        let comp = |id: &str, container: &str| SysComponentDto {
+            id: id.into(),
+            name: id.into(),
+            container: container.into(),
+            files: 1,
+            entry: vec![],
+        };
+        let edge = |from: &str, to: &str| SysEdgeDto {
+            from: from.into(),
+            to: to.into(),
+            imports: 1,
+            path: String::new(),
+            line: 1,
+        };
+        let st = Structure {
+            containers: vec![
+                SysContainerDto {
+                    id: "big".into(),
+                    name: "big".into(),
+                    files: 3,
+                },
+                SysContainerDto {
+                    id: "tiny".into(),
+                    name: "tiny".into(),
+                    files: 2,
+                },
+            ],
+            components: vec![
+                comp("big/a", "big"),
+                comp("big/b", "big"),
+                comp("tiny/c", "tiny"),
+            ],
+            edges: vec![edge("big/a", "big/b"), edge("big/a", "tiny/c")],
+            files: vec![
+                SysFileDto {
+                    path: "big/a/x.rs".into(),
+                    component: "big/a".into(),
+                },
+                SysFileDto {
+                    path: "tiny/c/y.rs".into(),
+                    component: "tiny/c".into(),
+                },
+            ],
+        };
+        let out = without_small(st, &view(|v| v.small = false));
+        assert_eq!(
+            out.containers.iter().map(|c| &*c.id).collect::<Vec<_>>(),
+            ["big"]
+        );
+        assert_eq!(
+            out.components.iter().map(|c| &*c.id).collect::<Vec<_>>(),
+            ["big/a", "big/b"]
+        );
+        assert_eq!(
+            out.edges
+                .iter()
+                .map(|e| (&*e.from, &*e.to))
+                .collect::<Vec<_>>(),
+            [("big/a", "big/b")]
+        );
+        assert_eq!(
+            out.files.iter().map(|f| &*f.path).collect::<Vec<_>>(),
+            ["big/a/x.rs"]
+        );
+    }
+
+    #[test]
+    fn hiding_outside_drops_people_externals_and_their_relations_and_groups_off_drops_groups() {
+        let d: SystemDescDto = serde_json::from_value(serde_json::json!({
+            "summary": "", "containers": [], "tiers": [], "components": [],
+            "people": [{"name": "User", "description": ""}],
+            "externals": [{"name": "GitHub", "kind": "API", "description": ""}],
+            "groups": [{"name": "App", "description": "", "containers": ["src"]}],
+            "relations": [
+                {"from": "User", "to": "src", "label": ""},
+                {"from": "src", "to": "GitHub", "label": ""},
+                {"from": "src", "to": "db", "label": ""}
+            ],
+            "commit": "c", "createdAt": 0.0
+        }))
+        .unwrap();
+        let out = viewed(
+            d,
+            &view(|v| {
+                v.outside = false;
+                v.groups = false;
+            }),
+        );
+        assert!(out.people.is_empty() && out.externals.is_empty() && out.groups.is_empty());
+        assert_eq!(
+            out.relations
+                .iter()
+                .map(|r| (&*r.from, &*r.to))
+                .collect::<Vec<_>>(),
+            [("src", "db")]
+        );
     }
 }
