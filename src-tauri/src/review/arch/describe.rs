@@ -183,6 +183,19 @@ pub(super) fn map_text(map: &SystemDto) -> String {
     out
 }
 
+/// The id of the container `c` names, by id or else by its one scanned or described name.
+fn container_id(c: &str, map: &SystemDto, described: &[ContainerDescDto]) -> Option<String> {
+    let ids = map.containers.iter().map(|m| (&m.id, &m.name));
+    let ids = ids.chain(described.iter().map(|m| (&m.id, &m.name)));
+    let all: Vec<_> = ids.collect();
+    if all.iter().any(|(id, _)| *id == c) {
+        return Some(c.to_string());
+    }
+    let mut named = all.iter().filter(|(_, name)| *name == c).map(|(id, _)| *id);
+    let first = named.next()?;
+    named.all(|id| id == first).then(|| first.clone())
+}
+
 /// Keeps what names something on the map: known component ids, people, externals and
 /// containers in relations, and known containers in groups, each in its first group only.
 /// The overview and features tours stay `last`'s.
@@ -211,11 +224,8 @@ fn validate(
             containers: g
                 .containers
                 .into_iter()
-                .filter(|c| {
-                    let known = map.containers.iter().any(|m| &m.id == c)
-                        || containers.iter().any(|m| &m.id == c);
-                    known && grouped.insert(c.clone())
-                })
+                .filter_map(|c| container_id(&c, map, &containers))
+                .filter(|c| grouped.insert(c.clone()))
                 .collect(),
             ..g
         })
@@ -334,7 +344,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_and_keeps_the_last_tours() {
+    fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_resolves_group_names_and_keeps_the_last_tours() {
         let d = Description {
             summary: "An app".into(),
             people: vec![ActorDto {
@@ -369,7 +379,7 @@ mod tests {
                 GroupDto {
                     name: "App".into(),
                     description: "The app".into(),
-                    containers: vec!["src".into(), "nowhere".into(), "db".into()],
+                    containers: vec!["src".into(), "nowhere".into(), "Store".into()],
                 },
                 GroupDto {
                     name: "Again".into(),
