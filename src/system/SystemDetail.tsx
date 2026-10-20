@@ -2,6 +2,7 @@ import type { LookDto, SystemDto, TourDto } from "../bindings";
 import { PipeButton } from "../terminal/PipeButton";
 import { tint } from "./colors";
 import { Chevron, Play } from "./glyphs";
+import { groupsOf } from "./groups";
 import { ChangedFiles, ChangedInside, LookList } from "./LensSections";
 import { isChanged, type Lens } from "./lens";
 import { MostUsed } from "./MostUsed";
@@ -129,6 +130,35 @@ function SystemBody({ map, colors, onShow }: Props) {
         </section>
       )}
     </>
+  );
+}
+
+/** A group's containers, biggest first. */
+function GroupInside({ map, colors, node, onShow }: Props) {
+  const ids = groupsOf(map)?.find((g) => g.id === node.id)?.containers ?? [];
+  const list = containersOf(map)
+    .filter((c) => ids.includes(c.id))
+    .sort((a, b) => b.files - a.files);
+  if (!list.length) return null;
+  return (
+    <section className="sys-sec">
+      <h4>
+        <span>Inside</span>
+        <span>{list.length}</span>
+      </h4>
+      {list.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          className="sys-li"
+          onClick={() => onShow(containerId(c.id))}
+        >
+          <Swatch color={colors.get(c.id) ?? "#8b8d93"} />
+          <span>{c.name}</span>
+          <span className="sys-n">{c.files}</span>
+        </button>
+      ))}
+    </section>
   );
 }
 
@@ -260,7 +290,10 @@ export function SystemDetail(p: Props) {
       : undefined;
   const chip = tier ?? node.tech;
   const drills =
-    p.openable && (node.id === SYSTEM || (node.kind === "container" && !!node.tiles?.length));
+    p.openable &&
+    (node.id === SYSTEM ||
+      node.kind === "group" ||
+      (node.kind === "container" && (!!node.tiles?.length || !!node.small)));
   const ref = node.id.slice(2);
   const status = p.lens && node.kind === "component" ? p.lens.status.get(ref) : undefined;
   const statusChip =
@@ -311,7 +344,7 @@ export function SystemDetail(p: Props) {
         <div className="sys-acts">
           {drills && (
             <button type="button" className="sys-btn" onClick={() => p.onOpen(node.id)}>
-              {node.id === SYSTEM ? "Containers" : "Components"}
+              {node.id === SYSTEM || node.kind === "group" ? "Containers" : "Components"}
               <Chevron />
             </button>
           )}
@@ -352,6 +385,7 @@ export function SystemDetail(p: Props) {
         ) : (
           <Inside {...p} />
         ))}
+      {node.kind === "group" && <GroupInside {...p} />}
       {node.kind === "component" && <ComponentBody {...p} />}
       {node.kind !== "component" && node.id !== SYSTEM && <TalksTo {...p} />}
     </aside>

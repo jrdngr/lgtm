@@ -12,7 +12,12 @@ const STORE = /sql|database|\bdb\b|store|cache|redis/i;
 /** A node's content. */
 export function Node({ n, stale }: { n: Placed; stale: boolean }) {
   const color = n.color ?? NEUTRAL;
-  const swatch = n.color && <span className="sys-sw" style={{ background: n.color }} />;
+  const swatch = n.color && (
+    <span
+      className={`sys-sw${n.kind === "group" ? " round" : ""}`}
+      style={{ background: n.color }}
+    />
+  );
   return (
     <>
       {n.kind === "person" && <Person />}
@@ -33,6 +38,7 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
         {n.kind === "container" && !n.door && (
           <DeltaCounts d={n.delta} className="sys-delta compact-only" />
         )}
+        {n.frame && <DeltaCounts d={n.delta} className="sys-delta" />}
       </span>
       {n.kind === "container" && !n.door && <DeltaCounts d={n.delta} className="sys-cnt" />}
       {n.flag && <span className="sys-flag">!</span>}
@@ -74,16 +80,19 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
 export type Spot = { box: Box; compact: boolean } | undefined;
 
 export function nodeClass(n: Placed, spot: Spot, lit: Set<string> | undefined) {
-  const store = n.kind === "container" && !n.tiles?.length && !!n.tech && STORE.test(n.tech);
+  const store =
+    n.kind === "container" && !n.small && !n.tiles?.length && !!n.tech && STORE.test(n.tech);
   return [
     "sys-node",
     n.kind,
     n.door && "door",
+    n.small && "small",
+    n.frame && "frame",
     store && "store",
     n.status,
     spot?.compact && "compact",
     !spot && "gone",
-    lit && !lit.has(n.id) && "dim",
+    lit && !lit.has(n.id) && !n.frame && "dim",
   ]
     .filter(Boolean)
     .join(" ");

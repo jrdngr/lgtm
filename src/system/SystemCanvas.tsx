@@ -4,7 +4,7 @@ import { NEUTRAL, tint } from "./colors";
 import { Fit, Minus, Plus } from "./glyphs";
 import type { Layout, Placed } from "./layout";
 import { EdgePills, MapEdges } from "./MapEdges";
-import { edgeKey, focusWires, mapFocus, restWires } from "./mapWires";
+import { edgeKey, edgesOf, focusWires, mapFocus, restWires } from "./mapWires";
 import { usePanZoom } from "./panZoom";
 import { Node, nodeClass, nodeStyle, type Spot } from "./SystemNode";
 import type { SEdge } from "./scene";
@@ -29,6 +29,7 @@ interface Props {
   /** Drawn over the canvas, outside the world. */
   children?: ReactNode;
   onSelect(id: string | undefined): void;
+  /** Opens a node a level down: ⌘-click, double-click, or a click on the focused node. */
   onOpen(id: string): void;
   onEdge(e: SEdge): void;
   nodeMenu(id: string): CtxEntry[];
@@ -43,6 +44,7 @@ type Hover = { node: string } | { edge: string };
 export function SystemCanvas(props: Props) {
   const { layout, edges, hot, hotColor, selected, selectedEdge, stale, onSelect, onOpen } = props;
   const [hover, setHover] = useState<Hover>();
+  const cmd = useCmdHeld();
   const focus = useMemo(
     () => (props.focus ? mapFocus(edges, props.focus) : undefined),
     [edges, props.focus],
@@ -54,6 +56,7 @@ export function SystemCanvas(props: Props) {
   useEffect(() => setHover(undefined), [props.focus, layout]);
 
   const hoverNode = hover && "node" in hover ? hover.node : undefined;
+  const hoverEdge = hover && "edge" in hover ? hover.edge : undefined;
   const hovered = new Set<string>();
   let lit = props.lit;
   if (hover && !focus) {
@@ -61,15 +64,23 @@ export function SystemCanvas(props: Props) {
       hovered.add(hover.edge);
       lit = new Set(hover.edge.split(">"));
     } else {
-      for (const e of edges)
-        if (e.from === hover.node || e.to === hover.node) hovered.add(edgeKey(e));
-      lit = neighborhood(edges, hover.node);
+      const mine = edgesOf(edges, hover.node);
+      for (const e of mine) hovered.add(edgeKey(e));
+      lit = neighborhood(mine, hover.node);
     }
   }
   const doors = new Set(layout.nodes.filter((n) => n.door).map((n) => n.id));
-  const wires = focus
-    ? focusWires(focus, edges, doors, hoverNode, selectedEdge)
-    : restWires(layout, edges, { hovered, hot, selectedEdge });
+  const wires =
+    focus && props.focus
+      ? focusWires(
+          focus,
+          props.focus,
+          edges,
+          doors,
+          { node: hoverNode, edge: hoverEdge },
+          selectedEdge,
+        )
+      : restWires(layout, edges, { hovered, hot, selectedEdge });
   const spot = (n: Placed): Spot => {
     if (!focus) return { box: n, compact: false };
     const at = focus.pos.get(n.id);
@@ -79,7 +90,7 @@ export function SystemCanvas(props: Props) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape deselects from the panel
     <div
-      className={`sys-canvas${focus ? " sys-focus" : ""}`}
+      className={`sys-canvas${focus ? " sys-focus" : ""}${cmd ? " cmd" : ""}`}
       ref={pz.ref}
       onPointerDown={pz.onPointerDown}
       onClick={() => {
@@ -158,7 +169,11 @@ export function SystemCanvas(props: Props) {
               if (!pz.dragged()) props.onEdge(w.e);
             }}
           />
-          <EdgePills wires={wires} hotColor={hotColor} />
+          <EdgePills
+            wires={wires}
+            hotColor={hotColor}
+            onHover={focus ? (edge) => setHover(edge ? { edge } : undefined) : undefined}
+          />
         </div>
         {layout.nodes.map((n) => {
           const at = spot(n);
@@ -174,7 +189,9 @@ export function SystemCanvas(props: Props) {
               }
               onClick={(ev) => {
                 ev.stopPropagation();
-                if (!pz.dragged()) onSelect(n.id);
+                if (pz.dragged()) return;
+                if (ev.metaKey || ev.ctrlKey || (focus && n.id === props.focus)) onOpen(n.id);
+                else onSelect(n.id);
               }}
               onDoubleClick={() => onOpen(n.id)}
               onContextMenu={(ev) => {
@@ -204,4 +221,22 @@ export function SystemCanvas(props: Props) {
       </div>
     </div>
   );
+}
+
+/** Whether ⌘ is held, so the node under the pointer reads as a link. */
+function useCmdHeld() {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    const on = (e: KeyboardEvent) => setHeld(e.metaKey);
+    const off = () => setHeld(false);
+    window.addEventListener("keydown", on);
+    window.addEventListener("keyup", on);
+    window.addEventListener("blur", off);
+    return () => {
+      window.removeEventListener("keydown", on);
+      window.removeEventListener("keyup", on);
+      window.removeEventListener("blur", off);
+    };
+  }, []);
+  return held;
 }

@@ -127,6 +127,15 @@ pub struct Container {
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
+pub struct Group {
+    /// A domain, like Billing or Notes.
+    pub name: String,
+    pub description: String,
+    /// Container ids from the prompt or the containers above; each in one group only.
+    pub containers: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, JsonSchema)]
 pub struct Component {
     /// A component id from the prompt.
     pub id: String,
@@ -168,6 +177,9 @@ pub struct System {
     /// Row names for components, from entry points down to foundations.
     pub tiers: Vec<String>,
     pub components: Vec<Component>,
+    /// With more than five containers, three to eight groups of them by domain; else empty.
+    #[serde(default)]
+    pub groups: Vec<Group>,
     pub relations: Vec<Relation>,
 }
 

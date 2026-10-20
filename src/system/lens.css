@@ -218,7 +218,7 @@
   color: #f85149;
 }
 
-.sys-node:not(.compact) .sys-delta.compact-only {
+.sys-node:not(.compact, .small) .sys-delta.compact-only {
   display: none;
 }
 
@@ -234,6 +234,10 @@
   border-radius: 5px;
   background: rgb(255 255 255 / 6%);
   font: 600 11px var(--mono);
+}
+
+.sys-node.small .sys-cnt {
+  display: none;
 }
 
 .sys-flag {

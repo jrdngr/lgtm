@@ -86,11 +86,24 @@ export function MapEdges(p: Props) {
 }
 
 /** The wires' numbers, status pills and labels, in the world over the SVG layer. */
-export function EdgePills({ wires, hotColor }: { wires: Wire[]; hotColor: string }) {
-  return wires.map(({ key, pill, mid, faint }) => {
+export function EdgePills({
+  wires,
+  hotColor,
+  onHover,
+}: {
+  wires: Wire[];
+  hotColor: string;
+  /** In a collapsed graph, labels take hovers like their wires. */
+  onHover?(key: string | undefined): void;
+}) {
+  return wires.map(({ key, pill, mid, faint, anchor, alone }) => {
     if (!pill) return null;
     const at = { left: mid.x, top: mid.y };
-    const dim = faint ? " faint" : "";
+    const dim = `${faint ? " faint" : ""}${anchor ? ` at-${anchor}` : ""}${alone ? " alone" : ""}${onHover ? " live" : ""}`;
+    const hover = onHover && {
+      onPointerEnter: () => onHover(key),
+      onPointerLeave: () => onHover(undefined),
+    };
     if (pill.kind === "num") {
       return (
         <span key={key} className="sys-num" style={at}>
@@ -105,13 +118,14 @@ export function EdgePills({ wires, hotColor }: { wires: Wire[]; hotColor: string
           key={key}
           className={`sys-elabel${dim}`}
           style={{ ...at, color: tint(c, 0.9), borderColor: tint(c, 0.6) }}
+          {...hover}
         >
           {pill.text}
         </span>
       );
     }
     return (
-      <span key={key} className={`sys-epill ${pill.kind}${dim}`} style={at}>
+      <span key={key} className={`sys-epill ${pill.kind}${dim}`} style={at} {...hover}>
         {pill.text}
       </span>
     );

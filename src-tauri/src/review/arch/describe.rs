@@ -31,6 +31,10 @@ keeps or a second binary, with a new id.
 - tiers: names for the rows the components sit in, from entry points down to foundations, like \
 Entry, Features, Platform. Three or four.
 - components: each component above by its id, with a description of a few words and its tier.
+- groups: with more than five containers, sort them into three to eight groups by domain \
+(what they're for, like Billing or Notes, not by kind like apps or libs), each with a short \
+name, a short description and its container ids. Put every container in exactly one group. \
+With five or fewer, leave it empty.
 - relations: who uses what, between people, externals and containers (by name for people and \
 externals, by id for containers), each with a label of a few words like \"Reads diffs\". Leave \
 out relations between containers that only stand for imports.
@@ -89,6 +93,16 @@ pub struct TourStepDto {
     pub text: String,
 }
 
+/// Containers that belong together, so a large system's context and containers maps show a
+/// few groups instead of one block.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+pub struct GroupDto {
+    pub name: String,
+    pub description: String,
+    /// Container ids.
+    pub containers: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct RelationDto {
@@ -106,6 +120,8 @@ pub struct Description {
     pub containers: Vec<ContainerDescDto>,
     pub tiers: Vec<String>,
     pub components: Vec<ComponentDescDto>,
+    #[serde(default)]
+    pub groups: Vec<GroupDto>,
     pub relations: Vec<RelationDto>,
 }
 
@@ -119,6 +135,9 @@ pub struct SystemDescDto {
     /// Top to bottom.
     pub tiers: Vec<String>,
     pub components: Vec<ComponentDescDto>,
+    /// Empty for a small system, and for descriptions written before groups.
+    #[serde(default)]
+    pub groups: Vec<GroupDto>,
     pub relations: Vec<RelationDto>,
     /// The overview tour, from descriptions that wrote it. New ones keep the last one's.
     #[serde(default)]
@@ -165,7 +184,8 @@ pub(super) fn map_text(map: &SystemDto) -> String {
 }
 
 /// Keeps what names something on the map: known component ids, people, externals and
-/// containers in relations. The overview and features tours stay `last`'s.
+/// containers in relations, and known containers in groups, each in its first group only.
+/// The overview and features tours stay `last`'s.
 fn validate(
     d: Description,
     map: &SystemDto,
@@ -182,6 +202,24 @@ fn validate(
         .chain(d.externals.iter().map(|e| e.name.clone()))
         .chain(containers.iter().map(|c| c.id.clone()))
         .chain(map.containers.iter().map(|c| c.id.clone()))
+        .collect();
+    let mut grouped = HashSet::new();
+    let groups = d
+        .groups
+        .into_iter()
+        .map(|g| GroupDto {
+            containers: g
+                .containers
+                .into_iter()
+                .filter(|c| {
+                    let known = map.containers.iter().any(|m| &m.id == c)
+                        || containers.iter().any(|m| &m.id == c);
+                    known && grouped.insert(c.clone())
+                })
+                .collect(),
+            ..g
+        })
+        .filter(|g| !g.containers.is_empty())
         .collect();
     let tiers = d.tiers;
     let (tour, features) = last.map_or_else(Default::default, |l| (l.tour, l.features));
@@ -202,6 +240,7 @@ fn validate(
             })
             .collect(),
         tiers,
+        groups,
         relations: d
             .relations
             .into_iter()
@@ -295,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_drops_unknown_components_tiers_and_relation_ends_and_keeps_the_last_tours() {
+    fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_and_keeps_the_last_tours() {
         let d = Description {
             summary: "An app".into(),
             people: vec![ActorDto {
@@ -326,6 +365,18 @@ mod tests {
                     tier: Some("Entry".into()),
                 },
             ],
+            groups: vec![
+                GroupDto {
+                    name: "App".into(),
+                    description: "The app".into(),
+                    containers: vec!["src".into(), "nowhere".into(), "db".into()],
+                },
+                GroupDto {
+                    name: "Again".into(),
+                    description: "Repeats".into(),
+                    containers: vec!["src".into()],
+                },
+            ],
             relations: vec![
                 relation("User", "src"),
                 relation("src", "db"),
@@ -341,6 +392,7 @@ mod tests {
             containers: vec![],
             tiers: vec![],
             components: vec![],
+            groups: vec![],
             relations: vec![],
             tour: vec![step("system")],
             features: vec![step("src/ui")],
@@ -369,6 +421,13 @@ mod tests {
         assert_eq!(
             out.features.iter().map(|t| &*t.node).collect::<Vec<_>>(),
             ["src/ui"]
+        );
+        assert_eq!(
+            out.groups
+                .iter()
+                .map(|g| (&*g.name, g.containers.clone()))
+                .collect::<Vec<_>>(),
+            [("App", vec!["src".to_string(), "db".to_string()])]
         );
         assert_eq!(out.commit, "abc");
     }

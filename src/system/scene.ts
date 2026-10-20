@@ -1,14 +1,16 @@
 import type { SysComponentDto, SystemDto } from "../bindings";
-import { LOOSE, PALETTE } from "./colors";
+import { LOOSE, NEUTRAL, PALETTE } from "./colors";
+import { type Group, groupOfContainer, groupsOf } from "./groups";
 import { addDelta, type Delta, isChanged, type Lens } from "./lens";
 
 export type Level =
   | { kind: "context" }
-  | { kind: "containers" }
+  /** With `group`, that group's containers, the other groups as doors; else every group's. */
+  | { kind: "containers"; group?: string }
   | { kind: "components"; container: string }
   | { kind: "symbols"; component: string };
 
-export type NodeKind = "person" | "system" | "external" | "container" | "component";
+export type NodeKind = "person" | "system" | "external" | "container" | "component" | "group";
 
 /** What the review does to a node: changes it, or reaches it through what it changes. */
 export type Status = "added" | "changed" | "removed" | "upstream" | "impacted";
@@ -30,8 +32,12 @@ export interface SNode {
   tiles?: { files: number; changed: boolean }[];
   /** The system's containers, at the context level. */
   blocks?: { name: string; color: string; files: number }[];
-  /** Another container, at the edge of a components view. */
+  /** Another container, at the edge of a components view, or another group at a group's. */
   door?: boolean;
+  /** A container's card in its group's frame: its name, tech and change alone. */
+  small?: boolean;
+  /** A group drawn as a frame around its containers' cards. */
+  frame?: boolean;
   status?: Status;
   /** Rows the review adds and removes in it. */
   delta?: Delta;
@@ -46,6 +52,9 @@ export interface SEdge {
   imports: number;
   label?: string;
   status?: "added" | "removed";
+  /** Between containers in different groups' frames: drawn only when lit, while the edge
+   * between their groups stands for it at rest. */
+  detail?: boolean;
 }
 
 export interface Row {
@@ -54,10 +63,20 @@ export interface Row {
   nodes: SNode[];
 }
 
+/** A group's frame and the cards inside it. */
+export interface Frame {
+  node: SNode;
+  nodes: SNode[];
+}
+
 export interface Scene {
   /** A column left of the boundary, its rows, and a column right of it. */
   left: SNode[];
   inside: Row[];
+  /** Packs the inside nodes into this many columns instead of rows. */
+  pack?: number;
+  /** Group frames, packed in columns, in place of rows. */
+  frames?: Frame[];
   right: SNode[];
   /** Names the boundary; absent when there's none. */
   boundary?: string;
@@ -66,10 +85,17 @@ export interface Scene {
   edges: SEdge[];
 }
 
+/** Every node inside a scene's boundary: its rows', or its frames and their cards. */
+export const nodesOf = (s: Scene) => [
+  ...s.inside.flatMap((r) => r.nodes),
+  ...(s.frames ?? []).flatMap((f) => [f.node, ...f.nodes]),
+];
+
 export const personId = (name: string) => `p:${name}`;
 export const externalId = (name: string) => `x:${name}`;
 export const containerId = (id: string) => `c:${id}`;
 export const componentId = (id: string) => `k:${id}`;
+export { groupId } from "./groups";
 export const SYSTEM = "sys";
 
 /** Past this many nodes a row wraps. */
@@ -174,7 +200,59 @@ function relations(map: SystemDto, container: (id: string) => string | undefined
   return out;
 }
 
+/** Blocks for containers, biggest first. */
+function blocksOf(map: SystemDto, ids: string[]) {
+  const colors = containerColors(map);
+  return containersOf(map)
+    .filter((c) => c.id !== "" && ids.includes(c.id))
+    .map((c) => ({ name: c.name, color: colors.get(c.id) ?? LOOSE, files: c.files }))
+    .sort((a, b) => b.files - a.files);
+}
+
+/** Import edges between the nodes `of` puts containers' components in. */
+function importEdges(map: SystemDto, of: (container: string) => string | undefined) {
+  const comp = new Map(map.components.map((k) => [k.id, k.container]));
+  const out: SEdge[] = [];
+  for (const e of map.edges) {
+    const a = comp.get(e.from);
+    const b = comp.get(e.to);
+    const from = a === undefined ? undefined : of(a);
+    const to = b === undefined ? undefined : of(b);
+    if (from && to && from !== to) out.push({ from, to, imports: e.imports });
+  }
+  return out;
+}
+
+function groupNode(map: SystemDto, g: Group): SNode {
+  return {
+    id: g.id,
+    kind: "group",
+    name: g.name,
+    description: g.description,
+    color: NEUTRAL,
+    blocks: blocksOf(map, g.containers),
+  };
+}
+
+/** Groups in the system, wired to each other by imports and to people and externals. */
+function groupedContext(map: SystemDto, groups: Group[]): Scene {
+  const of = groupOfContainer(groups);
+  const edges = new Map<string, SEdge>();
+  for (const e of importEdges(map, (c) => of.get(c))) add(edges, e);
+  for (const e of relations(map, (id) => of.get(id))) add(edges, e);
+  return {
+    left: people(map),
+    inside: [{ nodes: groups.map((g) => groupNode(map, g)) }],
+    pack: 2,
+    right: externals(map),
+    boundary: map.repo,
+    edges: [...edges.values()],
+  };
+}
+
 function contextScene(map: SystemDto): Scene {
+  const groups = groupsOf(map);
+  if (groups) return groupedContext(map, groups);
   const containers = containersOf(map);
   const colors = containerColors(map);
   const system: SNode = {
@@ -198,7 +276,7 @@ function contextScene(map: SystemDto): Scene {
   };
 }
 
-function containersScene(map: SystemDto, lens?: Lens): Scene {
+function containersScene(map: SystemDto, lens?: Lens, group?: string): Scene {
   // The biggest first, then ones only the description has, then files outside every root.
   const all = containersOf(map).sort(
     (a, b) =>
@@ -249,11 +327,85 @@ function containersScene(map: SystemDto, lens?: Lens): Scene {
   for (const e of relations(map, (id) => (known.has(id) ? containerId(id) : undefined))) {
     add(edges, e);
   }
-  return {
+  const scene: Scene = {
     left: people(map),
     inside: wrap(nodes, undefined, CONTAINERS_PER_ROW),
     right: externals(map),
     boundary: map.repo,
+    edges: [...edges.values()],
+  };
+  const groups = groupsOf(map);
+  if (!groups) return scene;
+  const open = groups.find((g) => g.id === group);
+  return open ? groupScene(scene, groups, open) : framedScene(scene, groups);
+}
+
+/** Every group as a frame of small container cards. At rest the edges between groups stand
+ * for the ones between their containers. */
+function framedScene(scene: Scene, groups: Group[]): Scene {
+  const nodes = new Map(scene.inside.flatMap((r) => r.nodes).map((n) => [n.id, n]));
+  const of = groupOfContainer(groups);
+  const groupOf = (id: string) => (id.startsWith("c:") ? of.get(id.slice(2)) : id);
+  const frames = groups.map((g) => {
+    const cards = g.containers.flatMap((c) => {
+      const n = nodes.get(containerId(c));
+      return n ? [{ ...n, small: true, tiles: undefined }] : [];
+    });
+    const changed = cards.filter((n) => n.status === "changed");
+    const node: SNode = {
+      id: g.id,
+      kind: "group",
+      name: g.name,
+      description: g.description,
+      color: NEUTRAL,
+      frame: true,
+      status: changed.length ? "changed" : cards.some((n) => n.status) ? "impacted" : undefined,
+      delta: changed.reduce<Delta | undefined>((d, n) => addDelta(d, n.delta), undefined),
+      flag: cards.some((n) => n.flag),
+    };
+    return { node, nodes: cards };
+  });
+  const bundles = new Map<string, SEdge>();
+  const detail: SEdge[] = [];
+  for (const e of scene.edges) {
+    const from = groupOf(e.from);
+    const to = groupOf(e.to);
+    if (!from || !to) continue;
+    if (from !== to) add(bundles, { from, to, imports: e.imports, label: e.label });
+    if (from !== e.from || to !== e.to) detail.push({ ...e, detail: true });
+  }
+  for (const b of bundles.values()) {
+    const statuses = scene.edges
+      .filter((e) => groupOf(e.from) === b.from && groupOf(e.to) === b.to)
+      .map((e) => e.status);
+    if (statuses.every((x) => x === "added")) b.status = "added";
+    else if (statuses.every((x) => x === "removed")) b.status = "removed";
+  }
+  return { ...scene, inside: [], frames, edges: [...bundles.values(), ...detail] };
+}
+
+/** One group's containers, with the other groups it talks to as doors. */
+function groupScene(scene: Scene, groups: Group[], open: Group): Scene {
+  const of = groupOfContainer(groups);
+  const mine = new Set(open.containers.map(containerId));
+  const end = (id: string) => (mine.has(id) || !id.startsWith("c:") ? id : of.get(id.slice(2)));
+  const edges = new Map<string, SEdge>();
+  for (const e of scene.edges) {
+    if (!mine.has(e.from) && !mine.has(e.to)) continue;
+    const from = end(e.from);
+    const to = end(e.to);
+    if (from && to && from !== to) add(edges, { ...e, from, to });
+  }
+  const touched = new Set([...edges.values()].flatMap((e) => [e.from, e.to]));
+  const doors: SNode[] = groups
+    .filter((g) => g !== open && touched.has(g.id))
+    .map((g) => ({ id: g.id, kind: "group", name: g.name, color: NEUTRAL, door: true }));
+  const nodes = scene.inside.flatMap((r) => r.nodes).filter((n) => mine.has(n.id));
+  return {
+    left: scene.left.filter((n) => touched.has(n.id)),
+    inside: wrap(nodes, undefined, CONTAINERS_PER_ROW),
+    right: [...doors, ...scene.right.filter((n) => touched.has(n.id))],
+    boundary: open.name,
     edges: [...edges.values()],
   };
 }
@@ -420,7 +572,7 @@ function componentsScene(map: SystemDto, container: string, lens?: Lens): Scene 
 export function sceneOf(map: SystemDto, level: Level, lens?: Lens): Scene {
   if (level.kind === "context") return contextScene(map);
   if (level.kind === "containers") {
-    const scene = containersScene(map, lens);
+    const scene = containersScene(map, lens, level.group);
     return lens ? affectedOnly(scene, CONTAINERS_PER_ROW) : scene;
   }
   const container = level.kind === "symbols" ? containerOf(map, level.component) : level.container;
@@ -434,6 +586,7 @@ const affected = (n: SNode) => !!n.status && n.status !== "upstream";
 /** `scene` without the nodes the review doesn't affect, rows packed again within each tier.
  * The whole scene when it affects none. */
 export function affectedOnly(scene: Scene, per: number): Scene {
+  if (scene.frames) return affectedFrames(scene);
   const groups: Row[] = [];
   for (const r of scene.inside) {
     const last = groups.at(-1);
@@ -444,6 +597,20 @@ export function affectedOnly(scene: Scene, per: number): Scene {
   const inside = groups.flatMap((g) => wrap(g.nodes.filter(affected), g.label, per));
   if (!inside.length) return scene;
   const ids = new Set(inside.flatMap((r) => r.nodes.map((n) => n.id)));
+  return { ...keepWired(scene, ids), inside };
+}
+
+function affectedFrames(scene: Scene): Scene {
+  const frames = (scene.frames ?? [])
+    .map((f) => ({ ...f, nodes: f.nodes.filter(affected) }))
+    .filter((f) => f.nodes.length);
+  if (!frames.length) return scene;
+  const ids = new Set(frames.flatMap((f) => [f.node.id, ...f.nodes.map((n) => n.id)]));
+  return { ...keepWired(scene, ids), frames };
+}
+
+/** `scene`'s side nodes and edges that still join the `ids` it keeps inside. */
+function keepWired(scene: Scene, ids: Set<string>): Scene {
   const touching = scene.edges.filter((e) => ids.has(e.from) || ids.has(e.to));
   const wired = (n: SNode) => touching.some((e) => e.from === n.id || e.to === n.id);
   const left = scene.left.filter(wired);
@@ -452,7 +619,6 @@ export function affectedOnly(scene: Scene, per: number): Scene {
   return {
     ...scene,
     left,
-    inside,
     right,
     edges: touching.filter((e) => ids.has(e.from) && ids.has(e.to)),
   };
@@ -469,7 +635,9 @@ export function largestContainer(map: SystemDto): string | undefined {
 
 /** Where `id` sits: the level that shows it and the container it's in, if any. */
 export function levelOf(map: SystemDto, id: string): Level | undefined {
-  if (id === SYSTEM || id.startsWith("p:") || id.startsWith("x:")) return { kind: "context" };
+  if (id === SYSTEM || id.startsWith("p:") || id.startsWith("x:") || id.startsWith("g:")) {
+    return { kind: "context" };
+  }
   if (id.startsWith("c:")) return { kind: "containers" };
   const k = map.components.find((c) => componentId(c.id) === id);
   return k ? { kind: "components", container: k.container } : undefined;

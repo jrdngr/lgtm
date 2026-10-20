@@ -91,14 +91,6 @@ export function wirePath(a: Box, b: Box): string {
   return `M${ax} ${ay}C${ax + dx} ${ay} ${bx - dx} ${by} ${bx} ${by}`;
 }
 
-/** The point halfway along `wirePath(a, b)`. */
-export function wireMid(a: Box, b: Box): { x: number; y: number } {
-  const y = (mid(a) + mid(b)) / 2;
-  if (Math.abs(a.x - b.x) < 20) return { x: (a.x + b.x) / 2 - 27, y };
-  const [ax, bx] = b.x > a.x ? [a.x + a.w, b.x] : [a.x, b.x + b.w];
-  return { x: (ax + bx) / 2, y };
-}
-
 /** One faint line per pair of files, or file and chip, that call each other. */
 export function hairlines(dto: SymbolsDto, placed: SymLayout): string[] {
   const groupOf = new Map<number, Box & { key: string }>();

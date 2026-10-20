@@ -16,6 +16,7 @@ import { EdgeDetail } from "./EdgeDetail";
 import { FindPalette } from "./FindPalette";
 import { GenerateButton, GeneratePop } from "./GenerateMenu";
 import { type GenKey, generatePrompt, genItems } from "./generate";
+import { groupsOf } from "./groups";
 import { layout } from "./layout";
 import { lensOf } from "./lens";
 import { edgeKey } from "./mapWires";
@@ -34,6 +35,7 @@ import {
   type Level,
   largestContainer,
   levelOf,
+  nodesOf,
   type SEdge,
   type SNode,
   SYSTEM,
@@ -67,18 +69,17 @@ export function ArchitecturePanel() {
 
 /** The node that stands for `level` when nothing is selected. */
 function subject(map: SystemDto, level: Level): SNode | undefined {
-  if (level.kind === "components" || level.kind === "symbols") {
-    const c =
-      level.kind === "symbols" ? componentId(level.component) : containerId(level.container);
-    const at: Level =
-      level.kind === "symbols"
-        ? { kind: "components", container: containerOf(map, level.component) }
-        : { kind: "containers" };
-    return sceneOf(map, at)
-      .inside.flatMap((r) => r.nodes)
-      .find((n) => n.id === c);
+  if (level.kind === "context" || level.kind === "containers") {
+    const g = level.kind === "containers" && groupsOf(map)?.find((x) => x.id === level.group);
+    if (g) return { id: g.id, kind: "group", name: g.name, description: g.description };
+    return { id: SYSTEM, kind: "system", name: map.repo, description: map.description?.summary };
   }
-  return sceneOf(map, { kind: "context" }).inside[0]?.nodes[0];
+  const c = level.kind === "symbols" ? componentId(level.component) : containerId(level.container);
+  const at: Level =
+    level.kind === "symbols"
+      ? { kind: "components", container: containerOf(map, level.component) }
+      : { kind: "containers" };
+  return nodesOf(sceneOf(map, at)).find((n) => n.id === c);
 }
 
 /** The scene edge for `from>to`, or the one into the door that stands for `to`'s container. */
@@ -187,8 +188,11 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     const at = levelOf(map, id);
     if (at) go(at, id);
   };
+  const groups = useMemo(() => groupsOf(map), [map]);
+  const groupOf = (container: string) => groups?.find((g) => g.containers.includes(container))?.id;
   const open = (id: string) => {
     if (id === SYSTEM) return go({ kind: "containers" });
+    if (groups?.some((g) => g.id === id)) return go({ kind: "containers", group: id });
     const c = map.containers.find((c) => containerId(c.id) === id);
     if (c && map.components.some((k) => k.container === c.id)) {
       go({ kind: "components", container: c.id });
@@ -203,9 +207,13 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
             componentId(shown.component),
           )
       : shown.kind === "components"
-        ? () => go({ kind: "containers" }, containerId(shown.container))
+        ? () =>
+            go(
+              { kind: "containers", group: groupOf(shown.container) },
+              containerId(shown.container),
+            )
         : shown.kind === "containers"
-          ? () => go({ kind: "context" }, SYSTEM)
+          ? () => go({ kind: "context" }, shown.group ?? SYSTEM)
           : undefined;
   const container =
     shown.kind === "components"
@@ -286,7 +294,9 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     setToursOpen(false);
     const door = placed.nodes.find((n) => n.id === id)?.door;
     if (id && door && !trace) {
-      return map.components.some((k) => containerId(k.container) === id) ? open(id) : show(id);
+      return id.startsWith("g:") || map.components.some((k) => containerId(k.container) === id)
+        ? open(id)
+        : show(id);
     }
     setEdgeSel(undefined);
     if (!trace || !id) return setSelected(id);
@@ -309,8 +319,18 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       : sel?.kind === "component"
         ? sel.id
         : undefined;
+  const crumbGroup =
+    shown.kind === "containers"
+      ? shown.group
+      : shown.kind === "components" || shown.kind === "symbols"
+        ? groupOf(container ?? "")
+        : undefined;
+  const groupName = groups?.find((g) => g.id === crumbGroup)?.name;
   const crumbs: Crumb[] = [
     { id: SYSTEM, name: map.repo, onClick: () => go({ kind: "context" }, SYSTEM) },
+    ...(crumbGroup && groupName
+      ? [{ id: crumbGroup, name: groupName, onClick: () => open(crumbGroup) }]
+      : []),
     ...(shown.kind === "components" || shown.kind === "symbols"
       ? [
           crumb(containerId(container ?? ""), () =>
@@ -369,6 +389,9 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         { label: "Show in Files", onSelect: () => revealInFiles(workspace, path) },
         askItem,
       ];
+    }
+    if (info?.kind === "group") {
+      return [{ label: "Containers", onSelect: () => open(id) }, "-", askItem];
     }
     if (info?.kind === "container") {
       return [

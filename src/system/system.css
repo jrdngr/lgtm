@@ -279,6 +279,10 @@
   opacity: 0.35;
 }
 
+.sys-focus .sys-edge.faint {
+  opacity: 0.07;
+}
+
 .sys-edge.added {
   stroke: var(--added);
 }
@@ -311,6 +315,33 @@
 .sys-elabel.faint,
 .sys-epill.faint {
   opacity: 0.3;
+}
+
+/* A collapsed graph's labels sit by their neighbor and fade away behind a hover. */
+.sys-elabel.at-start,
+.sys-epill.at-start {
+  transform: translate(0, -50%);
+}
+
+.sys-elabel.at-end,
+.sys-epill.at-end {
+  transform: translate(-100%, -50%);
+}
+
+.sys-elabel.live,
+.sys-epill.live {
+  pointer-events: auto;
+  cursor: default;
+}
+
+.sys-focus .sys-elabel.faint,
+.sys-focus .sys-epill.faint {
+  opacity: 0.06;
+}
+
+.sys-elabel.alone {
+  z-index: 1;
+  max-width: none;
 }
 
 .sys-num {
@@ -523,6 +554,30 @@
 
 .sys-node.component .sys-nm {
   font-size: 13.5px;
+}
+
+.sys-node.group .sys-blocks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sys-node.group.frame {
+  justify-content: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #34363c;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 2.5%);
+  box-shadow: none;
+}
+
+.sys-node.small {
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+}
+
+.sys-node.small .sys-nm {
+  font-size: 13px;
 }
 
 .sys-node.door {
@@ -1113,4 +1168,10 @@
 
 .sys-world .sys-node.compact .sys-nm {
   font-size: 13px;
+}
+
+/* Holding ⌘ makes the node under the pointer read as a link. */
+.sys-canvas.cmd .sys-node:not(.frame):hover .sys-nm,
+.sys-canvas.cmd .sys-node.frame .sys-hd:hover .sys-nm {
+  text-decoration: underline;
 }

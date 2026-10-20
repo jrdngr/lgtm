@@ -846,6 +846,17 @@ export type GhPost = {
 	pending: boolean,
 };
 
+/**
+ *  Containers that belong together, so a large system's context and containers maps show a
+ *  few groups instead of one block.
+ */
+export type GroupDto = {
+	name: string,
+	description: string,
+	/**  Container ids. */
+	containers: string[],
+};
+
 export type HeadDto = {
 	/**  The head on GitHub isn't the fetched one. */
 	moved: boolean,
@@ -1643,6 +1654,8 @@ export type SystemDescDto = {
 	/**  Top to bottom. */
 	tiers: string[],
 	components: ComponentDescDto[],
+	/**  Empty for a small system, and for descriptions written before groups. */
+	groups?: GroupDto[],
 	relations: RelationDto[],
 	/**  The overview tour, from descriptions that wrote it. New ones keep the last one's. */
 	tour?: TourStepDto[],

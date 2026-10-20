@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Layout, Placed } from "./layout";
-import { mapFocus, restWires } from "./mapWires";
+import { focusWires, mapFocus, restWires } from "./mapWires";
 import type { SEdge } from "./scene";
 
 const node = (id: string, x: number, y: number): Placed => ({
@@ -79,5 +79,41 @@ describe("mapFocus", () => {
       ["b", "c"],
       ["d", "b"],
     ]);
+  });
+});
+
+describe("focusWires", () => {
+  const all: SEdge[] = [
+    { from: "a", to: "b", imports: 1, label: "Reads" },
+    { from: "b", to: "a", imports: 1, label: "Notifies" },
+    { from: "b", to: "c", imports: 1, label: "Writes" },
+    { from: "c", to: "d", imports: 1, label: "Hidden" },
+  ];
+  const wires = (hover: { node?: string; edge?: string } = {}) =>
+    focusWires(mapFocus(all, "b"), "b", all, new Set(), hover, undefined);
+
+  it("labels each neighbor once, by the neighbor, both ways joined", () => {
+    const w = wires();
+    const f = mapFocus(all, "b");
+    const a = f.pos.get("a");
+    const c = f.pos.get("c");
+    if (!a || !c) throw new Error("missing");
+    expect(w.map((x) => [x.key, x.pill?.text, x.anchor])).toEqual([
+      ["a>b", "Reads · Notifies", "start"],
+      ["b>a", undefined, "start"],
+      ["b>c", "Writes", "end"],
+    ]);
+    expect(w[0].mid.x).toBeGreaterThan(a.x + a.w);
+    expect(w[2].mid.x).toBeLessThan(c.x);
+    expect(w[0].mid.y).toBe(a.y + a.h / 2);
+  });
+
+  it("fades every wire but the hovered neighbor's or edge's", () => {
+    expect(wires({ node: "c" }).map((x) => [x.key, x.faint, x.alone])).toEqual([
+      ["a>b", true, false],
+      ["b>a", true, false],
+      ["b>c", false, true],
+    ]);
+    expect(wires({ edge: "b>a" }).map((x) => x.faint)).toEqual([true, false, true]);
   });
 });

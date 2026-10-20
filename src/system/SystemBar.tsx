@@ -84,7 +84,7 @@ export function SystemBar(p: Props) {
               className={`sys-crumb${i === p.crumbs.length - 1 ? " on" : ""}`}
               onClick={c.onClick}
             >
-              {i < 2 && <Swatch c={c} />}
+              {(i === 0 || c.color) && <Swatch c={c} />}
               <span className="sys-cn">{c.name}</span>
             </button>
           </Fragment>

@@ -325,6 +325,7 @@ mod tests {
             }],
             tiers: vec![],
             components: vec![],
+            groups: vec![],
             relations: vec![],
             tour: vec![step("system", None, None, None)],
             features: vec![],

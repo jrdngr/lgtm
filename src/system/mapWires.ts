@@ -1,6 +1,7 @@
+import type { Box } from "./layout";
 import { curve, type Layout } from "./layout";
 import type { SEdge } from "./scene";
-import { collapse, type Dims, type Focus, type Link, wireMid, wirePath } from "./symbolsLinks";
+import { collapse, type Dims, type Focus, type Link } from "./symbolsLinks";
 
 export const edgeKey = (e: { from: string; to: string }) => `${e.from}>${e.to}`;
 
@@ -27,6 +28,18 @@ export interface Wire {
   /** The selected edge, drawn wider. */
   wide?: boolean;
   pill?: Pill;
+  /** The pill's `mid` is its left end, or its right end, instead of its center. */
+  anchor?: "start" | "end";
+  /** Lit alone by a hover in a collapsed graph, its label shown whole. */
+  alone?: boolean;
+}
+
+/** The edges a node draws when hovered or focused: those between it and other nodes the map
+ * shows at rest, or else the ones only lit through it, like a container card's in a frame. */
+export function edgesOf(edges: SEdge[], id: string): SEdge[] {
+  const mine = edges.filter((e) => (e.from === id || e.to === id) && e.from !== e.to);
+  const rest = mine.filter((e) => !e.detail);
+  return rest.length ? rest : mine;
 }
 
 /** What a review-changed edge's pill says. */
@@ -61,6 +74,7 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
     const key = edgeKey(e);
     const hot = s.hot.has(key) || key === s.selectedEdge;
     const on = hot || s.hovered.has(key);
+    if (e.detail && !on) return [];
     const n = s.hot.get(key);
     const pill: Pill | undefined =
       n !== undefined
@@ -85,44 +99,90 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
   });
 }
 
-/** Collapsed node size and spacing, with room between columns for labels. */
-const DIMS: Dims = { w: 190, h: 34, row: 46, col: 400 };
+/** A collapsed graph's straight run out of each neighbor, where its label sits, and the bend
+ * from there to the center. */
+const STUB = 214;
+const BEND = 96;
+/** Collapsed node size and spacing, with room between columns for a stub and its bend. */
+const DIMS: Dims = { w: 172, h: 30, row: 40, col: 172 + STUB + BEND };
+/** Between a neighbor and its label. */
+const LABEL_GAP = 8;
 
 /** The graph node `id` collapses into: the nodes that use it left, itself, what it uses right. */
 export function mapFocus(edges: SEdge[], id: string): Focus {
-  const links: Link[] = edges
-    .filter((e) => (e.from === id || e.to === id) && e.from !== e.to)
-    .map((e) => [e.from, e.to]);
+  const links: Link[] = edgesOf(edges, id).map((e) => [e.from, e.to]);
   return collapse(links, id, DIMS);
 }
 
-/** The collapsed graph's wires, all bright; a hovered neighbor fades the ones it isn't on. */
+/** A wire between the center and a neighbor: straight out of the neighbor for a label's room,
+ * then bent to the center. The label's spot is by the neighbor. */
+function stubWire(from: Box, to: Box, center: Box) {
+  const nb = from === center ? to : from;
+  const leftSide = nb.x < center.x;
+  const ny = nb.y + nb.h / 2;
+  const cy = center.y + center.h / 2;
+  const nx = leftSide ? nb.x + nb.w : nb.x;
+  const sx = leftSide ? nx + STUB : nx - STUB;
+  const cx = leftSide ? center.x : center.x + center.w;
+  const half = (cx - sx) / 2;
+  const toCenter = `M${nx} ${ny}L${sx} ${ny}C${sx + half} ${ny} ${cx - half} ${cy} ${cx} ${cy}`;
+  const toNb = `M${cx} ${cy}C${cx - half} ${cy} ${sx + half} ${ny} ${sx} ${ny}L${nx} ${ny}`;
+  return {
+    d: from === center ? toNb : toCenter,
+    mid: { x: leftSide ? nx + LABEL_GAP : nx - LABEL_GAP, y: ny },
+    anchor: leftSide ? ("start" as const) : ("end" as const),
+  };
+}
+
+/** The collapsed graph's wires, all bright, each labeled by its neighbor; a neighbor linked
+ * both ways gets one label for both. Hovering a neighbor or a wire fades the rest. */
 export function focusWires(
   focus: Focus,
+  center: string,
   edges: SEdge[],
   doors: Set<string>,
-  hover: string | undefined,
+  hover: { node?: string; edge?: string },
   selectedEdge: string | undefined,
 ): Wire[] {
   const byKey = new Map(edges.map((e) => [edgeKey(e), e]));
+  const mid = focus.pos.get(center);
+  if (!mid) return [];
+  const labeled = new Set<string>();
+  const both = new Map<string, string>();
+  for (const [from, to] of focus.links) {
+    const nb = from === center ? to : from;
+    const label = byKey.get(`${from}>${to}`)?.label;
+    if (label) both.set(nb, both.has(nb) ? `${both.get(nb)} · ${label}` : label);
+  }
+  const node = hover.node && hover.node !== center && focus.pos.has(hover.node) && hover.node;
   return focus.links.flatMap(([from, to]) => {
     const e = byKey.get(`${from}>${to}`);
     const a = focus.pos.get(from);
     const b = focus.pos.get(to);
     if (!e || !a || !b) return [];
     const key = edgeKey(e);
-    const faint = !!hover && hover !== from && hover !== to && focus.pos.has(hover);
+    const nb = from === center ? to : from;
+    const alone = node ? node === nb : hover.edge === key;
+    const faint = node ? !alone : !!hover.edge && !alone;
+    const text = e.status ? undefined : both.get(nb);
+    const first = !labeled.has(nb);
+    labeled.add(nb);
+    const pill: Pill | undefined = e.status
+      ? { kind: e.status, text: statusLabel(e) }
+      : text && first
+        ? { kind: "label", text, hot: false }
+        : undefined;
     return [
       {
         e,
         key,
-        d: wirePath(a, b),
-        mid: wireMid(a, b),
+        ...stubWire(a, b, mid),
         door: doors.has(from) || doors.has(to),
         tone: e.status ?? "blue",
         faint,
+        alone,
         wide: key === selectedEdge,
-        pill: litPill(e, false),
+        pill,
       },
     ];
   });

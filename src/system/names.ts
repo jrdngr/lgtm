@@ -6,7 +6,7 @@ export interface NodeInfo {
   name: string;
   /** A container's color, or its container's for a component. */
   color: string;
-  kind: "system" | "person" | "external" | "container" | "component";
+  kind: "system" | "person" | "external" | "container" | "component" | "group";
   /** The container a component is in. */
   container?: string;
 }
@@ -21,6 +21,7 @@ export function nodeInfo(
   const ref = id.slice(2);
   if (id.startsWith("p:")) return { name: ref, color: NEUTRAL, kind: "person" };
   if (id.startsWith("x:")) return { name: ref, color: NEUTRAL, kind: "external" };
+  if (id.startsWith("g:")) return { name: ref, color: NEUTRAL, kind: "group" };
   if (id.startsWith("c:")) {
     const c = containersOf(map).find((c) => c.id === ref);
     return c && { name: c.name, color: colors.get(c.id) ?? NEUTRAL, kind: "container" };
