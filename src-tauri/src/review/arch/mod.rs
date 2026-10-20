@@ -4,6 +4,7 @@
 pub mod assess;
 mod compute;
 pub mod describe;
+pub mod design;
 #[cfg(test)]
 mod diff_tests;
 pub mod edge;

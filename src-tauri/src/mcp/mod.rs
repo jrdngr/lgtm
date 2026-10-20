@@ -5,6 +5,7 @@
 
 mod arch;
 mod bridge;
+mod design;
 pub mod hook;
 mod inputs;
 mod qa;

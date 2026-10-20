@@ -3,11 +3,21 @@ import { NEUTRAL, tint } from "./colors";
 import { DeltaCounts } from "./Delta";
 import { Chevron, Person } from "./glyphs";
 import type { Box, Placed } from "./layout";
+import type { Mark } from "./scene";
 
 /** A tile's width for a component of `files` files. */
 const tileWidth = (files: number) => Math.round(Math.min(40, 8 + Math.sqrt(files) * 5));
 
 const STORE = /sql|database|\bdb\b|store|cache|redis/i;
+
+const MARKS: Record<Mark, string> = {
+  new: "New",
+  changed: "Changes",
+  removed: "Removed",
+  built: "✓",
+  planned: "Planned",
+  differs: "Differs",
+};
 
 /** A node's content. */
 export function Node({ n, stale }: { n: Placed; stale: boolean }) {
@@ -29,6 +39,7 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
           n.tech && <span className="sys-chip">{n.tech}</span>}
         {n.door && <Chevron />}
         {stale && <span className="sys-stale" />}
+        {n.mark && <span className={`sys-mark ${n.mark}`}>{MARKS[n.mark]}</span>}
         {n.kind === "component" && n.status === "added" && (
           <span className="sys-delta new">new</span>
         )}
@@ -42,6 +53,14 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
       </span>
       {n.kind === "container" && !n.door && <DeltaCounts d={n.delta} className="sys-cnt" />}
       {n.flag && <span className="sys-flag">!</span>}
+      {!!n.lines?.length && (
+        <span className="sys-lines">
+          {n.lines.map((l, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: lines can repeat
+            <span key={i}>{l}</span>
+          ))}
+        </span>
+      )}
       {n.kind === "container" && !n.door && (n.tech?.length ?? 0) > 10 && (
         <span className="sys-chip">{n.tech}</span>
       )}
@@ -90,6 +109,7 @@ export function nodeClass(n: Placed, spot: Spot, lit: Set<string> | undefined) {
     n.frame && "frame",
     store && "store",
     n.status,
+    n.mark && `m-${n.mark}`,
     spot?.compact && "compact",
     !spot && "gone",
     lit && !lit.has(n.id) && !n.frame && "dim",

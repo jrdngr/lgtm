@@ -102,6 +102,12 @@ pub struct ArchChanged {
     pub review: u32,
 }
 
+/// A terminal agent wrote a design's map.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct DesignChanged {
+    pub id: String,
+}
+
 /// A terminal agent described the system map.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SystemChanged {

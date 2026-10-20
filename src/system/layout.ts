@@ -78,16 +78,22 @@ function groupSize(n: SNode): [number, number] {
   return [w, Math.max(h, GROUP_TOP + Math.ceil(count / 2) * BLOCK_ROW)];
 }
 
+/** A design component's card: its name, then a line per interface. */
+const LINE = 18;
+const linesSize = (n: SNode): [number, number] => [200, 44 + (n.lines?.length ?? 0) * LINE];
+
 const size = (n: SNode): [number, number] =>
-  n.door
-    ? DOOR
-    : n.small
-      ? SMALL
-      : n.kind === "system"
-        ? systemSize(n)
-        : n.kind === "group"
-          ? groupSize(n)
-          : SIZE[n.kind];
+  n.lines?.length && !n.door
+    ? linesSize(n)
+    : n.door
+      ? DOOR
+      : n.small
+        ? SMALL
+        : n.kind === "system"
+          ? systemSize(n)
+          : n.kind === "group"
+            ? groupSize(n)
+            : SIZE[n.kind];
 
 const gapX = (nodes: SNode[]) => (nodes.some((n) => n.kind === "container") ? 60 : GAP_X);
 

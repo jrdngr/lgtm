@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 import { dockOf } from "../core/docks";
 import { openArchitecture } from "../core/panels";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
+import { showCode } from "../design/designs";
 
 interface Show {
   workspace: string;
@@ -13,8 +14,9 @@ const listeners = new Set<Listener>();
 let pending: Show | undefined;
 
 /** Shows node `id`, the edge `from>to` between two nodes, or starts tour `tour:<id>`, in the
- * workspace's Architecture tab, opening the tab. */
+ * workspace's Architecture tab, opening the tab on the code. */
 export function showInSystem(workspace: WorkspaceName, id: string) {
+  showCode();
   pending = { workspace: workspaceKey(workspace), id };
   for (const l of listeners) l(pending);
   const api = dockOf(workspace);

@@ -114,6 +114,17 @@ export const commands = {
 	/**  What the system map shows. */
 	archView: () => typedError<ArchViewDto, string>(__TAURI_INVOKE("arch_view")),
 	setArchView: (view: ArchViewDto) => typedError<null, string>(__TAURI_INVOKE("set_arch_view", { view })),
+	/**  Every design of the repo, with its state. */
+	designs: (workspace: string | null) => typedError<DesignItemDto[], string>(__TAURI_INVOKE("designs", { workspace })),
+	/**  Creates a design, or with `id` changes one. */
+	saveDesign: (id: string | null, design: DesignInput) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design", { id, design })),
+	deleteDesign: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_design", { id })),
+	/**  The prompt asking a terminal agent to write a design's map. */
+	designPrompt: (workspace: string | null, id: string) => typedError<string, string>(__TAURI_INVOKE("design_prompt", { workspace, id })),
+	/**  Every file at a bookmark. */
+	bookmarkFiles: (workspace: string | null, bookmark: string) => typedError<string[], string>(__TAURI_INVOKE("bookmark_files", { workspace, bookmark })),
+	/**  Local bookmarks, those on `@`'s stack first. */
+	designBookmarks: (workspace: string | null) => typedError<string[], string>(__TAURI_INVOKE("design_bookmarks", { workspace })),
 	/**  The prompt asking a terminal agent to describe the system map. */
 	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
 	/**  A component's symbols other components use most. */
@@ -349,6 +360,7 @@ export const events = {
 	agentShow: makeEvent<AgentShow>("agent-show"),
 	archChanged: makeEvent<ArchChanged>("arch-changed"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
+	designChanged: makeEvent<DesignChanged>("design-changed"),
 	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
 	jjPaused: makeEvent<JjPaused>("jj-paused"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
@@ -723,6 +735,125 @@ export type Deferral = {
 	at: number | null,
 };
 
+export type DesignActorDto = {
+	name: string,
+	description: string,
+	change: DesignChange,
+};
+
+/**  Whether the code has what the design plans. */
+export type DesignBuilt = "built" | "planned" | "differs";
+
+/**  How a design changes a node of the code's system. */
+export type DesignChange = "new" | "changed" | "removed" | "same";
+
+/**  A terminal agent wrote a design's map. */
+export type DesignChanged = {
+	id: string,
+};
+
+export type DesignComponentDto = {
+	id: string,
+	container: string,
+	name: string,
+	description: string,
+	change: DesignChange,
+	/**  The code's component it is or changes. */
+	code: string | null,
+	/**  Removed components it takes over from. */
+	replaces: string[],
+	spec: SpecRefDto[],
+	interfaces: InterfaceDto[],
+	built: DesignBuilt | null,
+};
+
+export type DesignContainerDto = {
+	id: string,
+	name: string,
+	tech: string,
+	description: string,
+	change: DesignChange,
+	/**  The code's container it is or changes. */
+	code: string | null,
+	/**  Removed containers it takes over from. */
+	replaces: string[],
+	spec: SpecRefDto[],
+	built: DesignBuilt | null,
+};
+
+/**  A design as stored: what to generate it from, and the map once generated. */
+export type DesignDto = {
+	id: string,
+	name: string,
+	bookmark: string,
+	/**  Repo-relative files and folders; a folder takes every file under it. */
+	files: string[],
+	prompt: string,
+	createdAt: number | null,
+	map: DesignMapDto | null,
+};
+
+export type DesignExternalDto = {
+	name: string,
+	kind: string,
+	description: string,
+	change: DesignChange,
+	built: DesignBuilt | null,
+};
+
+/**  What the create and edit form sends. */
+export type DesignInput = {
+	name: string,
+	bookmark: string,
+	files: string[],
+	prompt: string,
+};
+
+/**  A design with its state, for lists. */
+export type DesignItemDto = {
+	design: DesignDto,
+	state: DesignState,
+	/**  The files its entries cover at the bookmark. */
+	fileCount: number,
+};
+
+export type DesignMapDto = {
+	summary: string,
+	people: DesignActorDto[],
+	externals: DesignExternalDto[],
+	containers: DesignContainerDto[],
+	components: DesignComponentDto[],
+	relations: DesignRelationDto[],
+	differences: DifferenceDto[],
+	/**  The bookmark's commit it was written from. */
+	specCommit: string,
+	/**  The working copy's commit it was compared with. */
+	codeCommit: string | null,
+	createdAt: number | null,
+};
+
+export type DesignRelationDto = {
+	from: string,
+	to: string,
+	label: string,
+	change: DesignChange,
+	built: DesignBuilt | null,
+};
+
+export type DesignState = "fresh" | "stale" | "missing";
+
+/**  Where the code differs from the design: something built otherwise, or not in the spec. */
+export type DifferenceDto = {
+	/**
+	 *  The design node it's about: a container or component id, or a person's or external's
+	 *  name.
+	 */
+	node: string,
+	text: string,
+	path: string | null,
+	line: number | null,
+};
+
 export type DiscussionDto = {
 	pr: PrDto,
 	/**  Oldest first. */
@@ -924,6 +1055,15 @@ export type ImportDto = {
 	toPath: string,
 	/**  1-based, at head, or at base for a removed import. */
 	line: number,
+};
+
+export type InterfaceDto = {
+	name: string,
+	/**  Its shape as the spec gives it, like `send_push(user, msg) -> Delivery`. */
+	signature: string,
+	description: string,
+	spec: SpecRefDto[],
+	built: DesignBuilt | null,
 };
 
 /**  A change to the repo, on a revision given by change id. */
@@ -1547,6 +1687,14 @@ export type SiteDto = {
 	path: string,
 	/**  1-based. */
 	line: number,
+};
+
+/**  A line of a spec file. */
+export type SpecRefDto = {
+	path: string,
+	line: number,
+	/**  What it says there, in a sentence. */
+	text: string,
 };
 
 /**  Where a thread is in the reply workflow. */

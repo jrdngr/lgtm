@@ -1,9 +1,11 @@
-//! Per-repo SQLite store for marks, file checks, comments, review sessions, and reports.
+//! Per-repo SQLite store for marks, file checks, comments, review sessions, reports and
+//! designs.
 
 mod arch;
 mod bots;
 mod checks;
 mod comments;
+mod designs;
 mod marks;
 mod prs;
 mod qa;
@@ -234,6 +236,7 @@ impl Store {
         db.execute_batch(SCHEMA)?;
         comments::create_table(&db)?;
         arch::create_table(&db)?;
+        designs::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
         qa::create_table(&db)?;

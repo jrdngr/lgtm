@@ -79,7 +79,10 @@ impl Lgtm {
         Self {
             app,
             hello,
-            tool_router: Self::tool_router() + Self::arch_router() + Self::qa_router(),
+            tool_router: Self::tool_router()
+                + Self::arch_router()
+                + Self::design_router()
+                + Self::qa_router(),
         }
     }
 

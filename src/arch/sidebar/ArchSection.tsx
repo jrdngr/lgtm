@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { LookDto } from "../../bindings";
 import { useWorkspace, type WorkspaceName } from "../../core/workspace";
+import { DesignsSection } from "../../design/DesignsSection";
 import { type CurrentReview, useCurrentReview } from "../../review/current";
 import { useSendText } from "../../review/useSendText";
 import { GenerateButton, GeneratePop } from "../../system/GenerateMenu";
@@ -63,6 +64,7 @@ export function ArchSection() {
         />
       )}
       {error && <div className="arch-error">{error}</div>}
+      <DesignsSection onError={setError} />
       {review ? (
         <Body key={review.id} workspace={workspace} review={review} onError={setError} />
       ) : (

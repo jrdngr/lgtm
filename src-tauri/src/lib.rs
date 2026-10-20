@@ -95,6 +95,12 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::arch::system_map,
             commands::arch::arch_view,
             commands::arch::set_arch_view,
+            commands::design::designs,
+            commands::design::save_design,
+            commands::design::delete_design,
+            commands::design::design_prompt,
+            commands::design::bookmark_files,
+            commands::design::design_bookmarks,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,
             commands::arch::system_find,
@@ -185,6 +191,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::QaChanged,
             events::ArchChanged,
             events::SystemChanged,
+            events::DesignChanged,
             events::TerminalAgent
         ])
 }

@@ -9,6 +9,7 @@ import { addTerminal, focusPanel, openReport } from "../core/panels";
 import { onAnyReveal } from "../core/reveal";
 import { setStateRepo } from "../core/savedState";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
+import { DesignFormHost } from "../design/DesignFormHost";
 import { confirmClose } from "../editor/unsaved";
 import { forgetPr } from "../github/pr";
 import { useShortcutsMenu } from "../help/open";
@@ -274,6 +275,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       <JjBlockedBanner workspace={selected} />
       <McpOffer />
       <PromptHost />
+      <DesignFormHost workspace={selected} />
       <div className="workbench-body">
         <SidePanel
           side="left"

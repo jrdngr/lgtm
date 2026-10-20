@@ -18,6 +18,12 @@ const LEVELS = [
 
 interface Props {
   crumbs: Crumb[];
+  /** Code or a design, after the crumbs. */
+  source?: ReactNode;
+  /** Names the fourth level, Symbols by default. */
+  fourth?: string;
+  /** Hides Review, Find, Trace and Tours. */
+  bare?: boolean;
   level: Level["kind"];
   onBack?(): void;
   onForward?(): void;
@@ -80,19 +86,23 @@ export function SystemBar(p: Props) {
           </Fragment>
         ))}
       </div>
+      {p.source}
       <div className="sys-levels">
-        {LEVELS.map(([kind, label], i) => (
-          <button
-            key={kind}
-            type="button"
-            className={i === at ? "on" : undefined}
-            aria-pressed={i === at}
-            disabled={kind === "symbols" && !p.symbols}
-            onClick={() => p.onLevel(kind)}
-          >
-            {label}
-          </button>
-        ))}
+        {LEVELS.map(([kind, name], i) => {
+          const label = kind === "symbols" && p.fourth ? p.fourth : name;
+          return (
+            <button
+              key={kind}
+              type="button"
+              className={i === at ? "on" : undefined}
+              aria-pressed={i === at}
+              disabled={kind === "symbols" && !p.symbols}
+              onClick={() => p.onLevel(kind)}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       <span className="sys-grow" />
       {p.tour ? (
@@ -105,6 +115,11 @@ export function SystemBar(p: Props) {
         </span>
       ) : p.trace ? (
         <TraceBar {...p.trace} />
+      ) : p.bare ? (
+        <>
+          {p.view}
+          {p.generate}
+        </>
       ) : (
         <>
           {p.lens && (

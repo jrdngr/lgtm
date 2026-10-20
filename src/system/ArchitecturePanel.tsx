@@ -1,9 +1,12 @@
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { showLook } from "../arch/showLook";
 import { setArchView, useArch } from "../arch/state";
 import type { LookDto, SystemDto, TourDto } from "../bindings";
 import { revealInFiles } from "../core/reveal";
 import { useWorkspace } from "../core/workspace";
+import { DesignView } from "../design/DesignView";
+import { editDesign, useDesigns, useSource } from "../design/designs";
+import { SourceSwitch } from "../design/SourceSwitch";
 import { openFile } from "../editor/open";
 import { usePr } from "../github/pr";
 import { commands } from "../ipc";
@@ -65,10 +68,28 @@ import "./lens.css";
 export function ArchitecturePanel() {
   const workspace = useWorkspace();
   const { map, error, reload } = useSystem(workspace);
+  const { items } = useDesigns(workspace);
+  const { design } = useSource();
+  const noCode = !!map && !map.components.length;
+  const item =
+    items?.find((i) => i.design.id === design) ?? (noCode && !design ? items?.[0] : undefined);
+  const source = items && <SourceSwitch items={items} onNew={() => editDesign(workspace)} />;
+  if (item) {
+    return <DesignView item={item} code={noCode ? undefined : map} source={source} />;
+  }
   if (error && !map) return <div className="placeholder error">{error}</div>;
   if (!map) return <div className="placeholder">Reading the system…</div>;
-  if (!map.components.length) return <div className="placeholder">No source files</div>;
-  return <Loaded map={map} error={error} reload={reload} />;
+  if (noCode) {
+    return (
+      <div className="placeholder dsn-empty">
+        No source files
+        <button type="button" className="dsn-btn" onClick={() => editDesign(workspace)}>
+          New Design…
+        </button>
+      </div>
+    );
+  }
+  return <Loaded map={map} error={error} reload={reload} source={source} />;
 }
 
 /** The node that stands for `level` when nothing is selected. */
@@ -95,7 +116,17 @@ function sceneEdge(map: SystemDto, edges: SEdge[], key: string): SEdge | undefin
   return edges.find((e) => e.from === from && e.to === door);
 }
 
-function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload(): void }) {
+function Loaded({
+  map,
+  error,
+  reload,
+  source,
+}: {
+  map: SystemDto;
+  error?: string;
+  reload(): void;
+  source: ReactNode;
+}) {
   const workspace = useWorkspace();
   const root = useRef<HTMLDivElement>(null);
   const [level, setLevel] = useState<Level>({ kind: "context" });
@@ -550,6 +581,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     <div className="sys-panel" ref={root} tabIndex={0} onKeyDown={onKey}>
       <SystemBar
         crumbs={crumbs}
+        source={source}
         level={shown.kind}
         onBack={canBack ? () => step(-1) : undefined}
         onForward={canForward ? () => step(1) : undefined}

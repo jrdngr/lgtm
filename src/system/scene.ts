@@ -10,6 +10,9 @@ export type Level =
   | { kind: "components"; container: string }
   | { kind: "symbols"; component: string };
 
+/** How a design marks a node: by what it changes, or once code lands, by whether it's built. */
+export type Mark = "new" | "changed" | "removed" | "built" | "planned" | "differs";
+
 export type NodeKind = "person" | "system" | "external" | "container" | "component" | "group";
 
 /** What the review does to a node: changes it, or reaches it through what it changes. */
@@ -43,6 +46,10 @@ export interface SNode {
   delta?: Delta;
   /** It has open Look items. */
   flag?: boolean;
+  /** On a design's map. */
+  mark?: Mark;
+  /** A design component's interfaces, a line each. */
+  lines?: string[];
 }
 
 export interface SEdge {
