@@ -351,10 +351,6 @@
 .stack-pos {
   flex: none;
   font: 10px var(--mono);
-  color: var(--faint);
-}
-
-.stack-pos.here {
   color: var(--added);
 }
 

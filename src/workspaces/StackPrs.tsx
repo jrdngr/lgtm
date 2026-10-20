@@ -148,9 +148,7 @@ export function StackPrs({ workspace, refreshed, onError }: Props) {
                 <span className="stack-num">#{pr.number}</span>
                 <span className="ellipsis">{pr.title}</span>
                 {pr.draft && <span className="pill">draft</span>}
-                <span className={`stack-pos${pr.position === "@" ? " here" : ""}`}>
-                  {pr.position}
-                </span>
+                {pr.position === "@" && <span className="stack-pos">@</span>}
               </span>
               <span className="stack-bm">{pr.bookmark}</span>
             </span>
