@@ -86,6 +86,35 @@ export function filterLabel(filter: Filter, setup: MarkSetup) {
   return filter === "left" ? "not done" : setup.label(filter);
 }
 
+/** One part of the progress bar: rows marked one color, rows done by their file, or
+ * unmarked rows. */
+export interface ProgressPart {
+  key: string;
+  label: string;
+  color?: MarkColor;
+  rows: number;
+  done: boolean;
+}
+
+/** The parts with rows, marks in setup order, then rows done by their file, then unmarked. */
+export function progressParts(p: Progress, setup: MarkSetup): ProgressPart[] {
+  const marked = setup.slots
+    .filter((s) => (p.marks[s.color] ?? 0) > 0)
+    .map((s) => ({
+      key: s.color,
+      label: setup.label(s.color),
+      color: s.color,
+      rows: p.marks[s.color] ?? 0,
+      done: setup.done(s.color),
+    }));
+  const unmarked = p.changed - p.byFile - marked.reduce((n, m) => n + m.rows, 0);
+  return [
+    ...marked,
+    { key: "byFile", label: "checked files", rows: p.byFile, done: true },
+    { key: "unmarked", label: "unmarked", rows: unmarked, done: false },
+  ].filter((x) => x.rows > 0);
+}
+
 /** The counts behind a progress figure, for a tooltip. */
 export function progressTitle(p: Progress, setup: MarkSetup) {
   const parts = setup.slots

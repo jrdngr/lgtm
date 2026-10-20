@@ -6,7 +6,7 @@ import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
 import type { Filter } from "./rowState";
-import { type Progress, progressTitle } from "./state";
+import { type Progress, type ProgressPart, progressParts } from "./state";
 import "./ReviewBar.css";
 
 const SINCE_LABEL = {
@@ -147,26 +147,80 @@ export function ReviewBar(props: Props) {
 const share = (n: number, of: number) => (of > 0 ? (n / of) * 100 : 0);
 
 /** Marked rows as one bar split by color, then rows done by their file, with the done share
- * beside it. */
+ * beside it. Hovering shows the lines reviewed and left, and each part's count. */
 function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSetup }) {
+  const [hover, setHover] = useState(false);
+  const parts = progressParts(p, setup);
   return (
-    <span className="progress" title={progressTitle(p, setup)}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: hovering only shows counts
+    <span
+      className="progress"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
       <span className="progress-stack">
-        {setup.slots.map(
-          (s) =>
-            (p.marks[s.color] ?? 0) > 0 && (
-              <span
-                key={s.color}
-                style={{
-                  width: `${share(p.marks[s.color] ?? 0, p.changed)}%`,
-                  background: markVar(s.color),
-                }}
-              />
-            ),
-        )}
-        <span className="p-by-file" style={{ width: `${share(p.byFile, p.changed)}%` }} />
+        {parts
+          .filter((x) => x.key !== "unmarked")
+          .map((x) => (
+            <span
+              key={x.key}
+              className={x.color ? undefined : "p-by-file"}
+              style={{
+                width: `${share(x.rows, p.changed)}%`,
+                background: x.color && markVar(x.color),
+              }}
+            />
+          ))}
       </span>
       <span className="progress-pct">{Math.floor(share(p.done, p.changed))}%</span>
+      {hover && <ProgressCard p={p} parts={parts} />}
+    </span>
+  );
+}
+
+const count = (n: number) => n.toLocaleString("en-US");
+
+function ProgressCard({ p, parts }: { p: Progress; parts: ProgressPart[] }) {
+  const bar = [...parts.filter((x) => x.done), ...parts.filter((x) => !x.done)];
+  return (
+    <span className="progress-card">
+      <span className="pc-totals">
+        <span>
+          <span className="pc-label">REVIEWED</span>
+          <b>{count(p.done)}</b>
+        </span>
+        <span>
+          <span className="pc-label">LEFT</span>
+          <b className="pc-left">{count(p.changed - p.done)}</b>
+        </span>
+      </span>
+      <span className="pc-bar">
+        {bar
+          .filter((x) => x.key !== "unmarked")
+          .map((x) => (
+            <span
+              key={x.key}
+              className={x.color ? undefined : "p-by-file"}
+              style={{
+                width: `${share(x.rows, p.changed)}%`,
+                background: x.color && markVar(x.color),
+              }}
+            />
+          ))}
+      </span>
+      <span className="pc-sep" />
+      <span className="pc-rows">
+        {parts.map((x) => (
+          <span key={x.key} className="pc-row">
+            <span
+              className={`pc-sw${x.key === "byFile" ? " p-by-file" : ""}${x.key === "unmarked" ? " empty" : ""}`}
+              style={x.color ? { background: markVar(x.color) } : undefined}
+            />
+            <span className="pc-name">{x.label}</span>
+            <span>{count(x.rows)}</span>
+          </span>
+        ))}
+      </span>
     </span>
   );
 }

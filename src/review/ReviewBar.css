@@ -54,6 +54,7 @@
 }
 
 .review-bar .progress {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -69,8 +70,96 @@
   background: var(--border);
 }
 
-.progress-stack .p-by-file {
+.progress-stack .p-by-file,
+.progress-card .p-by-file {
   background: var(--faint);
+}
+
+.progress-card {
+  display: flex;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  flex-direction: column;
+  gap: 12px;
+  width: 280px;
+  box-sizing: border-box;
+  padding: 14px;
+  border: 1px solid #3a3c42;
+  border-radius: 10px;
+  background: #202124;
+  box-shadow: 0 16px 40px rgb(0 0 0 / 50%);
+  color: #e6e6e6;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-totals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pc-totals > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pc-totals b {
+  font-size: 22px;
+}
+
+.pc-totals b.pc-left {
+  color: #e3b341;
+}
+
+.pc-label {
+  color: #c9ccd2;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.pc-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--border);
+}
+
+.pc-sep {
+  height: 1px;
+  background: #34363b;
+}
+
+.pc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pc-name {
+  flex: 1;
+}
+
+.pc-sw {
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border-radius: 2px;
+}
+
+.pc-sw.empty {
+  border: 1px solid var(--faint);
 }
 
 .progress-pct {
