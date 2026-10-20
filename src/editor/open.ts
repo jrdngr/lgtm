@@ -7,6 +7,8 @@ export interface EditorParams {
   path: string;
   /** 1-based line to put the cursor on. */
   line?: number;
+  /** A link's `#anchor` to show: a heading, an element id, or a line (`L12`). */
+  anchor?: string;
   /** Changes on every open, so opening an open file at a line moves its cursor again. */
   nonce?: number;
   // Kept with the layout, so the tab comes back as it was.
@@ -27,9 +29,10 @@ export const editorId = (path: string) => `editor:${path}`;
 
 export const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
-/** Opens `path` in an editor tab, or focuses the one it's in, with the cursor at `line`. */
-export function openFileIn(api: DockviewApi, path: string, line?: number) {
-  const params: EditorParams = { path, line, nonce: Date.now() };
+/** Opens `path` in an editor tab, or focuses the one it's in, with the cursor at `line` or
+ * showing `anchor`. */
+export function openFileIn(api: DockviewApi, path: string, line?: number, anchor?: string) {
+  const params: EditorParams = { path, line, anchor, nonce: Date.now() };
   const open = api.getPanel(editorId(path));
   if (open) {
     open.api.updateParameters(params);
@@ -47,7 +50,7 @@ export function openFileIn(api: DockviewApi, path: string, line?: number) {
 }
 
 /** Opens `path` in the workspace's dock. */
-export function openFile(workspace: WorkspaceName, path: string, line?: number) {
+export function openFile(workspace: WorkspaceName, path: string, line?: number, anchor?: string) {
   const api = dockOf(workspace);
-  if (api) openFileIn(api, path, line);
+  if (api) openFileIn(api, path, line, anchor);
 }

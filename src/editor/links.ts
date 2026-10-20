@@ -23,26 +23,30 @@ export function linksIn(line: string): LineLink[] {
 }
 
 /** Where a link in the file at `from` (repo-relative) goes: a web address, or a file in the
- * repo. Links within the page go nowhere. */
+ * repo with the anchor after its `#`, if any. A bare `#anchor` is in `from` itself. */
 export function resolveLink(
   href: string,
   from: string | undefined,
-): { url: string } | { path: string } | undefined {
+): { url: string } | { path: string; anchor?: string } | undefined {
   if (/^(https?|mailto):/i.test(href)) return { url: href };
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith("#") || from === undefined) return;
-  const target = decodeURI(href.split("#")[0]);
-  const parts = target.startsWith("/") ? [] : from.split("/").slice(0, -1);
-  for (const part of target.split("/")) {
+  if (/^[a-z][a-z0-9+.-]*:/i.test(href) || from === undefined) return;
+  const hash = href.indexOf("#");
+  const anchor = hash < 0 ? "" : decodeURIComponent(href.slice(hash + 1));
+  const target = decodeURI(hash < 0 ? href : href.slice(0, hash));
+  const parts = target.startsWith("/") || !target ? [] : from.split("/").slice(0, -1);
+  for (const part of (target || from).split("/")) {
     if (part === "..") parts.pop();
     else if (part && part !== ".") parts.push(part);
   }
-  return parts.length ? { path: parts.join("/") } : undefined;
+  if (!parts.length) return undefined;
+  return anchor ? { path: parts.join("/"), anchor } : { path: parts.join("/") };
 }
 
-/** Opens a link in the file at `from`: web addresses in the browser, files in an editor. */
+/** Opens a link in the file at `from`: web addresses in the browser, files in an editor at
+ * the link's anchor. */
 export function followLink(href: string, workspace: WorkspaceName, from?: string) {
   const to = resolveLink(href, from);
   if (!to) return;
   if ("url" in to) openUrl(to.url);
-  else openFile(workspace, to.path);
+  else openFile(workspace, to.path, undefined, to.anchor);
 }

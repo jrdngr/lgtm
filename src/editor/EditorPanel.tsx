@@ -11,6 +11,7 @@ import { copy, openMenu } from "../ui/contextMenu";
 import { saveTabParams } from "../workbench/tabParams";
 import { wordWrap } from "../workbench/wordWrap";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
+import { anchorLine } from "./anchors";
 import { minimalChange } from "./change";
 import { editorMenu, pathAndLine, placeAt } from "./editorMenu";
 import { HtmlView } from "./HtmlView";
@@ -40,7 +41,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorParams>) {
  * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
 function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
-  const { path, line, nonce } = params;
+  const { path, line, anchor, nonce } = params;
   const host = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView>();
   /** The text as last read or saved. */
@@ -129,6 +130,27 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     // Used: a restart brings back the cursor where it was left, not this line.
     saveTabParams(api, { line: undefined, nonce: undefined });
   }, [api, view, line, nonce]);
+
+  // A link's anchor shows where it points, in whichever view the tab is in.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` follows the same link again
+  useEffect(() => {
+    if (!view || !anchor) return;
+    saveTabParams(api, { anchor: undefined, nonce: undefined });
+    const at = anchorLine(view.state.doc.toString(), anchor);
+    if (at === undefined) return;
+    const pos = view.state.doc.line(Math.min(at, view.state.doc.lines)).from;
+    view.dispatch({
+      selection: { anchor: pos },
+      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 24 }),
+    });
+    if (renderedRef.current instanceof HTMLElement) {
+      const root = renderedRef.current;
+      requestAnimationFrame(() => {
+        const blocks = [...root.querySelectorAll<HTMLElement>("[data-start]")];
+        blocks.find((b) => Number(b.dataset.end) >= at)?.scrollIntoView({ block: "start" });
+      });
+    } else view.focus();
+  }, [api, view, anchor, nonce]);
 
   useEffect(() => {
     api.setTitle(dirty ? `● ${baseName(path)}` : baseName(path));
