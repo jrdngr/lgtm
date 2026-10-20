@@ -157,6 +157,10 @@ export function QaTab({ api }: IDockviewPanelProps) {
         <div className="qa-sent">
           ✓ Sent to <span className="qa-sent-term">›_ {d.sent || "a terminal"}</span>
           {d.sentAt != null && ` · ${sentTime(d.sentAt)}`}
+          <span className="spacer" />
+          <button type="button" className="qa-sent-close" onClick={() => api.close()}>
+            Close Tab
+          </button>
         </div>
       )}
       {state.error && <div className="review-error">{state.error}</div>}
