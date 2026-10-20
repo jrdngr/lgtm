@@ -170,6 +170,37 @@ impl RepoCtx {
         Ok(d)
     }
 
+    /// Saves a new design an agent asked for, after checking its bookmark and that each entry
+    /// names a file or folder there. Folders get a trailing `/`, as the design form writes them.
+    pub async fn create_design(
+        &self,
+        workspace: Option<&str>,
+        mut input: DesignInput,
+    ) -> anyhow::Result<DesignDto> {
+        let all = self
+            .bookmark_files(workspace, &input.bookmark)
+            .await
+            .with_context(|| format!("no bookmark `{}`", input.bookmark))?;
+        let mut missing = Vec::new();
+        for e in &mut input.files {
+            let path = e.trim_start_matches("./").trim_end_matches('/').to_string();
+            if all.contains(&path) {
+                *e = path;
+            } else if covered(&all, std::slice::from_ref(&path)).is_empty() {
+                missing.push(path);
+            } else {
+                *e = format!("{path}/");
+            }
+        }
+        if !missing.is_empty() {
+            bail!("not at `{}`: {}", input.bookmark, missing.join(", "));
+        }
+        if input.files.is_empty() {
+            bail!("a design needs files");
+        }
+        self.save_design(None, input)
+    }
+
     pub fn delete_design(&self, id: &str) -> anyhow::Result<()> {
         Ok(self.store.lock().unwrap().delete_design(id)?)
     }
@@ -240,6 +271,47 @@ fn exact(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::review::tests::{jj, repo, write};
+
+    #[tokio::test]
+    async fn create_design_marks_folders_and_refuses_paths_not_at_the_bookmark() {
+        let (dir, ctx) = repo();
+        let d = dir.path();
+        std::fs::create_dir_all(d.join("docs/notify")).unwrap();
+        write(d, "docs/notify/a.md", "# A\n");
+        write(d, "docs/plan.md", "# Plan\n");
+        jj(d, &["bookmark", "create", "spec", "-r", "@"]);
+        let input = |files: &[&str]| DesignInput {
+            name: "Notify".into(),
+            bookmark: "spec".into(),
+            files: files.iter().map(|f| f.to_string()).collect(),
+            prompt: String::new(),
+        };
+
+        let made = ctx
+            .create_design(None, input(&["./docs/notify", "docs/plan.md"]))
+            .await
+            .unwrap();
+        assert_eq!(made.files, ["docs/notify/", "docs/plan.md"]);
+        assert_eq!(ctx.design(&made.id).unwrap().name, "Notify");
+
+        let err = ctx
+            .create_design(None, input(&["docs/notify/", "docs/gone.md"]))
+            .await
+            .unwrap_err();
+        assert_eq!(err.to_string(), "not at `spec`: docs/gone.md");
+        assert!(
+            ctx.create_design(
+                None,
+                DesignInput {
+                    bookmark: "nope".into(),
+                    ..input(&["docs/plan.md"])
+                }
+            )
+            .await
+            .is_err()
+        );
+    }
 
     #[test]
     fn covered_takes_files_and_everything_under_folders() {

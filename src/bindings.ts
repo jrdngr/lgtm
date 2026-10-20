@@ -747,9 +747,10 @@ export type DesignBuilt = "built" | "planned" | "differs";
 /**  How a design changes a node of the code's system. */
 export type DesignChange = "new" | "changed" | "removed" | "same";
 
-/**  A terminal agent wrote a design's map. */
+/**  A terminal agent made a design or wrote its map. */
 export type DesignChanged = {
 	id: string,
+	workspace: string | null,
 };
 
 export type DesignComponentDto = {

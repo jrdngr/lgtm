@@ -6,8 +6,9 @@ use rmcp::{tool, tool_router};
 use serde::{Deserialize, Serialize};
 use tauri_specta::Event as _;
 
-use super::server::{Lgtm, Out, failed};
+use super::server::{Lgtm, Out, failed, json};
 use crate::events::DesignChanged;
+use crate::review::arch::design::DesignInput;
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -134,6 +135,25 @@ pub struct Design {
     pub differences: Vec<Difference>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+pub struct NewDesign {
+    /// What the user calls it.
+    pub name: String,
+    /// The jj bookmark whose commit holds the spec files.
+    pub bookmark: String,
+    /// Spec files and folders, relative to the repo root; a folder takes everything under it.
+    pub files: Vec<String>,
+    /// What to map from them, like one concept or some phases. Empty for all of it.
+    #[serde(default)]
+    pub prompt: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DesignId {
+    /// A design's id from list_designs.
+    pub id: String,
+}
+
 #[tool_router(router = design_router, vis = "pub(super)")]
 impl Lgtm {
     #[tool(
@@ -149,14 +169,79 @@ impl Lgtm {
             .save_design_map(self.workspace(), &id, reply)
             .await
             .map_err(failed)?;
-        DesignChanged { id: id.clone() }
-            .emit_to(self.app(), &label)
-            .ok();
+        DesignChanged {
+            id: id.clone(),
+            workspace: self.workspace().map(String::from),
+        }
+        .emit_to(self.app(), &label)
+        .ok();
         let m = d.map.as_ref();
         Ok(format!(
             "Stored design `{id}`: {} containers, {} components.",
             m.map_or(0, |m| m.containers.len()),
             m.map_or(0, |m| m.components.len())
         ))
+    }
+
+    #[tool(
+        description = "Make a design in lgtm: a named set of spec files at a bookmark, mapped \
+        as a C4 diagram in the Architecture tab. Returns the instructions for mapping it, which \
+        end with calling set_design."
+    )]
+    async fn create_design(&self, Parameters(p): Parameters<NewDesign>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let input = DesignInput {
+            name: p.name,
+            bookmark: p.bookmark,
+            files: p.files,
+            prompt: p.prompt,
+        };
+        let d = ctx
+            .create_design(self.workspace(), input)
+            .await
+            .map_err(failed)?;
+        DesignChanged {
+            id: d.id.clone(),
+            workspace: self.workspace().map(String::from),
+        }
+        .emit_to(self.app(), &label)
+        .ok();
+        ctx.design_prompt(self.workspace(), &d.id)
+            .await
+            .map_err(failed)
+    }
+
+    #[tool(
+        description = "List the repo's designs: id, name, bookmark, files, prompt, and \
+        whether its map is fresh, stale (the bookmark moved over its files) or missing."
+    )]
+    async fn list_designs(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let items = ctx.designs(self.workspace()).await.map_err(failed)?;
+        let out: Vec<_> = items
+            .into_iter()
+            .map(|i| {
+                serde_json::json!({
+                    "id": i.design.id,
+                    "name": i.design.name,
+                    "bookmark": i.design.bookmark,
+                    "files": i.design.files,
+                    "prompt": i.design.prompt,
+                    "state": i.state,
+                })
+            })
+            .collect();
+        json(&out)
+    }
+
+    #[tool(
+        description = "The instructions for mapping design `id` again, which end with \
+        calling set_design. Use it on a stale or missing design from list_designs."
+    )]
+    async fn design_instructions(&self, Parameters(p): Parameters<DesignId>) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        ctx.design_prompt(self.workspace(), &p.id)
+            .await
+            .map_err(failed)
     }
 }
