@@ -67,6 +67,20 @@ describe("restWires", () => {
     });
   });
 
+  it("slides lit labels along their wires apart when they'd overlap", () => {
+    const close: Layout = {
+      ...layout,
+      nodes: [node("a", 0, 0), node("b", 300, 0), node("c", 0, 6), node("d", 300, 6)],
+    };
+    const two: SEdge[] = [
+      { from: "a", to: "b", imports: 1, label: "verifies tokens" },
+      { from: "c", to: "d", imports: 1, label: "watches" },
+    ];
+    const [x, y] = restWires(close, two, { hovered: new Set(["a>b", "c>d"]), hot: new Map() });
+    const apart = Math.abs(x.mid.x - y.mid.x) > 85 || Math.abs(x.mid.y - y.mid.y) >= 18;
+    expect(apart).toBe(true);
+  });
+
   it("gives an unlabeled lit edge no pill", () => {
     expect(rest(["b>d"]).find((x) => x.key === "b>d")?.pill).toBeUndefined();
   });

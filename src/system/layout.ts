@@ -283,7 +283,7 @@ function exit(a: Box, b: Box) {
 }
 
 /** A curve between two boxes' edges, bowed to the right of its direction so that edges
- * both ways between two boxes stay apart, with the point halfway along it. */
+ * both ways between two boxes stay apart, with the point halfway along it and any other. */
 export function curve(a: Box, b: Box) {
   const p = exit(a, b);
   const q = exit(b, a);
@@ -296,5 +296,9 @@ export function curve(a: Box, b: Box) {
   return {
     d: `M${p.x} ${p.y}Q${cx} ${cy} ${q.x} ${q.y}`,
     mid: { x: (p.x + 2 * cx + q.x) / 4, y: (p.y + 2 * cy + q.y) / 4 },
+    at: (t: number) => ({
+      x: (1 - t) ** 2 * p.x + 2 * (1 - t) * t * cx + t * t * q.x,
+      y: (1 - t) ** 2 * p.y + 2 * (1 - t) * t * cy + t * t * q.y,
+    }),
   };
 }

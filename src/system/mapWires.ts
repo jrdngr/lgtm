@@ -71,6 +71,7 @@ interface RestState {
 export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] {
   const box = new Map(layout.nodes.map((n) => [n.id, n]));
   const hovering = s.hovered.size > 0;
+  const placed: Box[] = [];
   return edges.flatMap((e) => {
     const a = box.get(e.from);
     const b = box.get(e.to);
@@ -88,11 +89,13 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
           : e.status && !hovering && !s.quiet
             ? { kind: e.status, text: statusLabel(e) }
             : undefined;
+    const { d, mid, at } = curve(a, b);
     return [
       {
         e,
         key,
-        ...curve(a, b),
+        d,
+        mid: on && pill ? spot(pill, at, placed, layout.nodes) : mid,
         door: !!(a.door || b.door),
         tone: (on || !s.quiet ? e.status : undefined) ?? (hot ? "hot" : on ? "blue" : undefined),
         faint: !on && hovering,
@@ -102,6 +105,38 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
       },
     ];
   });
+}
+
+/** Spots along a wire to try for its pill, from halfway out. */
+const SPOTS = [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8];
+/** Then, off its middle, for wires running side by side. */
+const NUDGES = [20, -20, 40, -40];
+
+/** A pill's rough box centered on `p`. */
+function pillBox(pill: Pill, p: { x: number; y: number }): Box {
+  const w = pill.kind === "num" ? 20 : Math.min(200, pill.text.length * 6.2 + 16);
+  return { x: p.x - w / 2, y: p.y - 9, w, h: 18 };
+}
+
+const meets = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/** Where a lit pill sits: the first spot along or beside its wire clear of the pills placed
+ * before it and of the nodes, else the first clear of the pills, else halfway. Adds its box
+ * to `placed`. */
+function spot(
+  pill: Pill,
+  at: (t: number) => { x: number; y: number },
+  placed: Box[],
+  nodes: Box[],
+) {
+  const mid = at(0.5);
+  const off = NUDGES.map((dy) => ({ x: mid.x, y: mid.y + dy }));
+  const tries = [...SPOTS.map(at), ...off].map((p) => ({ p, b: pillBox(pill, p) }));
+  const free = tries.filter((c) => !placed.some((b) => meets(b, c.b)));
+  const pick = free.find((c) => !nodes.some((n) => meets(n, c.b))) ?? free[0] ?? tries[0];
+  placed.push(pick.b);
+  return pick.p;
 }
 
 /** A collapsed graph's straight run out of each neighbor, where its label sits, and the bend
