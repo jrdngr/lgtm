@@ -108,3 +108,8 @@
 .arch-split {
   position: relative;
 }
+
+.sys-gen[aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+}

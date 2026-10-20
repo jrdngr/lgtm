@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  keepSubmit,
   pinTarget,
   promptAgent,
   registerTerminal,
@@ -114,6 +115,34 @@ describe("submitNextSend", () => {
     sendToTerminal("s2", "ls");
     off2();
     expect(shell.got).toEqual(["ls"]);
+  });
+});
+
+describe("keepSubmit", () => {
+  it("keeps a send armed past the window while its text is worked out", async () => {
+    vi.useFakeTimers();
+    const agent = fake("k1", true, true);
+    const off = registerTerminal("k-agent", agent.target);
+    let resolve = (_: string) => {};
+    const text = new Promise<string>((r) => {
+      resolve = r;
+    });
+    submitNextSend();
+    const kept = keepSubmit(text);
+    vi.advanceTimersByTime(10_000);
+    resolve("describe it");
+    sendToTerminal("k1", await kept);
+    off();
+    vi.useRealTimers();
+    expect(agent.got).toEqual(["describe it", "\r"]);
+  });
+
+  it("doesn't arm a send that wasn't armed", async () => {
+    const agent = fake("k2", true, true);
+    const off = registerTerminal("k-agent2", agent.target);
+    sendToTerminal("k2", await keepSubmit(Promise.resolve("plain")));
+    off();
+    expect(agent.got).toEqual(["plain"]);
   });
 });
 

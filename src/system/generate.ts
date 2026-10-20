@@ -37,10 +37,10 @@ export async function generatePrompt(
   review: number | undefined,
   keys: GenKey[],
 ): Promise<Prompt> {
-  const parts: Prompt[] = [];
-  if (keys.includes("description")) parts.push(await commands.describePrompt(workspace));
-  if (keys.includes("assessment") && review !== undefined)
-    parts.push(await commands.assessPrompt(review));
+  const parts = await Promise.all([
+    ...(keys.includes("description") ? [commands.describePrompt(workspace)] : []),
+    ...(keys.includes("assessment") && review !== undefined ? [commands.assessPrompt(review)] : []),
+  ]);
   const failed = parts.find((p) => p.status === "error");
   if (failed) return failed;
   const texts = parts.map((p) => (p.status === "ok" ? p.data : ""));

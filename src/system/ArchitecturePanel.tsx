@@ -10,6 +10,7 @@ import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
 import { PipeButton } from "../terminal/PipeButton";
+import { keepSubmit } from "../terminal/registry";
 import type { CtxEntry } from "../ui/contextMenu";
 import { NEUTRAL } from "./colors";
 import { EdgeDetail } from "./EdgeDetail";
@@ -104,6 +105,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const tracing = useTrace(map);
   const { trace } = tracing;
   const [touring, setTouring] = useState<{ tour: TourDto; at: number }>();
@@ -344,7 +346,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const send = async (
     text: Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
   ) => {
-    const r = await text;
+    setSending(true);
+    const r = await keepSubmit(text).finally(() => setSending(false));
     if (r.status === "error") return setSendError(r.error);
     setSendError(undefined);
     sendText(r.data);
@@ -567,6 +570,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
             className="sys-btn"
             items={gen}
             open={genOpen}
+            busy={sending}
             onToggle={() => {
               setToursOpen(false);
               setGenOpen(!genOpen);

@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { PipeButton } from "../terminal/PipeButton";
+import { Spinner } from "../ui/Busy";
 import type { GenItem, GenKey, GenState } from "./generate";
 import { Chevron } from "./glyphs";
 import "./gen.css";
 
 const STATES: Record<GenState, string> = { fresh: "Fresh", stale: "Stale", missing: "Missing" };
 
-/** Opens Generate; a dot when something is stale or missing. */
+/** Opens Generate; a dot when something is stale or missing, a spinner while a prompt is
+ * being put together. */
 export function GenerateButton(p: {
   items: GenItem[];
   open: boolean;
+  busy?: boolean;
   onToggle(): void;
   className?: string;
 }) {
@@ -18,14 +21,14 @@ export function GenerateButton(p: {
       type="button"
       className={`pipe sys-gen${p.className ? ` ${p.className}` : ""}${p.open ? " open" : ""}`}
       aria-expanded={p.open}
+      aria-busy={p.busy}
+      disabled={p.busy}
       data-generate
       onClick={p.onToggle}
     >
       Generate
-      {p.items.some((i) => i.state !== "fresh") && <span className="sys-gen-dot" />}
-      <span className="sys-down">
-        <Chevron size={10} />
-      </span>
+      {!p.busy && p.items.some((i) => i.state !== "fresh") && <span className="sys-gen-dot" />}
+      <span className="sys-down">{p.busy ? <Spinner /> : <Chevron size={10} />}</span>
     </button>
   );
 }

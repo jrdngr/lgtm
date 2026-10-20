@@ -9,6 +9,7 @@ import { lensOf } from "../../system/lens";
 import { SystemTree } from "../../system/SystemTree";
 import { showInSystem } from "../../system/showInSystem";
 import { useSystem } from "../../system/useSystem";
+import { keepSubmit } from "../../terminal/registry";
 import { Busy } from "../../ui/Busy";
 import { Empty, SectionHeader } from "../../ui/SectionHeader";
 import { useArch } from "../state";
@@ -26,6 +27,7 @@ export function ArchSection() {
   const review = useCurrentReview(workspace);
   const [error, setError] = useState<string>();
   const [genOpen, setGenOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const { sendText, picker } = useSendText(workspace, setError, () => {});
   const { map } = useSystem(workspace);
   const { arch } = useArch(review);
@@ -33,7 +35,8 @@ export function ArchSection() {
   const send = async (
     p: Promise<{ status: "ok"; data: string } | { status: "error"; error: string }>,
   ) => {
-    const r = await p;
+    setSending(true);
+    const r = await keepSubmit(p).finally(() => setSending(false));
     if (r.status === "error") return setError(r.error);
     setError(undefined);
     sendText(r.data);
@@ -41,7 +44,12 @@ export function ArchSection() {
   return (
     <div className="side-split arch-split">
       <SectionHeader title="Architecture">
-        <GenerateButton items={gen} open={genOpen} onToggle={() => setGenOpen(!genOpen)} />
+        <GenerateButton
+          items={gen}
+          open={genOpen}
+          busy={sending}
+          onToggle={() => setGenOpen(!genOpen)}
+        />
       </SectionHeader>
       {genOpen && (
         <GeneratePop

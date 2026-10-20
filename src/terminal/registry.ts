@@ -139,6 +139,15 @@ export function submitNextSend() {
   submitUntil = Date.now() + SUBMIT_MS;
 }
 
+/** `text`, with a send armed by `submitNextSend` before it kept armed until it resolves, for
+ * text that takes longer to work out than the window. */
+export async function keepSubmit<T>(text: Promise<T>): Promise<T> {
+  const armed = Date.now() < submitUntil;
+  const out = await text;
+  if (armed) submitNextSend();
+  return out;
+}
+
 /** C0 and C1 control characters other than tab and newline. An escape in pasted text could end
  * bracketed paste early and have the shell run the rest. */
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
