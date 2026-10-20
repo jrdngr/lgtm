@@ -51,6 +51,12 @@
   }
 }
 
+.sys-nav {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
 .sys-back {
   display: grid;
   flex: none;

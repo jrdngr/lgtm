@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { NEUTRAL, tint } from "./colors";
+import { DeltaCounts } from "./Delta";
 import { Chevron, Person } from "./glyphs";
 import type { Box, Placed } from "./layout";
-import { deltaText } from "./lens";
 
 /** A tile's width for a component of `files` files. */
 const tileWidth = (files: number) => Math.round(Math.min(40, 8 + Math.sqrt(files) * 5));
@@ -24,15 +24,17 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
           n.tech && <span className="sys-chip">{n.tech}</span>}
         {n.door && <Chevron />}
         {stale && <span className="sys-stale" />}
-        {n.kind === "component" && (n.delta || n.status === "added") && (
-          <span className={`sys-delta${n.status === "added" ? " new" : ""}`}>
-            {n.status === "added" ? "new" : deltaText(n.delta)}
-          </span>
+        {n.kind === "component" && n.status === "added" && (
+          <span className="sys-delta new">new</span>
+        )}
+        {n.kind === "component" && n.status !== "added" && (
+          <DeltaCounts d={n.delta} className="sys-delta" />
+        )}
+        {n.kind === "container" && !n.door && (
+          <DeltaCounts d={n.delta} className="sys-delta compact-only" />
         )}
       </span>
-      {n.kind === "container" && !n.door && n.delta && (
-        <span className="sys-cnt">{deltaText(n.delta)}</span>
-      )}
+      {n.kind === "container" && !n.door && <DeltaCounts d={n.delta} className="sys-cnt" />}
       {n.flag && <span className="sys-flag">!</span>}
       {n.kind === "container" && !n.door && (n.tech?.length ?? 0) > 10 && (
         <span className="sys-chip">{n.tech}</span>

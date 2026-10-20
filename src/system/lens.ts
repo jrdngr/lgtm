@@ -92,12 +92,6 @@ export function lensOf(arch: ArchDto, files: { rows: RowDto[] }[]): Lens {
 export const isChanged = (s: CompStatus | undefined) =>
   s === "changed" || s === "added" || s === "removed";
 
-/** `+4 −1`, `+2`, or nothing. */
-export function deltaText(d: Delta | undefined): string {
-  if (!d) return "";
-  return [d.add ? `+${d.add}` : "", d.del ? `−${d.del}` : ""].filter(Boolean).join(" ");
-}
-
 export function addDelta(a: Delta | undefined, b: Delta | undefined): Delta | undefined {
   if (!a) return b;
   if (!b) return a;

@@ -213,6 +213,7 @@ function containersScene(map: SystemDto, lens?: Lens): Scene {
       ...(lens?.removed ?? []).filter((k) => k.container === c.id),
     ];
     const changed = comps.filter((k) => isChanged(lens?.status.get(k.id)));
+    const impacted = comps.some((k) => lens?.status.get(k.id) === "impacted");
     return {
       id: containerId(c.id),
       kind: "container",
@@ -226,7 +227,7 @@ function containersScene(map: SystemDto, lens?: Lens): Scene {
         .sort((a, b) => b.files - a.files)
         .slice(0, TILES)
         .map((k) => ({ files: k.files, changed: changed.includes(k) })),
-      status: changed.length ? "changed" : undefined,
+      status: changed.length ? "changed" : impacted ? "impacted" : undefined,
       delta: changed.reduce<Delta | undefined>(
         (d, k) => addDelta(d, lens?.delta.get(k.id)),
         undefined,
@@ -415,12 +416,46 @@ function componentsScene(map: SystemDto, container: string, lens?: Lens): Scene 
   };
 }
 
+/** With the lens: only what the review changes or impacts, and what wires to it. */
 export function sceneOf(map: SystemDto, level: Level, lens?: Lens): Scene {
   if (level.kind === "context") return contextScene(map);
-  if (level.kind === "containers") return containersScene(map, lens);
-  if (level.kind === "symbols")
-    return componentsScene(map, containerOf(map, level.component), lens);
-  return componentsScene(map, level.container, lens);
+  if (level.kind === "containers") {
+    const scene = containersScene(map, lens);
+    return lens ? affectedOnly(scene, CONTAINERS_PER_ROW) : scene;
+  }
+  const container = level.kind === "symbols" ? containerOf(map, level.component) : level.container;
+  const scene = componentsScene(map, container, lens);
+  return lens ? affectedOnly(scene, PER_ROW) : scene;
+}
+
+/** Whether the review changes a node or reaches it through a change it uses. */
+const affected = (n: SNode) => !!n.status && n.status !== "upstream";
+
+/** `scene` without the nodes the review doesn't affect, rows packed again within each tier.
+ * The whole scene when it affects none. */
+export function affectedOnly(scene: Scene, per: number): Scene {
+  const groups: Row[] = [];
+  for (const r of scene.inside) {
+    const last = groups.at(-1);
+    if (!last || r.label !== undefined || last.label === undefined) {
+      groups.push({ label: r.label, nodes: [...r.nodes] });
+    } else last.nodes.push(...r.nodes);
+  }
+  const inside = groups.flatMap((g) => wrap(g.nodes.filter(affected), g.label, per));
+  if (!inside.length) return scene;
+  const ids = new Set(inside.flatMap((r) => r.nodes.map((n) => n.id)));
+  const touching = scene.edges.filter((e) => ids.has(e.from) || ids.has(e.to));
+  const wired = (n: SNode) => touching.some((e) => e.from === n.id || e.to === n.id);
+  const left = scene.left.filter(wired);
+  const right = scene.right.filter(wired);
+  for (const n of [...left, ...right]) ids.add(n.id);
+  return {
+    ...scene,
+    left,
+    inside,
+    right,
+    edges: touching.filter((e) => ids.has(e.from) && ids.has(e.to)),
+  };
 }
 
 /** The container a component is in. */

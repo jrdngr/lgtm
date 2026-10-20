@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { showLook } from "../arch/showLook";
 import { setArchView, useArch } from "../arch/state";
 import type { LookDto, SystemDto, TourDto } from "../bindings";
 import { revealInFiles } from "../core/reveal";
@@ -19,6 +20,7 @@ import { layout } from "./layout";
 import { lensOf } from "./lens";
 import { edgeKey } from "./mapWires";
 import { nodeInfo } from "./names";
+import { NAV, navPush, navStep, type Place, sameLevel } from "./nav";
 import { ReviewStrip } from "./ReviewStrip";
 import { SymbolsView } from "./SymbolsView";
 import { type Crumb, SystemBar } from "./SystemBar";
@@ -95,6 +97,7 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
   const [selected, setSelected] = useState<string>();
   const [edgeSel, setEdgeSel] = useState<string>();
   const [symSel, setSymSel] = useState<string>();
+  const [nav, setNav] = useState(NAV);
   /** The user's lens toggle; until they use it, the lens is on only for a PR's review. */
   const [lensPick, setLensPick] = useState<boolean>();
   const [finding, setFinding] = useState(false);
@@ -132,12 +135,39 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
 
   useEffect(() => setSelectedNode(workspace, selected), [workspace, selected]);
 
-  const go = (next: Level, node?: string, e?: string) => {
-    setLevel(next);
-    setSelected(node);
-    setEdgeSel(e);
+  const here: Place = { level: shown, node: selected, edge: edgeSel };
+  const place = (p: Place) => {
+    setLevel(p.level);
+    setSelected(p.node);
+    setEdgeSel(p.edge);
     setSymSel(undefined);
   };
+  /** Shows `next`, remembering where it left when it changes level. */
+  const go = (next: Level, node?: string, e?: string) => {
+    const to = { level: next, node, edge: e };
+    if (!sameLevel(next, shown)) setNav(navPush(nav, here, to));
+    place(to);
+  };
+  const step = (by: -1 | 1) => {
+    const n = navStep(nav, here, by);
+    if (n === nav) return;
+    setNav(n);
+    place(n.stack[n.at]);
+  };
+  // The mouse's back and forward buttons.
+  const stepRef = useRef(step);
+  stepRef.current = step;
+  useEffect(() => {
+    const el = root.current;
+    const onUp = (e: MouseEvent) => {
+      if (e.button === 3) stepRef.current(-1);
+      else if (e.button === 4) stepRef.current(1);
+    };
+    el?.addEventListener("mouseup", onUp);
+    return () => el?.removeEventListener("mouseup", onUp);
+  }, []);
+  const canBack = nav.at > 0;
+  const canForward = nav.at >= 0 && nav.at < nav.stack.length - 1;
   /** Shows `id`, a node or `from>to`, at the level that holds it, staying put when this level
    * shows it. */
   const show = (id: string) => {
@@ -361,6 +391,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
     const mod = e.metaKey || e.ctrlKey;
     if (mod && e.shiftKey && (e.key === ">" || e.key === ".")) {
       if (detail) ask(detail.id);
+    } else if (e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_")) {
+      step(e.shiftKey ? 1 : -1);
     } else if (mod) return;
     else if (e.key === "/") setFinding(true);
     else if (stop && e.key === "ArrowRight")
@@ -478,7 +510,8 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
       <SystemBar
         crumbs={crumbs}
         level={shown.kind}
-        onUp={up}
+        onBack={canBack ? () => step(-1) : undefined}
+        onForward={canForward ? () => step(1) : undefined}
         onLevel={pickLevel}
         symbols={symbolsOf !== undefined}
         trace={
@@ -523,14 +556,13 @@ function Loaded({ map, error, reload }: { map: SystemDto; error?: string; reload
         <ReviewStrip
           arch={arch}
           range={
-            view.range
-              ? `${view.range.from?.slice(0, 8) ?? "root"}..${view.range.to.slice(0, 8)}`
-              : review.revset
+            view.range && `${view.range.from?.slice(0, 8) ?? "root"}..${view.range.to.slice(0, 8)}`
           }
-          onClearRange={view.range ? () => setArchView(review.id, { range: undefined }) : undefined}
+          onClearRange={() => setArchView(review.id, { range: undefined })}
           transitive={view.transitive}
           onTransitive={(transitive) => setArchView(review.id, { transitive })}
           look={lens.open}
+          onLook={() => showLook(workspace)}
         />
       )}
       {(error || sendError || archError) && (

@@ -202,8 +202,24 @@
 .sys-delta {
   flex: none;
   margin-left: auto;
-  color: #f0cf7a;
   font: 600 11px var(--mono);
+}
+
+.sys-dc {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.sys-dc .add {
+  color: #3fb950;
+}
+
+.sys-dc .del {
+  color: #f85149;
+}
+
+.sys-node:not(.compact) .sys-delta.compact-only {
+  display: none;
 }
 
 .sys-delta.new {
@@ -216,8 +232,7 @@
   right: 12px;
   padding: 1px 6px;
   border-radius: 5px;
-  background: rgb(227 179 65 / 14%);
-  color: #f0cf7a;
+  background: rgb(255 255 255 / 6%);
   font: 600 11px var(--mono);
 }
 
@@ -387,7 +402,7 @@
 }
 
 .sys-n.delta {
-  color: #f0cf7a;
+  color: #7ee093;
   font: 600 11px var(--mono);
 }
 

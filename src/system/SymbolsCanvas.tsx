@@ -183,15 +183,15 @@ export function SymbolsCanvas(p: Props) {
               <marker
                 key={k}
                 id={`sym-arrow-${k}`}
-                viewBox="0 0 8 8"
-                refX="7"
+                viewBox="0 0 10 8"
+                refX="10"
                 refY="4"
-                markerWidth="8"
+                markerWidth="10"
                 markerHeight="8"
                 markerUnits="userSpaceOnUse"
                 orient="auto"
               >
-                <path d="M0 0L8 4L0 8z" fill={fill} />
+                <path d="M0 0.5L10 4L0 7.5L2.5 4z" fill={fill} />
               </marker>
             ))}
           </defs>

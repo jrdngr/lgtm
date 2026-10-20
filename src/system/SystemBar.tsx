@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from "react";
-import { Chevron, Close, Play, Search, Trace, Up } from "./glyphs";
+import { Back, Chevron, Close, Forward, Play, Search, Trace } from "./glyphs";
 import type { Level } from "./scene";
 import { TraceBar, type TraceBarProps } from "./TraceBar";
 
@@ -21,7 +21,8 @@ const LEVELS = [
 interface Props {
   crumbs: Crumb[];
   level: Level["kind"];
-  onUp?(): void;
+  onBack?(): void;
+  onForward?(): void;
   onLevel(kind: Level["kind"]): void;
   /** Whether there's a component to show the Symbols of. */
   symbols: boolean;
@@ -49,20 +50,31 @@ function Swatch({ c }: { c: Crumb }) {
   );
 }
 
-/** The Architecture tab's toolbar: up a level, where you are, the level, and the tools. */
+/** The Architecture tab's toolbar: back and forward, where you are, the level, and the tools. */
 export function SystemBar(p: Props) {
   const at = LEVELS.findIndex(([k]) => k === p.level);
   return (
     <div className="sys-bar">
-      <button
-        type="button"
-        className="sys-back"
-        aria-label="Up a Level"
-        disabled={!p.onUp}
-        onClick={p.onUp}
-      >
-        <Up />
-      </button>
+      <span className="sys-nav">
+        <button
+          type="button"
+          className="sys-back"
+          aria-label="Back"
+          disabled={!p.onBack}
+          onClick={p.onBack}
+        >
+          <Back />
+        </button>
+        <button
+          type="button"
+          className="sys-back"
+          aria-label="Forward"
+          disabled={!p.onForward}
+          onClick={p.onForward}
+        >
+          <Forward />
+        </button>
+      </span>
       <div className="sys-crumbs">
         {p.crumbs.map((c, i) => (
           <Fragment key={c.id}>

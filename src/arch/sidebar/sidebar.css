@@ -134,6 +134,17 @@
   background: rgb(79 140 201 / 16%);
 }
 
+.arch-items.flash li:not(.done) {
+  animation: arch-flash 1.2s ease-out;
+}
+
+@keyframes arch-flash {
+  0%,
+  40% {
+    background: rgb(248 81 73 / 22%);
+  }
+}
+
 .arch-items li.done {
   opacity: 0.5;
 }

@@ -104,7 +104,13 @@ function Body({
         )
       ) : (
         <>
-          <Look review={review.id} look={arch.look} onShow={showLook} onError={onError} />
+          <Look
+            workspace={workspace}
+            review={review}
+            look={arch.look}
+            onShow={showLook}
+            onError={onError}
+          />
           <Layers review={review} layers={arch.layers} assessed={!!arch.assessment} />
           {map && lens && <SystemTree map={map} lens={lens} />}
         </>

@@ -82,7 +82,9 @@ export function wirePath(a: Box, b: Box): string {
   const ay = mid(a);
   const by = mid(b);
   if (Math.abs(a.x - b.x) < 20) {
-    return `M${a.x} ${ay}C${a.x - 36} ${ay} ${b.x - 36} ${by} ${b.x} ${by}`;
+    // Out to the left and back in, wider the farther apart, so it enters flat.
+    const out = 36 + Math.min(64, Math.abs(by - ay) / 5);
+    return `M${a.x} ${ay}C${a.x - out} ${ay} ${b.x - out} ${by} ${b.x} ${by}`;
   }
   const [ax, bx, dir] = b.x > a.x ? [a.x + a.w, b.x, 1] : [a.x, b.x + b.w, -1];
   const dx = Math.max(40, Math.abs(bx - ax) / 2) * dir;

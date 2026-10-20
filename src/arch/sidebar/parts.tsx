@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { GroupHead } from "../../ui/GroupHead";
 import { meterTone } from "./logic";
 
@@ -6,13 +6,19 @@ import { meterTone } from "./logic";
 export function Fold({
   title,
   count,
+  open,
   children,
 }: {
   title: string;
   count: number;
+  /** Opens the fold each time it changes to a truthy value. */
+  open?: number;
   children: ReactNode;
 }) {
   const [shut, setShut] = useState(false);
+  useEffect(() => {
+    if (open) setShut(false);
+  }, [open]);
   return (
     <>
       <GroupHead name={title} count={count} shut={shut} onToggle={() => setShut(!shut)} />

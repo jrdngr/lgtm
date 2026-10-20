@@ -135,6 +135,7 @@ describe("sceneOf", () => {
     const overlay = lens({
       status: new Map([
         ["src/ui", "changed"],
+        ["src/api", "impacted"],
         ["src/old", "removed"],
       ]),
       removed: [comp("src/old", "src")],
@@ -156,9 +157,36 @@ describe("sceneOf", () => {
       ["k:src/old", "k:src/api", 2, "removed"],
     ]);
     const c = sceneOf(map(), { kind: "containers" }, overlay);
-    expect(c.inside[0].nodes.map((n) => n.status)).toEqual(["changed", undefined]);
+    expect(c.inside[0].nodes.map((n) => n.status)).toEqual(["changed"]);
     expect(c.inside[0].nodes[0].delta).toEqual({ add: 4, del: 1 });
     expect(c.inside[0].nodes[0].tiles?.map((t) => t.changed)).toEqual([true, false]);
+  });
+
+  it("shows only what the review changes or impacts, and what wires to it", () => {
+    const overlay = lens({
+      status: new Map([
+        ["src/ui", "changed"],
+        ["core/src/db", "upstream"],
+      ]),
+    });
+    const s = sceneOf(map(described()), { kind: "containers" }, overlay);
+    expect(ids(s)).toEqual({
+      left: ["p:User"],
+      inside: [[undefined, ["c:src"]]],
+      right: ["x:GitHub"],
+    });
+    expect(edges(s)).toEqual([
+      ["p:User", "c:src", 0, "Reviews"],
+      ["c:src", "x:GitHub", 0, "Reads PRs"],
+    ]);
+    const k = sceneOf(map(described()), { kind: "components", container: "src" }, overlay);
+    expect(ids(k).inside).toEqual([["Entry", ["k:src/ui"]]]);
+  });
+
+  it("shows the whole scene when the review affects nothing in it", () => {
+    const overlay = lens({ status: new Map([["src/ui", "changed"]]) });
+    const s = sceneOf(map(), { kind: "components", container: "core/src" }, overlay);
+    expect(ids(s).inside).toEqual([[undefined, ["k:core/src/db"]]]);
   });
 
   it("marks a container edge new only when the review's imports alone make it", () => {

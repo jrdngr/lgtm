@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { ArchDto, ArchRange } from "../bindings";
 import { commands, errorText, unwrap } from "../ipc";
 import type { CurrentReview } from "../review/current";
@@ -8,7 +8,7 @@ export interface ArchView {
   transitive: boolean;
   /** Commits picked in History, instead of the review's base and head. */
   range?: ArchRange;
-  /** Bumped to load again after a check or an assessment. */
+  /** Bumped to load again after an assessment. */
   version: number;
 }
 
@@ -30,7 +30,7 @@ export function setArchView(review: number, change: Partial<ArchView>) {
   for (const l of listeners) l();
 }
 
-/** Loads the review's architecture again, after a check or an assessment. */
+/** Loads the review's architecture again, after an assessment. */
 export function reloadArch(review: number) {
   setArchView(review, { version: archView(review).version + 1 });
 }
@@ -71,24 +71,83 @@ interface State {
   error?: string;
 }
 
-/** The current review's architecture diff, as its view asks for. Keeps the review's last one
- * while the next loads. */
+/** The commits a review shows, so another review of the same ones (a review pane taking over
+ * from the idle review) can show the last architecture while its own loads. */
+const contentOf = (review: CurrentReview | undefined, view: ArchView) =>
+  review?.revset && review.head
+    ? JSON.stringify([review.revset, review.head, view.transitive, view.range ?? null])
+    : undefined;
+const lastByContent = new Map<string, ArchDto>();
+
+/** Look checks made here and not yet in a load, by review content and then Look key. */
+const checks = new Map<string, Map<string, boolean>>();
+const checkListeners = new Set<() => void>();
+
+function subscribeChecks(l: () => void) {
+  checkListeners.add(l);
+  return () => checkListeners.delete(l);
+}
+
+const checkKey = (review: CurrentReview) => `${review.revset}@${review.head}`;
+
+/** Checks or unchecks a Look item at once, saving it in the background. Resolves to the
+ * error when saving fails, and the check goes back. */
+export async function checkLook(
+  review: CurrentReview,
+  key: string,
+  checked: boolean,
+): Promise<string | undefined> {
+  const k = checkKey(review);
+  const set = (on: boolean | undefined) => {
+    const next = new Map(checks.get(k));
+    if (on === undefined) next.delete(key);
+    else next.set(key, on);
+    checks.set(k, next);
+    for (const l of checkListeners) l();
+  };
+  set(checked);
+  const r = await commands.checkLook(review.id, key, checked);
+  if (r.status === "ok") return undefined;
+  set(undefined);
+  return r.error;
+}
+
+function withChecks(arch: ArchDto, mine: Map<string, boolean> | undefined): ArchDto {
+  if (!mine?.size) return arch;
+  return {
+    ...arch,
+    look: arch.look.map((l) => (mine.has(l.key) ? { ...l, checked: !!mine.get(l.key) } : l)),
+  };
+}
+
+/** The current review's architecture diff, as its view asks for, with the checks made here.
+ * Keeps the review's last one while the next loads, and shows one of the same commits while a
+ * new review of them loads. */
 export function useArch(review: CurrentReview | undefined) {
   const id = review?.id;
   const files = review?.files;
   const view = useArchView(id);
+  const content = contentOf(review, view);
   const [state, setState] = useState<State>({});
+  const mineChecks = useSyncExternalStore(subscribeChecks, () =>
+    review ? checks.get(checkKey(review)) : undefined,
+  );
   useEffect(() => {
     if (id === undefined || !files) return;
     let live = true;
     load(id, files, view).then(
-      (arch) => live && setState({ id, arch }),
+      (arch) => {
+        if (content) lastByContent.set(content, arch);
+        if (live) setState({ id, arch });
+      },
       (e) => live && setState({ id, error: errorText(e) }),
     );
     return () => {
       live = false;
     };
-  }, [id, files, view]);
+  }, [id, files, view, content]);
   const mine = state.id === id;
-  return { arch: mine ? state.arch : undefined, error: mine ? state.error : undefined, view };
+  const arch = mine ? state.arch : content ? lastByContent.get(content) : undefined;
+  const checked = useMemo(() => arch && withChecks(arch, mineChecks), [arch, mineChecks]);
+  return { arch: checked, error: mine ? state.error : undefined, view };
 }

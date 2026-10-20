@@ -16,14 +16,9 @@ const svg = (size: number, children: React.ReactNode, width = 1.6) => (
   </svg>
 );
 
-export const Up = () =>
-  svg(
-    16,
-    <>
-      <path d="M6 3.5L2.5 7 6 10.5" />
-      <path d="M2.5 7h6.5a4 4 0 014 4v1.5" />
-    </>,
-  );
+export const Back = () => svg(16, <path d="M10 3.5L5.5 8l4.5 4.5" />, 1.8);
+
+export const Forward = () => svg(16, <path d="M6 3.5L10.5 8 6 12.5" />, 1.8);
 
 export const Chevron = ({ size = 12 }: { size?: number }) =>
   svg(size, <path d="M6 3.5L10.5 8 6 12.5" />, 2);

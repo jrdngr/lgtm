@@ -1,27 +1,50 @@
+import { useEffect, useRef, useState } from "react";
 import type { LookDto } from "../../bindings";
-import { commands } from "../../ipc";
-import { reloadArch } from "../state";
+import type { WorkspaceName } from "../../core/workspace";
+import type { CurrentReview } from "../../review/current";
+import { onShowLook } from "../showLook";
+import { checkLook } from "../state";
 import { bySeverity } from "./logic";
 import { Box, Fold, Row } from "./parts";
 
 interface Props {
-  review: number;
+  workspace: WorkspaceName;
+  review: CurrentReview;
   look: LookDto[];
   onShow(l: LookDto): void;
   onError(error: string | undefined): void;
 }
 
+/** How long the open items flash when the tab's count asks for them. */
+const FLASH_MS = 1200;
+
 /** What to scrutinize, worst first, each checked off by hand. */
-export function Look({ review, look, onShow, onError }: Props) {
+export function Look({ workspace, review, look, onShow, onError }: Props) {
+  const list = useRef<HTMLUListElement>(null);
+  const [flash, setFlash] = useState(0);
+  useEffect(
+    () =>
+      onShowLook(workspace, () => {
+        setFlash((n) => n + 1);
+        requestAnimationFrame(() =>
+          list.current?.querySelector("li:not(.done)")?.scrollIntoView({ block: "nearest" }),
+        );
+      }),
+    [workspace],
+  );
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(0), FLASH_MS);
+    return () => clearTimeout(t);
+  }, [flash]);
+
   async function check(l: LookDto) {
-    const r = await commands.checkLook(review, l.key, !l.checked);
-    onError(r.status === "error" ? r.error : undefined);
-    if (r.status === "ok") reloadArch(review);
+    onError(await checkLook(review, l.key, !l.checked));
   }
   if (!look.length) return null;
   return (
-    <Fold title="Look" count={look.filter((l) => !l.checked).length}>
-      <ul className="arch-items">
+    <Fold title="Look" count={look.filter((l) => !l.checked).length} open={flash}>
+      <ul ref={list} className={`arch-items${flash ? " flash" : ""}`}>
         {bySeverity(look).map((l) => (
           <li key={l.key} className={`arch-check${l.checked ? " done" : ""}`}>
             <Box on={l.checked} label={l.title} onToggle={() => check(l)} />

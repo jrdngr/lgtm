@@ -2,7 +2,8 @@ import { type ReactNode, useMemo, useState } from "react";
 import type { SystemDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { GroupHead } from "../ui/GroupHead";
-import { deltaText, isChanged, type Lens } from "./lens";
+import { DeltaCounts } from "./Delta";
+import { isChanged, type Lens } from "./lens";
 import {
   componentId,
   containerColors,
@@ -93,7 +94,9 @@ export function SystemTree({ map, lens }: Props) {
     );
     const count = lens ? (
       changed.length ? (
-        <span className="sys-tr-n chg">{deltaText(delta) || "changed"}</span>
+        <span className="sys-tr-n chg">
+          {delta.add || delta.del ? <DeltaCounts d={delta} /> : "changed"}
+        </span>
       ) : (
         all.length > 0 && <span className="sys-tr-n">{all.length}</span>
       )
@@ -130,11 +133,13 @@ export function SystemTree({ map, lens }: Props) {
                   {!lens && stale.has(k.id) && <span className="sys-tr-stale">● stale</span>}
                   {lens && isChanged(s) ? (
                     <span className={`sys-tr-n ${s === "added" ? "new" : "chg"}`}>
-                      {s === "added"
-                        ? "new"
-                        : s === "removed"
-                          ? "removed"
-                          : deltaText(lens.delta.get(k.id))}
+                      {s === "added" ? (
+                        "new"
+                      ) : s === "removed" ? (
+                        "removed"
+                      ) : (
+                        <DeltaCounts d={lens.delta.get(k.id)} />
+                      )}
                     </span>
                   ) : (
                     <span className="sys-tr-n">{k.files}</span>

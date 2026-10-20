@@ -1,6 +1,7 @@
 import type { DockviewApi } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { onAnyShowLook } from "../arch/showLook";
 import { bottom } from "../core/bottom";
 import { bottomDockOf, dockOf, revealPanel } from "../core/docks";
 import { bottomKey, chord, tabKey } from "../core/keys";
@@ -152,6 +153,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   }
 
   useEffect(() => onAnyReveal(() => showView("right", "repo")));
+  useEffect(() => onAnyShowLook(() => showView("right", "architecture")));
 
   /** Closes the focused dock's active tab, asking first about unsaved edits. */
   async function closeTab() {

@@ -1,6 +1,7 @@
 import type { LookDto, SystemDto } from "../bindings";
 import { tint } from "./colors";
-import { deltaText, isChanged, type Lens } from "./lens";
+import { DeltaCounts } from "./Delta";
+import { isChanged, type Lens } from "./lens";
 import { componentId } from "./scene";
 
 const SEV = { high: ["hi", "HIGH"], medium: ["md", "MED"], low: ["lo", "LOW"] } as const;
@@ -89,7 +90,7 @@ export function ChangedInside({
           <span className="sys-sw" style={{ background: tint(color, 0.7 - i * 0.1) }} />
           <span>{k.name}</span>
           <span className="sys-n delta">
-            {lens.status.get(k.id) === "added" ? "new" : deltaText(lens.delta.get(k.id))}
+            {lens.status.get(k.id) === "added" ? "new" : <DeltaCounts d={lens.delta.get(k.id)} />}
           </span>
         </button>
       ))}
