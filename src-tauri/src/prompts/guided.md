@@ -27,7 +27,8 @@ rate it and explain it.
   paragraph or two. Write for someone about to read the code, not a summary of the diff.
 - `steps`: two to six steps in reading order, each a sentence or two with the lines it's
   about. Give them for every High and Medium chunk, and for a Low one that spans files or runs
-  past a screen.
+  past a screen. Point a step at the code that does what it says; point at a comment only
+  when the comment is the change.
 - `tests`: if tests cover the chunk and are quick to run, run them and give how many passed
   and failed, and the changed lines no test exercises when you can tell. Leave it out otherwise.
 
