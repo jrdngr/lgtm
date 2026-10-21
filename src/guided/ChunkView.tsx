@@ -5,6 +5,7 @@ import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { CommentBlock } from "../review/CommentBlock";
 import type { CurrentReview } from "../review/current";
+import { Diffstat } from "../review/Diffstat";
 import type { MarkSetup } from "../review/marks";
 import { markKey, NEW_COMMENT } from "../review/model";
 import { unified } from "../review/snippet";
@@ -341,39 +342,38 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           <div className="gd-writeup">
             <Markdown>{chunk.writeup}</Markdown>
           </div>
-          {(docs.length > 0 || chunk.tests) && (
-            <div className="gd-chips">
-              {docs.map((d) => (
-                <span key={d.path} className="gd-chip">
-                  <b>{DOC_NAMES[d.kind]}</b>
-                  <span>{d.title}</span>
-                  <button
-                    type="button"
-                    className="gd-link"
-                    onClick={() => openFile(workspace, d.path)}
-                  >
-                    Open
-                  </button>
-                </span>
-              ))}
-              {chunk.tests && (
-                <span className="gd-chip">
-                  <b>Tests</b>
-                  {chunk.tests.passed > 0 && (
-                    <span className="gd-pass">{chunk.tests.passed} pass</span>
-                  )}
-                  {chunk.tests.failed > 0 && (
-                    <span className="gd-fail">{chunk.tests.failed} fail</span>
-                  )}
-                  {chunk.tests.uncovered.length > 0 && (
-                    <span className="gd-uncovered">
-                      {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)} uncovered
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
-          )}
+          <div className="gd-chips">
+            <Diffstat stat={s.stat} />
+            {docs.map((d) => (
+              <span key={d.path} className="gd-chip">
+                <b>{DOC_NAMES[d.kind]}</b>
+                <span>{d.title}</span>
+                <button
+                  type="button"
+                  className="gd-link"
+                  onClick={() => openFile(workspace, d.path)}
+                >
+                  Open
+                </button>
+              </span>
+            ))}
+            {chunk.tests && (
+              <span className="gd-chip">
+                <b>Tests</b>
+                {chunk.tests.passed > 0 && (
+                  <span className="gd-pass">{chunk.tests.passed} pass</span>
+                )}
+                {chunk.tests.failed > 0 && (
+                  <span className="gd-fail">{chunk.tests.failed} fail</span>
+                )}
+                {chunk.tests.uncovered.length > 0 && (
+                  <span className="gd-uncovered">
+                    {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)} uncovered
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
           {sel && (
             <div className="gd-selbar">
               <span>

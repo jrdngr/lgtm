@@ -4,6 +4,8 @@ import { useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { type CurrentReview, useCurrentReview } from "../review/current";
+import { Diffstat } from "../review/Diffstat";
+import { sumStats } from "../review/lineStat";
 import { type MarkSetup, useMarkSetup } from "../review/marks";
 import { useSendText } from "../review/useSendText";
 import { run } from "../services/pathMenu";
@@ -155,7 +157,7 @@ export function GuidedPanel() {
         <VerdictMark s={s} />
         <span className="gd-title">{s.chunk.title}</span>
         {threads > 0 && <span className="gd-threads">{threads}</span>}
-        <span className="gd-n">{s.lines}</span>
+        <Diffstat stat={s.stat} />
       </Row>
     );
   };
@@ -163,7 +165,7 @@ export function GuidedPanel() {
   const riskGroup = (risk: ChunkRisk) => {
     const states = view.states.filter((s) => s.chunk.risk === risk);
     if (!states.length) return null;
-    const lines = states.reduce((n, s) => n + s.lines, 0);
+    const stat = sumStats(states.map((s) => s.stat));
     return (
       <div key={risk}>
         <GroupHead
@@ -173,7 +175,12 @@ export function GuidedPanel() {
               {RISK_NAMES[risk]}
             </span>
           }
-          count={`${states.length} · ${lines}`}
+          count={
+            <>
+              {states.length}
+              <Diffstat stat={stat} />
+            </>
+          }
           shut={isShut(risk)}
           onToggle={() => toggle(risk)}
           onContextMenu={contextMenu(() => chunkMenu(review, setup, states))}
@@ -192,7 +199,7 @@ export function GuidedPanel() {
       className="sub"
     >
       <span className="gd-title mono">{e.part.path}</span>
-      <span className="gd-n">{e.lines}</span>
+      <Diffstat stat={e.stat} />
     </Row>
   );
 

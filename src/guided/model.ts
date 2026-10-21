@@ -9,6 +9,7 @@ import type {
   VerdictDto,
 } from "../bindings";
 import { SIGN } from "../model/sign";
+import type { LineStat } from "../review/lineStat";
 import type { FlatFile } from "../review/model";
 
 export const RISKS: ChunkRisk[] = ["high", "medium", "low"];
@@ -87,6 +88,16 @@ export function changedRows(files: FlatFile[], segments: Segment[]) {
 export const lineCount = (files: FlatFile[], segments: Segment[]) =>
   changedRows(files, segments).length;
 
+/** How many lines `segments` add and remove. */
+export function segmentStat(files: FlatFile[], segments: Segment[]): LineStat {
+  const stat = { added: 0, removed: 0 };
+  for (const { file, row } of changedRows(files, segments)) {
+    if (files[file].rows[row].kind === "added") stat.added++;
+    else stat.removed++;
+  }
+  return stat;
+}
+
 /** A chunk's code as diff text, per file under its path: what a verdict remembers, to show
  * what changed since. */
 export function chunkText(files: FlatFile[], segments: Segment[]): string {
@@ -112,6 +123,7 @@ export interface ChunkState {
   segments: Segment[];
   text: string;
   lines: number;
+  stat: LineStat;
   verdict?: VerdictDto;
   /** Its code changed since its verdict, so the verdict no longer holds. */
   changed: boolean;
@@ -132,6 +144,7 @@ export function chunkStates(files: FlatFile[], g: GuidedDto): ChunkState[] {
       segments,
       text,
       lines: lineCount(files, segments),
+      stat: segmentStat(files, segments),
       verdict,
       changed,
       done: !!verdict && !changed && verdict.verdict !== "change",
@@ -244,6 +257,7 @@ export interface ExcludedState {
   index: number;
   segments: Segment[];
   lines: number;
+  stat: LineStat;
 }
 
 /** Everything a guided review shows over the review's files and comments. */
@@ -260,7 +274,13 @@ export function guidedView(files: FlatFile[], comments: CommentDto[], g: GuidedD
   const states = chunkStates(files, g);
   const parts = g.excluded.map((part, index) => {
     const segments = segmentsOf(files, part.ranges);
-    return { part, index, segments, lines: lineCount(files, segments) };
+    return {
+      part,
+      index,
+      segments,
+      lines: lineCount(files, segments),
+      stat: segmentStat(files, segments),
+    };
   });
   return {
     states,

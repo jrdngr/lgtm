@@ -1,4 +1,5 @@
 import type { LineStat } from "./lineStat";
+import "./Diffstat.css";
 
 /** `+added −removed`, in diff colors, leaving out a side with no lines. */
 export function Diffstat({ stat }: { stat: LineStat }) {
