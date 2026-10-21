@@ -17,7 +17,8 @@ interface Props {
   onCancel(): void;
 }
 
-/** Creates or edits a design: its name, revision, files and folders, and prompt. */
+/** Creates or edits a design: its name, revision, files and folders, and prompt. Without files
+ * it saves an empty design to draw on. */
 export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
   const [name, setName] = useState(design?.name ?? "");
   const [revision, setRevision] = useState(design?.revision ?? "@");
@@ -58,11 +59,10 @@ export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
   const save = async (generate: boolean) => {
     const input: DesignInput = { name: name.trim(), revision: revision.trim(), files, prompt };
     if (!input.name) return setError("Name it first");
-    if (!files.length) return setError("Add files first");
     try {
       await onDone(
         await unwrap(commands.saveDesign(workspace, design?.id ?? null, input)),
-        generate,
+        generate && files.length > 0,
       );
     } catch (e) {
       setError(errorText(e));
@@ -221,14 +221,21 @@ export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
           <button type="button" className="dsn-btn" onClick={onCancel}>
             Cancel
           </button>
-          {design && (
+          {design && files.length > 0 && (
             <button type="button" className="dsn-btn" onClick={() => save(false)}>
               Save
             </button>
           )}
-          <PipeButton type="submit" className="sm" keys={isMac ? "⌘↵" : "Ctrl↵"}>
-            Generate
-          </PipeButton>
+          {files.length > 0 ? (
+            <PipeButton type="submit" className="sm" keys={isMac ? "⌘↵" : "Ctrl↵"}>
+              Generate
+            </PipeButton>
+          ) : (
+            <button type="submit" className="dsn-btn">
+              {design ? "Save" : "Create"}
+              <kbd>{isMac ? "⌘↵" : "Ctrl↵"}</kbd>
+            </button>
+          )}
         </div>
       </form>
     </div>

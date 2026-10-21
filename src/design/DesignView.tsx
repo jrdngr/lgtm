@@ -63,6 +63,21 @@ function counts(m: DesignMapDto) {
   };
 }
 
+/** The map of a design not generated yet: a blank canvas to draw on. */
+const BLANK: DesignMapDto = {
+  summary: "",
+  people: [],
+  externals: [],
+  containers: [],
+  components: [],
+  relations: [],
+  differences: [],
+  specCommit: "",
+  codeCommit: null,
+  filesHash: null,
+  createdAt: null,
+};
+
 const NO_HOT = new Map<string, number | undefined>();
 const NO_STALE = new Set<string>();
 
@@ -75,7 +90,6 @@ export function DesignView({ item, code, source }: Props) {
     root.current?.querySelector<HTMLElement>(".dsn-keys")?.focus(),
   );
   const root = useRef<HTMLDivElement>(null);
-  const m = item.design.map;
   const gen = (
     <PipeButton
       className="sys-btn"
@@ -89,37 +103,16 @@ export function DesignView({ item, code, source }: Props) {
   );
   return (
     <div className="sys-panel sys-design" ref={root}>
-      {m ? (
-        <DesignMap
-          key={item.design.id}
-          item={item}
-          m={m}
-          code={code}
-          source={source}
-          gen={gen}
-          onSend={sendText}
-        />
-      ) : (
-        <>
-          <SystemBar
-            crumbs={[{ id: designSystemId, name: item.design.name }]}
-            source={source}
-            fourth="Interfaces"
-            bare
-            level="context"
-            onLevel={() => {}}
-            symbols={false}
-            finding={false}
-            onFind={() => {}}
-            onTrace={() => {}}
-            toursOpen={false}
-            onTours={() => {}}
-            view={null}
-            generate={gen}
-          />
-          <div className="dsn-empty">Not generated</div>
-        </>
-      )}
+      <DesignMap
+        key={item.design.id}
+        item={item}
+        m={item.design.map ?? BLANK}
+        code={item.design.map ? code : undefined}
+        source={source}
+        gen={item.design.files.length ? gen : undefined}
+        blank={!item.design.map}
+        onSend={sendText}
+      />
       {error && <div className="sys-error error">{error}</div>}
       {genPicker}
       {picker}
@@ -133,6 +126,8 @@ function DesignMap(p: {
   code?: SystemDto;
   source: ReactNode;
   gen: ReactNode;
+  /** Not generated yet: the map is empty, and it opens in Edit. */
+  blank: boolean;
   onSend(text: string): void;
 }) {
   const { item, m, code } = p;
@@ -149,7 +144,7 @@ function DesignMap(p: {
   );
   const placed = useMemo(() => layout(scene), [scene]);
   const cv = useCanvas(useDesignCanvas(item.design));
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(p.blank);
   const vkey = viewKey(here.level);
   const ed = useCanvasEdit({
     canvas: cv.canvas,
