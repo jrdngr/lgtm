@@ -7,14 +7,13 @@ const HINTS: [string[], string][] = [
 ];
 
 interface Props {
-  last?: string;
   busy: boolean;
   /** A review is loading. */
   loading: boolean;
 }
 
-/** The revisions log's keys, and the last action with its undo key. */
-export function RevisionsFooter({ last, busy, loading }: Props) {
+/** The revisions log's keys, and what it's doing. */
+export function RevisionsFooter({ busy, loading }: Props) {
   return (
     <div className="picker-footer">
       {HINTS.map(([keys, label]) => (
@@ -26,17 +25,7 @@ export function RevisionsFooter({ last, busy, loading }: Props) {
         </span>
       ))}
       <span className="spacer" />
-      {busy ? (
-        <Busy>Working…</Busy>
-      ) : loading ? (
-        <Busy>Loading review…</Busy>
-      ) : (
-        last && (
-          <span className="picker-last">
-            {last} · <kbd>u</kbd>
-          </span>
-        )
-      )}
+      {busy ? <Busy>Working…</Busy> : loading && <Busy>Loading review…</Busy>}
     </div>
   );
 }

@@ -56,22 +56,12 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
   const [pending, setPending] = useState<Set<string>>();
   /** The commit a drag across rows started on. */
   const drag = useRef<number>(undefined);
+  const [dragging, setDragging] = useState(false);
 
   const commits = useMemo(() => (rows ?? []).flatMap((r, i) => (r.commit ? [i] : [])), [rows]);
   const graph = useMemo(() => graphOf(rows ?? []), [rows]);
   const commitAt = (k: number) => rows?.[commits[k]]?.commit ?? undefined;
   const changeAt = (k: number) => commitAt(k)?.changeId;
-  const shown = pending ?? reviewed;
-  const inReview = (i: number) => shown.has(rows?.[i]?.commit?.commitId ?? "");
-  /** The first and last row of the review, for the bracket beside them. */
-  let first = -1;
-  let lastIn = -1;
-  rows?.forEach((_, i) => {
-    if (!inReview(i)) return;
-    if (first < 0) first = i;
-    lastIn = i;
-  });
-
   async function reload(keep?: string) {
     const r = await commands.logRows(workspace);
     if (r.status === "error") return setError(r.error);
@@ -152,6 +142,7 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     const up = async () => {
       const from = drag.current;
       drag.current = undefined;
+      setDragging(false);
       if (from === undefined || from === cursor) return;
       const range = rangeOf(cursor, from);
       if (!range) return;
@@ -173,7 +164,7 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     return ids;
   }
 
-  const { act, busy, last, undo, redo } = useJjActions(
+  const { act, busy, undo, redo } = useJjActions(
     workspace,
     revset,
     () => reload(changeAt(cursor)),
@@ -251,12 +242,6 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
         case "Escape":
           target?.focus();
           break;
-        case "u":
-          undo();
-          break;
-        case "U":
-          redo();
-          break;
         default:
           return;
       }
@@ -264,6 +249,19 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     e.preventDefault();
     e.stopPropagation();
   }
+
+  // A drag brackets the commits it's across as it goes, before anything loads.
+  const tentative = dragging || !!pending;
+  const shown = dragging ? pickedIds() : (pending ?? reviewed);
+  const inReview = (i: number) => shown.has(rows?.[i]?.commit?.commitId ?? "");
+  /** The first and last row of the review, for the bracket beside them. */
+  let first = -1;
+  let lastIn = -1;
+  rows?.forEach((_, i) => {
+    if (!inReview(i)) return;
+    if (first < 0) first = i;
+    lastIn = i;
+  });
 
   const commitIndex = new Map(commits.map((row, k) => [row, k]));
 
@@ -292,7 +290,10 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
               onMouseDown={(e) => {
                 // A right-click picks in the row's menu, keeping a range it's in.
                 if (c < 0 || e.button !== 0) return;
-                if (!e.shiftKey) drag.current = c;
+                if (!e.shiftKey) {
+                  drag.current = c;
+                  setDragging(true);
+                }
                 move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
               }}
               onMouseEnter={() => {
@@ -303,7 +304,21 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
             >
               {edge && (
                 <span
-                  className={`lr-bk${i === first ? " top" : ""}${i === lastIn ? " bot" : ""}${pending ? " loading" : ""}`}
+                  className={`lr-bk${i === first ? " top" : ""}${i === lastIn ? " bot" : ""}${tentative ? " loading" : ""}`}
+                />
+              )}
+              {commit && (
+                <button
+                  type="button"
+                  className="lr-rail"
+                  aria-label="Review"
+                  tabIndex={-1}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
+                  onClick={() => {
+                    move(c);
+                    review(commit.changeId);
+                  }}
                 />
               )}
               <LogGraph cells={graph.cells[i]} width={graph.width} />
@@ -326,7 +341,7 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
           );
         })}
       </div>
-      <RevisionsFooter last={last} busy={busy} loading={!!pending} />
+      <RevisionsFooter busy={busy} loading={!!pending} />
     </div>
   );
 }

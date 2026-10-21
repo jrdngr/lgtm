@@ -60,8 +60,8 @@ export function revRowMenu(r: Row): CtxEntry[] {
     "-",
     { label: "Copy", items: copyItems(change, r.commit, r.description) },
     "-",
-    { label: "Undo", keys: "u", disabled: busy, onSelect: r.undo },
-    { label: "Redo", keys: "U", disabled: busy, onSelect: r.redo },
+    { label: "Undo", disabled: busy, onSelect: r.undo },
+    { label: "Redo", disabled: busy, onSelect: r.redo },
   ];
 }
 

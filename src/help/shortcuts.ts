@@ -118,7 +118,6 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["J", "K"], action: "Extend a range" },
       { keys: ["↵", "e"], action: "Edit the commit" },
       { keys: ["r"], action: "Review the selection" },
-      { keys: ["u", "U"], action: "Undo / redo the last edit" },
       { keys: ["Esc"], action: "Back to the review" },
     ],
   },

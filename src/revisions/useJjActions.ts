@@ -14,18 +14,16 @@ export function useJjActions(
   reload: () => Promise<unknown>,
   onError: (message: string | undefined) => void,
 ) {
-  const [last, setLast] = useState<string>();
   const [steps, setSteps] = useState(1);
   const [busy, setBusy] = useState(false);
 
-  async function act(action: JjAction, label: string, follow?: boolean) {
+  async function act(action: JjAction, _label: string, follow?: boolean) {
     if (busy) return;
     setBusy(true);
     try {
       onError(undefined);
       const r = await commands.jjAct(workspace, action);
       if (r.status === "error") return onError(r.error);
-      setLast(label);
       if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
       await reload();
       await reviewAfter(workspace, (r) => loadReview(workspace, r), revset, follow);
@@ -37,7 +35,6 @@ export function useJjActions(
   return {
     act,
     busy,
-    last,
     undo: () => act({ kind: "undo", steps }, "Undid the last action"),
     redo: () => act({ kind: "redo", steps }, "Redid the action"),
   };

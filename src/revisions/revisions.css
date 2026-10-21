@@ -51,6 +51,16 @@
   background: rgb(79 140 201 / 14%);
 }
 
+/* `@` stays green under the cursor or a pick. */
+.lr.at.picked,
+.revisions:not(:focus-within) .lr.at.cursor {
+  background: rgb(63 185 80 / 16%);
+}
+
+.lr.at.cursor {
+  background: rgb(63 185 80 / 26%);
+}
+
 /* The bracket down the left of the reviewed commits. */
 .lr-bk {
   position: absolute;
@@ -74,11 +84,28 @@
   border-bottom-left-radius: 4px;
 }
 
-/* Dashed until the review it marks has loaded. */
+/* Darker while dragging, until the review it marks has loaded. */
 .lr-bk.loading {
-  border-left-style: dashed;
-  border-top-style: dashed;
-  border-bottom-style: dashed;
+  border-color: #23868d;
+}
+
+/* The strip the bracket sits in: clicking it beside a commit reviews that commit. */
+.lr-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 16px;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.lr-rail:hover {
+  background: rgb(57 197 207 / 14%);
 }
 
 .lg-graph {
@@ -213,8 +240,4 @@ button.lr-pr.on {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
-}
-
-.picker-last {
-  color: var(--fg);
 }
