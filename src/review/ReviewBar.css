@@ -192,3 +192,8 @@
 .review-note.warn {
   color: var(--amber);
 }
+
+.review-send {
+  padding: 1px 8px;
+  font-size: var(--fs-xs);
+}

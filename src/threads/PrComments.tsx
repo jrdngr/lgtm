@@ -12,6 +12,7 @@ import type { CurrentReview } from "../review/current";
 import { sendToAgent, startLink } from "../review/linkCommands";
 import { useLink } from "../review/linkedAgent";
 import { NoNotes, NoteList } from "../review/NoteList";
+import { SendNotesButton } from "../review/SendNotesButton";
 import { useNotes } from "../review/useNotes";
 import { run } from "../services/pathMenu";
 import { openSettings } from "../settings/open";
@@ -65,7 +66,7 @@ export function PrComments({ pr, review }: Props) {
   const discussion = useDiscussion(workspace, pr);
   const filter = shownFilter.use();
   const shut = notesFolded.use();
-  const notes = useNotes(review);
+  const notes = useNotes(review, workspace);
   const [confirm, setConfirm] = useState(0);
   const [error, setError] = useState<string>();
   const threads = review?.threads ?? [];
@@ -131,6 +132,11 @@ export function PrComments({ pr, review }: Props) {
               Sync
             </button>
           )}
+          <SendNotesButton
+            className="pr-head-btn"
+            count={notes.unsent.length}
+            onSend={notes.sendOpen}
+          />
           {canTriage && (
             <PipeButton className="pr-head-btn" onClick={triage} keys="t">
               Triage {fresh}

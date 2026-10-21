@@ -6,6 +6,7 @@ import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
 import type { Filter } from "./rowState";
+import { SendNotesButton } from "./SendNotesButton";
 import { type Progress, type ProgressPart, progressParts } from "./state";
 import "./ReviewBar.css";
 
@@ -60,6 +61,8 @@ interface Props {
   onReset(): void;
   /** Hands focus back to the review once the reset confirm closes. */
   onDone(): void;
+  /** Sends the unsent notes to the agent, shown only while there are some. */
+  send?: { count: number; onSend(): void };
 }
 
 export function ReviewBar(props: Props) {
@@ -133,6 +136,9 @@ export function ReviewBar(props: Props) {
         />
       </span>
       <span className="spacer" />
+      {props.send && props.send.count > 0 && (
+        <SendNotesButton className="review-send" {...props.send} />
+      )}
       <MarkBar
         setup={props.setup}
         onMark={review ? props.onMark : undefined}

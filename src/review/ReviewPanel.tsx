@@ -13,6 +13,7 @@ import { openMenu } from "../ui/contextMenu";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
 import { commentSlots } from "./comments";
+import { useCurrentReview } from "./current";
 import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
@@ -27,6 +28,7 @@ import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
 import { useContextLines } from "./useContextLines";
+import { useNotes } from "./useNotes";
 import { usePublishReview } from "./usePublishReview";
 import { usePublishTarget } from "./usePublishTarget";
 import { useReview } from "./useReview";
@@ -62,6 +64,7 @@ function keepsFocus(t: EventTarget) {
 
 export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) {
   const workspace = useWorkspace();
+  const notes = useNotes(useCurrentReview(workspace), workspace);
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
@@ -359,6 +362,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         setup={setup}
         onMark={a.applyMark}
         onReset={a.resetMarks}
+        send={{ count: notes.unsent.length, onSend: notes.sendOpen }}
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />
