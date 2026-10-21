@@ -28,12 +28,18 @@ function useGroup(api: DockviewApi, group: DockviewGroupPanel) {
 }
 
 /** Two arrows at a center line: pointing in to collapse, out to expand. */
-export function FoldIcon({ out }: { out?: boolean }) {
+export function FoldIcon({ out, vertical }: { out?: boolean; vertical?: boolean }) {
   const heads = out
     ? "M4 5.5 1.5 8 4 10.5M12 5.5 14.5 8 12 10.5"
     : "M4 5.5 6.5 8 4 10.5M12 5.5 9.5 8 12 10.5";
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="fold-icon">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      className={`fold-icon${vertical ? " vertical" : ""}`}
+    >
       <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
         <path d="M8 2.5v11M1.5 8h5M9.5 8h5" />
         <path d={heads} strokeLinejoin="round" />
@@ -85,7 +91,7 @@ export function Fold({
           if (next?.activePanel) activate(next.activePanel);
         }}
       >
-        <FoldIcon />
+        <FoldIcon vertical={axis === "y" || (!axis && inBottom)} />
       </button>
       {folded &&
         createPortal(

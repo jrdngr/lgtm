@@ -39,7 +39,8 @@
   padding: 3px;
 }
 
-.fold-strip.y .fold-icon {
+.fold-strip.y .fold-icon,
+.fold-icon.vertical {
   transform: rotate(90deg);
 }
 
