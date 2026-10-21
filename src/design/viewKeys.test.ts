@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { levelOfKey, viewKey } from "./view";
+import { levelOfKey, viewKey } from "./viewKeys";
 
 describe("levelOfKey", () => {
   it("reads back every level's key, ids with slashes included", () => {

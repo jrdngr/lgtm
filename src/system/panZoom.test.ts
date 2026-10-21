@@ -26,4 +26,9 @@ describe("fitView", () => {
   it("doesn't enlarge a small world", () => {
     expect(fitView(200, 100, 1000, 600)).toEqual({ k: 1, x: 400, y: 250 });
   });
+
+  it("centers a world that reaches left of and above the origin", () => {
+    // The world spans -100..100 by -50..50; its center, the origin, lands mid-viewport.
+    expect(fitView(100, 50, 1000, 600, -100, -50)).toEqual({ k: 1, x: 500, y: 300 });
+  });
 });

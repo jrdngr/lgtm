@@ -14,6 +14,8 @@ export interface MenuItem {
 interface Props {
   items: (MenuItem | false | undefined)[];
   label?: string;
+  /** Named button in place of the ⋯ icon. */
+  text?: string;
   className?: string;
 }
 
@@ -38,7 +40,7 @@ function placeBy(button: Element): Place {
 
 /** A ⋯ button opening a short list of actions under it, or over it near the window's bottom.
  * Closes on a pick, Escape, a click outside, or a scroll. */
-export function Menu({ items, label = "More actions", className }: Props) {
+export function Menu({ items, label = "More actions", text, className }: Props) {
   const [place, setPlace] = useState<Place>();
   const open = place !== undefined;
   const close = () => setPlace(undefined);
@@ -74,20 +76,33 @@ export function Menu({ items, label = "More actions", className }: Props) {
     };
   }, [open]);
 
+  const toggle = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setPlace(open ? undefined : placeBy(e.currentTarget));
+  };
   if (shown.length === 0) return null;
   return (
     <div className={`menu${className ? ` ${className}` : ""}`} ref={ref}>
-      <IconButton
-        icon="more"
-        label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className={open ? "open" : undefined}
-        onClick={(e) => {
-          e.stopPropagation();
-          setPlace(open ? undefined : placeBy(e.currentTarget));
-        }}
-      />
+      {text ? (
+        <button
+          type="button"
+          className={`sys-btn${open ? " open" : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={toggle}
+        >
+          {text} ▾
+        </button>
+      ) : (
+        <IconButton
+          icon="more"
+          label={label}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          className={open ? "open" : undefined}
+          onClick={toggle}
+        />
+      )}
       {open &&
         createPortal(
           <div className="menu-list" role="menu" style={place} ref={listRef}>

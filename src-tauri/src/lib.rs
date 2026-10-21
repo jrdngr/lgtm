@@ -1,9 +1,11 @@
 pub mod anchor;
 mod bots;
+mod canvas;
 mod commands;
 mod config;
 mod ctx;
 pub mod diff;
+mod drawings;
 mod dragged;
 mod events;
 mod files;
@@ -103,6 +105,15 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::design::design_prompt,
             commands::design::revision_files,
             commands::design::design_bookmarks,
+            commands::drawing::drawings,
+            commands::drawing::drawing,
+            commands::drawing::create_drawing,
+            commands::drawing::rename_drawing,
+            commands::drawing::delete_drawing,
+            commands::drawing::save_drawing_canvas,
+            commands::drawing::undo_drawing_agent,
+            commands::drawing::set_canvas_focus,
+            commands::drawing::write_export,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,
             commands::arch::system_find,
@@ -194,6 +205,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::ArchChanged,
             events::SystemChanged,
             events::DesignChanged,
+            events::DrawingChanged,
             events::TerminalAgent
         ])
 }

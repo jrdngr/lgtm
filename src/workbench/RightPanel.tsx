@@ -4,6 +4,7 @@ import { useArch } from "../arch/state";
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useWorkspace, workspaceKey } from "../core/workspace";
+import { DrawingsPanel } from "../drawings/DrawingsPanel";
 import { RepoTree } from "../editor/RepoTree";
 import { needsYou } from "../model/stages";
 import { openQuestions } from "../qa/model";
@@ -27,8 +28,8 @@ interface Props {
 }
 
 /** The right side panel: the repo's files; the review's changes, comments, architecture and
- * reports; and Q&A. A tab turns amber for threads that need you, open high Look items, and open
- * Q&A questions. */
+ * reports; Q&A; and drawings. A tab turns amber for threads that need you, open high Look items,
+ * and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
@@ -77,6 +78,13 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           icon: "help",
           alert: qa.sessions.some((d) => !d.archived && openQuestions(d).length > 0),
           render: () => <QaPanel />,
+        },
+        {
+          id: "drawings",
+          group: "drawings",
+          title: "Drawings",
+          icon: "drawing",
+          render: () => <DrawingsPanel />,
         },
       ]}
     />

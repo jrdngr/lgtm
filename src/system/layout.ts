@@ -15,8 +15,12 @@ export interface Layout {
   /** Tier bands: a tier's name and the rows it spans. */
   tiers: (Box & { label: string })[];
   boundary?: Box & { name: string; color?: string };
+  /** The world's right and bottom edges. */
   width: number;
   height: number;
+  /** Its left and top edges, when something sits left of or above 0. */
+  left?: number;
+  top?: number;
 }
 
 const SIZE: Record<NodeKind, [number, number]> = {

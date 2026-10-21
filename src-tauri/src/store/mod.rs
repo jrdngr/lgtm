@@ -6,6 +6,7 @@ mod bots;
 mod checks;
 mod comments;
 mod designs;
+mod drawings;
 mod marks;
 mod prs;
 mod qa;
@@ -237,6 +238,7 @@ impl Store {
         comments::create_table(&db)?;
         arch::create_table(&db)?;
         designs::create_table(&db)?;
+        drawings::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
         qa::create_table(&db)?;

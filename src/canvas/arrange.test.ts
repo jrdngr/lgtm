@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Layout, Placed } from "../../system/layout";
+import type { Layout, Placed } from "../system/layout";
 import { arrange, freeze } from "./arrange";
 import { fullCanvas, type View, viewOf } from "./view";
 

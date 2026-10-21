@@ -35,7 +35,8 @@ session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop
 answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
 questions, and sends their decisions back to this terminal. When they talk a queued question \
 over here instead and that changes it, rewrite it there with qa_rewrite. On a PR's threads, \
-stop at a drafted reply: only the human marks a reply ready to send.";
+stop at a drafted reply: only the human marks a reply ready to send. When they talk about a \
+drawing, a diagram, a selection or a numbered tag, read it with current_canvas first.";
 
 pub(super) type Out = Result<String, String>;
 
@@ -82,6 +83,7 @@ impl Lgtm {
             tool_router: Self::tool_router()
                 + Self::arch_router()
                 + Self::design_router()
+                + Self::canvas_router()
                 + Self::qa_router(),
         }
     }

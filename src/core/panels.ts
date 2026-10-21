@@ -6,7 +6,14 @@ import type {
 } from "dockview-react";
 
 /** The kinds of tab. A Claude tab is a terminal that starts Claude Code. */
-export type PanelKind = "review" | "terminal" | "claude" | "report" | "architecture" | "qa";
+export type PanelKind =
+  | "review"
+  | "terminal"
+  | "claude"
+  | "report"
+  | "architecture"
+  | "qa"
+  | "drawing";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -15,6 +22,7 @@ const TITLES: Record<PanelKind, string> = {
   report: "Report",
   architecture: "Architecture",
   qa: "Q&A",
+  drawing: "Drawing",
 };
 
 /** What the new tab menu offers, in order. */
@@ -78,6 +86,13 @@ export function openReport(api: DockviewApi, run: number) {
   const open = api.getPanel(`report-${run}`);
   if (open) return activate(open);
   addPanel(api, "report", { run }, inActivePane(api), `report-${run}`);
+}
+
+/** Shows drawing `id`, in the pane it's already open in if there is one. */
+export function openDrawing(api: DockviewApi, id: string, name: string) {
+  const open = api.getPanel(`drawing-${id}`);
+  if (open) return activate(open);
+  addPanel(api, "drawing", { drawing: id }, inActivePane(api), `drawing-${id}`).api.setTitle(name);
 }
 
 /** Shows the Architecture tab, in its pane if it's already open. */

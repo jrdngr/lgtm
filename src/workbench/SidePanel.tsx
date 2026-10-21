@@ -33,9 +33,9 @@ interface Props {
 const MIN_WIDTH = 160;
 const MAX_WIDTH = 600;
 
-/** A panel docked to one side of the window, outside the pane grid. Holds views behind a row
- * of icon tabs, shown when there's more than one and divided by the views' groups, and resizes
- * by dragging its inner edge. Each view draws its own header. */
+/** A panel docked to one side of the window, outside the pane grid. Holds views behind a strip
+ * of icon tabs down its outer edge, shown when there's more than one and divided by the views'
+ * groups, and resizes by dragging its inner edge. Each view draws its own header. */
 export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Props) {
   const drag = useRef<{ x: number; width: number }>(undefined);
   if (!state.open) return null;

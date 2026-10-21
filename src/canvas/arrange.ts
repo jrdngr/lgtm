@@ -1,5 +1,5 @@
-import type { Box, Layout, Placed } from "../../system/layout";
-import type { SEdge } from "../../system/scene";
+import type { Box, Layout, Placed } from "../system/layout";
+import type { SEdge } from "../system/scene";
 import { swatchHex } from "./palette";
 import type { Canvas, View } from "./view";
 
@@ -12,7 +12,7 @@ export interface Drag {
 
 export interface Arranged {
   layout: Layout;
-  /** Each part's box, by id. */
+  /** Each part's and shape's box, by id. */
   boxes: Map<string, Box>;
   /** Parts without a position in a view the user has arranged: new since. */
   fresh: Set<string>;
@@ -64,7 +64,8 @@ const inside = (b: Box, outer: Box) => {
   return cx > outer.x && cx < outer.x + outer.w && cy > outer.y && cy < outer.y + outer.h;
 };
 
-/** The automatic layout `base` with the view's positions, colors and a drag applied. Parts
+/** The automatic layout `base` with the view's positions, colors and a drag applied, and the
+ * view's shapes. Parts
  * the view has no position for keep their automatic spot, or once the user has arranged the
  * view, go to open space near the parts they link to. Arranged, a view drops its tier bands,
  * and its boundary follows the parts that started inside it. `extra` boxes (groups, notes,
@@ -111,6 +112,11 @@ export function arrange(
     return paint ? { ...p, paint: swatchHex(paint) } : p;
   });
   const boxes = new Map<string, Box>(nodes.map((n) => [n.id, n]));
+  const shapes = v.shapes.map((s): Box => {
+    const off = drag?.ids.has(s.id) ? { x: drag.dx, y: drag.dy } : { x: 0, y: 0 };
+    return { x: s.at.x + off.x, y: s.at.y + off.y, w: s.w, h: s.h };
+  });
+  for (const [i, s] of v.shapes.entries()) boxes.set(s.id, shapes[i]);
   const moved = positioned || !!drag;
   let boundary = base.boundary;
   if (moved && base.boundary) {
@@ -127,7 +133,7 @@ export function arrange(
       };
     }
   }
-  const all = [...nodes, ...(boundary ? [boundary] : []), ...extra];
+  const all = [...nodes, ...(boundary ? [boundary] : []), ...shapes, ...extra];
   const far = all.length ? union(all) : { x: 0, y: 0, w: 0, h: 0 };
   return {
     layout: {
@@ -136,6 +142,8 @@ export function arrange(
       boundary,
       width: Math.max(moved ? 0 : base.width, far.x + far.w + PAD),
       height: Math.max(moved ? 0 : base.height, far.y + far.h + PAD),
+      left: Math.min(0, far.x - PAD),
+      top: Math.min(0, far.y - PAD),
     },
     boxes,
     fresh,

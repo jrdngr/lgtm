@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+use crate::canvas::CanvasFocus;
 use crate::jj::Jj;
 use crate::review::Reviews;
 use crate::store::Store;
@@ -28,6 +29,8 @@ pub struct RepoCtx {
     pub workspace_base: Option<PathBuf>,
     pub store: Mutex<Store>,
     pub(crate) reviews: Reviews,
+    /// The canvas each workspace shows, by workspace name ("" for the main one).
+    pub(crate) canvas_focus: Mutex<HashMap<String, CanvasFocus>>,
 }
 
 impl RepoCtx {
@@ -41,6 +44,7 @@ impl RepoCtx {
             workspace_base: ws_base(),
             store: Mutex::new(store),
             reviews: Reviews::default(),
+            canvas_focus: Mutex::default(),
         }
     }
 }

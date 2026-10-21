@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { CanvasGroup } from "../../bindings";
-import type { Box } from "../../system/layout";
+import type { CanvasGroup } from "../bindings";
+import type { Box } from "../system/layout";
 import { group, groupAt, groupBoxes, moveInto, partsIn, ungroup } from "./canvasGroups";
 import { fullCanvas, type View, viewOf } from "./view";
 

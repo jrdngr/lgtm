@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
-import type { ArrowEnd, CanvasArrow, Swatch } from "../../bindings";
-import { tint } from "../../system/colors";
-import { arrowPath, type Pt, shapedPath } from "../../system/edgePaths";
-import { NOTE_PX } from "./notes";
+import type { ArrowEnd, CanvasArrow, Swatch } from "../bindings";
+import { tint } from "../system/colors";
+import { arrowPath, type Pt, shapedPath } from "../system/edgePaths";
+import { Shapes, Tags } from "./CanvasShapes";
+import { NOTE_PX, STICKY_W } from "./notes";
 import { INK, swatchHex } from "./palette";
 import { arrowRef, groupRef, noteRef, parseRef } from "./refs";
-import type { Draft, useCanvasEdit } from "./useCanvasEdit";
+import type { Draft } from "./tools";
+import type { useCanvasEdit } from "./useCanvasEdit";
 
 type Ed = ReturnType<typeof useCanvasEdit>;
 
@@ -48,7 +50,8 @@ export function CanvasUnder({ ed, editing }: { ed: Ed; editing: boolean }) {
   );
 }
 
-/** Group labels, notes, arrows and the editing handles: drawn in the world over the nodes. */
+/** Shapes, group labels, notes, arrows, tags and the editing handles: drawn in the world over
+ * the nodes. */
 export function CanvasOver({
   ed,
   editing,
@@ -71,6 +74,7 @@ export function CanvasOver({
   const bend = edgeSel.length === 1 ? bendHandle(ed, edgeSel[0].id) : undefined;
   return (
     <div className={`cv-over${editing ? " editing" : ""}`}>
+      <Shapes ed={ed} editing={editing} flash={flash} />
       {[...ed.frames].map(([id, b]) => {
         const grp = ed.view.groups.find((x) => x.id === id);
         if (!grp) return null;
@@ -130,7 +134,7 @@ export function CanvasOver({
                 className="cv-arrow"
                 stroke={c}
                 strokeDasharray={a.pattern === "dashed" ? "9 7" : undefined}
-                markerEnd={`url(#${headId(c)})`}
+                markerEnd={a.head !== false ? `url(#${headId(c)})` : undefined}
               />
               <path
                 d={d}
@@ -145,7 +149,7 @@ export function CanvasOver({
             d={arrowPath(ed.endPoint(g.from, { target: null, at: g.at }), g.at)}
             className="cv-arrow"
             stroke={INK}
-            markerEnd={`url(#${headId(INK)})`}
+            markerEnd={g.head ? `url(#${headId(INK)})` : undefined}
           />
         )}
       </svg>
@@ -170,13 +174,8 @@ export function CanvasOver({
         .map((n) => (
           <div
             key={n.id}
-            className={`cv-note cv-hit${sel(noteRef(n.id)) ? " on" : ""}${lit(n.id)}`}
-            style={{
-              left: n.at.x,
-              top: n.at.y,
-              fontSize: NOTE_PX[n.size],
-              color: hexOf(n.color, INK),
-            }}
+            className={`cv-note cv-hit${n.sticky ? " sticky" : ""}${sel(noteRef(n.id)) ? " on" : ""}${lit(n.id)}`}
+            style={{ left: n.at.x, top: n.at.y, ...noteStyle(n) }}
             onPointerDown={(e) => ed.press.note(n.id, e)}
             onDoubleClick={() => ed.press.noteText(n.id)}
           >
@@ -191,6 +190,18 @@ export function CanvasOver({
           onPointerDown={(e) => ed.press.bend(edgeSel[0].id, e, bend.from)}
         />
       )}
+      {(g?.kind === "frame" || g?.kind === "shape") && (
+        <div
+          className={`cv-sketch ${g.kind === "shape" ? g.shape : "frame"}`}
+          style={{
+            left: Math.min(g.start.x, g.at.x),
+            top: Math.min(g.start.y, g.at.y),
+            width: Math.abs(g.at.x - g.start.x),
+            height: Math.abs(g.at.y - g.start.y),
+          }}
+        />
+      )}
+      <Tags ed={ed} editing={editing} />
       {g?.kind === "marquee" && (
         <div
           className="cv-marquee"
@@ -230,16 +241,11 @@ function DraftNote({ ed, draft }: { ed: Ed; draft: Draft }) {
   return (
     <textarea
       ref={ref}
-      className="cv-draft"
+      className={`cv-draft${draft.sticky ? " sticky" : ""}`}
       rows={lines.length}
       cols={Math.max(8, ...lines.map((l) => l.length + 1))}
       value={draft.text}
-      style={{
-        left: draft.at.x,
-        top: draft.at.y,
-        fontSize: NOTE_PX[draft.size],
-        color: hexOf(draft.color, INK),
-      }}
+      style={{ left: draft.at.x, top: draft.at.y, ...noteStyle(draft) }}
       onPointerDown={(e) => e.stopPropagation()}
       onChange={(e) => ed.setDraft({ ...draft, text: e.target.value })}
       onBlur={() => ed.commitDraft(draft)}
@@ -253,4 +259,17 @@ function DraftNote({ ed, draft }: { ed: Ed; draft: Draft }) {
       }}
     />
   );
+}
+
+/** How a note's text draws: plain in its color, or on a card tinted by it. */
+function noteStyle(n: { size: Draft["size"]; color: Swatch | null; sticky?: boolean }) {
+  const px = NOTE_PX[n.size];
+  if (!n.sticky) return { fontSize: px, color: hexOf(n.color, INK) };
+  const c = hexOf(n.color, swatchHex("yellow"));
+  return {
+    fontSize: px,
+    width: STICKY_W[n.size],
+    background: tint(c, 0.18),
+    borderColor: tint(c, 0.45),
+  };
 }

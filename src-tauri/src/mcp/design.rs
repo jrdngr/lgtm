@@ -8,7 +8,7 @@ use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed, json};
 use crate::events::DesignChanged;
-use crate::review::arch::design::{CanvasOp, DesignInput};
+use crate::review::arch::design::DesignInput;
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -151,18 +151,6 @@ pub struct NewDesign {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct CanvasEdit {
-    /// A design's id from list_designs.
-    pub id: String,
-    /// `context`, `containers`, `components/<container id>` or `interfaces/<component id>`.
-    pub view: String,
-    /// Applied in order, as one step the user can undo. Part ids: `c:<container id>`,
-    /// `k:<component id>`, `p:<person name>`, `x:<external name>`, `i:<component id>#<n>` for
-    /// a component's n-th interface (from 0), and `sys` for the system at the context level.
-    pub ops: Vec<CanvasOp>,
-}
-
-#[derive(Deserialize, JsonSchema)]
 pub struct DesignId {
     /// A design's id from list_designs.
     pub id: String,
@@ -248,27 +236,6 @@ impl Lgtm {
             })
             .collect();
         json(&out)
-    }
-
-    #[tool(
-        description = "Draw on a design's diagram in lgtm, in one view: move parts, group them \
-        under labels (groups nest), color parts and groups, style edges, and add notes and \
-        arrows. The user draws there too; design_instructions shows the canvas as it is, with \
-        who made each element. Your changes may move or restyle the user's; they show as one \
-        agent pass the user can undo."
-    )]
-    async fn edit_canvas(&self, Parameters(p): Parameters<CanvasEdit>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let n = p.ops.len();
-        ctx.edit_design_canvas(&p.id, &p.view, p.ops)
-            .map_err(failed)?;
-        DesignChanged {
-            id: p.id.clone(),
-            workspace: self.workspace().map(String::from),
-        }
-        .emit_to(self.app(), &label)
-        .ok();
-        Ok(format!("Applied {n} changes to `{}` of design `{}`.", p.view, p.id))
     }
 
     #[tool(

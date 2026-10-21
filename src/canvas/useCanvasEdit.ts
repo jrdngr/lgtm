@@ -1,18 +1,10 @@
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import type {
-  ArrowEnd,
-  CanvasArrow,
-  CanvasNote,
-  EdgeStyle,
-  NoteSize,
-  Swatch,
-} from "../../bindings";
-import { boxExit, type Pt } from "../../system/edgePaths";
-import type { Box, Layout } from "../../system/layout";
-import { BLUE, DASHED, DOTTED } from "../../system/MapEdges";
-import type { Paint } from "../../system/mapWires";
-import type { ToWorld } from "../../system/SystemCanvas";
-import type { SEdge } from "../../system/scene";
+import type { ArrowEnd, CanvasArrow, CanvasNote, ShapeKind } from "../bindings";
+import { boxExit, type Pt } from "../system/edgePaths";
+import type { Box, Layout } from "../system/layout";
+import type { Paint } from "../system/mapWires";
+import type { ToWorld } from "../system/SystemCanvas";
+import type { SEdge } from "../system/scene";
 import { type Arranged, arrange, freeze } from "./arrange";
 import {
   type GroupBox,
@@ -25,60 +17,28 @@ import {
   partsIn,
   ungroup,
 } from "./canvasGroups";
+import { dragBox, inside, newShape, removeSelected, resized, setTag } from "./edits";
 import { noteBox } from "./notes";
-import { swatchHex } from "./palette";
 import { arrowRef, edgeRef, groupRef, idsOf, noteRef, parseRef } from "./refs";
-import { type Canvas, freshId, isPart, type View, viewOf, withView } from "./view";
+import {
+  centerOf,
+  type Draft,
+  defaultStyle,
+  edgePaint,
+  type Gesture,
+  type Label,
+  ORIGIN,
+  rectOf,
+  round,
+  SHAPE_TOOLS,
+  SLOP,
+  TOOL_KEYS,
+  type Tool,
+} from "./tools";
+import { type Canvas, freshId, isPart, isShape, type View, viewOf, withView } from "./view";
 
-export type Tool = "select" | "text" | "arrow";
-
-/** A press being dragged. */
-type Gesture =
-  | { kind: "move"; start: Pt; at: Pt; parts: Set<string>; notes: Set<string>; items: string[] }
-  | { kind: "marquee"; start: Pt; at: Pt; add: boolean }
-  | { kind: "arrow"; from: ArrowEnd; at: Pt; free: boolean }
-  | { kind: "end"; arrow: string; which: "from" | "to"; at: Pt; free: boolean }
-  | { kind: "bend"; key: string; start: Pt; at: Pt; from: Pt };
-
-/** A note being typed. */
-export interface Draft {
-  id?: string;
-  at: Pt;
-  text: string;
-  size: NoteSize;
-  color: Swatch | null;
-}
-
-/** A drag shorter than this, in world units, is a click. */
-const SLOP = 3;
-/** What a design edge draws in when its style gives no color. */
-const NEW = "#a371f7";
-
-const ORIGIN: Pt = { x: 0, y: 0 };
-const round = (p: Pt): Pt => ({ x: Math.round(p.x), y: Math.round(p.y) });
-const centerOf = (b: Box): Pt => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
-
-export function edgePaint(style: EdgeStyle, e: SEdge | undefined): Paint {
-  return {
-    color: style.color ? swatchHex(style.color) : e?.status === "added" ? NEW : BLUE,
-    dash: style.pattern === "dashed" ? DASHED : style.pattern === "dotted" ? DOTTED : undefined,
-    width: style.weight === "thick" ? 3 : 1.6,
-    route: style.route,
-    bend: style.bend,
-  };
-}
-
-export const defaultStyle = (): EdgeStyle => ({
-  pattern: "solid",
-  color: null,
-  weight: "thin",
-  route: "curved",
-  bend: null,
-  by: "user",
-});
-
-/** Editing a design view's canvas: what it draws, the selection, the tools, and the presses
- * and keys that change it. */
+/** Editing a canvas view: what it draws, the selection, the tools, and the presses and keys
+ * that change it. A design's map gives its parts as `base`; a drawing has none. */
 export function useCanvasEdit(p: {
   canvas: Canvas;
   commit(c: Canvas): void;
@@ -96,23 +56,28 @@ export function useCanvasEdit(p: {
   // Cleared when a draft is saved or dropped, so a blur as it closes doesn't save it again.
   const drafting = useRef<Draft | undefined>(undefined);
   drafting.current = draft;
+  const [label, setLabel] = useState<Label>();
+  const labeling = useRef<Label | undefined>(undefined);
+  labeling.current = label;
   const [renaming, setRenaming] = useState<string>();
   const [panning, setPanning] = useState(false);
   const live = useRef<Gesture | undefined>(undefined);
   live.current = gesture;
   const toWorldRef = useRef<ToWorld | undefined>(undefined);
 
-  // A new view or design starts with nothing selected.
+  // A new view starts with nothing selected.
   // biome-ignore lint/correctness/useExhaustiveDependencies: resets on a new view
   useEffect(() => {
     setSelected(new Set());
     setDraft(undefined);
+    setLabel(undefined);
   }, [key]);
   useEffect(() => {
     if (!editing) {
       setSelected(new Set());
       setTool("select");
       setDraft(undefined);
+      setLabel(undefined);
     }
   }, [editing]);
 
@@ -141,15 +106,36 @@ export function useCanvasEdit(p: {
   const moving = gesture?.kind === "move" ? gesture : undefined;
   const dx = moving ? moving.at.x - moving.start.x : 0;
   const dy = moving ? moving.at.y - moving.start.y : 0;
+  const sizing = gesture?.kind === "resize" ? gesture : undefined;
+  const shapes = v.shapes.map((s) => {
+    if (sizing?.id !== s.id) return s;
+    const b = resized(
+      sizing.from,
+      sizing.corner,
+      sizing.at.x - sizing.start.x,
+      sizing.at.y - sizing.start.y,
+    );
+    return { ...s, at: { x: b.x, y: b.y }, w: b.w, h: b.h };
+  });
+  const sized = sizing ? { ...v, shapes } : v;
   const notes = v.notes.map((n) =>
     moving?.notes.has(n.id) ? { ...n, at: { x: n.at.x + dx, y: n.at.y + dy } } : n,
   );
   const noteBoxes = new Map(notes.map((n) => [n.id, noteBox(n)]));
-  const arranged: Arranged = moving?.parts.size
-    ? arrange(p.base, p.edges, v, canvas.colors, { ids: moving.parts, dx, dy }, [
-        ...noteBoxes.values(),
-      ])
-    : plain;
+  const arranged: Arranged =
+    moving?.parts.size || sizing
+      ? arrange(
+          p.base,
+          p.edges,
+          sized,
+          canvas.colors,
+          moving ? { ids: moving.parts, dx, dy } : undefined,
+          [...noteBoxes.values()],
+        )
+      : plain;
+  const shown = moving
+    ? { ...v, shapes: v.shapes.map((s) => ({ ...s, at: arranged.boxes.get(s.id) ?? s.at })) }
+    : sized;
   // While parts move, frames keep to where they were, save those of moving groups.
   const frames = useMemo(() => {
     const boxes = groupBoxes(v, moving ? plain.boxes : arranged.boxes);
@@ -175,7 +161,16 @@ export function useCanvasEdit(p: {
     return boxExit(box, ob ? centerOf(ob) : (other.at ?? ORIGIN));
   };
 
-  /** The part, note or innermost group under `pt`. */
+  /** The box a tag on `target` sits at the corner of: its element's, or an arrow's middle. */
+  const tagBox = (target: string): Box | undefined => {
+    const a = v.arrows.find((x) => x.id === target);
+    if (!a) return boxOf(target);
+    const s = endPoint(a.from, a.to);
+    const t = endPoint(a.to, a.from);
+    return { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2, w: 0, h: 0 };
+  };
+
+  /** The part, shape, note or innermost group under `pt`. */
   const targetAt = (pt: Pt, except = new Set<string>()): string | undefined => {
     const hit = (b: Box) => pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h;
     const part = [...arranged.boxes].reverse().find(([id, b]) => !except.has(id) && hit(b));
@@ -236,12 +231,14 @@ export function useCanvasEdit(p: {
   const finishMove = (g: Extract<Gesture, { kind: "move" }>) => {
     const ddx = g.at.x - g.start.x;
     const ddy = g.at.y - g.start.y;
+    const parts = [...g.parts].filter((id) => !isShape(id));
+    const movedShapes = new Set([...g.parts].filter(isShape));
     change((view) => {
       let out = view;
-      if (g.parts.size) {
+      if (parts.length) {
         out = out.frozen ? out : freeze(out, plain.layout);
         const positions = { ...out.positions };
-        for (const id of g.parts) {
+        for (const id of parts) {
           const b = plain.boxes.get(id);
           const from = positions[id] ?? b;
           if (from)
@@ -249,6 +246,13 @@ export function useCanvasEdit(p: {
         }
         out = { ...out, positions };
       }
+      if (movedShapes.size)
+        out = {
+          ...out,
+          shapes: out.shapes.map((s) =>
+            movedShapes.has(s.id) ? { ...s, at: round({ x: s.at.x + ddx, y: s.at.y + ddy }) } : s,
+          ),
+        };
       if (g.notes.size)
         out = {
           ...out,
@@ -296,8 +300,9 @@ export function useCanvasEdit(p: {
 
   const startArrow = (e: React.PointerEvent, toWorld: ToWorld, target?: string) => {
     const at = round(toWorld(e.clientX, e.clientY));
+    const head = tool !== "line";
     const from: ArrowEnd = { target: e.altKey ? null : (target ?? targetAt(at) ?? null), at };
-    track(e, toWorld, { kind: "arrow", from, at, free: e.altKey }, (g, moved) => {
+    track(e, toWorld, { kind: "arrow", from, at, free: e.altKey, head }, (g, moved) => {
       if (!moved || g.kind !== "arrow") return;
       const to: ArrowEnd = {
         target: g.free
@@ -312,6 +317,7 @@ export function useCanvasEdit(p: {
         to,
         color: null,
         pattern: "solid",
+        head,
         by: "user",
       };
       change((view) => ({ ...view, arrows: [...view.arrows, arrow] }));
@@ -320,20 +326,63 @@ export function useCanvasEdit(p: {
     });
   };
 
-  const startText = (e: React.PointerEvent, toWorld: ToWorld) => {
-    setDraft({ at: round(toWorld(e.clientX, e.clientY)), text: "", size: "m", color: null });
+  const startText = (e: React.PointerEvent, toWorld: ToWorld, sticky: boolean) => {
+    setDraft({
+      at: round(toWorld(e.clientX, e.clientY)),
+      text: "",
+      size: "m",
+      color: sticky ? "yellow" : null,
+      sticky,
+    });
     setTool("select");
   };
 
+  const startShape = (e: React.PointerEvent, toWorld: ToWorld, shape: ShapeKind) => {
+    const start = toWorld(e.clientX, e.clientY);
+    track(e, toWorld, { kind: "shape", shape, start, at: start }, (g, moved) => {
+      if (g.kind !== "shape") return;
+      const id = freshId(v, "s:");
+      change((view) => ({
+        ...view,
+        shapes: [...view.shapes, newShape(id, shape, dragBox(g.start, g.at, moved))],
+      }));
+      setSelected(new Set([id]));
+      setTool("select");
+      setLabel({ id, text: "" });
+    });
+  };
+
+  const startFrame = (e: React.PointerEvent, toWorld: ToWorld) => {
+    const start = toWorld(e.clientX, e.clientY);
+    track(e, toWorld, { kind: "frame", start, at: start }, (g, moved) => {
+      if (g.kind !== "frame") return;
+      setTool("select");
+      const items = moved ? inside(arranged.boxes, rectOf(g.start, g.at)) : [];
+      if (!items.length) return;
+      const id = freshId(v, "g");
+      change((view) => group(view, items, id, "Frame"));
+      setSelected(new Set([groupRef(id)]));
+      setRenaming(id);
+    });
+  };
+
+  /** A press with the current tool that makes something; false for the select tool. */
+  const create = (e: React.PointerEvent, toWorld: ToWorld, target?: string): boolean => {
+    const shape = SHAPE_TOOLS[tool];
+    if (shape) startShape(e, toWorld, shape);
+    else if (tool === "arrow" || tool === "line") startArrow(e, toWorld, target);
+    else if (tool === "text" || tool === "note") startText(e, toWorld, tool === "note");
+    else if (tool === "frame") startFrame(e, toWorld);
+    else return false;
+    return true;
+  };
+
   const onNodeDown = (id: string, e: React.PointerEvent, toWorld: ToWorld) => {
-    if (tool === "arrow") return startArrow(e, toWorld, id);
-    if (tool === "text") return startText(e, toWorld);
-    startMove(id, e, toWorld);
+    if (!create(e, toWorld, id)) startMove(id, e, toWorld);
   };
 
   const onBackgroundDown = (e: React.PointerEvent, toWorld: ToWorld) => {
-    if (tool === "arrow") return startArrow(e, toWorld);
-    if (tool === "text") return startText(e, toWorld);
+    if (create(e, toWorld)) return;
     const start = toWorld(e.clientX, e.clientY);
     track(e, toWorld, { kind: "marquee", start, at: start, add: e.shiftKey }, (g, moved) => {
       if (g.kind !== "marquee") return;
@@ -341,12 +390,7 @@ export function useCanvasEdit(p: {
         if (!g.add) setSelected(new Set());
         return;
       }
-      const r = {
-        x: Math.min(g.start.x, g.at.x),
-        y: Math.min(g.start.y, g.at.y),
-        w: Math.abs(g.at.x - g.start.x),
-        h: Math.abs(g.at.y - g.start.y),
-      };
+      const r = rectOf(g.start, g.at);
       const meets = (b: Box) =>
         b.x < r.x + r.w && r.x < b.x + b.w && b.y < r.y + r.h && r.y < b.y + b.h;
       const hits = [
@@ -357,20 +401,49 @@ export function useCanvasEdit(p: {
     });
   };
 
-  /** Presses on the canvas's own elements: group labels, notes, arrows and handles. */
+  /** Presses on the canvas's own elements: shapes, group labels, notes, arrows, handles and
+   * tags. */
   const press = {
+    shape: (id: string, e: React.PointerEvent) => {
+      e.stopPropagation();
+      const tw = toWorldRef.current;
+      if (!tw || e.button !== 0) return;
+      onNodeDown(id, e, tw);
+    },
+    shapeText: (id: string) => {
+      const s = v.shapes.find((x) => x.id === id);
+      if (s) setLabel({ id, text: s.text });
+    },
+    resize: (id: string, corner: number, e: React.PointerEvent) => {
+      e.stopPropagation();
+      const tw = toWorldRef.current;
+      const s = v.shapes.find((x) => x.id === id);
+      if (!tw || !s || e.button !== 0) return;
+      const start = tw(e.clientX, e.clientY);
+      const from = { x: s.at.x, y: s.at.y, w: s.w, h: s.h };
+      track(e, tw, { kind: "resize", id, corner, start, at: start, from }, (g, moved) => {
+        if (!moved || g.kind !== "resize") return;
+        const b = resized(from, corner, g.at.x - g.start.x, g.at.y - g.start.y);
+        change((view) => ({
+          ...view,
+          shapes: view.shapes.map((x) =>
+            x.id === id ? { ...x, at: { x: b.x, y: b.y }, w: b.w, h: b.h, by: "user" } : x,
+          ),
+        }));
+      });
+    },
     group: (id: string, e: React.PointerEvent) => {
       e.stopPropagation();
       const tw = toWorldRef.current;
       if (!tw || e.button !== 0) return;
-      if (tool === "arrow") return startArrow(e, tw, id);
+      if (tool === "arrow" || tool === "line") return startArrow(e, tw, id);
       startMove(groupRef(id), e, tw);
     },
     note: (id: string, e: React.PointerEvent) => {
       e.stopPropagation();
       const tw = toWorldRef.current;
       if (!tw || e.button !== 0) return;
-      if (tool === "arrow") return startArrow(e, tw, id);
+      if (tool === "arrow" || tool === "line") return startArrow(e, tw, id);
       startMove(noteRef(id), e, tw);
     },
     arrow: (id: string, e: React.PointerEvent) => {
@@ -421,8 +494,38 @@ export function useCanvasEdit(p: {
     },
     noteText: (id: string) => {
       const n = v.notes.find((x) => x.id === id);
-      if (n) setDraft({ id, at: n.at, text: n.text, size: n.size, color: n.color });
+      if (n)
+        setDraft({ id, at: n.at, text: n.text, size: n.size, color: n.color, sticky: !!n.sticky });
     },
+    /** A tag dragged from the tray or off the element it's on, dropped onto another. */
+    tag: (digit: string, e: React.PointerEvent) => {
+      e.stopPropagation();
+      const tw = toWorldRef.current;
+      if (!tw || e.button !== 0) return;
+      const at = tw(e.clientX, e.clientY);
+      track(e, tw, { kind: "tag", digit, at }, (g) => {
+        if (g.kind !== "tag") return;
+        const on = targetAt(g.at) ?? arrowNear(g.at);
+        if (on) change((view) => setTag(view, digit, on));
+      });
+    },
+  };
+
+  /** The arrow passing nearest `pt`, within a few units. */
+  const arrowNear = (pt: Pt): string | undefined => {
+    let best: [string, number] | undefined;
+    for (const a of v.arrows) {
+      const s = endPoint(a.from, a.to);
+      const t = endPoint(a.to, a.from);
+      const len = Math.hypot(t.x - s.x, t.y - s.y) || 1;
+      const u = Math.max(
+        0,
+        Math.min(1, ((pt.x - s.x) * (t.x - s.x) + (pt.y - s.y) * (t.y - s.y)) / len ** 2),
+      );
+      const d = Math.hypot(pt.x - (s.x + u * (t.x - s.x)), pt.y - (s.y + u * (t.y - s.y)));
+      if (d < 12 && (!best || d < best[1])) best = [a.id, d];
+    }
+    return best?.[0];
   };
 
   const cancelDraft = () => {
@@ -436,16 +539,46 @@ export function useCanvasEdit(p: {
     const text = d.text.trim();
     if (!d.id && !text) return;
     if (d.id && !text) {
-      change((view) => ({ ...view, notes: view.notes.filter((n) => n.id !== d.id) }));
+      change((view) => ({
+        ...view,
+        notes: view.notes.filter((n) => n.id !== d.id),
+        tags: Object.fromEntries(Object.entries(view.tags).filter(([, on]) => on !== d.id)),
+      }));
       return;
     }
     const id = d.id ?? freshId(v, "n");
-    const note: CanvasNote = { id, text, at: d.at, size: d.size, color: d.color, by: "user" };
+    const note: CanvasNote = {
+      id,
+      text,
+      at: d.at,
+      size: d.size,
+      color: d.color,
+      sticky: d.sticky,
+      by: "user",
+    };
     change((view) => ({
       ...view,
       notes: d.id ? view.notes.map((n) => (n.id === id ? note : n)) : [...view.notes, note],
     }));
     setSelected(new Set([noteRef(id)]));
+  };
+
+  const cancelLabel = () => {
+    labeling.current = undefined;
+    setLabel(undefined);
+  };
+
+  const commitLabel = (l: Label) => {
+    if (!labeling.current) return;
+    cancelLabel();
+    const s = v.shapes.find((x) => x.id === l.id);
+    if (!s || s.text === l.text.trim()) return;
+    change((view) => ({
+      ...view,
+      shapes: view.shapes.map((x) =>
+        x.id === l.id ? { ...x, text: l.text.trim(), by: "user" } : x,
+      ),
+    }));
   };
 
   const groupSelection = () => {
@@ -465,18 +598,18 @@ export function useCanvasEdit(p: {
   };
 
   const removeSelection = () => {
-    const notesGone = new Set(idsOf(selected, "note"));
-    const arrowsGone = new Set(idsOf(selected, "arrow"));
-    const groupsGone = idsOf(selected, "group");
-    const edgesGone = new Set(idsOf(selected, "edge"));
-    if (!notesGone.size && !arrowsGone.size && !groupsGone.length && !edgesGone.size) return;
-    change((view) => ({
-      ...groupsGone.reduce(ungroup, view),
-      notes: view.notes.filter((n) => !notesGone.has(n.id)),
-      arrows: view.arrows.filter((a) => !arrowsGone.has(a.id)),
-      edges: Object.fromEntries(Object.entries(view.edges).filter(([k]) => !edgesGone.has(k))),
-    }));
+    const removable = [...selected].map(parseRef).some((r) => r.kind !== "part" || isShape(r.id));
+    if (!removable) return;
+    const groups = idsOf(selected, "group");
+    change((view) => removeSelected(view, selected, (x) => groups.reduce(ungroup, x)));
     setSelected(new Set());
+  };
+
+  /** The one thing selected, as an element id a tag can sit on. */
+  const single = (): string | undefined => {
+    if (selected.size !== 1) return undefined;
+    const r = parseRef([...selected][0]);
+    return r.kind === "edge" ? undefined : r.id;
   };
 
   /** Keys while editing; true when one was taken. */
@@ -484,13 +617,14 @@ export function useCanvasEdit(p: {
     if (!editing) return false;
     const mod = e.metaKey || e.ctrlKey;
     const k = e.key.toLowerCase();
+    const one = single();
     if (mod && k === "g") {
       if (e.shiftKey) ungroupSelection();
       else groupSelection();
-    } else if (mod) return false;
-    else if (k === "v") setTool("select");
-    else if (k === "t") setTool("text");
-    else if (k === "a") setTool("arrow");
+    } else if (mod || e.altKey) return false;
+    else if (/^[0-9]$/.test(e.key) && one) change((view) => setTag(view, e.key, one, true));
+    else if (TOOL_KEYS[k] && !e.shiftKey) setTool(TOOL_KEYS[k]);
+    else if (e.key === "Enter" && one && isShape(one)) press.shapeText(one);
     else if (e.key === "Backspace" || e.key === "Delete") removeSelection();
     else if (e.key === "Escape" && tool !== "select") setTool("select");
     else if (e.key === "Escape" && selected.size) setSelected(new Set());
@@ -509,31 +643,13 @@ export function useCanvasEdit(p: {
       if (ref.kind === "arrow") {
         const a = v.arrows.find((x) => x.id === ref.id);
         if (!a) return [];
-        const s = endPoint(a.from, a.to);
-        const t = endPoint(a.to, a.from);
-        return [
-          {
-            x: Math.min(s.x, t.x),
-            y: Math.min(s.y, t.y),
-            w: Math.abs(t.x - s.x),
-            h: Math.abs(t.y - s.y),
-          },
-        ];
+        return [rectOf(endPoint(a.from, a.to), endPoint(a.to, a.from))];
       }
       const e = p.edges.find((x) => `${x.from}>${x.to}` === ref.id);
       const a = e && arranged.boxes.get(e.from);
       const b = e && arranged.boxes.get(e.to);
       if (!a || !b) return [];
-      const ca = centerOf(a);
-      const cb = centerOf(b);
-      return [
-        {
-          x: Math.min(ca.x, cb.x),
-          y: Math.min(ca.y, cb.y),
-          w: Math.abs(cb.x - ca.x),
-          h: Math.abs(cb.y - ca.y),
-        },
-      ];
+      return [rectOf(centerOf(a), centerOf(b))];
     });
     if (!boxes.length) return undefined;
     const x = Math.min(...boxes.map((b) => b.x));
@@ -563,6 +679,7 @@ export function useCanvasEdit(p: {
   return {
     viewKey: key,
     view: v,
+    shapes: shown.shapes,
     arranged,
     frames,
     notes,
@@ -576,11 +693,16 @@ export function useCanvasEdit(p: {
     setDraft,
     commitDraft,
     cancelDraft,
+    label,
+    setLabel,
+    commitLabel,
+    cancelLabel,
     renaming,
     setRenaming,
     panning,
     dropTarget,
     endPoint,
+    tagBox,
     press,
     onNodeDown,
     onBackgroundDown,
@@ -590,6 +712,7 @@ export function useCanvasEdit(p: {
     ungroupSelection,
     removeSelection,
     selectionBox,
+    clearTags: () => change((view) => ({ ...view, tags: {} })),
     selectEdge: (key: string, add: boolean) =>
       setSelected(add ? new Set([...selected, edgeRef(key)]) : new Set([edgeRef(key)])),
     resetLayout: () => change((view) => ({ ...view, positions: {}, frozen: false })),

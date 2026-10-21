@@ -1,190 +1,47 @@
-//! A design's canvas: what the user and the agent draw over its map. Each view (a level, and
-//! for components and interfaces the container or component it shows) has its own positions,
-//! groups, edge styles, notes and arrows; a part's color follows it into every view.
-
-use std::collections::BTreeMap;
+//! An agent's changes to a canvas, applied as one pass the user can undo.
 
 use anyhow::{Context, bail};
 use rmcp::schemars::{self, JsonSchema};
-use serde::{Deserialize, Serialize};
-use specta::Type;
+use serde::Deserialize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum Swatch {
-    Red,
-    Orange,
-    Yellow,
-    Green,
-    Cyan,
-    Blue,
-    Purple,
-    Pink,
-}
-
-/// Who last made or changed an element.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub enum CanvasAuthor {
-    #[default]
-    User,
-    Agent,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-pub struct Pt {
-    pub x: i32,
-    pub y: i32,
-}
-
-/// A labeled frame around parts and other groups.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasGroup {
-    pub id: String,
-    pub label: String,
-    pub color: Option<Swatch>,
-    /// Part ids, which have a `:` (or are `sys`), and group ids, which don't.
-    pub members: Vec<String>,
-    #[serde(default)]
-    pub by: CanvasAuthor,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum LinePattern {
-    #[default]
-    Solid,
-    Dashed,
-    Dotted,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum LineWeight {
-    #[default]
-    Thin,
-    Thick,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum Route {
-    #[default]
-    Curved,
-    Elbow,
-}
-
-/// How a styled edge draws. A styled edge shows at rest, with its label.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct EdgeStyle {
-    pub pattern: LinePattern,
-    pub color: Option<Swatch>,
-    pub weight: LineWeight,
-    pub route: Route,
-    /// Where its middle is dragged to, from halfway between its ends' centers.
-    pub bend: Option<Pt>,
-    #[serde(default)]
-    pub by: CanvasAuthor,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum NoteSize {
-    S,
-    #[default]
-    M,
-    L,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasNote {
-    pub id: String,
-    pub text: String,
-    /// Its top left.
-    pub at: Pt,
-    pub size: NoteSize,
-    pub color: Option<Swatch>,
-    #[serde(default)]
-    pub by: CanvasAuthor,
-}
-
-/// An arrow's end: stuck to a part, group or note, or free at `at`.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ArrowEnd {
-    /// A part, group or note id; none when the end is free.
-    pub target: Option<String>,
-    /// Where a free end is, and where an attached one was last drawn.
-    #[serde(default)]
-    pub at: Pt,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct CanvasArrow {
-    pub id: String,
-    pub from: ArrowEnd,
-    pub to: ArrowEnd,
-    pub color: Option<Swatch>,
-    pub pattern: LinePattern,
-    #[serde(default)]
-    pub by: CanvasAuthor,
-}
-
-/// One view's drawing.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase", default)]
-pub struct ViewCanvas {
-    /// Set once the user moves something: every part keeps a position, and a part without
-    /// one is new since.
-    pub frozen: bool,
-    /// Parts' top lefts, by part id.
-    pub positions: BTreeMap<String, Pt>,
-    pub groups: Vec<CanvasGroup>,
-    /// By `from>to` part ids.
-    pub edges: BTreeMap<String, EdgeStyle>,
-    pub notes: Vec<CanvasNote>,
-    pub arrows: Vec<CanvasArrow>,
-}
-
-/// The last agent pass: how many changes it made and what it touched.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct AgentPass {
-    pub changed: u32,
-    /// Part, group, note and arrow ids, and edges as `from>to`.
-    pub touched: Vec<String>,
-    pub view: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, Type)]
-#[serde(rename_all = "camelCase", default)]
-pub struct DesignCanvas {
-    /// By view: `context`, `containers`, `components/<container id>` or
-    /// `interfaces/<component id>`.
-    pub views: BTreeMap<String, ViewCanvas>,
-    /// Part colors, by part id, in every view.
-    pub colors: BTreeMap<String, Swatch>,
-    pub agent: Option<AgentPass>,
-}
+use super::model::*;
 
 /// An agent's change to a view's canvas.
 #[derive(Clone, Debug, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum CanvasOp {
-    /// Puts a part's top left at (x, y). Parts are about 210 by 150 (containers) or 140 by 48
-    /// (components); leave 40 or more between them.
-    Move { part: String, x: i32, y: i32 },
-    /// Colors a part in every view, or a group; null clears it.
+    /// Puts a part's, shape's or note's top left at (x, y). Design parts are about 210 by 150
+    /// (containers) or 140 by 48 (components); leave 40 or more between things.
+    Move {
+        #[serde(alias = "part")]
+        target: String,
+        x: i32,
+        y: i32,
+    },
+    /// Colors a part (in every view of its design), shape, group, note or arrow; null clears it.
     Color {
         target: String,
         color: Option<Swatch>,
     },
+    /// Adds a shape, or with an existing id changes the fields given.
+    Shape {
+        /// `s:` and letters, digits, `-` and `_`. Made up when left out.
+        id: Option<String>,
+        kind: Option<ShapeKind>,
+        x: Option<i32>,
+        y: Option<i32>,
+        /// 160 by 64 when new and left out.
+        w: Option<i32>,
+        h: Option<i32>,
+        /// Drawn centered inside it.
+        text: Option<String>,
+        color: Option<Swatch>,
+        /// Tinted inside (the default), or an outline only.
+        fill: Option<bool>,
+        pattern: Option<LinePattern>,
+    },
     /// Makes a group, or with an existing id replaces its label, color and members. Members
-    /// are part ids and other groups' ids; each leaves any group it was in.
+    /// are part, shape and other groups' ids; each leaves any group it was in.
     Group {
         /// Letters, digits, `-` and `_`. Made up when left out.
         id: Option<String>,
@@ -194,7 +51,7 @@ pub enum CanvasOp {
     },
     /// Removes a group, keeping its members, which join its parent group if it had one.
     Ungroup { id: String },
-    /// Styles the edge between two parts, which then shows at rest with its label.
+    /// Styles the edge between two design parts, which then shows at rest with its label.
     StyleEdge {
         from: String,
         to: String,
@@ -208,7 +65,7 @@ pub enum CanvasOp {
     },
     /// Drops an edge's style.
     ClearEdge { from: String, to: String },
-    /// Adds a note, or with an existing id changes it.
+    /// Adds text, or with an existing id changes it. Sticky text sits on a note card.
     Note {
         id: Option<String>,
         text: String,
@@ -217,9 +74,11 @@ pub enum CanvasOp {
         #[serde(default)]
         size: NoteSize,
         color: Option<Swatch>,
+        #[serde(default)]
+        sticky: bool,
     },
     /// Adds an arrow, or with an existing id changes it. An end with a target sticks to that
-    /// part, group or note.
+    /// part, shape, group or note. Without a head it's a plain line.
     Arrow {
         id: Option<String>,
         from: ArrowEnd,
@@ -227,16 +86,12 @@ pub enum CanvasOp {
         color: Option<Swatch>,
         #[serde(default)]
         pattern: LinePattern,
+        head: Option<bool>,
     },
-    /// Removes a note, arrow or group (keeping its members).
+    /// Removes a shape, note, arrow or group (keeping its members).
     Remove { id: String },
-    /// Drops every position, so the view lays itself out again.
+    /// Drops every design part's position, so the view lays itself out again.
     ResetLayout,
-}
-
-/// A part id has a `:`, as `c:api` or `k:api/auth`, or is `sys`, the system.
-pub fn is_part(id: &str) -> bool {
-    id.contains(':') || id == "sys"
 }
 
 fn check_id(id: &str) -> anyhow::Result<()> {
@@ -247,16 +102,25 @@ fn check_id(id: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// `id` as a shape id, which starts with `s:`.
+fn shape_id(id: &str) -> anyhow::Result<String> {
+    let bare = id.strip_prefix("s:").unwrap_or(id);
+    check_id(bare)?;
+    Ok(format!("s:{bare}"))
+}
+
 impl ViewCanvas {
+    fn taken(&self, id: &str) -> bool {
+        self.groups.iter().any(|g| g.id == id)
+            || self.notes.iter().any(|n| n.id == id)
+            || self.arrows.iter().any(|a| a.id == id)
+            || self.shapes.iter().any(|s| s.id == id)
+    }
+
     fn fresh_id(&self, prefix: &str) -> String {
-        let taken = |id: &str| {
-            self.groups.iter().any(|g| g.id == id)
-                || self.notes.iter().any(|n| n.id == id)
-                || self.arrows.iter().any(|a| a.id == id)
-        };
         (1..)
             .map(|n| format!("{prefix}{n}"))
-            .find(|id| !taken(id))
+            .find(|id| !self.taken(id))
             .unwrap()
     }
 
@@ -314,19 +178,98 @@ impl ViewCanvas {
         Ok(())
     }
 
-    /// Removes a note, an arrow or a group.
+    /// Removes a shape, note, arrow or group, and any tag on it.
     fn remove(&mut self, id: &str) -> bool {
-        let (notes, arrows) = (self.notes.len(), self.arrows.len());
+        let before = self.shapes.len() + self.notes.len() + self.arrows.len();
+        self.shapes.retain(|s| s.id != id);
         self.notes.retain(|n| n.id != id);
         self.arrows.retain(|a| a.id != id);
-        notes != self.notes.len() || arrows != self.arrows.len() || self.ungroup(id)
+        let gone = before != self.shapes.len() + self.notes.len() + self.arrows.len();
+        if gone {
+            for g in &mut self.groups {
+                g.members.retain(|m| m != id);
+            }
+            self.groups.retain(|g| !g.members.is_empty());
+        }
+        let gone = gone || self.ungroup(id);
+        if gone {
+            self.tags.retain(|_, on| on != id);
+        }
+        gone
+    }
+
+    fn set_shape(&mut self, op: ShapeOp, by: CanvasAuthor) -> anyhow::Result<String> {
+        let id = match op.id {
+            Some(id) => shape_id(&id)?,
+            None => self.fresh_id("s:"),
+        };
+        let s = match self.shapes.iter_mut().find(|s| s.id == id) {
+            Some(s) => s,
+            None => {
+                self.shapes.push(CanvasShape {
+                    id: id.clone(),
+                    kind: ShapeKind::Rect,
+                    at: Pt::default(),
+                    w: 160,
+                    h: 64,
+                    text: String::new(),
+                    color: None,
+                    fill: true,
+                    pattern: LinePattern::Solid,
+                    by,
+                });
+                self.shapes.last_mut().unwrap()
+            }
+        };
+        if let Some(k) = op.kind {
+            s.kind = k;
+        }
+        if let Some(x) = op.x {
+            s.at.x = x;
+        }
+        if let Some(y) = op.y {
+            s.at.y = y;
+        }
+        if let Some(w) = op.w {
+            s.w = w.max(20);
+        }
+        if let Some(h) = op.h {
+            s.h = h.max(20);
+        }
+        if let Some(t) = op.text {
+            s.text = t;
+        }
+        if op.color.is_some() {
+            s.color = op.color;
+        }
+        if let Some(f) = op.fill {
+            s.fill = f;
+        }
+        if let Some(p) = op.pattern {
+            s.pattern = p;
+        }
+        s.by = by;
+        Ok(id)
     }
 }
 
-impl DesignCanvas {
+/// A shape op's fields.
+struct ShapeOp {
+    id: Option<String>,
+    kind: Option<ShapeKind>,
+    x: Option<i32>,
+    y: Option<i32>,
+    w: Option<i32>,
+    h: Option<i32>,
+    text: Option<String>,
+    color: Option<Swatch>,
+    fill: Option<bool>,
+    pattern: Option<LinePattern>,
+}
+
+impl Canvas {
     /// Applies an agent's `ops` to view `view`, recording them as the last agent pass.
     pub fn apply(&mut self, view: &str, ops: Vec<CanvasOp>) -> anyhow::Result<()> {
-        check_view(view)?;
         let mut touched = Vec::new();
         let changed = ops.len() as u32;
         let v = self.views.entry(view.to_string()).or_default();
@@ -334,26 +277,67 @@ impl DesignCanvas {
         for (n, op) in ops.into_iter().enumerate() {
             let at = || format!("op {}", n + 1);
             match op {
-                CanvasOp::Move { part, x, y } => {
-                    v.positions.insert(part.clone(), Pt { x, y });
-                    touched.push(part);
+                CanvasOp::Move { target, x, y } => {
+                    let to = Pt { x, y };
+                    if let Some(s) = v.shapes.iter_mut().find(|s| s.id == target) {
+                        s.at = to;
+                    } else if let Some(n) = v.notes.iter_mut().find(|n| n.id == target) {
+                        n.at = to;
+                    } else if is_part(&target) {
+                        v.positions.insert(target.clone(), to);
+                    } else {
+                        bail!("{}: no part, shape or note `{target}`", at());
+                    }
+                    touched.push(target);
                 }
                 CanvasOp::Color { target, color } => {
-                    if is_part(&target) {
+                    if let Some(s) = v.shapes.iter_mut().find(|s| s.id == target) {
+                        s.color = color;
+                        s.by = by;
+                    } else if let Some(g) = v.groups.iter_mut().find(|g| g.id == target) {
+                        g.color = color;
+                        g.by = by;
+                    } else if let Some(n) = v.notes.iter_mut().find(|n| n.id == target) {
+                        n.color = color;
+                        n.by = by;
+                    } else if let Some(a) = v.arrows.iter_mut().find(|a| a.id == target) {
+                        a.color = color;
+                        a.by = by;
+                    } else if is_part(&target) {
                         match color {
                             Some(c) => self.colors.insert(target.clone(), c),
                             None => self.colors.remove(&target),
                         };
                     } else {
-                        let g = v
-                            .groups
-                            .iter_mut()
-                            .find(|g| g.id == target)
-                            .with_context(|| format!("{}: no group `{target}`", at()))?;
-                        g.color = color;
-                        g.by = by;
+                        bail!("{}: nothing has id `{target}`", at());
                     }
                     touched.push(target);
+                }
+                CanvasOp::Shape {
+                    id,
+                    kind,
+                    x,
+                    y,
+                    w,
+                    h,
+                    text,
+                    color,
+                    fill,
+                    pattern,
+                } => {
+                    let op = ShapeOp {
+                        id,
+                        kind,
+                        x,
+                        y,
+                        w,
+                        h,
+                        text,
+                        color,
+                        fill,
+                        pattern,
+                    };
+                    touched.push(v.set_shape(op, by).with_context(at)?);
                 }
                 CanvasOp::Group {
                     id,
@@ -414,6 +398,7 @@ impl DesignCanvas {
                     y,
                     size,
                     color,
+                    sticky,
                 } => {
                     let id = match id {
                         Some(id) => id,
@@ -426,6 +411,7 @@ impl DesignCanvas {
                         at: Pt { x, y },
                         size,
                         color,
+                        sticky,
                         by,
                     };
                     match v.notes.iter_mut().find(|n| n.id == id) {
@@ -440,6 +426,7 @@ impl DesignCanvas {
                     to,
                     color,
                     pattern,
+                    head,
                 } => {
                     let id = match id {
                         Some(id) => id,
@@ -452,6 +439,7 @@ impl DesignCanvas {
                         to,
                         color,
                         pattern,
+                        head: head.unwrap_or(true),
                         by,
                     };
                     match v.arrows.iter_mut().find(|a| a.id == id) {
@@ -462,7 +450,7 @@ impl DesignCanvas {
                 }
                 CanvasOp::Remove { id } => {
                     if !v.remove(&id) {
-                        bail!("{}: no note, arrow or group `{id}`", at());
+                        bail!("{}: no shape, note, arrow or group `{id}`", at());
                     }
                 }
                 CanvasOp::ResetLayout => {
@@ -482,21 +470,6 @@ impl DesignCanvas {
     }
 }
 
-fn check_view(view: &str) -> anyhow::Result<()> {
-    let ok = matches!(view, "context" | "containers")
-        || view
-            .strip_prefix("components/")
-            .or_else(|| view.strip_prefix("interfaces/"))
-            .is_some_and(|rest| !rest.is_empty());
-    if !ok {
-        bail!(
-            "no view `{view}`: use context, containers, components/<container id> or \
-             interfaces/<component id>"
-        );
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -514,6 +487,10 @@ mod tests {
 
     fn members(v: &ViewCanvas, id: &str) -> Vec<String> {
         v.groups.iter().find(|g| g.id == id).unwrap().members.clone()
+    }
+
+    fn ops(json: serde_json::Value) -> Vec<CanvasOp> {
+        serde_json::from_value(json).unwrap()
     }
 
     #[test]
@@ -550,35 +527,87 @@ mod tests {
     }
 
     #[test]
-    fn an_agent_pass_records_what_it_touched_and_rejects_bad_views_and_ids() {
-        let mut c = DesignCanvas::default();
-        let ops: Vec<CanvasOp> = serde_json::from_value(serde_json::json!([
+    fn an_agent_pass_records_what_it_touched_and_rejects_bad_ids() {
+        let mut c = Canvas::default();
+        let pass = ops(serde_json::json!([
             {"op": "move", "part": "c:api", "x": 10, "y": 20},
             {"op": "group", "label": "Core", "members": ["c:api", "c:web"]},
             {"op": "color", "target": "c:api", "color": "orange"},
             {"op": "note", "text": "Phase 1", "x": 0, "y": 0},
             {"op": "arrow", "from": {"target": "n1"}, "to": {"target": "g1"}},
             {"op": "style_edge", "from": "c:web", "to": "c:api", "color": "blue"},
-        ]))
-        .unwrap();
-        c.apply("containers", ops).unwrap();
+        ]));
+        c.apply("containers", pass).unwrap();
         let v = &c.views["containers"];
         assert_eq!(v.positions["c:api"], Pt { x: 10, y: 20 });
         assert_eq!(c.colors["c:api"], Swatch::Orange);
         assert_eq!(v.groups[0].by, CanvasAuthor::Agent);
         assert_eq!(v.arrows[0].to.target.as_deref(), Some("g1"));
+        assert!(v.arrows[0].head);
         let pass = c.agent.as_ref().unwrap();
         assert_eq!(pass.touched, ["a1", "c:api", "c:web>c:api", "g1", "n1"]);
 
-        assert!(c.apply("components", vec![]).is_err());
-        let bad = vec![CanvasOp::Note {
-            id: Some("has space".into()),
-            text: String::new(),
-            x: 0,
-            y: 0,
-            size: NoteSize::S,
-            color: None,
-        }];
+        let bad = ops(serde_json::json!([{"op": "note", "id": "has space", "text": "", "x": 0, "y": 0}]));
         assert!(c.apply("context", bad).is_err());
+        let missing = ops(serde_json::json!([{"op": "color", "target": "nope", "color": null}]));
+        assert!(c.apply("context", missing).is_err());
+    }
+
+    #[test]
+    fn a_shape_op_on_an_existing_shape_changes_only_the_fields_given() {
+        let mut c = Canvas::default();
+        c.apply(
+            "main",
+            ops(serde_json::json!([
+                {"op": "shape", "id": "db", "kind": "ellipse", "x": 5, "y": 6, "text": "Postgres", "color": "green"},
+                {"op": "shape", "x": 300, "y": 0},
+            ])),
+        )
+        .unwrap();
+        c.apply(
+            "main",
+            ops(serde_json::json!([
+                {"op": "shape", "id": "s:db", "text": "Primary DB", "w": 200},
+                {"op": "move", "target": "s:1", "x": 40, "y": 50},
+            ])),
+        )
+        .unwrap();
+        let v = &c.views["main"];
+        let db = &v.shapes[0];
+        assert_eq!(db.id, "s:db", "a bare id gets the shape prefix");
+        assert_eq!(
+            (db.kind, db.at, db.w, db.h, db.text.as_str(), db.color),
+            (
+                ShapeKind::Ellipse,
+                Pt { x: 5, y: 6 },
+                200,
+                64,
+                "Primary DB",
+                Some(Swatch::Green)
+            )
+        );
+        assert_eq!(v.shapes[1].at, Pt { x: 40, y: 50 });
+    }
+
+    #[test]
+    fn removing_a_shape_drops_it_from_its_group_and_drops_its_tag() {
+        let mut c = Canvas::default();
+        c.apply(
+            "main",
+            ops(serde_json::json!([
+                {"op": "shape", "id": "a"},
+                {"op": "shape", "id": "b"},
+                {"op": "group", "id": "pair", "label": "Pair", "members": ["s:a", "s:b"]},
+            ])),
+        )
+        .unwrap();
+        let v = c.views.get_mut("main").unwrap();
+        v.tags.insert("3".into(), "s:a".into());
+        v.tags.insert("4".into(), "s:b".into());
+        c.apply("main", ops(serde_json::json!([{"op": "remove", "id": "s:a"}])))
+            .unwrap();
+        let v = &c.views["main"];
+        assert_eq!(members(v, "pair"), ["s:b"]);
+        assert_eq!(v.tags.keys().collect::<Vec<_>>(), ["4"]);
     }
 }

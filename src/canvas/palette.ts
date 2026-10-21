@@ -1,4 +1,4 @@
-import type { Swatch } from "../../bindings";
+import type { Swatch } from "../bindings";
 
 /** The canvas palette, in toolbar order. */
 export const SWATCHES: Swatch[] = [

@@ -151,6 +151,13 @@ const PATHS = {
   star: (
     <path d="m12 2.7 2.85 5.85 6.45.9-4.65 4.5 1.05 6.45L12 17.4l-5.7 3 1.05-6.45L2.7 9.45l6.45-.9z" />
   ),
+  drawing: (
+    <>
+      <rect x="3" y="4.5" width="7.5" height="6" rx="1.5" />
+      <circle cx="17.25" cy="16.5" r="3.75" />
+      <path d="M10.5 7.5h4.5l2.25 5.25" />
+    </>
+  ),
   architecture: (
     <>
       <rect x="9" y="2.5" width="6" height="6" rx="1" />

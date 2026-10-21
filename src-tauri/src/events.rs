@@ -109,6 +109,12 @@ pub struct DesignChanged {
     pub workspace: Option<String>,
 }
 
+/// A terminal agent made or changed a drawing.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct DrawingChanged {
+    pub id: String,
+}
+
 /// A terminal agent described the system map.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SystemChanged {

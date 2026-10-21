@@ -92,6 +92,8 @@ export function SystemCanvas(props: Props) {
     focus?.width ?? layout.width,
     focus?.height ?? layout.height,
     props.fitKey && `${props.fitKey}${props.focus ?? ""}`,
+    focus ? 0 : layout.left,
+    focus ? 0 : layout.top,
   );
   const { view } = pz;
   const toWorld: ToWorld = (cx, cy) => {

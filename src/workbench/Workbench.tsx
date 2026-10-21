@@ -10,6 +10,7 @@ import { onAnyReveal } from "../core/reveal";
 import { setStateRepo } from "../core/savedState";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { DesignFormHost } from "../design/DesignFormHost";
+import { requestNewDrawing } from "../drawings/store";
 import { confirmClose } from "../editor/unsaved";
 import { forgetPr } from "../github/pr";
 import { useShortcutsMenu } from "../help/open";
@@ -180,6 +181,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+T": () => reopenClosed(selected),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
+    "Mod+Shift+X": () => {
+      showView("right", "drawings");
+      requestNewDrawing();
+    },
     "Mod+J": () => openRevisions(selected),
     "Mod+Shift+J": () => {
       const target = targetOf(selected);

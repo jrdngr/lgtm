@@ -24,12 +24,6 @@ export function nodeName(n: DesignNode): { name: string; id: string } {
 const where = (d: DesignDto) =>
   `the design "${d.name}" (spec files ${d.files.join(", ")} at revision ${d.revision})`;
 
-/** Asks about a node of the design, or the whole design. */
-export function askDesignPrompt(d: DesignDto, n: DesignNode | undefined): string {
-  const what = n ? `the ${nodeName(n).name} part of ${where(d)}` : where(d);
-  return `Explain ${what}: what it does, how it fits with the rest, and how it compares to the code. Read the spec with \`jj file show -r ${d.revision} <path>\`. Keep it short.`;
-}
-
 /** Asks for the spec to be brought in line with the code where they differ. */
 export function updateSpecPrompt(d: DesignDto, m: DesignMapDto, n: DesignNode): string {
   const { name, id } = nodeName(n);

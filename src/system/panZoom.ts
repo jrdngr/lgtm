@@ -25,25 +25,27 @@ export function zoomAt(v: View, factor: number, px: number, py: number): View {
   return { k, x: px - (px - v.x) * r, y: py - (py - v.y) * r };
 }
 
-/** The view that shows the whole `w` by `h` world centered in a `vw` by `vh` viewport, no
- * larger than its own size. */
-export function fitView(w: number, h: number, vw: number, vh: number): View {
-  const k = clamp(Math.min(1, (vw - MARGIN * 2) / w, (vh - MARGIN * 2) / h));
-  return { k, x: (vw - w * k) / 2, y: (vh - h * k) / 2 };
+/** The view that shows the whole world, from (`left`, `top`) to (`w`, `h`), centered in a `vw`
+ * by `vh` viewport, no larger than its own size. */
+export function fitView(w: number, h: number, vw: number, vh: number, left = 0, top = 0): View {
+  const ww = w - left;
+  const wh = h - top;
+  const k = clamp(Math.min(1, (vw - MARGIN * 2) / ww, (vh - MARGIN * 2) / wh));
+  return { k, x: (vw - ww * k) / 2 - left * k, y: (vh - wh * k) / 2 - top * k };
 }
 
 /** Pans by dragging the background and zooms with the wheel or a pinch, toward the pointer.
  * Fits the world whenever its size changes, or with `fitKey`, whenever that does. `dragged()`
  * says whether the last pointer press panned, so its click can be ignored. */
-export function usePanZoom(width: number, height: number, fitKey?: string) {
+export function usePanZoom(width: number, height: number, fitKey?: string, left = 0, top = 0) {
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const moved = useRef(false);
 
   const fitNow = useCallback(() => {
     const el = ref.current;
-    if (el) setView(fitView(width, height, el.clientWidth, el.clientHeight));
-  }, [width, height]);
+    if (el) setView(fitView(width, height, el.clientWidth, el.clientHeight, left, top));
+  }, [width, height, left, top]);
   const fitWhen = fitKey ?? `${width}x${height}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: refits only when `fitWhen` changes
   useLayoutEffect(fitNow, [fitWhen]);

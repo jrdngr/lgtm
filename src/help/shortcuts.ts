@@ -44,6 +44,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧M", "⌘⇧P"], action: "Comments" },
       { keys: ["⌘⇧O"], action: "Reports" },
       { keys: ["⌘⇧I"], action: "Q&A" },
+      { keys: ["⌘⇧X"], action: "New drawing" },
       { keys: ["⌘J"], action: "Revisions list" },
       { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
       { keys: ["⇧⌘N"], action: "New workspace" },

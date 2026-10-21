@@ -2,7 +2,6 @@
 //! system map of the code. Each is a named object of the repo with its files and a prompt, and
 //! can be generated again at will.
 
-mod canvas;
 mod model;
 mod prompt;
 mod rev;
@@ -13,10 +12,10 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-pub use canvas::*;
 pub use model::*;
 pub use rev::ResolvedDto;
 
+use crate::canvas::{Canvas, CanvasOp};
 use crate::ctx::{RepoCtx, now_ms};
 use crate::jj::Jj;
 use crate::store::Store;
@@ -35,10 +34,10 @@ pub struct DesignDto {
     pub created_at: f64,
     pub map: Option<DesignMapDto>,
     #[serde(default)]
-    pub canvas: DesignCanvas,
+    pub canvas: Canvas,
     /// The canvas before the last agent pass, while that pass can be undone.
     #[serde(default)]
-    pub canvas_undo: Option<DesignCanvas>,
+    pub canvas_undo: Option<Canvas>,
 }
 
 /// What the create and edit form sends.
@@ -220,7 +219,7 @@ impl RepoCtx {
                     prompt: input.prompt,
                     created_at,
                     map: None,
-                    canvas: DesignCanvas::default(),
+                    canvas: Canvas::default(),
                     canvas_undo: None,
                 }
             }
@@ -296,7 +295,7 @@ impl RepoCtx {
 
     /// Stores the user's canvas for design `id`. A canvas without an agent pass ends the last
     /// one's undo.
-    pub fn save_design_canvas(&self, id: &str, canvas: DesignCanvas) -> anyhow::Result<DesignDto> {
+    pub fn save_design_canvas(&self, id: &str, canvas: Canvas) -> anyhow::Result<DesignDto> {
         let store = self.store.lock().unwrap();
         let mut d = load(&store, id)?;
         if canvas.agent.is_none() {
@@ -316,6 +315,7 @@ impl RepoCtx {
     ) -> anyhow::Result<DesignDto> {
         let store = self.store.lock().unwrap();
         let mut d = load(&store, id)?;
+        check_view(view)?;
         let mut canvas = d.canvas.clone();
         canvas.apply(view, ops)?;
         let mut before = std::mem::replace(&mut d.canvas, canvas);
@@ -488,4 +488,19 @@ mod tests {
             ["docs/design/a.md", "docs/design/b/c.md", "x.md"]
         );
     }
+}
+
+fn check_view(view: &str) -> anyhow::Result<()> {
+    let ok = matches!(view, "context" | "containers")
+        || view
+            .strip_prefix("components/")
+            .or_else(|| view.strip_prefix("interfaces/"))
+            .is_some_and(|rest| !rest.is_empty());
+    if !ok {
+        bail!(
+            "no view `{view}`: use context, containers, components/<container id> or \
+             interfaces/<component id>"
+        );
+    }
+    Ok(())
 }

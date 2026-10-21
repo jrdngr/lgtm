@@ -15,6 +15,7 @@ import { bottom } from "../core/bottom";
 import { type DockSlot, registerDock } from "../core/docks";
 import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "../core/panels";
 import { WorkspaceContext, type WorkspaceName } from "../core/workspace";
+import { DrawingTab } from "../drawings/DrawingTab";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
@@ -48,6 +49,7 @@ const components = {
   settings: guarded(SettingsPanel),
   shortcuts: guarded(ShortcutsPanel),
   qa: guarded(QaTab),
+  drawing: guarded(DrawingTab),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
   // runs panels are then closed, and whose System tab becomes Architecture.
   system: () => null,

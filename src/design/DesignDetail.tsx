@@ -24,7 +24,6 @@ interface Props {
   overCode: boolean;
   onShow(id: string): void;
   onFile(path: string, line?: number): void;
-  onAsk(): void;
   onUpdateSpec(): void;
 }
 
@@ -204,7 +203,6 @@ export function DesignDetail(p: Props) {
       <span className="sys-grow" />
       <div className="dsn-acts">
         {!!differences.length && <PipeButton onClick={p.onUpdateSpec}>Update spec</PipeButton>}
-        <PipeButton onClick={p.onAsk}>Ask</PipeButton>
         {!differences.length && spec[0] && (
           <button
             type="button"
@@ -263,10 +261,6 @@ function Overview(p: Props) {
           );
         })}
       </Section>
-      <span className="sys-grow" />
-      <div className="dsn-acts">
-        <PipeButton onClick={p.onAsk}>Ask</PipeButton>
-      </div>
     </aside>
   );
 }

@@ -5,6 +5,7 @@
 
 mod arch;
 mod bridge;
+mod canvas;
 mod design;
 pub mod hook;
 mod inputs;

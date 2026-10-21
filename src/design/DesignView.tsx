@@ -1,5 +1,11 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignItemDto, DesignMapDto, SystemDto } from "../bindings";
+import { AgentStrip, EditTools, SelectionBar } from "../canvas/CanvasBars";
+import { CanvasOver, CanvasUnder } from "../canvas/CanvasLayers";
+import { idsOf } from "../canvas/refs";
+import { useCanvas } from "../canvas/useCanvas";
+import { useCanvasEdit } from "../canvas/useCanvasEdit";
+import { useCanvasFocus } from "../canvas/useCanvasFocus";
 import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { useSendText } from "../review/useSendText";
@@ -12,14 +18,8 @@ import type { Level } from "../system/scene";
 import { PipeButton } from "../terminal/PipeButton";
 import { Spinner } from "../ui/Busy";
 import type { CtxEntry } from "../ui/contextMenu";
-import { AgentStrip, EditTools, SelectionBar } from "./canvas/CanvasBars";
-import { CanvasOver, CanvasUnder } from "./canvas/CanvasLayers";
-import { idsOf } from "./canvas/refs";
-import { useCanvas } from "./canvas/useCanvas";
-import { useCanvasEdit } from "./canvas/useCanvasEdit";
-import { levelOfKey, viewKey } from "./canvas/view";
 import { DesignDetail } from "./DesignDetail";
-import { askDesignPrompt, updateSpecPrompt } from "./designAsk";
+import { updateSpecPrompt } from "./designAsk";
 import {
   type DesignLevel,
   dcid,
@@ -31,10 +31,12 @@ import {
   specOf,
 } from "./designScene";
 import { useSource } from "./designs";
+import { useDesignCanvas } from "./useDesignCanvas";
 import { useDesignGenerate } from "./useDesignGenerate";
+import { levelOfKey, viewKey } from "./viewKeys";
 import "../system/system.css";
 import "./design.css";
-import "./canvas/canvas.css";
+import "../canvas/canvas.css";
 
 interface Props {
   item: DesignItemDto;
@@ -95,7 +97,7 @@ export function DesignView({ item, code, source }: Props) {
           code={code}
           source={source}
           gen={gen}
-          onAsk={sendText}
+          onSend={sendText}
         />
       ) : (
         <>
@@ -131,7 +133,7 @@ function DesignMap(p: {
   code?: SystemDto;
   source: ReactNode;
   gen: ReactNode;
-  onAsk(text: string): void;
+  onSend(text: string): void;
 }) {
   const { item, m, code } = p;
   const workspace = useWorkspace();
@@ -146,7 +148,7 @@ function DesignMap(p: {
     [m, item.design.name, code, here.level, overCode],
   );
   const placed = useMemo(() => layout(scene), [scene]);
-  const cv = useCanvas(item.design);
+  const cv = useCanvas(useDesignCanvas(item.design));
   const [editing, setEditing] = useState(false);
   const vkey = viewKey(here.level);
   const ed = useCanvasEdit({
@@ -156,6 +158,20 @@ function DesignMap(p: {
     base: placed,
     edges: scene.edges,
     editing,
+  });
+  const refocus = useCanvasFocus(workspace, {
+    kind: "design",
+    id: item.design.id,
+    view: vkey,
+    selection: [...ed.selected],
+    parts: ed.arranged.layout.nodes.map((n) => ({
+      id: n.id,
+      name: n.name,
+      x: Math.round(n.x),
+      y: Math.round(n.y),
+      w: Math.round(n.w),
+      h: Math.round(n.h),
+    })),
   });
   const [flash, setFlash] = useState<Set<string>>();
   useEffect(() => {
@@ -255,8 +271,6 @@ function DesignMap(p: {
   if (k && level.kind === "interfaces") crumbs.push({ id: `k:${k.id}`, name: k.name });
 
   const onFile = (path: string, line?: number) => openFile(workspace, path, line);
-  const ask = (id?: string) =>
-    p.onAsk(askDesignPrompt(item.design, id ? designNode(m, code, id) : undefined));
   const nodeMenu = (id: string): CtxEntry[] => {
     const n = designNode(m, code, id);
     const spec = specOf(n)[0];
@@ -272,8 +286,6 @@ function DesignMap(p: {
         onSelect: () => open(id),
       },
       spec && { label: "Open Spec", onSelect: () => onFile(spec.path, spec.line) },
-      "-",
-      { label: "Ask", keys: "⌘>", onSelect: () => ask(id) },
     ];
   };
   const showAgent = () => {
@@ -300,8 +312,7 @@ function DesignMap(p: {
   };
   const onNavKey = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.shiftKey && (e.key === ">" || e.key === ".")) ask(nodeId);
-    else if (e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_")) step(e.shiftKey ? 1 : -1);
+    if (e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_")) step(e.shiftKey ? 1 : -1);
     else if (mod) return;
     else if (e.key === "Escape" && here.node) setHere({ ...here, node: undefined });
     else if ((e.key === "Escape" || e.key === "Backspace") && up()) up()?.();
@@ -313,7 +324,7 @@ function DesignMap(p: {
 
   return (
     // biome-ignore lint/a11y/noNoninteractiveTabindex: the tab takes its own keys
-    <div className="dsn-keys" tabIndex={0} onKeyDown={onKey}>
+    <div className="dsn-keys" tabIndex={0} onKeyDown={onKey} onFocus={refocus}>
       <SystemBar
         crumbs={crumbs}
         source={p.source}
@@ -398,7 +409,7 @@ function DesignMap(p: {
               editing && (
                 <>
                   <SelectionBar ed={ed} canvas={cv.canvas} commit={cv.commit} toScreen={toScreen} />
-                  <EditTools ed={ed} />
+                  <EditTools ed={ed} onResetLayout={ed.resetLayout} />
                 </>
               )
             );
@@ -443,8 +454,7 @@ function DesignMap(p: {
           overCode={overCode && !!code}
           onShow={show}
           onFile={onFile}
-          onAsk={() => ask(nodeId)}
-          onUpdateSpec={() => node && p.onAsk(updateSpecPrompt(item.design, m, node))}
+          onUpdateSpec={() => node && p.onSend(updateSpecPrompt(item.design, m, node))}
         />
       </div>
     </div>

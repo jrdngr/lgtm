@@ -1,7 +1,8 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::review::arch::design::{DesignCanvas, DesignDto, DesignInput, DesignItemDto};
+use crate::canvas::Canvas;
+use crate::review::arch::design::{DesignDto, DesignInput, DesignItemDto};
 
 /// Every design of the repo, with its state.
 #[tauri::command]
@@ -37,7 +38,7 @@ pub(crate) async fn save_design(
 pub(crate) fn save_design_canvas(
     window: WebviewWindow,
     id: String,
-    canvas: DesignCanvas,
+    canvas: Canvas,
 ) -> CmdResult<DesignDto> {
     repo(&window)?.save_design_canvas(&id, canvas).map_err(err)
 }

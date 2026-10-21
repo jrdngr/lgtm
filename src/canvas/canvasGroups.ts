@@ -1,5 +1,5 @@
-import type { CanvasGroup } from "../../bindings";
-import type { Box } from "../../system/layout";
+import type { CanvasGroup } from "../bindings";
+import type { Box } from "../system/layout";
 import { isPart, type View } from "./view";
 
 /** Around a group's members, and above them for its label. */

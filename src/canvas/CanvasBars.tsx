@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { AgentPass, EdgeStyle, Swatch } from "../../bindings";
-import type { Pt } from "../../system/edgePaths";
+import type { AgentPass, CanvasShape, EdgeStyle, Swatch } from "../bindings";
+import type { Pt } from "../system/edgePaths";
 import { SWATCHES, swatchHex } from "./palette";
 import { idsOf, parseRef } from "./refs";
-import { defaultStyle, type Tool, type useCanvasEdit } from "./useCanvasEdit";
-import { type Canvas, withView } from "./view";
+import { defaultStyle, type Tool } from "./tools";
+import type { useCanvasEdit } from "./useCanvasEdit";
+import { type Canvas, isShape, withView } from "./view";
 
 type Ed = ReturnType<typeof useCanvasEdit>;
 
@@ -67,16 +68,25 @@ export function SelectionBar(p: {
   if (!box || ed.gesture) return null;
   const v = ed.view;
   const sel = ed.selected;
-  const parts = idsOf(sel, "part");
+  const all = idsOf(sel, "part");
+  const parts = all.filter((id) => !isShape(id));
+  const shapes = all.filter(isShape);
+  const shapeOf = (id: string) => v.shapes.find((x) => x.id === id);
   const groups = idsOf(sel, "group");
   const notes = idsOf(sel, "note");
   const arrows = idsOf(sel, "arrow");
   const edges = idsOf(sel, "edge");
-  const kinds = new Set([...sel].map((r) => parseRef(r).kind));
+  const kinds = new Set(
+    [...sel].map((r) => {
+      const ref = parseRef(r);
+      return ref.kind === "part" && isShape(ref.id) ? "shape" : ref.kind;
+    }),
+  );
   const only = kinds.size === 1 ? [...kinds][0] : undefined;
 
   const colorOf = [
     ...parts.map((id) => canvas.colors[id] ?? null),
+    ...shapes.map((id) => shapeOf(id)?.color ?? null),
     ...groups.map((id) => v.groups.find((g) => g.id === id)?.color ?? null),
     ...notes.map((id) => v.notes.find((n) => n.id === id)?.color ?? null),
     ...arrows.map((id) => v.arrows.find((a) => a.id === id)?.color ?? null),
@@ -100,6 +110,7 @@ export function SelectionBar(p: {
     }
     const view = {
       ...v,
+      shapes: v.shapes.map((x) => (shapes.includes(x.id) ? { ...x, color: c } : x)),
       groups: v.groups.map((g) => (groups.includes(g.id) ? { ...g, color: c } : g)),
       notes: v.notes.map((n) => (notes.includes(n.id) ? { ...n, color: c } : n)),
       arrows: v.arrows.map((a) => (arrows.includes(a.id) ? { ...a, color: c } : a)),
@@ -114,8 +125,42 @@ export function SelectionBar(p: {
     </button>
   );
 
+  const styleShapes = (f: (x: CanvasShape) => CanvasShape) =>
+    ed.change((view) => ({
+      ...view,
+      shapes: view.shapes.map((x) => (shapes.includes(x.id) ? { ...f(x), by: "user" } : x)),
+    }));
+
   let body: React.ReactNode;
-  if (only === "group" && groups.length === 1) {
+  if (only === "shape") {
+    body = (
+      <>
+        {swatches}
+        <Sep />
+        <Seg
+          items={[
+            ["fill", "Fill"],
+            ["outline", "Outline"],
+          ]}
+          on={same(shapes.map((id) => (shapeOf(id)?.fill ? "fill" : "outline")))}
+          onPick={(f) => styleShapes((x) => ({ ...x, fill: f === "fill" }))}
+        />
+        <Seg
+          items={[
+            ["solid", "Solid"],
+            ["dashed", "Dashed"],
+          ]}
+          on={same(shapes.map((id) => (shapeOf(id)?.pattern === "solid" ? "solid" : "dashed")))}
+          onPick={(pattern) => styleShapes((x) => ({ ...x, pattern }))}
+        />
+        <Sep />
+        <button type="button" className="cv-btn" onClick={ed.groupSelection}>
+          Group<kbd>⌘G</kbd>
+        </button>
+        {remove}
+      </>
+    );
+  } else if (only === "group" && groups.length === 1) {
     body = (
       <>
         <GroupLabel ed={ed} id={groups[0]} />
@@ -303,54 +348,100 @@ function GroupLabel({ ed, id }: { ed: Ed; id: string }) {
   );
 }
 
-const SelectIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-    <path d="M3 2l10 6-4.5 1L6 14z" />
-  </svg>
-);
-const ArrowIcon = () => (
+const icon = (d: React.ReactNode, props: React.SVGProps<SVGSVGElement> = {}) => (
   <svg
     width="13"
     height="13"
     viewBox="0 0 16 16"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.8"
+    strokeWidth="1.6"
     strokeLinecap="round"
     aria-hidden="true"
+    {...props}
   >
-    <path d="M3 13L13 3M7 3h6v6" />
+    {d}
   </svg>
 );
 
-/** The editing tools along the canvas's bottom. */
-export function EditTools({ ed }: { ed: Ed }) {
-  const tool = (t: Tool, icon: React.ReactNode, label: string, key: string) => (
-    <button
-      type="button"
-      className={`cv-btn${ed.tool === t ? " on" : ""}`}
-      aria-pressed={ed.tool === t}
-      onClick={() => ed.setTool(t)}
-    >
-      {icon}
-      {label}
-      <kbd>{key}</kbd>
-    </button>
-  );
-  const groupable = idsOf(ed.selected, "part").length + idsOf(ed.selected, "group").length > 0;
+const TOOLS: [Tool, string, string, React.ReactNode][] = [
+  [
+    "select",
+    "Select",
+    "v",
+    icon(<path d="M3 2l10 6-4.5 1L6 14z" fill="currentColor" stroke="none" />),
+  ],
+  ["rect", "Rectangle", "r", icon(<rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />)],
+  ["ellipse", "Ellipse", "o", icon(<ellipse cx="8" cy="8" rx="6" ry="4.5" />)],
+  ["diamond", "Diamond", "d", icon(<path d="M8 2l6 6-6 6-6-6z" />)],
+  ["arrow", "Arrow", "a", icon(<path d="M3 13L13 3M7 3h6v6" />, { strokeWidth: 1.8 })],
+  ["line", "Line", "l", icon(<path d="M3 13L13 3" />, { strokeWidth: 1.8 })],
+  [
+    "text",
+    "Text",
+    "t",
+    <b key="t" className="cv-t">
+      T
+    </b>,
+  ],
+  ["note", "Note", "n", icon(<path d="M3 3h10v6l-4 4H3z M9 13V9h4" />)],
+  [
+    "frame",
+    "Frame",
+    "f",
+    icon(<rect x="2" y="2.5" width="12" height="11" rx="2.5" />, { strokeDasharray: "2.5 2" }),
+  ],
+];
+
+/** The editing tools along the canvas's bottom, then the tags. */
+export function EditTools({ ed, onResetLayout }: { ed: Ed; onResetLayout?(): void }) {
+  const placed = new Set(Object.keys(ed.view.tags));
   return (
     <div className="cv-tools" onPointerDown={(e) => e.stopPropagation()}>
-      {tool("select", <SelectIcon />, "Select", "v")}
-      {tool("text", <b className="cv-t">T</b>, "Text", "t")}
-      {tool("arrow", <ArrowIcon />, "Arrow", "a")}
+      {TOOLS.map(([t, label, key, glyph]) => (
+        <button
+          key={t}
+          type="button"
+          className={`cv-btn${ed.tool === t ? " on" : ""}`}
+          aria-pressed={ed.tool === t}
+          aria-label={label}
+          onClick={() => ed.setTool(t)}
+        >
+          {glyph}
+          <span className="cv-tool-name">{label}</span>
+          <kbd>{key}</kbd>
+        </button>
+      ))}
       <Sep />
-      <button type="button" className="cv-btn" disabled={!groupable} onClick={ed.groupSelection}>
-        Group<kbd>⌘G</kbd>
+      <span className="cv-tray">
+        {"0123456789".split("").map((d) => (
+          <button
+            key={d}
+            type="button"
+            aria-label={`Tag ${d}`}
+            className={`cv-chip${placed.has(d) ? " placed" : ""}`}
+            onPointerDown={(e) => ed.press.tag(d, e)}
+          >
+            {d}
+          </button>
+        ))}
+      </span>
+      <button type="button" className="cv-btn" disabled={!placed.size} onClick={ed.clearTags}>
+        Clear tags
       </button>
-      <Sep />
-      <button type="button" className="cv-btn" disabled={!ed.view.frozen} onClick={ed.resetLayout}>
-        Reset Layout
-      </button>
+      {onResetLayout && (
+        <>
+          <Sep />
+          <button
+            type="button"
+            className="cv-btn"
+            disabled={!ed.view.frozen}
+            onClick={onResetLayout}
+          >
+            Reset Layout
+          </button>
+        </>
+      )}
     </div>
   );
 }

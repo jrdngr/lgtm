@@ -120,7 +120,7 @@ export const commands = {
 	saveDesign: (workspace: string | null, id: string | null, design: DesignInput) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design", { workspace, id, design })),
 	deleteDesign: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_design", { id })),
 	/**  Stores the user's drawing over a design's map. */
-	saveDesignCanvas: (id: string, canvas: DesignCanvas) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design_canvas", { id, canvas })),
+	saveDesignCanvas: (id: string, canvas: Canvas) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design_canvas", { id, canvas })),
 	/**  Undoes the last agent pass over a design's canvas. */
 	undoDesignAgent: (id: string) => typedError<DesignDto, string>(__TAURI_INVOKE("undo_design_agent", { id })),
 	/**  The prompt asking a terminal agent to write a design's map. */
@@ -129,6 +129,29 @@ export const commands = {
 	revisionFiles: (workspace: string | null, revision: string) => typedError<string[], string>(__TAURI_INVOKE("revision_files", { workspace, revision })),
 	/**  Local bookmarks, those on `@`'s stack first. */
 	designBookmarks: (workspace: string | null) => typedError<string[], string>(__TAURI_INVOKE("design_bookmarks", { workspace })),
+	/**  Every drawing of the repo, the last changed first. */
+	drawings: () => typedError<DrawingDto[], string>(__TAURI_INVOKE("drawings")),
+	drawing: (id: string) => typedError<DrawingDto, string>(__TAURI_INVOKE("drawing", { id })),
+	createDrawing: (name: string) => typedError<DrawingDto, string>(__TAURI_INVOKE("create_drawing", { name })),
+	renameDrawing: (id: string, name: string) => typedError<DrawingDto, string>(__TAURI_INVOKE("rename_drawing", { id, name })),
+	deleteDrawing: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_drawing", { id })),
+	/**  Stores the user's drawing. */
+	saveDrawingCanvas: (id: string, canvas: Canvas) => typedError<DrawingDto, string>(__TAURI_INVOKE("save_drawing_canvas", { id, canvas })),
+	/**  Undoes the last agent pass over a drawing. */
+	undoDrawingAgent: (id: string) => typedError<DrawingDto, string>(__TAURI_INVOKE("undo_drawing_agent", { id })),
+	/**  Records the canvas a workspace shows and what's selected on it, for agents. */
+	setCanvasFocus: (workspace: string | null, focus: {
+	kind: CanvasKind,
+	/**  The drawing's or design's id. */
+	id: string,
+	view: string,
+	/**  Selected element ids. */
+	selection: string[],
+	/**  A design view's parts; none for a drawing. */
+	parts: FocusPart[],
+} | null) => typedError<null, string>(__TAURI_INVOKE("set_canvas_focus", { workspace, focus })),
+	/**  Writes an exported drawing to `path`, which the user picked in a save dialog. */
+	writeExport: (path: string, data: number[]) => typedError<null, string>(__TAURI_INVOKE("write_export", { path, data })),
 	/**  The prompt asking a terminal agent to describe the system map. */
 	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
 	/**  A component's symbols other components use most. */
@@ -365,6 +388,7 @@ export const events = {
 	archChanged: makeEvent<ArchChanged>("arch-changed"),
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	designChanged: makeEvent<DesignChanged>("design-changed"),
+	drawingChanged: makeEvent<DrawingChanged>("drawing-changed"),
 	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
 	jjPaused: makeEvent<JjPaused>("jj-paused"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
@@ -401,7 +425,7 @@ export type AgentHookState = "working" | "input" | "done" | "failed" | "idle" | 
 /**  The last agent pass: how many changes it made and what it touched. */
 export type AgentPass = {
 	changed: number,
-	/**  Part, group, note and arrow ids, and edges as `from>to`. */
+	/**  Part, shape, group, note and arrow ids, and edges as `from>to`. */
 	touched: string[],
 	view: string,
 };
@@ -498,9 +522,9 @@ export type ArchViewDto = {
 	unaffected: Unaffected,
 };
 
-/**  An arrow's end: stuck to a part, group or note, or free at `at`. */
+/**  An arrow's end: stuck to a part, shape, group or note, or free at `at`. */
 export type ArrowEnd = {
-	/**  A part, group or note id; none when the end is free. */
+	/**  A part, shape, group or note id; none when the end is free. */
 	target: string | null,
 	/**  Where a free end is, and where an attached one was last drawn. */
 	at?: Pt,
@@ -554,28 +578,55 @@ export type BoundaryDto = {
 	components: string[],
 };
 
+export type Canvas = {
+	/**
+	 *  By view: a drawing's is `main`; a design's are `context`, `containers`,
+	 *  `components/<container id>` and `interfaces/<component id>`.
+	 */
+	views?: { [key in string]: ViewCanvas },
+	/**  Part colors, by part id, in every view. */
+	colors?: { [key in string]: Swatch },
+	agent?: AgentPass | null,
+};
+
+/**  An arrow, or without a head, a line. */
 export type CanvasArrow = {
 	id: string,
 	from: ArrowEnd,
 	to: ArrowEnd,
 	color: Swatch | null,
 	pattern: LinePattern,
+	head?: boolean,
 	by?: CanvasAuthor,
 };
 
 /**  Who last made or changed an element. */
 export type CanvasAuthor = "user" | "agent";
 
-/**  A labeled frame around parts and other groups. */
+export type CanvasFocus = {
+	kind: CanvasKind,
+	/**  The drawing's or design's id. */
+	id: string,
+	view: string,
+	/**  Selected element ids. */
+	selection: string[],
+	/**  A design view's parts; none for a drawing. */
+	parts: FocusPart[],
+};
+
+/**  A labeled frame around parts, shapes and other groups. */
 export type CanvasGroup = {
 	id: string,
 	label: string,
 	color: Swatch | null,
-	/**  Part ids, which have a `:` (or are `sys`), and group ids, which don't. */
+	/**  Part and shape ids, which have a `:` (or are `sys`), and group ids, which don't. */
 	members: string[],
 	by?: CanvasAuthor,
 };
 
+export type CanvasKind = "drawing" | "design";
+
+/**  Text on the canvas: plain, or on a sticky note. */
 export type CanvasNote = {
 	id: string,
 	text: string,
@@ -583,6 +634,24 @@ export type CanvasNote = {
 	at: Pt,
 	size: NoteSize,
 	color: Swatch | null,
+	sticky?: boolean,
+	by?: CanvasAuthor,
+};
+
+/**  A box the user or an agent drew, with its text inside. */
+export type CanvasShape = {
+	/**  Starts with `s:`. */
+	id: string,
+	kind: ShapeKind,
+	/**  Its top left. */
+	at: Pt,
+	w: number,
+	h: number,
+	text: string,
+	color: Swatch | null,
+	/**  Tinted inside, else an outline only. */
+	fill: boolean,
+	pattern: LinePattern,
 	by?: CanvasAuthor,
 };
 
@@ -796,17 +865,6 @@ export type DesignActorDto = {
 /**  Whether the code has what the design plans. */
 export type DesignBuilt = "built" | "planned" | "differs";
 
-export type DesignCanvas = {
-	/**
-	 *  By view: `context`, `containers`, `components/<container id>` or
-	 *  `interfaces/<component id>`.
-	 */
-	views?: { [key in string]: ViewCanvas },
-	/**  Part colors, by part id, in every view. */
-	colors?: { [key in string]: Swatch },
-	agent?: AgentPass | null,
-};
-
 /**  How a design changes a node of the code's system. */
 export type DesignChange = "new" | "changed" | "removed" | "same";
 
@@ -856,9 +914,9 @@ export type DesignDto = {
 	prompt: string,
 	createdAt: number | null,
 	map: DesignMapDto | null,
-	canvas?: DesignCanvas,
+	canvas?: Canvas,
 	/**  The canvas before the last agent pass, while that pass can be undone. */
-	canvasUndo?: DesignCanvas | null,
+	canvasUndo?: Canvas | null,
 };
 
 export type DesignExternalDto = {
@@ -935,6 +993,21 @@ export type DiscussionDto = {
 	pendingReview: boolean,
 	/**  The login `gh` is signed in as. */
 	viewer: string,
+};
+
+/**  A terminal agent made or changed a drawing. */
+export type DrawingChanged = {
+	id: string,
+};
+
+export type DrawingDto = {
+	id: string,
+	name: string,
+	createdAt: number | null,
+	updatedAt: number | null,
+	canvas: Canvas,
+	/**  The canvas before the last agent pass, while that pass can be undone. */
+	canvasUndo: Canvas | null,
 };
 
 /**  A file dropped into the workspace: where it goes and its contents as base64. */
@@ -1052,6 +1125,16 @@ export type Finding = {
 
 /**  What happens to a ready thread with no reply: one that was fixed as asked. */
 export type Fixed = "leave" | "reply" | "resolve" | "replyResolve";
+
+/**  A design part as the view draws it. */
+export type FocusPart = {
+	id: string,
+	name: string,
+	x: number,
+	y: number,
+	w: number,
+	h: number,
+};
 
 /**
  *  The GitHub thread a comment is on: a review thread on code, or a comment or review summary
@@ -1782,6 +1865,8 @@ export type Setup = { kind: "none" } | { kind: "approved" } |
 
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
+export type ShapeKind = "rect" | "ellipse" | "diamond";
+
 /**  How a change compares with the previous session. */
 export type Since = 
 /**  There's no previous session. */
@@ -2090,17 +2175,20 @@ export type View =
 /**  One view's drawing. */
 export type ViewCanvas = {
 	/**
-	 *  Set once the user moves something: every part keeps a position, and a part without
-	 *  one is new since.
+	 *  Set once the user moves a part: every part keeps a position, and a part without one is
+	 *  new since.
 	 */
 	frozen?: boolean,
 	/**  Parts' top lefts, by part id. */
 	positions?: { [key in string]: Pt },
+	shapes?: CanvasShape[],
 	groups?: CanvasGroup[],
 	/**  By `from>to` part ids. */
 	edges?: { [key in string]: EdgeStyle },
 	notes?: CanvasNote[],
 	arrows?: CanvasArrow[],
+	/**  The user's numbered pointers: the element each digit, `0` to `9`, sits on. */
+	tags?: { [key in string]: string },
 };
 
 /**  View > Word Wrap was turned on or off. */

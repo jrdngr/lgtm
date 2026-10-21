@@ -4,7 +4,8 @@ use std::fmt::Write;
 
 use anyhow::bail;
 
-use super::{DesignCanvas, ViewCanvas, covered, rev};
+use super::{covered, rev};
+use crate::canvas::{Canvas, ViewCanvas};
 use crate::ctx::RepoCtx;
 use crate::review::arch::describe::map_text;
 
@@ -82,11 +83,12 @@ impl RepoCtx {
 }
 
 /// The canvas drawn over the design so far, and how to draw on it.
-fn canvas_text(c: &DesignCanvas) -> String {
+fn canvas_text(c: &Canvas) -> String {
     let drawn = !c.colors.is_empty() || c.views.values().any(|v| *v != ViewCanvas::default());
     let mut out = String::from(
-        "\n\nAfterwards you may draw on the diagram with edit_canvas: arrange a view, group \
-         parts under labels, color them, style edges, and add notes and arrows.",
+        "\n\nAfterwards you may draw on the diagram with edit_canvas (kind `design`): arrange a \
+         view, group parts under labels, color them, style edges, and add shapes, text and \
+         arrows.",
     );
     if drawn {
         let mut c = c.clone();
