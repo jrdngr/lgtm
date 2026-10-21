@@ -3,6 +3,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { events, type GuidedDto } from "../bindings";
 import { dockOf } from "../core/docks";
 import { openGuidedTab } from "../core/panels";
+import { loadState, saveState } from "../core/savedState";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
 
@@ -72,16 +73,29 @@ export type Pick =
   | { kind: "excluded"; index: number }
   | { kind: "context" };
 
-const picks = new Map<string, Pick>();
+const isPick = (v: unknown): v is Pick =>
+  typeof v === "object" &&
+  v !== null &&
+  ["chunk", "commented", "excluded", "context"].includes((v as Pick).kind);
+
+/** Each workspace's pick, remembered across restarts. */
+const picks = new Map<string, Pick | undefined>();
+const pickName = (key: string) => `guided-pick:${key}`;
+
+function pickOf(key: string): Pick | undefined {
+  if (!picks.has(key)) picks.set(key, loadState(pickName(key), undefined, isPick));
+  return picks.get(key);
+}
 
 export function usePick(workspace: WorkspaceName): Pick | undefined {
-  return useSyncExternalStore(subscribe, () => picks.get(workspaceKey(workspace)));
+  return useSyncExternalStore(subscribe, () => pickOf(workspaceKey(workspace)));
 }
 
 export function setPick(workspace: WorkspaceName, pick: Pick | undefined) {
   const key = workspaceKey(workspace);
-  if (pick) picks.set(key, pick);
-  else picks.delete(key);
+  if (samePick(pickOf(key), pick)) return;
+  picks.set(key, pick);
+  saveState(pickName(key), pick ?? null);
   changed();
 }
 
@@ -92,8 +106,9 @@ export function openGuided(workspace: WorkspaceName, pick?: Pick) {
   if (api) openGuidedTab(api);
 }
 
-export const samePick = (a: Pick | undefined, b: Pick) =>
+export const samePick = (a: Pick | undefined, b: Pick | undefined): boolean =>
   !!a &&
+  !!b &&
   a.kind === b.kind &&
   (a.kind === "context" ||
     (a.kind === "chunk" && b.kind === "chunk" && a.id === b.id) ||

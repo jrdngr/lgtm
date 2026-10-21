@@ -13,8 +13,9 @@ import { PipeButton } from "../terminal/PipeButton";
 import { keepSubmit } from "../terminal/registry";
 import { Empty } from "../ui/SectionHeader";
 import { ChunkView } from "./ChunkView";
+import type { GuidedView } from "./model";
 import { CommentedView, ContextView, ExcludedView } from "./OtherViews";
-import { type Pick, usePick } from "./store";
+import { type Pick, setPick, usePick } from "./store";
 import { useGuidedView } from "./useGuidedView";
 import "../review/review.css";
 import "./guided.css";
@@ -39,6 +40,14 @@ function useFolds(): CommentFolds {
 /** What comments need of a review, from the current one. */
 const reviewOf = (r: CurrentReview | undefined) =>
   r && ({ id: r.id, state: { comments: r.comments, threads: r.threads } } as unknown as ReviewDto);
+
+/** Whether the guided review still has what `p` names. */
+function pickExists(p: Pick, view: GuidedView, review: CurrentReview): boolean {
+  if (p.kind === "context") return true;
+  if (p.kind === "chunk") return view.states.some((s) => s.chunk.id === p.id);
+  if (p.kind === "commented") return review.comments.some((c) => c.id === p.id);
+  return [...view.excluded, ...view.tests].some((e) => e.index === p.index);
+}
 
 /** The guided review's picked chunk, thread, excluded part or context docs. */
 export function GuidedTab({ api }: IDockviewPanelProps) {
@@ -69,10 +78,17 @@ export function GuidedTab({ api }: IDockviewPanelProps) {
   });
   const folds = useFolds();
 
-  // Without a pick, the first chunk still to review shows, or else the first.
+  // Without a pick, or once the picked one is gone, the first chunk still to review shows, or
+  // else the first. It becomes the pick, so the sidebar marks it.
   const first = view?.states.find((s) => !s.done) ?? view?.states[0];
-  const pick: Pick | undefined = picked ?? (first && { kind: "chunk", id: first.chunk.id });
+  const fallback: Pick | undefined = first && { kind: "chunk", id: first.chunk.id };
+  const valid = !!picked && !!view && !!review && pickExists(picked, view, review);
+  const pick = valid ? picked : fallback;
   const pickKey = JSON.stringify(pick);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follows the pick shown
+  useEffect(() => {
+    if (view && pick && !valid) setPick(workspace, pick);
+  }, [pickKey, valid, view]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: keys go to the view when it changes
   useEffect(() => {
