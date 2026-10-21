@@ -254,6 +254,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           </button>
           <span className={`gd-risk risk-${chunk.risk}`}>{RISK_NAMES[chunk.risk]}</span>
           <span className="gd-name">{chunk.title}</span>
+          <Diffstat stat={s.stat} />
           {s.changed && <span className="pill amber">Changed</span>}
           {chunk.tags.map((t) => (
             <span key={t} className="gd-tag">
@@ -369,38 +370,40 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
             <div className="gd-writeup">
               <Markdown>{chunk.writeup}</Markdown>
             </div>
-            <div className="gd-chips">
-              <Diffstat stat={s.stat} />
-              {docs.map((d) => (
-                <span key={d.path} className="gd-chip">
-                  <b>{DOC_NAMES[d.kind]}</b>
-                  <span>{d.title}</span>
-                  <button
-                    type="button"
-                    className="gd-link"
-                    onClick={() => openFile(workspace, d.path)}
-                  >
-                    Open
-                  </button>
-                </span>
-              ))}
-              {chunk.tests && (
-                <span className="gd-chip">
-                  <b>Tests</b>
-                  {chunk.tests.passed > 0 && (
-                    <span className="gd-pass">{chunk.tests.passed} pass</span>
-                  )}
-                  {chunk.tests.failed > 0 && (
-                    <span className="gd-fail">{chunk.tests.failed} fail</span>
-                  )}
-                  {chunk.tests.uncovered.length > 0 && (
-                    <span className="gd-uncovered">
-                      {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)} uncovered
-                    </span>
-                  )}
-                </span>
-              )}
-            </div>
+            {(docs.length > 0 || chunk.tests) && (
+              <div className="gd-chips">
+                {docs.map((d) => (
+                  <span key={d.path} className="gd-chip">
+                    <b>{DOC_NAMES[d.kind]}</b>
+                    <span>{d.title}</span>
+                    <button
+                      type="button"
+                      className="gd-link"
+                      onClick={() => openFile(workspace, d.path)}
+                    >
+                      Open
+                    </button>
+                  </span>
+                ))}
+                {chunk.tests && (
+                  <span className="gd-chip">
+                    <b>Tests</b>
+                    {chunk.tests.passed > 0 && (
+                      <span className="gd-pass">{chunk.tests.passed} pass</span>
+                    )}
+                    {chunk.tests.failed > 0 && (
+                      <span className="gd-fail">{chunk.tests.failed} fail</span>
+                    )}
+                    {chunk.tests.uncovered.length > 0 && (
+                      <span className="gd-uncovered">
+                        {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)}{" "}
+                        uncovered
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
           </>
         )}
         {lines.picked.length > 0 && (
