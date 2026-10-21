@@ -33,9 +33,9 @@ export function fitView(w: number, h: number, vw: number, vh: number): View {
 }
 
 /** Pans by dragging the background and zooms with the wheel or a pinch, toward the pointer.
- * Fits the world whenever its size changes. `dragged()` says whether the last pointer press
- * panned, so its click can be ignored. */
-export function usePanZoom(width: number, height: number) {
+ * Fits the world whenever its size changes, or with `fitKey`, whenever that does. `dragged()`
+ * says whether the last pointer press panned, so its click can be ignored. */
+export function usePanZoom(width: number, height: number, fitKey?: string) {
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const moved = useRef(false);
@@ -44,7 +44,9 @@ export function usePanZoom(width: number, height: number) {
     const el = ref.current;
     if (el) setView(fitView(width, height, el.clientWidth, el.clientHeight));
   }, [width, height]);
-  useLayoutEffect(fitNow, [fitNow]);
+  const fitWhen = fitKey ?? `${width}x${height}`;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refits only when `fitWhen` changes
+  useLayoutEffect(fitNow, [fitWhen]);
 
   useEffect(() => {
     const el = ref.current;

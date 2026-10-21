@@ -98,6 +98,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::design::designs,
             commands::design::save_design,
             commands::design::delete_design,
+            commands::design::save_design_canvas,
+            commands::design::undo_design_agent,
             commands::design::design_prompt,
             commands::design::revision_files,
             commands::design::design_bookmarks,

@@ -4,6 +4,12 @@ import type { Tone, Wire } from "./mapWires";
 
 export const BLUE = "#5b9bd5";
 
+/** A styled wire's dash patterns. */
+export const DASHED = "7 5";
+export const DOTTED = "1 6";
+
+const paintMarker = (color: string) => `paint-${color.slice(1)}`;
+
 interface Props {
   wires: Wire[];
   /** Under the nodes: hairlines, unlit wires and hit paths. Over them: lit wires. */
@@ -21,31 +27,34 @@ interface Props {
 /** One of the map's two SVG layers of wires; under the nodes, each wire has a wide hit path
  * unless it joins a door. */
 export function MapEdges(p: Props) {
-  const markers: Record<Tone, string> = {
+  const markers: Record<Exclude<Tone, "paint">, string> = {
     blue: BLUE,
     hot: p.hotColor,
     added: "#3fb950",
     removed: "#f85149",
   };
+  const paints = [...new Set(p.wires.flatMap((w) => (w.paint ? [w.paint.color] : [])))];
   return (
     <svg className="sys-edges" width={p.width} height={p.height} aria-hidden="true">
       {p.layer === "under" && (
         <defs>
-          {Object.entries(markers).map(([k, fill]) => (
-            <marker
-              key={k}
-              id={`sys-arrow-${k}`}
-              viewBox="0 0 8 8"
-              refX="7"
-              refY="4"
-              markerWidth="8"
-              markerHeight="8"
-              markerUnits="userSpaceOnUse"
-              orient="auto"
-            >
-              <path d="M0 0L8 4L0 8z" fill={fill} />
-            </marker>
-          ))}
+          {[...Object.entries(markers), ...paints.map((c) => [paintMarker(c), c])].map(
+            ([k, fill]) => (
+              <marker
+                key={k}
+                id={`sys-arrow-${k}`}
+                viewBox="0 0 8 8"
+                refX="7"
+                refY="4"
+                markerWidth="8"
+                markerHeight="8"
+                markerUnits="userSpaceOnUse"
+                orient="auto"
+              >
+                <path d="M0 0L8 4L0 8z" fill={fill} />
+              </marker>
+            ),
+          )}
         </defs>
       )}
       {p.layer === "under" && p.hairlines && (
@@ -57,7 +66,27 @@ export function MapEdges(p: Props) {
       )}
       {p.wires.map((w) => {
         if (!w.tone || !!w.over !== (p.layer === "over")) return null;
-        const cls = ["sys-edge", w.e.status, w.door && "door", w.faint && "faint"];
+        const cls = [
+          "sys-edge",
+          w.paint ? "painted" : w.e.status,
+          w.door && "door",
+          w.faint && "faint",
+        ];
+        if (w.paint) {
+          return (
+            <path
+              key={w.key}
+              className={cls.filter(Boolean).join(" ")}
+              d={w.d}
+              fill="none"
+              stroke={w.paint.color}
+              strokeDasharray={w.paint.dash}
+              strokeLinecap={w.paint.dash === DOTTED ? "round" : undefined}
+              strokeWidth={w.paint.width + (w.wide ? 0.8 : 0)}
+              markerEnd={`url(#sys-arrow-${paintMarker(w.paint.color)})`}
+            />
+          );
+        }
         return (
           <path
             key={w.key}
@@ -126,7 +155,7 @@ export function EdgePills({
     if (pill.kind === "label") {
       if (labels === "off") return null;
       if (labels === "hover" && onHover && !alone && key !== selectedEdge) return null;
-      const c = pill.hot ? hotColor : BLUE;
+      const c = pill.color ?? (pill.hot ? hotColor : BLUE);
       return (
         <span
           key={key}

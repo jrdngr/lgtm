@@ -119,6 +119,10 @@ export const commands = {
 	/**  Creates a design, or with `id` changes one. */
 	saveDesign: (workspace: string | null, id: string | null, design: DesignInput) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design", { workspace, id, design })),
 	deleteDesign: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_design", { id })),
+	/**  Stores the user's drawing over a design's map. */
+	saveDesignCanvas: (id: string, canvas: DesignCanvas) => typedError<DesignDto, string>(__TAURI_INVOKE("save_design_canvas", { id, canvas })),
+	/**  Undoes the last agent pass over a design's canvas. */
+	undoDesignAgent: (id: string) => typedError<DesignDto, string>(__TAURI_INVOKE("undo_design_agent", { id })),
 	/**  The prompt asking a terminal agent to write a design's map. */
 	designPrompt: (workspace: string | null, id: string) => typedError<string, string>(__TAURI_INVOKE("design_prompt", { workspace, id })),
 	/**  Every file at a revision. */
@@ -394,6 +398,14 @@ export type ActorDto = {
 /**  How a terminal's agent stands after a hook event. */
 export type AgentHookState = "working" | "input" | "done" | "failed" | "idle" | "gone";
 
+/**  The last agent pass: how many changes it made and what it touched. */
+export type AgentPass = {
+	changed: number,
+	/**  Part, group, note and arrow ids, and edges as `from>to`. */
+	touched: string[],
+	view: string,
+};
+
 /**  An agent asked the workspace's review pane to review `revset`. */
 export type AgentRevset = {
 	workspace: string | null,
@@ -486,6 +498,14 @@ export type ArchViewDto = {
 	unaffected: Unaffected,
 };
 
+/**  An arrow's end: stuck to a part, group or note, or free at `at`. */
+export type ArrowEnd = {
+	/**  A part, group or note id; none when the end is free. */
+	target: string | null,
+	/**  Where a free end is, and where an attached one was last drawn. */
+	at?: Pt,
+};
+
 export type AssessmentDto = {
 	/**  1 (risky) to 5 (safe to merge). */
 	score: number,
@@ -532,6 +552,38 @@ export type BotRunChanged = {
 export type BoundaryDto = {
 	name: string,
 	components: string[],
+};
+
+export type CanvasArrow = {
+	id: string,
+	from: ArrowEnd,
+	to: ArrowEnd,
+	color: Swatch | null,
+	pattern: LinePattern,
+	by?: CanvasAuthor,
+};
+
+/**  Who last made or changed an element. */
+export type CanvasAuthor = "user" | "agent";
+
+/**  A labeled frame around parts and other groups. */
+export type CanvasGroup = {
+	id: string,
+	label: string,
+	color: Swatch | null,
+	/**  Part ids, which have a `:` (or are `sys`), and group ids, which don't. */
+	members: string[],
+	by?: CanvasAuthor,
+};
+
+export type CanvasNote = {
+	id: string,
+	text: string,
+	/**  Its top left. */
+	at: Pt,
+	size: NoteSize,
+	color: Swatch | null,
+	by?: CanvasAuthor,
 };
 
 /**
@@ -744,6 +796,17 @@ export type DesignActorDto = {
 /**  Whether the code has what the design plans. */
 export type DesignBuilt = "built" | "planned" | "differs";
 
+export type DesignCanvas = {
+	/**
+	 *  By view: `context`, `containers`, `components/<container id>` or
+	 *  `interfaces/<component id>`.
+	 */
+	views?: { [key in string]: ViewCanvas },
+	/**  Part colors, by part id, in every view. */
+	colors?: { [key in string]: Swatch },
+	agent?: AgentPass | null,
+};
+
 /**  How a design changes a node of the code's system. */
 export type DesignChange = "new" | "changed" | "removed" | "same";
 
@@ -793,6 +856,9 @@ export type DesignDto = {
 	prompt: string,
 	createdAt: number | null,
 	map: DesignMapDto | null,
+	canvas?: DesignCanvas,
+	/**  The canvas before the last agent pass, while that pass can be undone. */
+	canvasUndo?: DesignCanvas | null,
 };
 
 export type DesignExternalDto = {
@@ -897,6 +963,17 @@ export type EdgeSitesDto = {
 };
 
 export type EdgeStatus = "added" | "removed" | "same";
+
+/**  How a styled edge draws. A styled edge shows at rest, with its label. */
+export type EdgeStyle = {
+	pattern: LinePattern,
+	color: Swatch | null,
+	weight: LineWeight,
+	route: Route,
+	/**  Where its middle is dragged to, from halfway between its ends' centers. */
+	bend: Pt | null,
+	by?: CanvasAuthor,
+};
 
 /**
  *  The questions an update after `after` dropped or rewrote, as they were, and the ones it
@@ -1107,6 +1184,10 @@ export type LayerDto = {
 	ranges: RangeDto[],
 };
 
+export type LinePattern = "solid" | "dashed" | "dotted";
+
+export type LineWeight = "thin" | "thick";
+
 /**  The thread the user is on, as the agent reads it. */
 export type LinkThread = {
 	/**  The whole thread, for the first prompt on it. */
@@ -1231,6 +1312,8 @@ export type NearbyPrsDto = {
 	bookmarks: string[],
 };
 
+export type NoteSize = "s" | "m" | "l";
+
 /**  lgtm > Settings… was chosen while this window had focus. */
 export type OpenSettings = Record<string, never>;
 
@@ -1345,6 +1428,11 @@ export type PromptInfo = {
 	path: string | null,
 	/**  Whether the file is used over the built-in prompt. */
 	exists: boolean,
+};
+
+export type Pt = {
+	x: number,
+	y: number,
 };
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
@@ -1558,6 +1646,8 @@ export type ReviewStateChanged = {
 
 export type RiskLevel = "minimal" | "low" | "moderate" | "high" | "critical";
 
+export type Route = "curved" | "elbow";
+
 export type Row = {
 	kind: RowKind,
 	/**  1-based line in the old file. Set for context and removed rows. */
@@ -1746,6 +1836,8 @@ export type StateDto = {
 	 */
 	threads: ThreadDto[],
 };
+
+export type Swatch = "red" | "orange" | "yellow" | "green" | "cyan" | "blue" | "purple" | "pink";
 
 /**
  *  File > Open Repository in this window. The window swaps itself for the start window once
@@ -1994,6 +2086,22 @@ export type View =
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string };
+
+/**  One view's drawing. */
+export type ViewCanvas = {
+	/**
+	 *  Set once the user moves something: every part keeps a position, and a part without
+	 *  one is new since.
+	 */
+	frozen?: boolean,
+	/**  Parts' top lefts, by part id. */
+	positions?: { [key in string]: Pt },
+	groups?: CanvasGroup[],
+	/**  By `from>to` part ids. */
+	edges?: { [key in string]: EdgeStyle },
+	notes?: CanvasNote[],
+	arrows?: CanvasArrow[],
+};
 
 /**  View > Word Wrap was turned on or off. */
 export type WordWrap = {

@@ -1,3 +1,4 @@
+import { type Shape, shapedPath } from "./edgePaths";
 import type { Box } from "./layout";
 import { curve, type Layout } from "./layout";
 import type { SEdge } from "./scene";
@@ -7,12 +8,19 @@ export const edgeKey = (e: { from: string; to: string }) => `${e.from}>${e.to}`;
 
 /** How a bright wire is colored: blue when lit by a hover, the hot color for a tour, a trace
  * or the selected edge, and green or red for an edge the review adds or removes. */
-export type Tone = "blue" | "hot" | "added" | "removed";
+export type Tone = "blue" | "hot" | "added" | "removed" | "paint";
+
+/** How a styled wire draws, at rest as when lit. */
+export interface Paint extends Shape {
+  color: string;
+  dash?: string;
+  width: number;
+}
 
 export type Pill =
   | { kind: "num"; text: string }
   | { kind: "added" | "removed"; text: string }
-  | { kind: "label"; text: string; hot: boolean };
+  | { kind: "label"; text: string; hot: boolean; color?: string };
 
 export interface Wire {
   e: SEdge;
@@ -29,6 +37,8 @@ export interface Wire {
   wide?: boolean;
   /** Lit, so drawn over the nodes. */
   over?: boolean;
+  /** Its style, when it has one. */
+  paint?: Paint;
   pill?: Pill;
   /** The pill's `mid` is its left end, or its right end, instead of its center. */
   anchor?: "start" | "end";
@@ -64,6 +74,8 @@ interface RestState {
   selectedEdge?: string;
   /** Changed edges are hairlines until lit, then keep their color and show their description. */
   quiet?: boolean;
+  /** Styled edges, by key: drawn at rest in their style, with their label. */
+  paints?: Map<string, Paint>;
 }
 
 /** The map at rest: every edge a hairline, bright only when hovered, hot, selected or, with the
@@ -72,7 +84,7 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
   const box = new Map(layout.nodes.map((n) => [n.id, n]));
   const hovering = s.hovered.size > 0;
   const placed: Box[] = [];
-  return edges.flatMap((e) => {
+  return edges.flatMap((e): Wire[] => {
     const a = box.get(e.from);
     const b = box.get(e.to);
     if (!a || !b) return [];
@@ -80,6 +92,29 @@ export function restWires(layout: Layout, edges: SEdge[], s: RestState): Wire[] 
     const hot = s.hot.has(key) || key === s.selectedEdge;
     const on = hot || s.hovered.has(key);
     if (e.detail && !on) return [];
+    const paint = s.paints?.get(key);
+    if (paint) {
+      const { d, mid } = shapedPath(a, b, paint);
+      const label: Pill | undefined = e.label
+        ? { kind: "label", text: e.label, hot: false, color: paint.color }
+        : undefined;
+      if (label) placed.push(pillBox(label, mid));
+      return [
+        {
+          e,
+          key,
+          d,
+          mid,
+          door: !!(a.door || b.door),
+          tone: "paint",
+          faint: !on && hovering,
+          wide: key === s.selectedEdge,
+          over: on,
+          paint,
+          pill: label,
+        },
+      ];
+    }
     const n = s.hot.get(key);
     const pill: Pill | undefined =
       n !== undefined

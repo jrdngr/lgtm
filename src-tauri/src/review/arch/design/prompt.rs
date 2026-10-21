@@ -4,7 +4,7 @@ use std::fmt::Write;
 
 use anyhow::bail;
 
-use super::{covered, rev};
+use super::{DesignCanvas, ViewCanvas, covered, rev};
 use crate::ctx::RepoCtx;
 use crate::review::arch::describe::map_text;
 
@@ -76,6 +76,29 @@ impl RepoCtx {
             .unwrap();
         }
         write!(out, "\n{INSTRUCTIONS} `{id}`.").unwrap();
+        out.push_str(&canvas_text(&d.canvas));
         Ok(out)
     }
+}
+
+/// The canvas drawn over the design so far, and how to draw on it.
+fn canvas_text(c: &DesignCanvas) -> String {
+    let drawn = !c.colors.is_empty() || c.views.values().any(|v| *v != ViewCanvas::default());
+    let mut out = String::from(
+        "\n\nAfterwards you may draw on the diagram with edit_canvas: arrange a view, group \
+         parts under labels, color them, style edges, and add notes and arrows.",
+    );
+    if drawn {
+        let mut c = c.clone();
+        c.agent = None;
+        write!(
+            out,
+            " The user and earlier passes drew this, each element marked by who made it; keep \
+             it unless the user asks otherwise, and use it to see how they think about the \
+             design:\n\n```json\n{}\n```",
+            serde_json::to_string(&c).unwrap_or_default()
+        )
+        .unwrap();
+    }
+    out
 }

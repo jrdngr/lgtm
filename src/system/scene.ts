@@ -48,6 +48,8 @@ export interface SNode {
   flag?: boolean;
   /** On a design's map. */
   mark?: Mark;
+  /** The color it was given on a design's canvas. */
+  paint?: string;
   /** A design component's interfaces, a line each. */
   lines?: string[];
 }

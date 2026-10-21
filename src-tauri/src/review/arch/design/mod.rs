@@ -2,6 +2,7 @@
 //! system map of the code. Each is a named object of the repo with its files and a prompt, and
 //! can be generated again at will.
 
+mod canvas;
 mod model;
 mod prompt;
 mod rev;
@@ -12,6 +13,7 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+pub use canvas::*;
 pub use model::*;
 pub use rev::ResolvedDto;
 
@@ -32,6 +34,11 @@ pub struct DesignDto {
     pub prompt: String,
     pub created_at: f64,
     pub map: Option<DesignMapDto>,
+    #[serde(default)]
+    pub canvas: DesignCanvas,
+    /// The canvas before the last agent pass, while that pass can be undone.
+    #[serde(default)]
+    pub canvas_undo: Option<DesignCanvas>,
 }
 
 /// What the create and edit form sends.
@@ -213,6 +220,8 @@ impl RepoCtx {
                     prompt: input.prompt,
                     created_at,
                     map: None,
+                    canvas: DesignCanvas::default(),
+                    canvas_undo: None,
                 }
             }
         };
@@ -283,6 +292,46 @@ impl RepoCtx {
             .chain(all)
             .filter(|b| seen.insert(b.clone()))
             .collect())
+    }
+
+    /// Stores the user's canvas for design `id`. A canvas without an agent pass ends the last
+    /// one's undo.
+    pub fn save_design_canvas(&self, id: &str, canvas: DesignCanvas) -> anyhow::Result<DesignDto> {
+        let store = self.store.lock().unwrap();
+        let mut d = load(&store, id)?;
+        if canvas.agent.is_none() {
+            d.canvas_undo = None;
+        }
+        d.canvas = canvas;
+        save(&store, &d)?;
+        Ok(d)
+    }
+
+    /// Applies an agent's `ops` to a view of design `id`'s canvas as one undoable pass.
+    pub fn edit_design_canvas(
+        &self,
+        id: &str,
+        view: &str,
+        ops: Vec<CanvasOp>,
+    ) -> anyhow::Result<DesignDto> {
+        let store = self.store.lock().unwrap();
+        let mut d = load(&store, id)?;
+        let mut canvas = d.canvas.clone();
+        canvas.apply(view, ops)?;
+        let mut before = std::mem::replace(&mut d.canvas, canvas);
+        before.agent = None;
+        d.canvas_undo = Some(before);
+        save(&store, &d)?;
+        Ok(d)
+    }
+
+    /// Puts design `id`'s canvas back as it was before the last agent pass.
+    pub fn undo_design_agent(&self, id: &str) -> anyhow::Result<DesignDto> {
+        let store = self.store.lock().unwrap();
+        let mut d = load(&store, id)?;
+        d.canvas = d.canvas_undo.take().context("nothing to undo")?;
+        save(&store, &d)?;
+        Ok(d)
     }
 
     /// Stores `reply`, in set_design's format, as design `id`'s map.

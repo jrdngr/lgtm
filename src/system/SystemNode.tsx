@@ -33,7 +33,11 @@ export function Node({ n, stale }: { n: Placed; stale: boolean }) {
       {n.kind === "person" && <Person />}
       <span className="sys-hd">
         {n.kind === "system" && <span className="sys-sw round" style={{ background: NEUTRAL }} />}
-        {n.kind !== "component" && !n.door && swatch}
+        {n.paint ? (
+          <span className="sys-sw" style={{ background: n.paint }} />
+        ) : (
+          n.kind !== "component" && !n.door && swatch
+        )}
         <span className="sys-nm">{n.name}</span>
         {(n.kind === "external" || (n.kind === "container" && (n.tech?.length ?? 0) <= 10)) &&
           n.tech && <span className="sys-chip">{n.tech}</span>}
@@ -137,6 +141,10 @@ export function nodeStyle(n: Placed, spot: Spot, selected: boolean, lit: boolean
     style.borderColor = tint(color, 0.6);
     style.background = tint(color, 0.08);
     style.color = color;
+  }
+  if (n.paint) {
+    const fill = tint(n.paint, 0.16);
+    style.background = `linear-gradient(${fill}, ${fill}), var(--sys-card)`;
   }
   return style;
 }

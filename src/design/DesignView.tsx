@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { DesignItemDto, DesignMapDto, SystemDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { openFile } from "../editor/open";
@@ -12,6 +12,12 @@ import type { Level } from "../system/scene";
 import { PipeButton } from "../terminal/PipeButton";
 import { Spinner } from "../ui/Busy";
 import type { CtxEntry } from "../ui/contextMenu";
+import { AgentStrip, EditTools, SelectionBar } from "./canvas/CanvasBars";
+import { CanvasOver, CanvasUnder } from "./canvas/CanvasLayers";
+import { idsOf } from "./canvas/refs";
+import { useCanvas } from "./canvas/useCanvas";
+import { useCanvasEdit } from "./canvas/useCanvasEdit";
+import { levelOfKey, viewKey } from "./canvas/view";
 import { DesignDetail } from "./DesignDetail";
 import { askDesignPrompt, updateSpecPrompt } from "./designAsk";
 import {
@@ -28,6 +34,7 @@ import { useSource } from "./designs";
 import { useDesignGenerate } from "./useDesignGenerate";
 import "../system/system.css";
 import "./design.css";
+import "./canvas/canvas.css";
 
 interface Props {
   item: DesignItemDto;
@@ -139,7 +146,27 @@ function DesignMap(p: {
     [m, item.design.name, code, here.level, overCode],
   );
   const placed = useMemo(() => layout(scene), [scene]);
-  const node = here.node ? designNode(m, code, here.node) : undefined;
+  const cv = useCanvas(item.design);
+  const [editing, setEditing] = useState(false);
+  const vkey = viewKey(here.level);
+  const ed = useCanvasEdit({
+    canvas: cv.canvas,
+    commit: cv.commit,
+    view: vkey,
+    base: placed,
+    edges: scene.edges,
+    editing,
+  });
+  const [flash, setFlash] = useState<Set<string>>();
+  useEffect(() => {
+    if (!flash) return;
+    const t = setTimeout(() => setFlash(undefined), 1600);
+    return () => clearTimeout(t);
+  }, [flash]);
+  const picked = idsOf(ed.selected, "part");
+  const pickedEdges = idsOf(ed.selected, "edge");
+  const nodeId = editing ? (picked.length === 1 ? picked[0] : undefined) : here.node;
+  const node = nodeId ? designNode(m, code, nodeId) : undefined;
 
   const go = (level: DesignLevel, id?: string) => {
     if (JSON.stringify(level) !== JSON.stringify(here.level)) {
@@ -249,9 +276,31 @@ function DesignMap(p: {
       { label: "Ask", keys: "⌘>", onSelect: () => ask(id) },
     ];
   };
+  const showAgent = () => {
+    const pass = cv.canvas.agent;
+    if (!pass) return;
+    if (pass.view !== vkey) go(levelOfKey(pass.view));
+    setFlash(new Set(pass.touched));
+  };
   const onKey = (e: KeyboardEvent) => {
     const mod = e.metaKey || e.ctrlKey;
-    if (mod && e.shiftKey && (e.key === ">" || e.key === ".")) ask(here.node);
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (editing && ed.onKey(e)) e.preventDefault();
+    else if (editing && mod && e.key.toLowerCase() === "z") {
+      if (e.shiftKey) cv.redo();
+      else cv.undo();
+      e.preventDefault();
+    } else if (!mod && !e.altKey && e.key === "e") {
+      setEditing(!editing);
+      e.preventDefault();
+    } else if (editing && e.key === "Escape") {
+      setEditing(false);
+      e.preventDefault();
+    } else onNavKey(e);
+  };
+  const onNavKey = (e: KeyboardEvent) => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.shiftKey && (e.key === ">" || e.key === ".")) ask(nodeId);
     else if (e.ctrlKey && !e.metaKey && (e.key === "-" || e.key === "_")) step(e.shiftKey ? 1 : -1);
     else if (mod) return;
     else if (e.key === "Escape" && here.node) setHere({ ...here, node: undefined });
@@ -281,32 +330,90 @@ function DesignMap(p: {
         toursOpen={false}
         onTours={() => {}}
         view={
-          drift && (
-            <span className="dsn-counts">
-              <span className="built">✓ {n.built} built</span>·
-              <span className="planned">{n.planned} planned</span>·
-              <span className="differs">{n.differs} differs</span>
-            </span>
-          )
+          <>
+            {drift && (
+              <span className="dsn-counts">
+                <span className="built">✓ {n.built} built</span>·
+                <span className="planned">{n.planned} planned</span>·
+                <span className="differs">{n.differs} differs</span>
+              </span>
+            )}
+            <button
+              type="button"
+              className={`sys-tool${editing ? " on" : ""}`}
+              aria-pressed={editing}
+              onClick={() => setEditing(!editing)}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z" />
+              </svg>
+              Edit
+              <kbd>e</kbd>
+            </button>
+          </>
         }
         generate={p.gen}
       />
+      {cv.canvas.agent && (
+        <AgentStrip pass={cv.canvas.agent} onUndo={cv.undoAgent} onShow={showAgent} />
+      )}
+      {cv.error && <div className="sys-error error">{cv.error}</div>}
       <div className="sys-work">
         <SystemCanvas
-          layout={placed}
+          layout={ed.arranged.layout}
           edges={scene.edges}
           labels={mapView.labels}
           hot={NO_HOT}
           hotColor={NEUTRAL}
-          selected={here.node}
-          focus={placed.nodes.some((n) => n.id === here.node && !n.door) ? here.node : undefined}
+          selected={editing ? undefined : here.node}
+          selectedEdge={pickedEdges.length === 1 ? pickedEdges[0] : undefined}
+          focus={
+            !editing && placed.nodes.some((n) => n.id === here.node && !n.door)
+              ? here.node
+              : undefined
+          }
           stale={NO_STALE}
-          onSelect={pick}
+          onSelect={editing ? () => {} : pick}
           onOpen={open}
-          onEdge={() => {}}
+          onEdge={(e) => editing && ed.selectEdge(`${e.from}>${e.to}`, false)}
           nodeMenu={nodeMenu}
           onReload={() => {}}
           quiet
+          paints={ed.paints}
+          flash={flash}
+          fitKey={`${item.design.id}:${vkey}`}
+          under={<CanvasUnder ed={ed} editing={editing} />}
+          over={<CanvasOver ed={ed} editing={editing} flash={flash} />}
+          screen={(toScreen, toWorld) => {
+            ed.setToWorld(toWorld);
+            return (
+              editing && (
+                <>
+                  <SelectionBar ed={ed} canvas={cv.canvas} commit={cv.commit} toScreen={toScreen} />
+                  <EditTools ed={ed} />
+                </>
+              )
+            );
+          }}
+          edit={
+            editing
+              ? {
+                  selected: ed.selected,
+                  fresh: ed.arranged.fresh,
+                  panning: ed.panning,
+                  onNodeDown: ed.onNodeDown,
+                  onBackgroundDown: ed.onBackgroundDown,
+                }
+              : undefined
+          }
         >
           {legend && (
             <div className="dsn-legend">
@@ -336,7 +443,7 @@ function DesignMap(p: {
           overCode={overCode && !!code}
           onShow={show}
           onFile={onFile}
-          onAsk={() => ask(here.node)}
+          onAsk={() => ask(nodeId)}
           onUpdateSpec={() => node && p.onAsk(updateSpecPrompt(item.design, m, node))}
         />
       </div>

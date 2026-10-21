@@ -1,7 +1,7 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::review::arch::design::{DesignDto, DesignInput, DesignItemDto};
+use crate::review::arch::design::{DesignCanvas, DesignDto, DesignInput, DesignItemDto};
 
 /// Every design of the repo, with its state.
 #[tauri::command]
@@ -29,6 +29,24 @@ pub(crate) async fn save_design(
         .save_design(workspace.as_deref(), id.as_deref(), design)
         .await
         .map_err(err)
+}
+
+/// Stores the user's drawing over a design's map.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn save_design_canvas(
+    window: WebviewWindow,
+    id: String,
+    canvas: DesignCanvas,
+) -> CmdResult<DesignDto> {
+    repo(&window)?.save_design_canvas(&id, canvas).map_err(err)
+}
+
+/// Undoes the last agent pass over a design's canvas.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn undo_design_agent(window: WebviewWindow, id: String) -> CmdResult<DesignDto> {
+    repo(&window)?.undo_design_agent(&id).map_err(err)
 }
 
 #[tauri::command]

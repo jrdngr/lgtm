@@ -2,10 +2,19 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { EdgeLabels } from "../bindings";
 import { type CtxEntry, openMenu } from "../ui/contextMenu";
 import { NEUTRAL, tint } from "./colors";
+import type { Pt } from "./edgePaths";
 import { Fit, Minus, Plus } from "./glyphs";
 import type { Layout, Placed } from "./layout";
 import { EdgePills, MapEdges } from "./MapEdges";
-import { edgeKey, edgesOf, focusWires, mapFocus, restWires, type Wire } from "./mapWires";
+import {
+  edgeKey,
+  edgesOf,
+  focusWires,
+  mapFocus,
+  type Paint,
+  restWires,
+  type Wire,
+} from "./mapWires";
 import { usePanZoom } from "./panZoom";
 import { Node, nodeClass, nodeStyle, type Spot } from "./SystemNode";
 import type { SEdge } from "./scene";
@@ -38,6 +47,32 @@ interface Props {
   onReload(): void;
   /** Changed edges show no status pills, only their labels when lit. */
   quiet?: boolean;
+  /** Styled edges, by key. */
+  paints?: Map<string, Paint>;
+  /** Parts to flash. */
+  flash?: Set<string>;
+  /** Refits the view when this changes, instead of when the world's size does. */
+  fitKey?: string;
+  /** Drawn in the world under the edges, and over the nodes. */
+  under?: ReactNode;
+  over?: ReactNode;
+  /** Drawn over the canvas at viewport points. */
+  screen?(toScreen: (p: Pt) => Pt, toWorld: ToWorld): ReactNode;
+  /** Editing: presses go to these instead of selecting, focusing and panning. */
+  edit?: Edit;
+}
+
+/** Turns a pointer's client point into a world point. */
+export type ToWorld = (clientX: number, clientY: number) => Pt;
+
+export interface Edit {
+  selected: Set<string>;
+  /** Parts placed since the user arranged the view. */
+  fresh: Set<string>;
+  /** While held, a drag on the background pans. */
+  panning: boolean;
+  onNodeDown(id: string, e: React.PointerEvent, toWorld: ToWorld): void;
+  onBackgroundDown(e: React.PointerEvent, toWorld: ToWorld): void;
 }
 
 type Hover = { node: string } | { edge: string };
@@ -53,8 +88,21 @@ export function SystemCanvas(props: Props) {
     () => (props.focus ? mapFocus(edges, props.focus) : undefined),
     [edges, props.focus],
   );
-  const pz = usePanZoom(focus?.width ?? layout.width, focus?.height ?? layout.height);
+  const pz = usePanZoom(
+    focus?.width ?? layout.width,
+    focus?.height ?? layout.height,
+    props.fitKey && `${props.fitKey}${props.focus ?? ""}`,
+  );
   const { view } = pz;
+  const toWorld: ToWorld = (cx, cy) => {
+    const r = pz.ref.current?.getBoundingClientRect();
+    return {
+      x: (cx - (r?.left ?? 0) - view.x) / view.k,
+      y: (cy - (r?.top ?? 0) - view.y) / view.k,
+    };
+  };
+  const toScreen = (p: Pt): Pt => ({ x: view.x + p.x * view.k, y: view.y + p.y * view.k });
+  const { edit } = props;
   const anim = useAnimating(props.focus);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new focus or level drops the hover
   useEffect(() => setHover(undefined), [props.focus, layout]);
@@ -85,7 +133,13 @@ export function SystemCanvas(props: Props) {
           selectedEdge,
           props.quiet,
         )
-      : restWires(layout, edges, { hovered, hot, selectedEdge, quiet: props.quiet });
+      : restWires(layout, edges, {
+          hovered,
+          hot,
+          selectedEdge,
+          quiet: props.quiet,
+          paints: props.paints,
+        });
   const edgeProps = {
     wires,
     width: Math.max(layout.width, focus?.width ?? 0),
@@ -107,9 +161,16 @@ export function SystemCanvas(props: Props) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape deselects from the panel
     <div
-      className={`sys-canvas${focus ? " sys-focus" : ""}${cmd ? " cmd" : ""}`}
+      className={`sys-canvas${focus ? " sys-focus" : ""}${cmd ? " cmd" : ""}${edit ? ` cv-edit${edit.panning ? " cv-pan" : ""}` : ""}`}
       ref={pz.ref}
-      onPointerDown={pz.onPointerDown}
+      onPointerDown={(e) => {
+        const onNode = (e.target as HTMLElement).closest("button, .cv-hit");
+        if (edit && !edit.panning && e.button === 0 && !onNode) {
+          edit.onBackgroundDown(e, toWorld);
+          return;
+        }
+        pz.onPointerDown(e);
+      }}
       onClick={() => {
         if (!pz.dragged()) onSelect(undefined);
       }}
@@ -172,6 +233,7 @@ export function SystemCanvas(props: Props) {
             </div>
           ))}
         </div>
+        {props.under}
         {/* Keyed by the focus so a collapsed graph's wires fade in once the nodes have moved. */}
         <div key={props.focus ?? "rest"} className={focus ? "sys-flinks" : undefined}>
           <MapEdges layer="under" {...edgeProps} />
@@ -182,15 +244,28 @@ export function SystemCanvas(props: Props) {
             <button
               key={n.id}
               type="button"
-              className={nodeClass(n, at, focus ? undefined : lit)}
-              style={nodeStyle(n, at, n.id === selected, !focus && !!lit?.has(n.id))}
+              className={`${nodeClass(n, at, focus ? undefined : lit)}${props.flash?.has(n.id) ? " cv-flash" : ""}`}
+              style={nodeStyle(
+                n,
+                at,
+                n.id === selected || !!edit?.selected.has(n.id),
+                !focus && !!lit?.has(n.id),
+              )}
+              onPointerDown={
+                edit &&
+                ((ev) => {
+                  if (ev.button !== 0 || edit.panning) return;
+                  ev.stopPropagation();
+                  edit.onNodeDown(n.id, ev, toWorld);
+                })
+              }
               onPointerEnter={() => setHover({ node: n.id })}
               onPointerLeave={() =>
                 setHover((h) => (h && "node" in h && h.node === n.id ? undefined : h))
               }
               onClick={(ev) => {
                 ev.stopPropagation();
-                if (pz.dragged()) return;
+                if (pz.dragged() || edit) return;
                 if (ev.metaKey || ev.ctrlKey || (focus && n.id === props.focus)) onOpen(n.id);
                 else onSelect(n.id);
               }}
@@ -204,6 +279,7 @@ export function SystemCanvas(props: Props) {
               }}
             >
               <Node n={n} stale={stale.has(n.id)} />
+              {edit?.fresh.has(n.id) && <span className="cv-fresh" />}
             </button>
           );
         })}
@@ -217,7 +293,9 @@ export function SystemCanvas(props: Props) {
             onHover={focus ? (edge) => setHover(edge ? { edge } : undefined) : undefined}
           />
         </div>
+        {props.over}
       </div>
+      {props.screen?.(toScreen, toWorld)}
       {props.children}
       <div className="sys-zoom">
         <button type="button" aria-label="Zoom In" onClick={pz.zoomIn}>
