@@ -26,6 +26,7 @@ const PATHS = {
   plus: <path d="M12 5v14M5 12h14" />,
   minus: <path d="M5 12h14" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  filter: <path d="M3 4h18l-7 8.5V19l-4 2v-8.5z" />,
   eraser: (
     <path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21zM22 21H7M5 11l9 9" />
   ),

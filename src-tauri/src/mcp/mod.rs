@@ -11,6 +11,7 @@ mod guided;
 pub mod hook;
 mod inputs;
 mod notes;
+mod revisions;
 mod qa;
 mod qa_inputs;
 pub mod register;

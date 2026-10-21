@@ -74,8 +74,10 @@ export const commands = {
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
-	/**  The commits of `jj log`'s default revset with its graph, for picking commits. */
-	logRows: (workspace: string | null) => typedError<LogRow[], string>(__TAURI_INVOKE("log_rows", { workspace })),
+	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
+	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
+	/**  Sets the workspace's log revset, blank for jj's default, failing with jj's error. */
+	setLogRevset: (workspace: string | null, revset: string) => typedError<null, string>(__TAURI_INVOKE("set_log_revset", { workspace, revset })),
 	/**
 	 *  The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's
 	 *  presets. `None` when trunk has no bookmark.
@@ -402,6 +404,7 @@ export const events = {
 	guidedChanged: makeEvent<GuidedChanged>("guided-changed"),
 	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
 	jjPaused: makeEvent<JjPaused>("jj-paused"),
+	logRevsetChanged: makeEvent<LogRevsetChanged>("log-revset-changed"),
 	notesChanged: makeEvent<NotesChanged>("notes-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
@@ -1400,6 +1403,11 @@ export type LogCommit = {
 	empty: boolean,
 };
 
+/**  The workspace's revisions log has a new revset. */
+export type LogRevsetChanged = {
+	workspace: string | null,
+};
+
 /**
  *  One commit in the log, with the graph drawn beside its two lines, or a line of graph
  *  alone where branches join or are elided.
@@ -1408,6 +1416,14 @@ export type LogRow = {
 	/**  The graph left of each of the row's lines: jj's own, without colors. */
 	graph: string[],
 	commit: LogCommit | null,
+};
+
+export type LogView = {
+	/**  The workspace's log revset; `None` is jj's default. */
+	revset: string | null,
+	rows: LogRow[],
+	/**  jj's error for `revset`, when the rows fell back to jj's default. */
+	error: string | null,
 };
 
 export type LookDto = {

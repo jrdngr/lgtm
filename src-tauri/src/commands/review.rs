@@ -1,7 +1,10 @@
-use tauri::WebviewWindow;
+use tauri::{Manager, WebviewWindow};
+use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
-use crate::jj::{JjAction, LogRow, WorkingCopyDto};
+use crate::events::LogRevsetChanged;
+use crate::jj::{JjAction, WorkingCopyDto};
+use crate::revisions::LogView;
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
 
@@ -44,15 +47,31 @@ pub(crate) fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> 
     Ok(())
 }
 
-/// The commits of `jj log`'s default revset with its graph, for picking commits.
+/// The workspace's revisions log: its revset and the rows of `jj log` with its graph.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn log_rows(
+pub(crate) async fn log_view(
     window: WebviewWindow,
     workspace: Option<String>,
-) -> CmdResult<Vec<LogRow>> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    ws.jj.log_rows().await.map_err(err)
+) -> CmdResult<LogView> {
+    repo(&window)?.log_view(workspace.as_deref()).await.map_err(err)
+}
+
+/// Sets the workspace's log revset, blank for jj's default, failing with jj's error.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn set_log_revset(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    revset: String,
+) -> CmdResult<()> {
+    let ctx = repo(&window)?;
+    ctx.set_log_revset(workspace.as_deref(), &revset)
+        .await
+        .map_err(err)?;
+    LogRevsetChanged { workspace }
+        .emit_to(window.app_handle(), window.label())
+        .map_err(|e| e.to_string())
 }
 
 /// The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's

@@ -118,11 +118,18 @@ fn pick_trunk(out: &str) -> Option<String> {
 }
 
 impl Jj {
-    /// The commits of `jj log`'s default revset, newest first, with jj's graph.
-    pub async fn log_rows(&self) -> anyhow::Result<Vec<LogRow>> {
-        let out = self
-            .exec_with(&["log", "-T", ROW_TEMPLATE], true, "never")
-            .await?;
+    /// The commits of `revset`, or `jj log`'s default revset, newest first, with jj's graph.
+    /// Fails with jj's own error, without the command line.
+    pub async fn log_rows(&self, revset: Option<&str>) -> anyhow::Result<Vec<LogRow>> {
+        let mut args = vec!["log", "-T", ROW_TEMPLATE];
+        if let Some(r) = revset {
+            args.extend(["-r", r]);
+        }
+        let out = self.exec_with(&args, true, "never").await.map_err(|e| {
+            let text = format!("{e:#}");
+            let command = format!("jj {}: ", args.join(" "));
+            anyhow::anyhow!("{}", text.strip_prefix(&command).unwrap_or(&text))
+        })?;
         Ok(parse_rows(&String::from_utf8_lossy(&out)))
     }
 

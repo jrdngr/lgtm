@@ -29,6 +29,7 @@ mod quit;
 mod recent;
 mod repo;
 mod review;
+mod revisions;
 mod settings;
 mod store;
 mod syntax;
@@ -80,7 +81,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::close_review,
             commands::review::context_lines,
             commands::review::refresh_review,
-            commands::review::log_rows,
+            commands::review::log_view,
+            commands::review::set_log_revset,
             commands::review::trunk_bookmark,
             commands::review::revset_commits,
             commands::review::working_copy,
@@ -215,6 +217,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::BotRunChanged,
             events::AgentShow,
             events::AgentRevset,
+            events::LogRevsetChanged,
             events::ReviewStateChanged,
             events::QaChanged,
             events::ArchChanged,

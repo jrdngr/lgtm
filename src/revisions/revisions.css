@@ -296,3 +296,47 @@ button.lr-pr.on {
 .mo-lit {
   color: var(--accent);
 }
+
+.revset-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 6px 4px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.revset-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.revset-input,
+.revset-text {
+  flex: 1;
+  min-width: 0;
+  font: 12px var(--mono);
+}
+
+.revset-text {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+}
+
+.revset-error {
+  color: var(--error);
+  font: 11px / 15px var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.section-header .icon-button.on {
+  color: var(--accent);
+}

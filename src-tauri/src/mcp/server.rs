@@ -26,8 +26,8 @@ const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. T
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
 this terminal's workspace: read its state, comments, symbol graph and reports; \
 add comments; store an architecture assessment; publish review findings \
-to a report; and point the review \
-at code or a revset. Tools that write to the review take its revset, from your prompt or \
+to a report; point the review \
+at code or a revset; and set the revset the revisions log lists. Tools that write to the review take its revset, from your prompt or \
 get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
 or list_threads; lgtm refuses a write once the review or PR has moved on. You can't mark code. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
@@ -87,6 +87,7 @@ impl Lgtm {
                 + Self::design_router()
                 + Self::canvas_router()
                 + Self::notes_router()
+                + Self::revisions_router()
                 + Self::qa_router(),
         }
     }
@@ -119,11 +120,16 @@ impl Lgtm {
     #[tool(
         description = "The open review: its revset and commits, and per file the changed \
         rows the human has marked (by mark label), how many count as done, and the line \
-        ranges still left."
+        ranges still left. Also the revset the revisions log lists (log_revset), null for \
+        jj's default."
     )]
     async fn get_review(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
-        json(&ctx.summary(self.workspace()).map_err(failed)?)
+        let mut review =
+            serde_json::to_value(ctx.summary(self.workspace()).map_err(failed)?)
+                .map_err(|e| e.to_string())?;
+        review["log_revset"] = ctx.log_revset(self.workspace()).map_err(failed)?.into();
+        json(&review)
     }
 
     #[tool(
@@ -384,8 +390,11 @@ impl Lgtm {
         Ok("Shown.".into())
     }
 
-    #[tool(description = "Change what the review pane reviews to a jj revset.")]
-    async fn set_revset(&self, Parameters(p): Parameters<inputs::Revset>) -> Out {
+    #[tool(
+        description = "Change what the review pane reviews to a jj revset. This doesn't \
+        change which commits the revisions log lists; set_log_revset does."
+    )]
+    async fn set_review_revset(&self, Parameters(p): Parameters<inputs::Revset>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
         ws.jj.resolve(&p.revset).await.map_err(failed)?;

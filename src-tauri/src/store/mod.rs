@@ -8,6 +8,7 @@ mod comments;
 mod designs;
 mod drawings;
 mod guided;
+mod log_revsets;
 mod marks;
 mod notes;
 mod prs;
@@ -243,6 +244,7 @@ impl Store {
         designs::create_table(&db)?;
         drawings::create_table(&db)?;
         guided::create_table(&db)?;
+        log_revsets::create_table(&db)?;
         notes::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
@@ -263,6 +265,7 @@ impl Store {
             "arch_reviews",
             "guided_reviews",
             "guided_verdicts",
+            "log_revsets",
             "notes",
             "note_folders",
         ] {

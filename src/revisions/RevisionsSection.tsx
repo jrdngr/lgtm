@@ -5,9 +5,12 @@ import { commands } from "../ipc";
 import { useReviewTarget } from "../review/target";
 import { useWorkingCopy } from "../review/workingCopy";
 import { contextMenu } from "../ui/contextMenu";
+import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { revsetMenu } from "../workbench/revsetMenu";
+import { useLogRevset } from "./logRevset";
 import { RevisionsLog } from "./RevisionsLog";
+import { RevsetStrip } from "./RevsetStrip";
 
 interface Props {
   workspace: WorkspaceName;
@@ -21,6 +24,8 @@ export function RevisionsSection({ workspace, refreshed }: Props) {
   const pr = usePr(workspace);
   const wc = useWorkingCopy(workspace);
   const [trunk, setTrunk] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const custom = useLogRevset(workspace)?.revset != null;
 
   useEffect(() => {
     let live = true;
@@ -37,7 +42,20 @@ export function RevisionsSection({ workspace, refreshed }: Props) {
     >
       <SectionHeader title="Revisions">
         {target?.stale && <span className="pill amber">stale</span>}
+        <IconButton
+          icon="filter"
+          label="Revset"
+          className={custom ? "on" : undefined}
+          aria-pressed={editing}
+          onClick={() => setEditing(!editing)}
+        />
       </SectionHeader>
+      <RevsetStrip
+        key={String(workspace)}
+        workspace={workspace}
+        editing={editing}
+        setEditing={setEditing}
+      />
       <RevisionsLog
         key={String(workspace)}
         workspace={workspace}

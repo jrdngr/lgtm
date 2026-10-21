@@ -13,6 +13,7 @@ import { CommitLines } from "./CommitLines";
 import { graphOf } from "./graphCells";
 import { LogGraph } from "./LogGraph";
 import { loadReview, onFocusLog, onOpenMotions } from "./loadReview";
+import { onLogRevsetChanged, publishLogRevset } from "./logRevset";
 import { MotionPopup } from "./MotionPopup";
 import { type Motion, motions, narrow, step } from "./motions";
 import { PrPill } from "./PrPill";
@@ -67,10 +68,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const commitAt = (k: number) => rows?.[commits[k]]?.commit ?? undefined;
   const changeAt = (k: number) => commitAt(k)?.changeId;
   async function reload(keep?: string) {
-    const r = await commands.logRows(workspace);
+    const r = await commands.logView(workspace);
     if (r.status === "error") return setError(r.error);
-    setRows(r.data);
-    const found = r.data.filter((l) => l.commit);
+    const { revset, rows, error } = r.data;
+    publishLogRevset(workspace, { revset, error });
+    setRows(rows);
+    const found = rows.filter((l) => l.commit);
     const at = found.findIndex((l) =>
       keep
         ? l.commit?.changeId === keep
@@ -89,6 +92,10 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   useRepoChanged(() => {
     if (!busy) reload(changeAt(cursor));
   });
+  const reloadLatest = useRef(reload);
+  reloadLatest.current = reload;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the log is keyed by workspace
+  useEffect(() => onLogRevsetChanged(workspace, () => reloadLatest.current()), []);
   useEffect(
     () =>
       onFocusLog(() => {

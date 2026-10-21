@@ -88,6 +88,12 @@ pub struct AgentRevset {
     pub revset: String,
 }
 
+/// The workspace's revisions log has a new revset.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct LogRevsetChanged {
+    pub workspace: Option<String>,
+}
+
 /// An agent changed review `review`'s comments or threads.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct ReviewStateChanged {
