@@ -78,12 +78,12 @@ export function ChunkCode({
               ].filter(Boolean);
               return (
                 <Fragment key={row}>
-                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: rows pick with the mouse; keys act on the chunk */}
                   <div
                     className={cls.join(" ")}
                     data-row={markKey(s.file, row)}
                     style={mark ? ({ "--m": markVar(mark) } as React.CSSProperties) : undefined}
-                    onClick={lines && ((e) => lines.onRow(s.file, row, e.shiftKey))}
+                    onMouseDown={lines && ((e) => lines.onRowDown({ file: s.file, row }, e))}
+                    onMouseEnter={lines && (() => lines.onRowEnter({ file: s.file, row }))}
                     onContextMenu={lines?.onRowMenu({ file: s.file, row })}
                   >
                     <span className="n">{r.newLine ?? r.oldLine ?? ""}</span>

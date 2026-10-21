@@ -505,6 +505,11 @@ button.gd-tag:hover {
   background: var(--del);
 }
 
+.gd-ln .code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .gd-ln.pickable {
   cursor: pointer;
 }

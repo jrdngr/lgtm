@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarkColor, RowRef } from "../bindings";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
@@ -10,6 +10,7 @@ import { markKey } from "../review/model";
 import { rowsRefs } from "../review/sendText";
 import { unified } from "../review/snippet";
 import type { Comments } from "../review/useComments";
+import { clearTextSelection } from "../review/useRowMouse";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import type { Segment } from "./model";
 
@@ -24,7 +25,7 @@ interface Deps {
 }
 
 /** Picking lines in a guided diff and acting on them as the Review tab does: move with j/k,
- * extend with J/K or shift-click, mark with 1–9 and 0, comment with c or ⇧C, send with ⌘>,
+ * extend with J/K, shift-click or a drag, mark with 1–9 and 0, comment with c or ⇧C, send with ⌘>,
  * copy with ⌘C, open with o, undo marks with ⌘Z, and the same from a row's menu. */
 export function useGuidedLines({ workspace, review, setup, segments, c, send, setError }: Deps) {
   const [ends, setEnds] = useState<{ anchor: string; head: string }>();
@@ -45,6 +46,41 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
   const pick = (r: RowRef, extend: boolean) =>
     setEnds((e) => ({ anchor: extend && e ? e.anchor : keyOf(r), head: keyOf(r) }));
   const clear = () => setEnds(undefined);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const up = () => {
+      dragging.current = false;
+    };
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
+  }, []);
+
+  /** Picks rows as the Review tab does: code text stays selectable, and a double-click there
+   * selects a word; gutters, or a triple click anywhere, pick rows. */
+  function onRowDown(r: RowRef, e: React.MouseEvent) {
+    if (e.button !== 0) return;
+    const inCode = e.target instanceof Element && e.target.closest(".code");
+    if (e.detail === 2 && inCode) return;
+    if (!inCode || e.detail >= 3) {
+      e.preventDefault();
+      clearTextSelection();
+    }
+    if (e.detail >= 3) {
+      const seg = segments.find((g) => g.file === r.file && g.rows.includes(r.row));
+      if (seg) {
+        const last = seg.rows[seg.rows.length - 1];
+        setEnds({ anchor: markKey(r.file, seg.rows[0]), head: markKey(r.file, last) });
+      }
+      return;
+    }
+    pick(r, e.shiftKey);
+    dragging.current = !e.shiftKey;
+  }
+
+  const onRowEnter = (r: RowRef) => {
+    if (dragging.current) pick(r, true);
+  };
   const fail = (e: unknown) => setError(String(e));
   const isChanged = (r: RowRef) => review.files[r.file].rows[r.row].kind !== "context";
 
@@ -207,7 +243,8 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
     picked,
     isPicked: (file: number, row: number) => pickedKeys.has(markKey(file, row)),
     isHead: (file: number, row: number) => !!head && head.file === file && head.row === row,
-    onRow: (file: number, row: number, extend: boolean) => pick({ file, row }, extend),
+    onRowDown,
+    onRowEnter,
     onRowMenu,
     onKey,
     clear,
