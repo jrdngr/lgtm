@@ -34,8 +34,3 @@ run *repo:
 gc *repo:
     src-tauri/target/release/lgtm gc {{ repo }}
 
-# Set the app version (Cargo.toml, package.json, Cargo.lock) before a release
-bump version:
-    sed -i.bak 's/^version = ".*"/version = "{{ version }}"/' src-tauri/Cargo.toml && rm src-tauri/Cargo.toml.bak
-    sed -i.bak 's/^  "version": ".*"/  "version": "{{ version }}"/' package.json && rm package.json.bak
-    cd src-tauri && cargo metadata --format-version 1 > /dev/null
