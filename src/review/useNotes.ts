@@ -21,11 +21,11 @@ export function useNotes(review: CurrentReview | undefined) {
     );
   const menu = (): CtxEntry[] => [
     {
-      label: "Send Open Notes to a Terminal",
+      label: "Send Open Comments to a Terminal",
       onSelect: sendOpen,
       disabled: open.length === 0,
     },
-    { label: "Show Done Notes", checked: showDone, onSelect: () => doneShown.set(!showDone) },
+    { label: "Show Done Comments", checked: showDone, onSelect: () => doneShown.set(!showDone) },
   ];
   return { notes, open, showDone, setShowDone: doneShown.set, error, menu };
 }

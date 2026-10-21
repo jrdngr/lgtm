@@ -26,7 +26,7 @@ function draftItem({ comment, c }: Card): MenuItem | false {
     !comment.thread &&
     c.canDraft && {
       label: "Draft PR Comment",
-      title: "Start a draft for GitHub on the same lines, with this note's text",
+      title: "Start a draft for GitHub on the same lines, with this comment's text",
       onSelect: () => c.draftFromNote(comment.id),
     }
   );
@@ -34,7 +34,7 @@ function draftItem({ comment, c }: Card): MenuItem | false {
 
 /** Deletes a note, a quote, or a draft not sent to GitHub, after asking. */
 function deleteItem({ comment, c }: Card): MenuItem {
-  const what = comment.thread?.quote ? "Quote" : comment.thread ? "Draft" : "Note";
+  const what = comment.thread?.quote ? "Quote" : comment.thread ? "Draft" : "Comment";
   return {
     label: `Delete ${what}…`,
     danger: true,

@@ -122,7 +122,7 @@ export function useReviewActions(d: Deps) {
   /** Opens a note on the selection. `github` makes it a draft for the PR instead. */
   function startComment(github = false) {
     if (github && !d.c.canDraft) {
-      setError("Drafts for GitHub need a PR workspace. Press c for a note.");
+      setError("Drafts for GitHub need a PR workspace. Press c for a comment.");
       return;
     }
     const draft = draftFor(files, lines, sel.start, sel.end);

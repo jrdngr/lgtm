@@ -7,6 +7,7 @@ import { useWorkspace, workspaceKey } from "../core/workspace";
 import { DrawingsPanel } from "../drawings/DrawingsPanel";
 import { RepoTree } from "../editor/RepoTree";
 import { needsYou } from "../model/stages";
+import { NotesPanel } from "../notes/NotesPanel";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
@@ -28,7 +29,7 @@ interface Props {
 }
 
 /** The right side panel: the repo's files; the review's changes, comments, architecture and
- * reports; Q&A; and drawings. A tab turns amber for threads that need you, open high Look items,
+ * reports; Q&A; drawings; and notes. A tab turns amber for threads that need you, open high Look items,
  * and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
@@ -85,6 +86,13 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           title: "Drawings",
           icon: "drawing",
           render: () => <DrawingsPanel />,
+        },
+        {
+          id: "notes",
+          group: "drawings",
+          title: "Notes",
+          icon: "note",
+          render: () => <NotesPanel />,
         },
       ]}
     />

@@ -9,6 +9,7 @@ mod canvas;
 mod design;
 pub mod hook;
 mod inputs;
+mod notes;
 mod qa;
 mod qa_inputs;
 pub mod register;

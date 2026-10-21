@@ -152,6 +152,20 @@ export const commands = {
 } | null) => typedError<null, string>(__TAURI_INVOKE("set_canvas_focus", { workspace, focus })),
 	/**  Writes an exported drawing to `path`, which the user picked in a save dialog. */
 	writeExport: (path: string, data: number[]) => typedError<null, string>(__TAURI_INVOKE("write_export", { path, data })),
+	/**  Every note and folder the workspace shows: global, the repo's and its own. */
+	notes: (workspace: string | null) => typedError<NotesDto, string>(__TAURI_INVOKE("notes", { workspace })),
+	note: (workspace: string | null, id: string) => typedError<NoteDto, string>(__TAURI_INVOKE("note", { workspace, id })),
+	createNote: (workspace: string | null, level: NoteLevel, folder: string, name: string, body: string) => typedError<NoteDto, string>(__TAURI_INVOKE("create_note", { workspace, level, folder, name, body })),
+	saveNote: (workspace: string | null, id: string, body: string) => typedError<NoteDto, string>(__TAURI_INVOKE("save_note", { workspace, id, body })),
+	renameNote: (workspace: string | null, id: string, name: string) => typedError<NoteDto, string>(__TAURI_INVOKE("rename_note", { workspace, id, name })),
+	/**  Moves a note into a folder of any level. */
+	moveNote: (workspace: string | null, id: string, level: NoteLevel, folder: string) => typedError<NoteDto, string>(__TAURI_INVOKE("move_note", { workspace, id, level, folder })),
+	deleteNote: (workspace: string | null, id: string) => typedError<null, string>(__TAURI_INVOKE("delete_note", { workspace, id })),
+	/**  Makes folder `name` in `parent`. Returns its path. */
+	createNoteFolder: (workspace: string | null, level: NoteLevel, parent: string, name: string) => typedError<string, string>(__TAURI_INVOKE("create_note_folder", { workspace, level, parent, name })),
+	renameNoteFolder: (workspace: string | null, level: NoteLevel, path: string, name: string) => typedError<null, string>(__TAURI_INVOKE("rename_note_folder", { workspace, level, path, name })),
+	/**  Deletes a folder with every note and folder in it. */
+	deleteNoteFolder: (workspace: string | null, level: NoteLevel, path: string) => typedError<null, string>(__TAURI_INVOKE("delete_note_folder", { workspace, level, path })),
 	/**  The prompt asking a terminal agent to describe the system map. */
 	describePrompt: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("describe_prompt", { workspace })),
 	/**  A component's symbols other components use most. */
@@ -391,6 +405,7 @@ export const events = {
 	drawingChanged: makeEvent<DrawingChanged>("drawing-changed"),
 	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
 	jjPaused: makeEvent<JjPaused>("jj-paused"),
+	notesChanged: makeEvent<NotesChanged>("notes-changed"),
 	openSettings: makeEvent<OpenSettings>("open-settings"),
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
@@ -1395,7 +1410,42 @@ export type NearbyPrsDto = {
 	bookmarks: string[],
 };
 
+export type NoteDto = {
+	id: string,
+	level: NoteLevel,
+	/**  `/`-separated, empty at the top of the level. */
+	folder: string,
+	name: string,
+	body: string,
+	createdAt: number | null,
+	updatedAt: number | null,
+};
+
+export type NoteFolderDto = {
+	level: NoteLevel,
+	path: string,
+};
+
+export type NoteLevel = "global" | "repo" | "workspace";
+
 export type NoteSize = "s" | "m" | "l";
+
+/**
+ *  A note or folder was made, changed, moved or deleted, in any window or by an agent. `id`
+ *  names the note when one changed.
+ */
+export type NotesChanged = {
+	id: string | null,
+};
+
+/**
+ *  What a workspace shows: every note of its three levels, and every folder, including the
+ *  ones holding a note.
+ */
+export type NotesDto = {
+	notes: NoteDto[],
+	folders: NoteFolderDto[],
+};
 
 /**  lgtm > Settings… was chosen while this window had focus. */
 export type OpenSettings = Record<string, never>;

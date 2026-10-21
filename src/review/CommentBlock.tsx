@@ -159,12 +159,12 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   const source = isNew
     ? github
       ? "New draft for GitHub"
-      : "New note"
+      : "New comment"
     : gh
       ? thread?.summary || "GitHub"
       : thread
         ? "Draft for GitHub"
-        : "Note";
+        : "Comment";
   const canFinal = !!gh && !!body.trim() && thread?.stage !== "ready";
   const finalButton = (
     <button
@@ -284,7 +284,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
             value={editing}
             rows={Math.min(12, Math.max(3, editing.split("\n").length))}
             placeholder={
-              gh ? "Write a reply" : github ? "Write a comment for GitHub" : "Write a note"
+              gh ? "Write a reply" : github ? "Write a comment for GitHub" : "Write a comment"
             }
             onChange={(e) => c.setBody(id, e.target.value)}
             onKeyDown={onBodyKey}

@@ -41,16 +41,20 @@ interface ItemProps {
 function noteMenu({ c, review, canDraft }: ItemProps): CtxEntry[] {
   const apply = (r: Promise<CommandResult<StateDto>>) => run(unwrap(r).then(review.apply));
   async function edit() {
-    const body = await promptText("Edit Note", { value: c.body, action: "Save", multiline: true });
+    const body = await promptText("Edit Comment", {
+      value: c.body,
+      action: "Save",
+      multiline: true,
+    });
     if (body !== undefined && body !== c.body) apply(commands.editComment(review.id, c.id, body));
   }
   async function remove() {
-    if (await confirmAction("Delete this note?", "Delete")) {
+    if (await confirmAction("Delete this comment?", "Delete")) {
       apply(commands.deleteComment(review.id, c.id));
     }
   }
   return [
-    { label: "Jump to Note", onSelect: () => review.jumpToComment(c.id) },
+    { label: "Jump to Comment", onSelect: () => review.jumpToComment(c.id) },
     { label: "Edit", onSelect: edit },
     {
       label: "Done",
@@ -65,7 +69,7 @@ function noteMenu({ c, review, canDraft }: ItemProps): CtxEntry[] {
     "-",
     { label: "Copy Text", onSelect: () => copy(c.body), disabled: !c.body },
     "-",
-    { label: "Delete Note…", onSelect: remove },
+    { label: "Delete Comment…", onSelect: remove },
   ];
 }
 
@@ -142,11 +146,11 @@ export function NoteList({ review, notes, canDraft, showDone, setShowDone }: Pro
   );
 }
 
-/** What the Notes list says when there are none. */
+/** What the comments list says when there are none. */
 export function NoNotes() {
   return (
     <Empty>
-      No notes. Select code and press <kbd>c</kbd>
+      No comments. Select code and press <kbd>c</kbd>
     </Empty>
   );
 }

@@ -90,7 +90,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘A"], action: "Select the whole review" },
       { keys: ["⌘Z", "⇧⌘Z"], action: "Undo / redo mark changes" },
       { keys: ["⌘C"], action: "Copy the selected text or rows" },
-      { keys: ["c"], action: "Write a note on the selection" },
+      { keys: ["c"], action: "Write a comment on the selection" },
       { keys: ["C"], action: "Draft a GitHub comment (PR workspaces)" },
       { keys: ["⌘>"], action: "Send the selection to the last terminal" },
       { keys: ["o"], action: "Open the file at the cursor in an editor" },

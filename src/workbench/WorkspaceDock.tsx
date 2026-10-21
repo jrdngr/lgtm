@@ -21,6 +21,7 @@ import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
 import { ShortcutsPanel } from "../help/ShortcutsPanel";
 import { commands, unwrap } from "../ipc";
+import { NoteTab } from "../notes/NoteTab";
 import { QaTab } from "../qa/QaTab";
 import { useAgentQa } from "../qa/useAgentQa";
 import { WorkspaceReview } from "../review/IdleReview";
@@ -50,6 +51,7 @@ const components = {
   shortcuts: guarded(ShortcutsPanel),
   qa: guarded(QaTab),
   drawing: guarded(DrawingTab),
+  note: guarded(NoteTab),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
   // runs panels are then closed, and whose System tab becomes Architecture.
   system: () => null,

@@ -13,7 +13,8 @@ export type PanelKind =
   | "report"
   | "architecture"
   | "qa"
-  | "drawing";
+  | "drawing"
+  | "note";
 
 const TITLES: Record<PanelKind, string> = {
   review: "Review",
@@ -23,6 +24,7 @@ const TITLES: Record<PanelKind, string> = {
   architecture: "Architecture",
   qa: "Q&A",
   drawing: "Drawing",
+  note: "Note",
 };
 
 /** What the new tab menu offers, in order. */
@@ -93,6 +95,15 @@ export function openDrawing(api: DockviewApi, id: string, name: string) {
   const open = api.getPanel(`drawing-${id}`);
   if (open) return activate(open);
   addPanel(api, "drawing", { drawing: id }, inActivePane(api), `drawing-${id}`).api.setTitle(name);
+}
+
+/** Shows note `id`, in the pane it's already open in if there is one. Opens it in the editor
+ * with `edit`, else as it last was. */
+export function openNote(api: DockviewApi, id: string, name: string, edit = false) {
+  const open = api.getPanel(`note-${id}`);
+  if (open) return activate(open);
+  const params = edit ? { note: id, view: "editor" } : { note: id };
+  addPanel(api, "note", params, inActivePane(api), `note-${id}`).api.setTitle(name);
 }
 
 /** Shows the Architecture tab, in its pane if it's already open. */

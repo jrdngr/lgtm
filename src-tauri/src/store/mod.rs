@@ -1,5 +1,5 @@
-//! Per-repo SQLite store for marks, file checks, comments, review sessions, reports and
-//! designs.
+//! Per-repo SQLite store for marks, file checks, comments, review sessions, reports,
+//! designs, drawings and notes. lgtm's global store is one too, holding only global notes.
 
 mod arch;
 mod bots;
@@ -8,6 +8,7 @@ mod comments;
 mod designs;
 mod drawings;
 mod marks;
+mod notes;
 mod prs;
 mod qa;
 pub mod report;
@@ -22,6 +23,7 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use marks::{Mark, MarkColor};
+pub use notes::NoteRow;
 pub use prs::PrRecord;
 pub use report::{BotRun, Part, Persona};
 pub use sessions::Session;
@@ -227,7 +229,6 @@ impl Store {
         Ok(Self::init(Connection::open(path)?)?)
     }
 
-    #[cfg(test)]
     pub fn in_memory() -> Self {
         Self::init(Connection::open_in_memory().unwrap()).unwrap()
     }
@@ -239,6 +240,7 @@ impl Store {
         arch::create_table(&db)?;
         designs::create_table(&db)?;
         drawings::create_table(&db)?;
+        notes::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
         qa::create_table(&db)?;
@@ -247,11 +249,18 @@ impl Store {
         Ok(Self { db })
     }
 
-    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions, review sessions, assessments and
-    /// Look checks, so a new workspace with its name starts empty.
+    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions, review sessions, assessments,
+    /// Look checks and notes, so a new workspace with its name starts empty.
     pub fn forget_workspace(&mut self, name: &str) -> rusqlite::Result<()> {
         let tx = self.db.transaction()?;
-        for table in ["bot_runs", "qa_sessions", "sessions", "arch_reviews"] {
+        for table in [
+            "bot_runs",
+            "qa_sessions",
+            "sessions",
+            "arch_reviews",
+            "notes",
+            "note_folders",
+        ] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }
         tx.commit()

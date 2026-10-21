@@ -115,6 +115,13 @@ pub struct DrawingChanged {
     pub id: String,
 }
 
+/// A note or folder was made, changed, moved or deleted, in any window or by an agent. `id`
+/// names the note when one changed.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct NotesChanged {
+    pub id: Option<String>,
+}
+
 /// A terminal agent described the system map.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SystemChanged {

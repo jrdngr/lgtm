@@ -71,7 +71,7 @@ export function FindingCard(props: Props) {
       label: "Send to Terminal",
       onSelect: () => onSend(findingText(f, source)),
     },
-    { label: "Keep as Note", disabled: !first || !!kept, onSelect: () => keep(false) },
+    { label: "Keep as Comment", disabled: !first || !!kept, onSelect: () => keep(false) },
     canDraft && {
       label: "Draft PR Comment",
       disabled: !first || !!kept,
@@ -107,7 +107,9 @@ export function FindingCard(props: Props) {
           />
           <IconButton
             icon={kept === "note" ? "check" : "comments"}
-            label={kept === "note" ? "Kept as note" : first ? "Keep as note on its code" : notHere}
+            label={
+              kept === "note" ? "Kept as comment" : first ? "Keep as comment on its code" : notHere
+            }
             disabled={!first || !!kept}
             onClick={() => keep(false)}
           />

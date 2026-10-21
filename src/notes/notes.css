@@ -1,0 +1,95 @@
+.notes-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.notes-head {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px 6px;
+  font-size: 12.5px;
+}
+
+.quick-note {
+  padding: 0 8px 6px;
+}
+
+.quick-note textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--bg);
+  color: var(--fg);
+  font: 12.5px / 1.45 inherit;
+  font-family: inherit;
+}
+
+.quick-note textarea:focus {
+  border-color: var(--accent);
+}
+
+.quick-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.quick-note-actions button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+}
+
+.quick-note-actions kbd {
+  font: var(--fs-xs) var(--mono);
+  opacity: 0.75;
+}
+
+.notes-tree {
+  flex: 1;
+  min-height: 0;
+}
+
+.notes-level-head {
+  display: flex;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.file-tree .notes-level-toggle {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.file-tree .notes-level-head .icon-button {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  justify-content: center;
+}
+
+.file-tree button .icon {
+  flex: none;
+  color: var(--soft);
+}
+
+.notes-when {
+  flex: none;
+  padding-right: 4px;
+  color: var(--soft);
+  font-size: var(--fs-xs);
+}

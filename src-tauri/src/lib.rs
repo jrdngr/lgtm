@@ -16,6 +16,7 @@ mod jj;
 mod layout;
 mod mcp;
 mod menu;
+mod notes;
 mod par;
 mod paths;
 mod placement;
@@ -114,6 +115,16 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::drawing::undo_drawing_agent,
             commands::drawing::set_canvas_focus,
             commands::drawing::write_export,
+            commands::notes::notes,
+            commands::notes::note,
+            commands::notes::create_note,
+            commands::notes::save_note,
+            commands::notes::rename_note,
+            commands::notes::move_note,
+            commands::notes::delete_note,
+            commands::notes::create_note_folder,
+            commands::notes::rename_note_folder,
+            commands::notes::delete_note_folder,
             commands::arch::describe_prompt,
             commands::arch::system_most_used,
             commands::arch::system_find,
@@ -206,6 +217,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::SystemChanged,
             events::DesignChanged,
             events::DrawingChanged,
+            events::NotesChanged,
             events::TerminalAgent
         ])
 }
@@ -238,6 +250,17 @@ fn adopt_login_shell_path() {
         // SAFETY: runs during startup before any other thread reads the environment.
         unsafe { std::env::set_var("PATH", path) };
     }
+}
+
+/// lgtm's own store, for global notes. Without one, global notes last until lgtm quits.
+fn global_store(app: &tauri::App) -> store::Store {
+    let opened = paths::data_dir(app)
+        .map_err(anyhow::Error::msg)
+        .and_then(|dir| store::Store::open(&dir.join("global.db")));
+    opened.unwrap_or_else(|e| {
+        eprintln!("lgtm: open the global store: {e:#}");
+        store::Store::in_memory()
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -287,6 +310,7 @@ pub fn run() {
                 Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
                 Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
             }
+            app.manage(notes::GlobalStore(std::sync::Mutex::new(global_store(app))));
             let cwd = std::env::current_dir()?;
             repo::open_from_args(app.handle(), &args, &cwd, true);
             Ok(())

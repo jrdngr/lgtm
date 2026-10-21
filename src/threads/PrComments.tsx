@@ -47,7 +47,7 @@ function FilterBar({ pr, notes }: { pr: number; notes: number }) {
     <div className="comments-filter">
       {option("all", "All")}
       {option("pr", "PR", pr)}
-      {option("notes", "Notes", notes)}
+      {option("notes", "Comments", notes)}
     </div>
   );
 }
@@ -167,7 +167,7 @@ export function PrComments({ pr, review }: Props) {
           ) : (
             <div className="notes-group">
               <GroupHead
-                name="Notes"
+                name="Comments"
                 count={`${notes.open.length} open`}
                 shut={shut}
                 onToggle={() => notesFolded.set(!shut)}

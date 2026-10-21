@@ -158,6 +158,18 @@ const PATHS = {
       <path d="M10.5 7.5h4.5l2.25 5.25" />
     </>
   ),
+  note: (
+    <>
+      <path d="M6 3h8l4 4v14H6z" />
+      <path d="M14 3v4h4M9 12h6M9 16h6" />
+    </>
+  ),
+  folderPlus: (
+    <>
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M12 10.5v5M9.5 13h5" />
+    </>
+  ),
   architecture: (
     <>
       <rect x="9" y="2.5" width="6" height="6" rx="1" />
