@@ -11,6 +11,7 @@ import {
   progressOf,
   segmentsOf,
   stepParts,
+  withWholeFiles,
 } from "./model";
 
 // a.ts: new lines 1 ctx, 2-3 added, old 2 removed (sits at new 4), 4 ctx; then a second hunk
@@ -190,5 +191,21 @@ describe("stepParts", () => {
     const got = stepParts(files, segs, related, [{ path: "e.ts", start: 1, end: 1 }]);
     expect(got.segments).toBe(segs);
     expect(got.related).toBe(related);
+  });
+});
+
+describe("withWholeFiles", () => {
+  it("shows an expanded file's every hunk where its first run was, once", () => {
+    const segs = segmentsOf(files, [
+      { path: "b.ts", start: 1, end: 1 },
+      { path: "a.ts", start: 2, end: 2 },
+      { path: "a.ts", start: 11, end: 11 },
+    ]);
+    const got = withWholeFiles(files, segs, new Set([0]));
+    expect(got.map((s) => [s.path, s.rows])).toEqual([
+      ["b.ts", [0]],
+      ["a.ts", [0, 1, 2, 3, 4]],
+      ["a.ts", [5, 6]],
+    ]);
   });
 });

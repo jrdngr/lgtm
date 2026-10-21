@@ -6,6 +6,7 @@ import { commands, unwrap } from "../ipc";
 import { SIGN } from "../model/sign";
 import { Code } from "../review/Cell";
 import { type FlatFile, markKey } from "../review/model";
+import { IconButton } from "../ui/icons";
 import { inRanges, type Segment } from "./model";
 
 /** Rows picked for a comment: changed rows of one file. */
@@ -26,10 +27,23 @@ interface Props {
   onRow?(file: number, row: number, extend: boolean): void;
   /** What shows under a row, like the comments that end there. */
   after?(file: number, row: number): ReactNode;
+  /** Files shown whole; with `onExpand`, each header can switch its file. */
+  expanded?: ReadonlySet<number>;
+  onExpand?(file: number): void;
 }
 
 /** A chunk's diff, one block per run of rows, under its file's path. */
-export function ChunkCode({ files, segments, ringed, lit, sel, onRow, after }: Props) {
+export function ChunkCode({
+  files,
+  segments,
+  ringed,
+  lit,
+  sel,
+  onRow,
+  after,
+  expanded,
+  onExpand,
+}: Props) {
   return (
     <>
       {segments.map((s) => {
@@ -43,6 +57,14 @@ export function ChunkCode({ files, segments, ringed, lit, sel, onRow, after }: P
               <span className="mono">{s.path}</span>
               {add > 0 && <span className="gd-add">+{add}</span>}
               {del > 0 && <span className="gd-del">−{del}</span>}
+              {onExpand && (
+                <IconButton
+                  className="gd-expand"
+                  icon={expanded?.has(s.file) ? "collapse" : "expand"}
+                  label={expanded?.has(s.file) ? "Step lines" : "Whole file"}
+                  onClick={() => onExpand(s.file)}
+                />
+              )}
             </div>
             {s.rows.map((row) => {
               const r = f.rows[row];

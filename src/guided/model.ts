@@ -309,3 +309,30 @@ export function stepParts(
   );
   return shown.length || near.length ? { segments: shown, related: near } : { segments, related };
 }
+
+/** `segments` with each file in `expanded` shown whole: every hunk of it, at the place of its
+ * first segment. */
+export function withWholeFiles(
+  files: FlatFile[],
+  segments: Segment[],
+  expanded: ReadonlySet<number>,
+): Segment[] {
+  const out: Segment[] = [];
+  const done = new Set<number>();
+  for (const seg of segments) {
+    if (!expanded.has(seg.file)) {
+      out.push(seg);
+      continue;
+    }
+    if (done.has(seg.file)) continue;
+    done.add(seg.file);
+    const f = files[seg.file];
+    const hunks = new Map<number, number[]>();
+    f.rows.forEach((_, row) => {
+      const h = f.rowHunk[row];
+      hunks.set(h, [...(hunks.get(h) ?? []), row]);
+    });
+    for (const rows of hunks.values()) out.push({ file: seg.file, path: seg.path, rows });
+  }
+  return out;
+}

@@ -26,6 +26,7 @@ import {
   RISK_NAMES,
   type Segment,
   stepParts,
+  withWholeFiles,
 } from "./model";
 import { setPick } from "./store";
 
@@ -124,6 +125,8 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   const { chunk } = s;
   const [steps, setSteps] = useState(false);
   const [step, setStep] = useState(0);
+  /** Files shown whole in Steps, by review file. */
+  const [whole, setWhole] = useState<ReadonlySet<number>>(new Set());
   const [since, setSince] = useState(s.changed);
   const [noting, setNoting] = useState<string>();
   const [prompts, setPrompts] = useState<PromptDto[]>();
@@ -148,6 +151,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   useEffect(() => {
     setSteps(false);
     setStep(0);
+    setWhole(new Set());
     setSince(s.changed);
     setNoting(undefined);
     setSel(undefined);
@@ -213,10 +217,18 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   }
 
   const lit = steps ? chunk.steps[step]?.ranges : undefined;
-  const { segments, related } = useMemo(
-    () => stepParts(review.files, s.segments, chunk.related, lit),
-    [review.files, s.segments, chunk.related, lit],
-  );
+  const { segments, related } = useMemo(() => {
+    const parts = stepParts(review.files, s.segments, chunk.related, lit);
+    return steps
+      ? { ...parts, segments: withWholeFiles(review.files, parts.segments, whole) }
+      : parts;
+  }, [review.files, s.segments, chunk.related, lit, whole, steps]);
+  const toggleWhole = (file: number) =>
+    setWhole((w) => {
+      const next = new Set(w);
+      if (!next.delete(file)) next.add(file);
+      return next;
+    });
   const code = (
     <>
       {since && s.verdict ? (
@@ -230,6 +242,8 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           sel={sel}
           onRow={onRow}
           after={after}
+          expanded={whole}
+          onExpand={steps ? toggleWhole : undefined}
         />
       )}
       {related.map((r) => (

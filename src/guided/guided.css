@@ -644,3 +644,7 @@ button.gd-tag:hover {
   color: var(--soft);
   font-size: var(--fs-sm);
 }
+
+.gd-fh .gd-expand {
+  margin-left: auto;
+}
