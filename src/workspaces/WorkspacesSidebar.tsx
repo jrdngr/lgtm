@@ -14,6 +14,7 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { arrange, forgetPin, usePins } from "./pins";
 import { usePinDrag } from "./usePinDrag";
+import { useTopSplit } from "./useTopSplit";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
 import "./workspaces.css";
@@ -44,6 +45,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   const [refreshed, setRefreshed] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const pins = usePins();
+  const split = useTopSplit();
   const { drop, start: startDrag } = usePinDrag(pins.pinned);
 
   function start(kind: AddKind) {
@@ -173,7 +175,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
 
   return (
     <div className="workspaces">
-      <div className="ws-top" onContextMenu={menu}>
+      <div ref={split.top} className="ws-top" style={split.style} onContextMenu={menu}>
         <SectionHeader title="Workspaces">
           <IconButton
             icon="sync"
@@ -224,6 +226,9 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
           </>
         )}
         <ul>{rest.map((w) => row(w, false))}</ul>
+      </div>
+      <div className="ws-split" {...split.splitter}>
+        <span />
       </div>
       <RevisionsSection workspace={selected} refreshed={refreshed} />
     </div>

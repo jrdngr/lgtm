@@ -10,7 +10,39 @@
   max-height: 45%;
   overflow: auto;
   padding-bottom: 6px;
-  border-bottom: 1px solid var(--hair);
+}
+
+/* Drag to resize the workspaces; double-click to fit them again. */
+.ws-split {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 7px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  cursor: row-resize;
+}
+
+.ws-split > span {
+  width: 28px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--faint);
+}
+
+.ws-split:hover > span {
+  background: var(--muted);
+}
+
+.revisions-section > .section-header {
+  background: var(--raise);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.revisions-section > .section-header .section-title {
+  color: var(--fg);
 }
 
 .revisions-section {
