@@ -16,6 +16,7 @@ import { Conversation } from "./Conversation";
 import { cardItems, moreItems, noteItems } from "./cardMenu";
 import { useLink } from "./linkedAgent";
 import { NEW_COMMENT } from "./model";
+import { NoteReply } from "./NoteReply";
 import { StageStrip } from "./StageStrip";
 import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
@@ -319,6 +320,9 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
         <div className="card-agent">
           <Conversation messages={comment.messages} />
         </div>
+      )}
+      {note && comment.messages.at(-1)?.author === "agent" && c.reviewId !== undefined && (
+        <NoteReply workspace={c.workspace} review={c.reviewId} comment={comment} />
       )}
     </div>
   );
