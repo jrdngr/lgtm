@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { MarkColor, PromptDto } from "../bindings";
+import type { ContextDocDto, MarkColor, PromptDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { remembered } from "../core/remembered";
 import { openFile } from "../editor/open";
@@ -29,6 +29,7 @@ import {
   stepParts,
   withWholeFiles,
 } from "./model";
+import { Superseded } from "./Superseded";
 import { setPick } from "./store";
 import { useGuidedLines } from "./useGuidedLines";
 
@@ -105,7 +106,7 @@ interface Props {
   c: Comments;
   folds: CommentFolds;
   send(text: string): void;
-  docs: { path: string; kind: keyof typeof DOC_NAMES; title: string }[];
+  docs: ContextDocDto[];
   setError(message: string): void;
 }
 
@@ -123,6 +124,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   const [noting, setNoting] = useState<string>();
   const [prompts, setPrompts] = useState<PromptDto[]>();
   const [promptsOpen, setPromptsOpen] = useState(false);
+  const current = docs.filter((d) => !d.superseded);
   const lit = steps ? chunk.steps[step]?.ranges : undefined;
   const { segments, related } = useMemo(() => {
     const parts = stepParts(review.files, s.segments, chunk.related, lit);
@@ -371,7 +373,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
             <ChunkSummary summary={chunk.summary} />
             {(docs.length > 0 || chunk.tests) && (
               <div className="gd-chips">
-                {docs.map((d) => (
+                {current.map((d) => (
                   <span key={d.path} className="gd-chip">
                     <b>{DOC_NAMES[d.kind]}</b>
                     <span>{d.title}</span>
@@ -384,6 +386,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
                     </button>
                   </span>
                 ))}
+                <Superseded workspace={workspace} docs={docs.filter((d) => d.superseded)} />
                 {chunk.tests && (
                   <span className="gd-chip">
                     <b>Tests</b>

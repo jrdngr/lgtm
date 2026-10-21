@@ -130,7 +130,13 @@ pub struct DocReply {
     /// Repository-relative path.
     pub path: String,
     pub kind: DocKindReply,
+    /// An ADR's number, like 12; empty when it has none.
+    #[serde(default)]
+    pub number: String,
     pub title: String,
+    /// It's an ADR a later one replaced.
+    #[serde(default)]
+    pub superseded: bool,
     /// A sentence or two on what it decides or records that bears on the change.
     pub summary: String,
 }
@@ -227,7 +233,9 @@ pub fn validate(
                 DocKindReply::Devlog => DocKind::Devlog,
                 DocKindReply::Other => DocKind::Other,
             },
+            number: d.number.trim().to_string(),
             title: d.title.trim().to_string(),
+            superseded: d.superseded,
             summary: d.summary.trim().to_string(),
         })
         .filter(|d| !d.path.is_empty())

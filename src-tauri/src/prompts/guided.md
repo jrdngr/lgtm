@@ -45,4 +45,5 @@ rate it and explain it.
 Look for architecture decision records and dev logs: `docs/adr/`, `docs/decisions/`, `adr/`,
 `doc/adr/`, `devlog/`, `docs/devlog/`, `DEVLOG.md`, and anything similar. For each one this
 change relates to, give a summary of a sentence or two in `context`, and list its path in the
-`docs` of each chunk it bears on. Leave out the ones it doesn't touch.
+`docs` of each chunk it bears on. Leave out the ones it doesn't touch. Give each ADR its
+`number`, and set `superseded` on one a later ADR replaced.

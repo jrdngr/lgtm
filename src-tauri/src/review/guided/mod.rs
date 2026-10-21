@@ -114,7 +114,12 @@ pub enum DocKind {
 pub struct ContextDocDto {
     pub path: String,
     pub kind: DocKind,
+    #[serde(default)]
+    pub number: String,
     pub title: String,
+    /// An ADR a later one replaced.
+    #[serde(default)]
+    pub superseded: bool,
     pub summary: String,
 }
 

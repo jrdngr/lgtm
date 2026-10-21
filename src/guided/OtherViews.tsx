@@ -11,6 +11,7 @@ import type { CommentFolds } from "../review/useSavedView";
 import { ChunkCode } from "./ChunkCode";
 import { commentsAfter, markOf, ringedRows } from "./ChunkView";
 import { type ExcludedState, REASON_NAMES, RISK_NAMES, RISKS, threadSegment } from "./model";
+import { Superseded } from "./Superseded";
 import { setGuided, setPick } from "./store";
 import { useGuidedLines } from "./useGuidedLines";
 
@@ -115,38 +116,42 @@ export function ContextView({ g, workspace: ws }: { g: GuidedDto; workspace: Wor
     <div className="gd-view" tabIndex={-1}>
       <div className="gd-head">
         <span className="gd-name">Context</span>
+        <span className="spacer" />
+        <Superseded workspace={ws} docs={g.context.filter((d) => d.superseded)} right />
       </div>
-      {g.context.map((d) => {
-        const chunks = g.chunks.filter((c) => c.docs.includes(d.path));
-        return (
-          <div key={d.path} className="gd-card">
-            <div className="gd-card-head">
-              <b>{d.kind === "adr" ? "ADR" : d.kind === "devlog" ? "Dev log" : "Doc"}</b>
-              <span>{d.title}</span>
-              <span className="mono gd-path">{d.path}</span>
-              <span className="spacer" />
-              <button type="button" className="gd-link" onClick={() => openFile(ws, d.path)}>
-                Open
-              </button>
-            </div>
-            <Markdown>{d.summary}</Markdown>
-            {chunks.length > 0 && (
-              <div className="gd-chips">
-                {chunks.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="gd-tag"
-                    onClick={() => setPick(ws, { kind: "chunk", id: c.id })}
-                  >
-                    {c.title}
-                  </button>
-                ))}
+      {g.context
+        .filter((d) => !d.superseded)
+        .map((d) => {
+          const chunks = g.chunks.filter((c) => c.docs.includes(d.path));
+          return (
+            <div key={d.path} className="gd-card">
+              <div className="gd-card-head">
+                <b>{d.kind === "adr" ? "ADR" : d.kind === "devlog" ? "Dev log" : "Doc"}</b>
+                <span>{d.title}</span>
+                <span className="mono gd-path">{d.path}</span>
+                <span className="spacer" />
+                <button type="button" className="gd-link" onClick={() => openFile(ws, d.path)}>
+                  Open
+                </button>
               </div>
-            )}
-          </div>
-        );
-      })}
+              <Markdown>{d.summary}</Markdown>
+              {chunks.length > 0 && (
+                <div className="gd-chips">
+                  {chunks.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="gd-tag"
+                      onClick={() => setPick(ws, { kind: "chunk", id: c.id })}
+                    >
+                      {c.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
     </div>
   );
 }

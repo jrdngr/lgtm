@@ -904,7 +904,10 @@ export type ContainerDto = {
 export type ContextDocDto = {
 	path: string,
 	kind: DocKind,
+	number?: string,
 	title: string,
+	/**  An ADR a later one replaced. */
+	superseded?: boolean,
 	summary: string,
 };
 

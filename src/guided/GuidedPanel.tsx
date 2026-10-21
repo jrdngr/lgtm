@@ -215,7 +215,7 @@ export function GuidedPanel() {
           <Row pick={{ kind: "context" }} picked={picked} onPick={pick}>
             <span className="gd-v" />
             <span className="gd-title">Context</span>
-            <span className="gd-n">{g.context.length}</span>
+            <span className="gd-n">{g.context.filter((d) => !d.superseded).length}</span>
           </Row>
         )}
         {RISKS.map(riskGroup)}
