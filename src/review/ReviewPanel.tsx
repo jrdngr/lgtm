@@ -73,7 +73,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const [mode, setMode] = useState<ViewMode>("unified");
   const [filter, setFilter] = useState<Filter>("all");
   const [menu, setMenu] = useState<{ x: number; y: number }>();
-  const [scrollTo, setScrollTo] = useState<{ line: number }>();
+  const [scrollTo, setScrollTo] = useState<{ line: number; center?: boolean }>();
   const keepFile = useRef<(file: number) => void>(undefined);
 
   const rootRef = useRef<HTMLDivElement>(null);

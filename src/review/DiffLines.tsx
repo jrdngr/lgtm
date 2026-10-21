@@ -73,7 +73,7 @@ interface Props extends LineHandlers {
   collapsedHunks: ReadonlySet<string>;
   scrollRef: RefObject<HTMLDivElement | null>;
   /** Scrolls this line to the top whenever a new object is passed. */
-  scrollTo?: { line: number };
+  scrollTo?: { line: number; center?: boolean };
   /** Set to a function that keeps a file's header in place through its next collapse. */
   keepFile: RefObject<((file: number) => void) | undefined>;
   onBackgroundMouseDown(): void;
@@ -153,7 +153,8 @@ export function DiffLines(props: Props) {
 
   // After the cursor effect, so a jump wins over its scroll.
   useEffect(() => {
-    if (scrollTo) virtualizer.scrollToIndex(scrollTo.line, { align: "start" });
+    if (scrollTo)
+      virtualizer.scrollToIndex(scrollTo.line, { align: scrollTo.center ? "center" : "start" });
   }, [scrollTo, virtualizer]);
 
   const sticky = stickyFile(lines, virtualizer);

@@ -11,7 +11,7 @@ interface Deps {
   mode: ViewMode;
   /** The scroller the diff's lines render in. */
   scrollRef: RefObject<HTMLElement | null>;
-  scrollTo(to: { line: number }): void;
+  scrollTo(to: { line: number; center: boolean }): void;
   /** Hands keys back to the review when the bar closes. */
   focus(): void;
 }
@@ -35,14 +35,17 @@ export function useReviewFind({ files, lines, mode, scrollRef, scrollTo, focus }
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new query starts at the top
   useEffect(() => setAt(0), [state]);
 
-  // Brings the current match's line into view when it isn't.
+  // Brings the current match's line to the middle when it's hidden, including under the
+  // sticky file header.
   useEffect(() => {
     const root = scrollRef.current;
     if (!open || !current || !root) return;
     const el = root.querySelector(`[data-index="${current.line}"]`);
     const view = root.getBoundingClientRect();
+    const top = root.querySelector(".sticky-file")?.getBoundingClientRect().bottom ?? view.top;
     const box = el?.getBoundingClientRect();
-    if (!box || box.top < view.top || box.bottom > view.bottom) scrollTo({ line: current.line });
+    if (!box || box.top < top || box.bottom > view.bottom)
+      scrollTo({ line: current.line, center: true });
   }, [open, current, scrollRef, scrollTo]);
 
   // Highlights the matches in the lines rendered now, and again as others render.
