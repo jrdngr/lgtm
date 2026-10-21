@@ -21,7 +21,8 @@ pub struct LogCommit {
     pub unique: u32,
     /// The whole description.
     pub description: String,
-    /// Local bookmarks, then remote ones as `name@remote` where they aren't where the local one is.
+    /// Local bookmarks, `*` first when out of sync with their remote, then remote ones as
+    /// `name@remote` where they aren't where the local one is.
     pub bookmarks: Vec<String>,
     /// The author's email up to the `@`, else their name.
     pub author: String,
@@ -38,7 +39,8 @@ pub struct LogCommit {
 /// graph beside it too.
 const ROW_TEMPLATE: &str = r#""\x1f" ++ commit_id ++ "\x1f" ++ change_id ++ "\x1f"
   ++ change_id.shortest().prefix().len() ++ "\x1f" ++ description.escape_json() ++ "\x1f"
-  ++ bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name())).join(" ")
+  ++ bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(),
+       if(b.synced(), "", "*") ++ b.name())).join(" ")
   ++ "\x1f"
   ++ coalesce(author.email().local(), author.name()) ++ "\x1f"
   ++ author.timestamp().format("%s") ++ "\x1f"

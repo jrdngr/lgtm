@@ -1,4 +1,5 @@
 import type { LogCommit } from "../bindings";
+import { showAuthor, showDate } from "./logView";
 import { when } from "./when";
 
 /** Characters of a change id shown, its unique prefix included. */
@@ -8,7 +9,9 @@ const ID_LENGTH = 8;
  * the PR pill. */
 export function CommitLines({ c, pill }: { c: LogCommit; pill?: React.ReactNode }) {
   const flags = [c.divergent && "divergent"].filter((f) => f !== false);
-  const meta = [c.author, when(c.time ?? 0)].filter(Boolean).join(" · ");
+  const author = showAuthor.use();
+  const date = showDate.use();
+  const meta = [author && c.author, date && when(c.time ?? 0)].filter(Boolean).join(" · ");
   return (
     <span className="lr-lines">
       <span className="lr-l1">
@@ -31,7 +34,7 @@ export function CommitLines({ c, pill }: { c: LogCommit; pill?: React.ReactNode 
             <span key={b}>{b}</span>
           ))}
         </span>
-        <span className="lr-meta">{meta}</span>
+        {meta && <span className="lr-meta">{meta}</span>}
         {pill}
       </span>
     </span>

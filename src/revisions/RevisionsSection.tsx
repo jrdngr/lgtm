@@ -4,11 +4,12 @@ import { usePr } from "../github/pr";
 import { commands } from "../ipc";
 import { useReviewTarget } from "../review/target";
 import { useWorkingCopy } from "../review/workingCopy";
-import { contextMenu } from "../ui/contextMenu";
+import { contextMenu, openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { revsetMenu } from "../workbench/revsetMenu";
 import { useLogRevset } from "./logRevset";
+import { showAuthor, showDate } from "./logView";
 import { RevisionsLog } from "./RevisionsLog";
 import { RevsetStrip } from "./RevsetStrip";
 
@@ -26,6 +27,8 @@ export function RevisionsSection({ workspace, refreshed }: Props) {
   const [trunk, setTrunk] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const custom = useLogRevset(workspace)?.revset != null;
+  const author = showAuthor.use();
+  const date = showDate.use();
 
   useEffect(() => {
     let live = true;
@@ -42,6 +45,16 @@ export function RevisionsSection({ workspace, refreshed }: Props) {
     >
       <SectionHeader title="Revisions">
         {target?.stale && <span className="pill amber">stale</span>}
+        <IconButton
+          icon="eye"
+          label="View"
+          onClick={(e) =>
+            openMenu(e, [
+              { label: "Author", checked: author, onSelect: () => showAuthor.set(!author) },
+              { label: "Date", checked: date, onSelect: () => showDate.set(!date) },
+            ])
+          }
+        />
         <IconButton
           icon="filter"
           label="Revset"
