@@ -681,3 +681,16 @@ button.gd-tag:hover {
   max-height: 30vh;
   overflow-y: auto;
 }
+
+.gd-ln.marked {
+  box-shadow: inset 3px 0 0 var(--m);
+}
+
+.gd-ln.marked .code {
+  background: color-mix(in srgb, var(--m) 15%, transparent);
+}
+
+.gd-ln.head {
+  outline: 1px solid var(--review-line);
+  outline-offset: -1px;
+}

@@ -120,14 +120,34 @@ export function GuidedTab({ api }: IDockviewPanelProps) {
   else if (pick?.kind === "excluded") {
     const e = [...view.excluded, ...view.tests].find((x) => x.index === pick.index);
     body = e ? (
-      <ExcludedView key={e.index} workspace={workspace} review={review} e={e} setError={setError} />
+      <ExcludedView
+        key={e.index}
+        workspace={workspace}
+        review={review}
+        setup={setup}
+        e={e}
+        c={c}
+        folds={folds}
+        send={sendText}
+        setError={setError}
+      />
     ) : (
       <Empty>Gone</Empty>
     );
   } else if (pick?.kind === "commented") {
     const t = review.comments.find((x) => x.id === pick.id);
     body = t ? (
-      <CommentedView key={t.id} review={review} comment={t} c={c} folds={folds} />
+      <CommentedView
+        key={t.id}
+        workspace={workspace}
+        review={review}
+        setup={setup}
+        comment={t}
+        c={c}
+        folds={folds}
+        send={sendText}
+        setError={setError}
+      />
     ) : (
       <Empty>Gone</Empty>
     );

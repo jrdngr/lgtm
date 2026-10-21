@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { PromptDto } from "../bindings";
+import type { MarkColor, PromptDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { remembered } from "../core/remembered";
 import { openFile } from "../editor/open";
@@ -9,14 +9,13 @@ import type { CurrentReview } from "../review/current";
 import { Diffstat } from "../review/Diffstat";
 import type { MarkSetup } from "../review/marks";
 import { markKey, NEW_COMMENT } from "../review/model";
-import { unified } from "../review/snippet";
 import type { Comments } from "../review/useComments";
 import type { CommentFolds } from "../review/useSavedView";
 import { PipeButton } from "../terminal/PipeButton";
 import { submitNextSend } from "../terminal/registry";
 import { ago } from "../ui/time";
 import { askText, changeText, giveVerdict } from "./actions";
-import { ChunkCode, type LineSel, RelatedCode } from "./ChunkCode";
+import { ChunkCode, RelatedCode } from "./ChunkCode";
 import { showChunk } from "./focus";
 import {
   type ChunkState,
@@ -30,6 +29,7 @@ import {
   withWholeFiles,
 } from "./model";
 import { setPick } from "./store";
+import { useGuidedLines } from "./useGuidedLines";
 
 /** The writeup and chips under a chunk's title are folded away, in every chunk. */
 const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
@@ -45,6 +45,14 @@ export function ringedRows(c: Comments, segments: Segment[], ids?: Set<number>) 
   }
   return out;
 }
+
+/** A changed row's mark color in the review, for tinting it as the Review tab does. */
+export const markOf =
+  (review: CurrentReview) =>
+  (file: number, row: number): MarkColor | undefined => {
+    const st = review.rowState(file, row);
+    return st === "checked" || st === "skipped" || st === "unmarked" ? undefined : st;
+  };
 
 /** Comment blocks under the last row each comment covers in `segments`: its threads, notes
  * and the draft being written. */
@@ -88,28 +96,6 @@ export function commentsAfter(
   };
 }
 
-/** Picking rows to comment on: a click picks one changed row, shift-click extends within the
- * file. */
-export function useLineSel(review: CurrentReview, segments: Segment[]) {
-  const [sel, setSel] = useState<LineSel & { anchor: number }>();
-  function onRow(file: number, row: number, extend: boolean) {
-    if (!extend || sel?.file !== file) return setSel({ file, rows: [row], anchor: row });
-    const [lo, hi] = [Math.min(sel.anchor, row), Math.max(sel.anchor, row)];
-    const shown = new Set(segments.filter((s) => s.file === file).flatMap((s) => s.rows));
-    const rows: number[] = [];
-    for (let r = lo; r <= hi; r++)
-      if (shown.has(r) && review.files[file].rows[r].kind !== "context") rows.push(r);
-    setSel({ ...sel, rows });
-  }
-  return { sel, setSel, onRow };
-}
-
-/** Opens a note, or with `github` a PR draft, on the picked rows. */
-export function startComment(review: CurrentReview, c: Comments, sel: LineSel, github: boolean) {
-  const rows = sel.rows.map((r) => review.files[sel.file].rows[r]);
-  c.start({ file: sel.file, rows: sel.rows, snippet: unified(rows), github });
-}
-
 interface Props {
   review: CurrentReview;
   setup: MarkSetup;
@@ -136,7 +122,20 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   const [noting, setNoting] = useState<string>();
   const [prompts, setPrompts] = useState<PromptDto[]>();
   const [promptsOpen, setPromptsOpen] = useState(false);
-  const { sel, setSel, onRow } = useLineSel(review, s.segments);
+  const lit = steps ? chunk.steps[step]?.ranges : undefined;
+  const { segments, related } = useMemo(() => {
+    const parts = stepParts(review.files, s.segments, chunk.related, lit);
+    return steps
+      ? { ...parts, segments: withWholeFiles(review.files, parts.segments, whole) }
+      : parts;
+  }, [review.files, s.segments, chunk.related, lit, whole, steps]);
+  const toggleWhole = (file: number) =>
+    setWhole((w) => {
+      const next = new Set(w);
+      if (!next.delete(file)) next.add(file);
+      return next;
+    });
+  const lines = useGuidedLines({ workspace, review, setup, segments, c, send, setError });
   const ringed = useMemo(() => ringedRows(c, s.segments), [c, s.segments]);
   const after = commentsAfter(c, folds, s.segments);
   const stepCode = useRef<HTMLDivElement>(null);
@@ -159,17 +158,17 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
     setWhole(new Set());
     setSince(s.changed);
     setNoting(undefined);
-    setSel(undefined);
+    lines.clear();
     setPromptsOpen(false);
     const paths = [...new Set(chunk.ranges.map((r) => r.path))];
-    const lines = s.segments.flatMap((g) =>
+    const added = s.segments.flatMap((g) =>
       g.rows.flatMap((r) => {
         const row = review.files[g.file].rows[r];
         return row.kind === "added" ? [row.text] : [];
       }),
     );
     let live = true;
-    unwrap(commands.chunkPrompts(paths, lines))
+    unwrap(commands.chunkPrompts(paths, added))
       .then((p) => live && setPrompts(p))
       .catch(() => live && setPrompts([]));
     return () => {
@@ -195,21 +194,17 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
     setNoting(undefined);
     giveVerdict(review, setup, [s], "change", note).then(advance, fail);
   }
-  const comment = (github: boolean) => {
-    if (!sel) return;
-    startComment(review, c, sel, github);
-    setSel(undefined);
-  };
-
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+    if (lines.onKey(e)) {
+      e.preventDefault();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
     const keys: Record<string, () => void> = {
       a: approve,
-      c: sel ? () => comment(false) : change,
-      C: () => sel && c.canDraft && comment(true),
+      c: change,
       "?": ask,
-      Escape: () => setSel(undefined),
     };
     if (steps) {
       keys.ArrowLeft = () => setStep((n) => Math.max(n - 1, 0));
@@ -221,19 +216,6 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
     act();
   }
 
-  const lit = steps ? chunk.steps[step]?.ranges : undefined;
-  const { segments, related } = useMemo(() => {
-    const parts = stepParts(review.files, s.segments, chunk.related, lit);
-    return steps
-      ? { ...parts, segments: withWholeFiles(review.files, parts.segments, whole) }
-      : parts;
-  }, [review.files, s.segments, chunk.related, lit, whole, steps]);
-  const toggleWhole = (file: number) =>
-    setWhole((w) => {
-      const next = new Set(w);
-      if (!next.delete(file)) next.add(file);
-      return next;
-    });
   const code = (
     <>
       {since && s.verdict ? (
@@ -244,8 +226,8 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           segments={segments}
           ringed={ringed}
           lit={lit}
-          sel={sel}
-          onRow={onRow}
+          lines={lines}
+          markOf={markOf(review)}
           after={after}
           expanded={whole}
           onExpand={steps ? toggleWhole : undefined}
@@ -421,16 +403,18 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
             </div>
           </>
         )}
-        {sel && (
+        {lines.picked.length > 0 && (
           <div className="gd-selbar">
             <span>
-              {sel.rows.length} {sel.rows.length === 1 ? "line" : "lines"}
+              {lines.picked.length} {lines.picked.length === 1 ? "line" : "lines"}
             </span>
-            <button type="button" className="gd-btn" onClick={() => comment(false)}>
-              Comment <kbd>c</kbd>
-            </button>
-            {c.canDraft && (
-              <button type="button" className="gd-btn" onClick={() => comment(true)}>
+            {lines.canComment && (
+              <button type="button" className="gd-btn" onClick={() => lines.comment(false)}>
+                Comment <kbd>c</kbd>
+              </button>
+            )}
+            {lines.canComment && c.canDraft && (
+              <button type="button" className="gd-btn" onClick={() => lines.comment(true)}>
                 Draft <kbd>⇧C</kbd>
               </button>
             )}

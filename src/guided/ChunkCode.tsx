@@ -1,19 +1,15 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
-import type { GuidedRange } from "../bindings";
+import type { GuidedRange, MarkColor } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { SIGN } from "../model/sign";
 import { Code } from "../review/Cell";
+import { markVar } from "../review/marks";
 import { type FlatFile, markKey } from "../review/model";
 import { IconButton } from "../ui/icons";
 import { inRanges, type Segment } from "./model";
-
-/** Rows picked for a comment: changed rows of one file. */
-export interface LineSel {
-  file: number;
-  rows: number[];
-}
+import type { GuidedLines } from "./useGuidedLines";
 
 interface Props {
   files: FlatFile[];
@@ -22,9 +18,10 @@ interface Props {
   ringed?: ReadonlySet<string>;
   /** A step's lines, lit while it's the one shown. */
   lit?: GuidedRange[];
-  sel?: LineSel;
-  /** Clicked a changed row; `extend` with shift held. */
-  onRow?(file: number, row: number, extend: boolean): void;
+  /** Picking and acting on lines; without it the code is read-only. */
+  lines?: GuidedLines;
+  /** A changed row's mark color, if it has one. */
+  markOf?(file: number, row: number): MarkColor | undefined;
   /** What shows under a row, like the comments that end there. */
   after?(file: number, row: number): ReactNode;
   /** Files shown whole; with `onExpand`, each header can switch its file. */
@@ -38,8 +35,8 @@ export function ChunkCode({
   segments,
   ringed,
   lit,
-  sel,
-  onRow,
+  lines,
+  markOf,
   after,
   expanded,
   onExpand,
@@ -68,21 +65,26 @@ export function ChunkCode({
             </div>
             {s.rows.map((row) => {
               const r = f.rows[row];
-              const changed = r.kind !== "context";
+              const mark = r.kind === "context" ? undefined : markOf?.(s.file, row);
               const cls = [
                 "gd-ln",
                 `kind-${r.kind}`,
+                mark && "marked",
                 ringed?.has(markKey(s.file, row)) && "ring",
                 lit && inRanges(lit, s.path, r.newLine) && "lit",
-                sel?.file === s.file && sel.rows.includes(row) && "sel",
-                changed && onRow && "pickable",
+                lines?.isPicked(s.file, row) && "sel",
+                lines?.isHead(s.file, row) && "head",
+                lines && "pickable",
               ].filter(Boolean);
               return (
                 <Fragment key={row}>
                   {/* biome-ignore lint/a11y/useKeyWithClickEvents: rows pick with the mouse; keys act on the chunk */}
                   <div
                     className={cls.join(" ")}
-                    onClick={changed && onRow ? (e) => onRow(s.file, row, e.shiftKey) : undefined}
+                    data-row={markKey(s.file, row)}
+                    style={mark ? ({ "--m": markVar(mark) } as React.CSSProperties) : undefined}
+                    onClick={lines && ((e) => lines.onRow(s.file, row, e.shiftKey))}
+                    onContextMenu={lines?.onRowMenu({ file: s.file, row })}
                   >
                     <span className="n">{r.newLine ?? r.oldLine ?? ""}</span>
                     <span className="s">{SIGN[r.kind]}</span>
