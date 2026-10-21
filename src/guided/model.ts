@@ -10,7 +10,7 @@ import type {
 } from "../bindings";
 import { SIGN } from "../model/sign";
 import type { LineStat } from "../review/lineStat";
-import type { FlatFile } from "../review/model";
+import { type FlatFile, markKey } from "../review/model";
 
 export const RISKS: ChunkRisk[] = ["high", "medium", "low"];
 
@@ -289,4 +289,23 @@ export function guidedView(files: FlatFile[], comments: CommentDto[], g: GuidedD
     tests: parts.filter((p) => p.part.reason === "tests"),
     excluded: parts.filter((p) => p.part.reason !== "tests"),
   };
+}
+
+/** The code a step shows: the runs of rows and related ranges its lines touch. A step
+ * without lines, or whose lines touch none, shows everything. */
+export function stepParts(
+  files: FlatFile[],
+  segments: Segment[],
+  related: GuidedRange[],
+  lit: GuidedRange[] | undefined,
+): { segments: Segment[]; related: GuidedRange[] } {
+  if (!lit?.length) return { segments, related };
+  const litRows = new Set(
+    segmentsOf(files, lit).flatMap((g) => g.rows.map((r) => markKey(g.file, r))),
+  );
+  const shown = segments.filter((g) => g.rows.some((r) => litRows.has(markKey(g.file, r))));
+  const near = related.filter((r) =>
+    lit.some((l) => l.path === r.path && l.start <= r.end && l.end >= r.start),
+  );
+  return shown.length || near.length ? { segments: shown, related: near } : { segments, related };
 }

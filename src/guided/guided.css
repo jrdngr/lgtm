@@ -451,6 +451,7 @@ button.gd-tag:hover {
 }
 
 .gd-code {
+  flex: none;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 6px;

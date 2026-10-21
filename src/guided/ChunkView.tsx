@@ -25,6 +25,7 @@ import {
   nextChunk,
   RISK_NAMES,
   type Segment,
+  stepParts,
 } from "./model";
 import { setPick } from "./store";
 
@@ -212,6 +213,10 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   }
 
   const lit = steps ? chunk.steps[step]?.ranges : undefined;
+  const { segments, related } = useMemo(
+    () => stepParts(review.files, s.segments, chunk.related, lit),
+    [review.files, s.segments, chunk.related, lit],
+  );
   const code = (
     <>
       {since && s.verdict ? (
@@ -219,7 +224,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
       ) : (
         <ChunkCode
           files={review.files}
-          segments={s.segments}
+          segments={segments}
           ringed={ringed}
           lit={lit}
           sel={sel}
@@ -227,7 +232,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           after={after}
         />
       )}
-      {chunk.related.map((r) => (
+      {related.map((r) => (
         <RelatedCode key={`${r.path}:${r.start}`} workspace={workspace} range={r} lit={lit} />
       ))}
     </>

@@ -10,6 +10,7 @@ import {
   nextChunk,
   progressOf,
   segmentsOf,
+  stepParts,
 } from "./model";
 
 // a.ts: new lines 1 ctx, 2-3 added, old 2 removed (sits at new 4), 4 ctx; then a second hunk
@@ -163,5 +164,31 @@ describe("lineDiff", () => {
       { kind: "added", text: "x" },
       { kind: "same", text: "c" },
     ]);
+  });
+});
+
+describe("stepParts", () => {
+  const segs = segmentsOf(files, [
+    { path: "a.ts", start: 2, end: 11 },
+    { path: "b.ts", start: 1, end: 1 },
+  ]);
+  const related = [
+    { path: "c.ts", start: 1, end: 5 },
+    { path: "d.ts", start: 1, end: 5 },
+  ];
+
+  it("keeps only the code a step's lines touch", () => {
+    const got = stepParts(files, segs, related, [
+      { path: "a.ts", start: 11, end: 11 },
+      { path: "d.ts", start: 3, end: 3 },
+    ]);
+    expect(got.segments.map((s) => [s.path, s.rows])).toEqual([["a.ts", [5, 6]]]);
+    expect(got.related.map((r) => r.path)).toEqual(["d.ts"]);
+  });
+
+  it("shows everything for a step whose lines touch nothing", () => {
+    const got = stepParts(files, segs, related, [{ path: "e.ts", start: 1, end: 1 }]);
+    expect(got.segments).toBe(segs);
+    expect(got.related).toBe(related);
   });
 });
