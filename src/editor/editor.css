@@ -227,15 +227,6 @@
   color: var(--fg);
 }
 
-.html-find input {
-  width: 220px;
-  font: inherit;
-}
-
-.html-find input.not-found {
-  outline: 1px solid var(--error);
-}
-
 .html-frame {
   flex: 1;
   min-height: 0;

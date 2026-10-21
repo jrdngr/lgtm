@@ -51,7 +51,13 @@
 
 .quick-note-actions kbd {
   font: var(--fs-xs) var(--mono);
-  opacity: 0.75;
+  color: inherit;
+  background: none;
+  border-color: rgb(255 255 255 / 30%);
+}
+
+.quick-note-actions button.primary kbd {
+  border-color: rgb(255 255 255 / 45%);
 }
 
 .notes-tree {

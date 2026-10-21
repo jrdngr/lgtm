@@ -104,16 +104,84 @@
     return width > 0 ? root.clientWidth / width : 1;
   }
 
+  // Find: every match highlighted, the current one more strongly, with the count sent back.
+  let found = { text: "", matchCase: false, ranges: [], at: 0 };
+
+  function matches(text, matchCase) {
+    const nodes = [];
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) =>
+        n.parentElement?.closest("script, style, noscript")
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    });
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+    const starts = [];
+    let pos = 0;
+    for (const n of nodes) {
+      starts.push(pos);
+      pos += n.data.length;
+    }
+    const all = nodes.map((n) => n.data).join("");
+    const hay = matchCase ? all : all.toLowerCase();
+    const needle = matchCase ? text : text.toLowerCase();
+    const at = (offset, end) => {
+      let i = nodes.length - 1;
+      while (i > 0 && (starts[i] > offset || (end && starts[i] === offset))) i--;
+      return [nodes[i], offset - starts[i]];
+    };
+    const ranges = [];
+    if (!needle) return ranges;
+    for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + needle.length)) {
+      const r = document.createRange();
+      r.setStart(...at(i, false));
+      r.setEnd(...at(i + needle.length, true));
+      ranges.push(r);
+    }
+    return ranges;
+  }
+
+  function paint() {
+    if (!("highlights" in CSS)) return;
+    if (!document.getElementById("lgtm-find-style")) {
+      const style = document.createElement("style");
+      style.id = "lgtm-find-style";
+      style.textContent =
+        "::highlight(lgtm-find){background-color:rgb(234 92 0 / 33%)}" +
+        "::highlight(lgtm-find-current){background-color:rgb(255 170 0 / 70%);color:#1e1e1e}";
+      document.head.append(style);
+    }
+    CSS.highlights.set("lgtm-find", new Highlight(...found.ranges));
+    const current = found.ranges[found.at];
+    if (current) CSS.highlights.set("lgtm-find-current", new Highlight(current));
+    else CSS.highlights.delete("lgtm-find-current");
+  }
+
+  function unpaint() {
+    if (!("highlights" in CSS)) return;
+    CSS.highlights.delete("lgtm-find");
+    CSS.highlights.delete("lgtm-find-current");
+  }
+
+  function find(m) {
+    const total = found.ranges.length;
+    if (m.fresh || m.text !== found.text || m.matchCase !== found.matchCase) {
+      found = { text: m.text, matchCase: !!m.matchCase, ranges: matches(m.text, !!m.matchCase), at: 0 };
+    } else if (total) {
+      found.at = (found.at + (m.back ? -1 : 1) + total) % total;
+    }
+    paint();
+    found.ranges[found.at]?.startContainer.parentElement?.scrollIntoView({ block: "center" });
+    post({ type: "found", at: found.at, total: found.ranges.length });
+  }
+
   addEventListener("message", (e) => {
     const m = e.data;
     if (e.source !== parent || !m || m.lgtm !== true) return;
     if (m.type === "zoom") document.documentElement.style.zoom = m.zoom === 1 ? "" : String(m.zoom);
     if (m.type === "fit") post({ type: "zoom", zoom: fitZoom() });
-    if (m.type === "find") {
-      if (m.fresh) getSelection()?.removeAllRanges();
-      const found = m.text ? window.find(m.text, false, m.back, true) : false;
-      post({ type: "found", found });
-    }
+    if (m.type === "find") find(m);
+    if (m.type === "findClose") unpaint();
     // Reloads keep the scroll position: the tab hands it back after the reload.
     if (m.type === "reload") {
       post({ type: "scroll", x: scrollX, y: scrollY });

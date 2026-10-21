@@ -47,6 +47,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧U"], action: "Guided Review" },
       { keys: ["⌘⇧X"], action: "New drawing" },
       { keys: ["⌘J"], action: "Revisions motions" },
+      { keys: ["⌘F"], action: "Find in the editor, rendered page or review" },
       { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
       { keys: ["⇧⌘N"], action: "New workspace" },
       { keys: ["⌥⌘N"], action: "Review a PR by URL or number, in its own workspace" },

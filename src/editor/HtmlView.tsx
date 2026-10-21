@@ -9,6 +9,7 @@ import {
 } from "react";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
+import { FindBar, type FindState } from "../find/FindBar";
 import { commands, errorText, unwrap } from "../ipc";
 import { openUrl } from "../services/pathMenu";
 import { IconButton } from "../ui/icons";
@@ -45,7 +46,7 @@ type FrameMessage =
   | { type: "nav"; url: string }
   | { type: "open"; url: string }
   | { type: "zoom"; zoom: number }
-  | { type: "found"; found: boolean }
+  | { type: "found"; at: number; total: number }
   | { type: "scroll"; x: number; y: number }
   | { type: "scrolled"; x: number; y: number };
 
@@ -58,12 +59,12 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   ref,
 ) {
   const frame = useRef<HTMLIFrameElement>(null);
-  const findInput = useRef<HTMLInputElement>(null);
   const [root, setRoot] = useState<string>();
   const [trail, setTrail] = useState<Trail>({ urls: [], at: 0 });
   const [zoom, setZoom] = useState(typeof saved.zoom === "number" ? saved.zoom : 1);
-  const [find, setFind] = useState<string>();
-  const [notFound, setNotFound] = useState(false);
+  const [find, setFind] = useState<FindState>();
+  const [found, setFound] = useState({ at: 0, total: 0 });
+  const [findFocus, setFindFocus] = useState(0);
   const [error, setError] = useState<string>();
   /** The user cancelled an open, so the page's asks are dropped until it loads again. */
   const refused = useRef(false);
@@ -169,7 +170,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
           setZoom(fitted(m.zoom));
           break;
         case "found":
-          setNotFound(!m.found);
+          setFound({ at: m.at, total: m.total });
           break;
         case "scroll":
           scroll.current = { x: m.x, y: m.y };
@@ -214,19 +215,19 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
   }
 
   function openFind() {
-    setFind((f) => f ?? "");
-    requestAnimationFrame(() => findInput.current?.select());
+    setFind((f) => f ?? { query: "", matchCase: false });
+    setFindFocus((k) => k + 1);
   }
 
   function closeFind() {
     setFind(undefined);
-    setNotFound(false);
+    setFound({ at: 0, total: 0 });
+    post({ type: "findClose" });
     frame.current?.focus();
   }
 
-  function search(text: string, back: boolean, fresh: boolean) {
-    if (text) post({ type: "find", text, back, fresh });
-    else setNotFound(false);
+  function search(next: FindState, back: boolean, fresh: boolean) {
+    post({ type: "find", text: next.query, matchCase: next.matchCase, back, fresh });
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -278,34 +279,18 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         {toggle}
       </div>
       {find !== undefined && (
-        <div className="editor-bar html-find">
-          <input
-            ref={findInput}
-            className={notFound ? "not-found" : undefined}
-            value={find}
-            placeholder="Find"
-            spellCheck={false}
-            onChange={(e) => {
-              setFind(e.target.value);
-              search(e.target.value, false, true);
+        <div className="find-anchor">
+          <FindBar
+            {...find}
+            {...found}
+            focusKey={findFocus}
+            onChange={(next) => {
+              setFind(next);
+              search(next, false, true);
             }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter") return;
-              e.preventDefault();
-              search(find, e.shiftKey, false);
-            }}
+            onStep={(back) => search(find, back, false)}
+            onClose={closeFind}
           />
-          <IconButton
-            icon="chevronLeft"
-            label="Previous (⇧↩)"
-            onClick={() => search(find, true, false)}
-          />
-          <IconButton
-            icon="chevronRight"
-            label="Next (↩)"
-            onClick={() => search(find, false, false)}
-          />
-          <IconButton icon="close" label="Close (Esc)" onClick={closeFind} />
         </div>
       )}
       {error && <div className="editor-bar error">{error}</div>}

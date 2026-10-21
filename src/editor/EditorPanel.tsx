@@ -4,6 +4,9 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { isMac } from "../core/keys";
 import { useWorkspace } from "../core/workspace";
+import { FindBar } from "../find/FindBar";
+import { useCmFind } from "../find/useCmFind";
+import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
 import { type Sender, sendItems } from "../terminal/sendItems";
@@ -59,6 +62,10 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const renderedRef = useRef<{ focus(): void }>(null);
   const saveRef = useRef(async () => false);
   const wrap = wordWrap.use();
+  const cmFind = useCmFind(view);
+  const domFind = useDomFind(renderedRef as React.RefObject<HTMLElement | null>);
+  const findRef = useRef(cmFind);
+  findRef.current = cmFind;
   const { sendRecent, sendToId } = useSendText(workspace, setError, () => view?.focus());
 
   useEffect(() => {
@@ -70,7 +77,9 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         const extensions = editorExtensions(path, text, wordWrap.get(), {
           save: () => saveRef.current(),
           link: (href) => followLink(href, workspace, path),
+          find: () => findRef.current.show(),
           changed: (u) => {
+            findRef.current.changed(u);
             if (u.selectionSet) saveTabParams(api, { cursor: u.state.selection.main.head });
             if (!u.docChanged) return;
             if (saved.current) setDirty(!u.state.doc.eq(saved.current));
@@ -235,7 +244,11 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
 
   function onKeyDown(e: React.KeyboardEvent) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
-    if (mod && e.shiftKey && e.key.toLowerCase() === "v" && renders(path)) {
+    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f" && !html) {
+      e.preventDefault();
+      if (rendered === undefined) cmFind.show();
+      else if (markdown) domFind.show();
+    } else if (mod && e.shiftKey && e.key.toLowerCase() === "v" && renders(path)) {
       e.preventDefault();
       toggleRendered();
     } else if (mod && e.shiftKey && (e.key === ">" || e.key === ".") && !html) {
@@ -312,6 +325,11 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           <button type="button" onClick={keepMine}>
             Keep mine
           </button>
+        </div>
+      )}
+      {!html && (rendered === undefined ? cmFind.open : markdown && domFind.open) && (
+        <div className="find-anchor">
+          <FindBar {...(rendered === undefined ? cmFind.bar : domFind.bar)} />
         </div>
       )}
       {html && (

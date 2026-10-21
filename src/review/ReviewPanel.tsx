@@ -1,11 +1,14 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeDto, View } from "../bindings";
+import { isMac } from "../core/keys";
 import { openArchitecture } from "../core/panels";
 import { remembered } from "../core/remembered";
 import { useWorkspace } from "../core/workspace";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
+import { FindBar } from "../find/FindBar";
+import { useReviewFind } from "../find/useReviewFind";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
@@ -328,6 +331,22 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),
   });
 
+  const find = useReviewFind({
+    files,
+    lines,
+    mode,
+    scrollRef,
+    scrollTo: setScrollTo,
+    focus: focusRoot,
+  });
+  function onReviewKey(e: React.KeyboardEvent) {
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      find.show();
+    } else onKeyDown(e);
+  }
+
   const handlers = useRowMouse({
     files,
     lines,
@@ -345,7 +364,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       ref={rootRef}
       className="review"
       tabIndex={-1}
-      onKeyDown={onKeyDown}
+      onKeyDown={onReviewKey}
       onMouseDown={(e) => {
         if (!keepsFocus(e.target)) focusRoot();
       }}
@@ -373,6 +392,11 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           {review.files.length === 0
             ? `No changes in ${review.revset}`
             : `No ${filterLabel(filter, setup)} rows`}
+        </div>
+      )}
+      {review && find.open && (
+        <div className="find-anchor">
+          <FindBar {...find.bar} />
         </div>
       )}
       {review && (

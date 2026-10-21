@@ -25,6 +25,7 @@ const theme = EditorView.theme(
     },
     ".cm-cursor": { borderLeftColor: "var(--fg)" },
     ".cm-panels": { background: "var(--panel)", color: "var(--fg)" },
+    ".cm-panels-top": { border: "none" },
   },
   { dark: true },
 );
@@ -39,7 +40,17 @@ interface Hooks {
   changed(u: ViewUpdate): void;
   /** Follows a link ⌘-clicked in a markdown file. */
   link(href: string): void;
+  /** Opens the find bar, which then stands in for CodeMirror's own search panel. */
+  find?(): void;
 }
+
+/** CodeMirror's search panel, empty: the find bar over the editor takes its place. */
+const noPanel = () => ({ dom: document.createElement("div") });
+
+const findBar = (open: () => void) => () => {
+  open();
+  return true;
+};
 
 /** Keeps the file's own line endings, so saving a CRLF file doesn't rewrite every line. */
 export function lineEnding(text: string): Extension {
@@ -64,9 +75,10 @@ export function editorExtensions(
     history(),
     bracketMatching(),
     highlightSelectionMatches(),
-    search({ top: true }),
+    search(hooks.find ? { top: true, createPanel: noPanel } : { top: true }),
     keymap.of([
       { key: "Mod-s", run: save, preventDefault: true },
+      ...(hooks.find ? [{ key: "Mod-f", run: findBar(hooks.find), preventDefault: true }] : []),
       indentWithTab,
       ...defaultKeymap,
       ...historyKeymap,
