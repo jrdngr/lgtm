@@ -95,7 +95,9 @@ pub enum CanvasOp {
 }
 
 fn check_id(id: &str) -> anyhow::Result<()> {
-    let chars = id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    let chars = id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     if id.is_empty() || !chars || is_part(id) {
         bail!("`{id}` isn't an id: use letters, digits, `-` and `_`");
     }
@@ -486,7 +488,12 @@ mod tests {
     }
 
     fn members(v: &ViewCanvas, id: &str) -> Vec<String> {
-        v.groups.iter().find(|g| g.id == id).unwrap().members.clone()
+        v.groups
+            .iter()
+            .find(|g| g.id == id)
+            .unwrap()
+            .members
+            .clone()
     }
 
     fn ops(json: serde_json::Value) -> Vec<CanvasOp> {
@@ -547,7 +554,8 @@ mod tests {
         let pass = c.agent.as_ref().unwrap();
         assert_eq!(pass.touched, ["a1", "c:api", "c:web>c:api", "g1", "n1"]);
 
-        let bad = ops(serde_json::json!([{"op": "note", "id": "has space", "text": "", "x": 0, "y": 0}]));
+        let bad =
+            ops(serde_json::json!([{"op": "note", "id": "has space", "text": "", "x": 0, "y": 0}]));
         assert!(c.apply("context", bad).is_err());
         let missing = ops(serde_json::json!([{"op": "color", "target": "nope", "color": null}]));
         assert!(c.apply("context", missing).is_err());
@@ -604,8 +612,11 @@ mod tests {
         let v = c.views.get_mut("main").unwrap();
         v.tags.insert("3".into(), "s:a".into());
         v.tags.insert("4".into(), "s:b".into());
-        c.apply("main", ops(serde_json::json!([{"op": "remove", "id": "s:a"}])))
-            .unwrap();
+        c.apply(
+            "main",
+            ops(serde_json::json!([{"op": "remove", "id": "s:a"}])),
+        )
+        .unwrap();
         let v = &c.views["main"];
         assert_eq!(members(v, "pair"), ["s:b"]);
         assert_eq!(v.tags.keys().collect::<Vec<_>>(), ["4"]);

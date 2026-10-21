@@ -179,6 +179,9 @@ mod tests {
         let mut moved = d.canvas.clone();
         moved.agent = None;
         d.user_save(moved);
-        assert!(d.undo_agent().is_err(), "the user's change ends the pass's undo");
+        assert!(
+            d.undo_agent().is_err(),
+            "the user's change ends the pass's undo"
+        );
     }
 }

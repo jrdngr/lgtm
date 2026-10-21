@@ -230,6 +230,7 @@ impl RepoCtx {
 
     /// Saves a new design an agent asked for, after checking its revision and that each entry
     /// names a file or folder there. Folders get a trailing `/`, as the design form writes them.
+    /// Without files it's an empty design to draw on.
     pub async fn create_design(
         &self,
         workspace: Option<&str>,
@@ -249,9 +250,6 @@ impl RepoCtx {
         }
         if !missing.is_empty() {
             bail!("not at `{}`: {}", input.revision, missing.join(", "));
-        }
-        if input.files.is_empty() {
-            bail!("a design needs files");
         }
         self.save_design(workspace, None, input).await
     }
@@ -425,7 +423,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn create_design_marks_folders_and_refuses_paths_not_at_the_bookmark() {
+    async fn create_design_marks_folders_allows_none_and_refuses_paths_not_at_the_bookmark() {
         let (dir, ctx) = repo();
         let d = dir.path();
         std::fs::create_dir_all(d.join("docs/notify")).unwrap();
@@ -451,6 +449,8 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(err.to_string(), "not at `spec`: docs/gone.md");
+        let empty = ctx.create_design(None, input(&[])).await.unwrap();
+        assert!(empty.files.is_empty() && empty.map.is_none());
         assert!(
             ctx.create_design(
                 None,

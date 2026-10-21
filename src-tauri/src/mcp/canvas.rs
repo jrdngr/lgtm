@@ -146,7 +146,10 @@ impl Lgtm {
                 }
                 .emit_to(self.app(), &label)
                 .ok();
-                Ok(format!("Applied {n} changes to `{view}` of design `{}`.", p.id))
+                Ok(format!(
+                    "Applied {n} changes to `{view}` of design `{}`.",
+                    p.id
+                ))
             }
         }
     }

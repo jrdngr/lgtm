@@ -144,6 +144,8 @@ pub struct NewDesign {
     #[serde(default, alias = "bookmark")]
     pub revision: Option<String>,
     /// Spec files and folders, relative to the repo root; a folder takes everything under it.
+    /// Leave out for an empty design to draw on with edit_canvas.
+    #[serde(default)]
     pub files: Vec<String>,
     /// What to map from them, like one concept or some phases. Empty for all of it.
     #[serde(default)]
@@ -188,7 +190,8 @@ impl Lgtm {
     #[tool(
         description = "Make a design in lgtm: a named set of spec files at a jj revision, mapped \
         as a C4 diagram in the Architecture tab. Returns the instructions for mapping it, which \
-        end with calling set_design."
+        end with calling set_design. Without files it makes an empty design to draw on with \
+        edit_canvas."
     )]
     async fn create_design(&self, Parameters(p): Parameters<NewDesign>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
@@ -208,6 +211,13 @@ impl Lgtm {
         }
         .emit_to(self.app(), &label)
         .ok();
+        if d.files.is_empty() {
+            return Ok(format!(
+                "Made empty design `{}` with id `{}`. Draw on it with edit_canvas (kind `design`, \
+                 view `containers`).",
+                d.name, d.id
+            ));
+        }
         ctx.design_prompt(self.workspace(), &d.id)
             .await
             .map_err(failed)
