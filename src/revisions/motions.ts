@@ -45,10 +45,8 @@ export function motions(trunk: string | null): Motion[][] {
     [
       { keys: "gf", label: "Fetch", action: () => ({ kind: "fetch" }) },
       { keys: "gp", label: "Push", action: () => ({ kind: "push" }) },
-    ],
-    [
       {
-        keys: "rm",
+        keys: "gr",
         label: `Rebase onto ${trunk ? `${trunk}@origin` : "trunk"}`,
         action: (t) => ({ kind: "rebaseOnTrunk", rev: t.cursor }),
       },

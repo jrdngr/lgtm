@@ -144,7 +144,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["s"], action: "Squash the selection into its parent" },
       { keys: ["u", "U"], action: "Undo / redo" },
       { keys: ["gf", "gp"], action: "Fetch / push" },
-      { keys: ["rm"], action: "Rebase the cursor's branch onto main@origin" },
+      { keys: ["gr"], action: "Rebase the cursor's branch onto main@origin" },
     ],
   },
   {

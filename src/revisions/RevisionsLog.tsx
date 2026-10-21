@@ -245,22 +245,27 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     else act(action, m.label, m.follow);
   }
 
-  /** Keys while the motions are open: each narrows them until one runs. */
-  function motionKey(e: React.KeyboardEvent, sofar: string) {
+  /** Keys while the motions are open: each narrows them until one runs. Keys no motion takes,
+   * like moving and reviewing, act on the log as usual. Returns whether it took the key. */
+  function motionKey(e: React.KeyboardEvent, sofar: string): boolean {
+    if (e.key === "Escape") setTyped(undefined);
+    else if (e.key === "Backspace") setTyped(sofar.slice(0, -1));
+    else {
+      const next = e.key.length === 1 ? step(groups, sofar, e.key) : undefined;
+      if (!next) return false;
+      if ("typed" in next) setTyped(next.typed);
+      else {
+        setTyped(undefined);
+        runMotion(next.run);
+      }
+    }
     e.preventDefault();
     e.stopPropagation();
-    if (e.key === "Escape") return setTyped(undefined);
-    if (e.key === "Backspace") return setTyped(sofar.slice(0, -1));
-    if (e.key.length !== 1) return;
-    const next = step(groups, sofar, e.key);
-    if (!next) return;
-    if ("typed" in next) return setTyped(next.typed);
-    setTyped(undefined);
-    runMotion(next.run);
+    return true;
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (typed !== undefined && !e.metaKey && !e.ctrlKey) return motionKey(e, typed);
+    if (typed !== undefined && !e.metaKey && !e.ctrlKey && motionKey(e, typed)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
     const d = MOVES[e.key];

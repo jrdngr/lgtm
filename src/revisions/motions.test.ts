@@ -9,6 +9,8 @@ describe("motions", () => {
     expect(step(groups, "", "g")).toEqual({ typed: "g" });
     expect(step(groups, "g", "p")).toMatchObject({ run: { keys: "gp" } });
     expect(step(groups, "g", "x")).toBeUndefined();
+    // The log's own keys stay free while the motions are open.
+    for (const k of ["j", "k", "J", "K", "r"]) expect(step(groups, "", k)).toBeUndefined();
   });
 
   it("tells undo from redo by case", () => {
@@ -27,8 +29,8 @@ describe("motions", () => {
     const t = { cursor: "kp", picked: "kp::ml" };
     const by = (k: string) => groups.flat().find((m) => m.keys === k);
     expect(by("nb")?.action(t)).toEqual({ kind: "newBefore", rev: "kp" });
-    expect(by("rm")?.action(t)).toEqual({ kind: "rebaseOnTrunk", rev: "kp" });
+    expect(by("gr")?.action(t)).toEqual({ kind: "rebaseOnTrunk", rev: "kp" });
     expect(by("s")?.action(t)).toEqual({ kind: "squash", revs: "kp::ml" });
-    expect(by("rm")?.label).toBe("Rebase onto main@origin");
+    expect(by("gr")?.label).toBe("Rebase onto main@origin");
   });
 });
