@@ -12,6 +12,7 @@ export type PanelKind =
   | "claude"
   | "report"
   | "architecture"
+  | "guided"
   | "qa"
   | "drawing"
   | "note";
@@ -22,13 +23,14 @@ const TITLES: Record<PanelKind, string> = {
   claude: "Claude",
   report: "Report",
   architecture: "Architecture",
+  guided: "Guided Review",
   qa: "Q&A",
   drawing: "Drawing",
   note: "Note",
 };
 
 /** What the new tab menu offers, in order. */
-export const KINDS: PanelKind[] = ["claude", "terminal", "review", "architecture", "qa"];
+export const KINDS: PanelKind[] = ["claude", "terminal", "review", "guided", "architecture", "qa"];
 
 export const isReviewPanel = (p: IDockviewPanel) => p.view.contentComponent === "review";
 
@@ -113,6 +115,13 @@ export function openArchitecture(api: DockviewApi) {
   addPanel(api, "architecture", {}, inActivePane(api), "architecture");
 }
 
+/** Shows the Guided Review tab, in its pane if it's already open. */
+export function openGuidedTab(api: DockviewApi) {
+  const open = api.getPanel("guided");
+  if (open) return activate(open);
+  addPanel(api, "guided", {}, inActivePane(api), "guided");
+}
+
 /** Shows the Q&A tab, or brings it forward. */
 export function openQa(api: DockviewApi) {
   const open = api.getPanel("qa");
@@ -121,10 +130,10 @@ export function openQa(api: DockviewApi) {
 }
 
 /** Tabs a dock has one of. */
-const SINGLE: PanelKind[] = ["architecture", "qa"];
+const SINGLE: PanelKind[] = ["architecture", "guided", "qa"];
 
-/** Opens a `kind` tab in `group`. Architecture and Q&A are one per dock, so an open one moves
- * here. */
+/** Opens a `kind` tab in `group`. Architecture, Guided Review and Q&A are one per dock, so an
+ * open one moves here. */
 export function addToGroup(api: DockviewApi, group: DockviewGroupPanel, kind: PanelKind) {
   const single = SINGLE.includes(kind) ? api.getPanel(kind) : undefined;
   if (single) {

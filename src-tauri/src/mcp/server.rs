@@ -83,6 +83,7 @@ impl Lgtm {
             hello,
             tool_router: Self::tool_router()
                 + Self::arch_router()
+                + Self::guided_router()
                 + Self::design_router()
                 + Self::canvas_router()
                 + Self::notes_router()

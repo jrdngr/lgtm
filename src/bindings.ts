@@ -109,6 +109,25 @@ export const commands = {
 	checkLook: (review: number, key: string, checked: boolean) => typedError<null, string>(__TAURI_INVOKE("check_look", { review, key, checked })),
 	/**  The prompt asking a terminal agent to assess the review's architecture change. */
 	assessPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("assess_prompt", { review })),
+	/**  The review's last guided review, if it has one. */
+	guided: (review: number) => typedError<{
+	chunks: ChunkDto[],
+	excluded: ExcludedDto[],
+	context: ContextDocDto[],
+	/**  By chunk id. */
+	verdicts: ([string, VerdictDto])[],
+	createdAt: number | null,
+	/**  It was made for other commits than the review shows now. */
+	stale: boolean,
+} | null, string>(__TAURI_INVOKE("guided", { review })),
+	/**  The prompt asking a terminal agent for the review's guided review, or to update it. */
+	guidedPrompt: (review: number) => typedError<string, string>(__TAURI_INVOKE("guided_prompt", { review })),
+	/**  Gives or takes back verdicts on chunks of the review's guided review. */
+	setGuidedVerdicts: (review: number, sets: VerdictSet[]) => typedError<GuidedDto, string>(__TAURI_INVOKE("set_guided_verdicts", { review, sets })),
+	/**  Makes excluded part `index` a chunk at `risk`. */
+	promoteExcluded: (review: number, index: number, risk: ChunkRisk) => typedError<GuidedDto, string>(__TAURI_INVOKE("promote_excluded", { review, index, risk })),
+	/**  The terminal agent prompts whose edits wrote `lines`, a chunk's added lines in `paths`. */
+	chunkPrompts: (paths: string[], lines: string[]) => typedError<PromptDto[], string>(__TAURI_INVOKE("chunk_prompts", { paths, lines })),
 	/**  The system map of a workspace's working copy. */
 	systemMap: (workspace: string | null) => typedError<SystemDto, string>(__TAURI_INVOKE("system_map", { workspace })),
 	/**  What the system map shows. */
@@ -380,6 +399,7 @@ export const events = {
 	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	designChanged: makeEvent<DesignChanged>("design-changed"),
 	drawingChanged: makeEvent<DrawingChanged>("drawing-changed"),
+	guidedChanged: makeEvent<GuidedChanged>("guided-changed"),
 	jjBlocked: makeEvent<JjBlocked>("jj-blocked"),
 	jjPaused: makeEvent<JjPaused>("jj-paused"),
 	notesChanged: makeEvent<NotesChanged>("notes-changed"),
@@ -736,6 +756,32 @@ export type Choice_Serialize = {
 	bullets?: string[],
 };
 
+export type ChunkDto = {
+	/**  Kept across updates of the guided review, so verdicts follow the chunk. */
+	id: string,
+	title: string,
+	risk: ChunkRisk,
+	tags: string[],
+	/**  Markdown. */
+	writeup: string,
+	/**  The changed lines it's made of, in the review's files. */
+	ranges: GuidedRange[],
+	/**  Unchanged lines read alongside it, in any file. */
+	related: GuidedRange[],
+	steps: StepDto[],
+	/**  Paths of the context docs it bears on. */
+	docs: string[],
+	tests: TestsDto | null,
+	/**  The person made it from excluded code and picked its risk. */
+	promoted: boolean,
+};
+
+export type ChunkRisk = "high" | "medium" | "low";
+
+export type ChunkVerdict = "approved" | 
+/**  Sent back to the agent with a note. */
+"change" | "skipped";
+
 /**  How the `claudeTerminal` setting resolved, for the Settings tab. */
 export type ClaudeCommand = {
 	setting: string,
@@ -825,6 +871,14 @@ export type ContainerDto = {
 	/**  The root's repo-relative path, "" for the repo root. */
 	id: string,
 	name: string,
+};
+
+/**  An ADR, dev log or other doc the change relates to. */
+export type ContextDocDto = {
+	path: string,
+	kind: DocKind,
+	title: string,
+	summary: string,
 };
 
 /**  One line of the new side, with its highlighting when the language is known. */
@@ -987,6 +1041,8 @@ export type DiscussionDto = {
 	viewer: string,
 };
 
+export type DocKind = "adr" | "devlog" | "other";
+
 /**  A terminal agent made or changed a drawing. */
 export type DrawingChanged = {
 	id: string,
@@ -1064,6 +1120,20 @@ export type Effect_Serialize = {
 	after: string,
 	before: QaQuestion_Serialize[],
 	added: string[],
+};
+
+export type ExcludeReason = "docs" | 
+/**  Simple and obviously right. */
+"simple" | "boilerplate" | "generated" | "tests" | "other" | 
+/**  Changed code the agent neither put in a chunk nor excluded. */
+"unlisted";
+
+export type ExcludedDto = {
+	path: string,
+	ranges: GuidedRange[],
+	reason: ExcludeReason,
+	/**  The agent's one line on why. */
+	why: string,
 };
 
 export type ExternalDto = {
@@ -1163,6 +1233,30 @@ export type GroupDto = {
 	description: string,
 	/**  Container ids. */
 	containers: string[],
+};
+
+/**  A terminal agent wrote review `review`'s guided review. */
+export type GuidedChanged = {
+	workspace: string | null,
+	review: number,
+};
+
+export type GuidedDto = {
+	chunks: ChunkDto[],
+	excluded: ExcludedDto[],
+	context: ContextDocDto[],
+	/**  By chunk id. */
+	verdicts: ([string, VerdictDto])[],
+	createdAt: number | null,
+	/**  It was made for other commits than the review shows now. */
+	stale: boolean,
+};
+
+/**  New-side lines `start` to `end` of `path`, 1-based and inclusive. */
+export type GuidedRange = {
+	path: string,
+	start: number,
+	end: number,
 };
 
 export type HeadDto = {
@@ -1553,7 +1647,17 @@ export type Prompt =
 /**  How takes and replies on GitHub threads are written. */
 "reply" | 
 /**  How Q&A questions are built, after the qqueue skill. */
-"qq";
+"qq" | 
+/**  How a guided review picks, groups and rates the code a person reads. */
+"guided";
+
+/**  A prompt whose edits wrote some of a chunk's lines. */
+export type PromptDto = {
+	prompt: string,
+	session: string,
+	/**  When its last matching edit was made. */
+	at: number | null,
+};
 
 /**  A prompt and its file, for the Settings tab. */
 export type PromptInfo = {
@@ -1973,6 +2077,11 @@ export type StateDto = {
 	threads: ThreadDto[],
 };
 
+export type StepDto = {
+	text: string,
+	ranges: GuidedRange[],
+};
+
 export type Swatch = "red" | "orange" | "yellow" | "green" | "cyan" | "blue" | "purple" | "pink";
 
 /**
@@ -2123,6 +2232,14 @@ export type TerminalAgent = {
 	ended: boolean,
 };
 
+/**  What the agent found running the tests that cover a chunk. */
+export type TestsDto = {
+	passed: number,
+	failed: number,
+	/**  Changed lines no test exercises. */
+	uncovered: GuidedRange[],
+};
+
 export type ThreadDto = {
 	/**  Its comment's id. */
 	id: number,
@@ -2214,6 +2331,23 @@ export type Unaffected = "hide" | "fade";
 export type Unshowable = "tooLarge" | "notText";
 
 export type Verdict = "comment" | "approve" | "requestChanges";
+
+export type VerdictDto = {
+	verdict: ChunkVerdict,
+	/**  The chunk's code when the verdict was given, to show what changed since. */
+	text: string,
+	/**  What the person asked for, on a Change. */
+	note: string,
+	at: number | null,
+};
+
+/**  A verdict to give a chunk, or `None` to take it back. */
+export type VerdictSet = {
+	chunk: string,
+	verdict: ChunkVerdict | null,
+	text: string,
+	note: string,
+};
 
 export type View = 
 /**  The whole review as one diff. */

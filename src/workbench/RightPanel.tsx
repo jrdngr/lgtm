@@ -6,6 +6,7 @@ import { BotsPanel } from "../bots/BotsPanel";
 import { useWorkspace, workspaceKey } from "../core/workspace";
 import { DrawingsPanel } from "../drawings/DrawingsPanel";
 import { RepoTree } from "../editor/RepoTree";
+import { GuidedPanel } from "../guided/GuidedPanel";
 import { needsYou } from "../model/stages";
 import { NotesPanel } from "../notes/NotesPanel";
 import { openQuestions } from "../qa/model";
@@ -48,6 +49,13 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           title: "Changes",
           icon: "gitTree",
           render: () => <FilesPanel />,
+        },
+        {
+          id: "guided",
+          group: "review",
+          title: "Guided",
+          icon: "guided",
+          render: () => <GuidedPanel />,
         },
         {
           id: "comments",

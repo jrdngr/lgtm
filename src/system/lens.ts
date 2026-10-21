@@ -97,3 +97,37 @@ export function addDelta(a: Delta | undefined, b: Delta | undefined): Delta | un
   if (!b) return a;
   return { add: a.add + b.add, del: a.del + b.del };
 }
+
+/** `lens` narrowed to `paths`: only components with one of those files show as changed, with
+ * only their deltas, wires and Look items. */
+export function focusLens(lens: Lens, paths: readonly string[]): Lens {
+  const keep = new Set(paths);
+  const files = new Map<string, ChangedFile[]>();
+  const delta = new Map<string, Delta>();
+  for (const [id, list] of lens.files) {
+    const mine = list.filter((f) => keep.has(f.path));
+    if (!mine.length) continue;
+    files.set(id, mine);
+    const d = mine.reduce((sum, f) => ({ add: sum.add + f.add, del: sum.del + f.del }), {
+      add: 0,
+      del: 0,
+    });
+    if (d.add || d.del) delta.set(id, d);
+  }
+  const status = new Map<string, CompStatus>();
+  for (const [id, s] of lens.status) status.set(id, files.has(id) ? s : "unchanged");
+  const look = new Map([...lens.look].filter(([id]) => files.has(id)));
+  const edgeLook = new Map(
+    [...lens.edgeLook].filter(([key]) => key.split(">").some((id) => files.has(id))),
+  );
+  return {
+    status,
+    removed: [],
+    edges: lens.edges.filter((e) => files.has(e.from) || files.has(e.to)),
+    delta,
+    files,
+    look,
+    edgeLook,
+    open: [...look.values()].reduce((n, l) => n + l.length, 0),
+  };
+}

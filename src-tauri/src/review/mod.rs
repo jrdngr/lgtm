@@ -4,6 +4,7 @@ mod agent;
 #[cfg(test)]
 mod agent_tests;
 pub(crate) mod arch;
+pub(crate) mod guided;
 mod at;
 mod build;
 mod cache;

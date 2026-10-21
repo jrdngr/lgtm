@@ -45,6 +45,16 @@ pub(super) struct HookReport {
     /// closing its terminal ends with reason `other`.
     #[serde(default)]
     pub ended: bool,
+    /// A file edit the agent just made, on `PostToolUse`.
+    #[serde(default)]
+    pub edit: Option<HookEdit>,
+}
+
+/// The file an edit tool wrote and the text it wrote there.
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub(super) struct HookEdit {
+    pub path: String,
+    pub text: String,
 }
 
 /// The state a hook event's input means, if any.
@@ -75,6 +85,30 @@ fn prompt(input: &serde_json::Value) -> Option<String> {
     (input["hook_event_name"] == "UserPromptSubmit")
         .then(|| input["prompt"].as_str().map(str::to_string))
         .flatten()
+}
+
+/// The edit a `PostToolUse` event of Claude Code's file tools made: the new text of an Edit
+/// or each of a MultiEdit's edits, or a Write's whole content.
+fn edit(input: &serde_json::Value) -> Option<HookEdit> {
+    if input["hook_event_name"] != "PostToolUse" {
+        return None;
+    }
+    let tool = &input["tool_input"];
+    let text = match input["tool_name"].as_str()? {
+        "Edit" => tool["new_string"].as_str()?.to_string(),
+        "Write" => tool["content"].as_str()?.to_string(),
+        "MultiEdit" => tool["edits"]
+            .as_array()?
+            .iter()
+            .filter_map(|e| e["new_string"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => return None,
+    };
+    Some(HookEdit {
+        path: tool["file_path"].as_str()?.to_string(),
+        text,
+    })
 }
 
 /// The agent's last message on a `Stop` event: the event's own copy, else the last text in
@@ -144,6 +178,7 @@ pub fn main() -> i32 {
         reply: reply(&input),
         session: input["session_id"].as_str().map(str::to_string),
         ended: ended(&input),
+        edit: edit(&input),
     };
     let asks = report.prompt.is_some();
     let Ok(mut stream) = UnixStream::connect(socket) else {
@@ -243,6 +278,41 @@ mod tests {
         let stop = input(r#"{"hook_event_name":"Stop","last_assistant_message":"Yes."}"#);
         assert_eq!(reply(&stop).as_deref(), Some("Yes."));
         assert_eq!(prompt(&stop), None);
+    }
+
+    #[test]
+    fn carries_what_the_file_tools_wrote() {
+        let input = |json: serde_json::Value| edit(&json);
+        let post = |tool: &str, tool_input: serde_json::Value| {
+            serde_json::json!({
+                "hook_event_name": "PostToolUse", "tool_name": tool, "tool_input": tool_input,
+            })
+        };
+        let at = |text: &str| {
+            Some(HookEdit {
+                path: "/r/a.rs".into(),
+                text: text.into(),
+            })
+        };
+        assert_eq!(
+            input(post("Edit", serde_json::json!({"file_path": "/r/a.rs", "new_string": "x"}))),
+            at("x")
+        );
+        assert_eq!(
+            input(post("Write", serde_json::json!({"file_path": "/r/a.rs", "content": "all"}))),
+            at("all")
+        );
+        let multi = serde_json::json!({
+            "file_path": "/r/a.rs",
+            "edits": [{"new_string": "one"}, {"new_string": "two"}],
+        });
+        assert_eq!(input(post("MultiEdit", multi)), at("one\ntwo"));
+        assert_eq!(input(post("Read", serde_json::json!({"file_path": "/r/a.rs"}))), None);
+        let pre = serde_json::json!({
+            "hook_event_name": "PreToolUse", "tool_name": "Edit",
+            "tool_input": {"file_path": "/r/a.rs", "new_string": "x"},
+        });
+        assert_eq!(input(pre), None);
     }
 
     #[test]

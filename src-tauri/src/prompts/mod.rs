@@ -17,15 +17,18 @@ pub enum Prompt {
     Reply,
     /// How Q&A questions are built, after the qqueue skill.
     Qq,
+    /// How a guided review picks, groups and rates the code a person reads.
+    Guided,
 }
 
 impl Prompt {
-    pub const ALL: [Prompt; 2] = [Prompt::Reply, Prompt::Qq];
+    pub const ALL: [Prompt; 3] = [Prompt::Reply, Prompt::Qq, Prompt::Guided];
 
     fn file(self) -> &'static str {
         match self {
             Prompt::Reply => "reply.md",
             Prompt::Qq => "qq.md",
+            Prompt::Guided => "guided.md",
         }
     }
 
@@ -33,6 +36,7 @@ impl Prompt {
         match self {
             Prompt::Reply => include_str!("reply.md"),
             Prompt::Qq => include_str!("qq.md"),
+            Prompt::Guided => include_str!("guided.md"),
         }
     }
 }
@@ -66,7 +70,11 @@ fn load_in(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<String> {
     let Some(path) = find(prompt, config) else {
         return Ok(prompt.default_text().to_string());
     };
-    let text = std::fs::read_to_string(&path)
+    read(&path)
+}
+
+fn read(path: &Path) -> anyhow::Result<String> {
+    let text = std::fs::read_to_string(path)
         .with_context(|| format!("can't read the prompt {}", path.display()))?;
     ensure!(
         !text.trim().is_empty(),
@@ -79,6 +87,19 @@ fn load_in(prompt: Prompt, config: Option<&Path>) -> anyhow::Result<String> {
 /// The prompt to give the agent.
 pub fn load(prompt: Prompt) -> anyhow::Result<String> {
     load_in(prompt, config_dir().as_deref())
+}
+
+fn load_for_in(prompt: Prompt, repo: &Path, config: Option<&Path>) -> anyhow::Result<String> {
+    let own = repo.join(".lgtm").join(prompt.file());
+    if is_plain_file(&own) {
+        return read(&own);
+    }
+    load_in(prompt, config)
+}
+
+/// The prompt to give the agent for the repo at `repo`: its `.lgtm/` file, else [`load`]'s.
+pub fn load_for(prompt: Prompt, repo: &Path) -> anyhow::Result<String> {
+    load_for_in(prompt, repo, config_dir().as_deref())
 }
 
 fn info_in(prompt: Prompt, config: Option<&Path>) -> PromptInfo {
@@ -168,6 +189,19 @@ mod tests {
         remove_in(P, config).unwrap();
         assert_eq!(load_in(P, config).unwrap(), P.default_text());
         assert!(!info_in(P, config).exists);
+    }
+
+    #[test]
+    fn a_repos_own_prompt_wins_over_the_config_file() {
+        let config = tempfile::tempdir().unwrap();
+        let config = Some(config.path());
+        let repo = tempfile::tempdir().unwrap();
+        let g = Prompt::Guided;
+        std::fs::write(edit_in(g, config).unwrap(), "mine").unwrap();
+        assert_eq!(load_for_in(g, repo.path(), config).unwrap(), "mine");
+        std::fs::create_dir(repo.path().join(".lgtm")).unwrap();
+        std::fs::write(repo.path().join(".lgtm/guided.md"), "the repo's").unwrap();
+        assert_eq!(load_for_in(g, repo.path(), config).unwrap(), "the repo's");
     }
 
     #[test]

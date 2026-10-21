@@ -7,6 +7,7 @@ mod arch;
 mod bridge;
 mod canvas;
 mod design;
+mod guided;
 pub mod hook;
 mod inputs;
 mod notes;
@@ -88,6 +89,10 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
         if let Some((label, ctx)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
             if report.state == AgentHookState::Idle {
                 ctx.new_agent_session(&report.terminal);
+            }
+            if let Some(session) = &report.session {
+                let edit = report.edit.as_ref().map(|e| (e.path.as_str(), e.text.as_str()));
+                ctx.record_hook(session, report.prompt.as_deref(), edit);
             }
             if report.prompt.is_some() {
                 let context = ctx.prompt_context(&report.terminal);

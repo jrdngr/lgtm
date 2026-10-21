@@ -170,6 +170,7 @@ const PATHS = {
       <path d="M12 10.5v5M9.5 13h5" />
     </>
   ),
+  guided: <path d="M5 5h14v4H5zM5 11h9v4H5zM5 17h5v3H5z" />,
   architecture: (
     <>
       <rect x="9" y="2.5" width="6" height="6" rx="1" />

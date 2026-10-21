@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { archOf, comp, edge } from "../arch/fixture.test-utils";
 import type { LookDto, RowDto } from "../bindings";
-import { lensOf } from "./lens";
+import { focusLens, lensOf } from "./lens";
 
 const row = (kind: RowDto["kind"]): RowDto => ({
   kind,
@@ -69,5 +69,36 @@ describe("lensOf", () => {
     expect(l.look.get("ui")?.map((x) => x.key)).toEqual(["a", "b"]);
     expect(l.edgeLook.get("ui>db")?.map((x) => x.key)).toEqual(["b"]);
     expect(l.open).toBe(2);
+  });
+});
+
+describe("focusLens", () => {
+  it("leaves out components, wires and Look items the chunk's files don't touch", () => {
+    const arch = archOf(
+      [
+        comp({
+          id: "ui",
+          status: "changed",
+          files: [
+            { path: "ui/a.ts", file: 0 },
+            { path: "ui/b.ts", file: 1 },
+          ],
+        }),
+        comp({ id: "db", status: "changed", files: [{ path: "db/q.ts", file: 2 }] }),
+        comp({ id: "old", status: "removed" }),
+      ],
+      [edge("ui", "api", { status: "added" }), edge("db", "api", { status: "added" })],
+      { look: [look({ key: "a", component: "ui" }), look({ key: "b", component: "db" })] },
+    );
+    const files = [{ rows: [row("added")] }, { rows: [row("removed")] }, { rows: [row("added")] }];
+    const l = focusLens(lensOf(arch, files), ["ui/b.ts"]);
+    expect(l.status.get("ui")).toBe("changed");
+    expect(l.status.get("db")).toBe("unchanged");
+    expect(l.removed).toEqual([]);
+    expect(l.delta.get("ui")).toEqual({ add: 0, del: 1 });
+    expect(l.files.get("ui")?.map((f) => f.path)).toEqual(["ui/b.ts"]);
+    expect(l.edges.map((e) => e.from)).toEqual(["ui"]);
+    expect(l.look.get("db")).toBeUndefined();
+    expect(l.open).toBe(1);
   });
 });

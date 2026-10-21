@@ -7,6 +7,7 @@ pub mod design;
 pub mod drawing;
 pub mod files;
 pub mod github;
+pub mod guided;
 pub mod html;
 pub mod notes;
 pub mod pty;

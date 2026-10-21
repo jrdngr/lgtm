@@ -9,6 +9,7 @@ import { editDesign, useDesigns, useSource } from "../design/designs";
 import { SourceSwitch } from "../design/SourceSwitch";
 import { openFile } from "../editor/open";
 import { usePr } from "../github/pr";
+import { clearChunk, useChunkFocus } from "../guided/focus";
 import { commands } from "../ipc";
 import { useCurrentReview } from "../review/current";
 import { useSendText } from "../review/useSendText";
@@ -23,7 +24,7 @@ import { GenerateButton, GeneratePop } from "./GenerateMenu";
 import { type GenKey, generatePrompt, genItems } from "./generate";
 import { groupsOf } from "./groups";
 import { layout } from "./layout";
-import { lensOf } from "./lens";
+import { focusLens, lensOf } from "./lens";
 import { edgeKey } from "./mapWires";
 import { nodeInfo } from "./names";
 import { NAV, navPush, navStep, type Place, sameLevel } from "./nav";
@@ -148,12 +149,16 @@ function Loaded({
   const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
   const review = useCurrentReview(workspace);
   const pr = usePr(workspace);
-  const lensOn = lensPick ?? (!!pr && review?.revset === pr.revset);
+  const focus = useChunkFocus(workspace);
+  const lensOn = !!focus || (lensPick ?? (!!pr && review?.revset === pr.revset));
   const lensReview = lensOn ? review : undefined;
   const { arch, error: reviewError, view } = useArch(review);
   const archError = lensOn ? reviewError : undefined;
   const files = lensReview?.files;
-  const lens = useMemo(() => (arch && files ? lensOf(arch, files) : undefined), [arch, files]);
+  const lens = useMemo(() => {
+    const whole = arch && files ? lensOf(arch, files) : undefined;
+    return whole && focus ? focusLens(whole, focus.paths) : whole;
+  }, [arch, files, focus]);
   const colors = useMemo(() => containerColors(map), [map]);
   const targets = useMemo(() => traceTargets(map, colors), [map, colors]);
 
@@ -613,7 +618,17 @@ function Loaded({
           setViewOpen(false);
           setToursOpen(!toursOpen);
         }}
-        lens={review ? { on: lensOn, onToggle: () => setLensPick(!lensOn) } : undefined}
+        lens={
+          review
+            ? {
+                on: lensOn,
+                onToggle: () => {
+                  clearChunk(workspace);
+                  setLensPick(!lensOn);
+                },
+              }
+            : undefined
+        }
         view={
           <ViewButton
             open={viewOpen}
@@ -642,9 +657,13 @@ function Loaded({
         <ReviewStrip
           arch={arch}
           range={
-            view.range && `${view.range.from?.slice(0, 8) ?? "root"}..${view.range.to.slice(0, 8)}`
+            focus?.title ??
+            (view.range &&
+              `${view.range.from?.slice(0, 8) ?? "root"}..${view.range.to.slice(0, 8)}`)
           }
-          onClearRange={() => setArchView(review.id, { range: undefined })}
+          onClearRange={() =>
+            focus ? clearChunk(workspace) : setArchView(review.id, { range: undefined })
+          }
           transitive={view.transitive}
           onTransitive={(transitive) => setArchView(review.id, { transitive })}
           look={lens.open}

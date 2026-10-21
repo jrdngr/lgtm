@@ -7,6 +7,7 @@ mod checks;
 mod comments;
 mod designs;
 mod drawings;
+mod guided;
 mod marks;
 mod notes;
 mod prs;
@@ -21,6 +22,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
+pub use guided::AgentEdit;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use marks::{Mark, MarkColor};
 pub use notes::NoteRow;
@@ -240,6 +242,7 @@ impl Store {
         arch::create_table(&db)?;
         designs::create_table(&db)?;
         drawings::create_table(&db)?;
+        guided::create_table(&db)?;
         notes::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
@@ -250,7 +253,7 @@ impl Store {
     }
 
     /// Deletes workspace `name`'s Reviewer runs, Q&A sessions, review sessions, assessments,
-    /// Look checks and notes, so a new workspace with its name starts empty.
+    /// Look checks, guided reviews and notes, so a new workspace with its name starts empty.
     pub fn forget_workspace(&mut self, name: &str) -> rusqlite::Result<()> {
         let tx = self.db.transaction()?;
         for table in [
@@ -258,6 +261,8 @@ impl Store {
             "qa_sessions",
             "sessions",
             "arch_reviews",
+            "guided_reviews",
+            "guided_verdicts",
             "notes",
             "note_folders",
         ] {

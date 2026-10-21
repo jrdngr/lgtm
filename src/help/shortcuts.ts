@@ -44,6 +44,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧M", "⌘⇧P"], action: "Comments" },
       { keys: ["⌘⇧O"], action: "Reports" },
       { keys: ["⌘⇧I"], action: "Q&A" },
+      { keys: ["⌘⇧U"], action: "Guided Review" },
       { keys: ["⌘⇧X"], action: "New drawing" },
       { keys: ["⌘J"], action: "Revisions motions" },
       { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
@@ -100,6 +101,20 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["]", "["], action: "Next / previous change" },
       { keys: ["}", "{"], action: "Next / previous file" },
       { keys: ["Esc"], action: "Back to the cursor row" },
+    ],
+  },
+  {
+    title: "Guided Review",
+    shortcuts: [
+      { keys: ["a"], action: "Approve the chunk and go to the next" },
+      {
+        keys: ["c"],
+        action: "Change: send the chunk and a note to the agent, then go to the next",
+      },
+      { keys: ["?"], action: "Ask the agent about the chunk" },
+      { keys: ["←", "→"], action: "Previous / next step" },
+      { keys: ["c", "⇧C"], action: "With lines picked: comment, or draft for the PR" },
+      { keys: ["p"], action: "Promote excluded code, then 1–3 for its risk" },
     ],
   },
   {

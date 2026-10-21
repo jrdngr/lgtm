@@ -19,6 +19,8 @@ import { DrawingTab } from "../drawings/DrawingTab";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
 import { PrPreview } from "../github/PrPreview";
+import { GuidedTab } from "../guided/GuidedTab";
+import { useAgentGuided } from "../guided/store";
 import { ShortcutsPanel } from "../help/ShortcutsPanel";
 import { commands, unwrap } from "../ipc";
 import { NoteTab } from "../notes/NoteTab";
@@ -52,6 +54,7 @@ const components = {
   qa: guarded(QaTab),
   drawing: guarded(DrawingTab),
   note: guarded(NoteTab),
+  guided: guarded(GuidedTab),
   // Restores layouts from earlier builds, whose Tasks, Files, Design, Threads, Graph and Agent
   // runs panels are then closed, and whose System tab becomes Architecture.
   system: () => null,
@@ -93,6 +96,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
   useAgentReports(workspace);
   useAgentArch(workspace);
   useAgentSystem(workspace);
+  useAgentGuided(workspace);
   // A deleted workspace's layout must not be saved again after its file is removed.
   useEffect(() => {
     gone.current = false;

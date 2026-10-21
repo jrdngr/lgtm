@@ -102,6 +102,13 @@ pub struct ArchChanged {
     pub review: u32,
 }
 
+/// A terminal agent wrote review `review`'s guided review.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct GuidedChanged {
+    pub workspace: Option<String>,
+    pub review: u32,
+}
+
 /// A terminal agent made a design or wrote its map.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct DesignChanged {

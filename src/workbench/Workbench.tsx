@@ -13,6 +13,7 @@ import { DesignFormHost } from "../design/DesignFormHost";
 import { requestNewDrawing } from "../drawings/store";
 import { confirmClose } from "../editor/unsaved";
 import { forgetPr } from "../github/pr";
+import { openGuided } from "../guided/store";
 import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
@@ -185,6 +186,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+T": () => reopenClosed(selected),
     "Mod+Shift+O": () => showView("right", "reviewers"),
     "Mod+Shift+I": () => showView("right", "qa"),
+    "Mod+Shift+U": () => {
+      showView("right", "guided");
+      openGuided(selected);
+    },
     "Mod+Shift+X": () => {
       showView("right", "drawings");
       requestNewDrawing();
