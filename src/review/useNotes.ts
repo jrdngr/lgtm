@@ -2,7 +2,7 @@ import { useState } from "react";
 import { remembered } from "../core/remembered";
 import type { WorkspaceName } from "../core/workspace";
 import type { CtxEntry } from "../ui/contextMenu";
-import { commentText } from "./comments";
+import { notesText } from "./comments";
 import type { CurrentReview } from "./current";
 import { linkedTerminal } from "./linkedAgent";
 import { isSent, markSent, useSentNotes } from "./sentNotes";
@@ -22,7 +22,7 @@ export function useNotes(review: CurrentReview | undefined, workspace: Workspace
     if (!review || !unsent.length) return;
     const batch = unsent;
     review.send(
-      batch.map((c) => commentText(review.files, c)).join("\n\n---\n\n"),
+      notesText(review.files, batch, review.revset),
       () => markSent(batch),
       (o) => setError("error" in o ? o.error : undefined),
       linkedTerminal(workspace) ?? undefined,

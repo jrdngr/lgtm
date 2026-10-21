@@ -7,7 +7,7 @@ const ID_LENGTH = 8;
 /** A commit's two lines: change id, description and flags; then bookmarks, author, age, and
  * the PR pill. */
 export function CommitLines({ c, pill }: { c: LogCommit; pill?: React.ReactNode }) {
-  const flags = [c.conflict && "conflict", c.divergent && "divergent"].filter((f) => f !== false);
+  const flags = [c.divergent && "divergent"].filter((f) => f !== false);
   const meta = [c.author, when(c.time ?? 0)].filter(Boolean).join(" · ");
   return (
     <span className="lr-lines">
