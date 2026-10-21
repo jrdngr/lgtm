@@ -16,6 +16,7 @@ import { submitNextSend } from "../terminal/registry";
 import { ago } from "../ui/time";
 import { askText, changeText, giveVerdict } from "./actions";
 import { ChunkCode, RelatedCode } from "./ChunkCode";
+import { ChunkSummary } from "./ChunkSummary";
 import { showChunk } from "./focus";
 import {
   type ChunkState,
@@ -31,7 +32,7 @@ import {
 import { setPick } from "./store";
 import { useGuidedLines } from "./useGuidedLines";
 
-/** The writeup and chips under a chunk's title are folded away, in every chunk. */
+/** The summary and chips under a chunk's title are folded away, in every chunk. */
 const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
 
 const DOC_NAMES = { adr: "ADR", devlog: "Dev log", other: "Doc" };
@@ -108,7 +109,7 @@ interface Props {
   setError(message: string): void;
 }
 
-/** One chunk: the agent's writeup, its docs and tests, and its code with its PR threads, with the
+/** One chunk: the agent's summary, its docs and tests, and its code with its PR threads, with the
  * verdicts that move on to the next chunk. */
 export function ChunkView({ review, setup, view, s, c, folds, send, docs, setError }: Props) {
   const workspace = c.workspace;
@@ -367,9 +368,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
 
         {!steps && !folded && (
           <>
-            <div className="gd-writeup">
-              <Markdown>{chunk.writeup}</Markdown>
-            </div>
+            <ChunkSummary summary={chunk.summary} />
             {(docs.length > 0 || chunk.tests) && (
               <div className="gd-chips">
                 {docs.map((d) => (

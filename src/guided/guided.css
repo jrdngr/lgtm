@@ -361,6 +361,90 @@ button.gd-tag:hover {
   margin-bottom: 0;
 }
 
+.gd-summary {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 900px);
+  gap: 10px 16px;
+  font-size: var(--fs);
+  line-height: 1.55;
+}
+
+.gd-sum-label {
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.gd-sum-body p,
+.gd-bullets {
+  margin: 0;
+}
+
+.gd-sum-body :where(p + p) {
+  margin-top: 6px;
+}
+
+.gd-bullets {
+  padding-left: 18px;
+}
+
+.gd-qa + .gd-qa {
+  margin-top: 8px;
+}
+
+.gd-q {
+  font-weight: 600;
+}
+
+.gd-change {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.gd-change + .gd-change,
+.gd-iface + .gd-iface {
+  margin-top: 6px;
+}
+
+.gd-before,
+.gd-after {
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.gd-before {
+  background: var(--del);
+}
+
+.gd-after {
+  background: var(--add);
+}
+
+.gd-iface-name {
+  font-family: var(--mono);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.gd-iface pre {
+  margin: 2px 0 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--raise);
+  font: var(--fs-sm) var(--mono);
+  white-space: pre-wrap;
+}
+
+.gd-iface .since-removed {
+  background: var(--del);
+}
+
+.gd-iface .since-added {
+  background: var(--add);
+}
+
 .gd-chips {
   display: flex;
   flex-wrap: wrap;
@@ -681,6 +765,11 @@ button.gd-tag:hover {
 
 .gd-fold:hover {
   color: var(--fg);
+}
+
+.gd-top .gd-summary {
+  max-height: 30vh;
+  overflow-y: auto;
 }
 
 .gd-top .gd-writeup {

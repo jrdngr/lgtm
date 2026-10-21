@@ -5,6 +5,7 @@
 mod prompt;
 pub mod provenance;
 pub mod reply;
+pub mod summary;
 #[cfg(test)]
 mod tests;
 
@@ -17,6 +18,7 @@ use crate::jj::Range;
 use crate::review::arch::assess::Commits;
 use crate::store::Store;
 use reply::GuidedReply;
+use summary::ChunkSummary;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -60,8 +62,8 @@ pub struct ChunkDto {
     pub title: String,
     pub risk: ChunkRisk,
     pub tags: Vec<String>,
-    /// Markdown.
-    pub writeup: String,
+    #[serde(default)]
+    pub summary: ChunkSummary,
     /// The changed lines it's made of, in the review's files.
     pub ranges: Vec<GuidedRange>,
     /// Unchanged lines read alongside it, in any file.

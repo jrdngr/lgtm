@@ -44,13 +44,13 @@ fn chunks_keep_only_review_files_and_get_unique_ids() {
         reply(serde_json::json!({
             "revset": "@", "from": "a", "to": "b",
             "chunks": [
-                { "id": "Lock wait", "title": "t", "risk": "high", "writeup": "w",
+                { "id": "Lock wait", "title": "t", "risk": "high",
                   "ranges": [{ "path": "a.rs", "start": 3, "end": 4 },
                              { "path": "gone.rs", "start": 1, "end": 2 }],
                   "docs": ["docs/adr/1.md", "nowhere.md"] },
-                { "id": "lock-wait", "title": "t", "risk": "low", "writeup": "w",
+                { "id": "lock-wait", "title": "t", "risk": "low",
                   "ranges": [{ "path": "a.rs", "start": 10, "end": 9 }] },
-                { "id": "x", "title": "t", "risk": "medium", "writeup": "w",
+                { "id": "x", "title": "t", "risk": "medium",
                   "ranges": [{ "path": "gone.rs", "start": 1, "end": 2 }] }
             ],
             "excluded": [],
@@ -72,7 +72,7 @@ fn changed_lines_nothing_names_are_listed_as_excluded() {
     let (_, excluded, _) = validate(
         reply(serde_json::json!({
             "revset": "@", "from": "a", "to": "b",
-            "chunks": [{ "id": "c", "title": "t", "risk": "low", "writeup": "w",
+            "chunks": [{ "id": "c", "title": "t", "risk": "low",
                          "ranges": [{ "path": "a.rs", "start": 3, "end": 3 }] }],
             "excluded": [{ "path": "b.rs", "reason": "simple", "why": "rename" }]
         })),
@@ -116,7 +116,7 @@ fn an_update_prompt_names_the_last_chunks_and_what_changed() {
             title: "Lock wait".into(),
             risk: ChunkRisk::High,
             tags: vec![],
-            writeup: String::new(),
+            summary: Default::default(),
             ranges: vec![GuidedRange {
                 path: "a.rs".into(),
                 start: 3,
@@ -143,4 +143,34 @@ fn an_update_prompt_names_the_last_chunks_and_what_changed() {
     assert!(text.contains("jj diff --from old --to new"));
     let fresh = prompt::text("@", "base", "new", None, "Rules.");
     assert!(!fresh.contains("Updating"));
+}
+
+#[test]
+fn a_summary_keeps_only_sections_with_something_in_them() {
+    let (chunks, _, _) = validate(
+        reply(serde_json::json!({
+            "revset": "@", "from": "a", "to": "b",
+            "chunks": [{ "id": "c", "title": "t", "risk": "low",
+                         "summary": {
+                             "purpose": "  Locks the store.  ",
+                             "context": [{ "question": "Who calls it?", "answer": " The MCP bridge. " },
+                                         { "question": "Blank?", "answer": " " }],
+                             "decisions": ["", "One lock per repo"],
+                             "behavior": [{ "before": " ", "after": "" }],
+                             "interface": [{ "name": "lock", "after": "fn lock(&self)\n" }]
+                         },
+                         "ranges": [{ "path": "a.rs", "start": 3, "end": 3 }] }],
+            "excluded": []
+        })),
+        &files(),
+    );
+    let s = &chunks[0].summary;
+    assert_eq!(s.purpose, "Locks the store.");
+    assert_eq!(s.context.len(), 1);
+    assert_eq!(s.context[0].answer, "The MCP bridge.");
+    assert_eq!(s.decisions, ["One lock per repo"]);
+    assert!(s.behavior.is_empty());
+    assert_eq!(s.interface[0].before, "");
+    assert_eq!(s.interface[0].after, "fn lock(&self)");
+    assert!(s.data.is_empty());
 }

@@ -37,7 +37,6 @@ const chunk = (
   title: id,
   risk,
   tags: [],
-  writeup: "",
   ranges: [{ path, start, end }],
   related: [],
   steps: [],

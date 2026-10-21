@@ -561,6 +561,13 @@ export type AtPlace = "inside" | "onTop" | "outside";
 
 export type Author = "user" | "agent";
 
+export type BehaviorChange = {
+	/**  Markdown; empty for new behavior. */
+	before?: string,
+	/**  Markdown; empty for removed behavior. */
+	after?: string,
+};
+
 /**  A report on a revset, frozen at the commits it resolved to when it was first published. */
 export type BotRun = {
 	id: number,
@@ -765,8 +772,7 @@ export type ChunkDto = {
 	title: string,
 	risk: ChunkRisk,
 	tags: string[],
-	/**  Markdown. */
-	writeup: string,
+	summary?: ChunkSummary,
 	/**  The changed lines it's made of, in the review's files. */
 	ranges: GuidedRange[],
 	/**  Unchanged lines read alongside it, in any file. */
@@ -780,6 +786,24 @@ export type ChunkDto = {
 };
 
 export type ChunkRisk = "high" | "medium" | "low";
+
+export type ChunkSummary = {
+	/**
+	 *  Markdown: why a new function, command, type or system exists. Empty for a change to
+	 *  existing code that needs no why.
+	 */
+	purpose?: string,
+	/**  The questions a reviewer would ask first, each with a short answer. */
+	context?: Qa[],
+	/**  The choices behind this implementation, a line of markdown each. */
+	decisions?: string[],
+	/**  What users or callers see differently. */
+	behavior?: BehaviorChange[],
+	/**  New, changed or removed signatures, commands, flags, MCP tools, schemas or config. */
+	interface?: InterfaceChange[],
+	/**  Effects on stored or persisted data: migrations, formats, state; a line of markdown each. */
+	data?: string[],
+};
 
 export type ChunkVerdict = "approved" | 
 /**  Sent back to the agent with a note. */
@@ -1313,6 +1337,15 @@ export type ImportDto = {
 	line: number,
 };
 
+export type InterfaceChange = {
+	/**  What it is, like a function name or `lgtm mcp --socket`. */
+	name?: string,
+	/**  The old signature or shape as code; empty when it's new. */
+	before?: string,
+	/**  The new one as code; empty when it's removed. */
+	after?: string,
+};
+
 export type InterfaceDto = {
 	name: string,
 	/**  Its shape as the spec gives it, like `send_push(user, msg) -> Delivery`. */
@@ -1717,6 +1750,12 @@ export type QText_Serialize = {
 	options: Choice_Serialize[],
 	/**  Why option 1 is recommended. */
 	why: string,
+};
+
+export type Qa = {
+	question?: string,
+	/**  Markdown, a sentence or two. */
+	answer?: string,
 };
 
 /**  A terminal agent changed a Q&A session's questions. */

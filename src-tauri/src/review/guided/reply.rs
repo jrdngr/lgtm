@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 
+use super::summary::ChunkSummary;
 use super::{
     ChunkDto, ChunkRisk, ContextDocDto, DocKind, ExcludeReason, ExcludedDto, GuidedRange, StepDto,
     TestsDto,
@@ -75,8 +76,9 @@ pub struct ChunkReply {
     /// A word or two each, like concurrency or public API.
     #[serde(default)]
     pub tags: Vec<String>,
-    /// Markdown: what the code does and where it could be wrong.
-    pub writeup: String,
+    /// Fill only the sections that apply.
+    #[serde(default)]
+    pub summary: ChunkSummary,
     /// The changed lines it's made of, from any of the review's files.
     pub ranges: Vec<RangeReply>,
     /// Unchanged lines in any file to read alongside it.
@@ -255,7 +257,7 @@ pub fn validate(
                     .filter(|t| !t.is_empty())
                     .take(5)
                     .collect(),
-                writeup: c.writeup.trim().to_string(),
+                summary: c.summary.cleaned(),
                 ranges,
                 related: c.related.into_iter().map(range).collect(),
                 steps: c
@@ -346,7 +348,7 @@ pub fn promoted(e: ExcludedDto, risk: ChunkRisk, chunks: &[ChunkDto]) -> ChunkDt
         title: e.path.clone(),
         risk,
         tags: Vec::new(),
-        writeup: e.why,
+        summary: ChunkSummary::default(),
         ranges: e.ranges,
         related: Vec::new(),
         steps: Vec::new(),

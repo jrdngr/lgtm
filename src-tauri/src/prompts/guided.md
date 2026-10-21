@@ -23,8 +23,16 @@ rate it and explain it.
 ## Each chunk
 
 - `title`: a few words naming what the code does, not what changed.
-- `writeup`: what the code does and why it's right or where it could be wrong, in a short
-  paragraph or two. Write for someone about to read the code, not a summary of the diff.
+- `summary`: what someone about to read the code needs first, not a summary of the diff. Fill
+  only the sections that apply and leave the rest empty; most chunks need two or three.
+  - `purpose`: for a new function, command, type or system, why it's being added.
+  - `context`: the questions a reviewer would ask first, each with a short, plain answer.
+  - `decisions`: the important choices that led to this implementation, a line each.
+  - `behavior`: what users or callers see differently, as before and after. Leave `before`
+    empty for new behavior and `after` empty for removed behavior.
+  - `interface`: new, changed or removed signatures, commands, flags, MCP tools, schemas or
+    config, as code. Leave `before` empty when it's new and `after` empty when it's removed.
+  - `data`: effects on stored or persisted data, like migrations, formats or saved state.
 - `steps`: two to six steps in reading order, each a sentence or two with the lines it's
   about. Give them for every High and Medium chunk, and for a Low one that spans files or runs
   past a screen. Point a step at the code that does what it says; point at a comment only
