@@ -45,6 +45,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧O"], action: "Reports" },
       { keys: ["⌘⇧I"], action: "Q&A" },
       { keys: ["⌘⇧X"], action: "New drawing" },
+      { keys: ["⌘J"], action: "Revisions motions" },
       { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
       { keys: ["⇧⌘N"], action: "New workspace" },
       { keys: ["⌥⌘N"], action: "Review a PR by URL or number, in its own workspace" },
@@ -116,9 +117,19 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: ["j", "k"], action: "Move" },
       { keys: ["J", "K"], action: "Extend a range" },
-      { keys: ["↵", "e"], action: "Edit the commit" },
+      { keys: ["↵"], action: "Edit the commit" },
       { keys: ["r"], action: "Review the selection" },
       { keys: ["Esc"], action: "Back to the review" },
+    ],
+  },
+  {
+    title: "Motions (⌘J)",
+    shortcuts: [
+      { keys: ["na", "nb"], action: "New commit after / before the cursor" },
+      { keys: ["s"], action: "Squash the selection into its parent" },
+      { keys: ["u", "U"], action: "Undo / redo" },
+      { keys: ["gf", "gp"], action: "Fetch / push" },
+      { keys: ["rm"], action: "Rebase the cursor's branch onto main@origin" },
     ],
   },
   {

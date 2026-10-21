@@ -1,4 +1,4 @@
-//! Commands from the revisions panel that change the repo.
+//! Commands from the revisions log that change the repo.
 
 use serde::Deserialize;
 use specta::Type;
@@ -19,14 +19,46 @@ pub enum JjAction {
     Redo {
         steps: u32,
     },
+    /// A new, empty commit as `rev`'s child, before its children, and `@` on it.
+    NewAfter {
+        rev: String,
+    },
+    /// A new, empty commit as `rev`'s parent, after its parents, and `@` on it.
+    NewBefore {
+        rev: String,
+    },
+    /// Squashes the commits of `revs` into the parent of the oldest, keeping its description.
+    Squash {
+        revs: String,
+    },
+    /// Rebases `rev` and its branch onto `trunk()`.
+    RebaseOnTrunk {
+        rev: String,
+    },
+    Fetch,
+    Push,
 }
 
 impl JjAction {
-    fn args(&self) -> Vec<&str> {
+    fn args(&self) -> Vec<String> {
+        let v = |a: &[&str]| a.iter().map(|s| s.to_string()).collect();
         match self {
-            JjAction::Edit { rev } => vec!["edit", rev],
-            JjAction::Undo { .. } => vec!["undo"],
-            JjAction::Redo { .. } => vec!["redo"],
+            JjAction::Edit { rev } => v(&["edit", rev]),
+            JjAction::Undo { .. } => v(&["undo"]),
+            JjAction::Redo { .. } => v(&["redo"]),
+            JjAction::NewAfter { rev } => v(&["new", "--insert-after", rev]),
+            JjAction::NewBefore { rev } => v(&["new", "--insert-before", rev]),
+            JjAction::Squash { revs } => v(&[
+                "squash",
+                "--from",
+                revs,
+                "--into",
+                &format!("roots({revs})-"),
+                "--use-destination-message",
+            ]),
+            JjAction::RebaseOnTrunk { rev } => v(&["rebase", "-b", rev, "-d", "trunk()"]),
+            JjAction::Fetch => v(&["git", "fetch"]),
+            JjAction::Push => v(&["git", "push"]),
         }
     }
 }
@@ -36,12 +68,14 @@ impl Jj {
     pub async fn act(&self, action: &JjAction) -> anyhow::Result<u32> {
         let steps = match action {
             JjAction::Undo { steps } | JjAction::Redo { steps } => *steps,
-            JjAction::Edit { .. } => 1,
+            _ => 1,
         };
+        let args = action.args();
+        let args: Vec<&str> = args.iter().map(String::as_str).collect();
         let mut seen = self.writer.lock().await;
         let done = async {
             for _ in 0..steps {
-                self.exec(&action.args(), false).await?;
+                self.exec(&args, false).await?;
             }
             Ok(steps)
         }
@@ -77,6 +111,49 @@ mod tests {
         assert_eq!(change_id(j, "@").await, top);
         j.act(&JjAction::Redo { steps: 1 }).await.unwrap();
         assert_eq!(change_id(j, "@").await, base);
+    }
+
+    #[tokio::test]
+    async fn new_after_and_before_insert_around_a_commit_and_move_the_working_copy() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        let j = &j;
+        jj(d, &["describe", "-m", "a"]);
+        jj(d, &["new", "-m", "b"]);
+        let a = change_id(j, "@-").await;
+        let b = change_id(j, "@").await;
+
+        j.act(&JjAction::NewAfter { rev: a.clone() }).await.unwrap();
+        let after = change_id(j, "@").await;
+        assert_eq!(change_id(j, "@-").await, a);
+        assert_eq!(change_id(j, &format!("{b}-")).await, after);
+
+        j.act(&JjAction::NewBefore { rev: a.clone() }).await.unwrap();
+        assert_eq!(change_id(j, &format!("{a}-")).await, change_id(j, "@").await);
+    }
+
+    #[tokio::test]
+    async fn squash_moves_a_range_into_the_parent_of_its_oldest_and_keeps_that_description() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        let j = &j;
+        write(d, "a.txt", "a\n");
+        jj(d, &["commit", "-m", "target"]);
+        write(d, "b.txt", "b\n");
+        jj(d, &["commit", "-m", "one"]);
+        write(d, "c.txt", "c\n");
+        jj(d, &["commit", "-m", "two"]);
+        let target = change_id(j, "@---").await;
+        let one = change_id(j, "@--").await;
+        let two = change_id(j, "@-").await;
+
+        let revs = format!("{one}::{two}");
+        j.act(&JjAction::Squash { revs }).await.unwrap();
+        let parent = &j.changes("@-").await.unwrap()[0];
+        assert_eq!(parent.change_id, target);
+        assert_eq!(parent.description.trim(), "target");
+        let files = j.read(&["file", "list", "-r", "@-"]).await.unwrap();
+        assert!(files.contains("b.txt") && files.contains("c.txt"), "{files}");
     }
 
     #[tokio::test]

@@ -1228,7 +1228,15 @@ export type InterfaceDto = {
 /**  A change to the repo, on a revision given by change id. */
 export type JjAction = { kind: "edit"; rev: string } | 
 /**  Undo or redo the last `steps` operations, as many as the action being undone ran. */
-{ kind: "undo"; steps: number } | { kind: "redo"; steps: number };
+{ kind: "undo"; steps: number } | { kind: "redo"; steps: number } | 
+/**  A new, empty commit as `rev`'s child, before its children, and `@` on it. */
+{ kind: "newAfter"; rev: string } | 
+/**  A new, empty commit as `rev`'s parent, after its parents, and `@` on it. */
+{ kind: "newBefore"; rev: string } | 
+/**  Squashes the commits of `revs` into the parent of the oldest, keeping its description. */
+{ kind: "squash"; revs: string } | 
+/**  Rebases `rev` and its branch onto `trunk()`. */
+{ kind: "rebaseOnTrunk"; rev: string } | { kind: "fetch" } | { kind: "push" };
 
 /**
  *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes

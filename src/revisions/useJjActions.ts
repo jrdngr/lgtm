@@ -15,27 +15,35 @@ export function useJjActions(
   onError: (message: string | undefined) => void,
 ) {
   const [steps, setSteps] = useState(1);
-  const [busy, setBusy] = useState(false);
+  /** The action running, if one is. */
+  const [running, setRunning] = useState<JjAction>();
+  /** What the last fetch or push did, which nothing else in the log shows. */
+  const [note, setNote] = useState<string>();
 
-  async function act(action: JjAction, _label: string, follow?: boolean) {
-    if (busy) return;
-    setBusy(true);
+  async function act(action: JjAction, _label?: string, follow?: boolean) {
+    if (running) return;
+    setRunning(action);
+    setNote(undefined);
     try {
       onError(undefined);
       const r = await commands.jjAct(workspace, action);
       if (r.status === "error") return onError(r.error);
       if (action.kind !== "undo" && action.kind !== "redo") setSteps(r.data);
+      if (action.kind === "fetch") setNote("Fetched");
+      if (action.kind === "push") setNote("Pushed");
       await reload();
       await reviewAfter(workspace, (r) => loadReview(workspace, r), revset, follow);
     } finally {
-      setBusy(false);
+      setRunning(undefined);
     }
   }
 
   return {
     act,
-    busy,
-    undo: () => act({ kind: "undo", steps }, "Undid the last action"),
-    redo: () => act({ kind: "redo", steps }, "Redid the action"),
+    busy: !!running,
+    running,
+    note,
+    undo: () => act({ kind: "undo", steps }),
+    redo: () => act({ kind: "redo", steps }),
   };
 }

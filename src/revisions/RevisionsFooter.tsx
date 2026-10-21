@@ -1,19 +1,31 @@
+import type { JjAction } from "../bindings";
 import { Busy } from "../ui/Busy";
 
 /** Key groups, each as key caps and what they do. */
 const HINTS: [string[], string][] = [
   [["r"], "review"],
-  [["e"], "edit"],
+  [["↵"], "edit"],
+  [["⌘J"], "motions"],
 ];
 
+const RUNNING: Partial<Record<JjAction["kind"], string>> = {
+  fetch: "Fetching…",
+  push: "Pushing…",
+  rebaseOnTrunk: "Rebasing…",
+  squash: "Squashing…",
+};
+
 interface Props {
-  busy: boolean;
+  /** The jj action running, if one is. */
+  running?: JjAction;
+  /** What the last fetch or push did. */
+  note?: string;
   /** A review is loading. */
   loading: boolean;
 }
 
-/** The revisions log's keys, and what it's doing. */
-export function RevisionsFooter({ busy, loading }: Props) {
+/** The revisions log's keys, and what it's doing or last did. */
+export function RevisionsFooter({ running, note, loading }: Props) {
   return (
     <div className="picker-footer">
       {HINTS.map(([keys, label]) => (
@@ -25,7 +37,13 @@ export function RevisionsFooter({ busy, loading }: Props) {
         </span>
       ))}
       <span className="spacer" />
-      {busy ? <Busy>Working…</Busy> : loading && <Busy>Loading review…</Busy>}
+      {running ? (
+        <Busy>{RUNNING[running.kind] ?? "Working…"}</Busy>
+      ) : loading ? (
+        <Busy>Loading review…</Busy>
+      ) : (
+        note && <span className="picker-note">{note}</span>
+      )}
     </div>
   );
 }

@@ -12,7 +12,9 @@ import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { CommitLines } from "./CommitLines";
 import { graphOf } from "./graphCells";
 import { LogGraph } from "./LogGraph";
-import { loadReview, onFocusLog } from "./loadReview";
+import { loadReview, onFocusLog, onOpenMotions } from "./loadReview";
+import { MotionPopup } from "./MotionPopup";
+import { type Motion, motions, narrow, step } from "./motions";
 import { PrPill } from "./PrPill";
 import { RevisionsFooter } from "./RevisionsFooter";
 import { useJjActions } from "./useJjActions";
@@ -28,12 +30,14 @@ interface Props {
   workspace: WorkspaceName;
   /** Changes when the user asks for a refresh, which asks GitHub for PRs again. */
   refreshed: number;
+  /** Trunk's bookmark, for the rebase motion's label. */
+  trunk: string | null;
 }
 
 /** `jj log` to pick what to review and which commit to edit. Reviewed commits are tinted with
  * a bracket, `@` green over them, and each open PR's head has its pill. Keys act on the
  * highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
-export function RevisionsLog({ workspace, refreshed }: Props) {
+export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const target = useReviewTarget(workspace);
   const revset = target?.revset ?? workspaceRevset(workspace) ?? "@";
   const reviewed = useMemo(
@@ -89,6 +93,17 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     () =>
       onFocusLog(() => {
         rootRef.current?.focus();
+      }),
+    [],
+  );
+  /** The keys typed so far while the motions are open. */
+  const [typed, setTyped] = useState<string>();
+  const groups = useMemo(() => motions(trunk), [trunk]);
+  useEffect(
+    () =>
+      onOpenMotions(() => {
+        rootRef.current?.focus();
+        setTyped("");
       }),
     [],
   );
@@ -164,7 +179,7 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     return ids;
   }
 
-  const { act, busy, undo, redo } = useJjActions(
+  const { act, busy, running, note, undo, redo } = useJjActions(
     workspace,
     revset,
     () => reload(changeAt(cursor)),
@@ -219,7 +234,33 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
     );
   }
 
+  function runMotion(m: Motion) {
+    const cursorChange = changeAt(cursor);
+    const range = picked();
+    if (!cursorChange || !range) return;
+    if (m.keys === "s" && unrelated) return setError(UNRELATED);
+    const action = m.action({ cursor: cursorChange, picked: range });
+    if (action.kind === "undo") undo();
+    else if (action.kind === "redo") redo();
+    else act(action, m.label, m.follow);
+  }
+
+  /** Keys while the motions are open: each narrows them until one runs. */
+  function motionKey(e: React.KeyboardEvent, sofar: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Escape") return setTyped(undefined);
+    if (e.key === "Backspace") return setTyped(sofar.slice(0, -1));
+    if (e.key.length !== 1) return;
+    const next = step(groups, sofar, e.key);
+    if (!next) return;
+    if ("typed" in next) return setTyped(next.typed);
+    setTyped(undefined);
+    runMotion(next.run);
+  }
+
   function onKeyDown(e: React.KeyboardEvent) {
+    if (typed !== undefined && !e.metaKey && !e.ctrlKey) return motionKey(e, typed);
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
     const d = MOVES[e.key];
@@ -231,9 +272,6 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
         case "Enter":
           // A focused button keeps its own Enter.
           if (e.target instanceof HTMLButtonElement) return;
-          edit();
-          break;
-        case "e":
           edit();
           break;
         case "r":
@@ -272,6 +310,9 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
       // biome-ignore lint/a11y/noNoninteractiveTabindex: takes the log's keys
       tabIndex={0}
       onKeyDown={onKeyDown}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setTyped(undefined);
+      }}
     >
       {error && <div className="review-error">{error}</div>}
       {!rows && !error && <div className="placeholder">Loading</div>}
@@ -341,7 +382,8 @@ export function RevisionsLog({ workspace, refreshed }: Props) {
           );
         })}
       </div>
-      <RevisionsFooter busy={busy} loading={!!pending} />
+      {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
+      <RevisionsFooter running={running} note={note} loading={!!pending} />
     </div>
   );
 }

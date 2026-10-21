@@ -31,3 +31,17 @@ export function onFocusLog(f: () => void) {
     focusers.delete(f);
   };
 }
+
+const motionOpeners = new Set<() => void>();
+
+/** Opens the revisions log's motions. */
+export function openMotions() {
+  for (const f of motionOpeners) f();
+}
+
+export function onOpenMotions(f: () => void) {
+  motionOpeners.add(f);
+  return () => {
+    motionOpeners.delete(f);
+  };
+}

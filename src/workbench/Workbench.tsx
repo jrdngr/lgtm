@@ -19,7 +19,7 @@ import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { forgetWorkspaceRevset } from "../review/revset";
 import { useReviewTarget } from "../review/target";
 import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
-import { focusLog } from "../revisions/loadReview";
+import { focusLog, openMotions } from "../revisions/loadReview";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
@@ -188,6 +188,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+Shift+X": () => {
       showView("right", "drawings");
       requestNewDrawing();
+    },
+    "Mod+J": () => {
+      showView("left", "workspaces");
+      requestAnimationFrame(() => requestAnimationFrame(openMotions));
     },
     "Mod+Shift+J": () => reviewRevset(selected, "@"),
     "Mod+Shift+ENTER": () => {

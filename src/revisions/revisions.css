@@ -1,4 +1,5 @@
 .revisions {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -240,4 +241,58 @@ button.lr-pr.on {
   align-items: center;
   gap: 4px;
   white-space: nowrap;
+}
+
+.picker-note {
+  color: var(--fg);
+}
+
+/* The motions, risen from the bottom of the log over its rows. */
+.mo-pop {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 36px;
+  z-index: 2;
+  padding: 6px 0;
+  background: #2b2b2d;
+  border: 1px solid #4a4a4a;
+  border-radius: 8px;
+  box-shadow: 0 -10px 30px rgb(0 0 0 / 45%);
+}
+
+.mo-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 2px 10px 6px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.mo-typed {
+  font: 12px var(--mono);
+}
+
+.mo-group + .mo-group {
+  margin-top: 4px;
+}
+
+.mo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+
+.mo kbd {
+  min-width: 22px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.mo-lit {
+  color: var(--accent);
 }

@@ -38,7 +38,12 @@ export function RevisionsSection({ workspace, refreshed }: Props) {
       <SectionHeader title="Revisions">
         {target?.stale && <span className="pill amber">stale</span>}
       </SectionHeader>
-      <RevisionsLog key={String(workspace)} workspace={workspace} refreshed={refreshed} />
+      <RevisionsLog
+        key={String(workspace)}
+        workspace={workspace}
+        refreshed={refreshed}
+        trunk={trunk}
+      />
     </div>
   );
 }
