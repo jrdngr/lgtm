@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { PromptDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { openFile } from "../editor/open";
@@ -25,7 +25,6 @@ import {
   nextChunk,
   RISK_NAMES,
   type Segment,
-  threadsIn,
 } from "./model";
 import { setPick } from "./store";
 
@@ -39,6 +38,48 @@ export function ringedRows(c: Comments, segments: Segment[], ids?: Set<number>) 
     for (let r = t.rows.start; r <= t.rows.end; r++) out.add(markKey(t.file, r));
   }
   return out;
+}
+
+/** Comment blocks under the last row each comment covers in `segments`: its threads, notes
+ * and the draft being written. */
+export function commentsAfter(
+  c: Comments,
+  folds: CommentFolds,
+  segments: Segment[],
+): (file: number, row: number) => ReactNode {
+  const at = new Map<string, number[]>();
+  const shown = new Map(segments.map((g) => [g.file, new Set<number>()]));
+  for (const g of segments) for (const r of g.rows) shown.get(g.file)?.add(r);
+  const place = (file: number, start: number, end: number, id: number) => {
+    const rows = shown.get(file);
+    if (!rows) return;
+    for (let r = end; r >= start; r--) {
+      if (!rows.has(r)) continue;
+      const key = markKey(file, r);
+      at.set(key, [...(at.get(key) ?? []), id]);
+      return;
+    }
+  };
+  for (const t of c.comments) if (t.rows) place(t.file, t.rows.start, t.rows.end, t.id);
+  const d = c.draft;
+  if (d?.rows.length) place(d.file, d.rows[0], d.rows[d.rows.length - 1], NEW_COMMENT);
+  return (file, row) => {
+    const ids = at.get(markKey(file, row));
+    if (!ids) return null;
+    return (
+      <div className="gd-inline">
+        {ids.map((id) => (
+          <CommentBlock
+            key={id}
+            id={id}
+            comment={c.comments.find((x) => x.id === id)}
+            c={c}
+            folds={folds}
+          />
+        ))}
+      </div>
+    );
+  };
 }
 
 /** Picking rows to comment on: a click picks one changed row, shift-click extends within the
@@ -75,7 +116,7 @@ interface Props {
   setError(message: string): void;
 }
 
-/** One chunk: its PR threads, the agent's writeup, its docs and tests, and its code, with the
+/** One chunk: the agent's writeup, its docs and tests, and its code with its PR threads, with the
  * verdicts that move on to the next chunk. */
 export function ChunkView({ review, setup, view, s, c, folds, send, docs, setError }: Props) {
   const workspace = c.workspace;
@@ -87,10 +128,20 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   const [prompts, setPrompts] = useState<PromptDto[]>();
   const [promptsOpen, setPromptsOpen] = useState(false);
   const { sel, setSel, onRow } = useLineSel(review, s.segments);
-  const threads = threadsIn(c.comments, s.segments);
   const ringed = useMemo(() => ringedRows(c, s.segments), [c, s.segments]);
-  const draftHere =
-    c.draft && s.segments.some((g) => g.file === c.draft?.file && g.rows.includes(c.draft.rows[0]));
+  const after = commentsAfter(c, folds, s.segments);
+  const stepCode = useRef<HTMLDivElement>(null);
+
+  // A picked step brings its lines into view.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the step changes
+  useEffect(() => {
+    if (!steps) return;
+    const first = stepCode.current?.querySelector(".gd-ln.lit");
+    first?.scrollIntoView({ block: "center", behavior: "smooth" });
+    stepCode.current?.parentElement
+      ?.querySelector(".gd-step.on")
+      ?.scrollIntoView({ block: "nearest" });
+  }, [steps, step]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new chunk starts fresh
   useEffect(() => {
@@ -173,6 +224,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           lit={lit}
           sel={sel}
           onRow={onRow}
+          after={after}
         />
       )}
       {chunk.related.map((r) => (
@@ -182,7 +234,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   );
 
   return (
-    <div className="gd-view" tabIndex={-1} onKeyDown={onKeyDown}>
+    <div className={`gd-view${steps ? " stepping" : ""}`} tabIndex={-1} onKeyDown={onKeyDown}>
       <div className="gd-head">
         <span className={`gd-risk risk-${chunk.risk}`}>{RISK_NAMES[chunk.risk]}</span>
         <span className="gd-name">{chunk.title}</span>
@@ -222,26 +274,35 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
         >
           Architecture
         </button>
-        {s.changed && s.verdict ? (
+        {s.changed && s.verdict && (
           <span className="gd-seg">
-            <button type="button" aria-pressed={since} onClick={() => setSince(true)}>
+            <button
+              type="button"
+              aria-pressed={since}
+              onClick={() => {
+                setSince(true);
+                setSteps(false);
+              }}
+            >
               Since you reviewed
             </button>
             <button type="button" aria-pressed={!since} onClick={() => setSince(false)}>
               Whole chunk
             </button>
           </span>
-        ) : (
-          chunk.steps.length > 0 && (
-            <button
-              type="button"
-              className="gd-btn"
-              aria-pressed={steps}
-              onClick={() => setSteps(!steps)}
-            >
-              Steps
-            </button>
-          )
+        )}
+        {chunk.steps.length > 0 && (
+          <button
+            type="button"
+            className="gd-btn"
+            aria-pressed={steps}
+            onClick={() => {
+              setSteps(!steps);
+              setSince(false);
+            }}
+          >
+            Steps
+          </button>
         )}
         <span className="gd-sep" />
         <button type="button" className="gd-btn" onClick={ask}>
@@ -287,15 +348,6 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
         </div>
       )}
 
-      {(threads.length > 0 || draftHere) && (
-        <div className="gd-threads-list">
-          {threads.map((t) => (
-            <CommentBlock key={t.id} id={t.id} comment={t} c={c} folds={folds} />
-          ))}
-          {draftHere && <CommentBlock id={NEW_COMMENT} c={c} folds={folds} />}
-        </div>
-      )}
-
       {steps ? (
         <div className="gd-steps">
           <div className="gd-step-list">
@@ -335,7 +387,9 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
               </button>
             </div>
           </div>
-          <div className="gd-step-code">{code}</div>
+          <div className="gd-step-code" ref={stepCode}>
+            {code}
+          </div>
         </div>
       ) : (
         <>

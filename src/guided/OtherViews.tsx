@@ -4,13 +4,11 @@ import { Markdown } from "../bots/Markdown";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
-import { CommentBlock } from "../review/CommentBlock";
 import type { CurrentReview } from "../review/current";
-import { NEW_COMMENT } from "../review/model";
 import type { Comments } from "../review/useComments";
 import type { CommentFolds } from "../review/useSavedView";
 import { ChunkCode } from "./ChunkCode";
-import { ringedRows, startComment, useLineSel } from "./ChunkView";
+import { commentsAfter, ringedRows, startComment, useLineSel } from "./ChunkView";
 import { type ExcludedState, REASON_NAMES, RISK_NAMES, RISKS, threadSegment } from "./model";
 import { setGuided, setPick } from "./store";
 
@@ -138,7 +136,6 @@ export function CommentedView({
   const segments = threadSegment(review.files, comment);
   const ringed = ringedRows(c, segments, new Set([comment.id]));
   const { sel, setSel, onRow } = useLineSel(review, segments);
-  const draftHere = c.draft && segments.some((s) => s.file === c.draft?.file);
   function onKeyDown(k: React.KeyboardEvent) {
     if (k.metaKey || k.ctrlKey || k.altKey || !sel) return;
     if (k.target instanceof HTMLTextAreaElement) return;
@@ -153,11 +150,14 @@ export function CommentedView({
         <span className="gd-risk commented">Commented</span>
         <span className="gd-name mono">{comment.path}</span>
       </div>
-      <div className="gd-threads-list">
-        <CommentBlock id={comment.id} comment={comment} c={c} folds={folds} />
-        {draftHere && <CommentBlock id={NEW_COMMENT} c={c} folds={folds} />}
-      </div>
-      <ChunkCode files={review.files} segments={segments} ringed={ringed} sel={sel} onRow={onRow} />
+      <ChunkCode
+        files={review.files}
+        segments={segments}
+        ringed={ringed}
+        sel={sel}
+        onRow={onRow}
+        after={commentsAfter(c, folds, segments)}
+      />
     </div>
   );
 }

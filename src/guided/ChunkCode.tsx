@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { GuidedRange } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
@@ -24,10 +24,12 @@ interface Props {
   sel?: LineSel;
   /** Clicked a changed row; `extend` with shift held. */
   onRow?(file: number, row: number, extend: boolean): void;
+  /** What shows under a row, like the comments that end there. */
+  after?(file: number, row: number): ReactNode;
 }
 
 /** A chunk's diff, one block per run of rows, under its file's path. */
-export function ChunkCode({ files, segments, ringed, lit, sel, onRow }: Props) {
+export function ChunkCode({ files, segments, ringed, lit, sel, onRow, after }: Props) {
   return (
     <>
       {segments.map((s) => {
@@ -54,16 +56,18 @@ export function ChunkCode({ files, segments, ringed, lit, sel, onRow }: Props) {
                 changed && onRow && "pickable",
               ].filter(Boolean);
               return (
-                // biome-ignore lint/a11y/useKeyWithClickEvents: rows pick with the mouse; keys act on the chunk
-                <div
-                  key={row}
-                  className={cls.join(" ")}
-                  onClick={changed && onRow ? (e) => onRow(s.file, row, e.shiftKey) : undefined}
-                >
-                  <span className="n">{r.newLine ?? r.oldLine ?? ""}</span>
-                  <span className="s">{SIGN[r.kind]}</span>
-                  <Code row={r} />
-                </div>
+                <Fragment key={row}>
+                  {/* biome-ignore lint/a11y/useKeyWithClickEvents: rows pick with the mouse; keys act on the chunk */}
+                  <div
+                    className={cls.join(" ")}
+                    onClick={changed && onRow ? (e) => onRow(s.file, row, e.shiftKey) : undefined}
+                  >
+                    <span className="n">{r.newLine ?? r.oldLine ?? ""}</span>
+                    <span className="s">{SIGN[r.kind]}</span>
+                    <Code row={r} />
+                  </div>
+                  {after?.(s.file, row)}
+                </Fragment>
               );
             })}
           </div>

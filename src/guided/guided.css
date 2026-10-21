@@ -443,12 +443,6 @@ button.gd-tag:hover {
   font-weight: 600;
 }
 
-.gd-threads-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
 .gd-selbar {
   display: flex;
   align-items: center;
@@ -527,8 +521,16 @@ button.gd-tag:hover {
   background-image: linear-gradient(var(--selection), var(--selection));
 }
 
+/* Steps fill the tab: the list and the code scroll on their own, so the list stays in view. */
+.gd-view.stepping {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
 .gd-steps {
   display: flex;
+  flex: 1;
   gap: 18px;
   min-height: 0;
 }
@@ -539,6 +541,18 @@ button.gd-tag:hover {
   flex-direction: column;
   gap: 4px;
   width: 340px;
+  padding-bottom: 16px;
+  overflow-y: auto;
+}
+
+.gd-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+  background: var(--bg);
 }
 
 .gd-step {
@@ -599,6 +613,8 @@ button.gd-tag:hover {
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  padding-bottom: 16px;
+  overflow-y: auto;
 }
 
 .gd-card {

@@ -25,8 +25,9 @@ rate it and explain it.
 - `title`: a few words naming what the code does, not what changed.
 - `writeup`: what the code does and why it's right or where it could be wrong, in a short
   paragraph or two. Write for someone about to read the code, not a summary of the diff.
-- `steps`: for a chunk worth walking through, two to six steps in reading order, each a
-  sentence or two with the lines it's about. Leave it empty for a short chunk.
+- `steps`: two to six steps in reading order, each a sentence or two with the lines it's
+  about. Give them for every High and Medium chunk, and for a Low one that spans files or runs
+  past a screen.
 - `tests`: if tests cover the chunk and are quick to run, run them and give how many passed
   and failed, and the changed lines no test exercises when you can tell. Leave it out otherwise.
 
