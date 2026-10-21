@@ -35,11 +35,17 @@ const MAX_WIDTH = 600;
 
 /** A panel docked to one side of the window, outside the pane grid. Holds views behind a strip
  * of icon tabs down its outer edge, shown when there's more than one and divided by the views'
- * groups, and resizes by dragging its inner edge. Each view draws its own header. */
+ * groups, and resizes by dragging its inner edge. Each view draws its own header. Hidden, the
+ * strip stays: a tab opens the panel on its view, and the open view's tab hides it. */
 export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Props) {
   const drag = useRef<{ x: number; width: number }>(undefined);
-  if (!state.open) return null;
+  const tabbed = views.length > 1;
+  if (!state.open && !tabbed) return null;
   const view = views.find((v) => v.id === state.view) ?? views[0];
+  const pick = (id: string) =>
+    onChange(
+      state.open && id === view.id ? { ...state, open: false } : { ...state, open: true, view: id },
+    );
 
   function startResize(e: React.PointerEvent) {
     e.preventDefault();
@@ -55,8 +61,11 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Pro
   }
 
   return (
-    <aside className={`side-panel side-${side}`} style={{ width: state.width }}>
-      {views.length > 1 && (
+    <aside
+      className={`side-panel side-${side}${state.open ? "" : " shut"}`}
+      style={state.open ? { width: state.width } : undefined}
+    >
+      {tabbed && (
         <div
           className="side-tabs"
           role="tablist"
@@ -74,14 +83,15 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Pro
               <button
                 type="button"
                 role="tab"
-                aria-selected={v.id === view.id}
+                aria-selected={state.open && v.id === view.id}
                 aria-label={v.title}
                 title={v.title}
                 className={
-                  [v.id === view.id && "selected", v.alert && "alert"].filter(Boolean).join(" ") ||
-                  undefined
+                  [state.open && v.id === view.id && "selected", v.alert && "alert"]
+                    .filter(Boolean)
+                    .join(" ") || undefined
                 }
-                onClick={() => onChange({ ...state, view: v.id })}
+                onClick={() => pick(v.id)}
               >
                 <Icon name={v.icon} />
               </button>
@@ -89,17 +99,21 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide }: Pro
           ))}
         </div>
       )}
-      <div className="side-body" ref={bodyRef} tabIndex={-1}>
-        {view.render()}
-      </div>
-      <div
-        className="side-resizer"
-        onPointerDown={startResize}
-        onPointerMove={resize}
-        onPointerUp={() => {
-          drag.current = undefined;
-        }}
-      />
+      {state.open && (
+        <>
+          <div className="side-body" ref={bodyRef} tabIndex={-1}>
+            {view.render()}
+          </div>
+          <div
+            className="side-resizer"
+            onPointerDown={startResize}
+            onPointerMove={resize}
+            onPointerUp={() => {
+              drag.current = undefined;
+            }}
+          />
+        </>
+      )}
     </aside>
   );
 }

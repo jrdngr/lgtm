@@ -509,6 +509,10 @@ kbd {
   color: var(--amber);
 }
 
+.side-panel.shut .side-tabs {
+  border: none;
+}
+
 .side-divider {
   flex: none;
   width: 18px;
