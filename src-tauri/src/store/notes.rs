@@ -6,6 +6,7 @@ use rusqlite::{OptionalExtension, Row, params};
 use super::Store;
 
 pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
+    set_aside_old_notes(db)?;
     db.execute_batch(
         "CREATE TABLE IF NOT EXISTS notes (
             id TEXT PRIMARY KEY,
@@ -21,6 +22,22 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
             path TEXT NOT NULL
         );",
     )
+}
+
+/// Renames a `notes` table from before markdown notes, which held review notes and has no
+/// `workspace` column, to `review_notes_old`, so the markdown notes table can take its name.
+fn set_aside_old_notes(db: &rusqlite::Connection) -> rusqlite::Result<()> {
+    let columns: i64 =
+        db.query_row("SELECT COUNT(*) FROM pragma_table_info('notes')", [], |r| r.get(0))?;
+    let has_workspace: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('notes') WHERE name = 'workspace'",
+        [],
+        |r| r.get(0),
+    )?;
+    if columns > 0 && !has_workspace {
+        db.execute_batch("ALTER TABLE notes RENAME TO review_notes_old;")?;
+    }
+    Ok(())
 }
 
 /// A stored note. `folder` is a `/`-separated path, empty at the top.
@@ -109,5 +126,38 @@ impl Store {
             params![workspace, path],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_old_review_notes_table_is_kept_aside_and_markdown_notes_save() {
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE notes (id INTEGER PRIMARY KEY, path TEXT NOT NULL, body TEXT NOT NULL);
+             INSERT INTO notes (path, body) VALUES ('a.rs', 'old');",
+        )
+        .unwrap();
+        create_table(&db).unwrap();
+        let store = Store { db };
+        let note = NoteRow {
+            id: "n1".into(),
+            workspace: Some("main".into()),
+            folder: String::new(),
+            name: "Plan".into(),
+            body: "# Plan".into(),
+            created_at: 1,
+            updated_at: 1,
+        };
+        store.put_note(&note).unwrap();
+        assert_eq!(store.note("n1").unwrap(), Some(note));
+        let old: String = store
+            .db
+            .query_row("SELECT body FROM review_notes_old", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(old, "old");
     }
 }
