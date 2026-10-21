@@ -52,6 +52,7 @@
 
 .gd-group {
   display: inline-flex;
+  flex: 1;
   align-items: center;
   gap: 7px;
 }
