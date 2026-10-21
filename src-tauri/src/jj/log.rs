@@ -21,6 +21,7 @@ pub struct LogCommit {
     pub unique: u32,
     /// The whole description.
     pub description: String,
+    /// Local bookmarks, then remote ones as `name@remote` where they aren't where the local one is.
     pub bookmarks: Vec<String>,
     /// The author's email up to the `@`, else their name.
     pub author: String,
@@ -37,12 +38,21 @@ pub struct LogCommit {
 /// graph beside it too.
 const ROW_TEMPLATE: &str = r#""\x1f" ++ commit_id ++ "\x1f" ++ change_id ++ "\x1f"
   ++ change_id.shortest().prefix().len() ++ "\x1f" ++ description.escape_json() ++ "\x1f"
-  ++ local_bookmarks.map(|b| b.name()).join(" ") ++ "\x1f"
+  ++ bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name())).join(" ")
+  ++ "\x1f"
   ++ coalesce(author.email().local(), author.name()) ++ "\x1f"
   ++ author.timestamp().format("%s") ++ "\x1f"
   ++ if(current_working_copy, "w") ++ if(immutable, "i") ++ if(conflict, "c")
   ++ if(divergent, "d") ++ if(empty, "e")
   ++ "\n\x1e\n""#;
+
+/// A line of graph alone, without the text jj puts after it, like `(elided revisions)`.
+fn graph_only(line: &str) -> &str {
+    let end = line
+        .find(|c: char| c == '(' || c.is_ascii_alphanumeric())
+        .unwrap_or(line.len());
+    line[..end].trim_end()
+}
 
 /// Rows from `jj log -T ROW_TEMPLATE`: a commit's line and its `\x1e` line make one row, and
 /// any other line is graph alone.
@@ -78,7 +88,7 @@ fn parse_rows(out: &str) -> Vec<LogRow> {
             }
         } else {
             rows.push(LogRow {
-                graph: vec![line.to_string()],
+                graph: vec![graph_only(line).to_string()],
                 commit: None,
             });
         }
@@ -138,14 +148,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn rows_pair_each_commit_with_its_graph_and_keep_graph_only_lines() {
+    fn rows_pair_each_commit_with_its_graph_and_keep_graph_only_lines_without_their_text() {
         let out = "@  \x1fc1\x1fkx\x1f2\x1f\"fix\\n\\nbody\"\x1fmain feat\x1fjo\x1f1700000000\x1fwe\n\
                    │  \x1e\n\
                    │ ○  \x1fc2\x1fpq\x1f1\x1f\"\"\x1f\x1fjo\x1f1\x1fc\n\
                    ├─╯  \x1e\n\
+                   │ ~  (elided revisions)\n\
                    ~\n";
         let rows = parse_rows(out);
-        assert_eq!(rows.len(), 3);
+        assert_eq!(rows.len(), 4);
         assert_eq!(rows[0].graph, ["@  ", "│  "]);
         let c = rows[0].commit.as_ref().unwrap();
         assert_eq!(c.description, "fix\n\nbody");
@@ -154,7 +165,8 @@ mod tests {
         assert_eq!((c.unique, c.time), (2, 1_700_000_000.0));
         assert_eq!(rows[1].graph, ["│ ○  ", "├─╯  "]);
         assert!(rows[1].commit.as_ref().unwrap().conflict);
-        assert_eq!((rows[2].graph[0].as_str(), rows[2].commit.is_none()), ("~", true));
+        assert_eq!((rows[2].graph[0].as_str(), rows[2].commit.is_none()), ("│ ~", true));
+        assert_eq!(rows[3].graph, ["~"]);
     }
 
     #[test]

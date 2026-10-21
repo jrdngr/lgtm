@@ -1285,6 +1285,7 @@ export type LogCommit = {
 	unique: number,
 	/**  The whole description. */
 	description: string,
+	/**  Local bookmarks, then remote ones as `name@remote` where they aren't where the local one is. */
 	bookmarks: string[],
 	/**  The author's email up to the `@`, else their name. */
 	author: string,
