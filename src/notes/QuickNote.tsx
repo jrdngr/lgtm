@@ -6,6 +6,7 @@ import { loadState, saveState } from "../core/savedState";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
+import { ErrorLine } from "../ui/ErrorLine";
 import { stampName } from "./store";
 
 const isString = (v: unknown): v is string => typeof v === "string";
@@ -72,7 +73,7 @@ export function QuickNote({ workspace }: { workspace: WorkspaceName }) {
           Save<kbd>⌘↵</kbd>
         </button>
       </div>
-      {error && <div className="review-error">{error}</div>}
+      {error && <ErrorLine text={error} onClose={() => setError(undefined)} />}
       {picker}
     </div>
   );

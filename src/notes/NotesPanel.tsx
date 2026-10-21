@@ -7,6 +7,7 @@ import { useWorkspace, type WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { guideAt, indent, toggled } from "../review/tree";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
+import { ErrorLine } from "../ui/ErrorLine";
 import { Icon, IconButton } from "../ui/icons";
 import { confirmAction, promptText } from "../ui/prompt";
 import { ago } from "../ui/time";
@@ -47,6 +48,9 @@ export function NotesPanel() {
   const { data, error: loadError } = useNotes(workspace);
   const [open, setOpen] = useOpen();
   const [error, setError] = useState<string>();
+  /** The load error the person dismissed, hidden until a different one comes. */
+  const [dismissed, setDismissed] = useState<string>();
+  const shownError = error || (loadError !== dismissed ? loadError : undefined);
   const [drop, setDrop] = useState<string>();
 
   const act = (f: () => Promise<unknown>) =>
@@ -167,7 +171,15 @@ export function NotesPanel() {
           />
         ))}
       </div>
-      {(error || loadError) && <div className="review-error">{error || loadError}</div>}
+      {shownError && (
+        <ErrorLine
+          text={shownError}
+          onClose={() => {
+            setError(undefined);
+            setDismissed(loadError);
+          }}
+        />
+      )}
     </div>
   );
 }

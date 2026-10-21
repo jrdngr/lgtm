@@ -255,3 +255,19 @@
 ::highlight(lgtm-match) {
   background-color: var(--selection);
 }
+
+.error-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.error-line > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-line .icon-button {
+  flex: none;
+  color: var(--error);
+}
