@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { PromptDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
+import { remembered } from "../core/remembered";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { CommentBlock } from "../review/CommentBlock";
@@ -29,6 +30,9 @@ import {
   withWholeFiles,
 } from "./model";
 import { setPick } from "./store";
+
+/** The writeup and chips under a chunk's title are folded away, in every chunk. */
+const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
 
 const DOC_NAMES = { adr: "ADR", devlog: "Dev log", other: "Doc" };
 
@@ -125,6 +129,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   const { chunk } = s;
   const [steps, setSteps] = useState(false);
   const [step, setStep] = useState(0);
+  const folded = topFolded.use();
   /** Files shown whole in Steps, by review file. */
   const [whole, setWhole] = useState<ReadonlySet<number>>(new Set());
   const [since, setSince] = useState(s.changed);
@@ -254,118 +259,184 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
 
   return (
     <div className={`gd-view${steps ? " stepping" : ""}`} tabIndex={-1} onKeyDown={onKeyDown}>
-      <div className="gd-head">
-        <span className={`gd-risk risk-${chunk.risk}`}>{RISK_NAMES[chunk.risk]}</span>
-        <span className="gd-name">{chunk.title}</span>
-        {s.changed && <span className="pill amber">Changed</span>}
-        {chunk.tags.map((t) => (
-          <span key={t} className="gd-tag">
-            {t}
-          </span>
-        ))}
-        <span className="spacer" />
-        {prompts && prompts.length > 0 && (
-          <span className="gd-pop-anchor">
-            <button type="button" className="gd-btn" onClick={() => setPromptsOpen(!promptsOpen)}>
-              Prompts {prompts.length}
-            </button>
-            {promptsOpen && (
-              <div className="gd-pop">
-                {prompts.map((p) => (
-                  <div key={`${p.session}:${p.prompt}`} className="gd-prompt">
-                    <span>{p.prompt}</span>
-                    {p.at !== null && <span className="gd-when">{ago(p.at)}</span>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </span>
-        )}
-        <button
-          type="button"
-          className="gd-btn"
-          onClick={() =>
-            showChunk(workspace, {
-              title: chunk.title,
-              paths: [...new Set(chunk.ranges.map((r) => r.path))],
-            })
-          }
-        >
-          Architecture
-        </button>
-        {s.changed && s.verdict && (
-          <span className="gd-seg">
-            <button
-              type="button"
-              aria-pressed={since}
-              onClick={() => {
-                setSince(true);
-                setSteps(false);
-              }}
-            >
-              Since you reviewed
-            </button>
-            <button type="button" aria-pressed={!since} onClick={() => setSince(false)}>
-              Whole chunk
-            </button>
-          </span>
-        )}
-        {chunk.steps.length > 0 && (
+      <div className="gd-top">
+        <div className="gd-head">
+          <button
+            type="button"
+            className="gd-fold"
+            aria-label={folded ? "Unfold" : "Fold"}
+            aria-expanded={!folded}
+            onClick={() => topFolded.set(!folded)}
+          >
+            {folded ? "▸" : "▾"}
+          </button>
+          <span className={`gd-risk risk-${chunk.risk}`}>{RISK_NAMES[chunk.risk]}</span>
+          <span className="gd-name">{chunk.title}</span>
+          {s.changed && <span className="pill amber">Changed</span>}
+          {chunk.tags.map((t) => (
+            <span key={t} className="gd-tag">
+              {t}
+            </span>
+          ))}
+          <span className="spacer" />
+          {prompts && prompts.length > 0 && (
+            <span className="gd-pop-anchor">
+              <button type="button" className="gd-btn" onClick={() => setPromptsOpen(!promptsOpen)}>
+                Prompts {prompts.length}
+              </button>
+              {promptsOpen && (
+                <div className="gd-pop">
+                  {prompts.map((p) => (
+                    <div key={`${p.session}:${p.prompt}`} className="gd-prompt">
+                      <span>{p.prompt}</span>
+                      {p.at !== null && <span className="gd-when">{ago(p.at)}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </span>
+          )}
           <button
             type="button"
             className="gd-btn"
-            aria-pressed={steps}
-            onClick={() => {
-              setSteps(!steps);
-              setSince(false);
-            }}
+            onClick={() =>
+              showChunk(workspace, {
+                title: chunk.title,
+                paths: [...new Set(chunk.ranges.map((r) => r.path))],
+              })
+            }
           >
-            Steps
+            Architecture
           </button>
-        )}
-        <span className="gd-sep" />
-        <button type="button" className="gd-btn" onClick={ask}>
-          Ask <kbd>?</kbd>
-        </button>
-        <button type="button" className="gd-btn" onClick={change}>
-          Change <kbd>c</kbd>
-        </button>
-        <button type="button" className="gd-btn approve" onClick={approve}>
-          Approve <kbd>a</kbd>
-        </button>
-      </div>
-
-      {noting !== undefined && (
-        <div className="gd-note">
-          <textarea
-            // biome-ignore lint/a11y/noAutofocus: Change opens it to type in
-            autoFocus
-            value={noting}
-            onChange={(e) => setNoting(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || !e.shiftKey)) {
-                e.preventDefault();
-                sendChange();
-              } else if (e.key === "Escape") setNoting(undefined);
-            }}
-          />
-          <div className="gd-note-actions">
-            <button type="button" className="gd-btn" onClick={() => setNoting(undefined)}>
-              Cancel
+          {s.changed && s.verdict && (
+            <span className="gd-seg">
+              <button
+                type="button"
+                aria-pressed={since}
+                onClick={() => {
+                  setSince(true);
+                  setSteps(false);
+                }}
+              >
+                Since you reviewed
+              </button>
+              <button type="button" aria-pressed={!since} onClick={() => setSince(false)}>
+                Whole chunk
+              </button>
+            </span>
+          )}
+          {chunk.steps.length > 0 && (
+            <button
+              type="button"
+              className="gd-btn"
+              aria-pressed={steps}
+              onClick={() => {
+                setSteps(!steps);
+                setSince(false);
+              }}
+            >
+              Steps
             </button>
-            <PipeButton onClick={sendChange} disabled={!noting.trim()}>
-              Change
-            </PipeButton>
-          </div>
+          )}
+          <span className="gd-sep" />
+          <button type="button" className="gd-btn" onClick={ask}>
+            Ask <kbd>?</kbd>
+          </button>
+          <button type="button" className="gd-btn" onClick={change}>
+            Change <kbd>c</kbd>
+          </button>
+          <button type="button" className="gd-btn approve" onClick={approve}>
+            Approve <kbd>a</kbd>
+          </button>
         </div>
-      )}
 
-      {s.verdict?.verdict === "change" && s.verdict.note && noting === undefined && (
-        <div className="gd-asked">
-          <span className="gd-asked-label">Your change</span>
-          <div>{s.verdict.note}</div>
-        </div>
-      )}
+        {noting !== undefined && (
+          <div className="gd-note">
+            <textarea
+              // biome-ignore lint/a11y/noAutofocus: Change opens it to type in
+              autoFocus
+              value={noting}
+              onChange={(e) => setNoting(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || !e.shiftKey)) {
+                  e.preventDefault();
+                  sendChange();
+                } else if (e.key === "Escape") setNoting(undefined);
+              }}
+            />
+            <div className="gd-note-actions">
+              <button type="button" className="gd-btn" onClick={() => setNoting(undefined)}>
+                Cancel
+              </button>
+              <PipeButton onClick={sendChange} disabled={!noting.trim()}>
+                Change
+              </PipeButton>
+            </div>
+          </div>
+        )}
+
+        {s.verdict?.verdict === "change" && s.verdict.note && noting === undefined && (
+          <div className="gd-asked">
+            <span className="gd-asked-label">Your change</span>
+            <div>{s.verdict.note}</div>
+          </div>
+        )}
+
+        {!steps && !folded && (
+          <>
+            <div className="gd-writeup">
+              <Markdown>{chunk.writeup}</Markdown>
+            </div>
+            <div className="gd-chips">
+              <Diffstat stat={s.stat} />
+              {docs.map((d) => (
+                <span key={d.path} className="gd-chip">
+                  <b>{DOC_NAMES[d.kind]}</b>
+                  <span>{d.title}</span>
+                  <button
+                    type="button"
+                    className="gd-link"
+                    onClick={() => openFile(workspace, d.path)}
+                  >
+                    Open
+                  </button>
+                </span>
+              ))}
+              {chunk.tests && (
+                <span className="gd-chip">
+                  <b>Tests</b>
+                  {chunk.tests.passed > 0 && (
+                    <span className="gd-pass">{chunk.tests.passed} pass</span>
+                  )}
+                  {chunk.tests.failed > 0 && (
+                    <span className="gd-fail">{chunk.tests.failed} fail</span>
+                  )}
+                  {chunk.tests.uncovered.length > 0 && (
+                    <span className="gd-uncovered">
+                      {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)} uncovered
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+        {sel && (
+          <div className="gd-selbar">
+            <span>
+              {sel.rows.length} {sel.rows.length === 1 ? "line" : "lines"}
+            </span>
+            <button type="button" className="gd-btn" onClick={() => comment(false)}>
+              Comment <kbd>c</kbd>
+            </button>
+            {c.canDraft && (
+              <button type="button" className="gd-btn" onClick={() => comment(true)}>
+                Draft <kbd>⇧C</kbd>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {steps ? (
         <div className="gd-steps">
@@ -411,59 +482,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           </div>
         </div>
       ) : (
-        <>
-          <div className="gd-writeup">
-            <Markdown>{chunk.writeup}</Markdown>
-          </div>
-          <div className="gd-chips">
-            <Diffstat stat={s.stat} />
-            {docs.map((d) => (
-              <span key={d.path} className="gd-chip">
-                <b>{DOC_NAMES[d.kind]}</b>
-                <span>{d.title}</span>
-                <button
-                  type="button"
-                  className="gd-link"
-                  onClick={() => openFile(workspace, d.path)}
-                >
-                  Open
-                </button>
-              </span>
-            ))}
-            {chunk.tests && (
-              <span className="gd-chip">
-                <b>Tests</b>
-                {chunk.tests.passed > 0 && (
-                  <span className="gd-pass">{chunk.tests.passed} pass</span>
-                )}
-                {chunk.tests.failed > 0 && (
-                  <span className="gd-fail">{chunk.tests.failed} fail</span>
-                )}
-                {chunk.tests.uncovered.length > 0 && (
-                  <span className="gd-uncovered">
-                    {chunk.tests.uncovered.reduce((n, r) => n + r.end - r.start + 1, 0)} uncovered
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-          {sel && (
-            <div className="gd-selbar">
-              <span>
-                {sel.rows.length} {sel.rows.length === 1 ? "line" : "lines"}
-              </span>
-              <button type="button" className="gd-btn" onClick={() => comment(false)}>
-                Comment <kbd>c</kbd>
-              </button>
-              {c.canDraft && (
-                <button type="button" className="gd-btn" onClick={() => comment(true)}>
-                  Draft <kbd>⇧C</kbd>
-                </button>
-              )}
-            </div>
-          )}
-          {code}
-        </>
+        code
       )}
     </div>
   );
