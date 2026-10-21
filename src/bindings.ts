@@ -74,8 +74,8 @@ export const commands = {
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
-	/**  `jj log` with the user's default revset and template, for picking commits. */
-	logGraph: (workspace: string | null) => typedError<LogLine[], string>(__TAURI_INVOKE("log_graph", { workspace })),
+	/**  The commits of `jj log`'s default revset with its graph, for picking commits. */
+	logRows: (workspace: string | null) => typedError<LogRow[], string>(__TAURI_INVOKE("log_rows", { workspace })),
 	/**
 	 *  The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's
 	 *  presets. `None` when trunk has no bookmark.
@@ -300,8 +300,6 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
-	/**  Picked from the stack, which `@` has since left. */
-	off: boolean,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Opens the workspace's PR on GitHub in the browser. */
 	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
@@ -312,7 +310,7 @@ export const commands = {
 	 *  asked again only with `refresh` or when the bookmarks change.
 	 */
 	nearbyPrs: (workspace: string | null, refresh: boolean) => typedError<NearbyPrsDto, string>(__TAURI_INVOKE("nearby_prs", { workspace, refresh })),
-	/**  Brings the workspace's stack PR in line with `@`, and returns the workspace's PR. */
+	/**  Keeps the workspace's stack PR's head current, and returns the workspace's PR. */
 	syncStackPr: (workspace: string | null) => typedError<{
 	number: number,
 	/**  `owner/name`. */
@@ -328,31 +326,10 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
-	/**  Picked from the stack, which `@` has since left. */
-	off: boolean,
 } | null, string>(__TAURI_INVOKE("sync_stack_pr", { workspace })),
-	/**  Edits the change of the workspace's stack PR, which `@` left. */
-	editBackToStackPr: (workspace: string | null) => typedError<{
-	number: number,
-	/**  `owner/name`. */
-	repo: string,
-	title: string,
-	url: string,
-	author: string,
-	baseRef: string,
-	headRef: string,
-	/**  The head commit as last fetched. */
-	head: string,
-	/**  The revset the workspace reviews. */
-	revset: string,
-	/**  Picked from the workspace's stack rather than checked out into it. */
-	stack: boolean,
-	/**  Picked from the stack, which `@` has since left. */
-	off: boolean,
-} | null, string>(__TAURI_INVOKE("edit_back_to_stack_pr", { workspace })),
-	/**  Picks stack PR `number` as the workspace's PR. With `edit`, edits its change first. */
-	selectStackPr: (workspace: string | null, number: number, edit: boolean) => typedError<PrDto, string>(__TAURI_INVOKE("select_stack_pr", { workspace, number, edit })),
-	/**  Deselects the workspace's stack PR. */
+	/**  Makes stack PR `number` the workspace's PR, to review its commits. */
+	reviewStackPr: (workspace: string | null, number: number) => typedError<PrDto, string>(__TAURI_INVOKE("review_stack_pr", { workspace, number })),
+	/**  Drops the workspace's stack PR. */
 	clearStackPr: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("clear_stack_pr", { workspace })),
 	/**
 	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
@@ -1301,16 +1278,33 @@ export type Location = {
 	end: number | null,
 };
 
-/**  One line of `jj log` output, with ANSI colors. */
-export type LogLine = {
-	text: string,
-	/**  Set on the first line of each commit. */
-	commitId: string | null,
-	changeId: string | null,
-	/**  The commit's whole description, on the first line of each commit. */
-	description: string | null,
-	/**  Whether this line starts the workspace's working-copy commit. */
+export type LogCommit = {
+	commitId: string,
+	changeId: string,
+	/**  How many of the change id's first characters tell it apart. */
+	unique: number,
+	/**  The whole description. */
+	description: string,
+	bookmarks: string[],
+	/**  The author's email up to the `@`, else their name. */
+	author: string,
+	/**  When it was authored, in seconds since the epoch. */
+	time: number | null,
 	workingCopy: boolean,
+	immutable: boolean,
+	conflict: boolean,
+	divergent: boolean,
+	empty: boolean,
+};
+
+/**
+ *  One commit in the log, with the graph drawn beside its two lines, or a line of graph
+ *  alone where branches join or are elided.
+ */
+export type LogRow = {
+	/**  The graph left of each of the row's lines: jj's own, without colors. */
+	graph: string[],
+	commit: LogCommit | null,
 };
 
 export type LookDto = {
@@ -1503,8 +1497,6 @@ export type PrDto = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
-	/**  Picked from the stack, which `@` has since left. */
-	off: boolean,
 };
 
 export type PrPreviewDto = {

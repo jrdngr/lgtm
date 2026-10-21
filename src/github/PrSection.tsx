@@ -1,13 +1,12 @@
 import { useState } from "react";
 import type { PrDto, ThreadDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
-import { commands, errorText } from "../ipc";
+import { commands } from "../ipc";
 import { viewerLogin } from "../model/people";
 import type { CurrentReview } from "../review/current";
 import { StageBar } from "../threads/StageBar";
 import { IconButton } from "../ui/icons";
 import { ago } from "../ui/time";
-import { clearStackPr, editBackToStackPr } from "../workspaces/stack";
 import { Avatar } from "./Post";
 import type { Discussion } from "./useDiscussion";
 import "./github.css";
@@ -22,36 +21,6 @@ function synced(at: number | undefined) {
   if (at === undefined) return "";
   const a = ago(at);
   return a === "now" ? " · synced just now" : ` · synced ${a} ago`;
-}
-
-/** A stack PR `@` left: Edit goes back onto it, ✕ deselects it. */
-function OffStack({ pr, onError }: { pr: PrDto; onError(e: string | undefined): void }) {
-  const workspace = useWorkspace();
-  const [busy, setBusy] = useState(false);
-  async function run(f: () => Promise<void>) {
-    setBusy(true);
-    onError(undefined);
-    await f().catch((e) => onError(errorText(e)));
-    setBusy(false);
-  }
-  return (
-    <>
-      <span className="pill amber">Off stack</span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => run(() => editBackToStackPr(workspace, pr))}
-      >
-        Edit
-      </button>
-      <IconButton
-        icon="close"
-        label="Deselect PR"
-        disabled={busy}
-        onClick={() => run(() => clearStackPr(workspace, pr))}
-      />
-    </>
-  );
 }
 
 interface Props {
@@ -88,7 +57,6 @@ export function PrSection({ pr, review, discussion, threads }: Props) {
         {state && <span className={`pill ${state[0]}`}>{state[1]}</span>}
         <span className="pr-number">#{pr.number}</span>
         {pr.author === viewer && <span className="pill blue">Yours</span>}
-        {pr.off && <OffStack pr={pr} onError={setError} />}
         <span className="spacer" />
         <IconButton icon="external" label="Open on GitHub" onClick={openPage} />
         <IconButton

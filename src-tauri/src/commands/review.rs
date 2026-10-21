@@ -1,7 +1,7 @@
 use tauri::WebviewWindow;
 
 use super::{CmdResult, err, repo};
-use crate::jj::{JjAction, LogLine, WorkingCopyDto};
+use crate::jj::{JjAction, LogRow, WorkingCopyDto};
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
 
@@ -44,15 +44,15 @@ pub(crate) fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> 
     Ok(())
 }
 
-/// `jj log` with the user's default revset and template, for picking commits.
+/// The commits of `jj log`'s default revset with its graph, for picking commits.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn log_graph(
+pub(crate) async fn log_rows(
     window: WebviewWindow,
     workspace: Option<String>,
-) -> CmdResult<Vec<LogLine>> {
+) -> CmdResult<Vec<LogRow>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    ws.jj.log_graph().await.map_err(err)
+    ws.jj.log_rows().await.map_err(err)
 }
 
 /// The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's

@@ -13,8 +13,8 @@ interface Props {
   loading: boolean;
 }
 
-/** The revisions panel's keys, and the last action with its undo key. */
-export function RevisionsPanelFooter({ last, busy, loading }: Props) {
+/** The revisions log's keys, and the last action with its undo key. */
+export function RevisionsFooter({ last, busy, loading }: Props) {
   return (
     <div className="picker-footer">
       {HINTS.map(([keys, label]) => (

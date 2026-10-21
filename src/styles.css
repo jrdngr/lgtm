@@ -293,8 +293,6 @@ kbd {
 
 .toolbar {
   position: relative;
-  /* Above the panes, so the revision picker opens over them. */
-  z-index: 30;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -302,49 +300,8 @@ kbd {
   border-bottom: 1px solid var(--border);
 }
 
-.toolbar-center {
-  position: absolute;
-  left: 25%;
-  right: 25%;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.toolbar-center > * {
-  pointer-events: auto;
-}
-
-.toolbar .commit-picker {
-  top: calc(100% + 4px);
-  left: 50%;
-  right: auto;
-  width: min(900px, 90vw);
-  translate: -50% 0;
-  max-height: 70vh;
-}
-
-/* Holds the field's width while a review loads. */
-.rev-shimmer {
-  flex: 1;
-  min-width: 120px;
-  height: 10px;
-  border-radius: 3px;
-  background:
-    linear-gradient(90deg, var(--hair) 25%, var(--raise) 50%, var(--hair) 75%) 0 0 / 200% 100%;
-  animation: rev-shimmer 1.2s linear infinite;
-}
-
-@keyframes rev-shimmer {
-  to {
-    background-position: -200% 0;
-  }
-}
-
 .toolbar .repo {
-  /* Ends before the centered revision field, which starts at 25%. */
   min-width: 0;
-  max-width: calc(25% - 48px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

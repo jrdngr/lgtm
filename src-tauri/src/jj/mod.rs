@@ -31,7 +31,7 @@ pub use background::Snapshot;
 pub use child::end_all;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
-pub use log::LogLine;
+pub use log::LogRow;
 pub use near::{NearBookmark, StackSide};
 pub use workspace::WorkspaceInfo;
 

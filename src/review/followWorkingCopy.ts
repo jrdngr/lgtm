@@ -5,7 +5,7 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { prOf, setPr } from "../github/pr";
 import { commands } from "../ipc";
 import { githubOff } from "../tools/agents";
-import { stackPrsShown } from "../workspaces/stack";
+import { prFollowsReview } from "../workspaces/stack";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 import { targetOf } from "./target";
 
@@ -13,18 +13,9 @@ import { targetOf } from "./target";
 const running = new Set<string>();
 const again = new Set<string>();
 
-/** The workspace's PR once its stack PR is in line with the new `@`. With stack PRs hidden,
- * none is picked, and one picked earlier is dropped. */
+/** The workspace's PR, its stack PR's head kept current. */
 async function prAfterMove(workspace: WorkspaceName): Promise<PrDto | null> {
   if (githubOff()) return prOf(workspace);
-  if (!stackPrsShown()) {
-    const pr = await prOf(workspace);
-    if (!pr?.stack) return pr;
-    const r = await commands.clearStackPr(workspace);
-    if (r.status === "error") return pr;
-    setPr(workspace, null);
-    return null;
-  }
   const r = await commands.syncStackPr(workspace);
   if (r.status === "error") return prOf(workspace);
   setPr(workspace, r.data);
@@ -37,17 +28,17 @@ async function holdsAt(workspace: WorkspaceName, revset: string) {
   return r.status === "ok" && r.data.place !== "outside";
 }
 
-/** Keeps a review `@` is in or sits right on, unless the workspace's PR changed. Any other goes
- * to the PR's commits, or to `@` without a PR. A review already on it refreshes on its own. */
+/** Keeps a review of the workspace's PR, or one `@` is in or sits right on. Any other goes to
+ * the commits of the PR the workspace was checked out for, or to `@`. A review already on it
+ * refreshes on its own. */
 async function followOnce(workspace: WorkspaceName) {
-  const before = (await prOf(workspace))?.number;
   const pr = await prAfterMove(workspace);
   const current = workspaceRevset(workspace);
-  const samePr = pr?.number === before;
-  if (samePr && current && (await holdsAt(workspace, current))) return;
-  const revset = pr?.revset ?? "@";
+  if (current && (current === pr?.revset || (await holdsAt(workspace, current)))) return;
+  const revset = pr && !pr.stack ? pr.revset : "@";
   if (current === revset) return;
   setWorkspaceRevset(workspace, revset);
+  await prFollowsReview(workspace, revset);
   await targetOf(workspace)?.load(revset);
 }
 

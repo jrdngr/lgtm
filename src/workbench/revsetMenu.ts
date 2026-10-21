@@ -12,6 +12,7 @@ import {
   reviewAfter,
 } from "../review/RevisionsPanelMenu";
 import type { ReviewTarget } from "../review/target";
+import { loadReview } from "../revisions/loadReview";
 import { run } from "../services/pathMenu";
 import type { CtxEntry } from "../ui/contextMenu";
 
@@ -26,9 +27,9 @@ export async function actOn(
 }
 
 /** Loads `revset` as the review, throwing its error. */
-export function reviewRevset(target: ReviewTarget, revset: string) {
+export function reviewRevset(workspace: WorkspaceName, revset: string) {
   run(
-    target.load(revset).then((failed) => {
+    loadReview(workspace, revset).then((failed) => {
       if (failed) throw new Error(failed);
     }),
   );
@@ -40,32 +41,24 @@ interface Picker {
   trunk: string | null;
   pr: PrDto | null | undefined;
   wc: WorkingCopyDto | undefined;
-  openRevisions(): void;
 }
 
-/** The header's menu: Review picks the PR, a preset or any revset; Edit Review Head moves `@`
+/** The revisions log's menu: Review picks the PR, a preset or any revset; Edit Review Head moves `@`
  * to the review's newest commit. */
-export function revsetMenu({
-  workspace,
-  target,
-  trunk,
-  pr,
-  wc,
-  openRevisions,
-}: Picker): CtxEntry[] {
+export function revsetMenu({ workspace, target, trunk, pr, wc }: Picker): CtxEntry[] {
   const head = target?.changes.at(-1);
   const jj = (f: () => Promise<RevAction | undefined>) => () => {
     if (!target) return;
     run(f().then((a) => a && actOn(workspace, target, a)));
   };
   const busy = !target || target.loading;
-  const review = (revset: string) => () => target && reviewRevset(target, revset);
+  const review = (revset: string) => () => reviewRevset(workspace, revset);
+  const current = target?.revset;
   const choices = [
     ...(pr ? [[`#${pr.number}`, pr.revset]] : []),
     ...presets(trunk).map((p) => [p, p]),
   ];
   return [
-    { label: "Open Revisions", keys: "⌘J", disabled: !target, onSelect: openRevisions },
     {
       label: "Open Review Tab",
       onSelect: () => {
@@ -75,21 +68,18 @@ export function revsetMenu({
     },
     {
       label: "Review",
-      disabled: !target,
       items: [
         ...choices.map(([label, revset]) => ({
           label,
-          checked: target?.revset === revset,
+          checked: current === revset,
           keys: revset === "@" ? "⇧⌘J" : undefined,
           onSelect: review(revset),
         })),
         "-",
         {
           label: "Revset…",
-          onSelect: () => {
-            if (!target) return;
-            askRevset(target.revset).then((r) => r?.trim() && reviewRevset(target, r.trim()));
-          },
+          onSelect: () =>
+            askRevset(current ?? "@").then((r) => r?.trim() && reviewRevset(workspace, r.trim())),
         },
       ],
     },

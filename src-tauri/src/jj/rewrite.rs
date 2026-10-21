@@ -16,6 +16,7 @@ impl Jj {
         self.write(&["new", rev]).await
     }
 
+    #[cfg(test)]
     pub async fn edit(&self, rev: &str) -> anyhow::Result<()> {
         self.write(&["edit", rev]).await
     }

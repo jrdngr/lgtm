@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
+import { prFollowsReview } from "../workspaces/stack";
 import { fileMoves, type Moves, movesFrom } from "./follow";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 
@@ -52,6 +53,7 @@ export function useReview(workspace: WorkspaceName) {
     }
     opened.current = revset;
     setWorkspaceRevset(workspace, revset);
+    prFollowsReview(workspace, revset);
     if (current.current) commands.closeReview(current.current.id);
     show({ review: r.data });
     return r.data;

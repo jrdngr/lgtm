@@ -26,9 +26,14 @@ pub use send::Fixed;
 
 impl PrRecord {
     /// What the workspace reviews: the PR's own commits, which match GitHub's diff.
+    /// A stack PR's stop at the open PR below it, even when both target the same base.
     pub fn revset(&self) -> String {
         let base = remote_bookmark(&self.base_ref, &self.base_remote);
-        format!("{base}..{}", self.head_revset())
+        let own = format!("{base}..{}", self.head_revset());
+        match &self.below {
+            Some(b) => format!("{own} ~ ::{}", head_revset(b)),
+            None => own,
+        }
     }
 
     /// The PR's head. A stack PR's is its bookmark: the local one, else where it was fetched.
@@ -81,8 +86,6 @@ pub struct PrDto {
     pub revset: String,
     /// Picked from the workspace's stack rather than checked out into it.
     pub stack: bool,
-    /// Picked from the stack, which `@` has since left.
-    pub off: bool,
 }
 
 impl From<&PrRecord> for PrDto {
@@ -98,7 +101,6 @@ impl From<&PrRecord> for PrDto {
             head: p.head.clone(),
             revset: p.revset(),
             stack: p.stack,
-            off: p.off,
         }
     }
 }

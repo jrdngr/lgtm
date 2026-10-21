@@ -28,7 +28,7 @@ pub(crate) async fn nearby_prs(
         .map_err(err)
 }
 
-/// Brings the workspace's stack PR in line with `@`, and returns the workspace's PR.
+/// Keeps the workspace's stack PR's head current, and returns the workspace's PR.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn sync_stack_pr(
@@ -41,39 +41,21 @@ pub(crate) async fn sync_stack_pr(
         .map_err(err)
 }
 
-/// Picks stack PR `number` as the workspace's PR. With `edit`, edits its change first.
+/// Makes stack PR `number` the workspace's PR, to review its commits.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn select_stack_pr(
+pub(crate) async fn review_stack_pr(
     window: WebviewWindow,
     workspace: Option<String>,
     number: u32,
-    edit: bool,
 ) -> CmdResult<PrDto> {
-    let repo = repo(&window)?;
-    let ws = workspace.as_deref();
-    let pr = if edit {
-        repo.edit_stack_pr(ws, number).await
-    } else {
-        repo.select_stack_pr(ws, number).await
-    };
-    pr.map_err(err)
-}
-
-/// Edits the change of the workspace's stack PR, which `@` left.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn edit_back_to_stack_pr(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Option<PrDto>> {
     repo(&window)?
-        .edit_back_to_stack_pr(workspace.as_deref())
+        .review_stack_pr(workspace.as_deref(), number)
         .await
         .map_err(err)
 }
 
-/// Deselects the workspace's stack PR.
+/// Drops the workspace's stack PR.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn clear_stack_pr(window: WebviewWindow, workspace: Option<String>) -> CmdResult<()> {

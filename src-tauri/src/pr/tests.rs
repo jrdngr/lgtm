@@ -224,3 +224,53 @@ async fn off_the_stack_the_pr_view_is_the_prs_own_commits() {
     let got: Vec<_> = changes.into_iter().map(|c| c.description).collect();
     assert_eq!(got, ["one", "two"]);
 }
+
+#[tokio::test]
+async fn a_stack_prs_commits_stop_at_the_open_pr_below_it() {
+    let up = tempfile::tempdir().unwrap();
+    upstream(up.path());
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let j: &Jj = &ctx.main.jj;
+    j.remote_add("origin", &up.path().to_string_lossy())
+        .await
+        .unwrap();
+    j.fetch("origin", &["main"]).await.unwrap();
+    jj(d, &["new", "main@origin"]);
+    for (file, bookmark) in [("one", "low"), ("two", "")] {
+        write(d, file, file);
+        jj(d, &["commit", "-m", file]);
+        if !bookmark.is_empty() {
+            jj(d, &["bookmark", "create", bookmark, "-r", "@-"]);
+        }
+    }
+    write(d, "three", "three");
+    jj(d, &["describe", "-m", "three"]);
+    jj(d, &["bookmark", "create", "high", "-r", "@"]);
+    let record = |below: Option<&str>| crate::store::PrRecord {
+        workspace: String::new(),
+        repo: crate::github::GhRepo {
+            owner: "o".into(),
+            name: "r".into(),
+        },
+        number: 2,
+        id: String::new(),
+        title: String::new(),
+        url: String::new(),
+        author: String::new(),
+        base_ref: "main".into(),
+        base_remote: "origin".into(),
+        head_ref: "high".into(),
+        head_remote: None,
+        added_remote: None,
+        head: String::new(),
+        stack: true,
+        below: below.map(String::from),
+    };
+    let described = |revset: String| async move {
+        let changes = j.changes(&revset).await.unwrap();
+        changes.into_iter().map(|c| c.description).collect::<Vec<_>>()
+    };
+    assert_eq!(described(record(None).revset()).await, ["one", "two", "three"]);
+    assert_eq!(described(record(Some("low")).revset()).await, ["two", "three"]);
+}

@@ -5,6 +5,7 @@ import { useReviewTarget } from "../review/target";
 import { useAtOutside } from "../review/workingCopy";
 import { run } from "../services/pathMenu";
 import { actOn, reviewRevset } from "./revsetMenu";
+import "./AtBanner.css";
 
 /** Under the header while `@` is outside the review: review `@`, or edit the review's head. */
 export function AtBanner({ workspace }: { workspace: WorkspaceName }) {
@@ -19,7 +20,7 @@ export function AtBanner({ workspace }: { workspace: WorkspaceName }) {
       <span className="rev-at">@</span>
       <span>@ is outside the review</span>
       <span className="spacer" />
-      <button type="button" onClick={() => reviewRevset(target, "@")}>
+      <button type="button" onClick={() => reviewRevset(workspace, "@")}>
         Review @
       </button>
       {head && (

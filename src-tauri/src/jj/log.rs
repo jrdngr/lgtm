@@ -1,53 +1,89 @@
-//! `jj log` as the user sees it, for picking commits.
+//! `jj log` for picking commits, as rows lgtm draws.
 
 use super::Jj;
 
-/// One line of `jj log` output, with ANSI colors.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
+/// One commit in the log, with the graph drawn beside its two lines, or a line of graph
+/// alone where branches join or are elided.
+#[derive(Clone, Debug, PartialEq, serde::Serialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
-pub struct LogLine {
-    pub text: String,
-    /// Set on the first line of each commit.
-    pub commit_id: Option<String>,
-    pub change_id: Option<String>,
-    /// The commit's whole description, on the first line of each commit.
-    pub description: Option<String>,
-    /// Whether this line starts the workspace's working-copy commit.
-    pub working_copy: bool,
+pub struct LogRow {
+    /// The graph left of each of the row's lines: jj's own, without colors.
+    pub graph: Vec<String>,
+    pub commit: Option<LogCommit>,
 }
 
-/// Splits out the `\x1f`-separated ids, working-copy flag and JSON-escaped description that
-/// `log_graph` puts in front of each commit's template.
-fn parse_log(out: &str) -> Vec<LogLine> {
-    out.lines()
-        .map(|line| {
-            let mut parts = line.splitn(6, '\x1f');
-            let prefix = parts.next().unwrap_or_default();
-            let fields = (
-                parts.next(),
-                parts.next(),
-                parts.next(),
-                parts.next(),
-                parts.next(),
-            );
-            match fields {
-                (Some(commit), Some(change), Some(wc), Some(desc), Some(rest)) => LogLine {
-                    text: format!("{prefix}{rest}"),
-                    commit_id: Some(commit.to_string()),
-                    change_id: Some(change.to_string()),
-                    description: serde_json::from_str(desc).ok(),
-                    working_copy: wc == "1",
-                },
-                _ => LogLine {
-                    text: line.to_string(),
-                    commit_id: None,
-                    change_id: None,
-                    description: None,
-                    working_copy: false,
-                },
+#[derive(Clone, Debug, PartialEq, serde::Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct LogCommit {
+    pub commit_id: String,
+    pub change_id: String,
+    /// How many of the change id's first characters tell it apart.
+    pub unique: u32,
+    /// The whole description.
+    pub description: String,
+    pub bookmarks: Vec<String>,
+    /// The author's email up to the `@`, else their name.
+    pub author: String,
+    /// When it was authored, in seconds since the epoch.
+    pub time: f64,
+    pub working_copy: bool,
+    pub immutable: bool,
+    pub conflict: bool,
+    pub divergent: bool,
+    pub empty: bool,
+}
+
+/// Each commit's fields, `\x1f`-separated, then a second line marked `\x1e` so jj draws the
+/// graph beside it too.
+const ROW_TEMPLATE: &str = r#""\x1f" ++ commit_id ++ "\x1f" ++ change_id ++ "\x1f"
+  ++ change_id.shortest().prefix().len() ++ "\x1f" ++ description.escape_json() ++ "\x1f"
+  ++ local_bookmarks.map(|b| b.name()).join(" ") ++ "\x1f"
+  ++ coalesce(author.email().local(), author.name()) ++ "\x1f"
+  ++ author.timestamp().format("%s") ++ "\x1f"
+  ++ if(current_working_copy, "w") ++ if(immutable, "i") ++ if(conflict, "c")
+  ++ if(divergent, "d") ++ if(empty, "e")
+  ++ "\n\x1e\n""#;
+
+/// Rows from `jj log -T ROW_TEMPLATE`: a commit's line and its `\x1e` line make one row, and
+/// any other line is graph alone.
+fn parse_rows(out: &str) -> Vec<LogRow> {
+    let mut rows: Vec<LogRow> = Vec::new();
+    for line in out.lines() {
+        if let Some((graph, rest)) = line.split_once('\x1f') {
+            let f: Vec<&str> = rest.split('\x1f').collect();
+            if f.len() < 8 {
+                continue;
             }
-        })
-        .collect()
+            let flags = f[7];
+            rows.push(LogRow {
+                graph: vec![graph.to_string()],
+                commit: Some(LogCommit {
+                    commit_id: f[0].into(),
+                    change_id: f[1].into(),
+                    unique: f[2].parse().unwrap_or(4),
+                    description: serde_json::from_str(f[3]).unwrap_or_default(),
+                    bookmarks: f[4].split_whitespace().map(String::from).collect(),
+                    author: f[5].into(),
+                    time: f[6].parse().unwrap_or(0.0),
+                    working_copy: flags.contains('w'),
+                    immutable: flags.contains('i'),
+                    conflict: flags.contains('c'),
+                    divergent: flags.contains('d'),
+                    empty: flags.contains('e'),
+                }),
+            });
+        } else if let Some((graph, _)) = line.split_once('\x1e') {
+            if let Some(last) = rows.last_mut().filter(|r| r.graph.len() == 1) {
+                last.graph.push(graph.to_string());
+            }
+        } else {
+            rows.push(LogRow {
+                graph: vec![line.to_string()],
+                commit: None,
+            });
+        }
+    }
+    rows
 }
 
 /// Names `trunk()` usually resolves to, preferred over other bookmarks on the same commit.
@@ -72,21 +108,12 @@ fn pick_trunk(out: &str) -> Option<String> {
 }
 
 impl Jj {
-    /// `jj log` as the user sees it: their default revset and log template, with the graph
-    /// and colors. Lines that start a commit carry its ids.
-    pub async fn log_graph(&self) -> anyhow::Result<Vec<LogLine>> {
-        let template = self
-            .read(&["config", "get", "templates.log"])
-            .await
-            .map(|t| t.trim().to_string())
-            .unwrap_or_else(|_| "builtin_log_compact".into());
-        let template = format!(
-            r#""\x1f" ++ stringify(commit_id) ++ "\x1f" ++ stringify(change_id.shortest(8)) ++ "\x1f" ++ if(current_working_copy, "1", "0") ++ "\x1f" ++ description.escape_json() ++ "\x1f" ++ ({template})"#
-        );
+    /// The commits of `jj log`'s default revset, newest first, with jj's graph.
+    pub async fn log_rows(&self) -> anyhow::Result<Vec<LogRow>> {
         let out = self
-            .exec_with(&["log", "-T", &template], true, "always")
+            .exec_with(&["log", "-T", ROW_TEMPLATE], true, "never")
             .await?;
-        Ok(parse_log(&String::from_utf8_lossy(&out)))
+        Ok(parse_rows(&String::from_utf8_lossy(&out)))
     }
 
     /// The local bookmark `trunk()` resolves to, as a revset symbol, or `None` when it has
@@ -111,16 +138,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn log_lines_carry_ids_only_where_a_commit_starts() {
-        let got = parse_log("@  \x1fc1\x1fab\x1f1\x1f\"fix\\n\\nbody\"\x1fab desc\n│  body\n");
-        assert_eq!(got[0].text, "@  ab desc");
-        assert_eq!(got[0].description.as_deref(), Some("fix\n\nbody"));
-        assert!(got[0].working_copy);
-        assert_eq!(got[0].commit_id.as_deref(), Some("c1"));
-        assert_eq!(
-            (got[1].text.as_str(), got[1].change_id.as_deref()),
-            ("│  body", None)
-        );
+    fn rows_pair_each_commit_with_its_graph_and_keep_graph_only_lines() {
+        let out = "@  \x1fc1\x1fkx\x1f2\x1f\"fix\\n\\nbody\"\x1fmain feat\x1fjo\x1f1700000000\x1fwe\n\
+                   │  \x1e\n\
+                   │ ○  \x1fc2\x1fpq\x1f1\x1f\"\"\x1f\x1fjo\x1f1\x1fc\n\
+                   ├─╯  \x1e\n\
+                   ~\n";
+        let rows = parse_rows(out);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].graph, ["@  ", "│  "]);
+        let c = rows[0].commit.as_ref().unwrap();
+        assert_eq!(c.description, "fix\n\nbody");
+        assert_eq!(c.bookmarks, ["main", "feat"]);
+        assert!(c.working_copy && c.empty && !c.conflict);
+        assert_eq!((c.unique, c.time), (2, 1_700_000_000.0));
+        assert_eq!(rows[1].graph, ["│ ○  ", "├─╯  "]);
+        assert!(rows[1].commit.as_ref().unwrap().conflict);
+        assert_eq!((rows[2].graph[0].as_str(), rows[2].commit.is_none()), ("~", true));
     }
 
     #[test]

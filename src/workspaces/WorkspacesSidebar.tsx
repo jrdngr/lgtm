@@ -3,8 +3,9 @@ import type { WorkspaceDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
-import { prOf, reloadPr } from "../github/pr";
-import { commands, errorText } from "../ipc";
+import { reloadPr } from "../github/pr";
+import { commands } from "../ipc";
+import { RevisionsSection } from "../revisions/RevisionsSection";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
@@ -12,8 +13,6 @@ import { confirmShown, showText } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
 import { type AddKind, onAddRequest } from "./addRequests";
 import { arrange, forgetPin, usePins } from "./pins";
-import { StackPrs } from "./StackPrs";
-import { clearStackPr, setStackPrsShown, stackPrsShown } from "./stack";
 import { usePinDrag } from "./usePinDrag";
 import type { Workspaces } from "./useWorkspaces";
 import { WorkspaceRow } from "./WorkspaceRow";
@@ -31,7 +30,8 @@ interface Props {
   onHide(): void;
 }
 
-/** The repo's workspaces. Click one to switch to it. */
+/** The repo's workspaces, and the selected one's revisions under them. Click a workspace to
+ * switch to it. */
 export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide }: Props) {
   const { workspaces, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
@@ -40,22 +40,9 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<string>();
-  // Bumped by Refresh, so the stack PRs ask GitHub again.
+  // Bumped by Refresh, so the revisions' PRs ask GitHub again.
   const [refreshed, setRefreshed] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
-  const [showPrs, setShowPrs] = useState(stackPrsShown);
-
-  /** Shows or hides the stack PRs. Hiding deselects every workspace's stack PR. */
-  async function toggleStackPrs() {
-    const show = !showPrs;
-    setShowPrs(show);
-    setStackPrsShown(show);
-    if (show) return;
-    for (const w of workspaces ?? []) {
-      const pr = await prOf(w.name);
-      if (pr?.stack) await clearStackPr(w.name, pr).catch((e) => setError(errorText(e)));
-    }
-  }
   const pins = usePins();
   const { drop, start: startDrag } = usePinDrag(pins.pinned);
 
@@ -171,89 +158,74 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
         </li>
       );
     }
-    const item = (
+    return (
       <WorkspaceRow
         key={key}
         w={w}
         selected={selected === w.name}
         onSelect={() => onSelect(w.name)}
         onDelete={() => setConfirming(w.name ?? undefined)}
-        onError={setError}
         onPinDrag={pinned ? (e) => startDrag(e, key) : undefined}
         drop={pinned ? dropAt(key) : undefined}
       />
     );
-    if (selected !== w.name || !showPrs || githubOff) return item;
-    return [
-      item,
-      <StackPrs key={`${key} stack`} workspace={w.name} refreshed={refreshed} onError={setError} />,
-    ];
   }
 
   return (
-    <div className="workspaces" onContextMenu={menu}>
-      <SectionHeader title="Workspaces">
-        {!githubOff && (
+    <div className="workspaces">
+      <div className="ws-top" onContextMenu={menu}>
+        <SectionHeader title="Workspaces">
           <IconButton
-            icon="pr"
-            label="Stack PRs"
-            className={`ws-pr-toggle${showPrs ? " on" : ""}`}
-            aria-pressed={showPrs}
+            icon="sync"
+            label="Refresh"
+            disabled={refreshing}
             onClick={(e) => {
               e.stopPropagation();
-              toggleStackPrs();
+              refresh();
             }}
           />
-        )}
-        <IconButton
-          icon="sync"
-          label="Refresh"
-          disabled={refreshing}
-          onClick={(e) => {
-            e.stopPropagation();
-            refresh();
-          }}
-        />
-        <button
-          type="button"
-          className="ws-new"
-          onClick={(e) => {
-            e.stopPropagation();
-            openMenu(e, addItems);
-          }}
-        >
-          + New ▾
-        </button>
-      </SectionHeader>
-      {openingPr && (
-        <OpenPr onClose={() => setOpeningPr(false)} onError={setError} onOpened={prOpened} />
-      )}
-      {naming && (
-        <form className="workspace-form" onSubmit={create}>
-          <input
-            // biome-ignore lint/a11y/noAutofocus: the form opens to take a name
-            autoFocus
-            value={name}
-            placeholder="workspace-name"
-            spellCheck={false}
-            aria-label="Workspace name"
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setNaming(false)}
-          />
-          <button type="submit" className="primary" disabled={busy || !name.trim()}>
-            {busy ? "Creating" : "Create"}
+          <button
+            type="button"
+            className="ws-new"
+            onClick={(e) => {
+              e.stopPropagation();
+              openMenu(e, addItems);
+            }}
+          >
+            + New ▾
           </button>
-        </form>
-      )}
-      {error && <div className="review-error">{error}</div>}
-      {top.length > 0 && (
-        <>
-          <div className="ws-cap">Pinned</div>
-          <ul>{top.map((w) => row(w, true))}</ul>
-          <div className="ws-divider" />
-        </>
-      )}
-      <ul>{rest.map((w) => row(w, false))}</ul>
+        </SectionHeader>
+        {openingPr && (
+          <OpenPr onClose={() => setOpeningPr(false)} onError={setError} onOpened={prOpened} />
+        )}
+        {naming && (
+          <form className="workspace-form" onSubmit={create}>
+            <input
+              // biome-ignore lint/a11y/noAutofocus: the form opens to take a name
+              autoFocus
+              value={name}
+              placeholder="workspace-name"
+              spellCheck={false}
+              aria-label="Workspace name"
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === "Escape" && setNaming(false)}
+            />
+            <button type="submit" className="primary" disabled={busy || !name.trim()}>
+              {busy ? "Creating" : "Create"}
+            </button>
+          </form>
+        )}
+        {error && <div className="review-error">{error}</div>}
+        {top.length > 0 && (
+          <>
+            <div className="ws-cap">Pinned</div>
+            <ul>{top.map((w) => row(w, true))}</ul>
+            <div className="ws-divider" />
+          </>
+        )}
+        <ul>{rest.map((w) => row(w, false))}</ul>
+      </div>
+      <RevisionsSection workspace={selected} refreshed={refreshed} />
     </div>
   );
 }

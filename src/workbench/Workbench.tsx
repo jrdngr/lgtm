@@ -17,8 +17,9 @@ import { useShortcutsMenu } from "../help/open";
 import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { forgetWorkspaceRevset } from "../review/revset";
-import { openRevisions, targetOf } from "../review/target";
-import { useAtOutside } from "../review/workingCopy";
+import { useReviewTarget } from "../review/target";
+import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
+import { focusLog } from "../revisions/loadReview";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
@@ -31,7 +32,6 @@ import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
 import { JjBlockedBanner, JjBusyTag, useTrackJjBusy } from "./JjBusy";
 import { toggleMaximize } from "./maximize";
-import { RevPicker } from "./RevPicker";
 import { RightPanel } from "./RightPanel";
 import { reviewRevset } from "./revsetMenu";
 import { SidePanel, type SideState } from "./SidePanel";
@@ -75,6 +75,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
   useCloseGuard();
   useFollowWorkingCopy();
+  useTrackWorkingCopy(selected, useReviewTarget(selected));
   useTrackJjBusy();
   useWordWrapMenu();
   useSettingsMenu(selected);
@@ -173,7 +174,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+W": () => void closeTab(),
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
-    "Mod+Shift+K": () => showView("left", "workspaces"),
+    "Mod+Shift+K": () => {
+      showView("left", "workspaces");
+      requestAnimationFrame(() => requestAnimationFrame(focusLog));
+    },
     "Mod+Shift+E": () => showView("right", "changes"),
     "Mod+Shift+R": () => showView("right", "repo"),
     "Mod+Shift+M": () => showView("right", "comments"),
@@ -185,11 +189,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       showView("right", "drawings");
       requestNewDrawing();
     },
-    "Mod+J": () => openRevisions(selected),
-    "Mod+Shift+J": () => {
-      const target = targetOf(selected);
-      if (target) reviewRevset(target, "@");
-    },
+    "Mod+Shift+J": () => reviewRevset(selected, "@"),
     "Mod+Shift+ENTER": () => {
       const dock = dockOf(selected);
       if (dock) toggleMaximize(dock, inBottom() ? undefined : dock.activeGroup);
@@ -266,9 +266,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
         </span>
         <JjBusyTag workspace={selected} />
         <span className="spacer" />
-        <div className="toolbar-center">
-          <RevPicker workspace={selected} />
-        </div>
         <SideToggle
           side="right"
           open={sides.right.open}

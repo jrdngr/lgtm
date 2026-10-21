@@ -1,14 +1,12 @@
 import type { WorkspaceDto } from "../bindings";
 import { workspaceKey } from "../core/workspace";
 import { usePr } from "../github/pr";
-import { errorText } from "../ipc";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
 import { agentName, openAgent } from "./agentTabs";
 import { COLORS, usePins } from "./pins";
-import { clearStackPr } from "./stack";
 import { deleteItem, workspaceMenu } from "./workspaceMenu";
 
 /** Characters of a change id shown, its unique prefix included. */
@@ -34,9 +32,8 @@ function Change({ w }: { w: WorkspaceDto }) {
   );
 }
 
-/** A PR workspace is one line, its PR. Others show their name, with the PR picked from their
- * stack and its ✕, then their change. */
-function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void }) {
+/** A PR workspace is one line, its PR. Others show their name, then their change. */
+function Lines({ w }: { w: WorkspaceDto }) {
   const pr = usePr(w.name);
   if (pr && !pr.stack) {
     return (
@@ -51,23 +48,6 @@ function Lines({ w, onError }: { w: WorkspaceDto; onError(message: string): void
       <span className="workspace-title">
         <span className="ellipsis">{w.title}</span>
         {w.name === null && <span className="pill">main</span>}
-        {pr?.off && <span className="pill amber">Off stack</span>}
-        {pr && (
-          <span className="pill pr" title={pr.title}>
-            #{pr.number}
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: the PR tab's menu deselects by keyboard */}
-            <span
-              className="pill-x"
-              title="Deselect PR"
-              onClick={(e) => {
-                e.stopPropagation();
-                clearStackPr(w.name, pr).catch((err) => onError(errorText(err)));
-              }}
-            >
-              ✕
-            </span>
-          </span>
-        )}
       </span>
       <span className="workspace-desc">
         <Change w={w} />
@@ -81,7 +61,6 @@ interface Props {
   selected: boolean;
   onSelect(): void;
   onDelete(): void;
-  onError(message: string): void;
   /** Starts dragging a pinned row. */
   onPinDrag?(e: React.PointerEvent): void;
   /** Where a dragged pin would land, next to this row. */
@@ -89,7 +68,7 @@ interface Props {
 }
 
 /** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
-export function WorkspaceRow({ w, selected, onSelect, onDelete, onError, onPinDrag, drop }: Props) {
+export function WorkspaceRow({ w, selected, onSelect, onDelete, onPinDrag, drop }: Props) {
   const pr = usePr(w.name);
   const a = useActivity(w.name);
   const key = workspaceKey(w.name);
@@ -122,7 +101,7 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onError, onPinDr
         onClick={onSelect}
         title={w.description.trim() || undefined}
       >
-        <Lines w={w} onError={onError} />
+        <Lines w={w} />
       </button>
       <span className="workspace-side">
         {w.name !== null && (

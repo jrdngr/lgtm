@@ -11,7 +11,6 @@ import { pathItems, run } from "../services/pathMenu";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { MenuItem } from "../ui/Menu";
 import { COLORS, type PinColor, setColor, togglePin } from "./pins";
-import { clearStackPr } from "./stack";
 
 /** The row's Delete, in its ⋯ menu and its right-click menu. The main workspace can't go. */
 export const deleteItem = (w: WorkspaceDto, onDelete: () => void): MenuItem => ({
@@ -89,13 +88,11 @@ export function workspaceMenu({
     "-",
     ...(pr
       ? [
-          pr.stack
-            ? { label: "Deselect PR", onSelect: () => run(clearStackPr(ws, pr)) }
-            : {
-                label: "Sync PR",
-                disabled: !currentReview(ws),
-                onSelect: () => currentReview(ws)?.refetchPr(),
-              },
+          !pr.stack && {
+            label: "Sync PR",
+            disabled: !currentReview(ws),
+            onSelect: () => currentReview(ws)?.refetchPr(),
+          },
           { label: "Open PR on GitHub", onSelect: () => run(unwrap(commands.openPrPage(ws))) },
           { label: "Copy PR URL", onSelect: () => copy(pr.url) },
           "-" as const,

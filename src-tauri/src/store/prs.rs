@@ -30,13 +30,12 @@ pub struct PrRecord {
     pub added_remote: Option<String>,
     /// The head commit as last fetched.
     pub head: String,
-    /// Picked from the workspace's stack, which it follows `@` along, rather than checked out.
+    /// Picked from the workspace's stack rather than checked out.
     #[serde(default)]
     pub stack: bool,
-    /// A stack PR `@` no longer builds on. It stays picked until the user edits back onto it
-    /// or deselects it.
+    /// A stack PR's commits stop at this bookmark: the head of the open PR below it.
     #[serde(default)]
-    pub off: bool,
+    pub below: Option<String>,
 }
 
 const SCHEMA: &str = "
