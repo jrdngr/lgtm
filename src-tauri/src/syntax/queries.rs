@@ -119,6 +119,36 @@ pub(super) const MD_INJECTIONS: &str = r#"
   (#set! injection.include-children))
 "#;
 
+/// The crate ships no queries. Earlier patterns win where two match the same node.
+pub(super) const HCL_HIGHLIGHTS: &str = r#"
+(comment) @comment
+(block . (identifier) @type)
+(attribute . (identifier) @property)
+(object_elem key: (expression (variable_expr (identifier) @property)))
+(get_attr (identifier) @property)
+(function_call . (identifier) @function)
+((variable_expr (identifier) @variable.builtin)
+  (#any-of? @variable.builtin
+    "var" "local" "data" "module" "each" "count" "self" "path" "terraform"))
+(for_intro (identifier) @variable.parameter)
+(template_for_start (identifier) @variable.parameter)
+[(string_lit) (template_literal) (quoted_template_start) (quoted_template_end)] @string
+(heredoc_template (template_literal) @string)
+[(heredoc_start) (heredoc_identifier)] @punctuation
+(numeric_lit) @number
+[(bool_lit) (null_lit)] @constant
+["if" "else" "endif" "for" "endfor" "in"] @keyword
+[
+  (template_interpolation_start) (template_interpolation_end)
+  (template_directive_start) (template_directive_end) (strip_marker)
+] @escape
+[
+  "!" "*" "/" "%" "+" "-" ">" ">=" "<" "<=" "==" "!=" "&&" "||" "?" ":" "=" "=>"
+  (ellipsis)
+] @operator
+["." ".*" "[*]" "," "{" "}" "[" "]" "(" ")"] @punctuation
+"#;
+
 pub(super) const SHELL_SYMBOLS: &str = r#"
 (function_definition name: (word) @name) @symbol
 "#;

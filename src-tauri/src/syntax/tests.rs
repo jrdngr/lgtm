@@ -13,7 +13,7 @@ fn symbols(path: &str, src: &str) -> Vec<(String, u32, u32)> {
 
 #[test]
 fn every_language_builds() {
-    assert_eq!(LazyLock::force(&LANGS).len(), 18);
+    assert_eq!(LazyLock::force(&LANGS).len(), 19);
 }
 
 #[test]
@@ -215,6 +215,18 @@ fn markdown_highlights_inline_text_and_fenced_code_by_language() {
     assert!(has(0, "tag"), "{:?}", lines[0]);
     assert!(has(2, "string") && has(2, "keyword"), "{:?}", lines[2]);
     assert!(has(5, "keyword"), "{:?}", lines[5]);
+}
+
+#[test]
+fn terraform_highlights_blocks_attributes_and_references() {
+    let src = "resource \"aws_s3_bucket\" \"logs\" {\n  bucket = var.name\n  count  = length(local.ids)\n}\n";
+    let lines = highlight_file("main.tf", src);
+    let class = |n: &str| Some(HIGHLIGHT_NAMES.iter().position(|h| *h == n).unwrap() as u8);
+    let has = |line: usize, n: &str| lines[line].iter().any(|s| s.0 == class(n));
+    assert!(has(0, "type") && has(0, "string"), "{:?}", lines[0]);
+    assert!(has(1, "property") && has(1, "variable.builtin"), "{:?}", lines[1]);
+    assert!(has(2, "function"), "{:?}", lines[2]);
+    assert!(!highlight_file("code.terraform", "x = 1")[0].is_empty());
 }
 
 #[test]

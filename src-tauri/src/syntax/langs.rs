@@ -295,6 +295,10 @@ pub(super) static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|
             .leading(&["comment"]),
         ),
         (
+            "hcl",
+            Lang::new(tree_sitter_hcl::LANGUAGE.into(), "hcl", HCL_HIGHLIGHTS, ""),
+        ),
+        (
             "dockerfile",
             Lang::new(
                 tree_sitter_containerfile::LANGUAGE.into(),
@@ -336,6 +340,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "html" | "htm" => "html",
         "sql" => "sql",
         "mk" => "make",
+        "hcl" | "tf" | "tfvars" | "terraform" => "hcl",
         "dockerfile" | "containerfile" => "dockerfile",
         _ => return None,
     })
