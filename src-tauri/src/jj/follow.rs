@@ -1,7 +1,7 @@
 //! Telling the app's own working-copy moves from ones made elsewhere: a terminal, an agent.
 
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, LazyLock, Mutex};
 
 use super::{Jj, checkout};
@@ -13,19 +13,6 @@ type Listed = Option<(Vec<String>, HashMap<String, String>)>;
 /// so they share one `jj workspace list` per operation instead of a read each.
 static LISTED: LazyLock<Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<Listed>>>>> =
     LazyLock::new(Mutex::default);
-
-/// The repo's current operation heads, from the names of its op heads files.
-fn op_heads(repo: &Path) -> Vec<String> {
-    let Ok(entries) = std::fs::read_dir(repo.join("op_heads/heads")) else {
-        return vec![];
-    };
-    let mut heads: Vec<String> = entries
-        .flatten()
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .collect();
-    heads.sort();
-    heads
-}
 
 impl Jj {
     async fn working_copy_change(&self) -> anyhow::Result<String> {
@@ -41,7 +28,7 @@ impl Jj {
         };
         let entry = LISTED.lock().unwrap().entry(repo.clone()).or_default().clone();
         let mut listed = entry.lock().await;
-        let heads = op_heads(&repo);
+        let heads = checkout::op_heads(&repo);
         let fresh = listed.as_ref().filter(|(at, _)| !heads.is_empty() && *at == heads);
         let changes = match fresh {
             Some((_, changes)) => changes.clone(),

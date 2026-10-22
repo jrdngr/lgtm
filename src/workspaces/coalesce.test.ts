@@ -8,21 +8,22 @@ describe("coalesce", () => {
   it("fires once after a burst goes quiet", () => {
     const fire = vi.fn();
     const call = coalesce(fire, 250, 1000);
-    call();
+    call(1);
     vi.advanceTimersByTime(100);
-    call();
-    call();
+    call(2);
+    call(3);
     vi.advanceTimersByTime(249);
     expect(fire).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
     expect(fire).toHaveBeenCalledTimes(1);
+    expect(fire).toHaveBeenCalledWith([1, 2, 3]);
   });
 
   it("fires during a burst that never goes quiet, by its longest wait", () => {
     const fire = vi.fn();
     const call = coalesce(fire, 250, 1000);
     for (let t = 0; t < 1500; t += 100) {
-      call();
+      call(t);
       vi.advanceTimersByTime(100);
     }
     expect(fire).toHaveBeenCalledTimes(1);

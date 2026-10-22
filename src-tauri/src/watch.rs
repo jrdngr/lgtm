@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::time::Duration;
 
 use ignore::gitignore::Gitignore;
@@ -11,7 +11,13 @@ use notify::{RecursiveMode, Watcher as _};
 use tokio::sync::mpsc;
 use tokio::time::{Instant, sleep_until};
 
+use crate::jj::checkout::{op_heads, repo_dir};
 use crate::jj::{Jj, Notice, Snapshot};
+
+/// The operation heads each repo store had after the app's last background snapshot there,
+/// shared since every workspace's watcher sees every operation.
+static SNAPSHOT_HEADS: LazyLock<Mutex<HashMap<PathBuf, Vec<String>>>> =
+    LazyLock::new(Mutex::default);
 
 const SNAPSHOT_DEBOUNCE: Duration = Duration::from_millis(300);
 /// The longest a run of edits holds off a snapshot.
@@ -20,8 +26,9 @@ const CHANGE_DEBOUNCE: Duration = Duration::from_millis(50);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
-    /// A jj operation landed: the repo's commits may have changed.
-    RepoChanged,
+    /// A jj operation landed: the repo's commits may have changed. `snapshot` when the
+    /// operation is the app's own background snapshot, which only rewrites a working copy.
+    RepoChanged { snapshot: bool },
     /// The working copy became stale (with jj's message) or stopped being stale.
     Stale(Option<String>),
     /// Something other than the app moved `@`.
@@ -136,7 +143,8 @@ pub fn start(
     if let Some(dir) = &op_heads {
         watcher.watch(dir, RecursiveMode::NonRecursive)?;
     }
-    let task = tauri::async_runtime::spawn(run(rx, jj, stale, emit));
+    let repo = repo_dir(root);
+    let task = tauri::async_runtime::spawn(run(rx, jj, repo, stale, emit));
     Ok(Watch {
         _watcher: watcher,
         task,
@@ -146,6 +154,7 @@ pub fn start(
 async fn run(
     mut rx: mpsc::UnboundedReceiver<Ping>,
     jj: Arc<Jj>,
+    repo: Option<PathBuf>,
     stale: Arc<Mutex<Option<String>>>,
     emit: impl Fn(Event),
 ) {
@@ -185,8 +194,11 @@ async fn run(
                 let now = Instant::now();
                 if changed_at.is_some_and(|t| t <= now) {
                     changed_at = None;
-                    tracing::trace!(workspace = jj.name(), "repo changed");
-                    emit(Event::RepoChanged);
+                    let snapshot = repo.as_ref().is_some_and(|r| {
+                        SNAPSHOT_HEADS.lock().unwrap().get(r) == Some(&op_heads(r))
+                    });
+                    tracing::trace!(workspace = jj.name(), snapshot, "repo changed");
+                    emit(Event::RepoChanged { snapshot });
                     match jj.moved_working_copy().await {
                         Ok(true) => emit(Event::WorkingCopyMoved),
                         Ok(false) => {}
@@ -196,9 +208,18 @@ async fn run(
                 if snapshot_at.is_some_and(|t| t <= now) {
                     snapshot_at = None;
                     edits_since = None;
+                    let before = repo.as_deref().map(op_heads);
                     let now_stale = match jj.background_snapshot().await {
                         Ok(Snapshot::Done(now_stale)) => {
                             retry_at = None;
+                            // Heads that moved are the snapshot's, unless another operation
+                            // landed at the same moment.
+                            if let (Some(r), Some(before)) = (&repo, before) {
+                                let after = op_heads(r);
+                                if after != before {
+                                    SNAPSHOT_HEADS.lock().unwrap().insert(r.clone(), after);
+                                }
+                            }
                             now_stale
                         }
                         Ok(Snapshot::Retry(after)) => {
@@ -288,7 +309,10 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(200)).await;
         std::fs::write(root.join("a.txt"), "hi\n").unwrap();
         let got = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
-        assert_eq!(got.ok().flatten(), Some(Event::RepoChanged));
+        assert_eq!(
+            got.ok().flatten(),
+            Some(Event::RepoChanged { snapshot: true })
+        );
     }
 
     #[tokio::test]

@@ -8,6 +8,14 @@ interface Listener {
   cb: () => void;
   /** Set for a workspace's own views, which wait while the workspace is hidden. */
   key?: string;
+  /** Whether the app's own background snapshots count as changes. */
+  snapshots: boolean;
+}
+
+export interface RepoChangedOptions {
+  /** Whether the app's own background snapshots count as changes, which only rewrite a
+   * working copy. Defaults to true. */
+  snapshots?: boolean;
 }
 
 const listeners = new Set<Listener>();
@@ -27,8 +35,10 @@ export function showWorkspace(ws: WorkspaceName) {
   }
 }
 
-function fire() {
+function fire(burst: { payload: { snapshot: boolean } }[]) {
+  const snapshotOnly = burst.every((e) => e.payload.snapshot);
   for (const l of listeners) {
+    if (snapshotOnly && !l.snapshots) continue;
     if (l.key === undefined || l.key === shown) l.cb();
     else missed.add(l);
   }
@@ -38,13 +48,18 @@ function fire() {
  * operation, and an agent's snapshots land every few seconds, so a run of reports reloads
  * once. With `workspace`, a change while it's hidden calls `cb` when it's next shown
  * instead. Returns a function that stops it. */
-export function onRepoChanged(cb: () => void, workspace?: WorkspaceName): () => void {
+export function onRepoChanged(
+  cb: () => void,
+  workspace?: WorkspaceName,
+  { snapshots = true }: RepoChangedOptions = {},
+): () => void {
   if (!listening) {
     listening = true;
     // Scoped to this window: other windows hold other repos.
     events.repoChanged(getCurrentWebviewWindow()).listen(coalesce(fire, 250, 1000));
   }
-  const l: Listener = { cb, key: workspace === undefined ? undefined : workspaceKey(workspace) };
+  const key = workspace === undefined ? undefined : workspaceKey(workspace);
+  const l: Listener = { cb, key, snapshots };
   listeners.add(l);
   return () => {
     listeners.delete(l);
@@ -53,10 +68,15 @@ export function onRepoChanged(cb: () => void, workspace?: WorkspaceName): () => 
 }
 
 /** Calls the latest `cb` whenever this window's repo changes, as `onRepoChanged` does. */
-export function useRepoChanged(cb: () => void, workspace?: WorkspaceName) {
+export function useRepoChanged(
+  cb: () => void,
+  workspace?: WorkspaceName,
+  options: RepoChangedOptions = {},
+) {
   const ref = useRef(cb);
   ref.current = cb;
   const key = workspace === undefined ? undefined : workspaceKey(workspace);
+  const snapshots = options.snapshots ?? true;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `key` stands for `workspace`
-  useEffect(() => onRepoChanged(() => ref.current(), workspace), [key]);
+  useEffect(() => onRepoChanged(() => ref.current(), workspace, { snapshots }), [key, snapshots]);
 }

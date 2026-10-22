@@ -39,9 +39,14 @@ export function useRowPrs(workspace: WorkspaceName, refreshed: number) {
     if (githubOff) setNearby([]);
     else load(refreshed > 0);
   }, [githubOff, load, refreshed]);
-  useRepoChanged(() => {
-    if (!githubOff) load(false);
-  }, workspace);
+  // A background snapshot only rewrites `@`, which moves no bookmarks.
+  useRepoChanged(
+    () => {
+      if (!githubOff) load(false);
+    },
+    workspace,
+    { snapshots: false },
+  );
 
   return (c: LogCommit): RowPr | undefined => {
     if (pr && !pr.stack && c.commitId === pr.head) {

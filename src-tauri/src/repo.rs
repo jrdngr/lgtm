@@ -73,7 +73,7 @@ fn emitter(app: &AppHandle, label: &str) -> Emit {
     let (app, label) = (app.clone(), label.to_string());
     Arc::new(move |workspace: Option<String>, e: watch::Event| {
         let sent = match e {
-            watch::Event::RepoChanged => RepoChanged {}.emit_to(&app, &label),
+            watch::Event::RepoChanged { snapshot } => RepoChanged { snapshot }.emit_to(&app, &label),
             watch::Event::Stale(message) => {
                 WorkingCopyStale { workspace, message }.emit_to(&app, &label)
             }

@@ -1984,8 +1984,13 @@ export type Reopen_Serialize = {
 	at: number | null,
 };
 
-/**  A jj operation landed in the window's repo, so reviews may be out of date. */
-export type RepoChanged = Record<string, never>;
+/**
+ *  A jj operation landed in the window's repo, so reviews may be out of date. `snapshot`
+ *  when it's the app's own background snapshot, which only rewrites a working copy.
+ */
+export type RepoChanged = {
+	snapshot: boolean,
+};
 
 export type RepoInfo = {
 	root: string,

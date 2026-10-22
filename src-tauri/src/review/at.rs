@@ -47,7 +47,7 @@ impl RepoCtx {
         }
         let emit = self.emit.lock().unwrap().clone();
         if let Some(emit) = emit {
-            emit(review.ws.name.clone(), watch::Event::RepoChanged);
+            emit(review.ws.name.clone(), watch::Event::RepoChanged { snapshot: false });
         }
         anyhow::bail!(
             "lgtm's review of `{}` is reloading to show the revset's new commits, so nothing \

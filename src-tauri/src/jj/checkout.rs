@@ -18,6 +18,19 @@ pub fn repo_dir(root: &Path) -> Option<PathBuf> {
     root.join(".jj").join(target.trim()).canonicalize().ok()
 }
 
+/// The repo's current operation heads, from the names of its op heads files.
+pub fn op_heads(repo: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(repo.join("op_heads/heads")) else {
+        return vec![];
+    };
+    let mut heads: Vec<String> = entries
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    heads.sort();
+    heads
+}
+
 /// The workspace name in a `.jj/working_copy/checkout` file: field 3 of jj's `Checkout`
 /// protobuf.
 fn checkout_name(bytes: &[u8]) -> Option<String> {

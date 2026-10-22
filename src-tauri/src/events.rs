@@ -4,9 +4,12 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use tauri_specta::Event;
 
-/// A jj operation landed in the window's repo, so reviews may be out of date.
+/// A jj operation landed in the window's repo, so reviews may be out of date. `snapshot`
+/// when it's the app's own background snapshot, which only rewrites a working copy.
 #[derive(Clone, Serialize, Type, Event)]
-pub struct RepoChanged {}
+pub struct RepoChanged {
+    pub snapshot: bool,
+}
 
 /// Something other than the app, like a terminal or an agent, moved a workspace's working
 /// copy. `workspace` is `null` for the main one.
