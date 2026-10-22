@@ -5,6 +5,7 @@
 use std::time::Duration;
 
 use super::child::{self, LockWait, Mode};
+use super::holders;
 use super::{Jj, Notice, is_stale};
 
 /// Timeouts since the last resume that pause background snapshots.
@@ -61,15 +62,21 @@ impl Jj {
                 Err(e) => return Err(e),
             },
         };
-        let mut strikes = self.background.lock().unwrap();
         let Some(wait) = lock_wait else {
-            *strikes = Strikes::default();
+            *self.background.lock().unwrap() = Strikes::default();
             return Ok(Snapshot::Done(None));
         };
+        let held_by = holders::describe(&wait.lock).await;
         eprintln!(
-            "lgtm: background snapshot in {}: {wait}",
-            self.root.display()
+            "lgtm: background snapshot in {}: {wait}{}",
+            self.root.display(),
+            if held_by.is_empty() {
+                String::new()
+            } else {
+                format!(", open in:\n{held_by}")
+            }
         );
+        let mut strikes = self.background.lock().unwrap();
         strikes.count += 1;
         if strikes.count - strikes.resumed_at < PAUSE_AFTER {
             return Ok(Snapshot::Retry(retry_after(strikes.count)));
