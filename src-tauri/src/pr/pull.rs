@@ -146,20 +146,21 @@ impl RepoCtx {
             pr.number,
             &viewer,
         ));
-        let mut head_texts = HashMap::new();
-        for t in threads
+        let mut paths: Vec<String> = threads
             .iter()
             .filter(|t| t.line.is_some() && t.side == Side::New)
-        {
-            if head_texts.contains_key(&t.path) {
-                continue;
-            }
-            if let Ok(bytes) = ws.jj.file(Some(&pr.head), &t.path).await
-                && let Ok(text) = String::from_utf8(bytes)
-            {
-                head_texts.insert(t.path.clone(), text);
-            }
-        }
+            .map(|t| t.path.clone())
+            .collect();
+        paths.sort();
+        paths.dedup();
+        let head_texts: HashMap<String, String> = ws
+            .jj
+            .files_at(&pr.head, &paths)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|(path, bytes)| Some((path, String::from_utf8(bytes).ok()?)))
+            .collect();
         self.add_threads(id, threads, &head_texts, &format!("PR #{}", pr.number))
     }
 }
