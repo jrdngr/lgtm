@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { ContextDocDto, MarkColor, PromptDto } from "../bindings";
+import type { ContextDocDto, PromptDto } from "../bindings";
 import { Markdown } from "../bots/Markdown";
 import { remembered } from "../core/remembered";
 import { openFile } from "../editor/open";
@@ -36,14 +36,6 @@ import { useGuidedLines } from "./useGuidedLines";
 const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
 
 const DOC_NAMES = { adr: "ADR", devlog: "Dev log", other: "Doc" };
-
-/** A changed row's mark color in the review, for tinting it as the Review tab does. */
-export const markOf =
-  (review: CurrentReview) =>
-  (file: number, row: number): MarkColor | undefined => {
-    const st = review.rowState(file, row);
-    return st === "checked" || st === "skipped" || st === "unmarked" ? undefined : st;
-  };
 
 /** Comment blocks under the last row each comment covers in `segments`: its threads, notes
  * and the draft being written. */
@@ -217,7 +209,6 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
           segments={segments}
           lit={lit}
           lines={lines}
-          markOf={markOf(review)}
           after={after}
           expanded={whole}
           onExpand={steps ? toggleWhole : undefined}

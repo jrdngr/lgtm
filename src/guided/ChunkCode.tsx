@@ -1,11 +1,10 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
-import type { GuidedRange, MarkColor } from "../bindings";
+import type { GuidedRange } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { SIGN } from "../model/sign";
 import { Code } from "../review/Cell";
-import { markVar } from "../review/marks";
 import { type FlatFile, markKey } from "../review/model";
 import { IconButton } from "../ui/icons";
 import { inRanges, type Segment } from "./model";
@@ -18,8 +17,6 @@ interface Props {
   lit?: GuidedRange[];
   /** Picking and acting on lines; without it the code is read-only. */
   lines?: GuidedLines;
-  /** A changed row's mark color, if it has one. */
-  markOf?(file: number, row: number): MarkColor | undefined;
   /** What shows under a row, like the comments that end there. */
   after?(file: number, row: number): ReactNode;
   /** Files shown whole; with `onExpand`, each header can switch its file. */
@@ -28,16 +25,7 @@ interface Props {
 }
 
 /** A chunk's diff, one block per run of rows, under its file's path. */
-export function ChunkCode({
-  files,
-  segments,
-  lit,
-  lines,
-  markOf,
-  after,
-  expanded,
-  onExpand,
-}: Props) {
+export function ChunkCode({ files, segments, lit, lines, after, expanded, onExpand }: Props) {
   return (
     <>
       {segments.map((s) => {
@@ -62,11 +50,9 @@ export function ChunkCode({
             </div>
             {s.rows.map((row) => {
               const r = f.rows[row];
-              const mark = r.kind === "context" ? undefined : markOf?.(s.file, row);
               const cls = [
                 "gd-ln",
                 `kind-${r.kind}`,
-                mark && "marked",
                 lit && inRanges(lit, s.path, r.newLine) && "lit",
                 lines?.isPicked(s.file, row) && "sel",
                 lines?.isHead(s.file, row) && "head",
@@ -77,7 +63,6 @@ export function ChunkCode({
                   <div
                     className={cls.join(" ")}
                     data-row={markKey(s.file, row)}
-                    style={mark ? ({ "--m": markVar(mark) } as React.CSSProperties) : undefined}
                     onMouseDown={lines && ((e) => lines.onRowDown({ file: s.file, row }, e))}
                     onMouseEnter={lines && (() => lines.onRowEnter({ file: s.file, row }))}
                     onContextMenu={lines?.onRowMenu({ file: s.file, row })}

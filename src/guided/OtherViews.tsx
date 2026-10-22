@@ -9,7 +9,7 @@ import type { MarkSetup } from "../review/marks";
 import type { Comments } from "../review/useComments";
 import type { CommentFolds } from "../review/useSavedView";
 import { ChunkCode } from "./ChunkCode";
-import { commentsAfter, markOf } from "./ChunkView";
+import { commentsAfter } from "./ChunkView";
 import { type ExcludedState, REASON_NAMES, RISK_NAMES, RISKS, threadSegment } from "./model";
 import { Superseded } from "./Superseded";
 import { setGuided, setPick } from "./store";
@@ -103,7 +103,6 @@ export function ExcludedView({
         files={review.files}
         segments={e.segments}
         lines={lines}
-        markOf={markOf(review)}
         after={commentsAfter(c, folds, e.segments)}
       />
     </div>
@@ -192,7 +191,6 @@ export function CommentedView({
         files={review.files}
         segments={segments}
         lines={lines}
-        markOf={markOf(review)}
         after={commentsAfter(c, folds, segments)}
       />
     </div>
