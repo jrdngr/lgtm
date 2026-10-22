@@ -151,7 +151,7 @@ async fn run(
 ) {
     // Where `@` starts, so the first move is caught.
     if let Err(e) = jj.moved_working_copy().await {
-        tracing::warn!(workspace = %jj.root().display(), "read @: {e:#}");
+        tracing::warn!(workspace = jj.name(), "read @: {e:#}");
     }
     let mut snapshot_at: Option<Instant> = None;
     // When the edits the next snapshot waits on began.
@@ -174,7 +174,7 @@ async fn run(
                     }
                 }
                 Some(Ping::Edit) => {
-                    tracing::trace!(workspace = %jj.root().display(), "edit");
+                    tracing::trace!(workspace = jj.name(), "edit");
                     let now = Instant::now();
                     let first = *edits_since.get_or_insert(now);
                     let at = (now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT);
@@ -185,12 +185,12 @@ async fn run(
                 let now = Instant::now();
                 if changed_at.is_some_and(|t| t <= now) {
                     changed_at = None;
-                    tracing::trace!(workspace = %jj.root().display(), "repo changed");
+                    tracing::trace!(workspace = jj.name(), "repo changed");
                     emit(Event::RepoChanged);
                     match jj.moved_working_copy().await {
                         Ok(true) => emit(Event::WorkingCopyMoved),
                         Ok(false) => {}
-                        Err(e) => tracing::warn!(workspace = %jj.root().display(), "read @: {e:#}"),
+                        Err(e) => tracing::warn!(workspace = jj.name(), "read @: {e:#}"),
                     }
                 }
                 if snapshot_at.is_some_and(|t| t <= now) {
@@ -208,7 +208,7 @@ async fn run(
                         }
                         Ok(Snapshot::Paused) => continue,
                         Err(e) => {
-                            tracing::warn!(workspace = %jj.root().display(), "snapshot: {e:#}");
+                            tracing::warn!(workspace = jj.name(), "snapshot: {e:#}");
                             continue;
                         }
                     };

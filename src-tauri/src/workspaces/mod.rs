@@ -207,7 +207,7 @@ impl RepoCtx {
         });
         match started {
             Ok(w) => *watch = Some(w),
-            Err(e) => tracing::error!(workspace = %ws.root.display(), "watch: {e:#}"),
+            Err(e) => tracing::error!(workspace = ws.jj.name(), "watch: {e:#}"),
         }
     }
 

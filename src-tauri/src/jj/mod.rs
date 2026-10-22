@@ -12,6 +12,7 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 
 mod at;
+pub mod checkout;
 mod background;
 mod bookmarks;
 mod push;
@@ -113,6 +114,7 @@ pub struct Jj {
     writer: Mutex<Option<String>>,
     notify: OnceLock<Notify>,
     background: std::sync::Mutex<background::Strikes>,
+    name: OnceLock<String>,
 }
 
 /// Reads longer than this log at INFO.
@@ -121,7 +123,7 @@ const SLOW_READ: std::time::Duration = std::time::Duration::from_secs(2);
 /// Logs a jj command: changes at INFO, reads and snapshots at DEBUG, and slow reads at INFO.
 /// A failure logs at the same level; the caller decides whether it's a problem.
 fn log_run(
-    root: &Path,
+    workspace: &str,
     args: &[&str],
     read_only: bool,
     took: std::time::Duration,
@@ -134,7 +136,6 @@ fn log_run(
         command.push('…');
     }
     let ms = took.as_millis() as u64;
-    let workspace = root.display();
     let quiet = read_only && took < SLOW_READ || args == ["util", "snapshot"];
     match (err, quiet) {
         (None, true) => tracing::debug!(%workspace, ms, "jj {command}"),
@@ -151,11 +152,18 @@ impl Jj {
             writer: Mutex::new(None),
             notify: OnceLock::new(),
             background: Default::default(),
+            name: OnceLock::new(),
         }
     }
 
-    pub fn root(&self) -> &Path {
-        &self.root
+    /// The workspace's name, for logs. Its directory's name when the checkout file can't say.
+    pub fn name(&self) -> &str {
+        self.name.get_or_init(|| {
+            checkout::name_at(&self.root).unwrap_or_else(|| {
+                let dir = self.root.file_name().unwrap_or_default();
+                dir.to_string_lossy().into_owned()
+            })
+        })
     }
 
     /// Sets where notices go. Only the first call counts.
@@ -206,7 +214,7 @@ impl Jj {
     ) -> anyhow::Result<Vec<u8>> {
         let started = std::time::Instant::now();
         let out = self.exec_untimed(args, read_only, color).await;
-        log_run(&self.root, args, read_only, started.elapsed(), out.as_ref().err());
+        log_run(self.name(), args, read_only, started.elapsed(), out.as_ref().err());
         out
     }
 

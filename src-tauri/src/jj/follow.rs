@@ -13,7 +13,7 @@ impl Jj {
     pub(super) async fn note_working_copy(&self, seen: &mut Option<String>) {
         match self.working_copy_change().await {
             Ok(change) => *seen = Some(change),
-            Err(e) => tracing::warn!(workspace = %self.root.display(), "read @: {e:#}"),
+            Err(e) => tracing::warn!(workspace = self.name(), "read @: {e:#}"),
         }
     }
 

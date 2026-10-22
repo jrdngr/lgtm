@@ -65,13 +65,13 @@ impl Jj {
         };
         let Some(wait) = lock_wait else {
             let ms = started.elapsed().as_millis() as u64;
-            tracing::debug!(workspace = %self.root.display(), ms, "background snapshot");
+            tracing::debug!(workspace = self.name(), ms, "background snapshot");
             *self.background.lock().unwrap() = Strikes::default();
             return Ok(Snapshot::Done(None));
         };
         let held_by = holders::describe(&wait.lock).await;
         tracing::info!(
-            workspace = %self.root.display(),
+            workspace = self.name(),
             lock = wait.lock,
             held_by = held_by.replace('\n', "; "),
             "background snapshot gave up waiting on a lock",
@@ -84,7 +84,7 @@ impl Jj {
         strikes.paused = true;
         drop(strikes);
         tracing::info!(
-            workspace = %self.root.display(),
+            workspace = self.name(),
             "background snapshots paused until you act in the workspace"
         );
         self.notify(Notice::Paused(true));
