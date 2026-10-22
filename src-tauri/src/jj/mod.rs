@@ -14,6 +14,7 @@ use tokio::sync::Mutex;
 mod at;
 mod background;
 mod bookmarks;
+mod push;
 mod child;
 mod diff;
 mod edit;
@@ -35,6 +36,7 @@ pub use diff::{FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogRow;
 pub use near::{NearBookmark, StackSide};
+pub use push::PushPlan;
 pub use workspace::WorkspaceInfo;
 
 /// True when `err` came from jj refusing to work on a stale working copy.

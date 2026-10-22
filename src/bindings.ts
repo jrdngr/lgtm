@@ -93,6 +93,8 @@ export const commands = {
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**  The bookmarks closest to `rev` on either side, for moving one onto it. */
 	nearestBookmarks: (workspace: string | null, rev: string) => typedError<BookmarkSpot[], string>(__TAURI_INVOKE("nearest_bookmarks", { workspace, rev })),
+	/**  What a push from the workspace would leave out without asking. */
+	pushPlan: (workspace: string | null) => typedError<PushPlan, string>(__TAURI_INVOKE("push_plan", { workspace })),
 	log: (level: LogLevel, module: string, message: string) => __TAURI_INVOKE<void>("log", { level, module, message }),
 	/**  The most detailed level the UI's lines are kept at, so it can skip the rest. */
 	logLevel: () => __TAURI_INVOKE<LogLevel>("log_level"),
@@ -1441,7 +1443,12 @@ export type JjAction = { kind: "edit"; rev: string } |
 /**  Moves the closest bookmarks behind `@` up to it. */
 { kind: "bookmarkAdvance" } | 
 /**  Moves bookmark `name` to `rev`, backwards or sideways too. */
-{ kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | { kind: "push" };
+{ kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | 
+/**
+ *  `jj git push`. With `new_bookmarks`, those go too, by name, so they start tracking
+ *  `remote`, along with what plain push sends.
+ */
+{ kind: "push"; remote?: string | null; newBookmarks?: string[] };
 
 /**
  *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes
@@ -1803,6 +1810,12 @@ export type Pt = {
 };
 
 export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: number };
+
+export type PushPlan = {
+	remote: string,
+	/**  Local bookmarks in the push range that don't track `remote` yet. */
+	newBookmarks: string[],
+};
 
 export type QState = "open" | "decided" | 
 /**  Put off: resolved for the queue, and left out of the write. */

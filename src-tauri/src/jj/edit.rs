@@ -43,7 +43,14 @@ pub enum JjAction {
         rev: String,
     },
     Fetch,
-    Push,
+    /// `jj git push`. With `new_bookmarks`, those go too, by name, so they start tracking
+    /// `remote`, along with what plain push sends.
+    Push {
+        #[serde(default)]
+        remote: Option<String>,
+        #[serde(default, rename = "newBookmarks")]
+        new_bookmarks: Vec<String>,
+    },
 }
 
 impl JjAction {
@@ -69,7 +76,20 @@ impl JjAction {
                 v(&["bookmark", "set", "-r", rev, "--allow-backwards", "--", name])
             }
             JjAction::Fetch => v(&["git", "fetch"]),
-            JjAction::Push => v(&["git", "push"]),
+            JjAction::Push {
+                remote,
+                new_bookmarks,
+            } => {
+                let mut args = v(&["git", "push"]);
+                if let (Some(remote), false) = (remote, new_bookmarks.is_empty()) {
+                    args.extend(["--remote".into(), format!("exact:{remote}")]);
+                    args.extend(["-r".into(), super::push::push_range(remote)]);
+                    for b in new_bookmarks {
+                        args.extend(["-b".into(), format!("exact:{b}")]);
+                    }
+                }
+                args
+            }
         }
     }
 }

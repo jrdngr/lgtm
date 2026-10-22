@@ -91,6 +91,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::working_copy,
             commands::review::jj_act,
             commands::review::nearest_bookmarks,
+            commands::review::push_plan,
             commands::log::log,
             commands::log::log_level,
             commands::search::search_text,

@@ -1,8 +1,9 @@
 import { useState } from "react";
 import type { JjAction } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
-import { commands } from "../ipc";
+import { commands, unwrap } from "../ipc";
 import { reviewAfter } from "../review/RevisionsPanelMenu";
+import { confirmAction } from "../ui/prompt";
 import { loadReview } from "./loadReview";
 
 /** Runs jj actions from the log one at a time, with undo and redo taking back all of the last
@@ -20,8 +21,30 @@ export function useJjActions(
   /** What the last fetch or push did, which nothing else in the log shows. */
   const [note, setNote] = useState<string>();
 
-  async function act(action: JjAction, _label?: string, follow?: boolean) {
+  /** A push names the bookmarks it would create on the remote, once they're confirmed. Null
+   * when cancelled. */
+  async function withNewBookmarks(action: JjAction): Promise<JjAction | null> {
+    if (action.kind !== "push") return action;
+    const plan = await unwrap(commands.pushPlan(workspace));
+    const names = plan.newBookmarks;
+    if (!names.length) return action;
+    const list = names.join(", ");
+    const ok = await confirmAction(
+      `Push new ${names.length === 1 ? "bookmark" : "bookmarks"} ${list} to ${plan.remote}?`,
+      "Push",
+    );
+    return ok ? { kind: "push", remote: plan.remote, newBookmarks: names } : null;
+  }
+
+  async function act(requested: JjAction, _label?: string, follow?: boolean) {
     if (running) return;
+    let action: JjAction | null;
+    try {
+      action = await withNewBookmarks(requested);
+    } catch (e) {
+      return onError(String(e));
+    }
+    if (!action) return;
     setRunning(action);
     setNote(undefined);
     try {
