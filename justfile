@@ -1,6 +1,6 @@
-# Log levels for the app, as RUST_LOG takes them: `just log=debug dev`,
-# `just log=lgtm_lib::watch=trace,info run`
-log := "lgtm_lib=info,warn"
+# Log levels for the app, as RUST_LOG takes them. `lgtm_lib` is the backend and
+# `ui` the frontend: `just log=debug dev`, `just log=lgtm_lib::watch=trace,info run`
+log := "lgtm_lib=info,ui=info,warn"
 
 # Run the app with hot reload
 dev:

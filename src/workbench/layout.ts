@@ -1,6 +1,9 @@
 import type { DockviewApi, SerializedDockview } from "dockview-react";
+import { logger } from "../core/log";
 import { dropStalePanels } from "../core/panels";
 import type { Fold } from "./fold";
+
+const log = logger("layout");
 
 /** A workspace's saved docks. The bottom one is left out while it has no panels. */
 export interface SavedLayout {
@@ -17,7 +20,7 @@ export function parseLayout(saved: string | null): SavedLayout {
     const json = JSON.parse(saved);
     return "main" in json || "bottom" in json ? json : { main: json };
   } catch (e) {
-    console.warn("discarding unreadable layout", e);
+    log.warn("discarding unreadable layout", e);
     return {};
   }
 }
@@ -36,7 +39,7 @@ export function restoreLayout(
       for (const p of api.panels) if (p.title === "Reviewers") p.api.setTitle("Report");
       if (api.panels.length > 0) return;
     } catch (e) {
-      console.warn("discarding unreadable layout", e);
+      log.warn("discarding unreadable layout", e);
       api.clear();
     }
   }

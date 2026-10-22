@@ -10,6 +10,18 @@ use tokio::process::Command;
 use super::GhRepo;
 
 async fn run(args: &[&str], input: Option<&[u8]>) -> anyhow::Result<Vec<u8>> {
+    let started = std::time::Instant::now();
+    let out = run_untimed(args, input).await;
+    let command = args[..3.min(args.len())].join(" ");
+    let ms = started.elapsed().as_millis() as u64;
+    match &out {
+        Ok(_) => tracing::debug!(ms, "gh {command}"),
+        Err(e) => tracing::debug!(ms, "gh {command} failed: {e:#}"),
+    }
+    out
+}
+
+async fn run_untimed(args: &[&str], input: Option<&[u8]>) -> anyhow::Result<Vec<u8>> {
     let mut child = Command::new("gh")
         .args(args)
         .stdin(if input.is_some() {

@@ -174,6 +174,7 @@ async fn run(
                     }
                 }
                 Some(Ping::Edit) => {
+                    tracing::trace!(workspace = %jj.root().display(), "edit");
                     let now = Instant::now();
                     let first = *edits_since.get_or_insert(now);
                     let at = (now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT);
@@ -184,6 +185,7 @@ async fn run(
                 let now = Instant::now();
                 if changed_at.is_some_and(|t| t <= now) {
                     changed_at = None;
+                    tracing::trace!(workspace = %jj.root().display(), "repo changed");
                     emit(Event::RepoChanged);
                     match jj.moved_working_copy().await {
                         Ok(true) => emit(Event::WorkingCopyMoved),

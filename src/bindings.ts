@@ -91,6 +91,9 @@ export const commands = {
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**  The bookmarks closest to `rev` on either side, for moving one onto it. */
 	nearestBookmarks: (workspace: string | null, rev: string) => typedError<BookmarkSpot[], string>(__TAURI_INVOKE("nearest_bookmarks", { workspace, rev })),
+	log: (level: LogLevel, module: string, message: string) => __TAURI_INVOKE<void>("log", { level, module, message }),
+	/**  The most detailed level the UI's lines are kept at, so it can skip the rest. */
+	logLevel: () => __TAURI_INVOKE<LogLevel>("log_level"),
 	/**  Lines of the workspace's working copy matching `query`. */
 	searchText: (workspace: string | null, query: TextQuery) => typedError<Hits, string>(__TAURI_INVOKE("search_text", { workspace, query })),
 	/**
@@ -1508,6 +1511,8 @@ export type LogCommit = {
 	divergent: boolean,
 	empty: boolean,
 };
+
+export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";
 
 /**  The workspace's revisions log has a new revset. */
 export type LogRevsetChanged = {

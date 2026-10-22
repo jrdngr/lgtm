@@ -1,10 +1,13 @@
 import type { Terminal } from "@xterm/xterm";
 import type { DockviewApi, IDockviewPanel } from "dockview-react";
+import { logger } from "../core/log";
 import { addTerminal } from "../core/panels";
 import type { WorkspaceName } from "../core/workspace";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { moveToOther } from "../workbench/tabMenu";
 import { targetItems } from "./sendItems";
+
+const log = logger("terminal");
 
 interface Deps {
   term: Terminal;
@@ -39,7 +42,7 @@ export function terminalMenu(d: Deps): CtxEntry[] {
       onSelect: after(() => {
         clipboardText().then(
           (text) => term.paste(text),
-          (e) => console.error("paste", e),
+          (e) => log.error("paste", e),
         );
       }),
     },

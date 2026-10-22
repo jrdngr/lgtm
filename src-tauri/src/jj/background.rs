@@ -45,6 +45,7 @@ impl Jj {
             return Ok(Snapshot::Paused);
         }
         let _guard = self.writer.lock().await;
+        let started = std::time::Instant::now();
         let out = child::run(
             self.command(&["util", "snapshot"], false, "never"),
             Mode::Background,
@@ -63,6 +64,8 @@ impl Jj {
             },
         };
         let Some(wait) = lock_wait else {
+            let ms = started.elapsed().as_millis() as u64;
+            tracing::debug!(workspace = %self.root.display(), ms, "background snapshot");
             *self.background.lock().unwrap() = Strikes::default();
             return Ok(Snapshot::Done(None));
         };
@@ -80,6 +83,10 @@ impl Jj {
         }
         strikes.paused = true;
         drop(strikes);
+        tracing::info!(
+            workspace = %self.root.display(),
+            "background snapshots paused until you act in the workspace"
+        );
         self.notify(Notice::Paused(true));
         Ok(Snapshot::Paused)
     }

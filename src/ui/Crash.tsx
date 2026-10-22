@@ -1,5 +1,8 @@
-import { Component, type FunctionComponent, type ReactNode } from "react";
+import { Component, type ErrorInfo, type FunctionComponent, type ReactNode } from "react";
+import { logger } from "../core/log";
 import "./crash.css";
+
+const log = logger("crash");
 
 /** Shows what threw while rendering its children, in place of them, so one broken view
  * doesn't blank the window. */
@@ -10,8 +13,8 @@ export class Crash extends Component<{ children: ReactNode }, { error?: Error }>
     return { error };
   }
 
-  componentDidCatch(error: Error) {
-    console.error(error);
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    log.error(error, info.componentStack ?? "");
   }
 
   render() {

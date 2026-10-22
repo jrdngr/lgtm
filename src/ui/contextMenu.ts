@@ -8,6 +8,9 @@ import {
 } from "@tauri-apps/api/menu";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import type { MouseEvent as ReactMouseEvent } from "react";
+import { logger } from "../core/log";
+
+const log = logger("context menu");
 
 /** One row of a right-click menu. `false` and `undefined` drop out, so items can be conditional. */
 export type CtxItem =
@@ -129,7 +132,7 @@ export function openMenu(e: ReactMouseEvent | MouseEvent, entries: CtxEntry[]) {
   native(items)
     .then((n) => Menu.new({ items: n as MenuItemOptions[] }))
     .then((menu) => menu.popup(at))
-    .catch((err) => console.error("context menu", err));
+    .catch((err) => log.error("context menu", err));
 }
 
 /** A handler for `onContextMenu` that builds its items when the menu opens. */
@@ -159,14 +162,14 @@ export function installContextMenus() {
       ],
     })
       .then((menu) => menu.popup(at))
-      .catch((err) => console.error("context menu", err));
+      .catch((err) => log.error("context menu", err));
   });
 }
 
 /** Copies text to the clipboard, resolving once it's there. Goes through the app rather than
  * the web view, which refuses clipboard access outside a click or key press. */
 export const copy = (text: string): Promise<void> =>
-  writeText(text).catch((e) => console.error("copy", e));
+  writeText(text).catch((e) => log.error("copy", e));
 
 /** The clipboard's text, empty when it holds none. */
 export const clipboardText = (): Promise<string> => readText().catch(() => "");

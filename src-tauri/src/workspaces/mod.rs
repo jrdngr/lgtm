@@ -184,7 +184,7 @@ impl RepoCtx {
         });
         match started {
             Ok(w) => *watch = Some(w),
-            Err(e) => tracing::error!("watch {}: {e:#}", ws.root.display()),
+            Err(e) => tracing::error!(workspace = %ws.root.display(), "watch: {e:#}"),
         }
     }
 
@@ -206,6 +206,7 @@ impl RepoCtx {
         // A workspace of this name forgotten some other way (`lgtm gc`, jj) left its history.
         self.store.lock().unwrap().forget_workspace(name)?;
         self.list_workspaces().await?;
+        tracing::info!(workspace = name, %rev, path = %path.display(), "added workspace");
         Ok(path)
     }
 
@@ -237,6 +238,7 @@ impl RepoCtx {
             std::fs::remove_dir_all(&ws.root)
                 .with_context(|| format!("remove {}", ws.root.display()))?;
         }
+        tracing::info!(workspace = name, deleted_dir = ours, "forgot workspace");
         Ok(())
     }
 }

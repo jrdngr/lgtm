@@ -90,6 +90,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::working_copy,
             commands::review::jj_act,
             commands::review::nearest_bookmarks,
+            commands::log::log,
+            commands::log::log_level,
             commands::search::search_text,
             commands::search::replace_text,
             commands::search::find_references,
@@ -284,11 +286,12 @@ fn global_store(app: &tauri::App) -> store::Store {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-/// Logs to stdout at `RUST_LOG`'s levels, else INFO for lgtm and WARN for its libraries.
+/// Logs to stdout at `RUST_LOG`'s levels, else INFO for lgtm and its UI and WARN for its
+/// libraries.
 /// Not for `lgtm mcp` and `lgtm hook`, whose stdout talks to Claude Code.
 fn init_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("lgtm_lib=info,warn"));
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("lgtm_lib=info,ui=info,warn"));
     tracing_subscriber::fmt().with_env_filter(filter).init();
 }
 

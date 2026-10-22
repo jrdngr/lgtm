@@ -113,6 +113,35 @@ pub struct Jj {
     background: std::sync::Mutex<background::Strikes>,
 }
 
+/// Reads longer than this log at INFO.
+const SLOW_READ: std::time::Duration = std::time::Duration::from_secs(2);
+
+/// Logs a jj command: changes at INFO, reads and snapshots at DEBUG, and slow reads at INFO.
+/// A failure logs at the same level; the caller decides whether it's a problem.
+fn log_run(
+    root: &Path,
+    args: &[&str],
+    read_only: bool,
+    took: std::time::Duration,
+    err: Option<&anyhow::Error>,
+) {
+    let mut command = args.join(" ");
+    if command.len() > 200 {
+        let cut = command.floor_char_boundary(200);
+        command.truncate(cut);
+        command.push('…');
+    }
+    let ms = took.as_millis() as u64;
+    let workspace = root.display();
+    let quiet = read_only && took < SLOW_READ || args == ["util", "snapshot"];
+    match (err, quiet) {
+        (None, true) => tracing::debug!(%workspace, ms, "jj {command}"),
+        (None, false) => tracing::info!(%workspace, ms, "jj {command}"),
+        (Some(e), true) => tracing::debug!(%workspace, ms, "jj {command} failed: {e:#}"),
+        (Some(e), false) => tracing::info!(%workspace, ms, "jj {command} failed: {e:#}"),
+    }
+}
+
 impl Jj {
     pub fn new(root: &Path) -> Self {
         Self {
@@ -168,6 +197,18 @@ impl Jj {
     /// Reads take no locks, so they can be killed at any point. Writes are never ended early,
     /// and one that succeeds starts background snapshots again.
     async fn exec_with(
+        &self,
+        args: &[&str],
+        read_only: bool,
+        color: &str,
+    ) -> anyhow::Result<Vec<u8>> {
+        let started = std::time::Instant::now();
+        let out = self.exec_untimed(args, read_only, color).await;
+        log_run(&self.root, args, read_only, started.elapsed(), out.as_ref().err());
+        out
+    }
+
+    async fn exec_untimed(
         &self,
         args: &[&str],
         read_only: bool,

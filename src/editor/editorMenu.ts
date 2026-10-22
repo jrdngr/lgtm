@@ -1,6 +1,7 @@
 import { selectAll } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { logger } from "../core/log";
 import { revealInFiles } from "../core/reveal";
 import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
@@ -11,6 +12,8 @@ import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { wordWrap } from "../workbench/wordWrap";
 import { lineRef } from "./renderedLines";
+
+const log = logger("editor");
 
 interface Deps {
   view: EditorView;
@@ -38,7 +41,7 @@ export function placeAt(v: EditorView, e: MouseEvent | React.MouseEvent) {
 function paste(v: EditorView) {
   clipboardText().then(
     (text) => v.dispatch(v.state.replaceSelection(text), { userEvent: "input.paste" }),
-    (e) => console.error("paste", e),
+    (e) => log.error("paste", e),
   );
 }
 
@@ -71,7 +74,7 @@ export function editorMenu(d: Deps): CtxEntry[] {
         const range = v.state.selection.main;
         writeText(selected(v)).then(
           () => v.dispatch({ changes: range, userEvent: "delete.cut" }),
-          (e) => console.error("cut", e),
+          (e) => log.error("cut", e),
         );
       }),
     },

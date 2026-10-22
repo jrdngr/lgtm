@@ -1,6 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect } from "react";
 import { events, type PrDto } from "../bindings";
+import { logger } from "../core/log";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { prOf, setPr } from "../github/pr";
 import { commands } from "../ipc";
@@ -8,6 +9,8 @@ import { githubOff } from "../tools/agents";
 import { prFollowsReview } from "../workspaces/stack";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 import { targetOf } from "./target";
+
+const log = logger("follow @");
 
 /** Workspaces with a follow running, and those moved again while it ran. */
 const running = new Set<string>();
@@ -54,7 +57,7 @@ export async function followWorkingCopy(workspace: WorkspaceName) {
   try {
     do {
       again.delete(key);
-      await followOnce(workspace).catch((e) => console.error("follow @:", e));
+      await followOnce(workspace).catch((e) => log.error(e));
     } while (again.has(key));
   } finally {
     running.delete(key);

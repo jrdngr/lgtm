@@ -123,6 +123,7 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
         }
     });
     app.state::<RepoWindows>().insert(label.clone(), ctx);
+    tracing::info!(repo = %root.display(), "opened repo");
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
         tracing::warn!("save recent repos: {e}");
     }

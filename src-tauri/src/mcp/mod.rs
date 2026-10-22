@@ -88,6 +88,7 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     let first: serde_json::Value = serde_json::from_str(&line)?;
     if let Some(hook) = first.get("hook") {
         let report: hook::HookReport = serde_json::from_value(hook.clone())?;
+        tracing::debug!(terminal = report.terminal, state = ?report.state, "agent hook");
         if let Some((label, ctx)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
             if report.state == AgentHookState::Idle {
                 ctx.new_agent_session(&report.terminal);
@@ -116,10 +117,13 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
         return Ok(());
     }
     let hello: Hello = serde_json::from_value(first)?;
-    server::Lgtm::new(app, hello)
-        .serve((read, write))
-        .await?
-        .waiting()
-        .await?;
-    Ok(())
+    let (workspace, terminal) = (hello.workspace.clone(), hello.terminal.clone());
+    tracing::info!(?workspace, ?terminal, "agent connected over MCP");
+    let served = server::Lgtm::new(app, hello).serve((read, write)).await;
+    let ended = match served {
+        Ok(running) => running.waiting().await.map(drop).map_err(anyhow::Error::from),
+        Err(e) => Err(e.into()),
+    };
+    tracing::info!(?workspace, ?terminal, "agent disconnected from MCP");
+    ended
 }
