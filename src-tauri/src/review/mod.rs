@@ -64,6 +64,7 @@ pub struct Reviews {
     current: Mutex<HashMap<String, u32>>,
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
+    evologs: views::Evologs,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
 }
@@ -75,6 +76,7 @@ impl Default for Reviews {
             current: Mutex::default(),
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
+            evologs: Default::default(),
             links: Mutex::default(),
         }
     }

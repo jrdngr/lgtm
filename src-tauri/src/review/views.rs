@@ -2,7 +2,7 @@
 //! from. Old commits map to current ones through evolog predecessors, since split and squash
 //! break change IDs.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -90,7 +90,34 @@ pub fn relisted(changes: Vec<Change>, shown: &[ChangeDto]) -> Vec<ChangeDto> {
         .collect()
 }
 
-pub async fn stack(jj: &Jj, changes: Vec<Change>, prev: Option<&Session>) -> anyhow::Result<Stack> {
+/// Each commit's evolog, by commit id. A commit's predecessors never change.
+#[derive(Default)]
+pub struct Evologs(std::sync::Mutex<HashMap<String, Vec<String>>>);
+
+/// Past this many commits the evolog cache starts over.
+const MAX_EVOLOGS: usize = 1024;
+
+impl Evologs {
+    async fn of(&self, jj: &Jj, commit: &str) -> anyhow::Result<Vec<String>> {
+        if let Some(found) = self.0.lock().unwrap().get(commit) {
+            return Ok(found.clone());
+        }
+        let evolog = jj.evolog(commit).await?;
+        let mut cache = self.0.lock().unwrap();
+        if cache.len() >= MAX_EVOLOGS {
+            cache.clear();
+        }
+        cache.insert(commit.to_string(), evolog.clone());
+        Ok(evolog)
+    }
+}
+
+pub async fn stack(
+    jj: &Jj,
+    evologs: &Evologs,
+    changes: Vec<Change>,
+    prev: Option<&Session>,
+) -> anyhow::Result<Stack> {
     let Some(prev) = prev.filter(|p| !p.commits.is_empty()) else {
         return Ok(Stack {
             preds: vec![vec![]; changes.len()],
@@ -101,13 +128,17 @@ pub async fn stack(jj: &Jj, changes: Vec<Change>, prev: Option<&Session>) -> any
             removed: vec![],
         });
     };
-    // Bounded, since each evolog is a jj process with its own pipes.
+    // Bounded, since each evolog is a jj process with its own pipes. A commit from the
+    // previous session is its own predecessor, with no need to ask.
     let limit = tokio::sync::Semaphore::new(8);
     let evologs = futures::future::try_join_all(changes.iter().map(|c| {
         let limit = &limit;
         async move {
+            if prev.commits.contains(&c.commit_id) {
+                return Ok(vec![c.commit_id.clone()]);
+            }
             let _permit = limit.acquire().await?;
-            jj.evolog(&c.commit_id).await
+            evologs.of(jj, &c.commit_id).await
         }
     }))
     .await?;

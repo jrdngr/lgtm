@@ -53,7 +53,7 @@ impl RepoCtx {
     ) -> anyhow::Result<Loaded> {
         let whole = listed.whole;
         let config = Config::at_base(&ws.jj, whole.from.as_deref()).await?;
-        let stack = views::stack(&ws.jj, listed.changes, prev).await?;
+        let stack = views::stack(&ws.jj, &self.reviews.evologs, listed.changes, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
         let view = match view {
             View::Change { change } | View::SinceLast { change }
