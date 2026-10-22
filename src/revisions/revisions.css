@@ -340,3 +340,20 @@ button.lr-pr.on {
 .section-header .icon-button.on {
   color: var(--accent);
 }
+
+.mo-pick {
+  cursor: pointer;
+}
+
+.mo-pick.on {
+  background: var(--hover);
+}
+
+.mo-bookmark {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 12px var(--mono);
+  color: #d29ee6;
+}

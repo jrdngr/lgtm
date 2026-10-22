@@ -3,7 +3,7 @@ use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
 use crate::events::LogRevsetChanged;
-use crate::jj::{JjAction, WorkingCopyDto};
+use crate::jj::{BookmarkSpot, JjAction, WorkingCopyDto};
 use crate::revisions::LogView;
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::store::MarkColor;
@@ -120,6 +120,18 @@ pub(crate) async fn jj_act(
 ) -> CmdResult<u32> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     ws.jj.act(&action).await.map_err(err)
+}
+
+/// The bookmarks closest to `rev` on either side, for moving one onto it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn nearest_bookmarks(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    rev: String,
+) -> CmdResult<Vec<BookmarkSpot>> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    ws.jj.nearest_bookmarks(&rev).await.map_err(err)
 }
 
 /// Reloads a review after the repo changed, or switches it to `view`.

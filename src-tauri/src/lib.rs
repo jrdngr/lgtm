@@ -87,6 +87,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::revset_commits,
             commands::review::working_copy,
             commands::review::jj_act,
+            commands::review::nearest_bookmarks,
             commands::review::mark_rows,
             commands::review::clear_file_marks,
             commands::review::set_files_checked,

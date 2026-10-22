@@ -89,6 +89,8 @@ export const commands = {
 	workingCopy: (workspace: string | null, revset: string) => typedError<WorkingCopyDto, string>(__TAURI_INVOKE("working_copy", { workspace, revset })),
 	/**  Runs a revisions panel action in the workspace. Returns how many jj operations it took. */
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
+	/**  The bookmarks closest to `rev` on either side, for moving one onto it. */
+	nearestBookmarks: (workspace: string | null, rev: string) => typedError<BookmarkSpot[], string>(__TAURI_INVOKE("nearest_bookmarks", { workspace, rev })),
 	/**
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -566,6 +568,15 @@ export type BehaviorChange = {
 	before?: string,
 	/**  Markdown; empty for removed behavior. */
 	after?: string,
+};
+
+/**  A local bookmark and the change it's on. */
+export type BookmarkSpot = {
+	name: string,
+	/**  The change id, short. */
+	change: string,
+	/**  Length of the shortest prefix of `change` that's unique in the repo. */
+	unique: number,
 };
 
 /**  A report on a revset, frozen at the commits it resolved to when it was first published. */
@@ -1371,7 +1382,9 @@ export type JjAction = { kind: "edit"; rev: string } |
 /**  Rebases `rev` and its branch onto `trunk()`. */
 { kind: "rebaseOnTrunk"; rev: string } | 
 /**  Moves the closest bookmarks behind `@` up to it. */
-{ kind: "bookmarkAdvance" } | { kind: "fetch" } | { kind: "push" };
+{ kind: "bookmarkAdvance" } | 
+/**  Moves bookmark `name` to `rev`, backwards or sideways too. */
+{ kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | { kind: "push" };
 
 /**
  *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes

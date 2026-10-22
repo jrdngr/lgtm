@@ -4,6 +4,8 @@ import type { JjAction } from "../bindings";
 export interface MotionTarget {
   cursor: string;
   picked: string;
+  /** The bookmark picked for a motion that asks for one. */
+  bookmark?: string;
 }
 
 export interface Motion {
@@ -12,6 +14,8 @@ export interface Motion {
   action(t: MotionTarget): JjAction;
   /** The review follows `@` after it, as after an edit. */
   follow?: boolean;
+  /** It moves one of the bookmarks nearest the cursor, picked first when there are several. */
+  pickBookmark?: boolean;
 }
 
 /** The ⌘J motions, in groups. `trunk` names trunk's bookmark for the rebase's label. */
@@ -38,7 +42,15 @@ export function motions(trunk: string | null): Motion[][] {
         action: (t) => ({ kind: "squash", revs: t.picked }),
       },
     ],
-    [{ keys: "ba", label: "Advance bookmark", action: () => ({ kind: "bookmarkAdvance" }) }],
+    [
+      { keys: "ba", label: "Advance bookmark", action: () => ({ kind: "bookmarkAdvance" }) },
+      {
+        keys: "bs",
+        label: "Set bookmark",
+        action: (t) => ({ kind: "bookmarkSet", name: t.bookmark ?? "", rev: t.cursor }),
+        pickBookmark: true,
+      },
+    ],
     [
       { keys: "u", label: "Undo", action: () => ({ kind: "undo", steps: 1 }) },
       { keys: "U", label: "Redo", action: () => ({ kind: "redo", steps: 1 }) },

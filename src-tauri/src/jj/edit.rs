@@ -37,6 +37,11 @@ pub enum JjAction {
     },
     /// Moves the closest bookmarks behind `@` up to it.
     BookmarkAdvance,
+    /// Moves bookmark `name` to `rev`, backwards or sideways too.
+    BookmarkSet {
+        name: String,
+        rev: String,
+    },
     Fetch,
     Push,
 }
@@ -60,6 +65,9 @@ impl JjAction {
             ]),
             JjAction::RebaseOnTrunk { rev } => v(&["rebase", "-b", rev, "-d", "trunk()"]),
             JjAction::BookmarkAdvance => v(&["bookmark", "advance"]),
+            JjAction::BookmarkSet { name, rev } => {
+                v(&["bookmark", "set", "-r", rev, "--allow-backwards", "--", name])
+            }
             JjAction::Fetch => v(&["git", "fetch"]),
             JjAction::Push => v(&["git", "push"]),
         }

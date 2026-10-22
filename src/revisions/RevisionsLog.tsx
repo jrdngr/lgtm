@@ -9,15 +9,17 @@ import { useReviewTarget } from "../review/target";
 import { openMenu } from "../ui/contextMenu";
 import { reviewStackPr } from "../workspaces/stack";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
+import { BookmarkPopup } from "./BookmarkPopup";
 import { CommitLines } from "./CommitLines";
 import { graphOf } from "./graphCells";
 import { LogGraph } from "./LogGraph";
 import { loadReview, onFocusLog, onOpenMotions } from "./loadReview";
 import { onLogRevsetChanged, publishLogRevset } from "./logRevset";
 import { MotionPopup } from "./MotionPopup";
-import { type Motion, motions, narrow, step } from "./motions";
+import { type Motion, type MotionTarget, motions, narrow, step } from "./motions";
 import { PrPill } from "./PrPill";
 import { RevisionsFooter } from "./RevisionsFooter";
+import { useBookmarkPick } from "./useBookmarkPick";
 import { useJjActions } from "./useJjActions";
 import { type RowPr, useRowPrs } from "./useRowPrs";
 import "./revisions.css";
@@ -246,11 +248,19 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     const range = picked();
     if (!cursorChange || !range) return;
     if (m.keys === "s" && unrelated) return setError(UNRELATED);
-    const action = m.action({ cursor: cursorChange, picked: range });
+    const target = { cursor: cursorChange, picked: range };
+    if (m.pickBookmark) bookmarks.start(m, target);
+    else runOn(m, target);
+  }
+
+  function runOn(m: Motion, target: MotionTarget) {
+    const action = m.action(target);
     if (action.kind === "undo") undo();
     else if (action.kind === "redo") redo();
     else act(action, m.label, m.follow);
   }
+
+  const bookmarks = useBookmarkPick(workspace, runOn, setError);
 
   /** Keys while the motions are open: each narrows them until one runs. Keys no motion takes,
    * like moving and reviewing, act on the log as usual. Returns whether it took the key. */
@@ -272,6 +282,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
+    if (bookmarks.key(e)) return;
     if (typed !== undefined && !e.metaKey && !e.ctrlKey && motionKey(e, typed)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
@@ -395,6 +406,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         })}
       </div>
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
+      {bookmarks.pick && <BookmarkPopup pick={bookmarks.pick} onPick={bookmarks.choose} />}
       <RevisionsFooter running={running} note={note} loading={!!pending} />
     </div>
   );

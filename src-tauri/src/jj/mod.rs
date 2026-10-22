@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 
 mod at;
 mod background;
+mod bookmarks;
 mod child;
 mod diff;
 mod edit;
@@ -28,6 +29,7 @@ pub(crate) mod test_support;
 pub mod workspace;
 pub use at::WorkingCopyDto;
 pub use background::Snapshot;
+pub use bookmarks::BookmarkSpot;
 pub use child::end_all;
 pub use diff::{FileDiff, Range};
 pub use edit::JjAction;

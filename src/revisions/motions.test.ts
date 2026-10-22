@@ -32,6 +32,11 @@ describe("motions", () => {
     expect(by("gr")?.action(t)).toEqual({ kind: "rebaseOnTrunk", rev: "kp" });
     expect(by("s")?.action(t)).toEqual({ kind: "squash", revs: "kp::ml" });
     expect(by("ba")?.action(t)).toEqual({ kind: "bookmarkAdvance" });
+    expect(by("bs")?.action({ ...t, bookmark: "feat" })).toEqual({
+      kind: "bookmarkSet",
+      name: "feat",
+      rev: "kp",
+    });
     expect(by("gr")?.label).toBe("Rebase onto main@origin");
   });
 });
