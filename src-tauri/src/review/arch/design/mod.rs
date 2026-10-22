@@ -77,9 +77,9 @@ struct At {
     all: Vec<String>,
 }
 
-/// Snapshots the working copy first, so an edit to a spec file there counts.
+/// Where `revision` is. The caller snapshots the working copy first, so an edit to a spec
+/// file there counts.
 async fn at(jj: &Jj, revision: &str) -> Option<At> {
-    jj.snapshot_or_stale().await.ok()?;
     let resolved = rev::resolve(jj, revision).await.ok()?;
     let all = jj.commit_files(&resolved.commit).await.ok()?.to_vec();
     Some(At { resolved, all })
@@ -134,6 +134,8 @@ impl RepoCtx {
                 .collect()
         };
         let ws = self.workspace(workspace).await?;
+        // A snapshot that fails leaves the last one's files to compare.
+        ws.jj.snapshot_or_stale().await.ok();
         // Designs often share a revision: resolve and hash each one once.
         let mut by_rev: HashMap<String, Vec<DesignDto>> = HashMap::new();
         let mut order = Vec::new();
@@ -141,9 +143,9 @@ impl RepoCtx {
             order.push(d.id.clone());
             by_rev.entry(d.revision.clone()).or_default().push(d);
         }
+        let ats = futures::future::join_all(by_rev.keys().map(|r| at(&ws.jj, r))).await;
         let mut items = HashMap::new();
-        for (revision, designs) in by_rev {
-            let at = at(&ws.jj, &revision).await;
+        for ((_, designs), at) in by_rev.into_iter().zip(ats) {
             let covers: Vec<Vec<String>> = designs
                 .iter()
                 .map(|d| at.as_ref().map_or(vec![], |a| covered(&a.all, &d.files)))
@@ -343,6 +345,7 @@ impl RepoCtx {
             serde_json::from_value(reply).context("the design doesn't match the format")?;
         let design = self.design(id)?;
         let ws = self.workspace(workspace).await?;
+        ws.jj.snapshot_or_stale().await.ok();
         let At { resolved, all } = at(&ws.jj, &design.revision)
             .await
             .with_context(|| format!("no revision `{}`", design.revision))?;

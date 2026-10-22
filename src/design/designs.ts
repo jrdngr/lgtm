@@ -7,14 +7,35 @@ import { keepSubmit, submitNextSend } from "../terminal/registry";
 
 let changes = 0;
 const listeners = new Set<() => void>();
-const subscribe = (f: () => void) => {
-  listeners.add(f);
-  return () => listeners.delete(f);
-};
+let listening = false;
 const bump = () => {
   changes++;
   for (const f of listeners) f();
 };
+const subscribe = (f: () => void) => {
+  if (!listening) {
+    listening = true;
+    events.designChanged(getCurrentWebviewWindow()).listen(bump);
+  }
+  listeners.add(f);
+  return () => listeners.delete(f);
+};
+
+/** Each workspace's load in flight, shared by the lists that ask meanwhile. */
+const loads = new Map<string, { at: number; p: Promise<DesignItemDto[]> }>();
+
+function load(workspace: WorkspaceName, at: number) {
+  const key = workspaceKey(workspace);
+  let l = loads.get(key);
+  if (!l || l.at !== at) {
+    const made = { at, p: unwrap(commands.designs(workspace)) };
+    l = made;
+    loads.set(key, made);
+    const done = () => loads.get(key) === made && loads.delete(key);
+    made.p.then(done, done);
+  }
+  return l.p;
+}
 
 /** Has every list of designs load again. */
 export const designsChanged = bump;
@@ -25,10 +46,9 @@ export function useDesigns(workspace: WorkspaceName) {
   const [error, setError] = useState<string>();
   const version = useSyncExternalStore(subscribe, () => changes);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `version` asks for a reload
   useEffect(() => {
     let live = true;
-    unwrap(commands.designs(workspace)).then(
+    load(workspace, version).then(
       (d) => {
         if (!live) return;
         setItems(d);
@@ -40,13 +60,6 @@ export function useDesigns(workspace: WorkspaceName) {
       live = false;
     };
   }, [workspace, version]);
-
-  useEffect(() => {
-    const sub = events.designChanged(getCurrentWebviewWindow()).listen(bump);
-    return () => {
-      sub.then((un) => un());
-    };
-  }, []);
 
   return { items, error, reload: useCallback(bump, []) };
 }
