@@ -37,6 +37,15 @@ pub struct FileDiff {
     pub hunks: Vec<Hunk>,
 }
 
+/// A file a diff changes, without its patch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiffPath {
+    pub path: String,
+    /// Source path for renames and copies.
+    pub old_path: Option<String>,
+    pub status: FileStatus,
+}
+
 impl Jj {
     /// Resolves a review revset R to `heads(::R ~ R)` → `heads(R)`. For a stack this is the
     /// same diff as `jj diff -r R`; for R with gaps (a PR that merged trunk) it matches
@@ -73,6 +82,22 @@ impl Jj {
         let git_args = Self::range_args(range, &["--git"]);
         let (meta, git) = tokio::try_join!(self.read(&meta_args), self.read_lossy(&git_args))?;
         join(diff::parse_meta(&meta)?, diff::parse_git(&git)?)
+    }
+
+    /// The files `range` changes, without reading their patches.
+    pub async fn diff_paths(&self, range: &Range) -> anyhow::Result<Vec<DiffPath>> {
+        let meta_args = Self::range_args(range, &["-T", diff::META_TEMPLATE]);
+        Ok(diff::parse_meta(&self.read(&meta_args).await?)?
+            .into_iter()
+            .map(|m| {
+                let moved = matches!(m.status, FileStatus::Renamed | FileStatus::Copied);
+                DiffPath {
+                    old_path: moved.then_some(m.source),
+                    path: m.path,
+                    status: m.status,
+                }
+            })
+            .collect())
     }
 
     fn range_args<'a>(range: &'a Range, extra: &[&'a str]) -> Vec<&'a str> {

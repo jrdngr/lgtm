@@ -13,7 +13,7 @@ use super::resolve::Resolver;
 use super::roots::{self, Manifests, Root};
 use super::scan;
 use crate::diff::{FileStatus, RowKind};
-use crate::jj::{FileDiff, Jj, Range};
+use crate::jj::{DiffPath, Jj, Range};
 use crate::review::build::ReviewFile;
 use crate::review::graph::{self, GraphDto};
 
@@ -66,7 +66,7 @@ pub fn changed_of(files: &[ReviewFile], indexed: bool) -> Vec<Changed> {
         .collect()
 }
 
-pub fn changed_of_diffs(diffs: &[FileDiff]) -> Vec<Changed> {
+pub fn changed_of_paths(diffs: &[DiffPath]) -> Vec<Changed> {
     diffs
         .iter()
         .map(|d| Changed {

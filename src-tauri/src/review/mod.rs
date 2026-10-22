@@ -66,6 +66,7 @@ pub struct Reviews {
     cache: Mutex<cache::FileCache>,
     evologs: views::Evologs,
     configs: crate::config::ConfigTexts,
+    history: arch::history::HistoryCache,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
 }
@@ -79,6 +80,7 @@ impl Default for Reviews {
             cache: Mutex::default(),
             evologs: Default::default(),
             configs: Default::default(),
+            history: Default::default(),
             links: Mutex::default(),
         }
     }

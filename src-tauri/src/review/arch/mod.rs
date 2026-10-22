@@ -11,6 +11,7 @@ pub mod edge;
 pub mod explore;
 mod extract;
 mod group;
+pub(crate) mod history;
 mod inputs;
 mod layers;
 mod load;

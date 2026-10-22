@@ -33,7 +33,7 @@ pub use at::WorkingCopyDto;
 pub use background::Snapshot;
 pub use bookmarks::BookmarkSpot;
 pub use child::end_all;
-pub use diff::{FileDiff, Range};
+pub use diff::{DiffPath, FileDiff, Range};
 pub use edit::JjAction;
 pub use log::LogRow;
 pub use near::{NearBookmark, StackSide};
@@ -302,6 +302,31 @@ impl Jj {
             ])
             .await?;
         Ok(parse_changes(&out))
+    }
+
+    /// Each commit in `revset` with its first parent.
+    pub async fn first_parents(
+        &self,
+        revset: &str,
+    ) -> anyhow::Result<HashMap<String, Option<String>>> {
+        let out = self
+            .read(&[
+                "log",
+                "--no-graph",
+                "-r",
+                revset,
+                "-T",
+                r#"commit_id ++ "\t" ++ parents.map(|p| p.commit_id()).join(" ") ++ "\n""#,
+            ])
+            .await?;
+        Ok(out
+            .lines()
+            .filter_map(|l| l.split_once('\t'))
+            .map(|(c, parents)| {
+                let first = parents.split(' ').next().filter(|p| !p.is_empty());
+                (c.to_string(), first.map(str::to_string))
+            })
+            .collect())
     }
 
     /// The repo-relative paths of the files in `rev`, as of the last snapshot.

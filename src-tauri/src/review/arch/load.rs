@@ -6,7 +6,7 @@ use super::compute::{self, Stored};
 use super::group::Grouping;
 use super::inputs::{self, Built};
 use super::model::{self, Model};
-use super::{ArchDto, ArchRange, HistoryDto, assess, state};
+use super::{ArchDto, ArchRange, HistoryDto, assess, history, state};
 use crate::config::Config;
 use crate::ctx::RepoCtx;
 use crate::jj::Range;
@@ -89,7 +89,9 @@ impl RepoCtx {
         .await?)
     }
 
-    /// The review's commits that changed the architecture, oldest first.
+    /// The review's commits that changed the architecture, oldest first. Each commit's entry
+    /// is kept while the commit and the review's files stay the same, so a reload only builds
+    /// new commits.
     pub async fn arch_history(&self, review: u32) -> anyhow::Result<Vec<HistoryDto>> {
         let (ws, revset) = {
             let r = self.review(review)?;
@@ -100,40 +102,38 @@ impl RepoCtx {
         // Files the review changes differ in the working copy, so each commit reads its
         // unchanged ones at the commit.
         let whole = ws.jj.resolve(&revset).await?;
-        let reviewed: Vec<String> = ws
-            .jj
-            .diff(&whole)
-            .await?
-            .into_iter()
-            .map(|d| d.path)
-            .collect();
+        let (reviewed, changes, parents) = tokio::try_join!(
+            ws.jj.diff_paths(&whole),
+            ws.jj.changes(&revset),
+            ws.jj.first_parents(&revset),
+        )?;
+        let reviewed: Vec<String> = reviewed.into_iter().map(|d| d.path).collect();
         let mut out = Vec::new();
-        for c in ws.jj.changes(&revset).await? {
-            let parent = ws
-                .jj
-                .commit_ids(&format!("parents({})", c.commit_id))
-                .await?
-                .into_iter()
-                .next();
+        for c in changes {
+            let parent = parents.get(&c.commit_id).cloned().flatten();
+            let key = history::key(&c.commit_id, parent.as_deref(), &reviewed);
+            if let Some(found) = self.reviews.history.get(&key) {
+                out.extend(found);
+                continue;
+            }
             let range = Range {
                 from: parent.clone(),
                 to: c.commit_id.clone(),
             };
-            let changed = inputs::changed_of_diffs(&ws.jj.diff(&range).await?);
-            if changed.is_empty() {
-                continue;
-            }
-            let extra = reviewed
-                .iter()
-                .filter(|p| !changed.iter().any(|c| c.path == **p))
-                .cloned()
-                .collect();
-            let Built { model, roots } =
-                inputs::build(&ws.jj, &ws.root, &repo, &range, changed, extra).await?;
-            let g = Grouping::new(roots, &repo);
-            let d = delta(&model, &g);
-            if d != [0; 4] {
-                out.push(HistoryDto {
+            let changed = inputs::changed_of_paths(&ws.jj.diff_paths(&range).await?);
+            let entry = if changed.is_empty() {
+                None
+            } else {
+                let extra = reviewed
+                    .iter()
+                    .filter(|p| !changed.iter().any(|c| c.path == **p))
+                    .cloned()
+                    .collect();
+                let Built { model, roots } =
+                    inputs::build(&ws.jj, &ws.root, &repo, &range, changed, extra).await?;
+                let g = Grouping::new(roots, &repo);
+                let d = delta(&model, &g);
+                (d != [0; 4]).then(|| HistoryDto {
                     change_id: c.change_id,
                     commit_id: c.commit_id,
                     parent,
@@ -142,8 +142,10 @@ impl RepoCtx {
                     components_removed: d[1],
                     edges_added: d[2],
                     edges_removed: d[3],
-                });
-            }
+                })
+            };
+            self.reviews.history.put(key, entry.clone());
+            out.extend(entry);
         }
         Ok(out)
     }
