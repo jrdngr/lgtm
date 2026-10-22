@@ -20,8 +20,15 @@ use crate::review::graph::{self, GraphDto};
 /// Past this many entries the cache starts over.
 const MAX_CACHED: usize = 50_000;
 
-/// Imports by (commit, path).
-type Cache = Mutex<HashMap<(String, String), Arc<Vec<Raw>>>>;
+/// A file's imports, found by its commit and path without reading it, or by its path and
+/// a hash of its contents once read, so an unchanged file in a new commit isn't parsed again.
+#[derive(PartialEq, Eq, Hash)]
+enum Key {
+    At(String, String),
+    Contents(String, [u8; 32]),
+}
+
+type Cache = Mutex<HashMap<Key, Arc<Vec<Raw>>>>;
 
 static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
 
@@ -126,17 +133,7 @@ pub async fn build(
         reads.push((true, Some(range.to.clone()), p.clone(), true));
     }
     let repo = repo.to_string();
-    let limit = tokio::sync::Semaphore::new(8);
-    let read =
-        futures::future::try_join_all(reads.iter().map(|(_, commit, path, optional)| async {
-            let _permit = limit.acquire().await?;
-            match imports_at(jj, commit.as_deref(), path).await {
-                Ok(raw) => Ok(Some(raw)),
-                // A file the review changes elsewhere may not exist at this commit.
-                Err(_) if *optional => Ok(None),
-                Err(e) => Err(e),
-            }
-        }));
+    let read = read_imports(jj, &reads);
     let (wc, raws) = tokio::join!(wc, read);
     let (wc, raws) = (wc?, raws?);
     Ok(tokio::task::spawn_blocking(move || {
@@ -181,34 +178,63 @@ pub async fn build(
     .await?)
 }
 
-/// A file's imports at `commit`, `None` when it isn't source or is too large.
-async fn imports_at(
+/// Each read's file imports: `None` for an optional file that isn't there, and `Some(None)`
+/// for one that isn't source or is too large. One `jj file show` per commit.
+async fn read_imports(
     jj: &Jj,
-    commit: Option<&str>,
-    path: &str,
-) -> anyhow::Result<Option<Arc<Vec<Raw>>>> {
-    if !extract::is_source(path) {
-        return Ok(None);
+    reads: &[(bool, Option<String>, String, bool)],
+) -> anyhow::Result<Vec<Option<Option<Arc<Vec<Raw>>>>>> {
+    let mut found = vec![None; reads.len()];
+    let mut by_commit: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (i, (_, commit, path, _)) in reads.iter().enumerate() {
+        if !extract::is_source(path) {
+            found[i] = Some(None);
+            continue;
+        }
+        let Some(commit) = commit else {
+            found[i] = Some(Some(Arc::default()));
+            continue;
+        };
+        let at = Key::At(commit.clone(), path.clone());
+        if let Some(hit) = CACHE.lock().unwrap().get(&at) {
+            found[i] = Some(Some(hit.clone()));
+            continue;
+        }
+        by_commit.entry(commit).or_default().push(i);
     }
-    let Some(commit) = commit else {
-        return Ok(Some(Arc::default()));
-    };
-    let key = (commit.to_string(), path.to_string());
-    if let Some(hit) = CACHE.lock().unwrap().get(&key) {
-        return Ok(Some(hit.clone()));
+    let batches =
+        futures::future::try_join_all(by_commit.into_iter().map(|(commit, at)| async move {
+            let paths: Vec<String> = at.iter().map(|&i| reads[i].2.clone()).collect();
+            let files = jj.files_at(commit, &paths).await?;
+            Ok::<_, anyhow::Error>((commit, at, files))
+        }))
+        .await?;
+    for (commit, at, files) in batches {
+        for i in at {
+            let (_, _, path, optional) = &reads[i];
+            let Some(bytes) = files.get(path) else {
+                // A file the review changes elsewhere may not exist at this commit.
+                anyhow::ensure!(*optional, "{path} isn't in commit {commit}");
+                continue;
+            };
+            if bytes.len() as u64 > crate::review::graph::scan::MAX_BYTES {
+                found[i] = Some(None);
+                continue;
+            }
+            let contents = Key::Contents(path.clone(), *blake3::hash(bytes).as_bytes());
+            let hit = CACHE.lock().unwrap().get(&contents).cloned();
+            let raw =
+                hit.unwrap_or_else(|| extract::imports(path, &String::from_utf8_lossy(bytes)));
+            let mut cache = CACHE.lock().unwrap();
+            if cache.len() >= MAX_CACHED {
+                cache.clear();
+            }
+            cache.insert(contents, raw.clone());
+            cache.insert(Key::At(commit.to_string(), path.clone()), raw.clone());
+            found[i] = Some(Some(raw));
+        }
     }
-    let bytes = jj.file(Some(commit), path).await?;
-    if bytes.len() as u64 > crate::review::graph::scan::MAX_BYTES {
-        return Ok(None);
-    }
-    let text = String::from_utf8_lossy(&bytes);
-    let raw = extract::imports(path, &text);
-    let mut cache = CACHE.lock().unwrap();
-    if cache.len() >= MAX_CACHED {
-        cache.clear();
-    }
-    cache.insert(key, raw.clone());
-    Ok(Some(raw))
+    Ok(found)
 }
 
 pub(super) fn snapshot(
