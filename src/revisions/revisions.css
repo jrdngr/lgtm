@@ -30,7 +30,7 @@
   background: var(--hover);
 }
 
-/* Reviewed commits are cyan, `@` green over them. */
+/* Reviewed commits are cyan, `@` green over them, empty commits yellow over both. */
 .lr.rv {
   background: rgb(57 197 207 / 9%);
 }
@@ -60,6 +60,19 @@
 
 .lr.at.cursor {
   background: rgb(63 185 80 / 26%);
+}
+
+.lr.empty {
+  background: rgb(227 179 65 / 12%);
+}
+
+.lr.empty.picked,
+.revisions:not(:focus-within) .lr.empty.cursor {
+  background: rgb(227 179 65 / 16%);
+}
+
+.lr.empty.cursor {
+  background: rgb(227 179 65 / 26%);
 }
 
 /* The bracket down the left of the reviewed commits. */

@@ -38,8 +38,8 @@ interface Props {
 }
 
 /** `jj log` to pick what to review and which commit to edit. Reviewed commits are tinted with
- * a bracket, `@` green over them, and each open PR's head has its pill. Keys act on the
- * highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
+ * a bracket, `@` green over them, empty commits yellow over both, and each open PR's head has
+ * its pill. Keys act on the highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
 export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const target = useReviewTarget(workspace);
   const revset = target?.revset ?? workspaceRevset(workspace) ?? "@";
@@ -344,7 +344,13 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           const c = commitIndex.get(i) ?? -1;
           const commit = row.commit;
           const inRange = c >= lo && c <= hi && (!inChain || inChain.has(commit?.commitId ?? ""));
-          const tint = commit?.workingCopy ? " at" : inReview(i) ? " rv" : "";
+          const tint = commit?.empty
+            ? " empty"
+            : commit?.workingCopy
+              ? " at"
+              : inReview(i)
+                ? " rv"
+                : "";
           const edge = first >= 0 && i >= first && i <= lastIn;
           const rp = commit ? prOf(commit) : undefined;
           return (
