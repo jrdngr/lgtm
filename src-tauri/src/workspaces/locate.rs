@@ -7,17 +7,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::jj::WorkspaceInfo;
-
-/// The repo store directory a workspace at `root` uses: `.jj/repo` itself in the main
-/// workspace, or where the `.jj/repo` file points in the others.
-fn repo_dir(root: &Path) -> Option<PathBuf> {
-    let link = root.join(".jj/repo");
-    if link.is_dir() {
-        return link.canonicalize().ok();
-    }
-    let target = std::fs::read_to_string(&link).ok()?;
-    root.join(".jj").join(target.trim()).canonicalize().ok()
-}
+use crate::jj::checkout::repo_dir;
 
 /// The name of the workspace at `root` when it's one of the repo stored in `repo`.
 pub fn workspace_at(root: &Path, repo: &Path) -> Option<String> {

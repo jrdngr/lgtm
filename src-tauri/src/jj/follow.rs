@@ -1,11 +1,73 @@
 //! Telling the app's own working-copy moves from ones made elsewhere: a terminal, an agent.
 
-use super::Jj;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
+
+use super::{Jj, checkout};
+
+/// Each workspace's `@` change by name, and the operation heads it was read at.
+type Listed = Option<(Vec<String>, HashMap<String, String>)>;
+
+/// The last listing per repo store. Every workspace's watcher looks after each operation,
+/// so they share one `jj workspace list` per operation instead of a read each.
+static LISTED: LazyLock<Mutex<HashMap<PathBuf, Arc<tokio::sync::Mutex<Listed>>>>> =
+    LazyLock::new(Mutex::default);
+
+/// The repo's current operation heads, from the names of its op heads files.
+fn op_heads(repo: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(repo.join("op_heads/heads")) else {
+        return vec![];
+    };
+    let mut heads: Vec<String> = entries
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    heads.sort();
+    heads
+}
 
 impl Jj {
     async fn working_copy_change(&self) -> anyhow::Result<String> {
         self.read(&["log", "--no-graph", "-r", "@", "-T", "change_id"])
             .await
+    }
+
+    /// The `@` change of this workspace, from a listing of every workspace's that's shared
+    /// with the repo's other workspaces while the operation stays the same.
+    async fn listed_working_copy(&self) -> anyhow::Result<String> {
+        let Some(repo) = checkout::repo_dir(&self.root) else {
+            return self.working_copy_change().await;
+        };
+        let entry = LISTED.lock().unwrap().entry(repo.clone()).or_default().clone();
+        let mut listed = entry.lock().await;
+        let heads = op_heads(&repo);
+        let fresh = listed.as_ref().filter(|(at, _)| !heads.is_empty() && *at == heads);
+        let changes = match fresh {
+            Some((_, changes)) => changes.clone(),
+            None => {
+                let out = self
+                    .read(&[
+                        "workspace",
+                        "list",
+                        "-T",
+                        r#"name ++ "\t" ++ target.change_id() ++ "\n""#,
+                    ])
+                    .await?;
+                let changes: HashMap<String, String> = out
+                    .lines()
+                    .filter_map(|l| l.split_once('\t'))
+                    .map(|(name, change)| (name.to_string(), change.to_string()))
+                    .collect();
+                *listed = Some((heads, changes.clone()));
+                changes
+            }
+        };
+        drop(listed);
+        match changes.get(self.name()) {
+            Some(change) => Ok(change.clone()),
+            None => self.working_copy_change().await,
+        }
     }
 
     /// Notes where `@` is after an app write, under the writer lock, so it isn't reported as
@@ -22,7 +84,7 @@ impl Jj {
     pub async fn moved_working_copy(&self) -> anyhow::Result<bool> {
         // Waits out an app write, which notes its own move when it's done.
         let mut seen = self.writer.lock().await;
-        let now = self.working_copy_change().await?;
+        let now = self.listed_working_copy().await?;
         let moved = seen.as_ref().is_some_and(|s| *s != now);
         *seen = Some(now);
         Ok(moved)
@@ -31,7 +93,7 @@ impl Jj {
 
 #[cfg(test)]
 mod tests {
-    use crate::jj::JjAction;
+    use crate::jj::{Jj, JjAction};
     use crate::jj::test_support::{jj, repo, write};
 
     #[tokio::test]
@@ -60,5 +122,24 @@ mod tests {
         assert!(moved().await);
         j.edit(&base).await.unwrap();
         assert!(!moved().await);
+    }
+
+    #[tokio::test]
+    async fn workspaces_of_one_repo_each_see_only_their_own_moves() {
+        let (dir, main) = repo();
+        let d = dir.path();
+        let other_dir = tempfile::tempdir().unwrap();
+        let other_root = other_dir.path().join("other");
+        jj(d, &["workspace", "add", "--name", "other", other_root.to_str().unwrap()]);
+        let other = Jj::new(&other_root);
+        assert!(!main.moved_working_copy().await.unwrap());
+        assert!(!other.moved_working_copy().await.unwrap());
+
+        jj(&other_root, &["new"]);
+        assert!(!main.moved_working_copy().await.unwrap());
+        assert!(other.moved_working_copy().await.unwrap());
+        jj(d, &["new"]);
+        assert!(main.moved_working_copy().await.unwrap());
+        assert!(!other.moved_working_copy().await.unwrap());
     }
 }

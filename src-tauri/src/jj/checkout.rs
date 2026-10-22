@@ -1,10 +1,21 @@
-//! The workspace name a directory's `.jj/working_copy/checkout` records.
+//! What a workspace directory's `.jj` says about it: its name and its repo's store.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The name of the workspace whose root is `root`, from its checkout file.
 pub fn name_at(root: &Path) -> Option<String> {
     checkout_name(&std::fs::read(root.join(".jj/working_copy/checkout")).ok()?)
+}
+
+/// The repo store directory a workspace at `root` uses: `.jj/repo` itself in the main
+/// workspace, or where the `.jj/repo` file points in the others.
+pub fn repo_dir(root: &Path) -> Option<PathBuf> {
+    let link = root.join(".jj/repo");
+    if link.is_dir() {
+        return link.canonicalize().ok();
+    }
+    let target = std::fs::read_to_string(&link).ok()?;
+    root.join(".jj").join(target.trim()).canonicalize().ok()
 }
 
 /// The workspace name in a `.jj/working_copy/checkout` file: field 3 of jj's `Checkout`
