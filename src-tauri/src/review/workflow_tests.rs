@@ -202,7 +202,8 @@ async fn per_change_and_since_last_session_views() {
         )
         .await
         .unwrap()
-        .review;
+        .loaded()
+        .0;
     let paths: Vec<_> = one.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["a.txt"]);
 
@@ -214,7 +215,7 @@ async fn per_change_and_since_last_session_views() {
     assert!(review.previous_session.is_some());
 
     let view = View::SinceLast { change: second };
-    let inter = ctx.refresh(review.id, Some(view)).await.unwrap().review;
+    let inter = ctx.refresh(review.id, Some(view)).await.unwrap().loaded().0;
     assert!(inter.interdiff);
     let added: Vec<_> = inter.files[0]
         .hunks
@@ -225,7 +226,7 @@ async fn per_change_and_since_last_session_views() {
         .collect();
     assert_eq!(added, ["three"]);
     let same = View::SinceLast { change: first };
-    let same = ctx.refresh(review.id, Some(same)).await.unwrap().review;
+    let same = ctx.refresh(review.id, Some(same)).await.unwrap().loaded().0;
     assert!(same.files.is_empty());
 
     // Loading the same revset again continues the session: still compared with the first.
@@ -253,7 +254,7 @@ async fn view_of_a_change_that_left_the_revset_falls_back_to_combined() {
     jj(d, &["new"]);
     write(d, "b.txt", "two\n");
     ctx.main.snapshot().await.unwrap();
-    let refreshed = ctx.refresh(review.id, None).await.unwrap().review;
+    let refreshed = ctx.refresh(review.id, None).await.unwrap().loaded().0;
     assert_eq!(refreshed.view, View::Combined);
     let paths: Vec<_> = refreshed.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["b.txt"]);
@@ -274,12 +275,12 @@ async fn refresh_maps_rows_to_where_the_code_moved() {
 
     write(d, "a.rs", "fn z() {}\nfn a() {}\nfn b() {}\n");
     ctx.main.snapshot().await.unwrap();
-    let refreshed = ctx.refresh(review.id, None).await.unwrap();
-    let new_b = row_of(&refreshed.review, 0, "fn b() {}", 0);
-    let moved = refreshed.moves.iter().find(|m| m.from == b).unwrap();
+    let (refreshed, moves) = ctx.refresh(review.id, None).await.unwrap().loaded();
+    let new_b = row_of(&refreshed, 0, "fn b() {}", 0);
+    let moved = moves.iter().find(|m| m.from == b).unwrap();
     assert_eq!(moved.to, new_b);
     assert_eq!(
-        marked(&refreshed.review, &refreshed.review.state.marks),
+        marked(&refreshed, &refreshed.state.marks),
         [("fn b() {}".to_string(), MarkColor::Red)]
     );
     // Undo history survives the refresh.
@@ -311,13 +312,9 @@ async fn refresh_keeps_rows_of_files_loaded_without_contents() {
 
     write(d, "b.rs", "fn b2() {}\n");
     ctx.main.snapshot().await.unwrap();
-    let refreshed = ctx.refresh(review.id, None).await.unwrap();
-    let moved: Vec<_> = refreshed
-        .moves
-        .iter()
-        .filter(|m| m.from.file == a as u32)
-        .collect();
-    assert_eq!(moved.len(), refreshed.review.files[a].hunks[0].rows.len());
+    let (refreshed, moves) = ctx.refresh(review.id, None).await.unwrap().loaded();
+    let moved: Vec<_> = moves.iter().filter(|m| m.from.file == a as u32).collect();
+    assert_eq!(moved.len(), refreshed.files[a].hunks[0].rows.len());
     assert!(moved.iter().all(|m| m.from == m.to));
 }
 
@@ -332,7 +329,7 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
     // Editing a.rs makes a new commit; b.rs is reused from the cache.
     write(d, "a.rs", "fn a2() {}\n");
     ctx.main.snapshot().await.unwrap();
-    let review = ctx.refresh(review.id, None).await.unwrap().review;
+    let review = ctx.refresh(review.id, None).await.unwrap().loaded().0;
     assert_eq!(
         rows_text(&review, &[row_of(&review, 0, "fn a2() {}", 0)]),
         ["fn a2() {}"]
@@ -346,4 +343,27 @@ async fn unchanged_files_reused_on_refresh_still_take_marks() {
         marked(&reopened, &reopened.state.marks),
         [("fn b() {}".to_string(), MarkColor::Cyan)]
     );
+}
+
+#[tokio::test]
+async fn refresh_without_new_commits_keeps_the_files_but_not_the_change_details() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn a() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+
+    jj(d, &["bookmark", "set", "feature", "-r", "@"]);
+    let RefreshDto::Same { changes, .. } = ctx.refresh(review.id, None).await.unwrap() else {
+        panic!("reloaded a review whose commits didn't change");
+    };
+    assert_eq!(changes[0].commit_id, review.changes[0].commit_id);
+    assert!(changes[0].bookmarks[0].starts_with("feature"));
+
+    // A new session compares against other commits, so the files load again.
+    ctx.seal_session(review.id).unwrap();
+    ctx.refresh(review.id, None).await.unwrap().loaded();
+    let view = View::Change {
+        change: review.changes[0].change_id.clone(),
+    };
+    ctx.refresh(review.id, Some(view)).await.unwrap().loaded();
 }

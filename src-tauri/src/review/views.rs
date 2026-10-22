@@ -78,8 +78,19 @@ fn dto(c: Change, since: Since) -> ChangeDto {
     }
 }
 
-pub async fn stack(jj: &Jj, revset: &str, prev: Option<&Session>) -> anyhow::Result<Stack> {
-    let changes = jj.changes(revset).await?;
+/// `changes` with what jj says of them now and the `since` they had in `shown`, for a
+/// review whose commits didn't change.
+pub fn relisted(changes: Vec<Change>, shown: &[ChangeDto]) -> Vec<ChangeDto> {
+    changes
+        .into_iter()
+        .map(|c| {
+            let was = shown.iter().find(|s| s.commit_id == c.commit_id);
+            dto(c, was.map_or(Since::Unknown, |s| s.since))
+        })
+        .collect()
+}
+
+pub async fn stack(jj: &Jj, changes: Vec<Change>, prev: Option<&Session>) -> anyhow::Result<Stack> {
     let Some(prev) = prev.filter(|p| !p.commits.is_empty()) else {
         return Ok(Stack {
             preds: vec![vec![]; changes.len()],

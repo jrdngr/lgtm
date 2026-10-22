@@ -3,7 +3,7 @@
 use crate::anchor::MatchConfig;
 use crate::config::Config;
 use crate::diff::FileStatus;
-use crate::jj::{FileDiff, Range};
+use crate::jj::{Change, FileDiff, Range};
 use crate::store::Session;
 use crate::workspace::Workspace;
 
@@ -23,17 +23,35 @@ pub(super) struct Loaded {
     pub cfg: MatchConfig,
 }
 
+/// A revset's base and head and its changes, oldest first.
+pub(super) struct Listed {
+    pub whole: Range,
+    pub changes: Vec<Change>,
+}
+
+impl Listed {
+    pub async fn of(ws: &Workspace, revset: &str) -> anyhow::Result<Self> {
+        let (whole, changes) = tokio::try_join!(ws.jj.resolve(revset), ws.jj.changes(revset))?;
+        Ok(Self { whole, changes })
+    }
+
+    pub fn commits(&self) -> Vec<String> {
+        self.changes.iter().map(|c| c.commit_id.clone()).collect()
+    }
+}
+
 impl RepoCtx {
     pub(super) async fn load(
         &self,
         ws: &Workspace,
         revset: &str,
+        listed: Listed,
         view: &View,
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
-        let whole = ws.jj.resolve(revset).await?;
+        let whole = listed.whole;
         let config = Config::at_base(&ws.jj, whole.from.as_deref()).await?;
-        let stack = views::stack(&ws.jj, revset, prev).await?;
+        let stack = views::stack(&ws.jj, listed.changes, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
         let view = match view {
             View::Change { change } | View::SinceLast { change }

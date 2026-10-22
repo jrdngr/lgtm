@@ -77,8 +77,19 @@ export function useReview(workspace: WorkspaceName) {
     if (!overtaken && r.status === "error") setError(r.error);
     else if (!overtaken && r.status === "ok") {
       setError(undefined);
-      const files = fileMoves(before.files, r.data.review.files);
-      show({ review: r.data.review, moves: movesFrom(r.data.moves, files) });
+      if (r.data.kind === "same") {
+        const { changes, state, stale } = r.data;
+        setLoaded((l) => {
+          if (!l || l.review.id !== before.id) return l;
+          const review = { ...l.review, changes, state, stale };
+          current.current = review;
+          return { review };
+        });
+        setStale(stale);
+      } else {
+        const files = fileMoves(before.files, r.data.review.files);
+        show({ review: r.data.review, moves: movesFrom(r.data.moves, files) });
+      }
     }
     if (again.current) {
       again.current = false;

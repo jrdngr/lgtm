@@ -50,7 +50,7 @@ use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
 pub use github::PulledThread;
-use load::Loaded;
+use load::{Listed, Loaded};
 use matching::MatchedCheck;
 pub use quotes::quoted_reply;
 pub use rowmap::RowMove;
@@ -104,11 +104,31 @@ pub struct ReviewDto {
 }
 
 #[derive(Clone, Serialize, Type)]
-#[serde(rename_all = "camelCase")]
-pub struct RefreshDto {
-    pub review: ReviewDto,
-    /// Where rows of the review as it was went.
-    pub moves: Vec<RowMove>,
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RefreshDto {
+    Loaded {
+        review: ReviewDto,
+        /// Where rows of the review as it was went.
+        moves: Vec<RowMove>,
+    },
+    /// The review still shows the same commits in the same view, so its files are as they
+    /// were.
+    Same {
+        changes: Vec<ChangeDto>,
+        state: StateDto,
+        stale: Option<String>,
+    },
+}
+
+#[cfg(test)]
+impl RefreshDto {
+    /// The reloaded review and where its rows went.
+    pub fn loaded(self) -> (ReviewDto, Vec<RowMove>) {
+        match self {
+            Self::Loaded { review, moves } => (review, moves),
+            Self::Same { .. } => panic!("the refresh kept the review as it was"),
+        }
+    }
 }
 
 /// A row by file index and its index among the file's rows, counting across hunks.
@@ -189,6 +209,10 @@ pub struct Review {
     whole: Range,
     /// The commits of the review's changes as last loaded, oldest first.
     commits: Vec<String>,
+    changes: Vec<ChangeDto>,
+    /// The view the files were loaded in. `None` until the first load, and after a session
+    /// change, so the next refresh loads them again.
+    shown: Option<View>,
     prev: Option<Session>,
     undo: Vec<Edit>,
     redo: Vec<Edit>,
@@ -253,8 +277,9 @@ impl RepoCtx {
                 prev => (prev, None, vec![]),
             }
         };
+        let listed = Listed::of(&ws, revset).await?;
         let loaded = self
-            .load(&ws, revset, &View::Combined, prev.as_ref())
+            .load(&ws, revset, listed, &View::Combined, prev.as_ref())
             .await?;
         // Started only once the load succeeds, so a revset that fails leaves no session.
         let session = match resumed {
@@ -296,6 +321,7 @@ impl RepoCtx {
         review.prev = store.last_session(&review.label)?;
         review.session =
             store.start_session(&review.label, review.ws.key(), &review.revset, now_ms())?;
+        review.shown = None;
         Ok(())
     }
 
@@ -330,14 +356,36 @@ impl RepoCtx {
                 review.load_gen,
             )
         };
-        let loaded = self.load(&ws, &revset, &view, prev.as_ref()).await?;
+        let listed = Listed::of(&ws, &revset).await?;
+        {
+            let review = self.review(id)?;
+            let mut review = review.lock().unwrap();
+            anyhow::ensure!(review.load_gen == load_gen, SUPERSEDED);
+            // Commit ids name their contents, so the same ones in the same view diff the same.
+            if review.shown.as_ref() == Some(&view)
+                && review.whole == listed.whole
+                && review.commits == listed.commits()
+            {
+                review.changes = views::relisted(listed.changes, &review.changes);
+                let store = self.store.lock().unwrap();
+                review.rematch(&store)?;
+                return Ok(RefreshDto::Same {
+                    changes: review.changes.clone(),
+                    state: review.state(),
+                    stale: ws.stale.lock().unwrap().clone(),
+                });
+            }
+        }
+        let loaded = self
+            .load(&ws, &revset, listed, &view, prev.as_ref())
+            .await?;
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         anyhow::ensure!(review.load_gen == load_gen, SUPERSEDED);
         review.view = loaded.dto.view.clone();
         let store = self.store.lock().unwrap();
         let (review, moves) = review.swap_in(&store, loaded, id)?;
-        Ok(RefreshDto { review, moves })
+        Ok(RefreshDto::Loaded { review, moves })
     }
 }
 
@@ -364,6 +412,8 @@ impl Review {
                 to: String::new(),
             },
             commits: vec![],
+            changes: vec![],
+            shown: None,
             prev: None,
             undo: vec![],
             redo: vec![],
@@ -382,6 +432,8 @@ impl Review {
         self.files = loaded.files;
         self.cfg = loaded.cfg;
         self.commits = loaded.commits;
+        self.changes = loaded.dto.changes.clone();
+        self.shown = Some(loaded.dto.view.clone());
         self.from = loaded.dto.from.clone();
         self.to = loaded.dto.to.clone();
         self.whole = loaded.whole;

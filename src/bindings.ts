@@ -1955,11 +1955,14 @@ export type RangeDto = {
 	end: number,
 };
 
-export type RefreshDto = {
-	review: ReviewDto,
-	/**  Where rows of the review as it was went. */
-	moves: RowMove[],
-};
+export type RefreshDto = { kind: "loaded"; review: ReviewDto; 
+/**  Where rows of the review as it was went. */
+moves: RowMove[] } | 
+/**
+ *  The review still shows the same commits in the same view, so its files are as they
+ *  were.
+ */
+{ kind: "same"; changes: ChangeDto[]; state: StateDto; stale: string | null };
 
 export type RelationDto = {
 	from: string,
