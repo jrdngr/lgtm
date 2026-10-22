@@ -9,7 +9,7 @@ import type { MarkSetup } from "../review/marks";
 import type { Comments } from "../review/useComments";
 import type { CommentFolds } from "../review/useSavedView";
 import { ChunkCode } from "./ChunkCode";
-import { commentsAfter, markOf, ringedRows } from "./ChunkView";
+import { commentsAfter, markOf } from "./ChunkView";
 import { type ExcludedState, REASON_NAMES, RISK_NAMES, RISKS, threadSegment } from "./model";
 import { Superseded } from "./Superseded";
 import { setGuided, setPick } from "./store";
@@ -177,7 +177,6 @@ export function CommentedView({
   setError(message: string): void;
 }) {
   const segments = useMemo(() => threadSegment(review.files, comment), [review.files, comment]);
-  const ringed = ringedRows(c, segments, new Set([comment.id]));
   const lines = useGuidedLines({ workspace, review, setup, segments, c, send, setError });
   function onKeyDown(k: React.KeyboardEvent) {
     if (k.target instanceof HTMLTextAreaElement) return;
@@ -192,7 +191,6 @@ export function CommentedView({
       <ChunkCode
         files={review.files}
         segments={segments}
-        ringed={ringed}
         lines={lines}
         markOf={markOf(review)}
         after={commentsAfter(c, folds, segments)}

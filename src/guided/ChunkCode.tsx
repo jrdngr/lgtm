@@ -14,8 +14,6 @@ import type { GuidedLines } from "./useGuidedLines";
 interface Props {
   files: FlatFile[];
   segments: Segment[];
-  /** Rows PR threads are on, by `markKey`. */
-  ringed?: ReadonlySet<string>;
   /** A step's lines, lit while it's the one shown. */
   lit?: GuidedRange[];
   /** Picking and acting on lines; without it the code is read-only. */
@@ -33,7 +31,6 @@ interface Props {
 export function ChunkCode({
   files,
   segments,
-  ringed,
   lit,
   lines,
   markOf,
@@ -70,7 +67,6 @@ export function ChunkCode({
                 "gd-ln",
                 `kind-${r.kind}`,
                 mark && "marked",
-                ringed?.has(markKey(s.file, row)) && "ring",
                 lit && inRanges(lit, s.path, r.newLine) && "lit",
                 lines?.isPicked(s.file, row) && "sel",
                 lines?.isHead(s.file, row) && "head",

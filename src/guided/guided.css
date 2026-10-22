@@ -598,11 +598,6 @@ button.gd-tag:hover {
   cursor: pointer;
 }
 
-.gd-ln.ring {
-  background-image: linear-gradient(var(--violet-soft), var(--violet-soft));
-  box-shadow: inset 3px 0 0 var(--mark-violet);
-}
-
 .gd-ln.lit {
   background-image: linear-gradient(var(--review-soft), var(--review-soft));
   box-shadow: inset 3px 0 0 var(--review);

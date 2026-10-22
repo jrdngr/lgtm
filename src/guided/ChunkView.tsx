@@ -21,7 +21,6 @@ import { showChunk } from "./focus";
 import {
   type ChunkState,
   type GuidedView,
-  inSegments,
   lineDiff,
   nextChunk,
   RISK_NAMES,
@@ -37,16 +36,6 @@ import { useGuidedLines } from "./useGuidedLines";
 const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
 
 const DOC_NAMES = { adr: "ADR", devlog: "Dev log", other: "Doc" };
-
-/** The rows of `segments` comment `ids` sit on, by `markKey`. */
-export function ringedRows(c: Comments, segments: Segment[], ids?: Set<number>) {
-  const out = new Set<string>();
-  for (const t of c.comments) {
-    if (!t.rows || (ids && !ids.has(t.id)) || !inSegments(t, segments)) continue;
-    for (let r = t.rows.start; r <= t.rows.end; r++) out.add(markKey(t.file, r));
-  }
-  return out;
-}
 
 /** A changed row's mark color in the review, for tinting it as the Review tab does. */
 export const markOf =
@@ -139,7 +128,6 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
       return next;
     });
   const lines = useGuidedLines({ workspace, review, setup, segments, c, send, setError });
-  const ringed = useMemo(() => ringedRows(c, s.segments), [c, s.segments]);
   const after = commentsAfter(c, folds, s.segments);
   const stepCode = useRef<HTMLDivElement>(null);
 
@@ -227,7 +215,6 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
         <ChunkCode
           files={review.files}
           segments={segments}
-          ringed={ringed}
           lit={lit}
           lines={lines}
           markOf={markOf(review)}
