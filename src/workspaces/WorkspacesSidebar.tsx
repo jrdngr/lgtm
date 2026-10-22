@@ -1,10 +1,11 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 import type { WorkspaceDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmWorkspace } from "../editor/unsaved";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
-import { commands } from "../ipc";
+import { commands, errorText, unwrap } from "../ipc";
 import { RevisionsSection } from "../revisions/RevisionsSection";
 import { useGithubOff } from "../tools/agents";
 import { openMenu } from "../ui/contextMenu";
@@ -54,6 +55,20 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   }
   // Resubscribed each render, so the shortcut sees the current state.
   useEffect(() => onAddRequest(start));
+
+  /** Asks where a workspace's files are, then opens it there. */
+  async function locate(w: WorkspaceDto) {
+    if (w.name === null) return;
+    const root = await open({ directory: true, defaultPath: w.root || undefined });
+    if (typeof root !== "string") return;
+    try {
+      await unwrap(commands.locateWorkspace(w.name, root));
+      await reload();
+      onSelect(w.name);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
@@ -165,7 +180,8 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
         key={key}
         w={w}
         selected={selected === w.name}
-        onSelect={() => onSelect(w.name)}
+        onSelect={() => (w.missing ? locate(w) : onSelect(w.name))}
+        onLocate={() => locate(w)}
         onDelete={() => setConfirming(w.name ?? undefined)}
         onPinDrag={pinned ? (e) => startDrag(e, key) : undefined}
         drop={pinned ? dropAt(key) : undefined}

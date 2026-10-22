@@ -56,6 +56,7 @@ interface Row {
   /** Switches to the workspace. */
   open(): void;
   onDelete(): void;
+  onLocate(): void;
   onClearDot(): void;
 }
 
@@ -68,6 +69,7 @@ export function workspaceMenu({
   dot,
   open,
   onDelete,
+  onLocate,
   onClearDot,
 }: Row): CtxEntry[] {
   const ws = w.name;
@@ -83,8 +85,15 @@ export function workspaceMenu({
     { label: pinned ? "Unpin" : "Pin to Top", onSelect: () => togglePin(key) },
     { label: "Color", items: colorItems(key, color) },
     "-",
-    { label: "New Terminal Here", onSelect: inIt((api) => focusPanel(addTerminal(api))) },
-    (!pr || pr.stack) && { label: "Open Review on @", onSelect: inIt((api) => reviewAt(ws, api)) },
+    !w.missing && {
+      label: "New Terminal Here",
+      onSelect: inIt((api) => focusPanel(addTerminal(api))),
+    },
+    !w.missing &&
+      (!pr || pr.stack) && {
+        label: "Open Review on @",
+        onSelect: inIt((api) => reviewAt(ws, api)),
+      },
     "-",
     ...(pr
       ? [
@@ -98,7 +107,8 @@ export function workspaceMenu({
           "-" as const,
         ]
       : []),
-    ...pathItems(ws, "", { relative: false }),
+    ...(w.missing ? [] : pathItems(ws, "", { relative: false })),
+    w.name !== null && { label: "Locate Folder…", onSelect: onLocate },
     "-",
     w.name !== null && !pr && dot && { label: "Mark Agents Seen", onSelect: onClearDot },
     "-",

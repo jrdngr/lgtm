@@ -47,6 +47,8 @@ export const commands = {
 	ptyRunning: (id: number) => __TAURI_INVOKE<string | null>("pty_running", { id }),
 	/**  Every workspace, the repo's main one first. */
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
+	/**  Remembers where workspace `name`'s files are, when they're there. */
+	locateWorkspace: (name: string, root: string) => typedError<null, string>(__TAURI_INVOKE("locate_workspace", { name, root })),
 	/**  The UI opened the workspace: watches it, and starts its paused background snapshots again. */
 	openWorkspace: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_workspace", { workspace })),
 	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run. */
@@ -2599,6 +2601,8 @@ export type WorkspaceDto = {
 	/**  Length of the shortest prefix of `change_id` that's unique in the repo. */
 	unique: number,
 	description: string,
+	/**  Its files weren't found where jj says or nearby. */
+	missing: boolean,
 };
 
 /* Tauri Specta runtime */

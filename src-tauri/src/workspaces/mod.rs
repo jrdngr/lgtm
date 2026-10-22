@@ -1,6 +1,7 @@
 //! Workspaces. New ones live under `~/.local/share/lgtm/ws/<repo>-<hash>/<workspace>`.
 
 pub mod gc;
+pub mod locate;
 mod setup;
 
 pub use setup::{Setup, setup_command};
@@ -29,6 +30,8 @@ pub struct WorkspaceDto {
     /// Length of the shortest prefix of `change_id` that's unique in the repo.
     pub unique: u32,
     pub description: String,
+    /// Its files weren't found where jj says or nearby.
+    pub missing: bool,
 }
 
 /// A path component without spaces or shell metacharacters.
@@ -100,7 +103,10 @@ impl RepoCtx {
     /// Every workspace, main first. One the UI opened that comes back after leaving the
     /// list is watched again.
     pub async fn list_workspaces(&self) -> anyhow::Result<Vec<WorkspaceDto>> {
-        let listed = self.main.jj.workspaces().await?;
+        let mut listed = self.main.jj.workspaces().await?;
+        let saved = self.store.lock().unwrap().workspace_roots()?;
+        let base = self.workspace_dir().ok();
+        let missing = locate::fix_roots(&mut listed, &self.root, base.as_deref(), &saved);
         let (main, others): (Vec<WorkspaceInfo>, Vec<WorkspaceInfo>) = listed
             .into_iter()
             .partition(|w| same_path(&w.root, &self.root));
@@ -116,7 +122,7 @@ impl RepoCtx {
             kept
         });
         let opened = self.opened.lock().unwrap();
-        for w in &others {
+        for w in others.iter().filter(|w| !missing.contains(&w.name)) {
             if !map.contains_key(&w.name) {
                 let ws = Arc::new(Workspace::new(
                     Some(w.name.clone()),
@@ -132,6 +138,7 @@ impl RepoCtx {
         }
         drop(opened);
         let dto = |w: WorkspaceInfo, main: bool| WorkspaceDto {
+            missing: missing.contains(&w.name),
             name: (!main).then(|| w.name.clone()),
             title: w.name,
             root: w.root.display().to_string(),
@@ -144,6 +151,22 @@ impl RepoCtx {
             .map(|w| dto(w, true))
             .chain(others.into_iter().map(|w| dto(w, false)))
             .collect())
+    }
+
+    /// Remembers that workspace `name`'s files are at `root`, once it checks they are.
+    pub async fn locate_workspace(&self, name: &str, root: &Path) -> anyhow::Result<()> {
+        let repo = self.root.join(".jj/repo").canonicalize()?;
+        let at = locate::workspace_at(root, &repo);
+        if at.as_deref() != Some(name) {
+            bail!("{} isn't workspace `{name}` of this repo", root.display());
+        }
+        let root = root.canonicalize()?;
+        self.store
+            .lock()
+            .unwrap()
+            .set_workspace_root(name, &root.to_string_lossy())?;
+        tracing::info!(workspace = name, root = %root.display(), "located workspace");
+        self.list_workspaces().await.map(drop)
     }
 
     /// The UI opened the workspace: watches it from now on, and starts its background

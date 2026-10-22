@@ -9,6 +9,7 @@ mod designs;
 mod drawings;
 mod guided;
 mod log_revsets;
+mod workspace_roots;
 mod marks;
 mod notes;
 mod prs;
@@ -246,6 +247,7 @@ impl Store {
         drawings::create_table(&db)?;
         guided::create_table(&db)?;
         log_revsets::create_table(&db)?;
+        workspace_roots::create_table(&db)?;
         notes::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
@@ -270,6 +272,7 @@ impl Store {
             "log_revsets",
             "notes",
             "note_folders",
+            "workspace_roots",
         ] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }

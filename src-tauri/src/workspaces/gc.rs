@@ -4,6 +4,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use super::locate::fix_roots;
 use super::{same_path, under};
 use crate::jj::git::worktree_prune_blocking;
 use crate::jj::workspace::{
@@ -68,7 +69,11 @@ pub fn run(base: &Path, repos: &[PathBuf], force: bool) -> Vec<String> {
                 }
                 continue;
             };
-            match workspaces_blocking(&root) {
+            let listed = workspaces_blocking(&root).map(|mut listed| {
+                fix_roots(&mut listed, &root, Some(base), &Default::default());
+                listed
+            });
+            match listed {
                 Ok(listed) if !listed.iter().any(|w| same_path(&w.root, &dir)) => {
                     remove(&dir, "its workspace was forgotten", &mut log);
                 }
@@ -82,9 +87,12 @@ pub fn run(base: &Path, repos: &[PathBuf], force: bool) -> Vec<String> {
         let Ok(listed) = workspaces_blocking(root) else {
             continue;
         };
+        // Only ones jj put under `base` that aren't anywhere now, moved ones aside.
+        let mut found = listed.clone();
+        let missing = fix_roots(&mut found, root, Some(base), &Default::default());
         for w in listed
             .iter()
-            .filter(|w| under(&w.root, base) && !w.root.exists())
+            .filter(|w| missing.contains(&w.name) && under(&w.root, base) && !w.root.exists())
         {
             match forget_blocking(root, &w.name) {
                 Ok(()) => log.push(format!("forgot workspace {} (directory is gone)", w.name)),

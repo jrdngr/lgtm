@@ -12,6 +12,20 @@ pub(crate) async fn list_workspaces(window: WebviewWindow) -> CmdResult<Vec<Work
     repo(&window)?.list_workspaces().await.map_err(err)
 }
 
+/// Remembers where workspace `name`'s files are, when they're there.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn locate_workspace(
+    window: WebviewWindow,
+    name: String,
+    root: String,
+) -> CmdResult<()> {
+    repo(&window)?
+        .locate_workspace(&name, std::path::Path::new(&root))
+        .await
+        .map_err(err)
+}
+
 /// The UI opened the workspace: watches it, and starts its paused background snapshots again.
 #[tauri::command]
 #[specta::specta]

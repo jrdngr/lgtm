@@ -48,6 +48,7 @@ function Lines({ w }: { w: WorkspaceDto }) {
       <span className="workspace-title">
         <span className="ellipsis">{w.title}</span>
         {w.name === null && <span className="pill">main</span>}
+        {w.missing && <span className="pill amber">not found</span>}
       </span>
       <span className="workspace-desc">
         <Change w={w} />
@@ -61,6 +62,8 @@ interface Props {
   selected: boolean;
   onSelect(): void;
   onDelete(): void;
+  /** Asks where its files are. */
+  onLocate(): void;
   /** Starts dragging a pinned row. */
   onPinDrag?(e: React.PointerEvent): void;
   /** Where a dragged pin would land, next to this row. */
@@ -68,7 +71,15 @@ interface Props {
 }
 
 /** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
-export function WorkspaceRow({ w, selected, onSelect, onDelete, onPinDrag, drop }: Props) {
+export function WorkspaceRow({
+  w,
+  selected,
+  onSelect,
+  onDelete,
+  onLocate,
+  onPinDrag,
+  drop,
+}: Props) {
   const pr = usePr(w.name);
   const a = useActivity(w.name);
   const key = workspaceKey(w.name);
@@ -84,6 +95,7 @@ export function WorkspaceRow({ w, selected, onSelect, onDelete, onPinDrag, drop 
       dot,
       open: onSelect,
       onDelete,
+      onLocate,
       onClearDot: () => clearFinished(w.name),
     }),
   );
