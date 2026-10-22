@@ -42,10 +42,10 @@ impl Jj {
     /// same diff as `jj diff -r R`; for R with gaps (a PR that merged trunk) it matches
     /// GitHub's PR diff. Anything else is rejected with jj's own error.
     pub async fn resolve(&self, revset: &str) -> anyhow::Result<Range> {
-        let heads = self.commit_ids(&format!("heads({revset})")).await?;
-        let bases = self
-            .commit_ids(&format!("heads(::({revset}) ~ ({revset}))"))
-            .await?;
+        let (heads, bases) = tokio::try_join!(
+            self.commit_ids(&format!("heads({revset})")),
+            self.commit_ids(&format!("heads(::({revset}) ~ ({revset}))")),
+        )?;
         match (heads.as_slice(), bases.as_slice()) {
             ([], _) => bail!("revset `{revset}` is empty"),
             ([to], []) => Ok(Range {

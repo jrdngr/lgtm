@@ -161,7 +161,7 @@ impl RepoCtx {
             new: range.to.clone(),
         };
         Ok(self
-            .build(sides, false, diffs, Config::at_base(&ws.jj, base).await?)
+            .build(sides, false, diffs, Config::at_base(&ws.jj, &self.reviews.configs, base).await?)
             .await?
             .0)
     }
