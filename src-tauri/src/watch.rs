@@ -151,7 +151,7 @@ async fn run(
 ) {
     // Where `@` starts, so the first move is caught.
     if let Err(e) = jj.moved_working_copy().await {
-        eprintln!("lgtm: read @: {e:#}");
+        tracing::warn!(workspace = %jj.root().display(), "read @: {e:#}");
     }
     let mut snapshot_at: Option<Instant> = None;
     // When the edits the next snapshot waits on began.
@@ -188,7 +188,7 @@ async fn run(
                     match jj.moved_working_copy().await {
                         Ok(true) => emit(Event::WorkingCopyMoved),
                         Ok(false) => {}
-                        Err(e) => eprintln!("lgtm: read @: {e:#}"),
+                        Err(e) => tracing::warn!(workspace = %jj.root().display(), "read @: {e:#}"),
                     }
                 }
                 if snapshot_at.is_some_and(|t| t <= now) {
@@ -206,7 +206,7 @@ async fn run(
                         }
                         Ok(Snapshot::Paused) => continue,
                         Err(e) => {
-                            eprintln!("lgtm: snapshot: {e:#}");
+                            tracing::warn!(workspace = %jj.root().display(), "snapshot: {e:#}");
                             continue;
                         }
                     };

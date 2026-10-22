@@ -67,14 +67,11 @@ impl Jj {
             return Ok(Snapshot::Done(None));
         };
         let held_by = holders::describe(&wait.lock).await;
-        eprintln!(
-            "lgtm: background snapshot in {}: {wait}{}",
-            self.root.display(),
-            if held_by.is_empty() {
-                String::new()
-            } else {
-                format!(", open in:\n{held_by}")
-            }
+        tracing::info!(
+            workspace = %self.root.display(),
+            lock = wait.lock,
+            held_by = held_by.replace('\n', "; "),
+            "background snapshot gave up waiting on a lock",
         );
         let mut strikes = self.background.lock().unwrap();
         strikes.count += 1;

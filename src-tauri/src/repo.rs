@@ -119,12 +119,12 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
             ctx.list_workspaces()
                 .await
                 .map(drop)
-                .unwrap_or_else(|e| eprintln!("lgtm: {e:#}"))
+                .unwrap_or_else(|e| tracing::error!("{e:#}"))
         }
     });
     app.state::<RepoWindows>().insert(label.clone(), ctx);
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
-        eprintln!("lgtm: save recent repos: {e}");
+        tracing::warn!("save recent repos: {e}");
     }
     let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
         .title(name(&root))
@@ -183,7 +183,7 @@ pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool
         return;
     };
     if let Err(e) = open(app, &cwd.join(arg)) {
-        eprintln!("lgtm: {e}");
+        tracing::error!("{e}");
         open_start(app).ok();
     }
 }
@@ -194,7 +194,7 @@ fn open_last(app: &AppHandle) -> Result<(), String> {
         .into_iter()
         .next()
         .ok_or("no recent repo")?;
-    open(app, &last).inspect_err(|e| eprintln!("lgtm: reopen {}: {e}", last.display()))
+    open(app, &last).inspect_err(|e| tracing::error!("reopen {}: {e}", last.display()))
 }
 
 #[cfg(test)]

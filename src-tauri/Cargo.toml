@@ -63,6 +63,8 @@ trash = "5"
 base64 = "0.22"
 percent-encoding = "2"
 rustix = { version = "1", features = ["process"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

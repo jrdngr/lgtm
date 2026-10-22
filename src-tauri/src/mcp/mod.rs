@@ -57,14 +57,14 @@ pub fn listen(app: AppHandle, path: PathBuf) {
         std::fs::remove_file(&path).ok();
         let listener = match UnixListener::bind(&path) {
             Ok(l) => l,
-            Err(e) => return eprintln!("lgtm: MCP socket {}: {e}", path.display()),
+            Err(e) => return tracing::error!("MCP socket {}: {e}", path.display()),
         };
         loop {
             let (stream, _) = match listener.accept().await {
                 Ok(s) => s,
                 Err(e) => {
                     // Errors like running out of file descriptors persist, so don't spin.
-                    eprintln!("lgtm: MCP accept: {e}");
+                    tracing::error!("MCP accept: {e}");
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 }
@@ -72,7 +72,7 @@ pub fn listen(app: AppHandle, path: PathBuf) {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = serve(app, stream).await {
-                    eprintln!("lgtm: MCP connection: {e:#}");
+                    tracing::error!("MCP connection: {e:#}");
                 }
             });
         }

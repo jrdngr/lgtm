@@ -187,7 +187,7 @@ fn start_drag(
                 }
             };
             if let Err(e) = drag::start_drag(&w, item, image, ended, Default::default()) {
-                eprintln!("lgtm: drag out: {e}");
+                tracing::warn!("drag out: {e}");
             }
         })
         .map_err(|e| e.to_string())

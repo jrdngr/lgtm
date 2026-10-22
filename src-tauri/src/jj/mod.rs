@@ -123,6 +123,10 @@ impl Jj {
         }
     }
 
+    pub fn root(&self) -> &Path {
+        &self.root
+    }
+
     /// Sets where notices go. Only the first call counts.
     pub fn set_notify(&self, notify: Notify) {
         self.notify.set(notify).ok();

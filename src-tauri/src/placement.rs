@@ -95,7 +95,7 @@ impl Placements {
             .map_or(Ok(()), std::fs::create_dir_all)
             .and_then(|()| std::fs::write(file, json));
         if let Err(e) = written {
-            eprintln!("lgtm: save window placements: {e}");
+            tracing::warn!("save window placements: {e}");
         }
     }
 }

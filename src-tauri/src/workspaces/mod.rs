@@ -184,7 +184,7 @@ impl RepoCtx {
         });
         match started {
             Ok(w) => *watch = Some(w),
-            Err(e) => eprintln!("lgtm: watch {}: {e:#}", ws.root.display()),
+            Err(e) => tracing::error!("watch {}: {e:#}", ws.root.display()),
         }
     }
 
@@ -228,10 +228,10 @@ impl RepoCtx {
             .is_some_and(|b| under(&ws.root, b));
         // The workspace is forgotten already, so its PR goes even if its directory stays.
         for problem in self.forget_pr(name).await {
-            eprintln!("lgtm: cleaning up after {name}: {problem}");
+            tracing::warn!("cleaning up after {name}: {problem}");
         }
         if let Err(e) = self.store.lock().unwrap().forget_workspace(name) {
-            eprintln!("lgtm: cleaning up after {name}: {e:#}");
+            tracing::warn!("cleaning up after {name}: {e:#}");
         }
         if ours && ws.root.is_dir() {
             std::fs::remove_dir_all(&ws.root)

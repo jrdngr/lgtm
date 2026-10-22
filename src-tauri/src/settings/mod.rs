@@ -108,7 +108,7 @@ pub fn load() {
         .map(|p| load_from(&p))
         .unwrap_or(Ok(Settings::default()));
     let settings = settings.unwrap_or_else(|e| {
-        eprintln!("lgtm: {e:#}");
+        tracing::error!("{e:#}");
         *LOAD_ERROR.write().unwrap() = Some(format!("{e:#}"));
         Settings::default()
     });

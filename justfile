@@ -1,7 +1,11 @@
+# Log levels for the app, as RUST_LOG takes them: `just log=debug dev`,
+# `just log=lgtm_lib::watch=trace,info run`
+log := "lgtm_lib=info,warn"
+
 # Run the app with hot reload
 dev:
     pnpm install --frozen-lockfile
-    pnpm tauri dev
+    RUST_LOG={{ log }} pnpm tauri dev
 
 # Fetch, start a new change on main@origin, and run the app
 go:
@@ -28,9 +32,9 @@ install: build
 # Run the app bundle from `just build`, optionally on a repo. Launching the
 # binary inside the .app gives it the bundle's Dock icon.
 run *repo:
-    src-tauri/target/release/bundle/macos/lgtm.app/Contents/MacOS/lgtm {{ repo }}
+    RUST_LOG={{ log }} src-tauri/target/release/bundle/macos/lgtm.app/Contents/MacOS/lgtm {{ repo }}
 
 # Clean up workspaces left behind (see `lgtm gc`)
 gc *repo:
-    src-tauri/target/release/lgtm gc {{ repo }}
+    RUST_LOG={{ log }} src-tauri/target/release/lgtm gc {{ repo }}
 

@@ -278,12 +278,20 @@ fn global_store(app: &tauri::App) -> store::Store {
         .map_err(anyhow::Error::msg)
         .and_then(|dir| store::Store::open(&dir.join("global.db")));
     opened.unwrap_or_else(|e| {
-        eprintln!("lgtm: open the global store: {e:#}");
+        tracing::error!("open the global store: {e:#}");
         store::Store::in_memory()
     })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+/// Logs to stdout at `RUST_LOG`'s levels, else INFO for lgtm and WARN for its libraries.
+/// Not for `lgtm mcp` and `lgtm hook`, whose stdout talks to Claude Code.
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("lgtm_lib=info,warn"));
+    tracing_subscriber::fmt().with_env_filter(filter).init();
+}
+
 pub fn run() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     // Claude Code starts this, inside a terminal that already has the user's PATH.
@@ -293,6 +301,7 @@ pub fn run() {
     if args.first().is_some_and(|a| a == "hook") {
         std::process::exit(mcp::hook::main());
     }
+    init_logging();
     adopt_login_shell_path();
     settings::load();
     if args.first().is_some_and(|a| a == "gc") {
@@ -328,7 +337,7 @@ pub fn run() {
             quit::intercept(app.handle());
             match paths::data_dir(app) {
                 Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
-                Err(e) => eprintln!("lgtm: no data directory for the MCP socket: {e}"),
+                Err(e) => tracing::error!("no data directory for the MCP socket: {e}"),
             }
             app.manage(notes::GlobalStore(std::sync::Mutex::new(global_store(app))));
             let cwd = std::env::current_dir()?;

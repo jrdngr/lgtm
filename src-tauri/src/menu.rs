@@ -119,7 +119,7 @@ pub fn handle(app: &AppHandle, event: MenuEvent) {
         _ => Ok(()),
     };
     if let Err(e) = result {
-        eprintln!("lgtm: {e}");
+        tracing::error!("{e}");
     }
 }
 

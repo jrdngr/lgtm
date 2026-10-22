@@ -122,7 +122,7 @@ pub fn intercept(app: &AppHandle) {
         let ns_app: *mut AnyObject = msg_send![class!(NSApplication), sharedApplication];
         let delegate: *mut AnyObject = msg_send![ns_app, delegate];
         let Some(delegate) = delegate.as_ref() else {
-            return eprintln!("lgtm: no app delegate, so quitting won't ask about unsaved edits");
+            return tracing::warn!("no app delegate, so quitting won't ask about unsaved edits");
         };
         let imp: Imp = std::mem::transmute(
             should_terminate as extern "C-unwind" fn(&AnyObject, Sel, *mut AnyObject) -> usize,
