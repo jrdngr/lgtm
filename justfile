@@ -2,6 +2,9 @@
 # `ui` the frontend: `just log=debug dev`, `just log=lgtm_lib::watch=trace,info run`
 log := "lgtm_lib=info,ui=info,warn"
 
+# Hourly log files, the last 24 kept, at most 50 MB each
+export LGTM_LOG_DIR := justfile_directory() / "logs"
+
 # Run the app with hot reload
 dev:
     pnpm install --frozen-lockfile
