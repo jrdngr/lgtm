@@ -254,7 +254,7 @@ impl RepoCtx {
                     to: "@".into(),
                 };
                 // A commit jj can no longer read leaves nothing to compare with.
-                match ws.jj.diff(&range).await {
+                match ws.jj.diff_paths(&range).await {
                     Ok(diffs) => diffs
                         .iter()
                         .map(|f| path_comps(&f.path))
