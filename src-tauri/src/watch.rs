@@ -85,7 +85,8 @@ fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping> {
     if rel.starts_with(".jj/repo/op_heads/heads") {
         return Some(Ping::Op);
     }
-    if rel.starts_with(".jj") || rel.starts_with(".git") {
+    // Its own and any nested workspace's or repo's internals.
+    if rel.components().any(|c| c.as_os_str() == ".jj" || c.as_os_str() == ".git") {
         return None;
     }
     if rel.file_name().is_some_and(|n| n == ".gitignore") {
@@ -241,6 +242,8 @@ mod tests {
         assert_eq!(c(".jj/repo/op_heads/heads/abc"), Some(Ping::Op));
         assert_eq!(c(".jj/repo/store/x"), None);
         assert_eq!(c(".git/index"), None);
+        assert_eq!(c(".workspaces/ws/.jj/working_copy/checkout"), None);
+        assert_eq!(c("vendor/lib/.git/HEAD"), None);
         assert_eq!(c("src/main.rs"), Some(Ping::Edit));
         assert_eq!(c("target/debug/x"), None);
         assert_eq!(c("a/b.log"), None);

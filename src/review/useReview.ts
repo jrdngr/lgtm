@@ -4,6 +4,7 @@ import { events, type ReviewDto, type StateDto, type View } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { prFollowsReview } from "../workspaces/stack";
+import { onRepoChanged } from "../workspaces/useRepoChanged";
 import { fileMoves, type Moves, movesFrom } from "./follow";
 import { setWorkspaceRevset, workspaceRevset } from "./revset";
 
@@ -103,7 +104,7 @@ export function useReview(workspace: WorkspaceName) {
   useEffect(() => {
     // Scoped to this window: other windows hold other repos.
     const win = getCurrentWebviewWindow();
-    const changed = events.repoChanged(win).listen(() => refreshRef.current());
+    const unchanged = onRepoChanged(() => refreshRef.current());
     const staleSub = events.workingCopyStale(win).listen((e) => {
       if (e.payload.workspace === workspace) setStale(e.payload.message);
     });
@@ -112,7 +113,7 @@ export function useReview(workspace: WorkspaceName) {
       if (e.payload.review === current.current?.id) setStateRef.current(e.payload.state);
     });
     return () => {
-      changed.then((un) => un());
+      unchanged();
       staleSub.then((un) => un());
       stateSub.then((un) => un());
       // An open still in flight closes its review when it lands.
