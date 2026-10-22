@@ -45,15 +45,13 @@ interface CellProps {
   side?: "left" | "right";
 }
 
-/** One row's gutter and code, tinted by its mark. A checked file's unmarked rows show the
- * first mark color. Undefined `row` is an empty side. */
+/** One row's gutter and code, tinted by its mark. Undefined `row` is an empty side. */
 export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
   if (row === undefined) return <div className="cell empty" />;
   const r = file.rows[row];
   const key = markKey(fileIdx, row);
   const mark = r.kind === "context" ? undefined : index.marks.get(key);
-  const checked = r.kind !== "context" && index.checks[fileIdx] === "checked";
-  const color = mark?.color ?? (checked ? setup.primary : undefined);
+  const color = mark?.color;
   const amber = !color && index.amber.has(key);
   const commented = index.commented.has(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;

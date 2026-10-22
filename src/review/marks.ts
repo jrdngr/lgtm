@@ -33,8 +33,7 @@ export interface MarkSetup {
   shown: MarkSlot[];
   done: DoneFn;
   label(color: MarkColor): string;
-  /** The first color in use, when it counts as done: what a checked file's rows show as,
-   * and the mark that checks a whole file. */
+  /** The first color in use, when it counts as done: the mark that checks a whole file. */
   primary: MarkColor | undefined;
 }
 
