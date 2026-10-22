@@ -333,34 +333,52 @@ impl Jj {
         commit: &str,
         paths: &[String],
     ) -> anyhow::Result<HashMap<String, String>> {
-        if paths.is_empty() {
-            return Ok(HashMap::new());
-        }
-        let fileset = paths
-            .iter()
-            .map(|p| fileset_literal(p))
-            .chain(["none()".to_string()])
-            .collect::<Vec<_>>()
-            .join(" | ");
-        // Each file starts with a marker and its path, so one output splits back into files.
-        let out = self
-            .exec(
-                &[
-                    "file",
-                    "show",
-                    "-r",
-                    commit,
-                    "-T",
-                    FILE_MARK_TEMPLATE,
-                    &fileset,
-                ],
-                true,
-            )
-            .await?;
-        Ok(split_files(&out)
+        Ok(self
+            .files_at(commit, paths)
+            .await?
             .into_iter()
-            .map(|(path, bytes)| (path, blake3::hash(bytes).to_hex().to_string()))
+            .map(|(path, bytes)| (path, blake3::hash(&bytes).to_hex().to_string()))
             .collect())
+    }
+
+    /// The contents of each of `paths` at `commit`, a few hundred paths per read. Paths not
+    /// there are left out.
+    pub async fn files_at(
+        &self,
+        commit: &str,
+        paths: &[String],
+    ) -> anyhow::Result<HashMap<String, Vec<u8>>> {
+        let mut found = HashMap::new();
+        for chunk in paths.chunks(FILES_PER_READ) {
+            // A union with none() makes a missing path print nothing rather than fail.
+            let fileset = chunk
+                .iter()
+                .map(|p| fileset_literal(p))
+                .chain(["none()".to_string()])
+                .collect::<Vec<_>>()
+                .join(" | ");
+            // Each file starts with a marker and its path, so one output splits back into files.
+            let out = self
+                .exec(
+                    &[
+                        "file",
+                        "show",
+                        "-r",
+                        commit,
+                        "-T",
+                        FILE_MARK_TEMPLATE,
+                        &fileset,
+                    ],
+                    true,
+                )
+                .await?;
+            found.extend(
+                split_files(&out)
+                    .into_iter()
+                    .map(|(path, bytes)| (path, bytes.to_vec())),
+            );
+        }
+        Ok(found)
     }
 
     /// File contents at `commit`, or empty for the root commit.
@@ -398,6 +416,9 @@ impl Jj {
 }
 
 const FILE_MARK: &[u8] = b"\0lgtm-file\0";
+/// Keeps a batched `jj file show`'s arguments well under the OS limit.
+const FILES_PER_READ: usize = 300;
+
 const FILE_MARK_TEMPLATE: &str = r#""\0lgtm-file\0" ++ path ++ "\0""#;
 
 /// `jj file show` output under `FILE_MARK_TEMPLATE`, as each file's path and bytes.
@@ -485,6 +506,28 @@ mod tests {
         assert_eq!(j.file_if_any(at, "nope.txt").await.unwrap(), None);
         assert_eq!(j.file_if_any(None, "a.txt").await.unwrap(), None);
         assert!(j.file_if_any(Some("no_such_rev"), "a.txt").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn files_at_reads_paths_across_batches_and_skips_missing_ones() {
+        let (dir, j) = test_support::repo();
+        let paths: Vec<String> = (0..FILES_PER_READ + 5).map(|i| format!("f{i}.txt")).collect();
+        for (i, p) in paths.iter().enumerate() {
+            test_support::write(dir.path(), p, &format!("{i}\n"));
+        }
+        test_support::write(dir.path(), "empty.txt", "");
+        j.snapshot().await.unwrap();
+        let at = j.commit_ids("@").await.unwrap().remove(0);
+        let asked: Vec<String> = paths
+            .iter()
+            .cloned()
+            .chain(["empty.txt".to_string(), "nope.txt".to_string()])
+            .collect();
+        let got = j.files_at(&at, &asked).await.unwrap();
+        assert_eq!(got.len(), paths.len() + 1);
+        assert_eq!(got[&paths[FILES_PER_READ + 4]], format!("{}\n", FILES_PER_READ + 4).as_bytes());
+        assert_eq!(got["empty.txt"], b"");
+        assert!(!got.contains_key("nope.txt"));
     }
 
     #[test]

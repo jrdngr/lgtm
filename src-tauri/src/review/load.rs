@@ -1,5 +1,7 @@
 //! Loading a revset's diff and building its files, reusing cached builds where possible.
 
+use std::collections::HashMap;
+
 use crate::anchor::MatchConfig;
 use crate::config::Config;
 use crate::diff::FileStatus;
@@ -136,34 +138,55 @@ impl RepoCtx {
     }
 
     /// Old and new contents per file, `None` where a side is absent, binary, or too large.
+    /// Each side is one batched read.
     async fn load_contents(
         &self,
         sides: &Sides,
         diffs: &[&FileDiff],
     ) -> anyhow::Result<Vec<(Option<String>, Option<String>)>> {
-        let limit = tokio::sync::Semaphore::new(8);
-        let load = |commit: Option<&'_ str>, path: &'_ str, present: bool| {
-            let limit = &limit;
-            let (commit, path) = (commit.map(str::to_string), path.to_string());
-            async move {
-                if !present {
-                    return Ok::<_, anyhow::Error>(None);
-                }
-                let _permit = limit.acquire().await?;
-                let bytes = self.main.jj.file(commit.as_deref(), &path).await?;
-                Ok((bytes.len() <= MAX_FILE_BYTES)
-                    .then(|| String::from_utf8(bytes).ok())
-                    .flatten())
+        let old_path = |d: &FileDiff| d.old_path.clone().unwrap_or_else(|| d.path.clone());
+        let old_paths: Vec<String> = diffs
+            .iter()
+            .filter(|d| !d.binary && d.status != FileStatus::Added)
+            .map(|d| old_path(d))
+            .collect();
+        let new_paths: Vec<String> = diffs
+            .iter()
+            .filter(|d| !d.binary && d.status != FileStatus::Removed)
+            .map(|d| d.path.clone())
+            .collect();
+        let jj = &self.main.jj;
+        let old = async {
+            match sides.old.as_deref() {
+                Some(commit) if !old_paths.is_empty() => jj.files_at(commit, &old_paths).await,
+                // The root commit has no files.
+                _ => Ok(HashMap::new()),
             }
         };
-        futures::future::try_join_all(diffs.iter().map(|d| {
-            let old_path = d.old_path.as_deref().unwrap_or(&d.path);
-            let old_present = !d.binary && d.status != FileStatus::Added;
-            let new_present = !d.binary && d.status != FileStatus::Removed;
-            let old = load(sides.old.as_deref(), old_path, old_present);
-            let new = load(Some(&sides.new), &d.path, new_present);
-            async move { tokio::try_join!(old, new) }
-        }))
-        .await
+        let new = async {
+            if new_paths.is_empty() {
+                return Ok(HashMap::new());
+            }
+            jj.files_at(&sides.new, &new_paths).await
+        };
+        let (old, mut new) = tokio::try_join!(old, new)?;
+        let text = |bytes: Option<Vec<u8>>| {
+            bytes
+                .filter(|b| b.len() <= MAX_FILE_BYTES)
+                .and_then(|b| String::from_utf8(b).ok())
+        };
+        Ok(diffs
+            .iter()
+            .map(|d| {
+                let o = (!d.binary && d.status != FileStatus::Added)
+                    // A file copied twice shares its old side, so it's cloned, not taken.
+                    .then(|| old.get(&old_path(d)).cloned())
+                    .flatten();
+                let n = (!d.binary && d.status != FileStatus::Removed)
+                    .then(|| new.remove(&d.path))
+                    .flatten();
+                (text(o), text(n))
+            })
+            .collect())
     }
 }
