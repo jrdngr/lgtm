@@ -9,7 +9,7 @@ use super::model::{self, Model};
 use super::{ArchDto, ArchRange, HistoryDto, assess, history, state};
 use crate::config::Config;
 use crate::ctx::RepoCtx;
-use crate::jj::Range;
+use crate::jj::{FileDiff, Range};
 use crate::review::View;
 use crate::review::build::{ReviewFile, Sides};
 use crate::workspace::Workspace;
@@ -33,39 +33,32 @@ impl RepoCtx {
         let (range, files, indexed, extra) = match own {
             Some(files) => (whole.clone(), files, true, vec![]),
             None => {
-                let (range, extra) = match range {
-                    Some(r) => {
-                        let range = Range {
-                            from: r.from,
-                            to: r.to,
-                        };
-                        // Files the review changes differ in the working copy, so the range's
-                        // unchanged ones are read at its end instead.
-                        let in_range: HashSet<String> = ws
-                            .jj
-                            .diff(&range)
-                            .await?
-                            .into_iter()
-                            .map(|d| d.path)
-                            .collect();
-                        let extra = ws
-                            .jj
-                            .diff(&whole)
-                            .await?
-                            .into_iter()
-                            .map(|d| d.path)
-                            .filter(|p| !in_range.contains(p))
-                            .collect();
-                        (range, extra)
-                    }
-                    None => (whole.clone(), vec![]),
+                let range = range.map_or_else(
+                    || whole.clone(),
+                    |r| Range {
+                        from: r.from,
+                        to: r.to,
+                    },
+                );
+                let diffs = ws.jj.diff(&range).await?;
+                // Files the review changes differ in the working copy, so the range's
+                // unchanged ones are read at its end instead.
+                let extra = if range == whole {
+                    vec![]
+                } else {
+                    let in_range: HashSet<&str> = diffs.iter().map(|d| d.path.as_str()).collect();
+                    ws.jj
+                        .diff_paths(&whole)
+                        .await?
+                        .into_iter()
+                        .map(|d| d.path)
+                        .filter(|p| !in_range.contains(p.as_str()))
+                        .collect()
                 };
-                (
-                    range.clone(),
-                    self.files_of(&ws, whole.from.as_deref(), &range).await?,
-                    false,
-                    extra,
-                )
+                let files = self
+                    .files_of(&ws, whole.from.as_deref(), &range, diffs)
+                    .await?;
+                (range, files, false, extra)
             }
         };
         let stored = self.stored(&ws, &revset, &whole)?;
@@ -150,20 +143,25 @@ impl RepoCtx {
         Ok(out)
     }
 
-    /// Builds the files `range` changes, skipping by the config at the review's `base`.
+    /// Builds the files of `range`'s `diffs`, skipping by the config at the review's `base`.
     async fn files_of(
         &self,
         ws: &Workspace,
         base: Option<&str>,
         range: &Range,
+        diffs: Vec<FileDiff>,
     ) -> anyhow::Result<Vec<ReviewFile>> {
-        let diffs = ws.jj.diff(range).await?;
         let sides = Sides {
             old: range.from.clone(),
             new: range.to.clone(),
         };
         Ok(self
-            .build(sides, false, diffs, Config::at_base(&ws.jj, &self.reviews.configs, base).await?)
+            .build(
+                sides,
+                false,
+                diffs,
+                Config::at_base(&ws.jj, &self.reviews.configs, base).await?,
+            )
             .await?
             .0)
     }
