@@ -1,6 +1,9 @@
 //! Git remotes, fetching, and bookmarks, for checking out PRs.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
+use std::time::SystemTime;
 
 use anyhow::Context;
 use tokio::process::Command;
@@ -18,29 +21,59 @@ pub fn remote_bookmark(name: &str, remote: &str) -> String {
     format!("{}@{}", q(name), q(remote))
 }
 
+type Remotes = Vec<(String, String)>;
+
+/// Each repo's remotes by its git config file, as of that file's last change.
+static REMOTES: LazyLock<Mutex<HashMap<PathBuf, (SystemTime, Remotes)>>> =
+    LazyLock::new(Mutex::default);
+
 impl Jj {
-    /// Remote names and URLs.
-    pub async fn remotes(&self) -> anyhow::Result<Vec<(String, String)>> {
+    /// Remote names and URLs. Read again only when the git config holding them changes.
+    pub async fn remotes(&self) -> anyhow::Result<Remotes> {
+        let config = self.git_config();
+        let changed = config
+            .as_deref()
+            .and_then(|c| std::fs::metadata(c).and_then(|m| m.modified()).ok());
+        if let (Some(config), Some(changed)) = (&config, changed)
+            && let Some((at, remotes)) = REMOTES.lock().unwrap().get(config)
+            && *at == changed
+        {
+            return Ok(remotes.clone());
+        }
         let out = self.read(&["git", "remote", "list"]).await?;
-        Ok(out
+        let remotes: Remotes = out
             .lines()
             .filter_map(|l| l.split_once(' '))
             .map(|(n, u)| (n.to_string(), u.trim().to_string()))
-            .collect())
+            .collect();
+        if let (Some(config), Some(changed)) = (config, changed) {
+            REMOTES
+                .lock()
+                .unwrap()
+                .insert(config, (changed, remotes.clone()));
+        }
+        Ok(remotes)
+    }
+
+    /// The config file of the git repo backing this one, where remotes live.
+    fn git_config(&self) -> Option<PathBuf> {
+        let store = super::checkout::repo_dir(&self.root)?.join("store");
+        let target = std::fs::read_to_string(store.join("git_target")).ok()?;
+        Some(store.join(target.trim()).join("config"))
     }
 
     pub async fn remote_add(&self, name: &str, url: &str) -> anyhow::Result<()> {
         let _guard = self.writer.lock().await;
-        self.exec(&["git", "remote", "add", name, url], false)
-            .await
-            .map(drop)
+        let added = self.exec(&["git", "remote", "add", name, url], false).await;
+        REMOTES.lock().unwrap().clear();
+        added.map(drop)
     }
 
     pub async fn remote_remove(&self, name: &str) -> anyhow::Result<()> {
         let _guard = self.writer.lock().await;
-        self.exec(&["git", "remote", "remove", name], false)
-            .await
-            .map(drop)
+        let removed = self.exec(&["git", "remote", "remove", name], false).await;
+        REMOTES.lock().unwrap().clear();
+        removed.map(drop)
     }
 
     /// Fetches `branches` from `remote`.
@@ -131,6 +164,19 @@ pub fn worktree_prune_blocking(root: &Path) {
 
 #[cfg(test)]
 mod tests {
+    use crate::jj::test_support::{jj, repo};
+
+    #[tokio::test]
+    async fn remotes_follow_changes_made_outside_the_app() {
+        let (dir, j) = repo();
+        assert!(j.remotes().await.unwrap().is_empty());
+        jj(dir.path(), &["git", "remote", "add", "up", "https://example.com/a.git"]);
+        let names = |r: Vec<(String, String)>| r.into_iter().map(|(n, _)| n).collect::<Vec<_>>();
+        assert_eq!(names(j.remotes().await.unwrap()), ["up"]);
+        j.remote_add("origin", "https://example.com/b.git").await.unwrap();
+        assert_eq!(names(j.remotes().await.unwrap()), ["origin", "up"]);
+    }
+
     #[test]
     fn remote_bookmarks_are_quoted() {
         assert_eq!(super::remote_bookmark("a/b", "gh-x"), r#""a/b"@"gh-x""#);
