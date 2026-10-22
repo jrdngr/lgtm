@@ -16,10 +16,9 @@ export const useWorkingCopy = store.use;
 export const useAtOutside = (workspace: WorkspaceName) =>
   useWorkingCopy(workspace)?.place === "outside";
 
-/** Keeps the workspace's working copy current as its review and the repo change. */
+/** Keeps the workspace's working copy current as its review's revset and the repo change. */
 export function useTrackWorkingCopy(workspace: WorkspaceName, target: ReviewTarget | undefined) {
   const revset = target?.revset;
-  const commits = target?.changes.map((c) => c.commitId).join();
   const asked = useRef(0);
   const load = useCallback(async () => {
     if (!revset) return;
@@ -27,9 +26,9 @@ export function useTrackWorkingCopy(workspace: WorkspaceName, target: ReviewTarg
     const r = await commands.workingCopy(workspace, revset);
     if (n === asked.current && r.status === "ok") store.publish(workspace, r.data);
   }, [workspace, revset]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: a reload can move the review
+  // The review's commits change only with the repo, which reloads this anyway.
   useEffect(() => {
     load();
-  }, [load, commits]);
+  }, [load]);
   useRepoChanged(load, workspace);
 }

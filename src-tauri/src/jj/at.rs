@@ -27,20 +27,37 @@ pub struct WorkingCopyDto {
 }
 
 impl Jj {
-    /// `@`, and whether it's in `revset`, sits right on it, or neither.
+    /// `@`, and whether it's in `revset`, sits right on it, or neither. One read: `@`'s row
+    /// says which of the two it's in, and any other row is a commit between them.
     pub async fn working_copy(&self, revset: &str) -> anyhow::Result<WorkingCopyDto> {
-        let at = self.changes("@").await?.pop().context("no working copy")?;
-        let has = async |r: String| self.commit_ids(&r).await.map(|c| !c.is_empty());
-        let place = if has(format!("@ & ({revset})")).await? {
-            AtPlace::Inside
-        } else if has(format!("@ & ({revset})::")).await?
-            // Right on the review, with no commits between.
-            && !has(format!("({revset})::@ ~ ({revset}) ~ @")).await?
-        {
-            AtPlace::OnTop
-        } else {
-            AtPlace::Outside
+        let within = |r: &str| template_literal(r);
+        let template = format!(
+            r#"if(self.contained_in({}), "in", if(self.contained_in({}), "on", "out")) ++ "\t" ++ {}"#,
+            within(revset),
+            within(&format!("({revset})::")),
+            super::CHANGE_TEMPLATE,
+        );
+        let rows = format!("@ | (({revset})::@ ~ ({revset}) ~ @)");
+        let out = self
+            .read(&["log", "--no-graph", "-r", &rows, "-T", &template])
+            .await?;
+        let rows: Vec<(&str, super::Change)> = out
+            .lines()
+            .filter_map(|l| {
+                let (place, rest) = l.split_once('\t')?;
+                Some((place, super::parse_changes(rest).pop()?))
+            })
+            .collect();
+        let (place, at) = rows
+            .iter()
+            .find(|(_, c)| c.working_copy)
+            .context("no working copy")?;
+        let place = match *place {
+            "in" => AtPlace::Inside,
+            "on" if rows.len() == 1 => AtPlace::OnTop,
+            _ => AtPlace::Outside,
         };
+        let at = at.clone();
         Ok(WorkingCopyDto {
             change_id: at.change_id,
             commit_id: at.commit_id,
@@ -50,6 +67,15 @@ impl Jj {
             place,
         })
     }
+}
+
+/// `text` as a jj template string literal.
+fn template_literal(text: &str) -> String {
+    let escaped = text
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n");
+    format!("\"{escaped}\"")
 }
 
 #[cfg(test)]
@@ -70,6 +96,11 @@ mod tests {
 
         assert_eq!(place("root()..pr").await, AtPlace::OnTop);
         assert_eq!(place("@").await, AtPlace::Inside);
+        // A revset with quotes in it.
+        assert_eq!(
+            place(r#"description(substring:"two")"#).await,
+            AtPlace::OnTop
+        );
         jj(d, &["edit", "pr-"]);
         assert_eq!(place("root()..pr").await, AtPlace::Inside);
         assert_eq!(place("pr").await, AtPlace::Outside);
