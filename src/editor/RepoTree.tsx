@@ -55,7 +55,7 @@ function useListings(workspace: string | null, open: ReadonlySet<string>) {
     setListings((m) => new Map([...m].filter(([d]) => keep.has(d))));
     load(shown);
   };
-  useRepoChanged(reload);
+  useRepoChanged(reload, workspace);
   return { listings, reload };
 }
 

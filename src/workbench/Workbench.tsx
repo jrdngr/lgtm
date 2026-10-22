@@ -31,6 +31,7 @@ import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
 import { type AddKind, requestAdd } from "../workspaces/addRequests";
+import { showWorkspace } from "../workspaces/useRepoChanged";
 import { useWorkspaces } from "../workspaces/useWorkspaces";
 import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { AtBanner } from "./AtBanner";
@@ -86,7 +87,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useWordWrapMenu();
   useSettingsMenu(selected);
   useShortcutsMenu(selected);
-  useEffect(() => selectActivity(selected), [selected]);
+  useEffect(() => {
+    selectActivity(selected);
+    showWorkspace(selected);
+  }, [selected]);
 
   const selectedRef = useRef(selected);
   selectedRef.current = selected;

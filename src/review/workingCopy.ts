@@ -31,5 +31,5 @@ export function useTrackWorkingCopy(workspace: WorkspaceName, target: ReviewTarg
   useEffect(() => {
     load();
   }, [load, commits]);
-  useRepoChanged(load);
+  useRepoChanged(load, workspace);
 }

@@ -30,7 +30,7 @@ export function ImagePanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   useEffect(() => {
     load();
   }, [load]);
-  useRepoChanged(load);
+  useRepoChanged(load, workspace);
   const { controls, view, size } = useImageZoom(url, path, params.zoom, (zoom) =>
     saveTabParams(api, { zoom: zoom === "shrink" ? undefined : zoom }),
   );

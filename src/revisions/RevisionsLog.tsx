@@ -93,7 +93,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }, []);
   useRepoChanged(() => {
     if (!busy) reload(changeAt(cursor));
-  });
+  }, workspace);
   const reloadLatest = useRef(reload);
   reloadLatest.current = reload;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the log is keyed by workspace

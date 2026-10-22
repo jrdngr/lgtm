@@ -41,7 +41,7 @@ export function useRowPrs(workspace: WorkspaceName, refreshed: number) {
   }, [githubOff, load, refreshed]);
   useRepoChanged(() => {
     if (!githubOff) load(false);
-  });
+  }, workspace);
 
   return (c: LogCommit): RowPr | undefined => {
     if (pr && !pr.stack && c.commitId === pr.head) {

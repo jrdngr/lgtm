@@ -219,7 +219,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     if (view.state.doc.eq(saved.current)) load(view, text);
     else setOnDisk(text);
   }
-  useRepoChanged(sync);
+  useRepoChanged(sync, workspace);
 
   function toggleRendered() {
     if (!view) return;

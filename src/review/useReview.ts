@@ -104,7 +104,7 @@ export function useReview(workspace: WorkspaceName) {
   useEffect(() => {
     // Scoped to this window: other windows hold other repos.
     const win = getCurrentWebviewWindow();
-    const unchanged = onRepoChanged(() => refreshRef.current());
+    const unchanged = onRepoChanged(() => refreshRef.current(), workspace);
     const staleSub = events.workingCopyStale(win).listen((e) => {
       if (e.payload.workspace === workspace) setStale(e.payload.message);
     });

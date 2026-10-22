@@ -191,7 +191,7 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
 
   useRepoChanged(async () => {
     if (root && (await commands.htmlChanged(root))) reload();
-  });
+  }, workspace);
 
   /** A page loaded in the frame: a load a page can't fake. */
   function onLoad() {
