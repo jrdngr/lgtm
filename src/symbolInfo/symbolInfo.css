@@ -1,0 +1,188 @@
+.si {
+  margin: 2px 12px 6px 70px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--mark-violet);
+  border-radius: 6px;
+  background: var(--panel);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  white-space: normal;
+  cursor: auto;
+  user-select: text;
+}
+
+.si-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+
+.si-bar.alone {
+  border-bottom: none;
+}
+
+.si-fold,
+.si-close {
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.si-close {
+  font-size: 14px;
+}
+
+.si-name {
+  font:
+    600 12.5px Menlo,
+    monospace;
+  color: #dcdcaa;
+}
+
+.si-kind {
+  padding: 0 5px;
+  border: 1px solid rgb(78 201 176 / 45%);
+  border-radius: 4px;
+  color: #4ec9b0;
+  font-size: 10.5px;
+}
+
+.si-changed {
+  padding: 0 5px;
+  border: 1px solid rgb(227 179 65 / 45%);
+  border-radius: 4px;
+  color: #e3b341;
+  font-size: 11px;
+}
+
+.si-working {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.si .si-refresh {
+  padding: 1px 8px;
+  font-size: 12px;
+}
+
+.si-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.si-sec:last-child {
+  border-bottom: none;
+}
+
+.si-sec h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.si-sec p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.si-sec ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.si-caller {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.si-who {
+  font:
+    12px Menlo,
+    monospace;
+  color: #dcdcaa;
+}
+
+.si-loc {
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font:
+    11.5px Menlo,
+    monospace;
+  text-decoration: underline;
+  text-decoration-color: rgb(79 140 201 / 40%);
+}
+
+.si-icon {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--violet-line);
+  border-radius: 4px;
+  background: var(--violet-soft);
+  color: var(--violet-text);
+  font:
+    600 9px / 1 -apple-system,
+    system-ui,
+    sans-serif;
+  vertical-align: middle;
+}
+
+.si-icon.busy {
+  border-style: dashed;
+}
+
+/* Placement in the review and Guided diffs: the block starts at the code, the icon sits left
+   of the line number. */
+.line .si {
+  margin-left: 124px;
+  max-width: 760px;
+}
+
+.gd-ln .n {
+  position: relative;
+}
+
+.gd-ln .si-icon {
+  position: absolute;
+  top: 3px;
+  left: 2px;
+}
+
+.gd-code .si {
+  margin-left: 62px;
+}
+
+.cm-si .si {
+  margin: 4px 16px 8px 8px;
+  max-width: 760px;
+  font-size: 12.5px;
+  line-height: normal;
+}
+
+.cm-si-gutter .si-icon {
+  margin: 0 2px 0 4px;
+}

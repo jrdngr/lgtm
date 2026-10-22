@@ -11,6 +11,8 @@ import { rowsRefs } from "../review/sendText";
 import { unified } from "../review/snippet";
 import type { Comments } from "../review/useComments";
 import { clearTextSelection } from "../review/useRowMouse";
+import { searchItems } from "../search/menu";
+import { wordAtPoint } from "../search/symbolAt";
 import { type CtxEntry, copy, openMenu } from "../ui/contextMenu";
 import type { Segment } from "./model";
 
@@ -235,8 +237,10 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
   /** A row's right-click acts on the picked lines when it's one of them, else on it alone. */
   const onRowMenu = (r: RowRef) => (e: React.MouseEvent) => {
     const picks = pickedKeys.has(keyOf(r)) ? picked : [r];
+    const word = wordAtPoint(e.clientX, e.clientY);
     if (picks.length === 1) pick(r, false);
-    openMenu(e, menu(picks));
+    const path = review?.files[r.file]?.dto.path;
+    openMenu(e, [...searchItems(workspace, word, path), ...menu(picks)]);
   };
 
   return {

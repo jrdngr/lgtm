@@ -108,6 +108,10 @@ pub struct ArchChanged {
     pub review: u32,
 }
 
+/// Symbol Information was asked for, written or removed.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct SymbolInfoChanged;
+
 /// A terminal agent wrote review `review`'s guided review.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct GuidedChanged {

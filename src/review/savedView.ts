@@ -60,6 +60,7 @@ export function restoredHunks(files: FlatFile[], saved: [string, number][]): Set
 export function lineRef(files: FlatFile[], line: DisplayLine | undefined): string | undefined {
   if (!line) return undefined;
   if (line.kind === "comment") return `c${line.comment}`;
+  if (line.kind === "info") return `i${line.info}`;
   const f = files[line.file];
   if (!f) return undefined;
   const path = f.dto.path;

@@ -2296,6 +2296,7 @@ dependencies = [
  "objc2",
  "percent-encoding",
  "portable-pty",
+ "regex",
  "rmcp",
  "rusqlite",
  "rustix",

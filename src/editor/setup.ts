@@ -11,6 +11,7 @@ import {
   lineNumbers,
   type ViewUpdate,
 } from "@codemirror/view";
+import { symbolInfo } from "../symbolInfo/editorInfo";
 import { treeSitter } from "./highlight";
 import { linkClicks } from "./linkClicks";
 
@@ -68,6 +69,7 @@ export function editorExtensions(
     return true;
   };
   return [
+    symbolInfo,
     lineNumbers(),
     highlightActiveLineGutter(),
     highlightActiveLine(),

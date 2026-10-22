@@ -17,6 +17,7 @@ mod qa_inputs;
 pub mod register;
 mod reports;
 mod server;
+mod symbol_info;
 
 use std::path::{Path, PathBuf};
 

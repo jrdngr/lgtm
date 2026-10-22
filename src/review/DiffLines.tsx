@@ -24,6 +24,7 @@ const HEIGHTS: Record<DisplayLine["kind"], number> = {
   more: ROW_HEIGHT,
   context: ROW_HEIGHT,
   comment: 120,
+  info: 120,
 };
 
 function lineKey(line: DisplayLine): string {
@@ -38,6 +39,8 @@ function lineKey(line: DisplayLine): string {
       return `g:${line.file}:${line.rows[0]}`;
     case "comment":
       return `c:${line.comment}`;
+    case "info":
+      return `i:${line.info}`;
     case "more":
       return `m:${line.file}:${line.region.from}`;
     case "context":
@@ -80,6 +83,9 @@ interface Props extends LineHandlers {
   onClearFile(file: number): void;
   onFileMenu(e: React.MouseEvent, file: number): void;
   renderComment(id: number): ReactNode;
+  renderInfo(key: string): ReactNode;
+  /** What sits left of a row's line number, like folded Symbol Information. */
+  renderFlag?(file: number, row: number): ReactNode;
   onShowContext(file: number, region: Region): void;
 }
 
@@ -183,6 +189,7 @@ export function DiffLines(props: Props) {
     const file = files[line.file];
     if (line.kind === "file") return header(line.file);
     if (line.kind === "comment") return props.renderComment(line.comment);
+    if (line.kind === "info") return props.renderInfo(line.info);
     if (line.kind === "more")
       return (
         <MoreBar region={line.region} onShow={() => props.onShowContext(line.file, line.region)} />
@@ -230,6 +237,7 @@ export function DiffLines(props: Props) {
           row={line.rows[0]}
           index={index}
           setup={props.setup}
+          flag={props.renderFlag?.(line.file, line.rows[0])}
         />
       ) : (
         <>
@@ -248,6 +256,7 @@ export function DiffLines(props: Props) {
             index={index}
             setup={props.setup}
             side="right"
+            flag={line.right === undefined ? undefined : props.renderFlag?.(line.file, line.right)}
           />
         </>
       );
@@ -289,7 +298,7 @@ export function DiffLines(props: Props) {
             // has a fixed height.
             const kind = lines[v.index].kind;
             const code = kind === "rows" || kind === "context";
-            const sized = kind === "comment" || (wrap && code);
+            const sized = kind === "comment" || kind === "info" || (wrap && code);
             return (
               <div
                 key={v.key}

@@ -48,6 +48,8 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧X"], action: "New drawing" },
       { keys: ["⌘J"], action: "Revisions motions" },
       { keys: ["⌘F"], action: "Find in the editor, rendered page or review" },
+      { keys: ["⇧⌘F"], action: "Search the workspace for the selection" },
+      { keys: ["⌘P"], action: "Go to a file, @ a symbol, or :line" },
       { keys: ["⇧⌘J"], action: "Review only the working copy (@)" },
       { keys: ["⇧⌘N"], action: "New workspace" },
       { keys: ["⌥⌘N"], action: "Review a PR by URL or number, in its own workspace" },
@@ -61,6 +63,23 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: "Editor or rendered markdown",
     shortcuts: [
       { keys: ["⌘>"], action: "Send the selection's path and lines to the last terminal" },
+    ],
+  },
+  {
+    title: "Symbols, in the editor or on a selection",
+    shortcuts: [
+      { keys: ["F12"], action: "Go to definition" },
+      { keys: ["⇧F12"], action: "Find all references" },
+      { keys: ["⌥F12"], action: "Symbol information" },
+    ],
+  },
+  {
+    title: "Search tab",
+    shortcuts: [
+      { keys: ["↑", "↓"], action: "Move between results" },
+      { keys: ["↵"], action: "Open the result" },
+      { keys: ["⌥↵"], action: "Send the results to the terminal" },
+      { keys: ["⌘↵"], action: "Replace all" },
     ],
   },
   {

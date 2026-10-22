@@ -6,7 +6,8 @@ import { file, review, rows } from "../review/fixture.test-utils";
 
 vi.mock("@tauri-apps/api/webviewWindow", () => ({ getCurrentWebviewWindow: () => ({}) }));
 vi.mock("../terminal/TerminalPanel", () => ({ TerminalPanel: () => null }));
-// Every command succeeds: no saved layout, no PR, and a review of two files.
+// Every command succeeds: no saved layout, no PR, no Symbol Information, and a review of two
+// files.
 vi.mock("../bindings", async (actual) => {
   const ok = (data: unknown) => Promise.resolve({ status: "ok", data });
   let id = 0;
@@ -14,6 +15,7 @@ vi.mock("../bindings", async (actual) => {
     {},
     {
       get: (_, name) => (_workspace: unknown, revset: string) => {
+        if (name === "symbolInfos") return ok([]);
         if (name !== "openReview") return ok(null);
         const r = review([file("a.ts", [rows(["+x"])]), file("b.ts", [rows(["+y"])])]);
         return ok({ ...r, id: ++id, revset });

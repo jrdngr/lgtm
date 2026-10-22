@@ -4,7 +4,7 @@ import { flushSync } from "react-dom";
 import { onAnyShowLook } from "../arch/showLook";
 import { bottom } from "../core/bottom";
 import { bottomDockOf, dockOf, revealPanel } from "../core/docks";
-import { bottomKey, chord, tabKey } from "../core/keys";
+import { bottomKey, chord, symbolKey, tabKey } from "../core/keys";
 import { addTerminal, focusPanel, openReport } from "../core/panels";
 import { onAnyReveal } from "../core/reveal";
 import { setStateRepo } from "../core/savedState";
@@ -21,6 +21,11 @@ import { forgetWorkspaceRevset } from "../review/revset";
 import { useReviewTarget } from "../review/target";
 import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
 import { focusLog, openMotions } from "../revisions/loadReview";
+import { askSymbolInfo } from "../search/menu";
+import { openQuickPick } from "../search/pickStore";
+import { QuickPickHost } from "../search/QuickPick";
+import { findReferences, goToDefinition, onShowSearch, searchWorkspace } from "../search/store";
+import { focusedWord } from "../search/symbolAt";
 import { useSettingsMenu } from "../settings/open";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
@@ -158,6 +163,13 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   useEffect(() => onAnyReveal(() => showView("right", "repo")));
   useEffect(() => onAnyShowLook(() => showView("right", "architecture")));
+  useEffect(() => onShowSearch(() => showView("right", "search")));
+
+  /** Runs `f` on the word the focused editor or selection is on, when there is one. */
+  const onWord = (f: (ws: WorkspaceName, word: string) => void) => () => {
+    const word = focusedWord();
+    if (word) f(selected, word);
+  };
 
   /** Closes the focused dock's active tab, asking first about unsaved edits. */
   async function closeTab() {
@@ -203,6 +215,11 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       const dock = dockOf(selected);
       if (dock) toggleMaximize(dock, inBottom() ? undefined : dock.activeGroup);
     },
+    "Mod+Shift+F": () => searchWorkspace(selected, focusedWord()),
+    "Mod+P": () => openQuickPick(selected),
+    F12: onWord(goToDefinition),
+    "Shift+F12": onWord(findReferences),
+    "Alt+F12": onWord((ws, word) => askSymbolInfo(ws, word)),
     "Mod+Shift+N": () => addFromPanel("workspace"),
     "Mod+Alt+N": () => addFromPanel("pr"),
     toggle: () => toggleBottom(),
@@ -242,7 +259,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     // Capture phase, so app shortcuts win over whatever panel has focus, including xterm.
     const onKey = (e: KeyboardEvent) => {
       if (promptKeeps(e)) return;
-      const key = bottomKey(e) ?? tabKey(e) ?? chord(e) ?? "";
+      const key = bottomKey(e) ?? tabKey(e) ?? symbolKey(e) ?? chord(e) ?? "";
       if (editorKeys.has(key) && (e.target as Element).closest?.(".cm-editor")) return;
       const run = keyRef.current?.(key);
       if (!run) return;
@@ -286,6 +303,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       <JjBlockedBanner workspace={selected} />
       <McpOffer />
       <PromptHost />
+      <QuickPickHost />
       <DesignFormHost workspace={selected} />
       <div className="workbench-body">
         <SidePanel

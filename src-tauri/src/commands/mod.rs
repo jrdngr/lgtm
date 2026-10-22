@@ -13,6 +13,7 @@ pub mod notes;
 pub mod pty;
 pub mod qa;
 pub mod repo;
+pub mod search;
 pub mod review;
 pub mod settings;
 pub mod workspaces;

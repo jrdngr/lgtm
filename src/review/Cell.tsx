@@ -43,10 +43,11 @@ interface CellProps {
   index: MarkIndex;
   setup: MarkSetup;
   side?: "left" | "right";
+  flag?: React.ReactNode;
 }
 
 /** One row's gutter and code, tinted by its mark. Undefined `row` is an empty side. */
-export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
+export function Cell({ file, fileIdx, row, index, setup, side, flag }: CellProps) {
   if (row === undefined) return <div className="cell empty" />;
   const r = file.rows[row];
   const key = markKey(fileIdx, row);
@@ -62,7 +63,7 @@ export function Cell({ file, fileIdx, row, index, setup, side }: CellProps) {
       title={amber ? "changed since marked" : markTitle(mark, setup)}
     >
       <span className="strip" />
-      <span className="flag" />
+      <span className="flag">{flag}</span>
       {side ? (
         <span className="ln">{lineNo ?? ""}</span>
       ) : (

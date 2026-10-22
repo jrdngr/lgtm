@@ -88,7 +88,8 @@ impl Lgtm {
                 + Self::canvas_router()
                 + Self::notes_router()
                 + Self::revisions_router()
-                + Self::qa_router(),
+                + Self::qa_router()
+                + Self::symbol_info_router(),
         }
     }
 

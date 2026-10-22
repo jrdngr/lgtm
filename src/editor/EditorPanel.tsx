@@ -9,6 +9,8 @@ import { useCmFind } from "../find/useCmFind";
 import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
+import { showInfos } from "../symbolInfo/editorInfo";
+import { useFolded, useSymbolInfos } from "../symbolInfo/store";
 import { type Sender, sendItems } from "../terminal/sendItems";
 import { copy, openMenu } from "../ui/contextMenu";
 import { saveTabParams } from "../workbench/tabParams";
@@ -124,6 +126,12 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   useEffect(() => {
     view?.dispatch({ effects: wrapping.reconfigure(wrapExtension(wrap)) });
   }, [view, wrap]);
+
+  const infos = useSymbolInfos(workspace, [path]);
+  const folded = useFolded();
+  useEffect(() => {
+    view?.dispatch({ effects: showInfos.of({ ws: workspace, infos, folded }) });
+  }, [view, workspace, infos, folded]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` reopens at the same line
   useEffect(() => {

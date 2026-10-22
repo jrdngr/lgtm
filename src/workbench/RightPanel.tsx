@@ -14,6 +14,7 @@ import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
 import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
+import { SearchPanel } from "../search/SearchPanel";
 import { CommentsPanel } from "../threads/CommentsPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 
@@ -43,6 +44,13 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       {...props}
       views={[
         { id: "repo", group: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
+        {
+          id: "search",
+          group: "repo",
+          title: "Search",
+          icon: "search",
+          render: () => <SearchPanel />,
+        },
         {
           id: "changes",
           group: "review",

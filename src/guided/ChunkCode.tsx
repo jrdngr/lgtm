@@ -1,11 +1,12 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import type { GuidedRange } from "../bindings";
-import type { WorkspaceName } from "../core/workspace";
+import { useWorkspace, type WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { SIGN } from "../model/sign";
 import { Code } from "../review/Cell";
 import { type FlatFile, markKey } from "../review/model";
+import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { IconButton } from "../ui/icons";
 import { inRanges, type Segment } from "./model";
 import type { GuidedLines } from "./useGuidedLines";
@@ -26,6 +27,7 @@ interface Props {
 
 /** A chunk's diff, one block per run of rows, under its file's path. */
 export function ChunkCode({ files, segments, lit, lines, after, expanded, onExpand }: Props) {
+  const info = useInfoLines(useWorkspace(), files);
   return (
     <>
       {segments.map((s) => {
@@ -67,10 +69,16 @@ export function ChunkCode({ files, segments, lit, lines, after, expanded, onExpa
                     onMouseEnter={lines && (() => lines.onRowEnter({ file: s.file, row }))}
                     onContextMenu={lines?.onRowMenu({ file: s.file, row })}
                   >
-                    <span className="n">{r.newLine ?? r.oldLine ?? ""}</span>
+                    <span className="n">
+                      {info.flag(s.file, row)}
+                      {r.newLine ?? r.oldLine ?? ""}
+                    </span>
                     <span className="s">{SIGN[r.kind]}</span>
                     <Code row={r} />
                   </div>
+                  {info.open.get(markKey(s.file, row))?.map((k) => (
+                    <Fragment key={k}>{info.render(k)}</Fragment>
+                  ))}
                   {after?.(s.file, row)}
                 </Fragment>
               );

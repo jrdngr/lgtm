@@ -91,6 +91,27 @@ export const commands = {
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**  The bookmarks closest to `rev` on either side, for moving one onto it. */
 	nearestBookmarks: (workspace: string | null, rev: string) => typedError<BookmarkSpot[], string>(__TAURI_INVOKE("nearest_bookmarks", { workspace, rev })),
+	/**  Lines of the workspace's working copy matching `query`. */
+	searchText: (workspace: string | null, query: TextQuery) => typedError<Hits, string>(__TAURI_INVOKE("search_text", { workspace, query })),
+	/**
+	 *  Replaces `query`'s matches with `replacement` in the working copy. Returns how many files
+	 *  changed.
+	 */
+	replaceText: (workspace: string | null, query: TextQuery, replacement: string) => typedError<number, string>(__TAURI_INVOKE("replace_text", { workspace, query, replacement })),
+	/**  Where `name` appears as an identifier in the working copy, definitions first. */
+	findReferences: (workspace: string | null, name: string) => typedError<Hits, string>(__TAURI_INVOKE("find_references", { workspace, name })),
+	/**  Symbols in the working copy matching `query`, best first. */
+	workspaceSymbols: (workspace: string | null, query: string) => typedError<SymbolHit[], string>(__TAURI_INVOKE("workspace_symbols", { workspace, query })),
+	/**  Every file in the working copy, relative, skipping ignored ones. */
+	workspaceFiles: (workspace: string | null) => typedError<string[], string>(__TAURI_INVOKE("workspace_files", { workspace })),
+	/**
+	 *  Marks `name` as asked about and returns the prompt for the agent. Its definition is the
+	 *  one in `path` when there is one there, else the first in the workspace.
+	 */
+	requestSymbolInfo: (workspace: string | null, name: string, path: string | null) => typedError<SymbolAsk, string>(__TAURI_INVOKE("request_symbol_info", { workspace, name, path })),
+	/**  Symbol Information on symbols defined in `paths`. */
+	symbolInfos: (workspace: string | null, paths: string[]) => typedError<SymbolInfoDto[], string>(__TAURI_INVOKE("symbol_infos", { workspace, paths })),
+	dismissSymbolInfo: (path: string, name: string) => typedError<null, string>(__TAURI_INVOKE("dismiss_symbol_info", { path, name })),
 	/**
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -415,6 +436,7 @@ export const events = {
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
+	symbolInfoChanged: makeEvent<SymbolInfoChanged>("symbol-info-changed"),
 	systemChanged: makeEvent<SystemChanged>("system-changed"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
@@ -609,6 +631,15 @@ export type BotRunChanged = {
 export type BoundaryDto = {
 	name: string,
 	components: string[],
+};
+
+export type Caller = {
+	/**  The calling function or other symbol. */
+	name: string,
+	/**  Workspace-relative path. */
+	path: string,
+	/**  1-based line of the call. */
+	line: number,
 };
 
 export type Canvas = {
@@ -1322,6 +1353,27 @@ export type HistoryDto = {
 	componentsRemoved: number,
 	edgesAdded: number,
 	edgesRemoved: number,
+};
+
+/**  A line with matches in it. */
+export type Hit = {
+	path: string,
+	/**  1-based. */
+	line: number,
+	text: string,
+	/**  Match ranges in `text`, in UTF-16 code units. */
+	spans: ([number, number])[],
+	/**  The line defines the symbol searched for. */
+	def: boolean,
+	/**  The lines around it, for references. */
+	before: string | null,
+	after: string | null,
+};
+
+export type Hits = {
+	hits: Hit[],
+	/**  The search stopped at its limit, so there are more. */
+	truncated: boolean,
 };
 
 export type Hunk = {
@@ -2185,6 +2237,40 @@ export type SymNodeDto = {
 	signature: string,
 };
 
+/**  Where a symbol asked about is defined, and the prompt to send. */
+export type SymbolAsk = {
+	path: string,
+	line: number,
+	prompt: string,
+};
+
+export type SymbolHit = {
+	name: string,
+	kind: SymbolKind,
+	path: string,
+	/**  The line it starts on, 1-based. */
+	line: number,
+};
+
+/**  Symbol Information was asked for, written or removed. */
+export type SymbolInfoChanged = null;
+
+export type SymbolInfoDto = {
+	path: string,
+	name: string,
+	/**  The definition's line now, 1-based. */
+	line: number,
+	kind: SymbolKind,
+	/**  Asked for, and the agent hasn't answered yet. */
+	working: boolean,
+	/**  The code changed since the agent described it. */
+	changed: boolean,
+	description: string,
+	callers: Caller[],
+	assumptions: string[],
+	errors: string[],
+};
+
 export type SymbolKind = "function" | "class" | "module" | "section";
 
 export type SymbolsDto = {
@@ -2314,6 +2400,19 @@ export type TestsDto = {
 	failed: number,
 	/**  Changed lines no test exercises. */
 	uncovered: GuidedRange[],
+};
+
+export type TextQuery = {
+	pattern: string,
+	regex: boolean,
+	caseSensitive: boolean,
+	wholeWord: boolean,
+	/**  Comma-separated globs a path must match one of; empty for any. */
+	include: string,
+	/**  Comma-separated globs no path may match. */
+	exclude: string,
+	/**  Search only these paths, when set. */
+	paths: string[] | null,
 };
 
 export type ThreadDto = {

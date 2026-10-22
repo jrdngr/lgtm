@@ -5,6 +5,8 @@ import { revealInFiles } from "../core/reveal";
 import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
 import { currentReview } from "../review/current";
+import { searchItems } from "../search/menu";
+import { editorWord } from "../search/symbolAt";
 import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, clipboardText, copy } from "../ui/contextMenu";
 import { wordWrap } from "../workbench/wordWrap";
@@ -59,6 +61,7 @@ export function editorMenu(d: Deps): CtxEntry[] {
   };
   const wrap = wordWrap.get();
   return [
+    ...searchItems(d.workspace, editorWord(v), path),
     {
       label: "Cut",
       keys: "⌘X",

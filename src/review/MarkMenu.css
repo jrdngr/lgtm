@@ -59,3 +59,17 @@
 .mark-menu .menu-key {
   width: 18px;
 }
+
+.mark-menu .menu-trail {
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--muted);
+}
+
+.mark-menu button:disabled {
+  opacity: 0.45;
+}
+
+.mark-menu button:disabled:hover {
+  background: none;
+}

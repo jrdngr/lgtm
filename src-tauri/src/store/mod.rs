@@ -16,6 +16,7 @@ mod qa;
 pub mod report;
 mod sessions;
 mod setup;
+mod symbol_info;
 mod threads;
 
 use std::path::Path;
@@ -250,6 +251,7 @@ impl Store {
         prs::create_table(&db)?;
         qa::create_table(&db)?;
         setup::create_table(&db)?;
+        symbol_info::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

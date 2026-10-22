@@ -12,6 +12,8 @@ import { useReviewFind } from "../find/useReviewFind";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
+import { searchItems } from "../search/menu";
+import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { openMenu } from "../ui/contextMenu";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
@@ -39,7 +41,7 @@ import { useReviewActions } from "./useReviewActions";
 import { useReviewKeys } from "./useReviewKeys";
 import { useReviewNav } from "./useReviewNav";
 import { useReviewState } from "./useReviewState";
-import { useRowMouse } from "./useRowMouse";
+import { type MenuAt, useRowMouse } from "./useRowMouse";
 import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
@@ -72,7 +74,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
   const [filter, setFilter] = useState<Filter>("all");
-  const [menu, setMenu] = useState<{ x: number; y: number }>();
+  const [menu, setMenu] = useState<MenuAt>();
   const [scrollTo, setScrollTo] = useState<{ line: number; center?: boolean }>();
   const keepFile = useRef<(file: number) => void>(undefined);
 
@@ -112,6 +114,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
+  const info = useInfoLines(workspace, files);
   const fileLines = useMemo(
     () =>
       buildLines(files, {
@@ -123,6 +126,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         done: setup.done,
         revealed,
         comments: slots,
+        infos: info.open,
         context: context.lines,
       }),
     [
@@ -135,6 +139,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       setup.done,
       revealed,
       slots,
+      info.open,
       context.lines,
     ],
   );
@@ -420,6 +425,8 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           onClearFile={a.clearFile}
           onFileMenu={openFileMenu}
           onShowContext={context.show}
+          renderInfo={info.render}
+          renderFlag={info.flag}
           renderComment={(id) => (
             <>
               <PrCommentsHead comments={c.onPr} id={id} />
@@ -450,6 +457,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           setup={setup}
           canDraft={c.canDraft}
           inHunk={inHunk(lines[cursor])}
+          symbol={searchItems(workspace, menu.word ?? "", menu.path)}
           onPick={a.pick}
           onClose={closeMenu}
         />

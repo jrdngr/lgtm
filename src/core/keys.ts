@@ -34,3 +34,9 @@ export function tabKey(
   if (e.ctrlKey) return e.shiftKey ? "prevTab" : "nextTab";
   return e.shiftKey ? "prevPane" : "nextPane";
 }
+
+/** F12, Shift+F12 and Alt+F12, the symbol keys, as in VS Code. */
+export function symbolKey(e: KeyboardEvent): "F12" | "Shift+F12" | "Alt+F12" | undefined {
+  if (e.key !== "F12" || e.metaKey || e.ctrlKey || (e.shiftKey && e.altKey)) return undefined;
+  return e.shiftKey ? "Shift+F12" : e.altKey ? "Alt+F12" : "F12";
+}

@@ -1,4 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
+import { wordAtPoint } from "../search/symbolAt";
 import type { LineHandlers } from "./DiffLines";
 import { type DisplayLine, type FlatFile, gapKey } from "./model";
 import { fileSelection, hunkSelection, rangeSelection, units } from "./selection";
@@ -9,12 +10,20 @@ export function clearTextSelection() {
   window.getSelection()?.removeAllRanges();
 }
 
+/** Where the line menu opens, and the word and file it opened on. */
+export interface MenuAt {
+  x: number;
+  y: number;
+  word?: string;
+  path?: string;
+}
+
 interface Deps {
   files: FlatFile[];
   lines: DisplayLine[];
   s: SelectionApi;
   rootRef: RefObject<HTMLDivElement | null>;
-  setMenu(at: { x: number; y: number }): void;
+  setMenu(at: MenuAt): void;
   toggleHunk(file: number, hunk: number): void;
   toggleFile(file: number): void;
   setChecked(file: number, checked: boolean): void;
@@ -70,7 +79,9 @@ export function useRowMouse(d: Deps): LineHandlers {
       e.preventDefault();
       if (i < sel.start || i > sel.end) place(i);
       const root = rootRef.current?.getBoundingClientRect();
-      if (root) d.setMenu({ x: e.clientX - root.left, y: e.clientY - root.top });
+      const word = wordAtPoint(e.clientX, e.clientY);
+      const path = files[lines[i]?.file]?.dto.path;
+      if (root) d.setMenu({ x: e.clientX - root.left, y: e.clientY - root.top, word, path });
     },
     onFileClick(file: number) {
       s.selectUnit(fileSelection(files, lines, file));

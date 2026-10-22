@@ -24,6 +24,8 @@ export type DisplayLine =
   /** A comment block, after the line holding its last row, or under the file header when its
    * code is gone (hunk -1). `NEW_COMMENT` is the draft. */
   | { kind: "comment"; file: number; hunk: number; comment: number }
+  /** Symbol Information, by `infoKey`, under the line holding its definition. */
+  | { kind: "info"; file: number; hunk: number; info: string }
   /** Unchanged code before hunk `hunk` (or after the last one), hidden behind a bar. */
   | { kind: "more"; file: number; hunk: number; region: Region }
   /** A line of that code once shown. `old` is its line on the old side. */
@@ -97,6 +99,8 @@ export interface Layout {
   /** Comment ids by the `markKey` of the row their block follows, or `fileSlot` for ones
    * whose code is gone. */
   comments?: ReadonlyMap<string, number[]>;
+  /** Open Symbol Information keys by the `markKey` of the row holding its definition. */
+  infos?: ReadonlyMap<string, string[]>;
   /** Unchanged code clicked open, by `regionKey`. */
   context?: ReadonlyMap<string, ContextLine[]>;
 }
@@ -165,6 +169,8 @@ export function buildLines(files: FlatFile[], layout: Layout): DisplayLine[] {
           for (const line of rowLines) {
             out.push(line);
             for (const row of line.rows) {
+              for (const info of layout.infos?.get(markKey(file, row)) ?? [])
+                out.push({ kind: "info", file, hunk, info });
               for (const comment of layout.comments?.get(markKey(file, row)) ?? [])
                 out.push({ kind: "comment", file, hunk, comment });
             }

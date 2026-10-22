@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { MarkColor } from "../bindings";
+import type { CtxEntry } from "../ui/contextMenu";
 import { colorForKey, type MarkSetup, markVar } from "./marks";
 import { plural } from "./state";
 import "./MarkMenu.css";
@@ -39,6 +40,8 @@ interface Props {
   canDraft: boolean;
   /** Shows Collapse Hunk, when the cursor is in a hunk. */
   inHunk: boolean;
+  /** The symbol items on top, from the right-click word. */
+  symbol?: CtxEntry[];
   onPick(action: MenuAction): void;
   onClose(): void;
 }
@@ -59,7 +62,17 @@ function useKeptInside(x: number, y: number) {
   return { ref, place };
 }
 
-export function MarkMenu({ x, y, changed, setup, canDraft, inHunk, onPick, onClose }: Props) {
+export function MarkMenu({
+  x,
+  y,
+  changed,
+  setup,
+  canDraft,
+  inHunk,
+  symbol = [],
+  onPick,
+  onClose,
+}: Props) {
   const { ref, place } = useKeptInside(x, y);
   const items: Item[] = [
     { action: "clear", key: "0", label: "Clear Mark" },
@@ -81,6 +94,26 @@ export function MarkMenu({ x, y, changed, setup, canDraft, inHunk, onPick, onClo
         onContextMenu={(e) => e.preventDefault()}
       />
       <div className="mark-menu" ref={ref} style={place}>
+        {symbol.map((item, i) =>
+          !item || (item !== "-" && "items" in item) ? null : item === "-" ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: separators have no identity
+            <hr key={i} className="menu-sep" />
+          ) : (
+            <button
+              type="button"
+              key={item.label}
+              disabled={item.disabled}
+              onClick={() => {
+                onClose();
+                item.onSelect();
+              }}
+            >
+              <span className="menu-key" />
+              {item.label}
+              {item.keys && <span className="menu-trail">{item.keys}</span>}
+            </button>
+          ),
+        )}
         <div className="menu-count">
           {changed} changed {plural(changed)}
         </div>

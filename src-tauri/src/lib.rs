@@ -30,7 +30,9 @@ mod recent;
 mod repo;
 mod review;
 mod revisions;
+mod search;
 mod settings;
+mod symbol_info;
 mod store;
 mod syntax;
 mod tools;
@@ -88,6 +90,14 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::working_copy,
             commands::review::jj_act,
             commands::review::nearest_bookmarks,
+            commands::search::search_text,
+            commands::search::replace_text,
+            commands::search::find_references,
+            commands::search::workspace_symbols,
+            commands::search::workspace_files,
+            commands::search::request_symbol_info,
+            commands::search::symbol_infos,
+            commands::search::dismiss_symbol_info,
             commands::review::mark_rows,
             commands::review::clear_file_marks,
             commands::review::set_files_checked,
@@ -223,6 +233,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::QaChanged,
             events::ArchChanged,
             events::GuidedChanged,
+            events::SymbolInfoChanged,
             events::SystemChanged,
             events::DesignChanged,
             events::DrawingChanged,
