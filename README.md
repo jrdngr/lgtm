@@ -12,29 +12,53 @@ This program may or may not be safe to run. Use it at your own risk.
 
 ## Screenshots
 
-**Mark reviewed lines with customizable colored labels**
+**Do jj stuff**
 
-![Mark reviewed lines with customizable colored labels](docs/screenshots/01-review-marks-notes.png)
+<img src="docs/screenshots/01-jj-sidebar-crop.png" alt="Do jj stuff" width="420">
 
-**jj stuff**
+**Ask your agent why it did something stupid**
 
-![jj stuff](docs/screenshots/03-revisions-list.png)
+![Ask your agent why it did something stupid](docs/screenshots/02-review-comment.png)
 
-**Agentic code review reports**
+**Custom review marks to help manage your 5000 line diff**
 
-![Agentic code review reports](docs/screenshots/10-reviewers-report.png)
+![Custom review marks to help manage your 5000 line diff](docs/screenshots/03-review-marks.png)
 
-**Structured Q&A**
+**Guided reviews that contextualize related parts of a diff**
 
-![Structured Q&A](docs/screenshots/13-qa-question.png)
+![Guided reviews that contextualize related parts of a diff](docs/screenshots/04-guided-review.png)
 
 **Ask your agent to help you reply to PR comments about code you didn't write**
 
-![Ask your agent to help you reply to PR comments about code you didn't write](docs/screenshots/18-pr-thread-agent.png)
+![Ask your agent to help you reply to PR comments about code you didn't write](docs/screenshots/05-pr-thread.png)
 
-**jj workspaces with their own terminals and layout**
+**C4-style architecture diagrams generated from your code, labeled by your diffs**
 
-![jj workspaces with their own terminals and layout](docs/screenshots/20-terminals.png)
+![C4-style architecture diagrams generated from your code, labeled by your diffs](docs/screenshots/06-arch-review-lens.png)
+
+**Arrange your spaghetti nicely**
+
+![Arrange your spaghetti nicely](docs/screenshots/07-arch-focus.png)
+
+**See your spaghetti in its full glory**
+
+![See your spaghetti in its full glory](docs/screenshots/08-arch-symbols.png)
+
+**Draw stuff and tag it so your agent can reference it by number**
+
+![Draw stuff and tag it so your agent can reference it by number](docs/screenshots/09-drawing-tags.png)
+
+**Q&A with your agent**
+
+![Q&A with your agent](docs/screenshots/10-qa.png)
+
+**Code review reports that you won't read because it's easier to type "fix all"**
+
+![Code review reports that you won't read because it's easier to type "fix all"](docs/screenshots/11-reports.png)
+
+**Notes like Obsidian except you have no idea where the files are**
+
+![Notes like Obsidian except you have no idea where the files are](docs/screenshots/12-notes.png)
 
 ## Requirements
 
