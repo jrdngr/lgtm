@@ -81,7 +81,7 @@ struct At {
 async fn at(jj: &Jj, revision: &str) -> Option<At> {
     jj.snapshot_or_stale().await.ok()?;
     let resolved = rev::resolve(jj, revision).await.ok()?;
-    let all = jj.files(&resolved.commit).await.ok()?;
+    let all = jj.commit_files(&resolved.commit).await.ok()?.to_vec();
     Some(At { resolved, all })
 }
 
@@ -267,7 +267,7 @@ impl RepoCtx {
         let ws = self.workspace(workspace).await?;
         ws.jj.snapshot_or_stale().await?;
         let r = rev::resolve(&ws.jj, revision).await?;
-        ws.jj.files(&r.commit).await
+        Ok(ws.jj.commit_files(&r.commit).await?.to_vec())
     }
 
     /// Local bookmarks, those on `@`'s stack first.

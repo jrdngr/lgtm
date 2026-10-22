@@ -116,7 +116,8 @@ impl RepoCtx {
             None
         } else {
             let ws = self.workspace(workspace).await?;
-            ws.jj.files("@").await.ok().map(HashSet::from_iter)
+            let files = ws.jj.working_copy_files().await.ok();
+            files.map(|f| f.iter().cloned().collect())
         };
         Ok((view, Files { view, tracked }))
     }

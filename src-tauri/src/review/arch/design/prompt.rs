@@ -42,7 +42,7 @@ impl RepoCtx {
         let ws = self.workspace(workspace).await?;
         ws.jj.snapshot_or_stale().await?;
         let commit = rev::resolve(&ws.jj, &d.revision).await?.commit;
-        let files = covered(&ws.jj.files(&commit).await?, &d.files);
+        let files = covered(&ws.jj.commit_files(&commit).await?, &d.files);
         if files.is_empty() {
             bail!("`{}` has none of the design's files", d.revision);
         }

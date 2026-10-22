@@ -13,6 +13,7 @@ use tokio::sync::Mutex;
 
 mod at;
 pub mod checkout;
+mod listing;
 mod background;
 mod bookmarks;
 mod push;
