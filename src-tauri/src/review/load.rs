@@ -108,7 +108,7 @@ impl RepoCtx {
             .collect();
         let mut built: Vec<Option<(ReviewFile, FileDto)>> = {
             let mut cache = self.reviews.cache.lock().unwrap();
-            keys.iter().map(|k| cache.take(k, &sides.new)).collect()
+            keys.iter().map(|k| cache.take(k, &sides)).collect()
         };
         let misses: Vec<(usize, FileDiff)> = diffs
             .into_iter()
