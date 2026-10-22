@@ -35,6 +35,8 @@ pub enum JjAction {
     RebaseOnTrunk {
         rev: String,
     },
+    /// Moves the closest bookmarks behind `@` up to it.
+    BookmarkAdvance,
     Fetch,
     Push,
 }
@@ -57,6 +59,7 @@ impl JjAction {
                 "--use-destination-message",
             ]),
             JjAction::RebaseOnTrunk { rev } => v(&["rebase", "-b", rev, "-d", "trunk()"]),
+            JjAction::BookmarkAdvance => v(&["bookmark", "advance"]),
             JjAction::Fetch => v(&["git", "fetch"]),
             JjAction::Push => v(&["git", "push"]),
         }
@@ -154,6 +157,23 @@ mod tests {
         assert_eq!(parent.description.trim(), "target");
         let files = j.read(&["file", "list", "-r", "@-"]).await.unwrap();
         assert!(files.contains("b.txt") && files.contains("c.txt"), "{files}");
+    }
+
+    #[tokio::test]
+    async fn bookmark_advance_moves_the_closest_bookmark_up_to_the_working_copy() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        let j = &j;
+        jj(d, &["describe", "-m", "a"]);
+        jj(d, &["bookmark", "create", "old", "-r", "@"]);
+        jj(d, &["new", "-m", "b"]);
+        jj(d, &["bookmark", "create", "near", "-r", "@"]);
+        jj(d, &["new", "-m", "c"]);
+        let b = change_id(j, "@-").await;
+
+        j.act(&JjAction::BookmarkAdvance).await.unwrap();
+        assert_eq!(change_id(j, "near").await, change_id(j, "@").await);
+        assert_eq!(change_id(j, "old").await, change_id(j, &format!("{b}-")).await);
     }
 
     #[tokio::test]

@@ -1369,7 +1369,9 @@ export type JjAction = { kind: "edit"; rev: string } |
 /**  Squashes the commits of `revs` into the parent of the oldest, keeping its description. */
 { kind: "squash"; revs: string } | 
 /**  Rebases `rev` and its branch onto `trunk()`. */
-{ kind: "rebaseOnTrunk"; rev: string } | { kind: "fetch" } | { kind: "push" };
+{ kind: "rebaseOnTrunk"; rev: string } | 
+/**  Moves the closest bookmarks behind `@` up to it. */
+{ kind: "bookmarkAdvance" } | { kind: "fetch" } | { kind: "push" };
 
 /**
  *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes

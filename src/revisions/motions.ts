@@ -38,6 +38,7 @@ export function motions(trunk: string | null): Motion[][] {
         action: (t) => ({ kind: "squash", revs: t.picked }),
       },
     ],
+    [{ keys: "ba", label: "Advance bookmark", action: () => ({ kind: "bookmarkAdvance" }) }],
     [
       { keys: "u", label: "Undo", action: () => ({ kind: "undo", steps: 1 }) },
       { keys: "U", label: "Redo", action: () => ({ kind: "redo", steps: 1 }) },

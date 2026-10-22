@@ -31,6 +31,7 @@ describe("motions", () => {
     expect(by("nb")?.action(t)).toEqual({ kind: "newBefore", rev: "kp" });
     expect(by("gr")?.action(t)).toEqual({ kind: "rebaseOnTrunk", rev: "kp" });
     expect(by("s")?.action(t)).toEqual({ kind: "squash", revs: "kp::ml" });
+    expect(by("ba")?.action(t)).toEqual({ kind: "bookmarkAdvance" });
     expect(by("gr")?.label).toBe("Rebase onto main@origin");
   });
 });
