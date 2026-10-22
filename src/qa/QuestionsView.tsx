@@ -294,7 +294,6 @@ export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
                     autoFocus
                     className="qq-input"
                     value={note}
-                    placeholder={`A note with option ${i + 1}, then ↵ to decide`}
                     onChange={(e) => setNote(e.target.value)}
                     onKeyDown={(e) => onInputKey(e, () => decide(sel, note))}
                   />
@@ -308,8 +307,9 @@ export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
               <GrowingText
                 autoFocus
                 className="qq-input"
+                rows={4}
+                maxLines={16}
                 value={other}
-                placeholder="None of these: your answer, then ↵ to decide"
                 onChange={(e) => setOther(e.target.value)}
                 onKeyDown={(e) => onInputKey(e, () => other.trim() && decide(null, "", other))}
               />
