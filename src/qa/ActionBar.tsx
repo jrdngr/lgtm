@@ -22,6 +22,8 @@ interface Props {
   agentBusy: boolean;
   /** The option picked out. */
   sel: number;
+  /** What's being written under the question. */
+  mode?: Mode;
   /** What undo would take back. */
   last?: { id: string; kind: UndoKind };
   /** There's more than one question to browse. */
@@ -35,7 +37,18 @@ interface Props {
 }
 
 /** The action bar under the question: primary first, keys inside the buttons. */
-export function ActionBar({ q, next, ahead, auto, canAnswer, agentBusy, sel, last, ...p }: Props) {
+export function ActionBar({
+  q,
+  next,
+  ahead,
+  auto,
+  canAnswer,
+  agentBusy,
+  sel,
+  mode,
+  last,
+  ...p
+}: Props) {
   if (auto)
     return (
       <div className="qq-actions">
@@ -71,7 +84,12 @@ export function ActionBar({ q, next, ahead, auto, canAnswer, agentBusy, sel, las
             disabled={!canAnswer}
             onClick={p.onDecide}
           >
-            {sel === 0 ? "Take recommended" : `Go with ${sel + 1}`} <kbd>↵</kbd>
+            {mode === "other"
+              ? "Submit other answer"
+              : sel === 0
+                ? "Take recommended"
+                : `Go with ${sel + 1}`}{" "}
+            <kbd>↵</kbd>
           </button>
           <span className="qq-group">
             <button

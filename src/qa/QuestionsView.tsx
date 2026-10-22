@@ -339,7 +339,12 @@ export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
               last={last}
               browse={all.length > 1}
               onBack={() => show(undefined)}
-              onDecide={() => decide(sel, mode === "note" ? note : undefined)}
+              mode={mode}
+              onDecide={() =>
+                mode === "other"
+                  ? other.trim() && decide(null, "", other)
+                  : decide(sel, mode === "note" ? note : undefined)
+              }
               onMode={setMode}
               onDefer={askDefer}
               onUndo={undo}
