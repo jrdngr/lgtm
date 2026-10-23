@@ -237,7 +237,25 @@ impl RepoCtx {
     /// workspace's commits stay in the repo. `claimed` runs once nothing else is changing
     /// the workspace, before anything is removed.
     pub async fn delete_workspace(&self, name: &str, claimed: impl FnOnce()) -> anyhow::Result<()> {
-        let ws = self.workspace(Some(name)).await?;
+        let ws = match self.workspace(Some(name)).await {
+            Ok(ws) => ws,
+            Err(e) => {
+                let listed = self.list_workspaces().await?;
+                if !listed
+                    .iter()
+                    .any(|w| w.missing && w.name.as_deref() == Some(name))
+                {
+                    return Err(e);
+                }
+                // Its files aren't anywhere lgtm can find, so there's no directory to remove.
+                claimed();
+                self.main.jj.workspace_forget(name).await?;
+                self.opened.lock().unwrap().remove(name);
+                self.forget_records(name).await;
+                tracing::info!(workspace = name, deleted_dir = false, "forgot workspace");
+                return Ok(());
+            }
+        };
         let _busy = ws.claim()?;
         claimed();
         self.main.jj.workspace_forget(name).await?;
@@ -251,18 +269,23 @@ impl RepoCtx {
             .as_ref()
             .is_some_and(|b| under(&ws.root, b));
         // The workspace is forgotten already, so its PR goes even if its directory stays.
-        for problem in self.forget_pr(name).await {
-            tracing::warn!("cleaning up after {name}: {problem}");
-        }
-        if let Err(e) = self.store.lock().unwrap().forget_workspace(name) {
-            tracing::warn!("cleaning up after {name}: {e:#}");
-        }
+        self.forget_records(name).await;
         if ours && ws.root.is_dir() {
             std::fs::remove_dir_all(&ws.root)
                 .with_context(|| format!("remove {}", ws.root.display()))?;
         }
         tracing::info!(workspace = name, deleted_dir = ours, "forgot workspace");
         Ok(())
+    }
+
+    /// Drops what lgtm keeps about forgotten workspace `name`: its PR and stored state.
+    async fn forget_records(&self, name: &str) {
+        for problem in self.forget_pr(name).await {
+            tracing::warn!("cleaning up after {name}: {problem}");
+        }
+        if let Err(e) = self.store.lock().unwrap().forget_workspace(name) {
+            tracing::warn!("cleaning up after {name}: {e:#}");
+        }
     }
 }
 

@@ -40,6 +40,28 @@ impl Jj {
         self.listing(key, "@").await
     }
 
+    /// The id of the repo's latest operation and of its parents, sorted.
+    pub async fn last_operation(&self) -> anyhow::Result<(String, Vec<String>)> {
+        let out = self
+            .read(&[
+                "op",
+                "log",
+                "-n1",
+                "--no-graph",
+                "-T",
+                r#"id ++ "\t" ++ parents.map(|p| p.id()).join(",") ++ "\n""#,
+            ])
+            .await?;
+        let (id, parents) = out.trim().split_once('\t').unwrap_or((out.trim(), ""));
+        let mut parents: Vec<String> = parents
+            .split(',')
+            .filter(|p| !p.is_empty())
+            .map(str::to_string)
+            .collect();
+        parents.sort();
+        Ok((id.to_string(), parents))
+    }
+
     async fn listing(&self, key: String, rev: &str) -> anyhow::Result<Arc<Vec<String>>> {
         if let Some(found) = LISTINGS.lock().unwrap().get(&key) {
             return Ok(found.clone());

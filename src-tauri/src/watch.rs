@@ -35,6 +35,9 @@ pub enum Event {
     WorkingCopyMoved,
     /// What the workspace's jj is doing.
     Jj(Notice),
+    /// An agent asked about review `review`, which shows older commits than its revset has
+    /// now. Sent whether or not the workspace is on screen.
+    ReviewOutdated { review: u32 },
 }
 
 /// Keeps watching until dropped.
@@ -109,6 +112,25 @@ fn shared_op_heads(root: &Path) -> Option<PathBuf> {
     let link = std::fs::read_to_string(root.join(".jj/repo")).ok()?;
     let repo = root.join(".jj").join(link.trim()).canonicalize().ok()?;
     Some(repo.join("op_heads/heads"))
+}
+
+/// Records the heads after a background snapshot when the snapshot is the only operation
+/// since `before`. Otherwise forgets them, so the operations count as real changes.
+async fn note_snapshot(jj: &Jj, repo: &Path, before: Vec<String>) {
+    let after = op_heads(repo);
+    if after == before {
+        return;
+    }
+    let only = match jj.last_operation().await {
+        Ok((id, parents)) => after == [id] && parents == before,
+        Err(_) => false,
+    };
+    let mut heads = SNAPSHOT_HEADS.lock().unwrap();
+    if only {
+        heads.insert(repo.to_path_buf(), after);
+    } else {
+        heads.remove(repo);
+    }
 }
 
 /// Starts watching `root` (canonical). `emit` runs on the async runtime.
@@ -212,13 +234,8 @@ async fn run(
                     let now_stale = match jj.background_snapshot().await {
                         Ok(Snapshot::Done(now_stale)) => {
                             retry_at = None;
-                            // Heads that moved are the snapshot's, unless another operation
-                            // landed at the same moment.
                             if let (Some(r), Some(before)) = (&repo, before) {
-                                let after = op_heads(r);
-                                if after != before {
-                                    SNAPSHOT_HEADS.lock().unwrap().insert(r.clone(), after);
-                                }
+                                note_snapshot(&jj, r, before).await;
                             }
                             now_stale
                         }

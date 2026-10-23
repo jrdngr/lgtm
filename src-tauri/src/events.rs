@@ -11,6 +11,13 @@ pub struct RepoChanged {
     pub snapshot: bool,
 }
 
+/// Review `review` shows older commits than its revset has now, and an agent is waiting on
+/// it, so it reloads even while its workspace is hidden.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct ReviewOutdated {
+    pub review: u32,
+}
+
 /// Something other than the app, like a terminal or an agent, moved a workspace's working
 /// copy. `workspace` is `null` for the main one.
 #[derive(Clone, Serialize, Type, Event)]

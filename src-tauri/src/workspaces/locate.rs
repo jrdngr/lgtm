@@ -11,6 +11,9 @@ use crate::jj::checkout::repo_dir;
 
 /// The name of the workspace at `root` when it's one of the repo stored in `repo`.
 pub fn workspace_at(root: &Path, repo: &Path) -> Option<String> {
+    if !root.is_absolute() {
+        return None;
+    }
     if repo_dir(root)? != repo {
         return None;
     }
@@ -54,7 +57,8 @@ pub fn fix_roots(
     let mut nearby: Option<HashMap<String, PathBuf>> = None;
     let mut missing = Vec::new();
     for w in listed.iter_mut() {
-        if is(&w.root, &w.name) {
+        // An empty root, as jj gives for old workspaces, would read the process's cwd.
+        if w.root.is_absolute() && is(&w.root, &w.name) {
             continue;
         }
         if let Some(p) = saved.get(&w.name).filter(|p| is(p, &w.name)) {

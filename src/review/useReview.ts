@@ -119,6 +119,10 @@ export function useReview(workspace: WorkspaceName) {
     const staleSub = events.workingCopyStale(win).listen((e) => {
       if (e.payload.workspace === workspace) setStale(e.payload.message);
     });
+    // An agent is waiting on this review to show its revset's new commits.
+    const outdatedSub = events.reviewOutdated(win).listen((e) => {
+      if (e.payload.review === current.current?.id) refreshRef.current();
+    });
     // An agent added a comment or changed a thread.
     const stateSub = events.reviewStateChanged(win).listen((e) => {
       if (e.payload.review === current.current?.id) setStateRef.current(e.payload.state);
@@ -126,6 +130,7 @@ export function useReview(workspace: WorkspaceName) {
     return () => {
       unchanged();
       staleSub.then((un) => un());
+      outdatedSub.then((un) => un());
       stateSub.then((un) => un());
       // An open still in flight closes its review when it lands.
       opens.current++;

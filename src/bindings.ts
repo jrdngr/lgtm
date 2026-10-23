@@ -442,6 +442,7 @@ export const events = {
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
+	reviewOutdated: makeEvent<ReviewOutdated>("review-outdated"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
@@ -2034,6 +2035,14 @@ export type ReviewDto = {
 	/**  When the previous session started (Unix ms), if there was one. */
 	previousSession: number | null,
 	stale: string | null,
+};
+
+/**
+ *  Review `review` shows older commits than its revset has now, and an agent is waiting on
+ *  it, so it reloads even while its workspace is hidden.
+ */
+export type ReviewOutdated = {
+	review: number,
 };
 
 /**  An agent changed review `review`'s comments or threads. */

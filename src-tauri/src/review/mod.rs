@@ -375,6 +375,7 @@ impl RepoCtx {
                 review.changes = views::relisted(listed.changes, &review.changes);
                 let store = self.store.lock().unwrap();
                 review.rematch(&store)?;
+                review.save_session(&store)?;
                 return Ok(RefreshDto::Same {
                     changes: review.changes.clone(),
                     state: review.state(),
