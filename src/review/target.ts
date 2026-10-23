@@ -1,4 +1,4 @@
-import type { ChangeDto } from "../bindings";
+import type { ChangeDto, View } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { workspaceStore } from "./workspaceStore";
 
@@ -11,8 +11,13 @@ export interface ReviewTarget {
   loading: boolean;
   /** The working copy is stale, so edits aren't picked up. */
   stale?: boolean;
-  /** Loads a revset as the review. Returns the error message when it fails. */
-  load(revset: string): Promise<string | undefined>;
+  /** The agent turn the review shows, in the Agent turn view. */
+  turn?: number;
+  /** Loads a revset as the review, in `view` or Combined. Returns the error message when it
+   * fails. */
+  load(revset: string, view?: View): Promise<string | undefined>;
+  /** Shows the review in `view`. */
+  view(view: View): void;
   /** Gives keys back to the review pane. */
   focus(): void;
 }

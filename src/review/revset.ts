@@ -1,4 +1,5 @@
-import type { WorkspaceName } from "../core/workspace";
+import type { View } from "../bindings";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { prOf } from "../github/pr";
 import { workspaceStore } from "./workspaceStore";
 
@@ -16,4 +17,17 @@ export const forgetWorkspaceRevset = (workspace: WorkspaceName) =>
  * revset from a past run isn't reused, so one that no longer resolves can't break startup. */
 export async function startRevset(workspace: WorkspaceName) {
   return store.get(workspace) ?? (await prOf(workspace))?.revset ?? "@";
+}
+
+/** The view a workspace's next review pane opens in, once. */
+const startViews = new Map<string, View>();
+
+export function setStartView(workspace: WorkspaceName, view: View) {
+  startViews.set(workspaceKey(workspace), view);
+}
+
+export function takeStartView(workspace: WorkspaceName): View | undefined {
+  const view = startViews.get(workspaceKey(workspace));
+  startViews.delete(workspaceKey(workspace));
+  return view;
 }

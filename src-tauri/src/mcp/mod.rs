@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
-use crate::events::{AgentHookState, TerminalAgent};
+use crate::events::{AgentHookState, TerminalAgent, TurnsChanged};
 use crate::repo::RepoWindows;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
@@ -97,8 +97,24 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 let edit = report.edit.as_ref().map(|e| (e.path.as_str(), e.text.as_str()));
                 ctx.record_hook(session, report.prompt.as_deref(), edit);
             }
-            if report.prompt.is_some() {
-                let context = ctx.prompt_context(&report.terminal);
+            if let (Some(point), Some(session)) = (report.checkpoint, &report.session) {
+                let workspace = report.workspace.as_deref();
+                let (tool, prompt) = (report.tool_use.as_deref(), report.prompt.as_deref());
+                match ctx.turn_checkpoint(workspace, session, tool, point, prompt).await {
+                    Ok(true) => {
+                        let workspace = report.workspace.clone();
+                        TurnsChanged { workspace }.emit_to(&app, &label).ok();
+                    }
+                    Ok(false) => {}
+                    Err(e) => tracing::warn!(?point, "agent turn snapshot: {e:#}"),
+                }
+            }
+            if report.prompt.is_some() || report.checkpoint.is_some() {
+                let context = report
+                    .prompt
+                    .is_some()
+                    .then(|| ctx.prompt_context(&report.terminal))
+                    .flatten();
                 let line = serde_json::json!({ "context": context });
                 let mut write = write;
                 write.write_all(format!("{line}\n").as_bytes()).await.ok();

@@ -35,14 +35,14 @@ export function useReview(workspace: WorkspaceName) {
     setStale(next.review.stale);
   }
 
-  /** Loading the revset this pane or its workspace already loaded continues its review
-   * session. Returns the error message when it fails. */
-  async function open(revset: string): Promise<ReviewDto | string> {
+  /** Loads `revset` in `view`, or Combined. Loading the revset this pane or its workspace
+   * already loaded continues its review session. Returns the error message when it fails. */
+  async function open(revset: string, view?: View): Promise<ReviewDto | string> {
     const resume = opened.current === revset || workspaceRevset(workspace) === revset;
     const mine = ++opens.current;
     setLoading(true);
     setError(undefined);
-    const r = await commands.openReview(workspace, revset, resume);
+    const r = await commands.openReview(workspace, revset, resume, view ?? null);
     if (opens.current !== mine) {
       if (r.status === "ok") commands.closeReview(r.data.id);
       return "superseded by a later open";

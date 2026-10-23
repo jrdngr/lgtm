@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { ChangeDto, MarkColor, ReviewDto, View } from "../bindings";
+import type { ChangeDto, MarkColor, ReviewDto, TurnDto, View } from "../bindings";
+import { turnName, turnTime } from "../turns/turnsStore";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { MarkBar } from "./MarkBar";
@@ -49,6 +50,8 @@ function defaultChange(review: ReviewDto, kind: "change" | "sinceLast"): string 
 
 interface Props {
   review?: ReviewDto;
+  /** The agent turns and checkpoints on `@`, for the Agent turn view. */
+  turns: TurnDto[];
   onView(view: View): void;
   mode: ViewMode;
   onMode(mode: ViewMode): void;
@@ -67,12 +70,16 @@ interface Props {
 
 export function ReviewBar(props: Props) {
   const { review } = props;
-  const view = review?.view ?? { kind: "combined" };
-  const current = view.kind === "combined" ? undefined : view.change;
+  const view: View = review?.view ?? { kind: "combined" };
+  const current = view.kind === "change" || view.kind === "sinceLast" ? view.change : undefined;
 
   function pickKind(kind: View["kind"]) {
     if (!review) return;
     if (kind === "combined") return props.onView({ kind });
+    if (kind === "turn") {
+      if (props.turns[0]) props.onView({ kind, turn: props.turns[0].id });
+      return;
+    }
     const change = current ?? defaultChange(review, kind);
     if (change) props.onView({ kind, change });
   }
@@ -91,9 +98,12 @@ export function ReviewBar(props: Props) {
           <option value="sinceLast" disabled={!review?.previousSession}>
             Since last session
           </option>
+          <option value="turn" disabled={!props.turns.length && view.kind !== "turn"}>
+            Agent turn
+          </option>
         </select>
       </span>
-      {review && view.kind !== "combined" && (
+      {review && (view.kind === "change" || view.kind === "sinceLast") && (
         <span className="quiet-select change-picker">
           <select
             value={current}
@@ -103,6 +113,21 @@ export function ReviewBar(props: Props) {
             {review.changes.map((c) => (
               <option key={c.changeId} value={c.changeId}>
                 {changeLabel(c)}
+              </option>
+            ))}
+          </select>
+        </span>
+      )}
+      {review && view.kind === "turn" && (
+        <span className="quiet-select change-picker">
+          <select
+            value={view.turn}
+            onChange={(e) => props.onView({ kind: "turn", turn: Number(e.target.value) })}
+            aria-label="Turn"
+          >
+            {props.turns.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.prompt === null ? `Checkpoint ${turnTime(t)}` : turnName(t)}
               </option>
             ))}
           </select>

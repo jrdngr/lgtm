@@ -8,8 +8,8 @@ use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::revisions::LogView;
 use crate::store::MarkColor;
 
-/// Loads the review for `revset` after snapshotting the working copy. Starts a review
-/// session, or with `resume` continues the revset's latest one.
+/// Loads the review for `revset` after snapshotting the working copy, in `view` or else
+/// Combined. Starts a review session, or with `resume` continues the revset's latest one.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn open_review(
@@ -17,9 +17,11 @@ pub(crate) async fn open_review(
     workspace: Option<String>,
     revset: String,
     resume: bool,
+    view: Option<View>,
 ) -> CmdResult<ReviewDto> {
+    let view = view.unwrap_or(View::Combined);
     repo(&window)?
-        .open(workspace.as_deref(), &revset, resume)
+        .open_in(workspace.as_deref(), &revset, resume, &view)
         .await
         .map_err(err)
 }

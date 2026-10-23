@@ -31,6 +31,8 @@ pub struct RepoCtx {
     pub(crate) reviews: Reviews,
     /// The canvas each workspace shows, by workspace name ("" for the main one).
     pub(crate) canvas_focus: Mutex<HashMap<String, CanvasFocus>>,
+    /// Agent turns' snapshots from before their tools ran.
+    pub(crate) befores: crate::turns::Befores,
 }
 
 impl RepoCtx {
@@ -45,6 +47,7 @@ impl RepoCtx {
             store: Mutex::new(store),
             reviews: Reviews::default(),
             canvas_focus: Mutex::default(),
+            befores: Default::default(),
         }
     }
 }

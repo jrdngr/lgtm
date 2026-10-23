@@ -122,6 +122,12 @@ pub struct ArchChanged {
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SymbolInfoChanged;
 
+/// An agent's turn in the workspace started, changed files or ended.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct TurnsChanged {
+    pub workspace: Option<String>,
+}
+
 /// A terminal agent wrote review `review`'s guided review.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct GuidedChanged {

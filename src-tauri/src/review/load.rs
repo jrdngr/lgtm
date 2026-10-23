@@ -63,7 +63,19 @@ impl RepoCtx {
             }
             view => view,
         };
-        let spec = views::spec(&ws.jj, &whole, view, &stack).await?;
+        // A turn that's gone falls back to the whole review too.
+        let span = match view {
+            View::Turn { turn } => self.turn_span(*turn, &at_commit(ws).await?)?,
+            _ => None,
+        };
+        let view = match (view, &span) {
+            (View::Turn { .. }, None) => &View::Combined,
+            _ => view,
+        };
+        let spec = match span {
+            Some((range, paths)) => views::Spec::Span { range, paths },
+            None => views::spec(&ws.jj, &whole, view, &stack).await?,
+        };
         let diffs = spec.diff(&ws.jj).await?;
         let sides = spec.sides();
         let interdiff = matches!(spec, views::Spec::Interdiff { .. });
@@ -189,4 +201,10 @@ impl RepoCtx {
             })
             .collect())
     }
+}
+
+/// The workspace's working-copy commit.
+async fn at_commit(ws: &Workspace) -> anyhow::Result<String> {
+    let at = ws.jj.commit_ids("@").await?;
+    at.into_iter().next().ok_or_else(|| anyhow::anyhow!("no working copy"))
 }

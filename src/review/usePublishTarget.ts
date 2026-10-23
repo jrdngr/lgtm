@@ -17,13 +17,13 @@ import {
 export function usePublishTarget(
   api: DockviewPanelApi,
   workspace: WorkspaceName,
-  target: Omit<ReviewTarget, "load" | "focus">,
-  actions: Pick<ReviewTarget, "load" | "focus">,
+  target: Omit<ReviewTarget, "load" | "view" | "focus">,
+  actions: Pick<ReviewTarget, "load" | "view" | "focus">,
 ) {
   const published = useRef<ReviewTarget>(undefined);
   const latest = useRef(actions);
   latest.current = actions;
-  const { revset, changes, loading, stale } = target;
+  const { revset, changes, loading, stale, turn } = target;
 
   useEffect(() => {
     const publish = () => {
@@ -34,7 +34,9 @@ export function usePublishTarget(
         changes,
         loading,
         stale,
-        load: (r) => latest.current.load(r),
+        turn,
+        load: (r, v) => latest.current.load(r, v),
+        view: (v) => latest.current.view(v),
         focus: () => latest.current.focus(),
       };
       publishTarget(workspace, published.current);
@@ -51,7 +53,7 @@ export function usePublishTarget(
       sub.dispose();
       off();
     };
-  }, [api, workspace, revset, changes, loading, stale]);
+  }, [api, workspace, revset, changes, loading, stale, turn]);
 
   useEffect(() => () => retractTarget(workspace, published.current), [workspace]);
 }

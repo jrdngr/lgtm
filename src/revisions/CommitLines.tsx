@@ -5,9 +5,17 @@ import { when } from "./when";
 /** Characters of a change id shown, its unique prefix included. */
 const ID_LENGTH = 8;
 
-/** A commit's two lines: change id, description and flags; then bookmarks, author, age, and
- * the PR pill. */
-export function CommitLines({ c, pill }: { c: LogCommit; pill?: React.ReactNode }) {
+/** A commit's two lines: change id, description and flags; then `lead` (`@`'s turns toggle),
+ * bookmarks, author, age, and the PR pill. */
+export function CommitLines({
+  c,
+  pill,
+  lead,
+}: {
+  c: LogCommit;
+  pill?: React.ReactNode;
+  lead?: React.ReactNode;
+}) {
   const flags = [c.divergent && "divergent"].filter((f) => f !== false);
   const author = showAuthor.use();
   const date = showDate.use();
@@ -29,6 +37,7 @@ export function CommitLines({ c, pill }: { c: LogCommit; pill?: React.ReactNode 
         ))}
       </span>
       <span className="lr-l2">
+        {lead}
         <span className="lr-books">
           {c.bookmarks.map((b) => (
             <span key={b}>{b}</span>

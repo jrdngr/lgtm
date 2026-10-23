@@ -20,6 +20,8 @@ pub enum View {
     Change { change: String },
     /// What one change does differently from what it did last session.
     SinceLast { change: String },
+    /// An agent turn's or checkpoint's diff.
+    Turn { turn: u32 },
 }
 
 /// How a change compares with the previous session.
@@ -217,12 +219,17 @@ pub async fn stack(
 pub enum Spec {
     Trees(Range),
     Interdiff { from: String, to: String },
+    /// Trees, of only `paths` when they're given.
+    Span {
+        range: Range,
+        paths: Option<Vec<String>>,
+    },
 }
 
 impl Spec {
     pub fn sides(&self) -> Sides {
         match self {
-            Spec::Trees(r) => Sides {
+            Spec::Trees(r) | Spec::Span { range: r, .. } => Sides {
                 old: r.from.clone(),
                 new: r.to.clone(),
             },
@@ -235,7 +242,7 @@ impl Spec {
 
     pub fn endpoints(&self) -> (Option<String>, String) {
         match self {
-            Spec::Trees(r) => (r.from.clone(), r.to.clone()),
+            Spec::Trees(r) | Spec::Span { range: r, .. } => (r.from.clone(), r.to.clone()),
             Spec::Interdiff { from, to } => (Some(from.clone()), to.clone()),
         }
     }
@@ -244,6 +251,10 @@ impl Spec {
         match self {
             Spec::Trees(r) => jj.diff(r).await,
             Spec::Interdiff { from, to } => jj.interdiff(from, to).await,
+            Spec::Span { range, paths } => {
+                let from = range.from.as_deref().unwrap_or("root()");
+                crate::turns::span_diff(jj, from, &range.to, paths.as_deref()).await
+            }
         }
     }
 }
@@ -258,7 +269,7 @@ pub async fn spec(jj: &Jj, whole: &Range, view: &View, stack: &Stack) -> anyhow:
             .ok_or_else(|| anyhow::anyhow!("change {change} is no longer in the review"))
     };
     match view {
-        View::Combined => Ok(Spec::Trees(whole.clone())),
+        View::Combined | View::Turn { .. } => Ok(Spec::Trees(whole.clone())),
         View::Change { change } => {
             let c = &stack.changes[find(change)?];
             Ok(Spec::Trees(jj.resolve(&c.commit_id).await?))

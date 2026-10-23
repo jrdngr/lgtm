@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LogRow } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { usePr } from "../github/pr";
-import { commands, errorText } from "../ipc";
+import { commands, errorText, unwrap } from "../ipc";
 import { editAction, revRowMenu } from "../review/RevisionsPanelMenu";
 import { workspaceRevset } from "../review/revset";
 import { useReviewTarget } from "../review/target";
+import { TurnRows, TurnsToggle } from "../turns/TurnRows";
+import { reloadTurns, turnsOpen, useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
 import { reviewStackPr } from "../workspaces/stack";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
@@ -43,6 +45,7 @@ interface Props {
  * double-clicking one edits it. */
 export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const target = useReviewTarget(workspace);
+  const turns = useTurns(workspace);
   const revset = target?.revset ?? workspaceRevset(workspace) ?? "@";
   const reviewed = useMemo(
     () => new Set(target?.changes.map((c) => c.commitId)),
@@ -282,9 +285,20 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
 
   function runOn(m: Motion, target: MotionTarget) {
     const action = m.action(target);
-    if (action.kind === "undo") undo();
+    if (action.kind === "checkpoint") checkpoint();
+    else if (action.kind === "undo") undo();
     else if (action.kind === "redo") redo();
     else act(action, m.label, m.follow);
+  }
+
+  async function checkpoint() {
+    try {
+      await unwrap(commands.setCheckpoint(workspace));
+      turnsOpen.set(true);
+      reloadTurns(workspace);
+    } catch (e) {
+      setError(errorText(e));
+    }
   }
 
   const bookmarks = useBookmarkPick(workspace, runOn, setError);
@@ -381,61 +395,73 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           const edge = first >= 0 && i >= first && i <= lastIn;
           const rp = commit ? prOf(commit) : undefined;
           return (
-            <div
-              key={commit?.commitId ?? `g${i}`}
-              className={`lr${tint}${commit ? " pickable" : ""}${inRange ? " picked" : ""}${c === cursor ? " cursor" : ""}`}
-              onMouseDown={(e) => {
-                // A right-click picks in the row's menu, keeping a range it's in.
-                if (c < 0 || e.button !== 0) return;
-                if (!e.shiftKey) {
-                  drag.current = c;
-                }
-                move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
-              }}
-              onMouseEnter={() => {
-                if (drag.current === undefined || c < 0) return;
-                if (c !== drag.current) setDragging(true);
-                move(c, drag.current);
-              }}
-              onDoubleClick={() => c >= 0 && edit(c)}
-              onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
-            >
-              {edge && (
-                <span
-                  className={`lr-bk${i === first ? " top" : ""}${i === lastIn ? " bot" : ""}${tentative ? " loading" : ""}`}
-                />
-              )}
-              {commit && (
-                <button
-                  type="button"
-                  className="lr-rail"
-                  aria-label="Review"
-                  tabIndex={-1}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onDoubleClick={(e) => e.stopPropagation()}
-                  onClick={() => {
-                    move(c);
-                    review(commit.changeId);
-                  }}
-                />
-              )}
-              <LogGraph cells={graph.cells[i]} width={graph.width} />
-              {commit && (
-                <CommitLines
-                  c={commit}
-                  pill={
-                    rp && (
-                      <PrPill
-                        workspace={workspace}
-                        pr={rp}
-                        on={prOn(rp)}
-                        onReview={() => reviewPr(rp)}
-                      />
-                    )
+            <Fragment key={commit?.commitId ?? `g${i}`}>
+              <div
+                className={`lr${tint}${commit ? " pickable" : ""}${inRange ? " picked" : ""}${c === cursor ? " cursor" : ""}`}
+                onMouseDown={(e) => {
+                  // A right-click picks in the row's menu, keeping a range it's in.
+                  if (c < 0 || e.button !== 0) return;
+                  if (!e.shiftKey) {
+                    drag.current = c;
                   }
+                  move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
+                }}
+                onMouseEnter={() => {
+                  if (drag.current === undefined || c < 0) return;
+                  if (c !== drag.current) setDragging(true);
+                  move(c, drag.current);
+                }}
+                onDoubleClick={() => c >= 0 && edit(c)}
+                onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
+              >
+                {edge && (
+                  <span
+                    className={`lr-bk${i === first ? " top" : ""}${i === lastIn ? " bot" : ""}${tentative ? " loading" : ""}`}
+                  />
+                )}
+                {commit && (
+                  <button
+                    type="button"
+                    className="lr-rail"
+                    aria-label="Review"
+                    tabIndex={-1}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onClick={() => {
+                      move(c);
+                      review(commit.changeId);
+                    }}
+                  />
+                )}
+                <LogGraph cells={graph.cells[i]} width={graph.width} />
+                {commit && (
+                  <CommitLines
+                    c={commit}
+                    lead={commit.workingCopy && <TurnsToggle turns={turns} />}
+                    pill={
+                      rp && (
+                        <PrPill
+                          workspace={workspace}
+                          pr={rp}
+                          on={prOn(rp)}
+                          onReview={() => reviewPr(rp)}
+                        />
+                      )
+                    }
+                  />
+                )}
+              </div>
+              {commit?.workingCopy && (
+                <TurnRows
+                  workspace={workspace}
+                  turns={turns}
+                  shown={target?.turn}
+                  below={graph.cells[i].at(-1) ?? []}
+                  width={graph.width}
+                  onError={setError}
                 />
               )}
-            </div>
+            </Fragment>
           );
         })}
       </div>

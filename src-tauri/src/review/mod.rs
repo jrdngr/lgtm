@@ -263,11 +263,23 @@ impl RepoCtx {
 
     /// Opens `revset` in the Combined view. Starts a review session, or with `resume`
     /// continues the revset's latest one, as when the same revset is loaded again.
+    #[cfg(test)]
     pub async fn open(
         &self,
         workspace: Option<&str>,
         revset: &str,
         resume: bool,
+    ) -> anyhow::Result<ReviewDto> {
+        self.open_in(workspace, revset, resume, &View::Combined).await
+    }
+
+    /// [`Self::open`], in `view`.
+    pub async fn open_in(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+        resume: bool,
+        view: &View,
     ) -> anyhow::Result<ReviewDto> {
         let ws = self.workspace(workspace).await?;
         ws.snapshot().await?;
@@ -285,7 +297,7 @@ impl RepoCtx {
         };
         let listed = Listed::of(&ws, revset).await?;
         let loaded = self
-            .load(&ws, revset, listed, &View::Combined, prev.as_ref())
+            .load(&ws, revset, listed, view, prev.as_ref())
             .await?;
         // Started only once the load succeeds, so a revset that fails leaves no session.
         let session = match resumed {
@@ -298,6 +310,7 @@ impl RepoCtx {
         };
         let id = self.reviews.next_id.fetch_add(1, Ordering::Relaxed);
         let mut review = Review::new(ws, revset, label, loaded.cfg);
+        review.view = loaded.dto.view.clone();
         review.baseline = prev
             .iter()
             .flat_map(|p| p.seen.iter().copied())

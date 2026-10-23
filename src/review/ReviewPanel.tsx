@@ -14,6 +14,7 @@ import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
 import { searchItems } from "../search/menu";
 import { useInfoLines } from "../symbolInfo/useInfoLines";
+import { useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
 import { CommentBlock } from "./CommentBlock";
 import { Conflicts } from "./Conflicts";
@@ -26,7 +27,7 @@ import { useMarkSetup } from "./marks";
 import { buildLines, changedRows, type DisplayLine, type ViewMode } from "./model";
 import { PrCommentsHead, prLines } from "./PrCommentsHead";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
-import { startRevset, workspaceRevset } from "./revset";
+import { startRevset, takeStartView, workspaceRevset } from "./revset";
 import type { Filter } from "./rowState";
 import { filterLabel, plural, sumProgress } from "./state";
 import { useAgentRequests } from "./useAgentRequests";
@@ -84,6 +85,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const focusRoot = useCallback(() => rootRef.current?.focus({ preventScroll: true }), []);
 
   const review = loaded?.review;
+  const turns = useTurns(workspace);
   const setup = useMarkSetup();
   const { files, index, rowState, progress } = useReviewState(review, setup.done);
   /** Whether rows changed since they were marked or their file was checked show amber. */
@@ -179,9 +181,10 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     },
   });
 
-  /** Loads `target` as the review. Returns the error message when it fails. */
-  async function load(target: string): Promise<string | undefined> {
-    const r = await open(target);
+  /** Loads `target` as the review, in `view` or Combined. Returns the error message when it
+   * fails. */
+  async function load(target: string, view?: View): Promise<string | undefined> {
+    const r = await open(target, view);
     if (typeof r === "string") return r;
     setRevset(target);
     fold.reset();
@@ -190,7 +193,8 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once on open
   useEffect(() => {
-    startRevset(workspace).then(load);
+    const view = takeStartView(workspace);
+    startRevset(workspace).then((r) => load(r, view));
   }, []);
 
   const commentFolds = useSavedView({
@@ -283,8 +287,14 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   usePublishTarget(
     api,
     workspace,
-    { revset, changes: review?.changes ?? NO_CHANGES, loading, stale: !!stale },
-    { load, focus: focusRoot },
+    {
+      revset,
+      changes: review?.changes ?? NO_CHANGES,
+      loading,
+      stale: !!stale,
+      turn: review?.view.kind === "turn" ? review.view.turn : undefined,
+    },
+    { load, view: changeView, focus: focusRoot },
   );
 
   function openMenuAtCursor() {
@@ -379,6 +389,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     >
       <ReviewBar
         review={review}
+        turns={turns}
         onView={changeView}
         mode={mode}
         onMode={setMode}

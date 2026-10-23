@@ -61,10 +61,18 @@ export const commands = {
 	/**  Ends the workspace's terminals, then forgets it and deletes its directory. */
 	deleteWorkspace: (name: string) => typedError<null, string>(__TAURI_INVOKE("delete_workspace", { name })),
 	/**
-	 *  Loads the review for `revset` after snapshotting the working copy. Starts a review
-	 *  session, or with `resume` continues the revset's latest one.
+	 *  Loads the review for `revset` after snapshotting the working copy, in `view` or else
+	 *  Combined. Starts a review session, or with `resume` continues the revset's latest one.
 	 */
-	openReview: (workspace: string | null, revset: string, resume: boolean) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume })),
+	openReview: (workspace: string | null, revset: string, resume: boolean, view: 
+/**  The whole review as one diff. */
+{ kind: "combined" } | 
+/**  One change's own diff. */
+{ kind: "change"; change: string } | 
+/**  What one change does differently from what it did last session. */
+{ kind: "sinceLast"; change: string } | 
+/**  An agent turn's or checkpoint's diff. */
+{ kind: "turn"; turn: number } | null) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Unchanged lines `from` to `to` of a file's new side, for showing code between hunks. */
 	contextLines: (review: number, file: number, from: number, to: number) => typedError<ContextLine[], string>(__TAURI_INVOKE("context_lines", { review, file, from, to })),
@@ -75,7 +83,9 @@ export const commands = {
 /**  One change's own diff. */
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
-{ kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
+{ kind: "sinceLast"; change: string } | 
+/**  An agent turn's or checkpoint's diff. */
+{ kind: "turn"; turn: number } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
 	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
 	/**  The repo's current operation, empty when it can't be read. */
@@ -425,6 +435,14 @@ export const commands = {
 	addQaTurn: (workspace: string | null, session: string, id: string, you: boolean, text: string) => typedError<Session_Serialize, string>(__TAURI_INVOKE("add_qa_turn", { workspace, session, id, you, text })),
 	/**  The open questions deferring question `id` would also defer. */
 	deferPreview: (workspace: string | null, session: string, id: string) => typedError<string[], string>(__TAURI_INVOKE("defer_preview", { workspace, session, id })),
+	/**  The agent turns and checkpoints on the workspace's working-copy change, newest first. */
+	agentTurns: (workspace: string | null) => typedError<TurnDto[], string>(__TAURI_INVOKE("agent_turns", { workspace })),
+	/**  Takes a checkpoint of the workspace's working copy. */
+	setCheckpoint: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("set_checkpoint", { workspace })),
+	/**  Puts the files an agent turn changed back as they were before it. */
+	undoTurn: (workspace: string | null, turn: number) => typedError<null, string>(__TAURI_INVOKE("undo_turn", { workspace, turn })),
+	/**  Forgets an agent turn or checkpoint. */
+	removeTurn: (turn: number) => typedError<null, string>(__TAURI_INVOKE("remove_turn", { turn })),
 };
 
 /** Events */
@@ -451,6 +469,7 @@ export const events = {
 	symbolInfoChanged: makeEvent<SymbolInfoChanged>("symbol-info-changed"),
 	systemChanged: makeEvent<SystemChanged>("system-changed"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
+	turnsChanged: makeEvent<TurnsChanged>("turns-changed"),
 	wordWrap: makeEvent<WordWrap>("word-wrap"),
 	workingCopyMoved: makeEvent<WorkingCopyMoved>("working-copy-moved"),
 	workingCopyStale: makeEvent<WorkingCopyStale>("working-copy-stale"),
@@ -2554,6 +2573,25 @@ export type Turn = {
 	text: string,
 };
 
+/**  A turn or checkpoint on the workspace's working-copy change. */
+export type TurnDto = {
+	id: number,
+	/**  The prompt, `None` for a checkpoint. */
+	prompt: string | null,
+	changeId: string,
+	/**  The agent is still working on it. */
+	running: boolean,
+	added: number,
+	removed: number,
+	/**  When it started (Unix ms). */
+	at: number | null,
+};
+
+/**  An agent's turn in the workspace started, changed files or ended. */
+export type TurnsChanged = {
+	workspace: string | null,
+};
+
 export type Unaffected = "hide" | "fade";
 
 export type Unshowable = "tooLarge" | "notText";
@@ -2583,7 +2621,9 @@ export type View =
 /**  One change's own diff. */
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
-{ kind: "sinceLast"; change: string };
+{ kind: "sinceLast"; change: string } | 
+/**  An agent turn's or checkpoint's diff. */
+{ kind: "turn"; turn: number };
 
 /**  One view's drawing. */
 export type ViewCanvas = {

@@ -10,6 +10,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::events::AgentHookState;
+use crate::turns::Checkpoint;
 
 /// The hook events lgtm listens to.
 pub const EVENTS: [&str; 9] = [
@@ -48,7 +49,22 @@ pub(super) struct HookReport {
     /// A file edit the agent just made, on `PostToolUse`.
     #[serde(default)]
     pub edit: Option<HookEdit>,
+    /// The terminal's workspace (`LGTM_WORKSPACE`), absent for the main one.
+    #[serde(default)]
+    pub workspace: Option<String>,
+    /// Where in the agent's turn the app snapshots the working copy, if anywhere.
+    #[serde(default)]
+    pub checkpoint: Option<Checkpoint>,
+    /// The tool call a `PreToolUse` or `PostToolUse` event is about.
+    #[serde(default)]
+    pub tool_use: Option<String>,
 }
+
+/// Claude Code's tools that can change files.
+const WRITERS: [&str; 5] = ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"];
+
+/// How long the hook waits for the app to snapshot the working copy.
+const SNAPSHOT_WAIT: Duration = Duration::from_secs(15);
 
 /// The file an edit tool wrote and the text it wrote there.
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,6 +89,19 @@ fn state(input: &serde_json::Value) -> Option<AgentHookState> {
         "SessionEnd" => Gone,
         _ => return None,
     })
+}
+
+/// Where in a turn the event is, for the app to snapshot the working copy: a prompt, either
+/// side of a tool that can change files, or the agent stopping.
+fn checkpoint(input: &serde_json::Value) -> Option<Checkpoint> {
+    let writes = || WRITERS.contains(&input["tool_name"].as_str().unwrap_or(""));
+    match input["hook_event_name"].as_str()? {
+        "UserPromptSubmit" => Some(Checkpoint::Start),
+        "PreToolUse" if writes() => Some(Checkpoint::Before),
+        "PostToolUse" if writes() => Some(Checkpoint::After),
+        "Stop" | "StopFailure" => Some(Checkpoint::End),
+        _ => None,
+    }
 }
 
 /// Whether the event is the user ending the session, by exiting or clearing it.
@@ -179,17 +208,26 @@ pub fn main() -> i32 {
         session: input["session_id"].as_str().map(str::to_string),
         ended: ended(&input),
         edit: edit(&input),
+        workspace: var("LGTM_WORKSPACE"),
+        checkpoint: checkpoint(&input),
+        tool_use: input["tool_use_id"].as_str().map(str::to_string),
     };
-    let asks = report.prompt.is_some();
+    // The app answers once it has the prompt's context, and after any snapshot, which has
+    // to land before the tool runs.
+    let wait = match (report.checkpoint, report.prompt.is_some()) {
+        (Some(_), _) => SNAPSHOT_WAIT,
+        (None, true) => Duration::from_secs(2),
+        (None, false) => Duration::ZERO,
+    };
     let Ok(mut stream) = UnixStream::connect(socket) else {
         return 0;
     };
     stream.set_write_timeout(Some(Duration::from_secs(1))).ok();
     let line = serde_json::json!({ "hook": report });
-    if writeln!(stream, "{line}").is_err() || !asks {
+    if writeln!(stream, "{line}").is_err() || wait.is_zero() {
         return 0;
     }
-    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    stream.set_read_timeout(Some(wait)).ok();
     let mut answer = String::new();
     BufReader::new(stream).read_line(&mut answer).ok();
     if let Some(output) = prompt_output(&answer) {
@@ -256,6 +294,20 @@ mod tests {
         );
         assert!(prompt_output(r#"{"context":null}"#).is_none());
         assert!(prompt_output("").is_none());
+    }
+
+    #[test]
+    fn snapshots_around_prompts_stops_and_tools_that_can_change_files() {
+        let at = |event: &str, tool: &str| {
+            checkpoint(&serde_json::json!({ "hook_event_name": event, "tool_name": tool }))
+        };
+        assert_eq!(at("UserPromptSubmit", ""), Some(Checkpoint::Start));
+        assert_eq!(at("PreToolUse", "Edit"), Some(Checkpoint::Before));
+        assert_eq!(at("PostToolUse", "Bash"), Some(Checkpoint::After));
+        assert_eq!(at("PreToolUse", "Read"), None);
+        assert_eq!(at("PostToolUse", "Grep"), None);
+        assert_eq!(at("StopFailure", ""), Some(Checkpoint::End));
+        assert_eq!(at("Notification", ""), None);
     }
 
     #[test]

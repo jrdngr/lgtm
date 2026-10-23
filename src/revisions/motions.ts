@@ -8,10 +8,13 @@ export interface MotionTarget {
   bookmark?: string;
 }
 
+/** A jj action, or a checkpoint of the working copy. */
+export type MotionAction = JjAction | { kind: "checkpoint" };
+
 export interface Motion {
   keys: string;
   label: string;
-  action(t: MotionTarget): JjAction;
+  action(t: MotionTarget): MotionAction;
   /** The review follows `@` after it, as after an edit. */
   follow?: boolean;
   /** It moves one of the bookmarks nearest the cursor, picked first when there are several. */
@@ -55,6 +58,7 @@ export function motions(trunk: string | null): Motion[][] {
       { keys: "u", label: "Undo", action: () => ({ kind: "undo", steps: 1 }) },
       { keys: "U", label: "Redo", action: () => ({ kind: "redo", steps: 1 }) },
     ],
+    [{ keys: "c", label: "Checkpoint", action: () => ({ kind: "checkpoint" }) }],
     [
       { keys: "gf", label: "Fetch", action: () => ({ kind: "fetch" }) },
       { keys: "gp", label: "Push", action: () => ({ kind: "push" }) },

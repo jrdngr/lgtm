@@ -37,6 +37,7 @@ mod symbol_info;
 mod store;
 mod syntax;
 mod tools;
+mod turns;
 mod watch;
 mod workspace;
 mod workspaces;
@@ -220,6 +221,10 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::qa::act_on_question,
             commands::qa::add_qa_turn,
             commands::qa::defer_preview,
+            commands::turns::agent_turns,
+            commands::turns::set_checkpoint,
+            commands::turns::undo_turn,
+            commands::turns::remove_turn,
         ])
         .events(collect_events![
             events::RepoChanged,
@@ -241,6 +246,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::QaChanged,
             events::ArchChanged,
             events::GuidedChanged,
+            events::TurnsChanged,
             events::SymbolInfoChanged,
             events::SystemChanged,
             events::DesignChanged,

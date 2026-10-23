@@ -19,6 +19,7 @@ mod sessions;
 mod setup;
 mod symbol_info;
 mod threads;
+mod turns;
 
 use std::path::Path;
 
@@ -34,6 +35,7 @@ pub use report::{BotRun, Part, Persona};
 pub use sessions::Session;
 pub use symbol_info::InfoKey;
 pub use threads::{Quote, Stage, Take, TakeVerdict, ThreadState};
+pub use turns::Turn;
 
 pub struct Store {
     db: Connection,
@@ -255,6 +257,7 @@ impl Store {
         qa::create_table(&db)?;
         setup::create_table(&db)?;
         symbol_info::create_table(&db)?;
+        turns::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }
@@ -275,6 +278,7 @@ impl Store {
             "note_folders",
             "workspace_roots",
             "symbol_info",
+            "agent_turns",
         ] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }

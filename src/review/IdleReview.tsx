@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { View } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
@@ -36,7 +37,7 @@ export function WorkspaceReview({
 /** Loads the workspace's revset for the header picker and the side panels. Whatever needs
  * the code on screen opens a review pane and is done there. */
 function IdleReview({ workspace }: { workspace: WorkspaceName }) {
-  const { loaded, loading, open, setState } = useReview(workspace);
+  const { loaded, loading, open, refresh, setState } = useReview(workspace);
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const review = loaded?.review;
   const setup = useMarkSetup();
@@ -44,14 +45,16 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
   const published = useRef<CurrentReview>(undefined);
   const target = useRef<ReviewTarget>(undefined);
 
-  async function load(next: string): Promise<string | undefined> {
-    const r = await open(next);
+  async function load(next: string, view?: View): Promise<string | undefined> {
+    const r = await open(next, view);
     if (typeof r === "string") return r;
     setRevset(next);
     return undefined;
   }
   const loadRef = useRef(load);
   loadRef.current = load;
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: load once
   useEffect(() => {
@@ -68,7 +71,8 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       revset,
       changes: review?.changes ?? [],
       loading,
-      load: (r) => loadRef.current(r),
+      load: (r, v) => loadRef.current(r, v),
+      view: (v) => refreshRef.current(v),
       focus: ignore,
     });
     publishTarget(workspace, target.current);

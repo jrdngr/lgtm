@@ -17,6 +17,7 @@ pub mod repo;
 pub mod search;
 pub mod review;
 pub mod settings;
+pub mod turns;
 pub mod workspaces;
 
 use std::path::PathBuf;
