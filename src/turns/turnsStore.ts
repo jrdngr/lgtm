@@ -37,19 +37,9 @@ export function useTurns(workspace: WorkspaceName): TurnDto[] {
   return store.use(workspace) ?? NONE;
 }
 
-/** "3 turns, 2 edits, 1 checkpoint". */
+/** "3 snapshots". */
 export function turnsLabel(turns: TurnDto[]): string {
-  const n = (count: number, one: string) => `${count} ${one}${count === 1 ? "" : "s"}`;
-  const count = (kind: TurnDto["kind"]) => turns.filter((t) => t.kind === kind).length;
-  const parts: [number, string][] = [
-    [count("agent"), "turn"],
-    [count("edit"), "edit"],
-    [count("checkpoint"), "checkpoint"],
-  ];
-  return parts
-    .filter(([c]) => c)
-    .map(([c, one]) => n(c, one))
-    .join(", ");
+  return `${turns.length} snapshot${turns.length === 1 ? "" : "s"}`;
 }
 
 /** A turn's name: its prompt's first line, the names of the files saved, or "Checkpoint". */

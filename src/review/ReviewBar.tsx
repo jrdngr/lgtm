@@ -127,7 +127,7 @@ export function ReviewBar(props: Props) {
           >
             {view.turns.length > 1 && (
               <option value="run" disabled>
-                {view.turns.length} turns
+                {view.turns.length} snapshots
               </option>
             )}
             {props.turns.map((t) => (
