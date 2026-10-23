@@ -78,6 +78,8 @@ export const commands = {
 { kind: "sinceLast"; change: string } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
 	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
+	/**  The repo's current operation, empty when it can't be read. */
+	operation: (workspace: string | null) => typedError<string, string>(__TAURI_INVOKE("operation", { workspace })),
 	/**  Sets the workspace's log revset, blank for jj's default, failing with jj's error. */
 	setLogRevset: (workspace: string | null, revset: string) => typedError<null, string>(__TAURI_INVOKE("set_log_revset", { workspace, revset })),
 	/**
@@ -1544,6 +1546,8 @@ export type LogView = {
 	rows: LogRow[],
 	/**  jj's error for `revset`, when the rows fell back to jj's default. */
 	error: string | null,
+	/**  The operation the rows are of, or one before it, as [`RepoCtx::operation`] gives it. */
+	operation: string,
 };
 
 export type LookDto = {

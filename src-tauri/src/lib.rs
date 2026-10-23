@@ -86,6 +86,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::review::context_lines,
             commands::review::refresh_review,
             commands::review::log_view,
+            commands::review::operation,
             commands::review::set_log_revset,
             commands::review::trunk_bookmark,
             commands::review::revset_commits,

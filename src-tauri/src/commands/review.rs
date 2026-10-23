@@ -4,8 +4,8 @@ use tauri_specta::Event as _;
 use super::{CmdResult, err, repo};
 use crate::events::LogRevsetChanged;
 use crate::jj::{BookmarkSpot, JjAction, WorkingCopyDto};
-use crate::revisions::LogView;
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
+use crate::revisions::LogView;
 use crate::store::MarkColor;
 
 /// Loads the review for `revset` after snapshotting the working copy. Starts a review
@@ -54,7 +54,23 @@ pub(crate) async fn log_view(
     window: WebviewWindow,
     workspace: Option<String>,
 ) -> CmdResult<LogView> {
-    repo(&window)?.log_view(workspace.as_deref()).await.map_err(err)
+    repo(&window)?
+        .log_view(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
+/// The repo's current operation, empty when it can't be read.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn operation(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<String> {
+    repo(&window)?
+        .operation(workspace.as_deref())
+        .await
+        .map_err(err)
 }
 
 /// Sets the workspace's log revset, blank for jj's default, failing with jj's error.

@@ -39,7 +39,8 @@ interface Props {
 
 /** `jj log` to pick what to review and which commit to edit. Reviewed commits are tinted with
  * a bracket, `@` green over them, empty commits yellow over both, and each open PR's head has
- * its pill. Keys act on the highlighted commit; dragging across commits reviews them, and double-clicking one edits it. */
+ * its pill. Keys act on the highlighted commit; dragging across commits reviews them, and
+ * double-clicking one edits it. */
 export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const target = useReviewTarget(workspace);
   const revset = target?.revset ?? workspaceRevset(workspace) ?? "@";
@@ -56,8 +57,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   /** Index into `commits` of the highlighted commit, and of the other end of a range. */
   const [cursor, setCursor] = useState(0);
   const [anchor, setAnchor] = useState<number>();
-  /** The commit ids jj lists for a picked range. */
-  const [chain, setChain] = useState<{ revset: string; ids: Set<string> }>();
+  /** The commits jj lists for a range, as of the rows it was asked with. */
+  const [chain, setChain] = useState<{ revset: string; ids: Set<string>; rows?: LogRow[] }>();
   const rootRef = useRef<HTMLDivElement>(null);
   /** The commits of a review being loaded, until it's loaded. */
   const [pending, setPending] = useState<Set<string>>();
@@ -69,10 +70,13 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const graph = useMemo(() => graphOf(rows ?? []), [rows]);
   const commitAt = (k: number) => rows?.[commits[k]]?.commit ?? undefined;
   const changeAt = (k: number) => commitAt(k)?.changeId;
+  /** The operation the rows are of, so a repo change they already show doesn't reload. */
+  const shownOp = useRef("");
   async function reload(keep?: string) {
     const r = await commands.logView(workspace);
     if (r.status === "error") return setError(r.error);
-    const { revset, rows, error } = r.data;
+    const { revset, rows, error, operation } = r.data;
+    shownOp.current = operation;
     publishLogRevset(workspace, { revset, error });
     setRows(rows);
     const found = rows.filter((l) => l.commit);
@@ -91,8 +95,11 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   useEffect(() => {
     reload();
   }, []);
-  useRepoChanged(() => {
-    if (!busy) reload(changeAt(cursor));
+  useRepoChanged(async () => {
+    if (busy) return;
+    const op = await commands.operation(workspace);
+    if (op.status === "ok" && op.data && op.data === shownOp.current) return;
+    reload(changeAt(cursor));
   }, workspace);
   const reloadLatest = useRef(reload);
   reloadLatest.current = reload;
@@ -135,20 +142,38 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const picked = () => rangeOf(cursor, anchor);
   const ranged = hi > lo ? picked() : undefined;
 
+  /** A drag's range, released and waiting on its commits to be reviewed. */
+  const released = useRef<string>(undefined);
   // The log can interleave branches, so a range holds only the commits `older::newer` lists.
+  // A drag asks once, when it's released.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `chain` is what this sets
   useEffect(() => {
-    if (!ranged || !rows) return;
+    if (!ranged || !rows || dragging) return;
+    if (chain?.revset === ranged && chain.rows === rows) return;
     let live = true;
     commands.revsetCommits(workspace, ranged).then((r) => {
-      if (live && r.status === "ok") setChain({ revset: ranged, ids: new Set(r.data) });
+      if (!live) return;
+      if (r.status !== "ok") {
+        if (released.current === ranged) released.current = undefined;
+        return;
+      }
+      const ids = new Set(r.data);
+      setChain({ revset: ranged, ids, rows });
+      if (released.current === ranged) reviewChain(ranged, ids);
     });
     return () => {
       live = false;
     };
-  }, [workspace, ranged, rows]);
+  }, [workspace, ranged, rows, dragging]);
   const inChain = ranged && chain?.revset === ranged ? chain.ids : undefined;
   /** The range's ends aren't ancestor and descendant, so `older::newer` is empty. */
   const unrelated = inChain?.size === 0;
+
+  function reviewChain(range: string, ids: Set<string>) {
+    released.current = undefined;
+    if (ids.size === 0) setError(UNRELATED);
+    else review(range);
+  }
 
   function reviewPicked() {
     if (unrelated) setError(UNRELATED);
@@ -170,9 +195,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       if (from === undefined || from === cursor) return;
       const range = rangeOf(cursor, from);
       if (!range) return;
-      const r = await commands.revsetCommits(workspace, range);
-      if (r.status === "ok" && r.data.length === 0) setError(UNRELATED);
-      else review(range);
+      if (chain?.revset === range && chain.rows === rows) reviewChain(range, chain.ids);
+      else released.current = range;
     };
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);

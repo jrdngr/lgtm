@@ -14,11 +14,17 @@ pub struct LogView {
     pub rows: Vec<LogRow>,
     /// jj's error for `revset`, when the rows fell back to jj's default.
     pub error: Option<String>,
+    /// The operation the rows are of, or one before it, as [`RepoCtx::operation`] gives it.
+    pub operation: String,
 }
 
 impl RepoCtx {
     pub fn log_revset(&self, workspace: Option<&str>) -> anyhow::Result<Option<String>> {
-        Ok(self.store.lock().unwrap().log_revset(workspace.unwrap_or(""))?)
+        Ok(self
+            .store
+            .lock()
+            .unwrap()
+            .log_revset(workspace.unwrap_or(""))?)
     }
 
     /// The workspace's log. A revset jj no longer takes, such as one naming a deleted
@@ -26,6 +32,7 @@ impl RepoCtx {
     pub async fn log_view(&self, workspace: Option<&str>) -> anyhow::Result<LogView> {
         let jj = &self.workspace(workspace).await?.jj;
         let revset = self.log_revset(workspace)?;
+        let operation = jj.operation();
         let (rows, error) = match &revset {
             None => (jj.log_rows(None).await?, None),
             Some(r) => match jj.log_rows(Some(r)).await {
@@ -33,14 +40,33 @@ impl RepoCtx {
                 Err(e) => (jj.log_rows(None).await?, Some(format!("{e:#}"))),
             },
         };
-        Ok(LogView { revset, rows, error })
+        Ok(LogView {
+            revset,
+            rows,
+            error,
+            operation,
+        })
+    }
+
+    /// The repo's current operation, read without running jj, for telling whether views are
+    /// of it. Empty when it can't be read.
+    pub async fn operation(&self, workspace: Option<&str>) -> anyhow::Result<String> {
+        Ok(self.workspace(workspace).await?.jj.operation())
     }
 
     /// Sets the workspace's log revset once jj takes it. Blank goes back to jj's default.
-    pub async fn set_log_revset(&self, workspace: Option<&str>, revset: &str) -> anyhow::Result<()> {
+    pub async fn set_log_revset(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+    ) -> anyhow::Result<()> {
         let revset = Some(revset.trim()).filter(|r| !r.is_empty());
         if let Some(r) = revset {
-            self.workspace(workspace).await?.jj.log_rows(Some(r)).await?;
+            self.workspace(workspace)
+                .await?
+                .jj
+                .log_rows(Some(r))
+                .await?;
         }
         Ok(self
             .store

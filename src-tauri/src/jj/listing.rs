@@ -14,6 +14,14 @@ static LISTINGS: LazyLock<Mutex<HashMap<String, Arc<Vec<String>>>>> =
     LazyLock::new(Mutex::default);
 
 impl Jj {
+    /// The repo's current operation, from its op heads files without running jj. Empty when
+    /// they can't be read.
+    pub fn operation(&self) -> String {
+        checkout::repo_dir(&self.root)
+            .map(|repo| checkout::op_heads(&repo).join(","))
+            .unwrap_or_default()
+    }
+
     /// The paths of the files in `commit`, a commit id.
     pub async fn commit_files(&self, commit: &str) -> anyhow::Result<Arc<Vec<String>>> {
         self.listing(commit.to_string(), commit).await
