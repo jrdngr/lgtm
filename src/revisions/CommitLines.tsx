@@ -11,13 +11,10 @@ export function CommitLines({
   c,
   pill,
   lead,
-  full,
 }: {
   c: LogCommit;
   pill?: React.ReactNode;
   lead?: React.ReactNode;
-  /** The whole description, not just its first line. */
-  full?: boolean;
 }) {
   const flags = [c.divergent && "divergent"].filter((f) => f !== false);
   const author = showAuthor.use();
@@ -31,9 +28,7 @@ export function CommitLines({
           {c.changeId.slice(c.unique, Math.max(c.unique, ID_LENGTH))}
         </span>
         <span className="lr-desc">
-          {(full ? c.description.trim() : c.description.split("\n")[0]) || (
-            <i className="lr-none">no description</i>
-          )}
+          {c.description.split("\n")[0] || <i className="lr-none">no description</i>}
         </span>
         {flags.map((f) => (
           <span key={f} className="pill red">

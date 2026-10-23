@@ -391,7 +391,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   /** A row's graph and its commit's lines. */
-  function rowBody(i: number, full?: boolean) {
+  function rowBody(i: number) {
     const commit = rows?.[i]?.commit;
     const rp = commit ? prOf(commit) : undefined;
     return (
@@ -400,7 +400,6 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         {commit && (
           <CommitLines
             c={commit}
-            full={full}
             lead={commit.workingCopy && <TurnsToggle turns={turns} />}
             pill={
               rp && (
@@ -438,6 +437,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           const edge = first >= 0 && i >= first && i <= lastIn;
           return (
             <Fragment key={commit?.commitId ?? `g${i}`}>
+              {/* biome-ignore lint/a11y/useKeyWithMouseEvents: hovering only shows the row wider */}
               <div
                 className={`lr${tint}${commit ? " pickable" : ""}${inRange ? " picked" : ""}${c === cursor ? " cursor" : ""}`}
                 onMouseDown={(e) => {
@@ -449,12 +449,14 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                   }
                   move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
                 }}
-                onMouseEnter={(e) => {
-                  if (drag.current === undefined) {
-                    if (commit) hover.enter(i, e.currentTarget);
-                    return;
-                  }
-                  if (c < 0) return;
+                onMouseOver={(e) => {
+                  if (drag.current !== undefined || !commit) return;
+                  // The turns toggle is a control of its own.
+                  if ((e.target as HTMLElement).closest(".lr-turns")) hover.leave();
+                  else hover.enter(i, e.currentTarget);
+                }}
+                onMouseEnter={() => {
+                  if (drag.current === undefined || c < 0) return;
                   if (c !== drag.current) setDragging(true);
                   move(c, drag.current);
                 }}
@@ -507,7 +509,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         })}
       </div>
       {hover.hover && !dragging && (
-        <RevisionPopover hover={hover.hover}>{rowBody(hover.hover.row, true)}</RevisionPopover>
+        <RevisionPopover hover={hover.hover}>{rowBody(hover.hover.row)}</RevisionPopover>
       )}
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
       {bookmarks.pick && <BookmarkPopup pick={bookmarks.pick} onPick={bookmarks.choose} />}

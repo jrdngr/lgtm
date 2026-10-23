@@ -384,41 +384,21 @@ button.lr-pr.on {
   font-weight: 600;
 }
 
-/* A revision's row over itself, wider and unclipped. */
+/* A revision's row over itself, as tall but wider and unclipped. */
 .lr.lr-pop {
   position: fixed;
   z-index: 50;
   width: max-content;
-  padding-bottom: 2px;
+  box-sizing: border-box;
   background-color: var(--raise);
-  border: 1px solid #4a4a4a;
+  outline: 1px solid #4a4a4a;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
   pointer-events: none;
 }
 
-.lr-pop .lr-l1,
-.lr-pop .lr-l2 {
-  height: auto;
-  min-height: 22px;
-  white-space: normal;
-}
-
-.lr-pop .lr-l1 {
-  align-items: baseline;
-  padding-top: 5px;
-}
-
-.lr-pop .lr-l2 {
-  padding-bottom: 4px;
-}
-
-.lr-pop .lr-desc {
-  overflow: visible;
-  white-space: pre-wrap;
-}
-
+.lr-pop .lr-desc,
 .lr-pop .lr-books {
-  flex-wrap: wrap;
+  flex: none;
   overflow: visible;
 }
