@@ -43,7 +43,15 @@ import { RightPanel } from "./RightPanel";
 import { reviewRevset } from "./revsetMenu";
 import { SidePanel, type SideState } from "./SidePanel";
 import { SideToggle } from "./SideToggle";
-import { loadSides, loadWorkspace, type Sides, saveSides, saveWorkspace } from "./sides";
+import {
+  keepRightView,
+  loadSides,
+  loadWorkspace,
+  rightViewOf,
+  type Sides,
+  saveSides,
+  saveWorkspace,
+} from "./sides";
 import { useCloseGuard } from "./useCloseGuard";
 import { WorkspaceDock } from "./WorkspaceDock";
 import { useWordWrapMenu } from "./wordWrap";
@@ -97,6 +105,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
+    setSides((s) => rightViewOf(s, workspaceKey(name)));
     setMounted((m) => (m.some((d) => d.name === name) ? m : [...m, { name, setup }]));
     saveWorkspace(repo.root, name);
   }
@@ -105,6 +114,10 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
    * was selected. Reads the selection as it is now: a delete finishes renders after it began. */
   function forget(name: string) {
     if (selectedRef.current === name) select(null);
+    setSides((s) => {
+      const { [name]: _, ...rest } = s.rightViews ?? {};
+      return { ...s, rightViews: rest };
+    });
     forgetPr(name);
     forgetWorkspaceRevset(name);
     setMounted((m) => m.filter((d) => d.name !== name));
@@ -135,13 +148,18 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     });
   }
 
-  const updateSide = (side: keyof Sides, f: (s: SideState) => SideState) =>
-    setSides((s) => ({ ...s, [side]: f(s[side]) }));
+  const updateSide = (side: "left" | "right", f: (s: SideState) => SideState) => {
+    const ws = workspaceKey(selectedRef.current);
+    setSides((s) => {
+      const next = { ...s, [side]: f(s[side]) };
+      return side === "right" ? keepRightView(next, ws) : next;
+    });
+  };
 
-  const toggle = (side: keyof Sides) => updateSide(side, (s) => ({ ...s, open: !s.open }));
+  const toggle = (side: "left" | "right") => updateSide(side, (s) => ({ ...s, open: !s.open }));
 
   /** Opens the side panel on `view` and focuses it. */
-  function showView(side: keyof Sides, view: string) {
+  function showView(side: "left" | "right", view: string) {
     updateSide(side, (s) => ({ ...s, open: true, view }));
     const body = side === "left" ? leftBody : rightBody;
     requestAnimationFrame(() => body.current?.focus());
