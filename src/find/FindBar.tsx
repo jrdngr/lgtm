@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isMac } from "../core/keys";
 import { IconButton } from "../ui/icons";
 import "./find.css";
 
@@ -16,6 +17,12 @@ interface Props extends FindState {
   onChange(next: FindState): void;
   onStep(back: boolean): void;
   onClose(): void;
+}
+
+/** For ⌘G, false: on to the next match; for ⇧⌘G, true: back to the previous one. */
+export function stepKey(e: React.KeyboardEvent): boolean | undefined {
+  const mod = isMac ? e.metaKey : e.ctrlKey;
+  if (mod && !e.altKey && e.key.toLowerCase() === "g") return e.shiftKey;
 }
 
 /** A find box over the top right of what it searches. */
@@ -41,6 +48,7 @@ export function FindBar({
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
         else if (e.key === "Enter") onStep(e.shiftKey);
+        else if (stepKey(e) !== undefined) onStep(stepKey(e) ?? false);
         else {
           // Typing stays in the field; only chords reach the pane's own keys.
           if (!e.metaKey && !e.ctrlKey) e.stopPropagation();

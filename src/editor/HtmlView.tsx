@@ -9,7 +9,7 @@ import {
 } from "react";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
-import { FindBar, type FindState } from "../find/FindBar";
+import { FindBar, type FindState, stepKey } from "../find/FindBar";
 import { commands, errorText, unwrap } from "../ipc";
 import { openUrl } from "../services/pathMenu";
 import { IconButton } from "../ui/icons";
@@ -241,6 +241,8 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
     else if (zoomKey(e) === "fit") run = () => post({ type: "fit" });
     else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "r") run = reload;
     else if (mod && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f") run = openFind;
+    else if (find !== undefined && stepKey(e) !== undefined)
+      run = () => search(find, stepKey(e) ?? false, false);
     else if (mod && !inField && e.key === "ArrowLeft") run = () => go(-1);
     else if (mod && !inField && e.key === "ArrowRight") run = () => go(1);
     if (!run) return;

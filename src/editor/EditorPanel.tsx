@@ -4,7 +4,7 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { isMac } from "../core/keys";
 import { useWorkspace } from "../core/workspace";
-import { FindBar } from "../find/FindBar";
+import { FindBar, stepKey } from "../find/FindBar";
 import { useCmFind } from "../find/useCmFind";
 import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
@@ -259,6 +259,10 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       e.preventDefault();
       if (rendered === undefined) cmFind.show();
       else if (markdown) domFind.show();
+    } else if (rendered !== undefined && domFind.open && stepKey(e) !== undefined) {
+      // In the editor, CodeMirror's own ⌘G steps.
+      e.preventDefault();
+      domFind.bar.onStep(stepKey(e) ?? false);
     } else if (mod && e.shiftKey && e.key.toLowerCase() === "v" && renders(path)) {
       e.preventDefault();
       toggleRendered();

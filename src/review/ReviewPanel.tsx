@@ -7,7 +7,7 @@ import { remembered } from "../core/remembered";
 import { useWorkspace } from "../core/workspace";
 import { editorAt } from "../editor/at";
 import { openFileIn } from "../editor/open";
-import { FindBar } from "../find/FindBar";
+import { FindBar, stepKey } from "../find/FindBar";
 import { useReviewFind } from "../find/useReviewFind";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
@@ -361,6 +361,9 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
       e.preventDefault();
       find.show();
+    } else if (find.open && stepKey(e) !== undefined) {
+      e.preventDefault();
+      find.bar.onStep(stepKey(e) ?? false);
     } else onKeyDown(e);
   }
 
