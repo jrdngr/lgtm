@@ -464,7 +464,13 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                     className="lr-rail"
                     aria-label="Review"
                     tabIndex={-1}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => {
+                      // A drag from the rail brackets commits as one from the row does.
+                      e.stopPropagation();
+                      if (e.button !== 0) return;
+                      drag.current = c;
+                      move(c);
+                    }}
                     onDoubleClick={(e) => e.stopPropagation()}
                     onClick={() => {
                       move(c);
