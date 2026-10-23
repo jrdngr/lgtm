@@ -22,6 +22,7 @@ import { type Motion, type MotionTarget, motions, narrow, step } from "./motions
 import { PrPill } from "./PrPill";
 import { RevisionsFooter } from "./RevisionsFooter";
 import { RevPickPopup } from "./RevPickPopup";
+import { RunningRow } from "./RunningRow";
 import { useBookmarkPick } from "./useBookmarkPick";
 import { useJjActions } from "./useJjActions";
 import { useRevPick } from "./useRevPick";
@@ -420,6 +421,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         if (!e.currentTarget.contains(e.relatedTarget)) setTyped(undefined);
       }}
     >
+      {running && <RunningRow action={running} />}
       {error && <div className="review-error">{error}</div>}
       {!rows && !error && <div className="placeholder">Loading</div>}
       <div className="lr-list">
@@ -494,7 +496,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           onPick={revs.choose}
         />
       )}
-      <RevisionsFooter running={running} note={note} loading={!!pending} />
+      <RevisionsFooter note={note} loading={!!pending} />
     </div>
   );
 }
