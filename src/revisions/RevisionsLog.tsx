@@ -21,8 +21,10 @@ import { MotionPopup } from "./MotionPopup";
 import { type Motion, type MotionTarget, motions, narrow, step } from "./motions";
 import { PrPill } from "./PrPill";
 import { RevisionsFooter } from "./RevisionsFooter";
+import { RevPickPopup } from "./RevPickPopup";
 import { useBookmarkPick } from "./useBookmarkPick";
 import { useJjActions } from "./useJjActions";
+import { useRevPick } from "./useRevPick";
 import { type RowPr, useRowPrs } from "./useRowPrs";
 import "./revisions.css";
 
@@ -279,8 +281,17 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     if (!cursorChange || !range) return;
     if (m.keys === "s" && unrelated) return setError(UNRELATED);
     const target = { cursor: cursorChange, picked: range };
+    const at = rows?.findIndex((r) => r.commit?.workingCopy) ?? -1;
+    const here = commits[cursor];
     if (m.pickBookmark) bookmarks.start(m, target);
-    else runOn(m, target);
+    else if (m.pickRev && at >= 0 && at !== here && rows) {
+      const both = [at, here].sort((a, b) => a - b);
+      revs.start(
+        m,
+        target,
+        both.map((row) => ({ row, change: rows[row].commit?.changeId ?? "" })),
+      );
+    } else runOn(m, target);
   }
 
   function runOn(m: Motion, target: MotionTarget) {
@@ -302,6 +313,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   const bookmarks = useBookmarkPick(workspace, runOn, setError);
+  const revs = useRevPick(runOn);
 
   /** Keys while the motions are open: each narrows them until one runs. Keys no motion takes,
    * like moving and reviewing, act on the log as usual. Returns whether it took the key. */
@@ -323,7 +335,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (bookmarks.key(e)) return;
+    if (bookmarks.key(e) || revs.key(e)) return;
     if (typed !== undefined && !e.metaKey && !e.ctrlKey && motionKey(e, typed)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = commits.length;
@@ -365,6 +377,36 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     lastIn = i;
   });
 
+  /** A row's tint: empty yellow over `@` green over reviewed cyan. */
+  function tintOf(i: number) {
+    const commit = rows?.[i]?.commit;
+    if (commit?.empty) return " empty";
+    if (commit?.workingCopy) return " at";
+    return inReview(i) ? " rv" : "";
+  }
+
+  /** A row's graph and its commit's lines. */
+  function rowBody(i: number) {
+    const commit = rows?.[i]?.commit;
+    const rp = commit ? prOf(commit) : undefined;
+    return (
+      <>
+        <LogGraph cells={graph.cells[i]} width={graph.width} />
+        {commit && (
+          <CommitLines
+            c={commit}
+            lead={commit.workingCopy && <TurnsToggle turns={turns} />}
+            pill={
+              rp && (
+                <PrPill workspace={workspace} pr={rp} on={prOn(rp)} onReview={() => reviewPr(rp)} />
+              )
+            }
+          />
+        )}
+      </>
+    );
+  }
+
   const commitIndex = new Map(commits.map((row, k) => [row, k]));
 
   return (
@@ -385,15 +427,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           const c = commitIndex.get(i) ?? -1;
           const commit = row.commit;
           const inRange = c >= lo && c <= hi && (!inChain || inChain.has(commit?.commitId ?? ""));
-          const tint = commit?.empty
-            ? " empty"
-            : commit?.workingCopy
-              ? " at"
-              : inReview(i)
-                ? " rv"
-                : "";
+          const tint = tintOf(i);
           const edge = first >= 0 && i >= first && i <= lastIn;
-          const rp = commit ? prOf(commit) : undefined;
           return (
             <Fragment key={commit?.commitId ?? `g${i}`}>
               <div
@@ -433,23 +468,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                     }}
                   />
                 )}
-                <LogGraph cells={graph.cells[i]} width={graph.width} />
-                {commit && (
-                  <CommitLines
-                    c={commit}
-                    lead={commit.workingCopy && <TurnsToggle turns={turns} />}
-                    pill={
-                      rp && (
-                        <PrPill
-                          workspace={workspace}
-                          pr={rp}
-                          on={prOn(rp)}
-                          onReview={() => reviewPr(rp)}
-                        />
-                      )
-                    }
-                  />
-                )}
+                {rowBody(i)}
               </div>
               {commit?.workingCopy && (
                 <TurnRows
@@ -467,6 +486,14 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       </div>
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
       {bookmarks.pick && <BookmarkPopup pick={bookmarks.pick} onPick={bookmarks.choose} />}
+      {revs.pick && (
+        <RevPickPopup
+          pick={revs.pick}
+          rowClass={(i) => tintOf(i).trim()}
+          rowBody={rowBody}
+          onPick={revs.choose}
+        />
+      )}
       <RevisionsFooter running={running} note={note} loading={!!pending} />
     </div>
   );

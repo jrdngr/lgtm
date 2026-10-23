@@ -19,6 +19,8 @@ export interface Motion {
   follow?: boolean;
   /** It moves one of the bookmarks nearest the cursor, picked first when there are several. */
   pickBookmark?: boolean;
+  /** Off `@`, it acts on `@` or the cursor's commit, picked first. */
+  pickRev?: boolean;
 }
 
 /** The ⌘J motions, in groups. `trunk` names trunk's bookmark for the rebase's label. */
@@ -66,6 +68,7 @@ export function motions(trunk: string | null): Motion[][] {
         keys: "gr",
         label: `Rebase onto ${trunk ? `${trunk}@origin` : "trunk"}`,
         action: (t) => ({ kind: "rebaseOnTrunk", rev: t.cursor }),
+        pickRev: true,
       },
     ],
   ];
