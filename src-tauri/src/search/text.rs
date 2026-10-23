@@ -69,7 +69,11 @@ fn globs(list: &str) -> anyhow::Result<Option<GlobSet>> {
     let mut any = false;
     for g in list.split(',').map(str::trim).filter(|g| !g.is_empty()) {
         let g = g.trim_end_matches('/');
-        let pattern = if g.contains('/') { g.to_string() } else { format!("**/{g}") };
+        let pattern = if g.contains('/') {
+            g.to_string()
+        } else {
+            format!("**/{g}")
+        };
         b.add(Glob::new(&pattern).with_context(|| format!("invalid glob {g}"))?);
         // A directory matches everything under it too.
         b.add(Glob::new(&format!("{pattern}/**"))?);
@@ -81,7 +85,10 @@ fn globs(list: &str) -> anyhow::Result<Option<GlobSet>> {
 /// The lines under `root` matching `q`, by path then line.
 pub fn search(root: &Path, q: &TextQuery) -> anyhow::Result<Hits> {
     if q.pattern.is_empty() {
-        return Ok(Hits { hits: vec![], truncated: false });
+        return Ok(Hits {
+            hits: vec![],
+            truncated: false,
+        });
     }
     let re = q.matcher()?;
     let targets = q.targets(root)?;
@@ -136,7 +143,11 @@ pub fn replace(root: &Path, q: &TextQuery, with: &str) -> anyhow::Result<u32> {
         return Ok(0);
     }
     let re = q.matcher()?;
-    let with = if q.regex { with.to_string() } else { with.replace('$', "$$") };
+    let with = if q.regex {
+        with.to_string()
+    } else {
+        with.replace('$', "$$")
+    };
     let mut changed = 0;
     for (abs, rel) in q.targets(root)? {
         let Some(text) = read(&abs) else { continue };

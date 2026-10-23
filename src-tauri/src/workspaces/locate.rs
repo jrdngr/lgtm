@@ -89,7 +89,11 @@ mod tests {
             .args(args)
             .output()
             .unwrap();
-        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8(out.stdout).unwrap()
     }
 
@@ -103,7 +107,10 @@ mod tests {
         let top = dir.path().canonicalize().unwrap();
         jj(&top, &["git", "init", "main"]);
         let main = top.join("main");
-        jj(&main, &["workspace", "add", "../rework", "--name", "full-impl"]);
+        jj(
+            &main,
+            &["workspace", "add", "../rework", "--name", "full-impl"],
+        );
         jj(&main, &["workspace", "add", "../gone", "--name", "gone"]);
         std::fs::rename(top.join("rework"), top.join("moved")).unwrap();
         std::fs::remove_dir_all(top.join("gone")).unwrap();

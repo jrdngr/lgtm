@@ -18,9 +18,13 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 
 impl Store {
     pub fn workspace_roots(&self) -> rusqlite::Result<HashMap<String, PathBuf>> {
-        let mut stmt = self.db.prepare("SELECT workspace, root FROM workspace_roots")?;
-        stmt.query_map([], |r| Ok((r.get(0)?, PathBuf::from(r.get::<_, String>(1)?))))?
-            .collect()
+        let mut stmt = self
+            .db
+            .prepare("SELECT workspace, root FROM workspace_roots")?;
+        stmt.query_map([], |r| {
+            Ok((r.get(0)?, PathBuf::from(r.get::<_, String>(1)?)))
+        })?
+        .collect()
     }
 
     pub fn set_workspace_root(&self, workspace: &str, root: &str) -> rusqlite::Result<()> {

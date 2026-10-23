@@ -75,9 +75,15 @@ impl JjAction {
             ]),
             JjAction::RebaseOnTrunk { rev } => v(&["rebase", "-b", rev, "-d", "trunk()"]),
             JjAction::BookmarkAdvance => v(&["bookmark", "advance"]),
-            JjAction::BookmarkSet { name, rev } => {
-                v(&["bookmark", "set", "-r", rev, "--allow-backwards", "--", name])
-            }
+            JjAction::BookmarkSet { name, rev } => v(&[
+                "bookmark",
+                "set",
+                "-r",
+                rev,
+                "--allow-backwards",
+                "--",
+                name,
+            ]),
             JjAction::Fetch => v(&["git", "fetch"]),
             JjAction::Push {
                 remote,
@@ -85,7 +91,8 @@ impl JjAction {
                 new_bookmarks,
             } => {
                 let mut args = v(&["git", "push"]);
-                if let (Some(remote), Some(range), false) = (remote, range, new_bookmarks.is_empty())
+                if let (Some(remote), Some(range), false) =
+                    (remote, range, new_bookmarks.is_empty())
                 {
                     args.extend(["--remote".into(), format!("exact:{remote}")]);
                     args.extend(["--config".into(), super::push::remote_binding(remote)]);
@@ -165,8 +172,13 @@ mod tests {
         assert_eq!(change_id(j, "@-").await, a);
         assert_eq!(change_id(j, &format!("{b}-")).await, after);
 
-        j.act(&JjAction::NewBefore { rev: a.clone() }).await.unwrap();
-        assert_eq!(change_id(j, &format!("{a}-")).await, change_id(j, "@").await);
+        j.act(&JjAction::NewBefore { rev: a.clone() })
+            .await
+            .unwrap();
+        assert_eq!(
+            change_id(j, &format!("{a}-")).await,
+            change_id(j, "@").await
+        );
     }
 
     #[tokio::test]
@@ -190,7 +202,10 @@ mod tests {
         assert_eq!(parent.change_id, target);
         assert_eq!(parent.description.trim(), "target");
         let files = j.read(&["file", "list", "-r", "@-"]).await.unwrap();
-        assert!(files.contains("b.txt") && files.contains("c.txt"), "{files}");
+        assert!(
+            files.contains("b.txt") && files.contains("c.txt"),
+            "{files}"
+        );
     }
 
     #[tokio::test]
@@ -207,7 +222,10 @@ mod tests {
 
         j.act(&JjAction::BookmarkAdvance).await.unwrap();
         assert_eq!(change_id(j, "near").await, change_id(j, "@").await);
-        assert_eq!(change_id(j, "old").await, change_id(j, &format!("{b}-")).await);
+        assert_eq!(
+            change_id(j, "old").await,
+            change_id(j, &format!("{b}-")).await
+        );
     }
 
     #[tokio::test]

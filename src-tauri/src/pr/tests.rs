@@ -269,8 +269,17 @@ async fn a_stack_prs_commits_stop_at_the_open_pr_below_it() {
     };
     let described = |revset: String| async move {
         let changes = j.changes(&revset).await.unwrap();
-        changes.into_iter().map(|c| c.description).collect::<Vec<_>>()
+        changes
+            .into_iter()
+            .map(|c| c.description)
+            .collect::<Vec<_>>()
     };
-    assert_eq!(described(record(None).revset()).await, ["one", "two", "three"]);
-    assert_eq!(described(record(Some("low")).revset()).await, ["two", "three"]);
+    assert_eq!(
+        described(record(None).revset()).await,
+        ["one", "two", "three"]
+    );
+    assert_eq!(
+        described(record(Some("low")).revset()).await,
+        ["two", "three"]
+    );
 }

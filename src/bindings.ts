@@ -71,8 +71,11 @@ export const commands = {
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | 
-/**  An agent turn's or checkpoint's diff. */
-{ kind: "turn"; turn: number } | null) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
+/**
+ *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
+ *  end.
+ */
+{ kind: "turn"; turns: number[] } | null) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Unchanged lines `from` to `to` of a file's new side, for showing code between hunks. */
 	contextLines: (review: number, file: number, from: number, to: number) => typedError<ContextLine[], string>(__TAURI_INVOKE("context_lines", { review, file, from, to })),
@@ -84,8 +87,11 @@ export const commands = {
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | 
-/**  An agent turn's or checkpoint's diff. */
-{ kind: "turn"; turn: number } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
+/**
+ *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
+ *  end.
+ */
+{ kind: "turn"; turns: number[] } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
 	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
 	/**  The repo's current operation, empty when it can't be read. */
@@ -2622,8 +2628,11 @@ export type View =
 { kind: "change"; change: string } | 
 /**  What one change does differently from what it did last session. */
 { kind: "sinceLast"; change: string } | 
-/**  An agent turn's or checkpoint's diff. */
-{ kind: "turn"; turn: number };
+/**
+ *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
+ *  end.
+ */
+{ kind: "turn"; turns: number[] };
 
 /**  One view's drawing. */
 export type ViewCanvas = {

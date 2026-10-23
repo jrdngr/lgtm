@@ -126,9 +126,8 @@ impl Lgtm {
     )]
     async fn get_review(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
-        let mut review =
-            serde_json::to_value(ctx.summary(self.workspace()).map_err(failed)?)
-                .map_err(|e| e.to_string())?;
+        let mut review = serde_json::to_value(ctx.summary(self.workspace()).map_err(failed)?)
+            .map_err(|e| e.to_string())?;
         review["log_revset"] = ctx.log_revset(self.workspace()).map_err(failed)?.into();
         json(&review)
     }

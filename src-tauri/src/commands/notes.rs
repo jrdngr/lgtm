@@ -95,7 +95,9 @@ pub(crate) fn move_note(
     level: NoteLevel,
     folder: String,
 ) -> CmdResult<NoteDto> {
-    book(&window, workspace, Some(&id), |b| b.move_to(&id, level, &folder))
+    book(&window, workspace, Some(&id), |b| {
+        b.move_to(&id, level, &folder)
+    })
 }
 
 #[tauri::command]
@@ -146,5 +148,7 @@ pub(crate) fn delete_note_folder(
     level: NoteLevel,
     path: String,
 ) -> CmdResult<()> {
-    book(&window, workspace, Some(""), |b| b.delete_folder(level, &path))
+    book(&window, workspace, Some(""), |b| {
+        b.delete_folder(level, &path)
+    })
 }

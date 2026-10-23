@@ -77,7 +77,7 @@ export function ReviewBar(props: Props) {
     if (!review) return;
     if (kind === "combined") return props.onView({ kind });
     if (kind === "turn") {
-      if (props.turns[0]) props.onView({ kind, turn: props.turns[0].id });
+      if (props.turns[0]) props.onView({ kind, turns: [props.turns[0].id] });
       return;
     }
     const change = current ?? defaultChange(review, kind);
@@ -121,10 +121,15 @@ export function ReviewBar(props: Props) {
       {review && view.kind === "turn" && (
         <span className="quiet-select change-picker">
           <select
-            value={view.turn}
-            onChange={(e) => props.onView({ kind: "turn", turn: Number(e.target.value) })}
+            value={view.turns.length === 1 ? view.turns[0] : "run"}
+            onChange={(e) => props.onView({ kind: "turn", turns: [Number(e.target.value)] })}
             aria-label="Turn"
           >
+            {view.turns.length > 1 && (
+              <option value="run" disabled>
+                {view.turns.length} turns
+              </option>
+            )}
             {props.turns.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.prompt === null ? `Checkpoint ${turnTime(t)}` : turnName(t)}

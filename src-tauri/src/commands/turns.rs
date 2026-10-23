@@ -10,14 +10,23 @@ pub(crate) async fn agent_turns(
     window: WebviewWindow,
     workspace: Option<String>,
 ) -> CmdResult<Vec<TurnDto>> {
-    repo(&window)?.turns(workspace.as_deref()).await.map_err(err)
+    repo(&window)?
+        .turns(workspace.as_deref())
+        .await
+        .map_err(err)
 }
 
 /// Takes a checkpoint of the workspace's working copy.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn set_checkpoint(window: WebviewWindow, workspace: Option<String>) -> CmdResult<()> {
-    repo(&window)?.checkpoint(workspace.as_deref()).await.map_err(err)
+pub(crate) async fn set_checkpoint(
+    window: WebviewWindow,
+    workspace: Option<String>,
+) -> CmdResult<()> {
+    repo(&window)?
+        .checkpoint(workspace.as_deref())
+        .await
+        .map_err(err)
 }
 
 /// Puts the files an agent turn changed back as they were before it.
@@ -28,7 +37,10 @@ pub(crate) async fn undo_turn(
     workspace: Option<String>,
     turn: u32,
 ) -> CmdResult<()> {
-    repo(&window)?.undo_turn(workspace.as_deref(), turn).await.map_err(err)
+    repo(&window)?
+        .undo_turn(workspace.as_deref(), turn)
+        .await
+        .map_err(err)
 }
 
 /// Forgets an agent turn or checkpoint.

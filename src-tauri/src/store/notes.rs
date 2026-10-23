@@ -28,7 +28,9 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 /// `workspace` column, to `review_notes_old`, so the markdown notes table can take its name.
 fn set_aside_old_notes(db: &rusqlite::Connection) -> rusqlite::Result<()> {
     let columns: i64 =
-        db.query_row("SELECT COUNT(*) FROM pragma_table_info('notes')", [], |r| r.get(0))?;
+        db.query_row("SELECT COUNT(*) FROM pragma_table_info('notes')", [], |r| {
+            r.get(0)
+        })?;
     let has_workspace: bool = db.query_row(
         "SELECT COUNT(*) > 0 FROM pragma_table_info('notes') WHERE name = 'workspace'",
         [],
@@ -69,7 +71,11 @@ fn row(r: &Row) -> rusqlite::Result<NoteRow> {
 impl Store {
     pub fn note(&self, id: &str) -> rusqlite::Result<Option<NoteRow>> {
         self.db
-            .query_row(&format!("SELECT {COLUMNS} FROM notes WHERE id = ?"), [id], row)
+            .query_row(
+                &format!("SELECT {COLUMNS} FROM notes WHERE id = ?"),
+                [id],
+                row,
+            )
             .optional()
     }
 

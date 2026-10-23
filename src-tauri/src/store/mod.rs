@@ -9,7 +9,6 @@ mod designs;
 mod drawings;
 mod guided;
 mod log_revsets;
-mod workspace_roots;
 mod marks;
 mod notes;
 mod prs;
@@ -20,14 +19,15 @@ mod setup;
 mod symbol_info;
 mod threads;
 mod turns;
+mod workspace_roots;
 
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
-pub use guided::AgentEdit;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
+pub use guided::AgentEdit;
 pub use marks::{Mark, MarkColor};
 pub use notes::NoteRow;
 pub use prs::PrRecord;

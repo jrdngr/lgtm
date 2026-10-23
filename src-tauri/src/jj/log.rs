@@ -174,7 +174,10 @@ mod tests {
         assert_eq!((c.unique, c.time), (2, 1_700_000_000.0));
         assert_eq!(rows[1].graph, ["│ ○  ", "├─╯  "]);
         assert!(rows[1].commit.as_ref().unwrap().conflict);
-        assert_eq!((rows[2].graph[0].as_str(), rows[2].commit.is_none()), ("│ ~", true));
+        assert_eq!(
+            (rows[2].graph[0].as_str(), rows[2].commit.is_none()),
+            ("│ ~", true)
+        );
         assert_eq!(rows[3].graph, ["~"]);
     }
 

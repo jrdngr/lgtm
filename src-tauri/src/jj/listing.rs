@@ -10,8 +10,7 @@ use super::{Jj, checkout};
 const MAX_LISTINGS: usize = 64;
 
 /// Listings by commit id, or for `@` by workspace and the repo's operation heads.
-static LISTINGS: LazyLock<Mutex<HashMap<String, Arc<Vec<String>>>>> =
-    LazyLock::new(Mutex::default);
+static LISTINGS: LazyLock<Mutex<HashMap<String, Arc<Vec<String>>>>> = LazyLock::new(Mutex::default);
 
 impl Jj {
     /// The repo's current operation, from its op heads files without running jj. Empty when

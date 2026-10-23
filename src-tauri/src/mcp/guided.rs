@@ -30,6 +30,8 @@ impl Lgtm {
         }
         .emit_to(self.app(), &label)
         .ok();
-        Ok(format!("Stored it: {chunks} chunks, {excluded} excluded parts."))
+        Ok(format!(
+            "Stored it: {chunks} chunks, {excluded} excluded parts."
+        ))
     }
 }

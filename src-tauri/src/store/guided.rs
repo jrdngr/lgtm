@@ -128,7 +128,12 @@ impl Store {
     }
 
     /// Remembers the prompt a terminal agent's session is working on.
-    pub fn record_agent_prompt(&self, session: &str, prompt: &str, at: i64) -> rusqlite::Result<()> {
+    pub fn record_agent_prompt(
+        &self,
+        session: &str,
+        prompt: &str,
+        at: i64,
+    ) -> rusqlite::Result<()> {
         self.db.execute(
             "INSERT OR REPLACE INTO agent_prompts (session, prompt, at) VALUES (?, ?, ?)",
             params![session, prompt, at],
@@ -211,7 +216,9 @@ mod tests {
         store
             .set_guided_verdicts("w", "@", &[set("a", Some("1")), set("b", Some("2"))])
             .unwrap();
-        store.set_guided_verdicts("w", "@", &[set("a", None)]).unwrap();
+        store
+            .set_guided_verdicts("w", "@", &[set("a", None)])
+            .unwrap();
         assert_eq!(
             store.guided_verdicts("w", "@").unwrap(),
             [("b".to_string(), "2".to_string())]
@@ -224,14 +231,21 @@ mod tests {
     #[test]
     fn edits_carry_their_sessions_last_prompt_and_match_by_path_suffix() {
         let store = Store::in_memory();
-        store.record_agent_edit("s", "/r/src/a.rs", "early", 1).unwrap();
+        store
+            .record_agent_edit("s", "/r/src/a.rs", "early", 1)
+            .unwrap();
         store.record_agent_prompt("s", "Fix the lock", 2).unwrap();
         store.record_agent_edit("s", "/r/src/a.rs", "x", 3).unwrap();
         store.record_agent_prompt("s", "Now the badge", 4).unwrap();
-        store.record_agent_edit("s", "/r/src/data.rs", "y", 5).unwrap();
+        store
+            .record_agent_edit("s", "/r/src/data.rs", "y", 5)
+            .unwrap();
         let got = store.agent_edits(&["src/a.rs"]).unwrap();
         assert_eq!(got.len(), 1);
-        assert_eq!((got[0].prompt.as_str(), got[0].text.as_str()), ("Fix the lock", "x"));
+        assert_eq!(
+            (got[0].prompt.as_str(), got[0].text.as_str()),
+            ("Fix the lock", "x")
+        );
         let data = store.agent_edits(&["data.rs"]).unwrap();
         assert_eq!(data[0].prompt, "Now the badge");
         assert!(store.agent_edits(&["a.rs.bak"]).unwrap().is_empty());

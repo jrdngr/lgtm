@@ -63,9 +63,9 @@ impl RepoCtx {
             }
             view => view,
         };
-        // A turn that's gone falls back to the whole review too.
+        // Turns that are gone fall back to the whole review too.
         let span = match view {
-            View::Turn { turn } => self.turn_span(*turn, &at_commit(ws).await?)?,
+            View::Turn { turns } => self.turn_span(turns, &at_commit(ws).await?)?,
             _ => None,
         };
         let view = match (view, &span) {
@@ -206,5 +206,7 @@ impl RepoCtx {
 /// The workspace's working-copy commit.
 async fn at_commit(ws: &Workspace) -> anyhow::Result<String> {
     let at = ws.jj.commit_ids("@").await?;
-    at.into_iter().next().ok_or_else(|| anyhow::anyhow!("no working copy"))
+    at.into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("no working copy"))
 }

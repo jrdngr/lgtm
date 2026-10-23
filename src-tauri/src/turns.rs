@@ -154,7 +154,10 @@ impl RepoCtx {
                 Ok(fresh)
             }
             Checkpoint::End => match running {
-                Some(turn) => self.end_turn(&ws, turn, &change, &commit).await.map(|_| true),
+                Some(turn) => self
+                    .end_turn(&ws, turn, &change, &commit)
+                    .await
+                    .map(|_| true),
                 None => Ok(false),
             },
         }
@@ -184,7 +187,11 @@ impl RepoCtx {
         let Some(at) = ws.jj.changes("@").await?.pop() else {
             return Ok(vec![]);
         };
-        let turns = self.store.lock().unwrap().turns_on(ws.key(), &at.change_id)?;
+        let turns = self
+            .store
+            .lock()
+            .unwrap()
+            .turns_on(ws.key(), &at.change_id)?;
         let mut out = Vec::new();
         for t in turns {
             let running = t.session.is_some() && t.end.is_none();
@@ -194,7 +201,11 @@ impl RepoCtx {
             let (added, removed) = if t.end.is_some() {
                 (t.added, t.removed)
             } else {
-                counts(span_diff(&ws.jj, &t.start, &at.commit_id, paths_of(&t)).await?.iter())
+                counts(
+                    span_diff(&ws.jj, &t.start, &at.commit_id, paths_of(&t))
+                        .await?
+                        .iter(),
+                )
             };
             out.push(TurnDto {
                 id: t.id as u32,
@@ -218,16 +229,42 @@ impl RepoCtx {
         Ok(())
     }
 
-    /// The commits and files turn `id`'s diff covers, as of `@` being `at`.
-    pub fn turn_span(&self, id: u32, at: &str) -> anyhow::Result<Option<(Range, Option<Vec<String>>)>> {
-        let Some(turn) = self.store.lock().unwrap().turn(id.into())? else {
+    /// The commits and files the diff of turns `ids` covers, as of `@` being `at`: from the
+    /// first's start to the last's end, over every file any of them changed, or every file
+    /// when one is a checkpoint. Turns that are gone are left out.
+    pub fn turn_span(
+        &self,
+        ids: &[u32],
+        at: &str,
+    ) -> anyhow::Result<Option<(Range, Option<Vec<String>>)>> {
+        let mut turns = Vec::new();
+        let store = self.store.lock().unwrap();
+        for id in ids {
+            turns.extend(store.turn((*id).into())?);
+        }
+        drop(store);
+        turns.sort_by_key(|t| (t.started_at, t.id));
+        let (Some(first), Some(last)) = (turns.first(), turns.last()) else {
             return Ok(None);
         };
         let range = Range {
-            from: Some(turn.start.clone()),
-            to: end_of(&turn, at),
+            from: Some(first.start.clone()),
+            to: end_of(last, at),
         };
-        Ok(Some((range, paths_of(&turn).map(<[String]>::to_vec))))
+        let paths = turns
+            .iter()
+            .map(paths_of)
+            .collect::<Option<Vec<_>>>()
+            .map(|ps| {
+                let mut all: Vec<String> = Vec::new();
+                for p in ps.into_iter().flatten() {
+                    if !all.contains(p) {
+                        all.push(p.clone());
+                    }
+                }
+                all
+            });
+        Ok(Some((range, paths)))
     }
 
     /// Puts the files a finished turn changed back as they were before it, unless they've
@@ -242,7 +279,10 @@ impl RepoCtx {
             bail!("the agent is still working on it");
         };
         let (_, commit) = at(&ws).await?;
-        if !span_diff(&ws.jj, end, &commit, Some(&turn.paths)).await?.is_empty() {
+        if !span_diff(&ws.jj, end, &commit, Some(&turn.paths))
+            .await?
+            .is_empty()
+        {
             bail!("its files have changed since it ended");
         }
         let _busy = ws.claim()?;

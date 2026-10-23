@@ -46,7 +46,9 @@ fn level(name: Option<&str>) -> Result<NoteLevel, String> {
         "global" => Ok(NoteLevel::Global),
         "repo" => Ok(NoteLevel::Repo),
         "workspace" => Ok(NoteLevel::Workspace),
-        other => Err(format!("`{other}` isn't a level: use global, repo or workspace")),
+        other => Err(format!(
+            "`{other}` isn't a level: use global, repo or workspace"
+        )),
     }
 }
 

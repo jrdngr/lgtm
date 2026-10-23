@@ -26,10 +26,17 @@ impl Jj {
         let Some(repo) = checkout::repo_dir(&self.root) else {
             return self.working_copy_change().await;
         };
-        let entry = LISTED.lock().unwrap().entry(repo.clone()).or_default().clone();
+        let entry = LISTED
+            .lock()
+            .unwrap()
+            .entry(repo.clone())
+            .or_default()
+            .clone();
         let mut listed = entry.lock().await;
         let heads = checkout::op_heads(&repo);
-        let fresh = listed.as_ref().filter(|(at, _)| !heads.is_empty() && *at == heads);
+        let fresh = listed
+            .as_ref()
+            .filter(|(at, _)| !heads.is_empty() && *at == heads);
         let changes = match fresh {
             Some((_, changes)) => changes.clone(),
             None => {
@@ -80,8 +87,8 @@ impl Jj {
 
 #[cfg(test)]
 mod tests {
-    use crate::jj::{Jj, JjAction};
     use crate::jj::test_support::{jj, repo, write};
+    use crate::jj::{Jj, JjAction};
 
     #[tokio::test]
     async fn reports_moves_made_outside_the_app_only() {
@@ -117,7 +124,16 @@ mod tests {
         let d = dir.path();
         let other_dir = tempfile::tempdir().unwrap();
         let other_root = other_dir.path().join("other");
-        jj(d, &["workspace", "add", "--name", "other", other_root.to_str().unwrap()]);
+        jj(
+            d,
+            &[
+                "workspace",
+                "add",
+                "--name",
+                "other",
+                other_root.to_str().unwrap(),
+            ],
+        );
         let other = Jj::new(&other_root);
         assert!(!main.moved_working_copy().await.unwrap());
         assert!(!other.moved_working_copy().await.unwrap());

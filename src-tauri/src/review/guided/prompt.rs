@@ -35,7 +35,10 @@ fn update(last: &Guided, to: &str) -> String {
         if last.commits.to == to {
             String::new()
         } else {
-            format!("See what changed since with `jj diff --from {} --to {to}`. ", last.commits.to)
+            format!(
+                "See what changed since with `jj diff --from {} --to {to}`. ",
+                last.commits.to
+            )
         }
     );
     for c in &last.chunks {

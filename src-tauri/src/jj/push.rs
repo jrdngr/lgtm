@@ -102,7 +102,16 @@ mod tests {
             .status()
             .unwrap();
         assert!(ok.success());
-        jj(dir.path(), &["git", "remote", "add", "up", remote.path().to_str().unwrap()]);
+        jj(
+            dir.path(),
+            &[
+                "git",
+                "remote",
+                "add",
+                "up",
+                remote.path().to_str().unwrap(),
+            ],
+        );
         write(dir.path(), "a", "a\n");
         jj(dir.path(), &["commit", "-m", "a"]);
         jj(dir.path(), &["bookmark", "create", "main", "-r", "@-"]);

@@ -211,7 +211,10 @@ fn base(r: &Range) -> &str {
 
 impl RepoCtx {
     /// The review's workspace key, revset, whole range and changed files with their rows.
-    fn guided_review(&self, review: u32) -> anyhow::Result<(String, String, Range, Vec<reply::FileRows>)> {
+    fn guided_review(
+        &self,
+        review: u32,
+    ) -> anyhow::Result<(String, String, Range, Vec<reply::FileRows>)> {
         let r = self.review(review)?;
         let r = r.lock().unwrap();
         let files = r
@@ -219,7 +222,12 @@ impl RepoCtx {
             .iter()
             .map(|f| reply::FileRows::of(&f.path, &f.rows))
             .collect();
-        Ok((r.ws.key().to_string(), r.revset.clone(), r.whole.clone(), files))
+        Ok((
+            r.ws.key().to_string(),
+            r.revset.clone(),
+            r.whole.clone(),
+            files,
+        ))
     }
 
     /// The review's last guided review, if it has one.
@@ -237,7 +245,13 @@ impl RepoCtx {
         let (ws, revset, whole, _) = self.guided_review(review)?;
         let last = load(&self.store.lock().unwrap(), &ws, &revset)?;
         let text = crate::prompts::load_for(crate::prompts::Prompt::Guided, &self.root)?;
-        Ok(prompt::text(&revset, base(&whole), &whole.to, last.as_ref(), &text))
+        Ok(prompt::text(
+            &revset,
+            base(&whole),
+            &whole.to,
+            last.as_ref(),
+            &text,
+        ))
     }
 
     /// Stores `reply` as review `review`'s guided review, replacing the last one. It must be
@@ -277,7 +291,11 @@ impl RepoCtx {
     }
 
     /// Gives or takes back verdicts on chunks of the review's guided review.
-    pub fn set_guided_verdicts(&self, review: u32, sets: Vec<VerdictSet>) -> anyhow::Result<GuidedDto> {
+    pub fn set_guided_verdicts(
+        &self,
+        review: u32,
+        sets: Vec<VerdictSet>,
+    ) -> anyhow::Result<GuidedDto> {
         let (ws, revset, whole, _) = self.guided_review(review)?;
         let mut store = self.store.lock().unwrap();
         let g = load(&store, &ws, &revset)?.ok_or_else(|| anyhow::anyhow!("no guided review"))?;

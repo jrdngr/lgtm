@@ -23,7 +23,7 @@ export function usePublishTarget(
   const published = useRef<ReviewTarget>(undefined);
   const latest = useRef(actions);
   latest.current = actions;
-  const { revset, changes, loading, stale, turn } = target;
+  const { revset, changes, loading, stale, turns } = target;
 
   useEffect(() => {
     const publish = () => {
@@ -34,7 +34,7 @@ export function usePublishTarget(
         changes,
         loading,
         stale,
-        turn,
+        turns,
         load: (r, v) => latest.current.load(r, v),
         view: (v) => latest.current.view(v),
         focus: () => latest.current.focus(),
@@ -53,7 +53,7 @@ export function usePublishTarget(
       sub.dispose();
       off();
     };
-  }, [api, workspace, revset, changes, loading, stale, turn]);
+  }, [api, workspace, revset, changes, loading, stale, turns]);
 
   useEffect(() => () => retractTarget(workspace, published.current), [workspace]);
 }

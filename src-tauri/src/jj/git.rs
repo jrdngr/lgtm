@@ -170,10 +170,15 @@ mod tests {
     async fn remotes_follow_changes_made_outside_the_app() {
         let (dir, j) = repo();
         assert!(j.remotes().await.unwrap().is_empty());
-        jj(dir.path(), &["git", "remote", "add", "up", "https://example.com/a.git"]);
+        jj(
+            dir.path(),
+            &["git", "remote", "add", "up", "https://example.com/a.git"],
+        );
         let names = |r: Vec<(String, String)>| r.into_iter().map(|(n, _)| n).collect::<Vec<_>>();
         assert_eq!(names(j.remotes().await.unwrap()), ["up"]);
-        j.remote_add("origin", "https://example.com/b.git").await.unwrap();
+        j.remote_add("origin", "https://example.com/b.git")
+            .await
+            .unwrap();
         assert_eq!(names(j.remotes().await.unwrap()), ["origin", "up"]);
     }
 

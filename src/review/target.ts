@@ -11,8 +11,8 @@ export interface ReviewTarget {
   loading: boolean;
   /** The working copy is stale, so edits aren't picked up. */
   stale?: boolean;
-  /** The agent turn the review shows, in the Agent turn view. */
-  turn?: number;
+  /** The agent turns the review shows, in the Agent turn view. */
+  turns?: number[];
   /** Loads a revset as the review, in `view` or Combined. Returns the error message when it
    * fails. */
   load(revset: string, view?: View): Promise<string | undefined>;

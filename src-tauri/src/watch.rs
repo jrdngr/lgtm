@@ -96,7 +96,10 @@ fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping> {
         return Some(Ping::Op);
     }
     // Its own and any nested workspace's or repo's internals.
-    if rel.components().any(|c| c.as_os_str() == ".jj" || c.as_os_str() == ".git") {
+    if rel
+        .components()
+        .any(|c| c.as_os_str() == ".jj" || c.as_os_str() == ".git")
+    {
         return None;
     }
     if rel.file_name().is_some_and(|n| n == ".gitignore") {

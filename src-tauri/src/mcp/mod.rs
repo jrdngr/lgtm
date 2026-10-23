@@ -11,11 +11,11 @@ mod guided;
 pub mod hook;
 mod inputs;
 mod notes;
-mod revisions;
 mod qa;
 mod qa_inputs;
 pub mod register;
 mod reports;
+mod revisions;
 mod server;
 mod symbol_info;
 
@@ -94,13 +94,19 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 ctx.new_agent_session(&report.terminal);
             }
             if let Some(session) = &report.session {
-                let edit = report.edit.as_ref().map(|e| (e.path.as_str(), e.text.as_str()));
+                let edit = report
+                    .edit
+                    .as_ref()
+                    .map(|e| (e.path.as_str(), e.text.as_str()));
                 ctx.record_hook(session, report.prompt.as_deref(), edit);
             }
             if let (Some(point), Some(session)) = (report.checkpoint, &report.session) {
                 let workspace = report.workspace.as_deref();
                 let (tool, prompt) = (report.tool_use.as_deref(), report.prompt.as_deref());
-                match ctx.turn_checkpoint(workspace, session, tool, point, prompt).await {
+                match ctx
+                    .turn_checkpoint(workspace, session, tool, point, prompt)
+                    .await
+                {
                     Ok(true) => {
                         let workspace = report.workspace.clone();
                         TurnsChanged { workspace }.emit_to(&app, &label).ok();
@@ -137,7 +143,11 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     tracing::info!(?workspace, ?terminal, "agent connected over MCP");
     let served = server::Lgtm::new(app, hello).serve((read, write)).await;
     let ended = match served {
-        Ok(running) => running.waiting().await.map(drop).map_err(anyhow::Error::from),
+        Ok(running) => running
+            .waiting()
+            .await
+            .map(drop)
+            .map_err(anyhow::Error::from),
         Err(e) => Err(e.into()),
     };
     tracing::info!(?workspace, ?terminal, "agent disconnected from MCP");

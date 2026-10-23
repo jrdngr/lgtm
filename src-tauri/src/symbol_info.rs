@@ -99,7 +99,10 @@ pub struct Located {
 
 /// The definitions of `name` in `rel` under `root`.
 fn defs_at(root: &Path, rel: &str, name: &str) -> Vec<Definition> {
-    let Some(text) = crate::files::resolve(root, rel).ok().and_then(|a| search::read(&a)) else {
+    let Some(text) = crate::files::resolve(root, rel)
+        .ok()
+        .and_then(|a| search::read(&a))
+    else {
         return vec![];
     };
     search::definitions(rel, &text, name)
@@ -166,7 +169,12 @@ pub fn asked(
     let d = defs
         .get(nth as usize)
         .with_context(|| format!("`{name}` isn't defined in {path} any more"))?;
-    let key = InfoKey { workspace, path, name, nth };
+    let key = InfoKey {
+        workspace,
+        path,
+        name,
+        nth,
+    };
     let mut s = load(store, &key)?.unwrap_or_default();
     s.hash = hash(&d.code);
     save(store, &key, &s, true)
@@ -189,7 +197,12 @@ pub fn set(store: &Store, workspace: &str, root: &Path, reply: InfoReply) -> any
     let defs = defs_at(root, &reply.path, &reply.name);
     let Some(i) = pick(&defs, reply.line) else {
         if let Ok(d) = locate(root, &reply.name, None, None) {
-            bail!("`{}` isn't defined in {}; it's in {}", reply.name, reply.path, d.path);
+            bail!(
+                "`{}` isn't defined in {}; it's in {}",
+                reply.name,
+                reply.path,
+                d.path
+            );
         }
         bail!("`{}` isn't defined in {}", reply.name, reply.path);
     };
@@ -251,9 +264,15 @@ pub fn infos(
                 kind: d.kind,
                 working,
                 changed: info.is_some() && !working && s.hash != hash(&d.code),
-                description: info.as_ref().map(|i| i.description.clone()).unwrap_or_default(),
+                description: info
+                    .as_ref()
+                    .map(|i| i.description.clone())
+                    .unwrap_or_default(),
                 callers: info.as_ref().map(|i| i.callers.clone()).unwrap_or_default(),
-                assumptions: info.as_ref().map(|i| i.assumptions.clone()).unwrap_or_default(),
+                assumptions: info
+                    .as_ref()
+                    .map(|i| i.assumptions.clone())
+                    .unwrap_or_default(),
                 errors: info.map(|i| i.errors).unwrap_or_default(),
             });
         }
@@ -284,14 +303,24 @@ mod tests {
             name: name.into(),
             line,
             description: "Adds.".into(),
-            callers: vec![Caller { name: "main".into(), path: "b.rs".into(), line: 2 }],
+            callers: vec![Caller {
+                name: "main".into(),
+                path: "b.rs".into(),
+                line: 2,
+            }],
             assumptions: vec!["Never overflows.".into()],
             errors: vec![],
         }
     }
 
-    fn ask(store: &Store, ws: &str, root: &Path, name: &str, path: &str, line: Option<u32>)
-    -> String {
+    fn ask(
+        store: &Store,
+        ws: &str,
+        root: &Path,
+        name: &str,
+        path: &str,
+        line: Option<u32>,
+    ) -> String {
         let d = locate(root, name, Some(path), line).unwrap();
         asked(store, ws, root, &d.path, name, d.nth).unwrap();
         request(&d, name)
@@ -309,11 +338,17 @@ mod tests {
         let prompt = ask(&store, "", root, "add", "b.rs", None);
         assert!(prompt.contains("a.rs:2"), "{prompt}");
         let got = infos(&store, "", root, &paths).unwrap();
-        assert_eq!((got[0].line, got[0].working, got[0].changed), (2, true, false));
+        assert_eq!(
+            (got[0].line, got[0].working, got[0].changed),
+            (2, true, false)
+        );
 
         set(&store, "", root, reply("a.rs", "add", None)).unwrap();
         let got = &infos(&store, "", root, &paths).unwrap()[0];
-        assert_eq!((got.working, got.changed, got.description.as_str()), (false, false, "Adds."));
+        assert_eq!(
+            (got.working, got.changed, got.description.as_str()),
+            (false, false, "Adds.")
+        );
 
         std::fs::write(root.join("a.rs"), "\n/// Docs.\nfn add() { 1; }\n").unwrap();
         let got = &infos(&store, "", root, &paths).unwrap()[0];

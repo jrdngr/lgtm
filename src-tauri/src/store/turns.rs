@@ -157,7 +157,8 @@ impl Store {
     }
 
     pub fn delete_turn(&self, id: i64) -> rusqlite::Result<()> {
-        self.db.execute("DELETE FROM agent_turns WHERE id = ?", [id])?;
+        self.db
+            .execute("DELETE FROM agent_turns WHERE id = ?", [id])?;
         Ok(())
     }
 
@@ -180,12 +181,19 @@ mod tests {
             .start_turn("ws", Some("s"), Some("Fix it"), "c1", "a", 1)
             .unwrap();
         assert_eq!(store.running_turn("s").unwrap().unwrap().id, id);
-        store.add_turn_paths(id, &["x.rs".into(), "y.rs".into()]).unwrap();
-        store.add_turn_paths(id, &["y.rs".into(), "z.rs".into()]).unwrap();
+        store
+            .add_turn_paths(id, &["x.rs".into(), "y.rs".into()])
+            .unwrap();
+        store
+            .add_turn_paths(id, &["y.rs".into(), "z.rs".into()])
+            .unwrap();
         store.end_turn(id, "c2", "b", (3, 1), 2).unwrap();
         let turn = store.turn(id).unwrap().unwrap();
         assert_eq!(turn.paths, ["x.rs", "y.rs", "z.rs"]);
-        assert_eq!((turn.end.as_deref(), turn.added, turn.removed), (Some("b"), 3, 1));
+        assert_eq!(
+            (turn.end.as_deref(), turn.added, turn.removed),
+            (Some("b"), 3, 1)
+        );
         assert!(store.running_turn("s").unwrap().is_none());
         assert!(store.turns_on("ws", "c1").unwrap().is_empty());
         assert_eq!(store.turns_on("ws", "c2").unwrap().len(), 1);
@@ -195,12 +203,24 @@ mod tests {
     fn turns_list_newest_first_per_workspace() {
         let store = Store::in_memory();
         let old = store.start_turn("ws", None, None, "c", "a", 1).unwrap();
-        let new = store.start_turn("ws", Some("s"), Some("p"), "c", "b", 2).unwrap();
+        let new = store
+            .start_turn("ws", Some("s"), Some("p"), "c", "b", 2)
+            .unwrap();
         store.start_turn("other", None, None, "c", "a", 3).unwrap();
-        let ids: Vec<i64> = store.turns_on("ws", "c").unwrap().iter().map(|t| t.id).collect();
+        let ids: Vec<i64> = store
+            .turns_on("ws", "c")
+            .unwrap()
+            .iter()
+            .map(|t| t.id)
+            .collect();
         assert_eq!(ids, [new, old]);
         store.prune_turns(2).unwrap();
-        let ids: Vec<i64> = store.turns_on("ws", "c").unwrap().iter().map(|t| t.id).collect();
+        let ids: Vec<i64> = store
+            .turns_on("ws", "c")
+            .unwrap()
+            .iter()
+            .map(|t| t.id)
+            .collect();
         assert_eq!(ids, [new]);
     }
 }

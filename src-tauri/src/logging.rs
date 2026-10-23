@@ -116,7 +116,10 @@ mod tests {
         w.write_all(b"abcd").unwrap();
         w.write_all(b"dropped").unwrap();
         let full = String::from_utf8(w.inner.clone()).unwrap();
-        assert!(full.starts_with("12345678abcdlgtm: this hour's log is full"), "{full}");
+        assert!(
+            full.starts_with("12345678abcdlgtm: this hour's log is full"),
+            "{full}"
+        );
         assert!(!full.contains("dropped"));
 
         HOUR.store(8, std::sync::atomic::Ordering::Relaxed);

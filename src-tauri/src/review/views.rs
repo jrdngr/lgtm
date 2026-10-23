@@ -20,8 +20,9 @@ pub enum View {
     Change { change: String },
     /// What one change does differently from what it did last session.
     SinceLast { change: String },
-    /// An agent turn's or checkpoint's diff.
-    Turn { turn: u32 },
+    /// The diff of a run of agent turns and checkpoints, from the first's start to the last's
+    /// end.
+    Turn { turns: Vec<u32> },
 }
 
 /// How a change compares with the previous session.
@@ -218,7 +219,10 @@ pub async fn stack(
 /// What a view diffs.
 pub enum Spec {
     Trees(Range),
-    Interdiff { from: String, to: String },
+    Interdiff {
+        from: String,
+        to: String,
+    },
     /// Trees, of only `paths` when they're given.
     Span {
         range: Range,

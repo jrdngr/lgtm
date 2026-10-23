@@ -4,7 +4,6 @@ mod agent;
 #[cfg(test)]
 mod agent_tests;
 pub(crate) mod arch;
-pub(crate) mod guided;
 mod at;
 mod build;
 mod cache;
@@ -18,6 +17,7 @@ mod github;
 #[cfg(test)]
 mod github_tests;
 mod graph;
+pub(crate) mod guided;
 mod link;
 pub use link::LinkThread;
 mod load;
@@ -270,7 +270,8 @@ impl RepoCtx {
         revset: &str,
         resume: bool,
     ) -> anyhow::Result<ReviewDto> {
-        self.open_in(workspace, revset, resume, &View::Combined).await
+        self.open_in(workspace, revset, resume, &View::Combined)
+            .await
     }
 
     /// [`Self::open`], in `view`.
@@ -296,9 +297,7 @@ impl RepoCtx {
             }
         };
         let listed = Listed::of(&ws, revset).await?;
-        let loaded = self
-            .load(&ws, revset, listed, view, prev.as_ref())
-            .await?;
+        let loaded = self.load(&ws, revset, listed, view, prev.as_ref()).await?;
         // Started only once the load succeeds, so a revset that fails leaves no session.
         let session = match resumed {
             Some(id) => id,

@@ -12,7 +12,10 @@ use crate::syntax::{self, SymbolKind};
 /// first, then the rest by path and line.
 pub fn references(root: &Path, name: &str) -> Hits {
     if name.is_empty() {
-        return Hits { hits: vec![], truncated: false };
+        return Hits {
+            hits: vec![],
+            truncated: false,
+        };
     }
     let targets: Vec<_> = files(root)
         .into_iter()

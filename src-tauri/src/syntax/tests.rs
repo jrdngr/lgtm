@@ -224,7 +224,11 @@ fn terraform_highlights_blocks_attributes_and_references() {
     let class = |n: &str| Some(HIGHLIGHT_NAMES.iter().position(|h| *h == n).unwrap() as u8);
     let has = |line: usize, n: &str| lines[line].iter().any(|s| s.0 == class(n));
     assert!(has(0, "type") && has(0, "string"), "{:?}", lines[0]);
-    assert!(has(1, "property") && has(1, "variable.builtin"), "{:?}", lines[1]);
+    assert!(
+        has(1, "property") && has(1, "variable.builtin"),
+        "{:?}",
+        lines[1]
+    );
     assert!(has(2, "function"), "{:?}", lines[2]);
     assert!(!highlight_file("code.terraform", "x = 1")[0].is_empty());
 }

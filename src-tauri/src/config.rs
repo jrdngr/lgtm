@@ -52,11 +52,7 @@ impl Config {
     /// Reads the config at `base`, a review's base commit, so the changes under review can't
     /// set what it skips. A missing file gives the defaults. Each base's file is read once,
     /// since a commit's contents never change.
-    pub async fn at_base(
-        jj: &Jj,
-        cache: &ConfigTexts,
-        base: Option<&str>,
-    ) -> anyhow::Result<Self> {
+    pub async fn at_base(jj: &Jj, cache: &ConfigTexts, base: Option<&str>) -> anyhow::Result<Self> {
         let key = base.unwrap_or_default().to_string();
         let found = cache.0.lock().unwrap().get(&key).cloned();
         let text = match found {

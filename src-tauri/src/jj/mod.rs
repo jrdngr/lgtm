@@ -12,11 +12,9 @@ use tokio::process::Command;
 use tokio::sync::Mutex;
 
 mod at;
-pub mod checkout;
-mod listing;
 mod background;
 mod bookmarks;
-mod push;
+pub mod checkout;
 mod child;
 mod diff;
 mod edit;
@@ -24,8 +22,10 @@ mod follow;
 pub mod git;
 mod holders;
 pub mod init;
+mod listing;
 mod log;
 mod near;
+mod push;
 mod rewrite;
 #[cfg(test)]
 pub(crate) mod test_support;
@@ -215,7 +215,13 @@ impl Jj {
     ) -> anyhow::Result<Vec<u8>> {
         let started = std::time::Instant::now();
         let out = self.exec_untimed(args, read_only, color).await;
-        log_run(self.name(), args, read_only, started.elapsed(), out.as_ref().err());
+        log_run(
+            self.name(),
+            args,
+            read_only,
+            started.elapsed(),
+            out.as_ref().err(),
+        );
         out
     }
 
@@ -310,11 +316,18 @@ impl Jj {
         &self,
         revset: &str,
     ) -> anyhow::Result<Vec<(Change, Option<String>)>> {
-        let template = format!(
-            r#"parents.map(|p| p.commit_id()).join(" ") ++ "\t" ++ {CHANGE_TEMPLATE}"#
-        );
+        let template =
+            format!(r#"parents.map(|p| p.commit_id()).join(" ") ++ "\t" ++ {CHANGE_TEMPLATE}"#);
         let out = self
-            .read(&["log", "--no-graph", "--reversed", "-r", revset, "-T", &template])
+            .read(&[
+                "log",
+                "--no-graph",
+                "--reversed",
+                "-r",
+                revset,
+                "-T",
+                &template,
+            ])
             .await?;
         Ok(out
             .lines()
@@ -568,7 +581,9 @@ mod tests {
     #[tokio::test]
     async fn files_at_reads_paths_across_batches_and_skips_missing_ones() {
         let (dir, j) = test_support::repo();
-        let paths: Vec<String> = (0..FILES_PER_READ + 5).map(|i| format!("f{i}.txt")).collect();
+        let paths: Vec<String> = (0..FILES_PER_READ + 5)
+            .map(|i| format!("f{i}.txt"))
+            .collect();
         for (i, p) in paths.iter().enumerate() {
             test_support::write(dir.path(), p, &format!("{i}\n"));
         }
@@ -582,7 +597,10 @@ mod tests {
             .collect();
         let got = j.files_at(&at, &asked).await.unwrap();
         assert_eq!(got.len(), paths.len() + 1);
-        assert_eq!(got[&paths[FILES_PER_READ + 4]], format!("{}\n", FILES_PER_READ + 4).as_bytes());
+        assert_eq!(
+            got[&paths[FILES_PER_READ + 4]],
+            format!("{}\n", FILES_PER_READ + 4).as_bytes()
+        );
         assert_eq!(got["empty.txt"], b"");
         assert!(!got.contains_key("nope.txt"));
     }

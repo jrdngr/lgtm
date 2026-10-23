@@ -46,7 +46,11 @@ pub fn prompts_of(edits: &[AgentEdit], lines: &[String]) -> Vec<PromptDto> {
 
 impl RepoCtx {
     /// The prompts behind `lines`, the added lines of a chunk in `paths`.
-    pub fn chunk_prompts(&self, paths: &[String], lines: &[String]) -> anyhow::Result<Vec<PromptDto>> {
+    pub fn chunk_prompts(
+        &self,
+        paths: &[String],
+        lines: &[String],
+    ) -> anyhow::Result<Vec<PromptDto>> {
         let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
         let edits = self.store.lock().unwrap().agent_edits(&paths)?;
         Ok(prompts_of(&edits, lines))
@@ -87,7 +91,10 @@ mod tests {
             edit("t", "Spawn it", "let child = jj_spawn(ws)?;", 1),
             edit("t", "Rename", "let other = 1;", 0),
         ];
-        let lines = ["child.kill()?;".to_string(), "let child = jj_spawn(ws)?;".into()];
+        let lines = [
+            "child.kill()?;".to_string(),
+            "let child = jj_spawn(ws)?;".into(),
+        ];
         let got: Vec<String> = prompts_of(&edits, &lines)
             .into_iter()
             .map(|p| p.prompt)

@@ -68,7 +68,11 @@ async fn a_workspace_whose_files_are_gone_can_still_be_deleted() {
     let root = ctx.workspace(Some("t1")).await.unwrap().root.clone();
     std::fs::remove_dir_all(&root).unwrap();
     let listed = ctx.list_workspaces().await.unwrap();
-    assert!(listed.iter().any(|w| w.name.as_deref() == Some("t1") && w.missing));
+    assert!(
+        listed
+            .iter()
+            .any(|w| w.name.as_deref() == Some("t1") && w.missing)
+    );
 
     ctx.delete_workspace("t1", || {}).await.unwrap();
     let listed = ctx.list_workspaces().await.unwrap();

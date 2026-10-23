@@ -366,8 +366,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   // A drag brackets the commits it's across as it goes, before anything loads.
-  /** The turn the review shows, which the bracket marks in place of its commits. */
-  const onTurn = !dragging && !pending && turns.some((t) => t.id === target?.turn);
+  /** The review shows turns, which the bracket marks in place of its commits. */
+  const onTurn = !dragging && !pending && turns.some((t) => target?.turns?.includes(t.id));
   const tentative = dragging || !!pending;
   const shown = dragging ? pickedIds() : (pending ?? reviewed);
   const inReview = (i: number) => shown.has(rows?.[i]?.commit?.commitId ?? "");
@@ -480,7 +480,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                 <TurnRows
                   workspace={workspace}
                   turns={turns}
-                  shown={onTurn ? target?.turn : undefined}
+                  shown={onTurn ? target?.turns : undefined}
                   below={graph.cells[i].at(-1) ?? []}
                   width={graph.width}
                   onError={setError}

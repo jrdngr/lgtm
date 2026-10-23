@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type { TurnDto } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
@@ -5,7 +6,7 @@ import type { Cell } from "../revisions/graphCells";
 import { CELL_W } from "../revisions/LogGraph";
 import { copy, openMenu } from "../ui/contextMenu";
 import { confirmAction } from "../ui/prompt";
-import { openTurn } from "./openTurn";
+import { openTurns } from "./openTurn";
 import { reloadTurns, turnName, turnsLabel, turnsOpen, turnTime } from "./turnsStore";
 import "./turns.css";
 
@@ -52,8 +53,8 @@ const FLAG = "M3.5 12.5V2.5M3.5 3h7l-1.8 2.5L10.5 8h-7";
 interface Props {
   workspace: WorkspaceName;
   turns: TurnDto[];
-  /** The id of the turn the review shows, if it shows one. */
-  shown?: number;
+  /** The ids of the turns the review shows, if it shows some. */
+  shown?: number[];
   /** `@`'s last graph line. */
   below: Cell[];
   width: number;
@@ -63,7 +64,49 @@ interface Props {
 /** One row per turn and checkpoint under `@`, newest first, while they're open. */
 export function TurnRows({ workspace, turns, shown, below, width, onError }: Props) {
   const open = turnsOpen.use();
+  /** The row a drag or shift-click range runs from. */
+  const anchor = useRef<number>(undefined);
+  /** The row a drag started on, while the button is down. */
+  const drag = useRef<number>(undefined);
+  /** The rows a drag is across, once it reaches a second row. */
+  const [dragged, setDragged] = useState<[number, number]>();
+  const draggedRef = useRef(dragged);
+  draggedRef.current = dragged;
+  /** A drag just ended, so the click that ends it opens nothing more. */
+  const ended = useRef(false);
+
+  const openRange = (a: number, b: number) =>
+    openTurns(workspace, turns.slice(Math.min(a, b), Math.max(a, b) + 1));
+
+  useEffect(() => {
+    const up = () => {
+      drag.current = undefined;
+      const d = draggedRef.current;
+      if (!d) return;
+      ended.current = true;
+      setDragged(undefined);
+      openRange(...d);
+    };
+    window.addEventListener("mouseup", up);
+    return () => window.removeEventListener("mouseup", up);
+  });
+
   if (!open) return null;
+
+  function click(e: React.MouseEvent, i: number) {
+    if (ended.current) {
+      ended.current = false;
+      return;
+    }
+    if (e.shiftKey && anchor.current !== undefined) return openRange(anchor.current, i);
+    anchor.current = i;
+    openTurns(workspace, [turns[i]]);
+  }
+
+  /** The rows the bracket marks: a drag's, else the review's. */
+  const showing = turns.flatMap((t, i) => (shown?.includes(t.id) ? [i] : []));
+  const marked = dragged ?? [showing[0] ?? -1, showing.at(-1) ?? -1];
+  const [lo, hi] = [Math.min(...marked), Math.max(...marked)];
 
   async function undo(t: TurnDto) {
     const ok = await confirmAction(`Undo "${turnName(t)}"?`, "Undo Turn");
@@ -84,7 +127,7 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
   function menu(e: React.MouseEvent, t: TurnDto) {
     const turn = t.prompt !== null;
     openMenu(e, [
-      { label: "Review", onSelect: () => openTurn(workspace, t) },
+      { label: "Review", onSelect: () => openTurns(workspace, [t]) },
       turn && { label: "Undo Turn", disabled: t.running, onSelect: () => undo(t) },
       turn && "-",
       turn && { label: "Copy Prompt", onSelect: () => copy(t.prompt ?? "") },
@@ -93,16 +136,27 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
     ]);
   }
 
-  return turns.map((t) => (
+  return turns.map((t, i) => (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the log takes the keys
     <div
       key={t.id}
-      className={`lt${t.id === shown ? " cursor" : ""}${t.running ? " running" : ""}`}
-      onMouseDown={(e) => e.stopPropagation()}
-      onClick={() => openTurn(workspace, t)}
+      className={`lt${shown?.includes(t.id) ? " cursor" : ""}${t.running ? " running" : ""}`}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        if (e.button === 0 && !e.shiftKey) drag.current = i;
+      }}
+      onMouseEnter={() => {
+        if (drag.current !== undefined && (dragged || i !== drag.current))
+          setDragged([drag.current, i]);
+      }}
+      onClick={(e) => click(e, i)}
       onContextMenu={(e) => menu(e, t)}
     >
-      {t.id === shown && <span className="lr-bk top bot" />}
+      {lo >= 0 && i >= lo && i <= hi && (
+        <span
+          className={`lr-bk${i === lo ? " top" : ""}${i === hi ? " bot" : ""}${dragged ? " loading" : ""}`}
+        />
+      )}
       <GraphThrough below={below} width={width} />
       <span className="lt-body">
         <svg

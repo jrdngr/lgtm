@@ -291,7 +291,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       changes: review?.changes ?? NO_CHANGES,
       loading,
       stale: !!stale,
-      turn: review?.view.kind === "turn" ? review.view.turn : undefined,
+      turns: review?.view.kind === "turn" ? review.view.turns : undefined,
     },
     { load, view: changeView, focus: focusRoot },
   );

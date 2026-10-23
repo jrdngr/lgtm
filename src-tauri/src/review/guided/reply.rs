@@ -195,9 +195,19 @@ fn unique_id(id: &str, taken: &mut HashSet<String>) -> String {
     let slug: String = id
         .trim()
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect();
-    let slug = if slug.trim_matches('-').is_empty() { "chunk".to_string() } else { slug };
+    let slug = if slug.trim_matches('-').is_empty() {
+        "chunk".to_string()
+    } else {
+        slug
+    };
     let mut out = slug.clone();
     let mut n = 2;
     while !taken.insert(out.clone()) {
@@ -320,8 +330,14 @@ pub fn validate(
         .collect();
     for f in files {
         let named = |span: (u32, u32)| {
-            chunks.iter().flat_map(|c| &c.ranges).any(|r| overlaps(r, &f.path, span))
-                || excluded.iter().flat_map(|e| &e.ranges).any(|r| overlaps(r, &f.path, span))
+            chunks
+                .iter()
+                .flat_map(|c| &c.ranges)
+                .any(|r| overlaps(r, &f.path, span))
+                || excluded
+                    .iter()
+                    .flat_map(|e| &e.ranges)
+                    .any(|r| overlaps(r, &f.path, span))
         };
         let left: Vec<(u32, u32)> = f.changed.iter().copied().filter(|s| !named(*s)).collect();
         if !left.is_empty() {

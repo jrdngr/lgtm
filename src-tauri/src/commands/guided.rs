@@ -26,7 +26,9 @@ pub(crate) fn set_guided_verdicts(
     review: u32,
     sets: Vec<VerdictSet>,
 ) -> CmdResult<GuidedDto> {
-    repo(&window)?.set_guided_verdicts(review, sets).map_err(err)
+    repo(&window)?
+        .set_guided_verdicts(review, sets)
+        .map_err(err)
 }
 
 /// Makes excluded part `index` a chunk at `risk`.
@@ -38,7 +40,9 @@ pub(crate) fn promote_excluded(
     index: u32,
     risk: ChunkRisk,
 ) -> CmdResult<GuidedDto> {
-    repo(&window)?.promote_excluded(review, index, risk).map_err(err)
+    repo(&window)?
+        .promote_excluded(review, index, risk)
+        .map_err(err)
 }
 
 /// The terminal agent prompts whose edits wrote `lines`, a chunk's added lines in `paths`.

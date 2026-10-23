@@ -76,7 +76,10 @@ pub(crate) async fn workspace_files(
 ) -> CmdResult<Vec<String>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     tokio::task::spawn_blocking(move || {
-        search::files(&ws.root).into_iter().map(|(_, rel)| rel).collect()
+        search::files(&ws.root)
+            .into_iter()
+            .map(|(_, rel)| rel)
+            .collect()
     })
     .await
     .map_err(|e| e.to_string())
@@ -96,12 +99,11 @@ pub(crate) async fn request_symbol_info(
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let root = ws.root.clone();
     let n = name.clone();
-    let def = tokio::task::spawn_blocking(move || {
-        symbol_info::locate(&root, &n, path.as_deref(), line)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(err)?;
+    let def =
+        tokio::task::spawn_blocking(move || symbol_info::locate(&root, &n, path.as_deref(), line))
+            .await
+            .map_err(|e| e.to_string())?
+            .map_err(err)?;
     Ok(SymbolAsk {
         prompt: symbol_info::request(&def, &name),
         path: def.path,
@@ -131,8 +133,15 @@ pub(crate) async fn mark_symbol_asked(
 ) -> CmdResult<()> {
     let ctx = super::repo(&window)?;
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    symbol_info::asked(&ctx.store.lock().unwrap(), ws.key(), &ws.root, &path, &name, nth)
-        .map_err(err)?;
+    symbol_info::asked(
+        &ctx.store.lock().unwrap(),
+        ws.key(),
+        &ws.root,
+        &path,
+        &name,
+        nth,
+    )
+    .map_err(err)?;
     SymbolInfoChanged.emit(&window).ok();
     Ok(())
 }
@@ -161,8 +170,17 @@ pub(crate) async fn dismiss_symbol_info(
 ) -> CmdResult<()> {
     let ctx = super::repo(&window)?;
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let key = InfoKey { workspace: ws.key(), path: &path, name: &name, nth };
-    ctx.store.lock().unwrap().delete_symbol_info(&key).map_err(|e| e.to_string())?;
+    let key = InfoKey {
+        workspace: ws.key(),
+        path: &path,
+        name: &name,
+        nth,
+    };
+    ctx.store
+        .lock()
+        .unwrap()
+        .delete_symbol_info(&key)
+        .map_err(|e| e.to_string())?;
     SymbolInfoChanged.emit(&window).ok();
     Ok(())
 }

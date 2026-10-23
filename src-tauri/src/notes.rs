@@ -123,7 +123,10 @@ impl NoteBook<'_> {
             return Ok((level, n));
         }
         let n = self.global.lock().unwrap().note(id)?;
-        Ok((NoteLevel::Global, n.with_context(|| format!("no note `{id}`"))?))
+        Ok((
+            NoteLevel::Global,
+            n.with_context(|| format!("no note `{id}`"))?,
+        ))
     }
 
     fn put(&self, level: NoteLevel, n: &NoteRow) -> anyhow::Result<()> {
@@ -295,7 +298,10 @@ mod tests {
     use super::*;
 
     fn stores() -> (Mutex<Store>, Mutex<Store>) {
-        (Mutex::new(Store::in_memory()), Mutex::new(Store::in_memory()))
+        (
+            Mutex::new(Store::in_memory()),
+            Mutex::new(Store::in_memory()),
+        )
     }
 
     fn book<'a>(s: &'a (Mutex<Store>, Mutex<Store>), ws: &str) -> NoteBook<'a> {
@@ -341,7 +347,10 @@ mod tests {
             (moved.level, moved.folder.as_str(), moved.body.as_str()),
             (NoteLevel::Global, "Later", "text")
         );
-        assert!(s.1.lock().unwrap().note(&n.id).unwrap().is_none(), "the repo copy is gone");
+        assert!(
+            s.1.lock().unwrap().note(&n.id).unwrap().is_none(),
+            "the repo copy is gone"
+        );
     }
 
     #[test]
@@ -349,7 +358,9 @@ mod tests {
         let s = stores();
         let a = book(&s, "");
         a.add_folder(NoteLevel::Repo, "", "Empty").unwrap();
-        let n = a.create(NoteLevel::Repo, "Plans/Auth", "Tokens", "").unwrap();
+        let n = a
+            .create(NoteLevel::Repo, "Plans/Auth", "Tokens", "")
+            .unwrap();
         let folders = |a: &NoteBook| {
             a.list()
                 .unwrap()

@@ -1,9 +1,9 @@
 //! Searching a workspace's working copy: text, references to a name, symbols and file paths.
 
 mod refs;
-mod text;
 #[cfg(test)]
 mod tests;
+mod text;
 
 use std::path::{Path, PathBuf};
 

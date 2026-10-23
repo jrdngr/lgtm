@@ -27,7 +27,11 @@ fn files() -> Vec<FileRows> {
         row(Context, Some(8), Some(9)),
         row(Added, None, Some(10)),
     ];
-    let b = [row(Context, Some(4), Some(4)), row(Removed, Some(5), None), row(Context, Some(6), Some(5))];
+    let b = [
+        row(Context, Some(4), Some(4)),
+        row(Removed, Some(5), None),
+        row(Context, Some(6), Some(5)),
+    ];
     vec![FileRows::of("a.rs", &a), FileRows::of("b.rs", &b)]
 }
 
@@ -64,7 +68,10 @@ fn chunks_keep_only_review_files_and_get_unique_ids() {
     assert_eq!(chunks[0].ranges.len(), 1);
     assert_eq!(chunks[0].docs, ["docs/adr/1.md"]);
     // An end before the start becomes the start.
-    assert_eq!((chunks[1].ranges[0].start, chunks[1].ranges[0].end), (10, 10));
+    assert_eq!(
+        (chunks[1].ranges[0].start, chunks[1].ranges[0].end),
+        (10, 10)
+    );
 }
 
 #[test]
@@ -81,11 +88,18 @@ fn changed_lines_nothing_names_are_listed_as_excluded() {
     assert_eq!(excluded.len(), 2);
     // A whole-file exclusion takes the file's changed lines.
     assert_eq!(excluded[0].reason, ExcludeReason::Simple);
-    assert_eq!((excluded[0].ranges[0].start, excluded[0].ranges[0].end), (5, 5));
+    assert_eq!(
+        (excluded[0].ranges[0].start, excluded[0].ranges[0].end),
+        (5, 5)
+    );
     // a.rs:10 is in no chunk; 3-4 overlaps one, so it isn't listed.
     assert_eq!(excluded[1].reason, ExcludeReason::Unlisted);
     assert_eq!(excluded[1].path, "a.rs");
-    let listed: Vec<_> = excluded[1].ranges.iter().map(|r| (r.start, r.end)).collect();
+    let listed: Vec<_> = excluded[1]
+        .ranges
+        .iter()
+        .map(|r| (r.start, r.end))
+        .collect();
     assert_eq!(listed, [(10, 10)]);
 }
 

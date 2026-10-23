@@ -347,11 +347,17 @@ mod tests {
             })
         };
         assert_eq!(
-            input(post("Edit", serde_json::json!({"file_path": "/r/a.rs", "new_string": "x"}))),
+            input(post(
+                "Edit",
+                serde_json::json!({"file_path": "/r/a.rs", "new_string": "x"})
+            )),
             at("x")
         );
         assert_eq!(
-            input(post("Write", serde_json::json!({"file_path": "/r/a.rs", "content": "all"}))),
+            input(post(
+                "Write",
+                serde_json::json!({"file_path": "/r/a.rs", "content": "all"})
+            )),
             at("all")
         );
         let multi = serde_json::json!({
@@ -359,7 +365,10 @@ mod tests {
             "edits": [{"new_string": "one"}, {"new_string": "two"}],
         });
         assert_eq!(input(post("MultiEdit", multi)), at("one\ntwo"));
-        assert_eq!(input(post("Read", serde_json::json!({"file_path": "/r/a.rs"}))), None);
+        assert_eq!(
+            input(post("Read", serde_json::json!({"file_path": "/r/a.rs"}))),
+            None
+        );
         let pre = serde_json::json!({
             "hook_event_name": "PreToolUse", "tool_name": "Edit",
             "tool_input": {"file_path": "/r/a.rs", "new_string": "x"},
