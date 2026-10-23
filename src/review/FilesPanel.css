@@ -75,7 +75,7 @@
 }
 
 .file-tree :where(.dir) .name:not([class*="decor-"]) {
-  color: var(--muted);
+  color: var(--soft);
 }
 
 .file-tree .done .name {
