@@ -53,8 +53,15 @@ export function logger(module: string): Record<LogLevel, Log> {
 
 const uncaught = logger("uncaught");
 
+/** WebKit reports a ResizeObserver that resized within its own callback as an error, though
+ * nothing failed: the rest of its notifications arrive next frame. */
+const RESIZE_LOOP = "ResizeObserver loop";
+
 /** Sends uncaught errors and unhandled rejections to the app's log. */
 export function installErrorLogging() {
-  window.addEventListener("error", (e) => uncaught.error(e.error ?? e.message));
+  window.addEventListener("error", (e) => {
+    if (!e.error && e.message?.startsWith(RESIZE_LOOP)) return;
+    uncaught.error(e.error ?? e.message);
+  });
   window.addEventListener("unhandledrejection", (e) => uncaught.error(e.reason));
 }
