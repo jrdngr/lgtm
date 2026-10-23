@@ -23,11 +23,8 @@ pub(super) struct Fetched {
     pub added_remote: Option<String>,
 }
 
-/// Fetches the PR's base and head.
+/// Fetches the PR's base and head, in one fetch when both are on the base's remote.
 pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result<Fetched> {
-    jj.fetch(&base.remote, &[&info.base_ref_name])
-        .await
-        .with_context(|| format!("fetch {} from {}", info.base_ref_name, base.remote))?;
     let mut added_remote = None;
     let head_remote = match (&info.head_repository, info.is_cross_repository) {
         (Some(_), false) => Some(base.remote.clone()),
@@ -46,7 +43,19 @@ pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result
         }
         (None, _) => None,
     };
-    match fetch_head(jj, info, base, head_remote).await {
+    let fetched = async {
+        let same = head_remote.as_deref() == Some(base.remote.as_str());
+        let mut branches = vec![info.base_ref_name.as_str()];
+        // A deleted head branch only warns, and fetch_head's fallback covers it.
+        if same {
+            branches.push(&info.head_ref_name);
+        }
+        jj.fetch(&base.remote, &branches)
+            .await
+            .with_context(|| format!("fetch {} from {}", info.base_ref_name, base.remote))?;
+        fetch_head(jj, info, base, head_remote, same).await
+    };
+    match fetched.await {
         Ok(head_remote) => Ok(Fetched {
             head_remote,
             added_remote,
@@ -58,17 +67,20 @@ pub(super) async fn fetch(jj: &Jj, info: &PrInfo, base: &Base) -> anyhow::Result
     }
 }
 
-/// Fetches the PR's head from `head_remote`, or from `pull/N/head` when that doesn't have it.
-/// Returns the remote it came from.
+/// Fetches the PR's head from `head_remote`, unless `fetched` already did, or from
+/// `pull/N/head` when that doesn't have it. Returns the remote it came from.
 async fn fetch_head(
     jj: &Jj,
     info: &PrInfo,
     base: &Base,
     head_remote: Option<String>,
+    fetched: bool,
 ) -> anyhow::Result<Option<String>> {
     if let Some(r) = &head_remote {
-        // A deleted branch fails here, and the fallback below covers it.
-        jj.fetch(r, &[&info.head_ref_name]).await.ok();
+        if !fetched {
+            // A deleted branch fails here, and the fallback below covers it.
+            jj.fetch(r, &[&info.head_ref_name]).await.ok();
+        }
         if jj.has_commit(&info.head_ref_oid).await {
             return Ok(head_remote);
         }
