@@ -17,7 +17,6 @@ import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
 import { CommentBlock } from "./CommentBlock";
-import { Conflicts } from "./Conflicts";
 import { commentSlots } from "./comments";
 import { useCurrentReview } from "./current";
 import { DiffLines } from "./DiffLines";
@@ -404,7 +403,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />
-      {review && <Conflicts changes={review.changes} send={(text) => sendText(text, focusRoot)} />}
       {error && <div className="review-error">{error}</div>}
       {review && fileLines.length === 0 && (
         <div className="placeholder">

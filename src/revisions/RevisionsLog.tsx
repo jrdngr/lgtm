@@ -366,6 +366,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   // A drag brackets the commits it's across as it goes, before anything loads.
+  /** The turn the review shows, which the bracket marks in place of its commits. */
+  const onTurn = !dragging && !pending && turns.some((t) => t.id === target?.turn);
   const tentative = dragging || !!pending;
   const shown = dragging ? pickedIds() : (pending ?? reviewed);
   const inReview = (i: number) => shown.has(rows?.[i]?.commit?.commitId ?? "");
@@ -373,7 +375,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   let first = -1;
   let lastIn = -1;
   rows?.forEach((_, i) => {
-    if (!inReview(i)) return;
+    if (onTurn || !inReview(i)) return;
     if (first < 0) first = i;
     lastIn = i;
   });
@@ -466,7 +468,9 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                     onDoubleClick={(e) => e.stopPropagation()}
                     onClick={() => {
                       move(c);
-                      review(commit.changeId);
+                      // Off a turn, `@`'s rail goes back to its whole diff.
+                      if (onTurn && commit.workingCopy) target?.view({ kind: "combined" });
+                      else review(commit.changeId);
                     }}
                   />
                 )}
@@ -476,7 +480,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                 <TurnRows
                   workspace={workspace}
                   turns={turns}
-                  shown={target?.turn}
+                  shown={onTurn ? target?.turn : undefined}
                   below={graph.cells[i].at(-1) ?? []}
                   width={graph.width}
                   onError={setError}

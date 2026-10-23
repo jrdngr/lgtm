@@ -102,6 +102,7 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
       onClick={() => openTurn(workspace, t)}
       onContextMenu={(e) => menu(e, t)}
     >
+      {t.id === shown && <span className="lr-bk top bot" />}
       <GraphThrough below={below} width={width} />
       <span className="lt-body">
         <svg
