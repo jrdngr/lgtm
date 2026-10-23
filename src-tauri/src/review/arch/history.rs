@@ -1,5 +1,6 @@
 //! Architecture history entries by commit. A commit's contents never change, so its entry
-//! holds while its parent and the review's files are the same.
+//! holds while its parent, the working copy it reads other files from, and the review's files
+//! are the same.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -15,9 +16,9 @@ const MAX_COMMITS: usize = 1024;
 #[derive(Default)]
 pub struct HistoryCache(Mutex<HashMap<Key, Option<HistoryDto>>>);
 
-pub fn key(commit: &str, parent: Option<&str>, reviewed: &[String]) -> Key {
+pub fn key(commit: &str, parent: Option<&str>, seen_from: &str, reviewed: &[String]) -> Key {
     let mut h = blake3::Hasher::new();
-    for part in [commit, parent.unwrap_or_default()]
+    for part in [commit, parent.unwrap_or_default(), seen_from]
         .into_iter()
         .chain(reviewed.iter().map(String::as_str))
     {

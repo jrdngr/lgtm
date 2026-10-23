@@ -305,27 +305,23 @@ impl Jj {
         Ok(parse_changes(&out))
     }
 
-    /// Each commit in `revset` with its first parent.
-    pub async fn first_parents(
+    /// The changes in `revset`, oldest first, each with its first parent, in one read.
+    pub async fn changes_with_parents(
         &self,
         revset: &str,
-    ) -> anyhow::Result<HashMap<String, Option<String>>> {
+    ) -> anyhow::Result<Vec<(Change, Option<String>)>> {
+        let template = format!(
+            r#"parents.map(|p| p.commit_id()).join(" ") ++ "\t" ++ {CHANGE_TEMPLATE}"#
+        );
         let out = self
-            .read(&[
-                "log",
-                "--no-graph",
-                "-r",
-                revset,
-                "-T",
-                r#"commit_id ++ "\t" ++ parents.map(|p| p.commit_id()).join(" ") ++ "\n""#,
-            ])
+            .read(&["log", "--no-graph", "--reversed", "-r", revset, "-T", &template])
             .await?;
         Ok(out
             .lines()
-            .filter_map(|l| l.split_once('\t'))
-            .map(|(c, parents)| {
+            .filter_map(|l| {
+                let (parents, rest) = l.split_once('\t')?;
                 let first = parents.split(' ').next().filter(|p| !p.is_empty());
-                (c.to_string(), first.map(str::to_string))
+                Some((parse_changes(rest).pop()?, first.map(str::to_string)))
             })
             .collect())
     }

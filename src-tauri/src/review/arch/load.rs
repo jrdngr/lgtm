@@ -95,16 +95,18 @@ impl RepoCtx {
         // Files the review changes differ in the working copy, so each commit reads its
         // unchanged ones at the commit.
         let whole = ws.jj.resolve(&revset).await?;
-        let (reviewed, changes, parents) = tokio::try_join!(
+        let (reviewed, changes, at) = tokio::try_join!(
             ws.jj.diff_paths(&whole),
-            ws.jj.changes(&revset),
-            ws.jj.first_parents(&revset),
+            ws.jj.changes_with_parents(&revset),
+            ws.jj.commit_ids("@"),
         )?;
         let reviewed: Vec<String> = reviewed.into_iter().map(|d| d.path).collect();
+        // Files outside the commit's own are read from the working copy, so its entry holds
+        // only while the workspace and its `@` stay the same.
+        let seen_from = format!("{}\0{}", ws.root.display(), at.join(","));
         let mut out = Vec::new();
-        for c in changes {
-            let parent = parents.get(&c.commit_id).cloned().flatten();
-            let key = history::key(&c.commit_id, parent.as_deref(), &reviewed);
+        for (c, parent) in changes {
+            let key = history::key(&c.commit_id, parent.as_deref(), &seen_from, &reviewed);
             if let Some(found) = self.reviews.history.get(&key) {
                 out.extend(found);
                 continue;
