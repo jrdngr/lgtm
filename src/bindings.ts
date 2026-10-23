@@ -1451,7 +1451,9 @@ export type JjAction = { kind: "edit"; rev: string } |
  *  `jj git push`. With `new_bookmarks`, those go too, by name, so they start tracking
  *  `remote`, along with what plain push sends.
  */
-{ kind: "push"; remote?: string | null; newBookmarks?: string[] };
+{ kind: "push"; remote?: string | null; 
+/**  The push plan's range, which `new_bookmarks` go with. */
+range?: string | null; newBookmarks?: string[] };
 
 /**
  *  A write in a workspace has waited on a jj lock for a while. `holders` lists the processes
@@ -1818,6 +1820,11 @@ export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: nu
 
 export type PushPlan = {
 	remote: string,
+	/**
+	 *  The revset plain push takes bookmarks from: the user's `revsets.git-push`, else jj's
+	 *  default. Its `remote` is bound with [`remote_binding`].
+	 */
+	range: string,
 	/**  Local bookmarks in the push range that don't track `remote` yet. */
 	newBookmarks: string[],
 };

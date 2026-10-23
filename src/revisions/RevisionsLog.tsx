@@ -142,24 +142,17 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const picked = () => rangeOf(cursor, anchor);
   const ranged = hi > lo ? picked() : undefined;
 
-  /** A drag's range, released and waiting on its commits to be reviewed. */
+  /** A released drag's range, while its commits are asked for. */
   const released = useRef<string>(undefined);
   // The log can interleave branches, so a range holds only the commits `older::newer` lists.
   // A drag asks once, when it's released.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `chain` is what this sets
   useEffect(() => {
-    if (!ranged || !rows || dragging) return;
+    if (!ranged || !rows || dragging || released.current === ranged) return;
     if (chain?.revset === ranged && chain.rows === rows) return;
     let live = true;
     commands.revsetCommits(workspace, ranged).then((r) => {
-      if (!live) return;
-      if (r.status !== "ok") {
-        if (released.current === ranged) released.current = undefined;
-        return;
-      }
-      const ids = new Set(r.data);
-      setChain({ revset: ranged, ids, rows });
-      if (released.current === ranged) reviewChain(ranged, ids);
+      if (live && r.status === "ok") setChain({ revset: ranged, ids: new Set(r.data), rows });
     });
     return () => {
       live = false;
@@ -170,9 +163,8 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const unrelated = inChain?.size === 0;
 
   function reviewChain(range: string, ids: Set<string>) {
-    released.current = undefined;
     if (ids.size === 0) setError(UNRELATED);
-    else review(range);
+    else review(range, ids);
   }
 
   function reviewPicked() {
@@ -195,8 +187,17 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       if (from === undefined || from === cursor) return;
       const range = rangeOf(cursor, from);
       if (!range) return;
-      if (chain?.revset === range && chain.rows === rows) reviewChain(range, chain.ids);
-      else released.current = range;
+      if (chain?.revset === range && chain.rows === rows) return reviewChain(range, chain.ids);
+      // Asked here rather than by the range's effect, so a reload meanwhile can't drop it.
+      released.current = range;
+      const asked = rows;
+      const r = await commands.revsetCommits(workspace, range);
+      if (released.current !== range) return;
+      released.current = undefined;
+      if (r.status !== "ok") return;
+      const ids = new Set(r.data);
+      setChain({ revset: range, ids, rows: asked });
+      reviewChain(range, ids);
     };
     window.addEventListener("mouseup", up);
     return () => window.removeEventListener("mouseup", up);
@@ -219,11 +220,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     setError,
   );
 
-  /** Loads `next` as the review, bracketing its commits dashed until it's loaded. */
-  async function review(next: string | undefined) {
+  /** Loads `next` as the review, bracketing its commits dashed until it's loaded: `known`,
+   * else the picked rows jj lists for it. */
+  async function review(next: string | undefined, known?: Set<string>) {
     if (!next) return;
     setError(undefined);
-    const ids = next === picked() ? pickedIds() : new Set<string>();
+    const ids = known ?? (next === picked() ? pickedIds() : new Set<string>());
     setPending(ids);
     if (!ids.size) {
       commands.revsetCommits(workspace, next).then((r) => {

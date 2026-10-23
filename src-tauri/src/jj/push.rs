@@ -10,32 +10,49 @@ use super::Jj;
 #[serde(rename_all = "camelCase")]
 pub struct PushPlan {
     pub remote: String,
+    /// The revset plain push takes bookmarks from: the user's `revsets.git-push`, else jj's
+    /// default. Its `remote` is bound with [`remote_binding`].
+    pub range: String,
     /// Local bookmarks in the push range that don't track `remote` yet.
     pub new_bookmarks: Vec<String>,
 }
 
-/// The commits plain `jj git push` pushes bookmarks in.
-pub fn push_range(remote: &str) -> String {
-    format!("remote_bookmarks(remote=exact:{remote:?})..@")
+/// jj's default for `revsets.git-push`.
+const DEFAULT_RANGE: &str = "remote_bookmarks(remote=exact:remote)..@";
+
+/// The `--config` that binds the `remote` a push range names, as jj does when it pushes.
+pub fn remote_binding(remote: &str) -> String {
+    let quoted = remote.replace('\\', "\\\\").replace('"', "\\\"");
+    format!("revset-aliases.remote='\"{quoted}\"'")
 }
 
 impl Jj {
-    /// The remote `jj git push` uses: `git.push`, else `origin`.
+    /// The remote `jj git push` uses: `git.push`, else the only remote, else `origin`.
     async fn push_remote(&self) -> String {
         match self.read(&["config", "get", "git.push"]).await {
-            Ok(r) if !r.trim().is_empty() => r.trim().to_string(),
+            Ok(r) if !r.trim().is_empty() => return r.trim().to_string(),
+            _ => {}
+        }
+        match self.remotes().await.as_deref() {
+            Ok([(only, _)]) => only.clone(),
             _ => "origin".to_string(),
         }
     }
 
     pub async fn push_plan(&self) -> anyhow::Result<PushPlan> {
         let remote = self.push_remote().await;
+        let range = match self.read(&["config", "get", "revsets.git-push"]).await {
+            Ok(r) if !r.trim().is_empty() => r.trim().to_string(),
+            _ => DEFAULT_RANGE.to_string(),
+        };
         let names = self
             .read(&[
                 "log",
                 "--no-graph",
+                "--config",
+                &remote_binding(&remote),
                 "-r",
-                &push_range(&remote),
+                &range,
                 "-T",
                 r#"local_bookmarks.map(|b| b.name() ++ "\n").join("")"#,
             ])
@@ -63,6 +80,7 @@ impl Jj {
         new_bookmarks.dedup();
         Ok(PushPlan {
             remote,
+            range,
             new_bookmarks,
         })
     }
@@ -75,7 +93,7 @@ mod tests {
     use crate::jj::test_support::{jj, repo, write};
 
     #[tokio::test]
-    async fn a_new_bookmark_is_named_and_pushed_with_the_tracked_ones() {
+    async fn a_new_bookmark_is_named_and_pushed_with_the_tracked_ones_to_the_only_remote() {
         let (dir, j) = repo();
         let remote = tempfile::tempdir().unwrap();
         let ok = std::process::Command::new("git")
@@ -84,7 +102,7 @@ mod tests {
             .status()
             .unwrap();
         assert!(ok.success());
-        jj(dir.path(), &["git", "remote", "add", "origin", remote.path().to_str().unwrap()]);
+        jj(dir.path(), &["git", "remote", "add", "up", remote.path().to_str().unwrap()]);
         write(dir.path(), "a", "a\n");
         jj(dir.path(), &["commit", "-m", "a"]);
         jj(dir.path(), &["bookmark", "create", "main", "-r", "@-"]);
@@ -98,13 +116,15 @@ mod tests {
         assert_eq!(
             plan,
             PushPlan {
-                remote: "origin".into(),
+                remote: "up".into(),
+                range: DEFAULT_RANGE.into(),
                 new_bookmarks: vec!["feat".into()],
             }
         );
 
         j.act(&JjAction::Push {
             remote: Some(plan.remote),
+            range: Some(plan.range),
             new_bookmarks: plan.new_bookmarks,
         })
         .await

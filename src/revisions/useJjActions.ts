@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { JjAction } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
@@ -18,6 +18,8 @@ export function useJjActions(
   const [steps, setSteps] = useState(1);
   /** The action running, if one is. */
   const [running, setRunning] = useState<JjAction>();
+  /** Whether an action has started, including asking for a push's plan. */
+  const inFlight = useRef(false);
   /** What the last fetch or push did, which nothing else in the log shows. */
   const [note, setNote] = useState<string>();
 
@@ -33,18 +35,26 @@ export function useJjActions(
       `Push new ${names.length === 1 ? "bookmark" : "bookmarks"} ${list} to ${plan.remote}?`,
       "Push",
     );
-    return ok ? { kind: "push", remote: plan.remote, newBookmarks: names } : null;
+    return ok
+      ? { kind: "push", remote: plan.remote, range: plan.range, newBookmarks: names }
+      : null;
   }
 
   async function act(requested: JjAction, _label?: string, follow?: boolean) {
-    if (running) return;
+    // Set at once, since `running` is only set after a push's plan is asked for.
+    if (inFlight.current) return;
+    inFlight.current = true;
     let action: JjAction | null;
     try {
       action = await withNewBookmarks(requested);
     } catch (e) {
+      inFlight.current = false;
       return onError(String(e));
     }
-    if (!action) return;
+    if (!action) {
+      inFlight.current = false;
+      return;
+    }
     setRunning(action);
     setNote(undefined);
     try {
@@ -58,6 +68,7 @@ export function useJjActions(
       await reviewAfter(workspace, (r) => loadReview(workspace, r), revset, follow);
     } finally {
       setRunning(undefined);
+      inFlight.current = false;
     }
   }
 

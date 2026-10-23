@@ -48,6 +48,9 @@ pub enum JjAction {
     Push {
         #[serde(default)]
         remote: Option<String>,
+        /// The push plan's range, which `new_bookmarks` go with.
+        #[serde(default)]
+        range: Option<String>,
         #[serde(default, rename = "newBookmarks")]
         new_bookmarks: Vec<String>,
     },
@@ -78,12 +81,15 @@ impl JjAction {
             JjAction::Fetch => v(&["git", "fetch"]),
             JjAction::Push {
                 remote,
+                range,
                 new_bookmarks,
             } => {
                 let mut args = v(&["git", "push"]);
-                if let (Some(remote), false) = (remote, new_bookmarks.is_empty()) {
+                if let (Some(remote), Some(range), false) = (remote, range, new_bookmarks.is_empty())
+                {
                     args.extend(["--remote".into(), format!("exact:{remote}")]);
-                    args.extend(["-r".into(), super::push::push_range(remote)]);
+                    args.extend(["--config".into(), super::push::remote_binding(remote)]);
+                    args.extend(["-r".into(), range.clone()]);
                     for b in new_bookmarks {
                         args.extend(["-b".into(), format!("exact:{b}")]);
                     }
