@@ -29,6 +29,7 @@ import { baseName, type EditorParams } from "./open";
 import { lineRef, renderedLines } from "./renderedLines";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
+import { useDiffGutter } from "./useDiffGutter";
 import { useImageZoom } from "./useImageZoom";
 import { ViewSwitch } from "./ViewSwitch";
 import "./editor.css";
@@ -126,6 +127,8 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   useEffect(() => {
     view?.dispatch({ effects: wrapping.reconfigure(wrapExtension(wrap)) });
   }, [view, wrap]);
+
+  useDiffGutter(view, workspace, path);
 
   const infos = useSymbolInfos(workspace, [path]);
   const folded = useFolded();

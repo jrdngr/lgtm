@@ -12,6 +12,8 @@ import {
   type ViewUpdate,
 } from "@codemirror/view";
 import { symbolInfo } from "../symbolInfo/editorInfo";
+import { diffGutter } from "./diffGutter";
+import { diffRuler, rulerTheme } from "./diffRuler";
 import { treeSitter } from "./highlight";
 import { linkClicks } from "./linkClicks";
 
@@ -70,7 +72,10 @@ export function editorExtensions(
   };
   return [
     symbolInfo,
+    diffGutter,
     lineNumbers(),
+    diffRuler,
+    rulerTheme,
     highlightActiveLineGutter(),
     highlightActiveLine(),
     drawSelection(),
