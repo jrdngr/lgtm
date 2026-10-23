@@ -20,6 +20,7 @@ import { onLogRevsetChanged, publishLogRevset } from "./logRevset";
 import { MotionPopup } from "./MotionPopup";
 import { type Motion, type MotionTarget, motions, narrow, step } from "./motions";
 import { PrPill } from "./PrPill";
+import { RevisionPopover, useRowHover } from "./RevisionPopover";
 import { RevisionsFooter } from "./RevisionsFooter";
 import { RevPickPopup } from "./RevPickPopup";
 import { RunningRow } from "./RunningRow";
@@ -313,6 +314,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     }
   }
 
+  const hover = useRowHover();
   const bookmarks = useBookmarkPick(workspace, runOn, setError);
   const revs = useRevPick(runOn);
 
@@ -389,7 +391,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   }
 
   /** A row's graph and its commit's lines. */
-  function rowBody(i: number) {
+  function rowBody(i: number, full?: boolean) {
     const commit = rows?.[i]?.commit;
     const rp = commit ? prOf(commit) : undefined;
     return (
@@ -398,6 +400,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         {commit && (
           <CommitLines
             c={commit}
+            full={full}
             lead={commit.workingCopy && <TurnsToggle turns={turns} />}
             pill={
               rp && (
@@ -426,7 +429,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       {running && <RunningRow action={running} />}
       {error && <div className="review-error">{error}</div>}
       {!rows && !error && <div className="placeholder">Loading</div>}
-      <div className="lr-list">
+      <div className="lr-list" onScroll={hover.leave}>
         {rows?.map((row, i) => {
           const c = commitIndex.get(i) ?? -1;
           const commit = row.commit;
@@ -438,6 +441,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
               <div
                 className={`lr${tint}${commit ? " pickable" : ""}${inRange ? " picked" : ""}${c === cursor ? " cursor" : ""}`}
                 onMouseDown={(e) => {
+                  hover.leave();
                   // A right-click picks in the row's menu, keeping a range it's in.
                   if (c < 0 || e.button !== 0) return;
                   if (!e.shiftKey) {
@@ -445,11 +449,16 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                   }
                   move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
                 }}
-                onMouseEnter={() => {
-                  if (drag.current === undefined || c < 0) return;
+                onMouseEnter={(e) => {
+                  if (drag.current === undefined) {
+                    if (commit) hover.enter(i, e.currentTarget);
+                    return;
+                  }
+                  if (c < 0) return;
                   if (c !== drag.current) setDragging(true);
                   move(c, drag.current);
                 }}
+                onMouseLeave={hover.leave}
                 onDoubleClick={() => c >= 0 && edit(c)}
                 onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
               >
@@ -465,6 +474,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                     aria-label="Review"
                     tabIndex={-1}
                     onMouseDown={(e) => {
+                      hover.leave();
                       // A drag from the rail brackets commits as one from the row does.
                       e.stopPropagation();
                       if (e.button !== 0) return;
@@ -496,6 +506,9 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           );
         })}
       </div>
+      {hover.hover && !dragging && (
+        <RevisionPopover hover={hover.hover}>{rowBody(hover.hover.row, true)}</RevisionPopover>
+      )}
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
       {bookmarks.pick && <BookmarkPopup pick={bookmarks.pick} onPick={bookmarks.choose} />}
       {revs.pick && (
