@@ -66,8 +66,12 @@
   stroke-width: 1.5;
 }
 
-.lt-ic.ck {
+.lt-ic.checkpoint {
   stroke: var(--amber);
+}
+
+.lt-ic.edit {
+  stroke: var(--mark-cyan);
 }
 
 /* The agent is still on it, in the color a working agent's workspace shows. */

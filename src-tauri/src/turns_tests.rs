@@ -135,3 +135,44 @@ async fn a_run_of_turns_diffs_from_the_first_start_to_the_last_end_over_their_fi
     let review = ctx.open_in(None, "@", false, &view).await.unwrap();
     assert_eq!(paths(&review), ["a.rs", "b.rs"]);
 }
+
+/// Saves `text` to `file` the way the editor does.
+async fn save(ctx: &RepoCtx, file: &str, text: &str) {
+    let ws = ctx.workspace(None).await.unwrap();
+    let before = working_commit(&ws).await.unwrap();
+    write(&ws.root, file, text);
+    ctx.record_save(&ws, file, &before).await.unwrap();
+}
+
+#[tokio::test]
+async fn saves_in_a_row_make_one_edit_and_an_agent_turn_between_starts_another() {
+    let (dir, ctx) = repo();
+    // Changed outside the editor, so in no edit.
+    write(dir.path(), "other.rs", "x\n");
+    save(&ctx, "a.rs", "1\n").await;
+    save(&ctx, "b.rs", "2\n").await;
+    save(&ctx, "a.rs", "1\n").await;
+    hook(&ctx, Checkpoint::Start, None).await;
+    hook(&ctx, Checkpoint::Before, Some("t1")).await;
+    write(dir.path(), "c.rs", "3\n");
+    hook(&ctx, Checkpoint::After, Some("t1")).await;
+    hook(&ctx, Checkpoint::End, None).await;
+    save(&ctx, "a.rs", "1\n2\n").await;
+
+    let turns = ctx.turns(None).await.unwrap();
+    let kinds: Vec<_> = turns.iter().map(|t| (t.kind, t.paths.clone())).collect();
+    assert_eq!(
+        kinds,
+        [
+            (TurnKind::Edit, vec!["a.rs".to_string()]),
+            (TurnKind::Agent, vec!["c.rs".to_string()]),
+            (TurnKind::Edit, vec!["a.rs".to_string(), "b.rs".to_string()]),
+        ]
+    );
+    assert_eq!((turns[2].added, turns[2].removed), (2, 0));
+    let view = View::Turn {
+        turns: vec![turns[2].id],
+    };
+    let review = ctx.open_in(None, "@", false, &view).await.unwrap();
+    assert_eq!(paths(&review), ["a.rs", "b.rs"]);
+}

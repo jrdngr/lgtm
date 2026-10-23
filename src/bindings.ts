@@ -323,7 +323,10 @@ export const commands = {
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
 	/**  An image file's bytes as base64. */
 	readImage: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_image", { workspace, path })),
-	/**  Saves a file, then snapshots the working copy so reviews of `@` pick it up. */
+	/**
+	 *  Saves a file between two snapshots of the working copy, so reviews of `@` pick it up and
+	 *  its turns show it as the user's edit.
+	 */
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
 	/**  Makes an empty file, or a folder when `dir`. */
 	createPath: (workspace: string | null, path: string, dir: boolean) => typedError<null, string>(__TAURI_INVOKE("create_path", { workspace, path, dir })),
@@ -2579,11 +2582,14 @@ export type Turn = {
 	text: string,
 };
 
-/**  A turn or checkpoint on the workspace's working-copy change. */
+/**  A turn, saved edit or checkpoint on the workspace's working-copy change. */
 export type TurnDto = {
 	id: number,
-	/**  The prompt, `None` for a checkpoint. */
+	kind: TurnKind,
+	/**  The prompt, for an agent's turn. */
 	prompt: string | null,
+	/**  The files it changed; none for a checkpoint. */
+	paths: string[],
 	changeId: string,
 	/**  The agent is still working on it. */
 	running: boolean,
@@ -2593,7 +2599,12 @@ export type TurnDto = {
 	at: number | null,
 };
 
-/**  An agent's turn in the workspace started, changed files or ended. */
+/**  Who made a turn. */
+export type TurnKind = "agent" | 
+/**  The user, saving files in lgtm's editor. */
+"edit" | "checkpoint";
+
+/**  An agent's turn in the workspace started, changed files or ended, or the user saved a file. */
 export type TurnsChanged = {
 	workspace: string | null,
 };

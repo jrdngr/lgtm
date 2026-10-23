@@ -49,6 +49,9 @@ function GraphThrough({ below, width }: { below: Cell[]; width: number }) {
 
 const TERMINAL = "M2.5 4l3 3-3 3M7 10.5h4.5";
 const FLAG = "M3.5 12.5V2.5M3.5 3h7l-1.8 2.5L10.5 8h-7";
+const PERSON =
+  "M7 6.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5zM2.5 12.5c0-2.6 2-4.2 4.5-4.2s4.5 1.6 4.5 4.2";
+const ICONS = { agent: TERMINAL, edit: PERSON, checkpoint: FLAG };
 
 interface Props {
   workspace: WorkspaceName;
@@ -109,7 +112,10 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
   const [lo, hi] = [Math.min(...marked), Math.max(...marked)];
 
   async function undo(t: TurnDto) {
-    const ok = await confirmAction(`Undo "${turnName(t)}"?`, "Undo Turn");
+    const ok = await confirmAction(
+      `Undo "${turnName(t)}"?`,
+      t.kind === "agent" ? "Undo Turn" : "Undo Edit",
+    );
     if (!ok) return;
     try {
       await unwrap(commands.undoTurn(workspace, t.id));
@@ -125,13 +131,18 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
   }
 
   function menu(e: React.MouseEvent, t: TurnDto) {
-    const turn = t.prompt !== null;
+    const turn = t.kind === "agent";
+    const undoable = t.kind !== "checkpoint";
     openMenu(e, [
       { label: "Review", onSelect: () => openTurns(workspace, [t]) },
-      turn && { label: "Undo Turn", disabled: t.running, onSelect: () => undo(t) },
-      turn && "-",
+      undoable && {
+        label: turn ? "Undo Turn" : "Undo Edit",
+        disabled: t.running,
+        onSelect: () => undo(t),
+      },
+      undoable && "-",
       turn && { label: "Copy Prompt", onSelect: () => copy(t.prompt ?? "") },
-      "-",
+      turn && "-",
       { label: "Remove", onSelect: () => remove(t) },
     ]);
   }
@@ -159,12 +170,8 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
       )}
       <GraphThrough below={below} width={width} />
       <span className="lt-body">
-        <svg
-          className={`lt-ic${t.prompt === null ? " ck" : ""}`}
-          viewBox="0 0 14 14"
-          aria-hidden="true"
-        >
-          <path d={t.prompt === null ? FLAG : TERMINAL} />
+        <svg className={`lt-ic ${t.kind}`} viewBox="0 0 14 14" aria-hidden="true">
+          <path d={ICONS[t.kind]} />
         </svg>
         <span className="lt-p">{turnName(t)}</span>
         <span className="lt-add">+{t.added}</span>

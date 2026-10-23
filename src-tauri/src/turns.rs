@@ -1,8 +1,9 @@
 //! Agent turns and checkpoints. lgtm's Claude Code hooks snapshot a terminal's workspace when
 //! a prompt is sent, around each tool that can write files, and when the agent stops. A
 //! turn's diff runs from its first snapshot to its last over the files its tools changed, so
-//! edits made in the working copy between tool calls stay out of it. A checkpoint is a
-//! snapshot the user takes, diffed whole against `@` as it is now.
+//! edits made in the working copy between tool calls stay out of it. Saving a file in lgtm's
+//! editor snapshots around the save, and saves in a row make one edit of the user's. A
+//! checkpoint is a snapshot the user takes, diffed whole against `@` as it is now.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -34,13 +35,26 @@ pub enum Checkpoint {
     End,
 }
 
-/// A turn or checkpoint on the workspace's working-copy change.
+/// Who made a turn.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum TurnKind {
+    Agent,
+    /// The user, saving files in lgtm's editor.
+    Edit,
+    Checkpoint,
+}
+
+/// A turn, saved edit or checkpoint on the workspace's working-copy change.
 #[derive(Clone, Debug, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnDto {
     pub id: u32,
-    /// The prompt, `None` for a checkpoint.
+    pub kind: TurnKind,
+    /// The prompt, for an agent's turn.
     pub prompt: Option<String>,
+    /// The files it changed; none for a checkpoint.
+    pub paths: Vec<String>,
     pub change_id: String,
     /// The agent is still working on it.
     pub running: bool,
@@ -53,6 +67,11 @@ pub struct TurnDto {
 /// Snapshots taken before tools run, by tool call, until the tools finish.
 #[derive(Default)]
 pub struct Befores(Mutex<HashMap<String, String>>);
+
+/// `@`'s commit, after a snapshot.
+pub async fn working_commit(ws: &Workspace) -> anyhow::Result<String> {
+    Ok(at(ws).await?.1)
+}
 
 /// `@`'s change and commit, after a snapshot.
 async fn at(ws: &Workspace) -> anyhow::Result<(String, String)> {
@@ -99,9 +118,17 @@ fn end_of(turn: &Turn, at: &str) -> String {
     turn.end.clone().unwrap_or_else(|| at.to_string())
 }
 
-/// The files a turn's diff covers: those its tools changed, or every file for a checkpoint.
+/// The files a turn's diff covers: those it changed, or every file for a checkpoint.
 fn paths_of(turn: &Turn) -> Option<&[String]> {
-    turn.session.is_some().then_some(turn.paths.as_slice())
+    (!turn.is_checkpoint()).then_some(turn.paths.as_slice())
+}
+
+fn kind_of(turn: &Turn) -> TurnKind {
+    match (turn.human, turn.session.is_some()) {
+        (true, _) => TurnKind::Edit,
+        (false, true) => TurnKind::Agent,
+        (false, false) => TurnKind::Checkpoint,
+    }
 }
 
 impl RepoCtx {
@@ -209,7 +236,9 @@ impl RepoCtx {
             };
             out.push(TurnDto {
                 id: t.id as u32,
+                kind: kind_of(&t),
                 prompt: t.prompt,
+                paths: t.paths,
                 change_id: t.change_id,
                 running,
                 added,
@@ -218,6 +247,41 @@ impl RepoCtx {
             });
         }
         Ok(out)
+    }
+
+    /// Records the user's save of `path` as an edit, `before` being `@`'s commit before it.
+    /// A save right after another edit, with no turn or checkpoint between, joins it.
+    /// Returns whether the workspace's turns changed.
+    pub async fn record_save(
+        &self,
+        ws: &Workspace,
+        path: &str,
+        before: &str,
+    ) -> anyhow::Result<bool> {
+        let (change, commit) = at(ws).await?;
+        if commit == before {
+            return Ok(false);
+        }
+        let (id, start, mut paths) = {
+            let store = self.store.lock().unwrap();
+            let last = store.turns_on(ws.key(), &change)?.into_iter().next();
+            match last.filter(|t| t.human) {
+                Some(t) => (t.id, t.start, t.paths),
+                None => (
+                    store.start_edit(ws.key(), &change, before, now_ms())?,
+                    before.to_string(),
+                    vec![],
+                ),
+            }
+        };
+        if !paths.iter().any(|p| p == path) {
+            paths.push(path.to_string());
+        }
+        let lines = counts(span_diff(&ws.jj, &start, &commit, Some(&paths)).await?.iter());
+        let store = self.store.lock().unwrap();
+        store.add_turn_paths(id, &paths)?;
+        store.end_turn(id, &change, &commit, lines, now_ms())?;
+        Ok(true)
     }
 
     /// Takes a checkpoint of the workspace's working copy.
@@ -267,12 +331,12 @@ impl RepoCtx {
         Ok(Some((range, paths)))
     }
 
-    /// Puts the files a finished turn changed back as they were before it, unless they've
+    /// Puts the files a finished turn or edit changed back as they were before it, unless they've
     /// changed since.
     pub async fn undo_turn(&self, workspace: Option<&str>, id: u32) -> anyhow::Result<()> {
         let ws = self.workspace(workspace).await?;
         let turn = self.store.lock().unwrap().turn(id.into())?;
-        let Some(turn) = turn.filter(|t| t.session.is_some()) else {
+        let Some(turn) = turn.filter(|t| !t.is_checkpoint()) else {
             bail!("no such turn");
         };
         let Some(end) = &turn.end else {

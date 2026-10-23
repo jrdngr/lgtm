@@ -1,4 +1,4 @@
-//! Agent turns and checkpoints: snapshots of a workspace's working copy that diffs start from.
+//! Agent turns, the user's saved edits, and checkpoints: snapshots of a workspace's working copy that diffs start from.
 
 use rusqlite::{OptionalExtension, params};
 
@@ -17,16 +17,27 @@ CREATE TABLE IF NOT EXISTS agent_turns (
     added INTEGER NOT NULL DEFAULT 0,
     removed INTEGER NOT NULL DEFAULT 0,
     started_at INTEGER NOT NULL,
-    ended_at INTEGER
+    ended_at INTEGER,
+    human INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS agent_turns_workspace ON agent_turns (workspace, change_id);
 ";
 
 pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
-    db.execute_batch(SCHEMA)
+    db.execute_batch(SCHEMA)?;
+    // Tables from before saved edits were kept have no `human` column.
+    let has_human: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('agent_turns') WHERE name = 'human'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_human {
+        db.execute_batch("ALTER TABLE agent_turns ADD COLUMN human INTEGER NOT NULL DEFAULT 0;")?;
+    }
+    Ok(())
 }
 
-/// A prompt's turn, or a checkpoint when it has no session.
+/// A prompt's turn, files the user saved, or a checkpoint when it's neither.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Turn {
     pub id: i64,
@@ -46,10 +57,19 @@ pub struct Turn {
     pub removed: u32,
     pub started_at: i64,
     pub ended_at: Option<i64>,
+    /// Files the user saved in lgtm's editor.
+    pub human: bool,
+}
+
+impl Turn {
+    /// A snapshot the user took, which diffs every file.
+    pub fn is_checkpoint(&self) -> bool {
+        self.session.is_none() && !self.human
+    }
 }
 
 const COLUMNS: &str = "id, workspace, session, prompt, change_id, start, end, paths, added, \
-                       removed, started_at, ended_at";
+                       removed, started_at, ended_at, human";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Turn> {
     let paths: String = r.get(7)?;
@@ -66,6 +86,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Turn> {
         removed: r.get(9)?,
         started_at: r.get(10)?,
         ended_at: r.get(11)?,
+        human: r.get(12)?,
     })
 }
 
@@ -84,6 +105,22 @@ impl Store {
             "INSERT INTO agent_turns (workspace, session, prompt, change_id, start, paths, started_at)
              VALUES (?, ?, ?, ?, ?, '[]', ?)",
             params![workspace, session, prompt, change_id, start, at],
+        )?;
+        Ok(self.db.last_insert_rowid())
+    }
+
+    /// Starts the user's saved edits from `start`. Returns its id.
+    pub fn start_edit(
+        &self,
+        workspace: &str,
+        change_id: &str,
+        start: &str,
+        at: i64,
+    ) -> rusqlite::Result<i64> {
+        self.db.execute(
+            "INSERT INTO agent_turns (workspace, change_id, start, paths, started_at, human)
+             VALUES (?, ?, ?, '[]', ?, 1)",
+            params![workspace, change_id, start, at],
         )?;
         Ok(self.db.last_insert_rowid())
     }

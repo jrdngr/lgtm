@@ -122,7 +122,7 @@ pub struct ArchChanged {
 #[derive(Clone, Serialize, Type, Event)]
 pub struct SymbolInfoChanged;
 
-/// An agent's turn in the workspace started, changed files or ended.
+/// An agent's turn in the workspace started, changed files or ended, or the user saved a file.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct TurnsChanged {
     pub workspace: Option<String>,

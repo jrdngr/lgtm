@@ -1,11 +1,14 @@
 use std::path::{Path, PathBuf};
 
-use tauri::WebviewWindow;
+use tauri::{Manager, WebviewWindow};
+use tauri_specta::Event;
 
 use super::{CmdResult, err};
+use crate::events::TurnsChanged;
 use crate::files::{self, FileEntry};
 use crate::prompts;
 use crate::syntax::{self, Segment};
+use crate::turns;
 use crate::workspace::Workspace;
 
 /// A directory of the workspace's working copy, `""` for its root.
@@ -59,7 +62,8 @@ pub(crate) async fn read_image(
     Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
-/// Saves a file, then snapshots the working copy so reviews of `@` pick it up.
+/// Saves a file between two snapshots of the working copy, so reviews of `@` pick it up and
+/// its turns show it as the user's edit.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn save_file(
@@ -68,9 +72,20 @@ pub(crate) async fn save_file(
     path: String,
     text: String,
 ) -> CmdResult<()> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    files::write(&contained(&ws, &path)?, &path, &text).map_err(err)?;
-    ws.snapshot().await.map_err(err)
+    let repo = super::repo(&window)?;
+    let ws = repo.workspace(workspace.as_deref()).await.map_err(err)?;
+    let file = contained(&ws, &path)?;
+    let before = turns::working_commit(&ws).await;
+    files::write(&file, &path, &text).map_err(err)?;
+    let (Ok(before), false) = (before, Path::new(&path).is_absolute()) else {
+        return ws.snapshot().await.map_err(err);
+    };
+    if repo.record_save(&ws, &path, &before).await.map_err(err)? {
+        TurnsChanged { workspace }
+            .emit_to(window.app_handle(), window.label())
+            .ok();
+    }
+    Ok(())
 }
 
 /// Highlight segments per line, empty when `path` has no grammar.
