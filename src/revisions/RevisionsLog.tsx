@@ -29,6 +29,9 @@ const MOVES: Record<string, number> = { j: 1, ArrowDown: 1, J: 1, k: -1, ArrowUp
 
 const UNRELATED = "Not one line of ancestry";
 
+/** How long a press is held before the drag bracket shows, when it hasn't left its row. */
+const DRAG_DELAY_MS = 250;
+
 interface Props {
   workspace: WorkspaceName;
   /** Changes when the user asks for a refresh, which asks GitHub for PRs again. */
@@ -65,6 +68,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   /** The commit a drag across rows started on. */
   const drag = useRef<number>(undefined);
   const [dragging, setDragging] = useState(false);
+  /** Starts the drag's bracket once a press has been held a moment, so a click doesn't flash it. */
+  const dragDelay = useRef<ReturnType<typeof setTimeout>>(undefined);
+  function startDragging() {
+    clearTimeout(dragDelay.current);
+    setDragging(true);
+  }
 
   const commits = useMemo(() => (rows ?? []).flatMap((r, i) => (r.commit ? [i] : [])), [rows]);
   const graph = useMemo(() => graphOf(rows ?? []), [rows]);
@@ -183,6 +192,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     const up = async () => {
       const from = drag.current;
       drag.current = undefined;
+      clearTimeout(dragDelay.current);
       setDragging(false);
       if (from === undefined || from === cursor) return;
       const range = rangeOf(cursor, from);
@@ -388,12 +398,15 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                 if (c < 0 || e.button !== 0) return;
                 if (!e.shiftKey) {
                   drag.current = c;
-                  setDragging(true);
+                  clearTimeout(dragDelay.current);
+                  dragDelay.current = setTimeout(startDragging, DRAG_DELAY_MS);
                 }
                 move(c, e.shiftKey ? (anchor ?? cursor) : undefined);
               }}
               onMouseEnter={() => {
-                if (drag.current !== undefined && c >= 0) move(c, drag.current);
+                if (drag.current === undefined || c < 0) return;
+                if (c !== drag.current) startDragging();
+                move(c, drag.current);
               }}
               onDoubleClick={() => c >= 0 && edit(c)}
               onContextMenu={(e) => c >= 0 && rowMenu(e, c)}
