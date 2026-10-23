@@ -86,5 +86,6 @@ pnpm install
 just dev         # hot reload; shows the repo picker
 just go          # jj git fetch, jj new main@origin, then just dev
 just test        # tsc + biome, vitest, cargo test (the Rust tests run jj)
+just log=debug dev   # dev with debug logging; logs also go to logs/
 just install     # release build, copied to /Applications
 ```
