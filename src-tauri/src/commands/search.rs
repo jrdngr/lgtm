@@ -4,6 +4,7 @@ use tauri_specta::Event as _;
 use super::{CmdResult, err};
 use crate::events::SymbolInfoChanged;
 use crate::search::{self, Hits, SymbolHit, TextQuery};
+use crate::store::InfoKey;
 use crate::symbol_info::{self, SymbolInfoDto};
 
 /// Lines of the workspace's working copy matching `query`.
@@ -81,8 +82,8 @@ pub(crate) async fn workspace_files(
     .map_err(|e| e.to_string())
 }
 
-/// Marks `name` as asked about and returns the prompt for the agent. Its definition is the
-/// one in `path` when there is one there, else the first in the workspace.
+/// The prompt asking the agent about `name`. Its definition is the one in `path` at `line`
+/// when there is one there, else the first in the workspace.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn request_symbol_info(
@@ -90,29 +91,50 @@ pub(crate) async fn request_symbol_info(
     workspace: Option<String>,
     name: String,
     path: Option<String>,
+    line: Option<u32>,
 ) -> CmdResult<SymbolAsk> {
-    let ctx = super::repo(&window)?;
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let root = ws.root.clone();
-    let (def, line, _, _) = {
-        let (name, path, root) = (name.clone(), path.clone(), root.clone());
-        tokio::task::spawn_blocking(move || symbol_info::locate(&root, &name, path.as_deref()))
-            .await
-            .map_err(|e| e.to_string())?
-            .map_err(err)?
-    };
-    let prompt = symbol_info::request(&ctx.store.lock().unwrap(), &root, &name, Some(&def))
-        .map_err(err)?;
-    SymbolInfoChanged.emit(&window).ok();
-    Ok(SymbolAsk { path: def, line, prompt })
+    let n = name.clone();
+    let def = tokio::task::spawn_blocking(move || {
+        symbol_info::locate(&root, &n, path.as_deref(), line)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(err)?;
+    Ok(SymbolAsk {
+        prompt: symbol_info::request(&def, &name),
+        path: def.path,
+        nth: def.nth,
+        line: def.line,
+    })
 }
 
 /// Where a symbol asked about is defined, and the prompt to send.
 #[derive(serde::Serialize, specta::Type)]
 pub(crate) struct SymbolAsk {
     path: String,
+    nth: u32,
     line: u32,
     prompt: String,
+}
+
+/// Marks a definition as asked about, once its prompt went out.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn mark_symbol_asked(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    path: String,
+    name: String,
+    nth: u32,
+) -> CmdResult<()> {
+    let ctx = super::repo(&window)?;
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    symbol_info::asked(&ctx.store.lock().unwrap(), ws.key(), &ws.root, &path, &name, nth)
+        .map_err(err)?;
+    SymbolInfoChanged.emit(&window).ok();
+    Ok(())
 }
 
 /// Symbol Information on symbols defined in `paths`.
@@ -125,18 +147,22 @@ pub(crate) async fn symbol_infos(
 ) -> CmdResult<Vec<SymbolInfoDto>> {
     let ctx = super::repo(&window)?;
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    symbol_info::infos(&ctx.store.lock().unwrap(), &ws.root, &paths).map_err(err)
+    symbol_info::infos(&ctx.store.lock().unwrap(), ws.key(), &ws.root, &paths).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn dismiss_symbol_info(window: WebviewWindow, path: String, name: String) -> CmdResult<()> {
-    super::repo(&window)?
-        .store
-        .lock()
-        .unwrap()
-        .delete_symbol_info(&path, &name)
-        .map_err(|e| e.to_string())?;
+pub(crate) async fn dismiss_symbol_info(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    path: String,
+    name: String,
+    nth: u32,
+) -> CmdResult<()> {
+    let ctx = super::repo(&window)?;
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let key = InfoKey { workspace: ws.key(), path: &path, name: &name, nth };
+    ctx.store.lock().unwrap().delete_symbol_info(&key).map_err(|e| e.to_string())?;
     SymbolInfoChanged.emit(&window).ok();
     Ok(())
 }

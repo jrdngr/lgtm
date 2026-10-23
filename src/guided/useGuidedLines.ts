@@ -239,8 +239,9 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
     const picks = pickedKeys.has(keyOf(r)) ? picked : [r];
     const word = wordAtPoint(e.clientX, e.clientY);
     if (picks.length === 1) pick(r, false);
-    const path = review?.files[r.file]?.dto.path;
-    openMenu(e, [...searchItems(workspace, word, path), ...menu(picks)]);
+    const f = review?.files[r.file];
+    const line = f?.rows[r.row]?.newLine ?? undefined;
+    openMenu(e, [...searchItems(workspace, word, f?.dto.path, line), ...menu(picks)]);
   };
 
   return {

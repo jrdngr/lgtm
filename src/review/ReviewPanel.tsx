@@ -45,6 +45,7 @@ import { type MenuAt, useRowMouse } from "./useRowMouse";
 import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
+import { useWorkingCopy } from "./workingCopy";
 
 /** Rows changed since they were reviewed show amber, in every review. */
 const amberRows = remembered("lgtm:amberRows", true, [true, false]);
@@ -114,7 +115,9 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   });
   const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
   const { collapsedFiles, collapsedHunks, revealed } = fold;
-  const info = useInfoLines(workspace, files);
+  const wc = useWorkingCopy(workspace)?.commitId;
+  const atWorkingCopy = !!review && wc === review.to;
+  const info = useInfoLines(workspace, files, atWorkingCopy);
   const fileLines = useMemo(
     () =>
       buildLines(files, {
@@ -457,7 +460,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           setup={setup}
           canDraft={c.canDraft}
           inHunk={inHunk(lines[cursor])}
-          symbol={searchItems(workspace, menu.word ?? "", menu.path)}
+          symbol={searchItems(workspace, menu.word ?? "", menu.path, menu.line)}
           onPick={a.pick}
           onClose={closeMenu}
         />

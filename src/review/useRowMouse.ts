@@ -16,6 +16,8 @@ export interface MenuAt {
   y: number;
   word?: string;
   path?: string;
+  /** The row's line in the new side. */
+  line?: number;
 }
 
 interface Deps {
@@ -28,6 +30,13 @@ interface Deps {
   toggleFile(file: number): void;
   setChecked(file: number, checked: boolean): void;
   reveal(gap: string): void;
+}
+
+/** The new-side line a diff line shows, when it shows one. */
+function rowLine(files: FlatFile[], l: DisplayLine | undefined): number | undefined {
+  if (l?.kind !== "rows") return undefined;
+  const rows = files[l.file]?.rows;
+  return l.rows.map((r) => rows?.[r]?.newLine).find((n) => n != null) ?? undefined;
 }
 
 /** Mouse handlers for the diff's lines: click, drag, and multi-click to select. */
@@ -81,7 +90,8 @@ export function useRowMouse(d: Deps): LineHandlers {
       const root = rootRef.current?.getBoundingClientRect();
       const word = wordAtPoint(e.clientX, e.clientY);
       const path = files[lines[i]?.file]?.dto.path;
-      if (root) d.setMenu({ x: e.clientX - root.left, y: e.clientY - root.top, word, path });
+      const line = rowLine(files, lines[i]);
+      if (root) d.setMenu({ x: e.clientX - root.left, y: e.clientY - root.top, word, path, line });
     },
     onFileClick(file: number) {
       s.selectUnit(fileSelection(files, lines, file));

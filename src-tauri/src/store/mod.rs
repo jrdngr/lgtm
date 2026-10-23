@@ -32,6 +32,7 @@ pub use notes::NoteRow;
 pub use prs::PrRecord;
 pub use report::{BotRun, Part, Persona};
 pub use sessions::Session;
+pub use symbol_info::InfoKey;
 pub use threads::{Quote, Stage, Take, TakeVerdict, ThreadState};
 
 pub struct Store {
@@ -273,6 +274,7 @@ impl Store {
             "notes",
             "note_folders",
             "workspace_roots",
+            "symbol_info",
         ] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }

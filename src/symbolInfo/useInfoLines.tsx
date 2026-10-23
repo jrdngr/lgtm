@@ -5,10 +5,16 @@ import { InfoBlock, InfoIcon } from "./InfoBlock";
 import { infoRows } from "./rows";
 import { infoKey, useFolded, useSymbolInfos } from "./store";
 
+const NO_PATHS: string[] = [];
+
 /** Symbol Information placed on a diff's rows: blocks under the open ones, by row `markKey`,
- * and gutter icons for folded ones. */
-export function useInfoLines(ws: WorkspaceName, files: FlatFile[]) {
-  const paths = useMemo(() => files.map((f) => f.dto.path), [files]);
+ * and gutter icons for folded ones. Only a diff whose new side is the working copy gets them,
+ * since that's where their lines are. */
+export function useInfoLines(ws: WorkspaceName, files: FlatFile[], atWorkingCopy: boolean) {
+  const paths = useMemo(
+    () => (atWorkingCopy ? files.map((f) => f.dto.path) : NO_PATHS),
+    [files, atWorkingCopy],
+  );
   const infos = useSymbolInfos(ws, paths);
   const folded = useFolded();
   return useMemo(() => {

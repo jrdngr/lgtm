@@ -38,12 +38,12 @@ export function InfoBlock({ ws, info }: Props) {
         ) : (
           <PipeButton
             className="si-refresh"
-            onClick={() => askSymbolInfo(ws, info.name, info.path)}
+            onClick={() => askSymbolInfo(ws, info.name, info.path, info.line)}
           >
             Refresh
           </PipeButton>
         )}
-        <button type="button" className="si-close" onClick={() => dismiss(info)}>
+        <button type="button" className="si-close" onClick={() => dismiss(ws, info)}>
           ×
         </button>
       </div>

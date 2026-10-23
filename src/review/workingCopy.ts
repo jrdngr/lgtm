@@ -11,6 +11,7 @@ import { workspaceStore } from "./workspaceStore";
 const store = workspaceStore<WorkingCopyDto>();
 
 export const useWorkingCopy = store.use;
+export const workingCopy = store.get;
 
 /** Whether the workspace's `@` is outside its review, so edits land where nobody's looking. */
 export const useAtOutside = (workspace: WorkspaceName) =>

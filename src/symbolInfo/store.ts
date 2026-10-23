@@ -4,8 +4,10 @@ import { events, type SymbolInfoDto } from "../bindings";
 import { loadState, saveState } from "../core/savedState";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
+import { useRepoChanged } from "../workspaces/useRepoChanged";
 
-export const infoKey = (i: { path: string; name: string }) => `${i.path}\0${i.name}`;
+export const infoKey = (i: { path: string; name: string; nth: number }) =>
+  `${i.path}\0${i.name}\0${i.nth}`;
 
 let version = 0;
 let listening = false;
@@ -29,13 +31,16 @@ function listen() {
   });
 }
 
-/** Symbol Information on symbols defined in `paths`, loaded again after any change. */
+/** Symbol Information on symbols defined in `paths`, loaded again after any change to it or
+ * the workspace's files. */
 export function useSymbolInfos(ws: WorkspaceName, paths: string[]): SymbolInfoDto[] {
   listen();
   const v = useSyncExternalStore(subscribe, () => version);
+  const [edits, setEdits] = useState(0);
+  useRepoChanged(() => setEdits((n) => n + 1), ws);
   const [infos, setInfos] = useState<SymbolInfoDto[]>([]);
   const key = paths.join("\n");
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `v` asks for a reload
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `v` and `edits` ask for a reload
   useEffect(() => {
     if (!key) return setInfos([]);
     let live = true;
@@ -46,7 +51,7 @@ export function useSymbolInfos(ws: WorkspaceName, paths: string[]): SymbolInfoDt
     return () => {
       live = false;
     };
-  }, [ws, key, v]);
+  }, [ws, key, v, edits]);
   return infos;
 }
 
@@ -74,4 +79,5 @@ export function setFolded(key: string, fold: boolean) {
   notify();
 }
 
-export const dismiss = (i: SymbolInfoDto) => commands.dismissSymbolInfo(i.path, i.name);
+export const dismiss = (ws: WorkspaceName, i: SymbolInfoDto) =>
+  commands.dismissSymbolInfo(ws, i.path, i.name, i.nth);

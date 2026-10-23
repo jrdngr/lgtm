@@ -5,7 +5,9 @@ import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { SIGN } from "../model/sign";
 import { Code } from "../review/Cell";
+import { useCurrentReview } from "../review/current";
 import { type FlatFile, markKey } from "../review/model";
+import { useWorkingCopy } from "../review/workingCopy";
 import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { IconButton } from "../ui/icons";
 import { inRanges, type Segment } from "./model";
@@ -27,7 +29,9 @@ interface Props {
 
 /** A chunk's diff, one block per run of rows, under its file's path. */
 export function ChunkCode({ files, segments, lit, lines, after, expanded, onExpand }: Props) {
-  const info = useInfoLines(useWorkspace(), files);
+  const ws = useWorkspace();
+  const atWorkingCopy = useCurrentReview(ws)?.head === useWorkingCopy(ws)?.commitId;
+  const info = useInfoLines(ws, files, atWorkingCopy);
   return (
     <>
       {segments.map((s) => {

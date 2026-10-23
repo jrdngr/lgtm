@@ -90,9 +90,22 @@ fn word_ranges(line: &str, name: &str) -> Vec<(usize, usize)> {
         .collect()
 }
 
-/// Where `name` is defined in `text`: the line that names it, its kind, and its code.
-pub fn definition(rel: &str, text: &str, name: &str) -> Option<(u32, SymbolKind, String)> {
-    let parsed = syntax::parse(rel, text)?;
+/// A definition of a name in a file.
+pub struct Definition {
+    /// The line that names it.
+    pub line: u32,
+    pub kind: SymbolKind,
+    pub code: String,
+    /// The lines it spans.
+    pub start: u32,
+    pub end: u32,
+}
+
+/// Every definition of `name` in `text`, in file order.
+pub fn definitions(rel: &str, text: &str, name: &str) -> Vec<Definition> {
+    let Some(parsed) = syntax::parse(rel, text) else {
+        return vec![];
+    };
     let lines: Vec<u32> = parsed
         .refs(text)
         .into_iter()
@@ -104,7 +117,7 @@ pub fn definition(rel: &str, text: &str, name: &str) -> Option<(u32, SymbolKind,
         .symbols(text)
         .into_iter()
         .filter(|s| s.name == name)
-        .find_map(|s| {
+        .filter_map(|s| {
             let line = lines
                 .iter()
                 .copied()
@@ -112,8 +125,15 @@ pub fn definition(rel: &str, text: &str, name: &str) -> Option<(u32, SymbolKind,
             let code = source
                 .get(s.start_line as usize - 1..(s.end_line as usize).min(source.len()))?
                 .join("\n");
-            Some((line, s.kind, code))
+            Some(Definition {
+                line,
+                kind: s.kind,
+                code,
+                start: s.start_line,
+                end: s.end_line,
+            })
         })
+        .collect()
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use specta::Type;
 
-pub use refs::{SymbolHit, definition, references, symbols};
+pub use refs::{Definition, SymbolHit, definitions, references, symbols};
 pub use text::{TextQuery, replace, search};
 
 /// Past these a search stops, so a huge repo can't stall it.

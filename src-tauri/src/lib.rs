@@ -104,6 +104,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::search::request_symbol_info,
             commands::search::symbol_infos,
             commands::search::dismiss_symbol_info,
+            commands::search::mark_symbol_asked,
             commands::review::mark_rows,
             commands::review::clear_file_marks,
             commands::review::set_files_checked,

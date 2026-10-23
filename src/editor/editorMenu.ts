@@ -64,7 +64,7 @@ export function editorMenu(d: Deps): CtxEntry[] {
   };
   const wrap = wordWrap.get();
   return [
-    ...searchItems(d.workspace, editorWord(v), path),
+    ...searchItems(d.workspace, editorWord(v), path, line),
     {
       label: "Cut",
       keys: "⌘X",

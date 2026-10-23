@@ -20,7 +20,7 @@ impl Lgtm {
         let (label, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
         let name = p.name.clone();
-        symbol_info::set(&ctx.store.lock().unwrap(), &ws.root, p).map_err(failed)?;
+        symbol_info::set(&ctx.store.lock().unwrap(), ws.key(), &ws.root, p).map_err(failed)?;
         SymbolInfoChanged.emit_to(self.app(), &label).ok();
         Ok(format!("Stored Symbol Information on `{name}`."))
     }

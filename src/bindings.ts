@@ -114,13 +114,15 @@ export const commands = {
 	/**  Every file in the working copy, relative, skipping ignored ones. */
 	workspaceFiles: (workspace: string | null) => typedError<string[], string>(__TAURI_INVOKE("workspace_files", { workspace })),
 	/**
-	 *  Marks `name` as asked about and returns the prompt for the agent. Its definition is the
-	 *  one in `path` when there is one there, else the first in the workspace.
+	 *  The prompt asking the agent about `name`. Its definition is the one in `path` at `line`
+	 *  when there is one there, else the first in the workspace.
 	 */
-	requestSymbolInfo: (workspace: string | null, name: string, path: string | null) => typedError<SymbolAsk, string>(__TAURI_INVOKE("request_symbol_info", { workspace, name, path })),
+	requestSymbolInfo: (workspace: string | null, name: string, path: string | null, line: number | null) => typedError<SymbolAsk, string>(__TAURI_INVOKE("request_symbol_info", { workspace, name, path, line })),
 	/**  Symbol Information on symbols defined in `paths`. */
 	symbolInfos: (workspace: string | null, paths: string[]) => typedError<SymbolInfoDto[], string>(__TAURI_INVOKE("symbol_infos", { workspace, paths })),
-	dismissSymbolInfo: (path: string, name: string) => typedError<null, string>(__TAURI_INVOKE("dismiss_symbol_info", { path, name })),
+	dismissSymbolInfo: (workspace: string | null, path: string, name: string, nth: number) => typedError<null, string>(__TAURI_INVOKE("dismiss_symbol_info", { workspace, path, name, nth })),
+	/**  Marks a definition as asked about, once its prompt went out. */
+	markSymbolAsked: (workspace: string | null, path: string, name: string, nth: number) => typedError<null, string>(__TAURI_INVOKE("mark_symbol_asked", { workspace, path, name, nth })),
 	/**
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
@@ -2288,6 +2290,7 @@ export type SymNodeDto = {
 /**  Where a symbol asked about is defined, and the prompt to send. */
 export type SymbolAsk = {
 	path: string,
+	nth: number,
 	line: number,
 	prompt: string,
 };
@@ -2306,6 +2309,8 @@ export type SymbolInfoChanged = null;
 export type SymbolInfoDto = {
 	path: string,
 	name: string,
+	/**  Which of the file's definitions of `name` it is, from 0. */
+	nth: number,
 	/**  The definition's line now, 1-based. */
 	line: number,
 	kind: SymbolKind,
