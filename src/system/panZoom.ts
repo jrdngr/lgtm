@@ -25,30 +25,46 @@ export function zoomAt(v: View, factor: number, px: number, py: number): View {
   return { k, x: px - (px - v.x) * r, y: py - (py - v.y) * r };
 }
 
-/** The view that shows the whole world, from (`left`, `top`) to (`w`, `h`), centered in a `vw`
- * by `vh` viewport, no larger than its own size. */
+/** The view that fills a `vw` by `vh` viewport with the whole world, from (`left`, `top`) to
+ * (`w`, `h`), centered. */
 export function fitView(w: number, h: number, vw: number, vh: number, left = 0, top = 0): View {
   const ww = w - left;
   const wh = h - top;
-  const k = clamp(Math.min(1, (vw - MARGIN * 2) / ww, (vh - MARGIN * 2) / wh));
+  const k = clamp(Math.min((vw - MARGIN * 2) / ww, (vh - MARGIN * 2) / wh));
   return { k, x: (vw - ww * k) / 2 - left * k, y: (vh - wh * k) / 2 - top * k };
 }
 
 /** Pans by dragging the background and zooms with the wheel or a pinch, toward the pointer.
- * Fits the world whenever its size changes, or with `fitKey`, whenever that does. `dragged()`
- * says whether the last pointer press panned, so its click can be ignored. */
+ * Fits the world whenever its size changes, or with `fitKey`, whenever that does, and again as
+ * the viewport resizes until the view is panned or zoomed. `dragged()` says whether the last
+ * pointer press panned, so its click can be ignored. */
 export function usePanZoom(width: number, height: number, fitKey?: string, left = 0, top = 0) {
   const ref = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
   const moved = useRef(false);
+  /** Whether the view is still the fitted one. */
+  const fitted = useRef(true);
 
   const fitNow = useCallback(() => {
     const el = ref.current;
-    if (el) setView(fitView(width, height, el.clientWidth, el.clientHeight, left, top));
+    if (!el) return;
+    fitted.current = true;
+    setView(fitView(width, height, el.clientWidth, el.clientHeight, left, top));
   }, [width, height, left, top]);
   const fitWhen = fitKey ?? `${width}x${height}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: refits only when `fitWhen` changes
   useLayoutEffect(fitNow, [fitWhen]);
+
+  // A tab laid out hidden has no size yet; it fits once it has one.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (fitted.current && el.clientWidth && el.clientHeight) fitNow();
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [fitNow]);
 
   useEffect(() => {
     const el = ref.current;
@@ -58,6 +74,7 @@ export function usePanZoom(width: number, height: number, fitKey?: string, left 
       const r = el.getBoundingClientRect();
       // A pinch arrives as a wheel with Control held, in much smaller steps.
       const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002));
+      fitted.current = false;
       setView((v) => zoomAt(v, factor, e.clientX - r.left, e.clientY - r.top));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -73,6 +90,7 @@ export function usePanZoom(width: number, height: number, fitKey?: string, left 
     const move = (ev: PointerEvent) => {
       if (!moved.current && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < SLOP) return;
       moved.current = true;
+      fitted.current = false;
       const dx = ev.clientX - last.x;
       const dy = ev.clientY - last.y;
       last = { x: ev.clientX, y: ev.clientY };
@@ -88,7 +106,9 @@ export function usePanZoom(width: number, height: number, fitKey?: string, left 
 
   const zoomBy = (factor: number) => {
     const el = ref.current;
-    if (el) setView((v) => zoomAt(v, factor, el.clientWidth / 2, el.clientHeight / 2));
+    if (!el) return;
+    fitted.current = false;
+    setView((v) => zoomAt(v, factor, el.clientWidth / 2, el.clientHeight / 2));
   };
 
   return {

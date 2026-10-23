@@ -23,12 +23,12 @@ describe("fitView", () => {
     expect(v).toMatchObject({ x: 24, y: 74 });
   });
 
-  it("doesn't enlarge a small world", () => {
-    expect(fitView(200, 100, 1000, 600)).toEqual({ k: 1, x: 400, y: 250 });
+  it("enlarges a small world, up to the largest zoom", () => {
+    expect(fitView(200, 100, 1000, 600)).toEqual({ k: MAX_ZOOM, x: 300, y: 200 });
   });
 
   it("centers a world that reaches left of and above the origin", () => {
     // The world spans -100..100 by -50..50; its center, the origin, lands mid-viewport.
-    expect(fitView(100, 50, 1000, 600, -100, -50)).toEqual({ k: 1, x: 500, y: 300 });
+    expect(fitView(100, 50, 1000, 600, -100, -50)).toEqual({ k: MAX_ZOOM, x: 500, y: 300 });
   });
 });
