@@ -88,6 +88,22 @@ pub(crate) async fn save_file(
     Ok(())
 }
 
+/// Each of `paths` as a workspace file to open, if it is one: relative to the workspace's
+/// root, or absolute inside it. Terminals ask this of the paths in their output.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn files_at(
+    window: WebviewWindow,
+    workspace: Option<String>,
+    paths: Vec<String>,
+) -> CmdResult<Vec<Option<String>>> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    Ok(paths
+        .iter()
+        .map(|p| files::workspace_file(&ws.root, p))
+        .collect())
+}
+
 /// Highlight segments per line, empty when `path` has no grammar.
 #[tauri::command]
 #[specta::specta]

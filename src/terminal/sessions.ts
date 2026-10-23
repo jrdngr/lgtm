@@ -4,6 +4,7 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands, type PtyEvent } from "../ipc";
 import { type ActivityState, pulse, report } from "../workspaces/activity";
 import { onAgentHook } from "./agentHooks";
+import { fileLinks } from "./fileLinks";
 import { isAgentTitle, isBusyTitle, titleLabel } from "./title";
 import { createTerminal } from "./xterm";
 
@@ -177,6 +178,7 @@ function startSession(
   });
 
   const subs = [
+    fileLinks(term, workspace),
     term.onData((data) => {
       if (pty === undefined) early += data;
       else commands.ptyWrite(pty, data);

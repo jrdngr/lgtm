@@ -190,6 +190,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::read_file,
             commands::files::read_image,
             commands::files::save_file,
+            commands::files::files_at,
             commands::files::create_path,
             commands::files::add_files,
             commands::files::drag_out,

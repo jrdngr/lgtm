@@ -31,6 +31,19 @@ pub fn resolve(root: &Path, rel: &str) -> anyhow::Result<PathBuf> {
     Ok(root.join(rel))
 }
 
+/// `path` relative to `root`, when it names a file there that a symlink doesn't lead out of.
+/// It may be relative to `root`, with `./` or not, or absolute inside it.
+pub fn workspace_file(root: &Path, path: &str) -> Option<String> {
+    let path = path.strip_prefix("./").unwrap_or(path);
+    let rel = match Path::new(path).strip_prefix(root) {
+        Ok(rel) => rel.to_str()?.to_string(),
+        Err(_) if Path::new(path).is_absolute() => return None,
+        Err(_) => path.to_string(),
+    };
+    let abs = resolve(root, &rel).ok()?;
+    (abs.is_file() && contain(root, &abs).is_ok()).then_some(rel)
+}
+
 /// The entries of directory `dir` (empty for the root), directories first, skipping what
 /// `.gitignore` files in the workspace ignore. Ignore files above the root don't count, so a
 /// workspace inside its repo's ignored `.workspaces/` still lists. The walk starts at the root
@@ -190,6 +203,23 @@ pub fn rename(from: &Path, to: &Path, to_name: &str) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workspace_file_takes_relative_and_inside_absolute_paths_of_files_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src/a.py"), "x").unwrap();
+        let abs = root.join("src/a.py").to_string_lossy().into_owned();
+        let found = |p: &str| workspace_file(root, p);
+        assert_eq!(found("src/a.py").as_deref(), Some("src/a.py"));
+        assert_eq!(found("./src/a.py").as_deref(), Some("src/a.py"));
+        assert_eq!(found(&abs).as_deref(), Some("src/a.py"));
+        assert_eq!(found("src"), None);
+        assert_eq!(found("src/missing.py"), None);
+        assert_eq!(found("../a.py"), None);
+        assert_eq!(found("/etc/hosts"), None);
+    }
 
     #[test]
     fn put_replaces_a_file_only_when_asked_and_never_a_folder() {

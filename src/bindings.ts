@@ -328,6 +328,11 @@ export const commands = {
 	 *  its turns show it as the user's edit.
 	 */
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
+	/**
+	 *  Each of `paths` as a workspace file to open, if it is one: relative to the workspace's
+	 *  root, or absolute inside it. Terminals ask this of the paths in their output.
+	 */
+	filesAt: (workspace: string | null, paths: string[]) => typedError<(string | null)[], string>(__TAURI_INVOKE("files_at", { workspace, paths })),
 	/**  Makes an empty file, or a folder when `dir`. */
 	createPath: (workspace: string | null, path: string, dir: boolean) => typedError<null, string>(__TAURI_INVOKE("create_path", { workspace, path, dir })),
 	/**

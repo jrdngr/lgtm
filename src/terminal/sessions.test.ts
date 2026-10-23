@@ -16,7 +16,15 @@ vi.mock("../ipc", () => ({
 vi.mock("./agentHooks", () => ({ onAgentHook: () => () => {} }));
 vi.mock("./xterm", () => ({
   createTerminal: () => ({
-    term: { cols: 80, rows: 24, onData: sub, onTitleChange, onResize: sub, dispose() {} },
+    term: {
+      cols: 80,
+      rows: 24,
+      registerLinkProvider: sub,
+      onData: sub,
+      onTitleChange,
+      onResize: sub,
+      dispose() {},
+    },
     refit() {},
     unwatch() {},
   }),
