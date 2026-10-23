@@ -72,6 +72,15 @@ fn replace_rewrites_matches_with_regex_groups_or_literally() {
 }
 
 #[test]
+fn replace_matches_within_lines_as_search_does() {
+    let dir = tree(&[("a.txt", "foo  \r\n\nbar\n")]);
+    let r = dir.path();
+    let trailing = TextQuery { regex: true, ..query(r"\s+$") };
+    assert_eq!(replace(r, &trailing, "").unwrap(), 1);
+    assert_eq!(fs::read_to_string(r.join("a.txt")).unwrap(), "foo\r\n\nbar\n");
+}
+
+#[test]
 fn references_are_identifiers_only_with_the_definition_first() {
     let dir = tree(&[
         ("b.rs", "fn caller() {\n    act();\n    // act in a comment\n}\n"),

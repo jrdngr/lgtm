@@ -26,11 +26,15 @@ export function RefsView({ ws, refs }: { ws: WorkspaceName; refs?: RefsState }) 
   const changed = useMemo(() => changedLines(review), [review]);
   const reviewed = useMemo(() => new Set(review?.files.map((f) => f.dto.path)), [review]);
   const [unfolded, setUnfolded] = useState<ReadonlySet<string>>(new Set());
-  const hits = refs?.hits ?? [];
-  const defs = hits.filter((h) => h.def);
-  const inReview = hits.filter((h) => !h.def && reviewed.has(h.path));
-  const elsewhere = hits.filter((h) => !h.def && !reviewed.has(h.path));
-  const shown = [...defs, ...inReview, ...elsewhere.filter((h) => unfolded.has(h.path))];
+  // Kept between renders, since the hit cursor goes back to the top when they change.
+  const { hits, defs, inReview, elsewhere, shown } = useMemo(() => {
+    const hits = refs?.hits ?? [];
+    const defs = hits.filter((h) => h.def);
+    const inReview = hits.filter((h) => !h.def && reviewed.has(h.path));
+    const elsewhere = hits.filter((h) => !h.def && !reviewed.has(h.path));
+    const shown = [...defs, ...inReview, ...elsewhere.filter((h) => unfolded.has(h.path))];
+    return { hits, defs, inReview, elsewhere, shown };
+  }, [refs, reviewed, unfolded]);
   const open = (h: Hit) => openFile(ws, h.path, h.line);
   const keys = useHitKeys(shown, open, () => sendToTerminal(ws, hitsText(hits)));
   const fileCount = new Set(hits.map((h) => h.path)).size;

@@ -71,7 +71,11 @@ export function TextView({ ws, text }: { ws: WorkspaceName; text: TextState }) {
     };
   }, [ws, q, scope, run, text.asked]);
 
-  const shown = result.hits.filter((h) => !folded.has(h.path));
+  // Kept between renders, since the hit cursor goes back to the top when they change.
+  const shown = useMemo(
+    () => result.hits.filter((h) => !folded.has(h.path)),
+    [result.hits, folded],
+  );
   const open = (h: Hit) => openFile(ws, h.path, h.line);
 
   async function replaceAll() {

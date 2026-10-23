@@ -27,8 +27,9 @@ pub fn references(root: &Path, name: &str) -> Hits {
     });
     let mut hits: Vec<Hit> = per_file.into_iter().flatten().flatten().collect();
     let truncated = hits.len() > MAX_HITS;
-    hits.truncate(MAX_HITS);
+    // Definitions first, so a long tail of uses can't cut them off.
     hits.sort_by_key(|h| !h.def);
+    hits.truncate(MAX_HITS);
     Hits { hits, truncated }
 }
 

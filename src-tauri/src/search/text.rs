@@ -140,7 +140,15 @@ pub fn replace(root: &Path, q: &TextQuery, with: &str) -> anyhow::Result<u32> {
     let mut changed = 0;
     for (abs, rel) in q.targets(root)? {
         let Some(text) = read(&abs) else { continue };
-        let next = re.replace_all(&text, with.as_str());
+        // Line by line, as search matches, so a match never spans a line break.
+        let next: String = text
+            .split_inclusive('\n')
+            .map(|piece| {
+                let body = piece.trim_end_matches(['\n', '\r']);
+                let end = &piece[body.len()..];
+                format!("{}{end}", re.replace_all(body, with.as_str()))
+            })
+            .collect();
         if next != text {
             std::fs::write(&abs, next.as_bytes()).with_context(|| format!("write {rel}"))?;
             changed += 1;
