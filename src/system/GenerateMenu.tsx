@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { PipeButton } from "../terminal/PipeButton";
+import { useSending } from "../terminal/sending";
 import { Spinner } from "../ui/Busy";
 import type { GenItem, GenKey, GenState } from "./generate";
 import { Chevron } from "./glyphs";
@@ -8,40 +9,44 @@ import "./gen.css";
 const STATES: Record<GenState, string> = { fresh: "Fresh", stale: "Stale", missing: "Missing" };
 
 /** Opens Generate; a dot when something is stale or missing, a spinner while a prompt is
- * being put together. */
+ * being put together or the agent works on what it sent. Sends from its pop pass the same
+ * `sendKey`. */
 export function GenerateButton(p: {
   items: GenItem[];
   open: boolean;
   busy?: boolean;
+  sendKey: string;
   onToggle(): void;
   className?: string;
 }) {
+  const busy = useSending(p.sendKey) || p.busy;
   return (
     <button
       type="button"
       className={`pipe bg sys-gen${p.className ? ` ${p.className}` : ""}${p.open ? " open" : ""}`}
       aria-expanded={p.open}
-      aria-busy={p.busy}
+      aria-busy={busy}
       disabled={p.busy}
       data-generate
       onClick={p.onToggle}
     >
       Generate
-      {!p.busy && p.items.some((i) => i.state !== "fresh") && <span className="sys-gen-dot" />}
-      <span className="sys-down">{p.busy ? <Spinner /> : <Chevron size={10} />}</span>
+      {!busy && p.items.some((i) => i.state !== "fresh") && <span className="sys-gen-dot" />}
+      <span className="sys-down">{busy ? <Spinner /> : <Chevron size={10} />}</span>
     </button>
   );
 }
 
 interface PopProps {
   items: GenItem[];
+  sendKey: string;
   className?: string;
   onGenerate(keys: GenKey[]): void;
   onClose(): void;
 }
 
 /** What to generate, stale and missing ones checked, and the button that sends them. */
-export function GeneratePop({ items, className, onGenerate, onClose }: PopProps) {
+export function GeneratePop({ items, sendKey, className, onGenerate, onClose }: PopProps) {
   const root = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState(
     () => new Set(items.filter((i) => i.state !== "fresh").map((i) => i.key)),
@@ -80,6 +85,7 @@ export function GeneratePop({ items, className, onGenerate, onClose }: PopProps)
       <div className="sys-gengo">
         <PipeButton
           background
+          sendKey={sendKey}
           className="sm"
           disabled={!keys.length}
           onClick={() => onGenerate(keys)}

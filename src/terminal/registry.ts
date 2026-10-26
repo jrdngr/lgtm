@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { loadState, saveState } from "../core/savedState";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
+import { sentInBackground } from "./sending";
 
 /** A live terminal pane that text can be pasted into. */
 interface TerminalTarget {
@@ -208,6 +209,7 @@ export function sendToTerminal(
   // A plain shell would run the text, so Enter waits for an agent.
   if (submit && target.hasAgent()) target.submit();
   if (role === "interactive") target.focus();
+  else if (to) sentInBackground(to);
   return "sent";
 }
 
@@ -219,6 +221,7 @@ export function promptAgent(id: string, text: string): boolean {
   t.paste(text.replace(CONTROLS, ""));
   t.submit();
   t.prompted();
+  sentInBackground(id);
   return true;
 }
 

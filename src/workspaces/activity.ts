@@ -181,11 +181,11 @@ export function tabState(a: Activity, id: string): AgentState | undefined {
   return a.agents.find((g) => g.tab === id)?.state;
 }
 
-function subscribe(l: () => void) {
+export function subscribeActivity(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
 }
 
 export function useActivity(workspace: WorkspaceName): Activity {
-  return useSyncExternalStore(subscribe, () => activity(workspace));
+  return useSyncExternalStore(subscribeActivity, () => activity(workspace));
 }

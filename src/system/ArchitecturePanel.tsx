@@ -1,4 +1,12 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { showLook } from "../arch/showLook";
 import { setArchView, useArch } from "../arch/state";
 import type { LookDto, SystemDto, TourDto } from "../bindings";
@@ -140,6 +148,7 @@ function Loaded({
   const [finding, setFinding] = useState(false);
   const [toursOpen, setToursOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const genKey = useId();
   const [viewOpen, setViewOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const tracing = useTrace(map);
@@ -536,7 +545,12 @@ function Loaded({
         />
       )}
       {genOpen && (
-        <GeneratePop items={gen} onGenerate={generate} onClose={() => setGenOpen(false)} />
+        <GeneratePop
+          sendKey={genKey}
+          items={gen}
+          onGenerate={generate}
+          onClose={() => setGenOpen(false)}
+        />
       )}
       {!touring && !trace && description !== "fresh" && (
         // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off the canvas; its button takes the keyboard
@@ -647,6 +661,7 @@ function Loaded({
         }
         generate={
           <GenerateButton
+            sendKey={genKey}
             className="sys-btn"
             items={gen}
             open={genOpen}

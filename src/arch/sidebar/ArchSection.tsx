@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { LookDto } from "../../bindings";
 import { useWorkspace, type WorkspaceName } from "../../core/workspace";
 import { DesignsSection } from "../../design/DesignsSection";
@@ -28,6 +28,7 @@ export function ArchSection() {
   const review = useCurrentReview(workspace);
   const [error, setError] = useState<string>();
   const [genOpen, setGenOpen] = useState(false);
+  const genKey = useId();
   const [sending, setSending] = useState(false);
   const { sendText, picker } = useSendText(workspace, setError, () => {}, "background");
   const { map } = useSystem(workspace);
@@ -46,6 +47,7 @@ export function ArchSection() {
     <div className="side-split arch-split">
       <SectionHeader title="Architecture">
         <GenerateButton
+          sendKey={genKey}
           items={gen}
           open={genOpen}
           busy={sending}
@@ -54,6 +56,7 @@ export function ArchSection() {
       </SectionHeader>
       {genOpen && (
         <GeneratePop
+          sendKey={genKey}
           className="side"
           items={gen}
           onGenerate={(keys) => {
