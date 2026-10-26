@@ -343,12 +343,15 @@ g.cv-flash {
   background: #b083f0;
 }
 
+/* Its own layer, so WebKit doesn't leave slivers of its border, ring and handles behind
+ * when it moves in the scaled world. */
 .cv-shape {
   display: flex;
   position: absolute;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
+  will-change: transform;
 }
 
 .cv-shape > svg {
