@@ -29,6 +29,7 @@ import { openQuickPick } from "../search/pickStore";
 import { QuickPickHost } from "../search/QuickPick";
 import { findReferences, goToDefinition, onShowSearch, searchWorkspace } from "../search/store";
 import { focusedWord } from "../search/symbolAt";
+import { watchSymbolLinks } from "../search/symbolLink";
 import { useSettingsMenu } from "../settings/open";
 import { BackgroundPicker } from "../terminal/BackgroundPicker";
 import { McpOffer } from "../tools/McpOffer";
@@ -108,6 +109,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   selectedRef.current = selected;
   useEffect(() => watchDefinitionClicks(() => selectedRef.current), []);
   useEffect(() => watchHovers(() => selectedRef.current), []);
+  useEffect(() => watchSymbolLinks(), []);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

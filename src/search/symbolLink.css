@@ -1,0 +1,11 @@
+.symbol-link {
+  position: fixed;
+  z-index: 30;
+  height: 1px;
+  pointer-events: none;
+}
+
+.symbol-link-on .cm-content,
+.symbol-link-on .code {
+  cursor: pointer;
+}
