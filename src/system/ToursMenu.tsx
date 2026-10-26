@@ -64,7 +64,7 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
           <span className="sys-tplay-n">{t.steps.length}</span>
         </button>
       ) : (
-        <PipeButton className="sm" onClick={() => onWrite(id)}>
+        <PipeButton background className="sm" onClick={() => onWrite(id)}>
           Write Tour
         </PipeButton>
       )}

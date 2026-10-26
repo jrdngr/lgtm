@@ -78,7 +78,12 @@ export function GeneratePop({ items, className, onGenerate, onClose }: PopProps)
         </label>
       ))}
       <div className="sys-gengo">
-        <PipeButton className="sm" disabled={!keys.length} onClick={() => onGenerate(keys)}>
+        <PipeButton
+          background
+          className="sm"
+          disabled={!keys.length}
+          onClick={() => onGenerate(keys)}
+        >
           Generate {keys.length}
         </PipeButton>
       </div>

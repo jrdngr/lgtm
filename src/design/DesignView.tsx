@@ -86,12 +86,16 @@ export function DesignView({ item, code, source }: Props) {
   const workspace = useWorkspace();
   const [error, setError] = useState<string>();
   const { generate, busy, picker: genPicker } = useDesignGenerate(workspace, setError);
-  const { sendText, picker } = useSendText(workspace, setError, () =>
-    root.current?.querySelector<HTMLElement>(".dsn-keys")?.focus(),
+  const { sendText, picker } = useSendText(
+    workspace,
+    setError,
+    () => root.current?.querySelector<HTMLElement>(".dsn-keys")?.focus(),
+    "background",
   );
   const root = useRef<HTMLDivElement>(null);
   const gen = (
     <PipeButton
+      background
       className="sys-btn"
       disabled={busy === item.design.id}
       aria-busy={busy === item.design.id}

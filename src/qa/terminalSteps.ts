@@ -20,10 +20,10 @@ const START_MS = 15_000;
 const CHECK_MS = 1000;
 
 /** The terminal whose agent runs the session's steps: the one that asked, while its agent is
- * there, else the send target's agent, which takes the session over. */
+ * there, else the background terminal's agent, which takes the session over. */
 function home(ws: WorkspaceName, d: Session) {
   if (d.terminal && terminalHasAgent(d.terminal)) return { id: d.terminal, takeover: false };
-  const target = sendTarget(ws);
+  const target = sendTarget(ws, "background");
   return target && terminalHasAgent(target) ? { id: target, takeover: true } : undefined;
 }
 

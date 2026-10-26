@@ -9,7 +9,7 @@ import { viewerLogin } from "../model/people";
 import { working } from "../model/stages";
 import { triageAllText } from "../review/agentText";
 import type { CurrentReview } from "../review/current";
-import { sendToAgent, startLink } from "../review/linkCommands";
+import { sendToBackgroundAgent, startLink } from "../review/linkCommands";
 import { useLink } from "../review/linkedAgent";
 import { NoNotes, NoteList } from "../review/NoteList";
 import { SendNotesButton } from "../review/SendNotesButton";
@@ -78,7 +78,7 @@ export function PrComments({ pr, review }: Props) {
   const fresh = freshThreads.length;
   const canTriage = !!review && !link.working && fresh > 0;
   const onError = (message: string) => setError(message);
-  /** Sends the new threads to the linked terminal, or the send target, to triage. */
+  /** Sends the new threads to the background terminal to triage. */
   async function triage() {
     if (!review) return;
     const rules = await commands.promptText("reply");
@@ -87,7 +87,7 @@ export function PrComments({ pr, review }: Props) {
       const c = review.comments.find((c) => c.id === t.id);
       return c ? [[t, c] as [ThreadDto, CommentDto]] : [];
     });
-    sendToAgent(workspace, review.send, triageAllText(review.files, pairs, rules.data), null);
+    sendToBackgroundAgent(workspace, triageAllText(review.files, pairs, rules.data), null, onError);
   }
   const sync = () => {
     review?.refetchPr();
@@ -138,7 +138,7 @@ export function PrComments({ pr, review }: Props) {
             onSend={notes.sendOpen}
           />
           {canTriage && (
-            <PipeButton className="pr-head-btn" onClick={triage} keys="t">
+            <PipeButton background className="pr-head-btn" onClick={triage} keys="t">
               Triage {fresh}
             </PipeButton>
           )}

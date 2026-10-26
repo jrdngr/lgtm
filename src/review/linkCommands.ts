@@ -1,6 +1,7 @@
 import type { WorkspaceName } from "../core/workspace";
 import { prOf } from "../github/pr";
 import { commands } from "../ipc";
+import { sendBackground } from "../terminal/background";
 import { focusTerminal, sendTarget, submitNextSend } from "../terminal/registry";
 import { linkText } from "./agentText";
 import { currentReview } from "./current";
@@ -42,20 +43,17 @@ export function talk(workspace: WorkspaceName, id: number, onError: (message: st
   else startLink(workspace, onError);
 }
 
-/** Pastes `text` about `thread` (or no one thread) into the linked terminal when there is one,
- * else as a send does, and submits it. A thread it's about becomes the one I'm on. */
-export function sendToAgent(
+/** Pastes `text` about `thread` (or no one thread) into the background terminal and submits
+ * it. A thread it's about becomes the one I'm on. */
+export async function sendToBackgroundAgent(
   workspace: WorkspaceName,
-  send: (
-    text: string,
-    onSent?: (terminal: string) => void,
-    report?: undefined,
-    preferred?: string,
-  ) => void,
   text: string,
   thread: number | null,
+  onError: (message: string) => void,
 ) {
   if (thread !== null) setCurrentThread(workspace, thread);
   submitNextSend();
-  send(text, (terminal) => notePasted(terminal, thread), undefined, linkedTerminal(workspace));
+  const sent = await sendBackground(workspace, text);
+  if ("terminal" in sent) notePasted(sent.terminal, thread);
+  else if (sent.error) onError(sent.error);
 }

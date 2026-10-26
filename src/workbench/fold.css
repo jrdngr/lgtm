@@ -71,8 +71,12 @@
   background: var(--hover);
 }
 
-/* The send target's title, violet as on its tab. */
-.fold-strip .fold-tab[data-send] {
+/* A pinned terminal's title, colored as on its tab. */
+.fold-strip .fold-tab[data-send="interactive"] {
+  color: var(--teal-text);
+}
+
+.fold-strip .fold-tab[data-send="background"] {
   color: var(--violet-text);
 }
 

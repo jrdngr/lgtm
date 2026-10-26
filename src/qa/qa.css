@@ -849,7 +849,7 @@
   background: #343437;
 }
 
-/* Sends and headless runs keep their colors. */
+/* Background sends keep their violet. */
 .qq .qq-btn.pipe {
   color: var(--violet-text);
   background: var(--violet-soft);

@@ -27,6 +27,7 @@ import { QuickPickHost } from "../search/QuickPick";
 import { findReferences, goToDefinition, onShowSearch, searchWorkspace } from "../search/store";
 import { focusedWord } from "../search/symbolAt";
 import { useSettingsMenu } from "../settings/open";
+import { BackgroundPicker } from "../terminal/BackgroundPicker";
 import { McpOffer } from "../tools/McpOffer";
 import { PromptHost, promptKeeps } from "../ui/prompt";
 import { selectActivity } from "../workspaces/activity";
@@ -325,6 +326,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       <JjBlockedBanner workspace={selected} />
       <McpOffer />
       <PromptHost />
+      <BackgroundPicker />
       <QuickPickHost />
       <DesignFormHost workspace={selected} />
       <div className="workbench-body">

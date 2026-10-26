@@ -4,11 +4,12 @@ import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
 import { currentReview } from "../review/current";
 import { workingCopy } from "../review/workingCopy";
-import { keepSubmit, sendToTerminal, submitNextSend } from "../terminal/registry";
+import { sendBackground } from "../terminal/background";
+import { keepSubmit, submitNextSend } from "../terminal/registry";
 import type { CtxEntry } from "../ui/contextMenu";
 import { findReferences, goToDefinition, searchWorkspace } from "./store";
 
-/** Asks the send target's agent for Symbol Information on `name`, defined in `path` at
+/** Asks the background terminal's agent for Symbol Information on `name`, defined in `path` at
  * `line` when it is there, and shows the definition when the review doesn't. */
 export async function askSymbolInfo(ws: WorkspaceName, name: string, path?: string, line?: number) {
   submitNextSend();
@@ -16,13 +17,9 @@ export async function askSymbolInfo(ws: WorkspaceName, name: string, path?: stri
     const ask = await keepSubmit(
       unwrap(commands.requestSymbolInfo(ws, name, path ?? null, line ?? null)),
     );
-    const sent = sendToTerminal(ws, ask.prompt);
-    if (sent !== "sent") {
-      await message(
-        sent === "noTerminal"
-          ? "No terminal is open. Open one with ⌘T and start your agent."
-          : "That terminal can't take a paste safely. Start your agent there first.",
-      );
+    const sent = await sendBackground(ws, ask.prompt);
+    if (!("terminal" in sent)) {
+      if (sent.error) await message(sent.error);
       return;
     }
     await unwrap(commands.markSymbolAsked(ws, ask.path, name, ask.nth));

@@ -11,7 +11,7 @@ export function useDesignGenerate(
   setError: (e: string | undefined) => void,
 ) {
   const [busy, setBusy] = useState<string>();
-  const { sendText, picker } = useSendText(workspace, setError, () => {});
+  const { sendText, picker } = useSendText(workspace, setError, () => {}, "background");
   const generate = async (id: string) => {
     setBusy(id);
     try {

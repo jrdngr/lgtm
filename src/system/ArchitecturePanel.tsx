@@ -147,6 +147,12 @@ function Loaded({
   const [touring, setTouring] = useState<{ tour: TourDto; at: number }>();
   const [sendError, setSendError] = useState<string>();
   const { sendText, picker } = useSendText(workspace, setSendError, () => root.current?.focus());
+  const background = useSendText(
+    workspace,
+    setSendError,
+    () => root.current?.focus(),
+    "background",
+  );
   const review = useCurrentReview(workspace);
   const pr = usePr(workspace);
   const focus = useChunkFocus(workspace);
@@ -393,7 +399,7 @@ function Loaded({
     const r = await keepSubmit(text).finally(() => setSending(false));
     if (r.status === "error") return setSendError(r.error);
     setSendError(undefined);
-    sendText(r.data);
+    background.sendText(r.data);
   };
   const gen = genItems(map, review && { arch });
   const generate = (keys: GenKey[]) => {
@@ -540,7 +546,7 @@ function Loaded({
           onClick={(e) => e.stopPropagation()}
         >
           {description === "missing" ? "Not described" : "Description stale"}
-          <PipeButton className="sm" onClick={() => generate(["description"])}>
+          <PipeButton background className="sm" onClick={() => generate(["description"])}>
             Describe
           </PipeButton>
         </div>

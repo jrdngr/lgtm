@@ -1,8 +1,10 @@
+import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { isMac } from "../core/keys";
 import { loadState, saveState } from "../core/savedState";
 import { type WorkspaceName, workspaceRoot } from "../core/workspace";
 import type { CurrentReview } from "../review/current";
+import { sendBackground } from "../terminal/background";
 import { PipeButton } from "../terminal/PipeButton";
 import { submitNextSend } from "../terminal/registry";
 
@@ -17,7 +19,8 @@ The change is the lgtm review of \`${revset}\`${where}. Read it with lgtm's get_
 When you're done, publish what you found with lgtm's publish_findings MCP tool and revset \`${revset}\`: one reviewer per pass or persona you used, with your suggested fixes. lgtm shows it as a report.`;
 }
 
-/** The review prompt, kept per repo, and the button that pastes it into the send target. */
+/** The review prompt, kept per repo, and the button that pastes it into the background
+ * terminal. */
 export function ReportPrompt({
   workspace,
   review,
@@ -30,9 +33,13 @@ export function ReportPrompt({
   );
   const ready = !!review && !!prompt.trim();
 
-  function create() {
+  async function create() {
     if (!review || !prompt.trim()) return;
-    review.send(reportText(prompt, review.revset, workspaceRoot(workspace)));
+    const sent = await sendBackground(
+      workspace,
+      reportText(prompt, review.revset, workspaceRoot(workspace)),
+    );
+    if ("error" in sent && sent.error) await message(sent.error, { kind: "error" });
   }
 
   return (
@@ -58,7 +65,7 @@ export function ReportPrompt({
       />
       <div className="report-prompt-bar">
         <span className="spacer" />
-        <PipeButton disabled={!ready} onClick={create} keys="⌘↵">
+        <PipeButton background disabled={!ready} onClick={create} keys="⌘↵">
           Create Report
         </PipeButton>
       </div>

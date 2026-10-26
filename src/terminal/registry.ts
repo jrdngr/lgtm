@@ -30,16 +30,25 @@ const terminals = new Map<string, TerminalTarget>();
 const opened = new Map<string, number>();
 let opens = 0;
 
-/** Each workspace's pinned send target, by workspace key. Saved per repo. */
+/** What a send is for: a prompt I'll answer in the terminal, or one whose agent reports back to
+ * lgtm. Each has its own pinned terminal per workspace. */
+export type Role = "interactive" | "background";
+
+/** Each workspace's pinned terminal for a role, by workspace key. Saved per repo. */
 type Pins = Record<string, string>;
-const PINS = "send-pins";
+const PINS: Record<Role, string> = { interactive: "send-pins", background: "send-pins-bg" };
 const isPins = (v: unknown): v is Pins =>
   typeof v === "object" && v !== null && Object.values(v).every((id) => typeof id === "string");
-let pins: Pins | undefined;
-const pinsNow = () => {
-  pins ??= loadState(PINS, {}, isPins);
-  return pins;
+const pins: Partial<Record<Role, Pins>> = {};
+const pinsNow = (role: Role) => {
+  pins[role] ??= loadState(PINS[role], {}, isPins);
+  return pins[role];
 };
+
+function savePins(role: Role, next: Pins) {
+  pins[role] = next;
+  saveState(PINS[role], next);
+}
 
 const listeners = new Set<() => void>();
 /** Bumped on every change to the terminals, their order or the pins. */
@@ -69,25 +78,49 @@ export function touchTerminal(id: string) {
   changed();
 }
 
-/** Pins terminal `id` as the workspace's send target. */
-export function pinTarget(workspace: WorkspaceName, id: string) {
-  const next = { ...pinsNow(), [workspaceKey(workspace)]: id };
-  pins = next;
-  saveState(PINS, next);
+/** Pins terminal `id` as the workspace's terminal for `role`, taking its other pin off it, or
+ * unpins it when it already is. */
+export function pinTarget(workspace: WorkspaceName, id: string, role: Role) {
+  const key = workspaceKey(workspace);
+  const other: Role = role === "interactive" ? "background" : "interactive";
+  const { [key]: was, ...rest } = pinsNow(role);
+  savePins(role, was === id ? rest : { ...rest, [key]: id });
+  if (pinsNow(other)[key] === id) {
+    const { [key]: _, ...others } = pinsNow(other);
+    savePins(other, others);
+  }
   changed();
 }
 
-/** Where sends go: the workspace's pinned terminal while it's open, else its first opened.
- * Undefined only when it has no terminal. */
-export function sendTarget(workspace: WorkspaceName): string | undefined {
-  const id = pinsNow()[workspaceKey(workspace)];
-  if (id !== undefined && terminals.get(id)?.workspace === workspace) return id;
+/** Terminal `id` of the workspace that's pinned for `role`, while it's open. */
+function pinned(workspace: WorkspaceName, role: Role): string | undefined {
+  const id = pinsNow(role)[workspaceKey(workspace)];
+  return id !== undefined && terminals.get(id)?.workspace === workspace ? id : undefined;
+}
+
+/** Where sends for `role` go: the workspace's pinned terminal for it while it's open. Else
+ * interactive sends go to its first opened terminal, other than the background one, and
+ * background sends go nowhere until one is pinned. */
+export function sendTarget(
+  workspace: WorkspaceName,
+  role: Role = "interactive",
+): string | undefined {
+  const id = pinned(workspace, role);
+  if (id !== undefined || role === "background") return id;
+  const background = pinned(workspace, "background");
   let first: string | undefined;
   for (const [t, term] of terminals) {
-    if (term.workspace !== workspace) continue;
+    if (term.workspace !== workspace || t === background) continue;
     if (first === undefined || (opened.get(t) ?? 0) < (opened.get(first) ?? 0)) first = t;
   }
   return first;
+}
+
+/** The role terminal `id` is pinned for in its workspace, if any. */
+export function roleOf(workspace: WorkspaceName, id: string): Role | undefined {
+  if (pinned(workspace, "background") === id) return "background";
+  if (sendTarget(workspace) === id) return "interactive";
+  return undefined;
 }
 
 /** Calls `l` on every change to the terminals, their order or the pins. */
@@ -105,10 +138,10 @@ export const focusTerminal = (id: string) => terminals.get(id)?.focus();
 /** Whether terminal `id` is open. */
 export const hasTerminal = (id: string) => terminals.has(id);
 
-/** The workspace's send target, kept current. */
-export function useSendTarget(workspace: WorkspaceName) {
+/** Each terminal's role in the workspace, kept current. */
+export function useRoles(workspace: WorkspaceName) {
   useSyncExternalStore(subscribeTerminals, () => version);
-  return sendTarget(workspace);
+  return (id: string) => roleOf(workspace, id);
 }
 
 export interface TerminalChoice {
@@ -117,9 +150,12 @@ export interface TerminalChoice {
   canPaste: boolean;
 }
 
-/** The workspace's terminals, the send target first, then most recently focused. */
-export function workspaceTerminals(workspace: WorkspaceName): TerminalChoice[] {
-  const target = sendTarget(workspace);
+/** The workspace's terminals, the target for `role` first, then most recently focused. */
+export function workspaceTerminals(
+  workspace: WorkspaceName,
+  role: Role = "interactive",
+): TerminalChoice[] {
+  const target = sendTarget(workspace, role);
   return [...terminals]
     .filter(([, t]) => t.workspace === workspace)
     .reverse()
@@ -153,10 +189,16 @@ export async function keepSubmit<T>(text: Promise<T>): Promise<T> {
 // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point
 const CONTROLS = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
 
-/** Pastes `text` into terminal `id`, or else the workspace's send target, and focuses it. Nothing is sent when that terminal's program doesn't use bracketed paste, since
- * a plain shell would run each pasted line. */
-export function sendToTerminal(workspace: WorkspaceName, text: string, id?: string): SendResult {
-  const to = id ?? sendTarget(workspace);
+/** Pastes `text` into terminal `id`, or else the workspace's target for `role`, focusing it
+ * for an interactive send. Nothing is sent when that terminal's program doesn't use bracketed
+ * paste, since a plain shell would run each pasted line. */
+export function sendToTerminal(
+  workspace: WorkspaceName,
+  text: string,
+  id?: string,
+  role: Role = "interactive",
+): SendResult {
+  const to = id ?? sendTarget(workspace, role);
   const target = to === undefined ? undefined : terminals.get(to);
   const submit = Date.now() < submitUntil;
   submitUntil = 0;
@@ -165,7 +207,7 @@ export function sendToTerminal(workspace: WorkspaceName, text: string, id?: stri
   target.paste(text.replace(CONTROLS, ""));
   // A plain shell would run the text, so Enter waits for an agent.
   if (submit && target.hasAgent()) target.submit();
-  target.focus();
+  if (role === "interactive") target.focus();
   return "sent";
 }
 

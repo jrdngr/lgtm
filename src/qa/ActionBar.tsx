@@ -112,7 +112,7 @@ export function ActionBar({
         </>
       )}
       {q.state !== "dropped" && q.state !== "deferred" && (
-        <PipeButton className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
+        <PipeButton background className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
           Discuss
         </PipeButton>
       )}

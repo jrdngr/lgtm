@@ -1,0 +1,6 @@
+/* The background terminal picker, over the whole window. */
+.background-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+}

@@ -29,7 +29,7 @@ export function ArchSection() {
   const [error, setError] = useState<string>();
   const [genOpen, setGenOpen] = useState(false);
   const [sending, setSending] = useState(false);
-  const { sendText, picker } = useSendText(workspace, setError, () => {});
+  const { sendText, picker } = useSendText(workspace, setError, () => {}, "background");
   const { map } = useSystem(workspace);
   const { arch } = useArch(review);
   const gen = genItems(map, review && { arch });

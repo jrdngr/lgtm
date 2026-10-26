@@ -1,7 +1,10 @@
 import { message } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import type { WorkspaceName } from "../core/workspace";
+import { backgroundTarget } from "../terminal/background";
 import {
+  keepSubmit,
+  type Role,
   sendTarget,
   sendToTerminal,
   type TerminalChoice,
@@ -16,12 +19,14 @@ type Report = (outcome: SendOutcome) => void;
 /** Told which terminal took the text. */
 type Sent = (terminal: string) => void;
 
-/** Sending text to one of the workspace's terminals. `picker` is the terminal picker to
- * render while the user chooses one. */
+/** Sending text to one of the workspace's terminals, the one pinned for `role` unless told
+ * otherwise. `picker` is the terminal picker to render while the user chooses one; a
+ * background send with no background terminal pinned asks which in `BackgroundPicker`. */
 export function useSendText(
   workspace: WorkspaceName,
   setError: (message: string | undefined) => void,
   focusRoot: () => void,
+  role: Role = "interactive",
 ) {
   /** Text waiting for the user to pick which terminal it goes to. */
   const [picking, setPicking] = useState<{
@@ -36,10 +41,12 @@ export function useSendText(
    * `report`, it's told which terminal took the text or why none did, and failures don't show
    * as the review's error. */
   function sendText(text: string, onSent?: Sent, report?: Report, preferred?: string) {
-    const terminals = workspaceTerminals(workspace);
+    const terminals = workspaceTerminals(workspace, role);
     const usable = (id: string | undefined) => terminals.find((t) => t.id === id && t.canPaste);
-    const to = usable(preferred) ?? usable(sendTarget(workspace));
+    const to = usable(preferred) ?? usable(sendTarget(workspace, role));
     if (to) sendTo(text, to.id, onSent, report);
+    else if (role === "background" && terminals.length)
+      keepSubmit(backgroundTarget(workspace)).then((id) => id && sendTo(text, id, onSent, report));
     else if (terminals.length > 1) setPicking({ text, terminals, onSent, report });
     else sendTo(text, undefined, onSent, report);
   }
@@ -47,9 +54,9 @@ export function useSendText(
   function sendTo(text: string, id: string | undefined, onSent?: Sent, report?: Report) {
     setPicking(undefined);
     const where = workspace ? `workspace ${workspace}` : "the main workspace";
-    const to = id ?? sendTarget(workspace);
+    const to = id ?? sendTarget(workspace, role);
     const terminal = workspaceTerminals(workspace).find((t) => t.id === to);
-    const result = sendToTerminal(workspace, text, to);
+    const result = sendToTerminal(workspace, text, to, role);
     const error =
       result === "noTerminal"
         ? `No terminal is open in ${where}. Open one with ⌘T and start your agent.`
@@ -65,6 +72,7 @@ export function useSendText(
   const picker = picking && (
     <TerminalPicker
       terminals={picking.terminals}
+      title="Send to terminal"
       onPick={(id) => {
         // A failed send leaves focus on the closed picker, so hand it back.
         if (sendTo(picking.text, id, picking.onSent, picking.report)) focusRoot();
@@ -89,12 +97,13 @@ export function useSendText(
 }
 
 /** Sending text from a place with no error line of its own, so failures show in a dialog. */
-export function useSendFromMenu(workspace: WorkspaceName) {
+export function useSendFromMenu(workspace: WorkspaceName, role: Role = "interactive") {
   return useSendText(
     workspace,
     (m) => {
       if (m) message(m, { kind: "error" });
     },
     () => {},
+    role,
   );
 }

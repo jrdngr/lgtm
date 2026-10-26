@@ -5,13 +5,14 @@ import "./TerminalPicker.css";
 
 interface Props {
   terminals: TerminalChoice[];
+  title: string;
   onPick(id: string): void;
   onClose(): void;
 }
 
 /** Picks which of the workspace's terminals to send to. The last focused one comes first.
  * Number keys pick directly; j/k or arrows and Enter pick the highlighted one. */
-export function TerminalPicker({ terminals, onPick, onClose }: Props) {
+export function TerminalPicker({ terminals, title, onPick, onClose }: Props) {
   const [at, setAt] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -33,7 +34,7 @@ export function TerminalPicker({ terminals, onPick, onClose }: Props) {
     <>
       <div className="menu-backdrop" onMouseDown={onClose} />
       <div ref={ref} className="mark-menu terminal-picker" tabIndex={-1} onKeyDown={onKeyDown}>
-        <div className="menu-count">Send to terminal</div>
+        <div className="menu-count">{title}</div>
         {terminals.map((t, i) => (
           <button
             type="button"

@@ -37,6 +37,7 @@ export function InfoBlock({ ws, info }: Props) {
           <span className="si-working">Working…</span>
         ) : (
           <PipeButton
+            background
             className="si-refresh"
             onClick={() => askSymbolInfo(ws, info.name, info.path, info.line)}
           >

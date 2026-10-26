@@ -95,10 +95,14 @@ export function ThreadFlow({ comment, c, editor }: Props) {
                   {body.trim() ? "Edit" : "Write reply"} <kbd>e</kbd>
                 </button>
                 {body.trim() && (
-                  <PipeButton onClick={() => c.reviewReply(comment)}>Review</PipeButton>
+                  <PipeButton background onClick={() => c.reviewReply(comment)}>
+                    Review
+                  </PipeButton>
                 )}
                 {!take && comment.thread?.stage === "new" && (
-                  <PipeButton onClick={() => c.triage(comment)}>Triage</PipeButton>
+                  <PipeButton background onClick={() => c.triage(comment)}>
+                    Triage
+                  </PipeButton>
                 )}
               </>
             )}

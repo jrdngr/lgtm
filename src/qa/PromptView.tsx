@@ -87,7 +87,13 @@ export function PromptView({ ws, d, busy, onSend }: Props) {
       </button>
       <div className="qq-actions">
         <span className="spacer" />
-        <PipeButton className="qq-btn" disabled={!prompt.trim()} onClick={send} keys="⌘↵">
+        <PipeButton
+          background
+          className="qq-btn"
+          disabled={!prompt.trim()}
+          onClick={send}
+          keys="⌘↵"
+        >
           Start Q&A
         </PipeButton>
       </div>

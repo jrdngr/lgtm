@@ -2,28 +2,52 @@ button.pipe {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border-color: var(--violet-line);
-  background: var(--violet-soft);
-  color: var(--violet-text);
+  border-color: var(--teal-line);
+  background: var(--teal-soft);
+  color: var(--teal-text);
   font-weight: 500;
   white-space: nowrap;
 }
 
 button.pipe:hover:not(:disabled) {
+  border-color: var(--teal);
+  background: rgb(47 191 160 / 26%);
+}
+
+button.pipe kbd {
+  color: rgb(127 227 204 / 65%);
+  border-color: var(--teal-line);
+}
+
+button.pipe.bg {
+  border-color: var(--violet-line);
+  background: var(--violet-soft);
+  color: var(--violet-text);
+}
+
+button.pipe.bg:hover:not(:disabled) {
   border-color: var(--mark-violet);
   background: rgb(163 113 247 / 26%);
 }
 
-button.pipe kbd {
+button.pipe.bg kbd {
   color: rgb(201 173 255 / 65%);
   border-color: var(--violet-line);
 }
 
 /* An icon-only send, in a row of quiet icon buttons. */
 .icon-button.pipe-icon {
-  color: var(--violet-text);
+  color: var(--teal-text);
 }
 
 .icon-button.pipe-icon.on {
+  background: var(--teal-soft);
+}
+
+.icon-button.pipe-icon.bg {
+  color: var(--violet-text);
+}
+
+.icon-button.pipe-icon.bg.on {
   background: var(--violet-soft);
 }

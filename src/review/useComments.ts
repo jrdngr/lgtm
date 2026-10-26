@@ -7,7 +7,7 @@ import { confirmAction } from "../ui/prompt";
 import { reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
-import { sendToAgent, talk as talkTo } from "./linkCommands";
+import { sendToBackgroundAgent, talk as talkTo } from "./linkCommands";
 import { type FlatFile, NEW_COMMENT } from "./model";
 
 const NONE: CommentDto[] = [];
@@ -214,20 +214,20 @@ export function useComments({
     talkTo(workspace, c.id, onError);
   }
 
-  /** Pastes a new thread and my rules for replies into the linked or send target terminal,
-   * for its agent to make the first take and reply. */
+  /** Pastes a new thread and my rules for replies into the background terminal, for its agent
+   * to make the first take and reply. */
   async function triage(c: CommentDto) {
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return onError(rules.error);
-    sendToAgent(workspace, send, triageText(files, c, rules.data), c.id);
+    sendToBackgroundAgent(workspace, triageText(files, c, rules.data), c.id, onError);
   }
 
-  /** Pastes a thread and my rules for replies into the linked or send target terminal, for its
-   * agent to review the reply and suggest a better one. */
+  /** Pastes a thread and my rules for replies into the background terminal, for its agent to
+   * review the reply and suggest a better one. */
   async function reviewReply(c: CommentDto) {
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return onError(rules.error);
-    sendToAgent(workspace, send, reviewText(files, c, rules.data), c.id);
+    sendToBackgroundAgent(workspace, reviewText(files, c, rules.data), c.id, onError);
   }
 
   /** Makes a thread's suggested reply its reply. */

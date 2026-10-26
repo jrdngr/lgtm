@@ -5,7 +5,7 @@ import { bottom } from "../core/bottom";
 import { dockOf } from "../core/docks";
 import { activate, focusPanel } from "../core/panels";
 import { useWorkspace, type WorkspaceName } from "../core/workspace";
-import { useSendTarget } from "../terminal/registry";
+import { useRoles } from "../terminal/registry";
 import { fold, foldAxis, foldOf, neighbor, subscribeFolds, unfold } from "./fold";
 import { useMaximized } from "./maximize";
 import "./fold.css";
@@ -48,10 +48,9 @@ export function FoldIcon({ out, vertical }: { out?: boolean; vertical?: boolean 
   );
 }
 
-/** How a strip marks the send target's title, as its tab does. */
+/** How a strip marks a pinned terminal's title, as its tab does. */
 export function useSendMark(workspace: WorkspaceName) {
-  const target = useSendTarget(workspace);
-  return (id: string) => (id === target ? "pinned" : undefined);
+  return useRoles(workspace);
 }
 
 /** The group's collapse button, and the strip it collapses to: every tab's title, which

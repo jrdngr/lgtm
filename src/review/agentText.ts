@@ -1,21 +1,29 @@
-import type { CommentDto, PrDto, ThreadDto } from "../bindings";
-import { threadWhere } from "../model/stages";
+import type { CommentDto, PrDto, Take, ThreadDto } from "../bindings";
+import { threadWhere, VERDICTS } from "../model/stages";
 import { codeText } from "./comments";
 import type { FlatFile } from "./model";
 import { UNTRUSTED_NOTE, untrusted } from "./untrusted";
 
-/** A thread for a terminal agent: what's quoted or posted, its code and the reply so far.
+/** A thread for a terminal agent: what's quoted or posted, its code, the take and the reply
+ * so far.
  * GitHub's text is fenced, so a prompt holding it needs `UNTRUSTED_NOTE`. */
 export function threadText(files: FlatFile[], c: CommentDto): string[] {
   const quote = c.thread?.quote;
+  const take = c.thread?.take;
   const posts = c.github?.posts.map((p) => untrusted(p.body.trim(), p.author)) ?? [];
   return [
     quote ? `Quoted from a comment on the PR:\n${untrusted(quote.text, quote.author)}` : "",
     c.path ? codeText(files, c) : "",
     ...(quote ? [] : posts),
+    take ? takeText(take) : "",
     c.body.trim() ? `My reply so far:\n${c.body.trim()}` : "",
   ];
 }
+
+const takeText = (t: Take) =>
+  [`The take so far: ${VERDICTS[t.verdict][0]}. ${t.why.trim()}`, t.question?.trim()]
+    .filter(Boolean)
+    .join("\n");
 
 const join = (parts: string[]) => parts.filter(Boolean).join("\n\n");
 

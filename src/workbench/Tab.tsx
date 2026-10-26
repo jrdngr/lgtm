@@ -4,7 +4,7 @@ import { activate } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
 import { useAtOutside } from "../review/workingCopy";
-import { hasTerminal, useSendTarget } from "../terminal/registry";
+import { hasTerminal, useRoles } from "../terminal/registry";
 import { openMenu } from "../ui/contextMenu";
 import { Icon } from "../ui/icons";
 import { Glyph } from "../workspaces/AgentGlyph";
@@ -63,14 +63,14 @@ function RenameField({ title, onDone }: { title: string; onDone(title?: string):
 }
 
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
- * selects it and opens its menu. A terminal's tab leads with a ›_, violet on the send target,
- * whose title is violet too. A tab running
+ * selects it and opens its menu. A terminal's tab leads with a ›_, teal on the interactive
+ * pin and violet on the background one, whose titles take the same colors. A tab running
  * agents shows their most urgent state before its title. */
 export function Tab(props: IDockviewPanelHeaderProps) {
   const { api, containerApi } = props;
   const workspace = useWorkspace();
   const renaming = useRenaming(api.id);
-  const pinned = useSendTarget(workspace) === api.id;
+  const role = useRoles(workspace)(api.id);
   const [title, setTitle] = useState(api.title ?? "");
   useEffect(() => {
     // A tab coming, going or retitled changes how much room its pane's titles have.
@@ -118,7 +118,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
   ) : (
     <DockviewDefaultTab
       {...props}
-      data-send={pinned ? "pinned" : undefined}
+      data-send={role}
       title={title}
       closeActionOverride={close}
       onContextMenu={(e) => {
@@ -141,7 +141,7 @@ export function Tab(props: IDockviewPanelHeaderProps) {
     );
   return (
     <div className="tab-row">
-      <span className={`tab-pin${pinned ? " on" : ""}`}>
+      <span className={`tab-pin${role ? ` ${role}` : ""}`}>
         <Icon name="terminal" size={13} />
       </span>
       {glyph}

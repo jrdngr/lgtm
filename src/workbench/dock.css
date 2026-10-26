@@ -38,16 +38,25 @@
   text-overflow: ellipsis;
 }
 
-/* The send target's title: violet, darker unless its tab is the focused pane's. */
+/* A pinned terminal's title: teal for interactive sends, violet for background ones, darker
+ * unless its tab is the focused pane's. */
+.dock .dv-default-tab[data-send="interactive"] {
+  --role-text: var(--teal-text);
+}
+
+.dock .dv-default-tab[data-send="background"] {
+  --role-text: var(--violet-text);
+}
+
 .dock .dv-default-tab[data-send] .dv-default-tab-content {
-  color: color-mix(in srgb, var(--violet-text) 55%, var(--bg));
+  color: color-mix(in srgb, var(--role-text) 55%, var(--bg));
 }
 
 .dock .dv-active-group .dv-active-tab .dv-default-tab[data-send] .dv-default-tab-content {
-  color: var(--violet-text);
+  color: var(--role-text);
 }
 
-/* A terminal tab's ›_: dim, violet on the send target. */
+/* A terminal tab's ›_: dim, in its pin's color when pinned. */
 .dock .tab-row {
   position: relative;
   display: flex;
@@ -66,7 +75,11 @@
   color: var(--faint);
 }
 
-.dock .tab-pin.on {
+.dock .tab-pin.interactive {
+  color: var(--teal);
+}
+
+.dock .tab-pin.background {
   color: var(--violet-text);
 }
 

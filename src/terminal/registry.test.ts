@@ -74,7 +74,7 @@ describe("send target", () => {
     const off = [registerTerminal("pa", a.target), registerTerminal("pb", b.target)];
     touchTerminal("pb");
     expect(sendTarget("w")).toBe("pa");
-    pinTarget("w", "pb");
+    pinTarget("w", "pb", "interactive");
     off.push(registerTerminal("pc", c.target));
     touchTerminal("pc");
     expect(sendTarget("w")).toBe("pb");
@@ -93,9 +93,37 @@ describe("send target", () => {
     const a = fake("w1");
     const b = fake("w2");
     const off = [registerTerminal("qa", a.target), registerTerminal("qb", b.target)];
-    pinTarget("w2", "qa");
+    pinTarget("w2", "qa", "interactive");
     expect(sendTarget("w2")).toBe("qb");
     for (const f of off) f();
+  });
+
+  it("sends background text only to the pinned background terminal, without focusing it", () => {
+    const a = fake("bw");
+    const b = fake("bw");
+    const focused: string[] = [];
+    const off = [
+      registerTerminal("ba", { ...a.target, focus: () => focused.push("ba") }),
+      registerTerminal("bb", { ...b.target, focus: () => focused.push("bb") }),
+    ];
+    expect(sendTarget("bw", "background")).toBeUndefined();
+    pinTarget("bw", "ba", "background");
+    expect(sendTarget("bw", "background")).toBe("ba");
+    expect(sendTarget("bw")).toBe("bb");
+    expect(sendToTerminal("bw", "triage", undefined, "background")).toBe("sent");
+    expect(a.got).toEqual(["triage"]);
+    expect(focused).toEqual([]);
+    for (const f of off) f();
+  });
+
+  it("moves a terminal's pin when it's pinned for the other role", () => {
+    const a = fake("mw");
+    const off = registerTerminal("ma", a.target);
+    pinTarget("mw", "ma", "background");
+    pinTarget("mw", "ma", "interactive");
+    expect(sendTarget("mw", "background")).toBeUndefined();
+    expect(sendTarget("mw")).toBe("ma");
+    off();
   });
 });
 

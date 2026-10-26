@@ -227,7 +227,7 @@ export function DesignForm({ workspace, design, onDone, onCancel }: Props) {
             </button>
           )}
           {files.length > 0 ? (
-            <PipeButton type="submit" className="sm" keys={isMac ? "⌘↵" : "Ctrl↵"}>
+            <PipeButton background type="submit" className="sm" keys={isMac ? "⌘↵" : "Ctrl↵"}>
               Generate
             </PipeButton>
           ) : (

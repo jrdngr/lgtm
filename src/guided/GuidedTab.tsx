@@ -64,6 +64,7 @@ export function GuidedTab({ api }: IDockviewPanelProps) {
     [],
   );
   const { sendText, picker } = useSendText(workspace, setError, focus);
+  const background = useSendText(workspace, setError, focus, "background");
   const dto = useMemo(() => reviewOf(review), [review]);
   const c = useComments({
     review: dto,
@@ -102,7 +103,7 @@ export function GuidedTab({ api }: IDockviewPanelProps) {
   function generate() {
     if (!review) return;
     keepSubmit(unwrap(commands.guidedPrompt(review.id)))
-      .then((text) => sendText(text))
+      .then((text) => background.sendText(text))
       .catch((e) => setError(String(e)));
   }
 
@@ -112,7 +113,9 @@ export function GuidedTab({ api }: IDockviewPanelProps) {
   else if (g === null)
     body = (
       <div className="placeholder">
-        <PipeButton onClick={generate}>Generate</PipeButton>
+        <PipeButton background onClick={generate}>
+          Generate
+        </PipeButton>
       </div>
     );
   else if (!view || !g) body = <Empty>Loading…</Empty>;

@@ -202,7 +202,11 @@ export function DesignDetail(p: Props) {
       )}
       <span className="sys-grow" />
       <div className="dsn-acts">
-        {!!differences.length && <PipeButton onClick={p.onUpdateSpec}>Update spec</PipeButton>}
+        {!!differences.length && (
+          <PipeButton background onClick={p.onUpdateSpec}>
+            Update spec
+          </PipeButton>
+        )}
         {!differences.length && spec[0] && (
           <button
             type="button"

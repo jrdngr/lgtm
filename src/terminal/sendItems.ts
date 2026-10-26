@@ -1,6 +1,6 @@
 import type { WorkspaceName } from "../core/workspace";
 import type { CtxEntry } from "../ui/contextMenu";
-import { pinTarget, sendTarget, workspaceTerminals } from "./registry";
+import { pinTarget, roleOf, workspaceTerminals } from "./registry";
 
 /** Sends text to the send target, or to a chosen one. */
 export interface Sender {
@@ -30,13 +30,19 @@ export function sendItems(
   ];
 }
 
-/** Pins terminal `id` as its workspace's send target. */
+/** Pins terminal `id` as its workspace's interactive or background terminal. */
 export function targetItems(ws: WorkspaceName, id: string): CtxEntry[] {
+  const role = roleOf(ws, id);
   return [
     {
-      label: "Pin as Send Target",
-      checked: sendTarget(ws) === id,
-      onSelect: () => pinTarget(ws, id),
+      label: "Pin as Interactive",
+      checked: role === "interactive",
+      onSelect: () => pinTarget(ws, id, "interactive"),
+    },
+    {
+      label: "Pin as Background",
+      checked: role === "background",
+      onSelect: () => pinTarget(ws, id, "background"),
     },
   ];
 }

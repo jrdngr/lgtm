@@ -50,6 +50,22 @@ describe("threadContext", () => {
     );
   });
 
+  it("gives the take before my reply, with the call to make on a Decide", () => {
+    const c = {
+      id: 31,
+      path: "",
+      body: "Once.",
+      github: t.github,
+      thread: {
+        quote: null,
+        take: { verdict: "decide", why: "Both work.", question: "Keep the cache?" },
+      },
+    } as unknown as CommentDto;
+    expect(threadContext([], t, c).full).toContain(
+      "The take so far: Decide. Both work.\nKeep the cache?\n\nMy reply so far:\nOnce.",
+    );
+  });
+
   it("falls back to the line when the comment isn't loaded, and names PR comments", () => {
     expect(threadContext([], t, undefined).full).toBe(threadContext([], t, undefined).short);
     const onPr = { ...t, path: "", line: null } as ThreadDto;

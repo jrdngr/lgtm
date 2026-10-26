@@ -9,7 +9,7 @@ import { closeDesignForm, designsChanged, designText, showDesign, useEditing } f
  * tab; a generated one also goes to a terminal agent. */
 export function DesignFormHost({ workspace }: { workspace: WorkspaceName }) {
   const editing = useEditing(workspace);
-  const { sendText, picker } = useSendFromMenu(workspace);
+  const { sendText, picker } = useSendFromMenu(workspace, "background");
   return (
     <>
       {editing && (

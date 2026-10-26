@@ -145,7 +145,7 @@ export function QuestionCard({
               {p.onExplain && (
                 <button
                   type="button"
-                  className="qq-explain pipe-icon"
+                  className="qq-explain pipe-icon bg"
                   title={`Explain option ${i + 1}`}
                   aria-label={`Explain option ${i + 1}`}
                   onClick={() => p.onExplain?.(i)}

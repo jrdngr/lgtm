@@ -102,7 +102,7 @@ export function GuidedPanel() {
   const { g, error, view } = useGuidedView(review);
   const picked = usePick(workspace);
   const [sendError, setSendError] = useState<string>();
-  const { sendText, picker } = useSendText(workspace, setSendError, () => {});
+  const { sendText, picker } = useSendText(workspace, setSendError, () => {}, "background");
   const [shut, setShut] = useSavedSet(`guided-shut:${workspace ?? ""}`);
   const toggle = (key: string) =>
     setShut((s) => {
@@ -128,7 +128,11 @@ export function GuidedPanel() {
       title="Guided"
       meta={g?.stale ? <span className="pill amber">Stale</span> : undefined}
     >
-      {review && <PipeButton onClick={generate}>{g ? "Update" : "Generate"}</PipeButton>}
+      {review && (
+        <PipeButton background onClick={generate}>
+          {g ? "Update" : "Generate"}
+        </PipeButton>
+      )}
     </SectionHeader>
   );
   const problem = sendError ?? error;
