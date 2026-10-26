@@ -2,6 +2,7 @@
 //! designs, drawings and notes. lgtm's global store is one too, holding only global notes.
 
 mod arch;
+mod asleep;
 mod bots;
 mod checks;
 mod comments;
@@ -253,6 +254,7 @@ impl Store {
         guided::create_table(&db)?;
         log_revsets::create_table(&db)?;
         workspace_roots::create_table(&db)?;
+        asleep::create_table(&db)?;
         notes::create_table(&db)?;
         bots::create_table(&db)?;
         prs::create_table(&db)?;
@@ -281,6 +283,7 @@ impl Store {
             "workspace_roots",
             "symbol_info",
             "agent_turns",
+            "asleep",
         ] {
             tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
         }

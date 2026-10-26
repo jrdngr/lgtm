@@ -39,6 +39,24 @@ pub(crate) async fn open_workspace(
         .map_err(err)
 }
 
+/// Ends the workspace's terminals and puts it to sleep until it's opened again.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn sleep_workspace(
+    window: WebviewWindow,
+    ptys: State<'_, Ptys>,
+    workspace: Option<String>,
+) -> CmdResult<()> {
+    ptys.kill_owner(&Owner {
+        window: window.label().to_string(),
+        workspace: workspace.clone(),
+    });
+    repo(&window)?
+        .sleep_workspace(workspace.as_deref())
+        .await
+        .map_err(err)
+}
+
 /// Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run.
 #[tauri::command]
 #[specta::specta]

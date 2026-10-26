@@ -14,7 +14,7 @@ import { useAgentReports } from "../bots/useAgentReports";
 import { bottom } from "../core/bottom";
 import { type DockSlot, registerDock } from "../core/docks";
 import { addTerminal, defaultLayout, focusPanel, isReviewPanel } from "../core/panels";
-import { WorkspaceContext, type WorkspaceName } from "../core/workspace";
+import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { DrawingTab } from "../drawings/DrawingTab";
 import { EditorPanel } from "../editor/EditorPanel";
 import { useAgentShow } from "../editor/useAgentShow";
@@ -66,6 +66,12 @@ const components = {
   graph: () => null,
   runs: () => null,
 };
+
+/** Each mounted dock's layout writer, by workspace key. */
+const writers = new Map<string, () => Promise<void>>();
+
+/** Saves the workspace's layout now, before its dock unmounts. */
+export const flushLayout = (workspace: WorkspaceName) => writers.get(workspaceKey(workspace))?.();
 
 interface Props {
   workspace: WorkspaceName;
@@ -137,24 +143,35 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     return loading.current;
   }
 
-  /** Saves both docks. A dock that isn't up yet keeps what was saved for it. */
+  /** Saves both docks now. A dock that isn't up yet keeps what was saved for it. */
+  async function write() {
+    clearTimeout(timer.current);
+    const saved = loaded.current;
+    if (gone.current || !saved) return;
+    const { main, bottom: below } = latest.current;
+    const layout: SavedLayout = {
+      main: main ? main.toJSON() : saved.main,
+      bottom: below ? (below.panels.length ? below.toJSON() : undefined) : saved.bottom,
+      folds: {
+        main: main ? savedFolds(main) : saved.folds?.main,
+        bottom: below ? savedFolds(below) : saved.folds?.bottom,
+      },
+    };
+    await commands.saveLayout(workspace, JSON.stringify(layout));
+  }
+
   function save() {
     clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      const saved = loaded.current;
-      if (gone.current || !saved) return;
-      const { main, bottom: below } = latest.current;
-      const layout: SavedLayout = {
-        main: main ? main.toJSON() : saved.main,
-        bottom: below ? (below.panels.length ? below.toJSON() : undefined) : saved.bottom,
-        folds: {
-          main: main ? savedFolds(main) : saved.folds?.main,
-          bottom: below ? savedFolds(below) : saved.folds?.bottom,
-        },
-      };
-      commands.saveLayout(workspace, JSON.stringify(layout));
-    }, 500);
+    timer.current = window.setTimeout(write, 500);
   }
+  const writeRef = useRef(write);
+  writeRef.current = write;
+  useEffect(() => {
+    writers.set(workspaceKey(workspace), () => writeRef.current());
+    return () => {
+      writers.delete(workspaceKey(workspace));
+    };
+  }, [workspace]);
 
   async function readyMain({ api }: DockviewReadyEvent) {
     latest.current.main = api;

@@ -28,9 +28,12 @@ impl RepoWindows {
         self.open.lock().unwrap().get(label).cloned()
     }
 
-    /// Forgets the window's repo.
+    /// Forgets the window's repo and stops its language servers.
     pub fn remove(&self, label: &str) {
-        self.open.lock().unwrap().remove(label);
+        let Some(ctx) = self.open.lock().unwrap().remove(label) else {
+            return;
+        };
+        tauri::async_runtime::spawn(async move { ctx.stop_servers().await });
     }
 
     /// The window and state of the repo whose main workspace is at `root`.

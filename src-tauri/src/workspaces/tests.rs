@@ -215,3 +215,33 @@ async fn only_workspaces_the_ui_opened_are_watched_and_once_each() {
     assert!(first.watch.lock().unwrap().is_none());
     assert!(second.watch.lock().unwrap().is_some());
 }
+
+#[tokio::test]
+async fn a_sleeping_workspace_stops_watching_until_opened_and_stays_asleep_across_lists() {
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    ctx.workspace_base = Some(base.path().to_path_buf());
+    *ctx.emit.lock().unwrap() = Some(Arc::new(|_, _| {}));
+    ctx.create_workspace("t1").await.unwrap();
+    ctx.open_workspace(Some("t1")).await.unwrap();
+    let ws = ctx.workspace(Some("t1")).await.unwrap();
+    let asleep = |list: &[WorkspaceDto]| {
+        list.iter()
+            .filter(|w| w.asleep)
+            .map(|w| w.title.clone())
+            .collect::<Vec<_>>()
+    };
+
+    ctx.sleep_workspace(Some("t1")).await.unwrap();
+    ctx.sleep_workspace(None).await.unwrap();
+    assert!(ws.watch.lock().unwrap().is_none());
+    // Listing again doesn't wake it, as it does a workspace the UI opened.
+    let list = ctx.list_workspaces().await.unwrap();
+    assert!(ws.watch.lock().unwrap().is_none());
+    assert_eq!(asleep(&list).len(), 2);
+
+    ctx.open_workspace(Some("t1")).await.unwrap();
+    assert!(ws.watch.lock().unwrap().is_some());
+    let list = ctx.list_workspaces().await.unwrap();
+    assert_eq!(asleep(&list), [list[0].title.clone()]);
+}

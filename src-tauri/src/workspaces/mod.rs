@@ -32,6 +32,8 @@ pub struct WorkspaceDto {
     pub description: String,
     /// Its files weren't found where jj says or nearby.
     pub missing: bool,
+    /// Put to sleep: its terminals, language servers and watcher are stopped until it's opened.
+    pub asleep: bool,
 }
 
 /// A path component without spaces or shell metacharacters.
@@ -137,7 +139,10 @@ impl RepoCtx {
             }
         }
         drop(opened);
+        drop(map);
+        let asleep = self.store.lock().unwrap().asleep()?;
         let dto = |w: WorkspaceInfo, main: bool| WorkspaceDto {
+            asleep: asleep.contains(if main { "" } else { w.name.as_str() }),
             missing: missing.contains(&w.name),
             name: (!main).then(|| w.name.clone()),
             title: w.name,
@@ -176,8 +181,30 @@ impl RepoCtx {
             self.opened.lock().unwrap().insert(name.to_string());
         }
         let ws = self.workspace(name).await?;
+        self.store
+            .lock()
+            .unwrap()
+            .set_asleep(name.unwrap_or(""), false)?;
         self.watch(&ws);
         ws.jj.resume();
+        Ok(())
+    }
+
+    /// Puts the workspace to sleep until the UI opens it again: stops its language servers and,
+    /// for a workspace other than main, whose watcher reports every workspace's operations, its
+    /// watcher. Its terminals end with its dock.
+    pub async fn sleep_workspace(&self, name: Option<&str>) -> anyhow::Result<()> {
+        let ws = self.workspace(name).await?;
+        if let Some(name) = name {
+            self.opened.lock().unwrap().remove(name);
+            ws.watch.lock().unwrap().take();
+        }
+        crate::lsp::stop(&ws.root).await;
+        self.store
+            .lock()
+            .unwrap()
+            .set_asleep(name.unwrap_or(""), true)?;
+        tracing::info!(workspace = name.unwrap_or("main"), "workspace asleep");
         Ok(())
     }
 
@@ -264,6 +291,7 @@ impl RepoCtx {
         // Reviews can outlive it, so its watcher stops here rather than when it drops: jj
         // can't read `@` in a forgotten workspace.
         ws.watch.lock().unwrap().take();
+        crate::lsp::stop(&ws.root).await;
         let ours = self
             .workspace_base
             .as_ref()
@@ -276,6 +304,16 @@ impl RepoCtx {
         }
         tracing::info!(workspace = name, deleted_dir = ours, "forgot workspace");
         Ok(())
+    }
+
+    /// Stops the language servers of every workspace, once nothing shows the repo.
+    pub async fn stop_servers(&self) {
+        let roots: Vec<PathBuf> = std::iter::once(self.main.root.clone())
+            .chain(self.workspaces.lock().unwrap().values().map(|w| w.root.clone()))
+            .collect();
+        for root in roots {
+            crate::lsp::stop(&root).await;
+        }
     }
 
     /// Drops what lgtm keeps about forgotten workspace `name`: its PR and stored state.

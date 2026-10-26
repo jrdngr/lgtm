@@ -28,13 +28,15 @@ interface Props {
    * once approved. */
   onSelect(name: WorkspaceName, setup?: boolean): void;
   onDeleted(name: string): void;
+  /** Puts a workspace to sleep. */
+  onSleep(name: WorkspaceName): void;
   /** Hides the left panel. */
   onHide(): void;
 }
 
 /** The repo's workspaces, and the selected one's revisions under them. Click a workspace to
  * switch to it. */
-export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide }: Props) {
+export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep, onHide }: Props) {
   const { workspaces, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
   const [openingPr, setOpeningPr] = useState(false);
@@ -150,6 +152,8 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
   }
 
   const { top, rest } = arrange(workspaces ?? [], (w) => workspaceKey(w.name), pins.pinned);
+  // One workspace stays awake.
+  const canSleep = (workspaces ?? []).filter((w) => !w.asleep).length > 1;
   const lastPin = top.filter((w) => workspaceKey(w.name) !== drop?.key).at(-1);
 
   /** Where the dragged pin would land, next to the row with `key`. */
@@ -181,6 +185,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onHide 
         w={w}
         selected={selected === w.name}
         onSelect={() => (w.missing ? locate(w) : onSelect(w.name))}
+        onSleep={canSleep ? () => onSleep(w.name) : undefined}
         onLocate={() => locate(w)}
         onDelete={() => setConfirming(w.name ?? undefined)}
         onPinDrag={pinned ? (e) => startDrag(e, key) : undefined}

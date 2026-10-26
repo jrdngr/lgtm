@@ -80,6 +80,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::workspaces::list_workspaces,
             commands::workspaces::locate_workspace,
             commands::workspaces::open_workspace,
+            commands::workspaces::sleep_workspace,
             commands::workspaces::create_workspace,
             commands::workspaces::approve_setup,
             commands::workspaces::delete_workspace,

@@ -26,7 +26,7 @@ vi.mock("./xterm", () => ({
       dispose() {},
     },
     refit() {},
-    unwatch() {},
+    release() {},
   }),
 }));
 const sub = () => ({ dispose() {} });

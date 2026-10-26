@@ -111,7 +111,7 @@ function startSession(
   setup: boolean,
   command?: Promise<string | undefined>,
 ): Session {
-  const { term, refit, unwatch } = createTerminal(host);
+  const { term, refit, release } = createTerminal(host);
   let pty: number | undefined;
   /** Input from before the PTY's id came back, like the terminal's replies to a program that
    * queries it as soon as it starts. */
@@ -219,7 +219,7 @@ function startSession(
       unhook();
       for (const s of subs) s.dispose();
       if (pty !== undefined) commands.ptyKill(pty);
-      unwatch();
+      release();
       term.dispose();
       host.remove();
     },

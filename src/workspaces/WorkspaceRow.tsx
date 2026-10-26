@@ -3,6 +3,7 @@ import { workspaceKey } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { useRoles } from "../terminal/registry";
 import { contextMenu } from "../ui/contextMenu";
+import { Icon } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
@@ -62,6 +63,8 @@ interface Props {
   w: WorkspaceDto;
   selected: boolean;
   onSelect(): void;
+  /** Unset when the workspace can't sleep. */
+  onSleep?(): void;
   onDelete(): void;
   /** Asks where its files are. */
   onLocate(): void;
@@ -76,6 +79,7 @@ export function WorkspaceRow({
   w,
   selected,
   onSelect,
+  onSleep,
   onDelete,
   onLocate,
   onPinDrag,
@@ -96,6 +100,7 @@ export function WorkspaceRow({
       pr,
       dot,
       open: onSelect,
+      onSleep,
       onDelete,
       onLocate,
       onClearDot: () => clearFinished(w.name),
@@ -103,7 +108,7 @@ export function WorkspaceRow({
   );
   return (
     <li
-      className={`workspace${selected ? " selected" : ""}${color ? " colored" : ""}${drop ? ` drop-${drop}` : ""}`}
+      className={`workspace${selected ? " selected" : ""}${w.asleep ? " asleep" : ""}${color ? " colored" : ""}${drop ? ` drop-${drop}` : ""}`}
       style={color ? ({ "--ws-color": COLORS[color] } as React.CSSProperties) : undefined}
       data-pin={onPinDrag ? key : undefined}
       onPointerDown={onPinDrag}
@@ -121,15 +126,21 @@ export function WorkspaceRow({
         {w.name !== null && (
           <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
-        <AgentGlyph
-          a={a}
-          name={(g) => agentName(w.name, g)}
-          role={(g) => (g.tab ? role(g.tab) : undefined)}
-          onOpen={(g) => {
-            onSelect();
-            openAgent(w.name, g);
-          }}
-        />
+        {w.asleep ? (
+          <span className="ws-moon">
+            <Icon name="moon" />
+          </span>
+        ) : (
+          <AgentGlyph
+            a={a}
+            name={(g) => agentName(w.name, g)}
+            role={(g) => (g.tab ? role(g.tab) : undefined)}
+            onOpen={(g) => {
+              onSelect();
+              openAgent(w.name, g);
+            }}
+          />
+        )}
       </span>
     </li>
   );

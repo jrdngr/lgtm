@@ -155,6 +155,11 @@ async fn server(root: &Path, kind: &'static Kind) -> anyhow::Result<Option<Arc<S
     Ok(Some(s))
 }
 
+/// Stops the servers running for workspace root `root`.
+pub async fn stop(root: &Path) {
+    SERVERS.lock().await.retain(|(r, _), _| r != root);
+}
+
 impl Server {
     /// Gives the server `text` as `path`'s contents, unless it has them already.
     fn sync(&self, path: &Path, lang: &str, text: String) {

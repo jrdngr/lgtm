@@ -360,3 +360,17 @@
   font: 10.5px var(--mono);
   color: var(--faint);
 }
+
+.workspace.asleep .workspace-open {
+  opacity: 0.5;
+}
+
+.ws-moon {
+  display: flex;
+  color: var(--muted);
+}
+
+.ws-moon svg {
+  width: 13px;
+  height: 13px;
+}

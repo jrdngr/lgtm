@@ -54,6 +54,8 @@ export const commands = {
 	locateWorkspace: (name: string, root: string) => typedError<null, string>(__TAURI_INVOKE("locate_workspace", { name, root })),
 	/**  The UI opened the workspace: watches it, and starts its paused background snapshots again. */
 	openWorkspace: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_workspace", { workspace })),
+	/**  Ends the workspace's terminals and puts it to sleep until it's opened again. */
+	sleepWorkspace: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("sleep_workspace", { workspace })),
 	/**  Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run. */
 	createWorkspace: (name: string) => typedError<Setup, string>(__TAURI_INVOKE("create_workspace", { name })),
 	/**
@@ -2783,6 +2785,8 @@ export type WorkspaceDto = {
 	description: string,
 	/**  Its files weren't found where jj says or nearby. */
 	missing: boolean,
+	/**  Put to sleep: its terminals, language servers and watcher are stopped until it's opened. */
+	asleep: boolean,
 };
 
 /* Tauri Specta runtime */

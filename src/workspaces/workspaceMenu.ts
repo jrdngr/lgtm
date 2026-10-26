@@ -53,8 +53,10 @@ interface Row {
   pr: PrDto | null | undefined;
   /** Whether the row shows an agent that ended while away. */
   dot: boolean;
-  /** Switches to the workspace. */
+  /** Switches to the workspace, which wakes it when it's asleep. */
   open(): void;
+  /** Puts it to sleep. Unset when it can't sleep, as the only awake workspace. */
+  onSleep?(): void;
   onDelete(): void;
   onLocate(): void;
   onClearDot(): void;
@@ -68,6 +70,7 @@ export function workspaceMenu({
   pr,
   dot,
   open,
+  onSleep,
   onDelete,
   onLocate,
   onClearDot,
@@ -111,6 +114,10 @@ export function workspaceMenu({
     w.name !== null && { label: "Locate Folder…", onSelect: onLocate },
     "-",
     w.name !== null && !pr && dot && { label: "Mark Agents Seen", onSelect: onClearDot },
+    "-",
+    w.asleep
+      ? { label: "Wake", onSelect: open }
+      : { label: "Sleep", disabled: !onSleep, onSelect: () => onSleep?.() },
     "-",
     deleteItem(w, onDelete),
   ];

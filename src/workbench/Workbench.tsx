@@ -11,7 +11,7 @@ import { setStateRepo } from "../core/savedState";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { DesignFormHost } from "../design/DesignFormHost";
 import { requestNewDrawing } from "../drawings/store";
-import { confirmClose } from "../editor/unsaved";
+import { confirmClose, confirmWorkspace } from "../editor/unsaved";
 import { forgetPr } from "../github/pr";
 import { openGuided } from "../guided/store";
 import { useShortcutsMenu } from "../help/open";
@@ -58,7 +58,7 @@ import {
   saveWorkspace,
 } from "./sides";
 import { useCloseGuard } from "./useCloseGuard";
-import { WorkspaceDock } from "./WorkspaceDock";
+import { flushLayout, WorkspaceDock } from "./WorkspaceDock";
 import { useWordWrapMenu } from "./wordWrap";
 
 /** Shortcuts acting on the selected workspace's panes. */
@@ -132,6 +132,30 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   }
 
   const workspaces = useWorkspaces();
+
+  /** Puts a workspace to sleep, once the user agrees to stop what runs in it: saves its layout
+   * and unmounts its dock, which ends its terminals, and moves off it if it's selected. */
+  async function sleep(name: WorkspaceName) {
+    if (!(await confirmWorkspace(name))) return;
+    await flushLayout(name);
+    if (selectedRef.current === name) {
+      const next = workspaces.workspaces?.find((w) => w.name !== name && !w.asleep);
+      if (!next) return;
+      select(next.name);
+    }
+    setMounted((m) => m.filter((d) => d.name !== name));
+    const r = await commands.sleepWorkspace(name);
+    if (r.status === "error") workspaces.setError(r.error);
+    workspaces.reload();
+  }
+
+  // Showing a sleeping workspace wakes it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: checks each list and selection
+  useEffect(() => {
+    if (!workspaces.workspaces?.some((w) => w.name === selected && w.asleep)) return;
+    commands.openWorkspace(selected).then(() => workspaces.reload());
+  }, [workspaces.workspaces, selected]);
+
   const atOutside = useAtOutside(selected);
   // The selected workspace, remembered from last time or forgotten from a terminal, may be
   // gone. A list fetched before it was created can lack it too, so a fresh one confirms.
@@ -354,6 +378,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
                   selected={selected}
                   onSelect={select}
                   onDeleted={forget}
+                  onSleep={sleep}
                   onHide={() => toggle("left")}
                 />
               ),
