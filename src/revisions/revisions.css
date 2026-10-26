@@ -408,3 +408,15 @@ button.lr-pr.on {
   min-width: 0;
   font: 12px var(--mono);
 }
+
+.log-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.log-error > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

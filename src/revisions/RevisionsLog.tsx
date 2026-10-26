@@ -9,6 +9,7 @@ import { useReviewTarget } from "../review/target";
 import { TurnRows, TurnsToggle } from "../turns/TurnRows";
 import { reloadTurns, turnsOpen, useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
+import { IconButton } from "../ui/icons";
 import { reviewStackPr } from "../workspaces/stack";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { BookmarkPopup } from "./BookmarkPopup";
@@ -443,7 +444,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       }}
     >
       {running && <RunningRow action={running} />}
-      {error && <div className="review-error">{error}</div>}
+      {error && (
+        <div className="review-error log-error">
+          <span>{error}</span>
+          <IconButton icon="close" label="Clear" onClick={() => setError(undefined)} />
+        </div>
+      )}
       {!rows && !error && <div className="placeholder">Loading</div>}
       <div className="lr-list" onScroll={hover.leave}>
         {rows?.map((row, i) => {
