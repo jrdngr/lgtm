@@ -29,8 +29,11 @@ export function editorWord(v: EditorView): string {
 
 /** The page's selection on one line, else the identifier at point `x`, `y`. */
 export function wordAtPoint(x: number, y: number): string {
-  const picked = oneLine(window.getSelection()?.toString() ?? "");
-  if (picked) return picked;
+  return oneLine(window.getSelection()?.toString() ?? "") || identifierAt(x, y);
+}
+
+/** The identifier in the page's text at point `x`, `y`, or "". */
+export function identifierAt(x: number, y: number): string {
   const range = document.caretRangeFromPoint?.(x, y);
   const node = range?.startContainer;
   if (!range || node?.nodeType !== Node.TEXT_NODE) return "";
@@ -43,4 +46,12 @@ export function focusedWord(): string {
   const view = el instanceof HTMLElement ? EditorView.findFromDOM(el) : null;
   if (view) return editorWord(view);
   return oneLine(window.getSelection()?.toString() ?? "");
+}
+
+/** The identifier under point `x`, `y` in editor `v`, or "". */
+export function editorWordAt(v: EditorView, x: number, y: number): string {
+  const pos = v.posAtCoords({ x, y });
+  if (pos === null) return "";
+  const line = v.state.doc.lineAt(pos);
+  return wordAt(line.text, pos - line.from);
 }

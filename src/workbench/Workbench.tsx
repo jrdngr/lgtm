@@ -21,6 +21,7 @@ import { forgetWorkspaceRevset } from "../review/revset";
 import { useReviewTarget } from "../review/target";
 import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
 import { focusLog, openMotions } from "../revisions/loadReview";
+import { watchDefinitionClicks } from "../search/definitionClick";
 import { askSymbolInfo } from "../search/menu";
 import { openQuickPick } from "../search/pickStore";
 import { QuickPickHost } from "../search/QuickPick";
@@ -103,6 +104,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  useEffect(() => watchDefinitionClicks(() => selectedRef.current), []);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);

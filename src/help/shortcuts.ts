@@ -69,7 +69,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Symbols, in the editor or on a selection",
     shortcuts: [
-      { keys: ["F12"], action: "Go to definition" },
+      { keys: ["F12", "⌘-click"], action: "Go to definition" },
       { keys: ["⇧F12"], action: "Find all references" },
       { keys: ["⌥F12"], action: "Symbol information" },
     ],
