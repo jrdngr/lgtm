@@ -12,9 +12,12 @@ export const commands = {
 	/**  The command-line tools that are missing or too old. */
 	checkTools: () => __TAURI_INVOKE<ToolProblem[]>("check_tools"),
 	openRepo: (path: string) => typedError<null, string>(__TAURI_INVOKE("open_repo", { path })),
-	/**  The git repo containing `path` when it isn't a jj repo, so the start window can offer to init. */
-	gitRoot: (path: string) => __TAURI_INVOKE<string | null>("git_root", { path }),
-	/**  Colocates jj with the git repo at `root`, then opens it. */
+	/**
+	 *  Where `jj git init` would make `path` a jj repo when it isn't one: the git repo holding it,
+	 *  else the folder itself.
+	 */
+	initRoot: (path: string) => __TAURI_INVOKE<string | null>("init_root", { path }),
+	/**  Makes `root` a jj repo colocated with git, then opens it. */
 	initJj: (root: string) => typedError<null, string>(__TAURI_INVOKE("init_jj", { root })),
 	/**  Recently opened repos, most recent first. */
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),

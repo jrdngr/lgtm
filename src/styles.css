@@ -243,11 +243,6 @@ kbd {
   overflow-wrap: anywhere;
 }
 
-.start .hint {
-  color: var(--muted);
-  font-size: 11px;
-}
-
 .recent {
   width: 100%;
   max-width: 400px;

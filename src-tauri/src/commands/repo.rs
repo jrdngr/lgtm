@@ -62,18 +62,20 @@ pub(crate) fn keep_window(window: WebviewWindow) {
     let _ = window;
 }
 
-/// The git repo containing `path` when it isn't a jj repo, so the start window can offer to init.
+/// Where `jj git init` would make `path` a jj repo when it isn't one: the git repo holding it,
+/// else the folder itself.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn git_root(path: String) -> Option<String> {
+pub(crate) fn init_root(path: String) -> Option<String> {
     let path = Path::new(&path);
-    if find_root(path).is_some() {
+    if find_root(path).is_some() || !path.is_dir() {
         return None;
     }
-    Some(init::git_root(path)?.display().to_string())
+    let root = init::git_root(path).unwrap_or_else(|| path.to_path_buf());
+    Some(root.display().to_string())
 }
 
-/// Colocates jj with the git repo at `root`, then opens it.
+/// Makes `root` a jj repo colocated with git, then opens it.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn init_jj(app: AppHandle, root: String) -> CmdResult<()> {

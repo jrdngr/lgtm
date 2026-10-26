@@ -1,4 +1,4 @@
-//! Turning a plain git repo into a colocated jj repo.
+//! Turning a git repo or a plain folder into a jj repo colocated with git.
 
 use std::path::{Path, PathBuf};
 
@@ -9,7 +9,7 @@ pub fn git_root(path: &Path) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// `jj git init --colocate` at `root`. The git repo keeps working as before.
+/// `jj git init --colocate` at `root`. A git repo there keeps working as before.
 pub fn init_colocated(root: &Path) -> anyhow::Result<()> {
     let out = std::process::Command::new("jj")
         .args(["git", "init", "--colocate", "--no-pager", "--color=never"])
@@ -45,5 +45,14 @@ mod tests {
         init_colocated(&root).unwrap();
         assert!(root.join(".jj").is_dir());
         assert!(root.join(".git").is_dir());
+    }
+
+    #[test]
+    fn init_makes_a_plain_folder_a_repo() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        assert_eq!(git_root(&root), None);
+        init_colocated(&root).unwrap();
+        assert!(root.join(".jj").is_dir());
     }
 }

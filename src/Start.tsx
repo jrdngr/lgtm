@@ -4,7 +4,7 @@ import { commands, type RepoInfo } from "./ipc";
 
 export function Start() {
   const [error, setError] = useState<string>();
-  const [gitRoot, setGitRoot] = useState<string | null>(null);
+  const [initRoot, setInitRoot] = useState<string | null>(null);
   const [recent, setRecent] = useState<RepoInfo[]>([]);
 
   useEffect(() => {
@@ -14,13 +14,13 @@ export function Start() {
   async function openPath(path: string) {
     const r = await commands.openRepo(path);
     setError(r.status === "error" ? r.error : undefined);
-    setGitRoot(r.status === "error" ? await commands.gitRoot(path) : null);
+    setInitRoot(r.status === "error" ? await commands.initRoot(path) : null);
   }
 
   async function initJj(root: string) {
     const r = await commands.initJj(root);
     setError(r.status === "error" ? r.error : undefined);
-    setGitRoot(null);
+    setInitRoot(null);
   }
 
   async function pick() {
@@ -34,13 +34,12 @@ export function Start() {
       <button type="button" onClick={pick}>
         Open repository
       </button>
-      {gitRoot ? (
+      {initRoot ? (
         <div className="init">
-          <p>{gitRoot} is a git repo without jj.</p>
-          <button type="button" onClick={() => initJj(gitRoot)}>
-            Initialize jj here
+          <p>{initRoot} isn't a jj repo.</p>
+          <button type="button" onClick={() => initJj(initRoot)}>
+            Run jj git init
           </button>
-          <p className="hint">Runs jj git init --colocate. Git keeps working as before.</p>
         </div>
       ) : (
         error && <p className="error">{error}</p>

@@ -61,7 +61,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::current_repo,
             commands::repo::check_tools,
             commands::repo::open_repo,
-            commands::repo::git_root,
+            commands::repo::init_root,
             commands::repo::init_jj,
             commands::repo::recent_repos,
             commands::repo::switch_repo,
