@@ -405,13 +405,15 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     return inReview(i) ? " rv" : "";
   }
 
-  /** A row's graph and its commit's lines. */
+  /** A row's graph and its commit's lines. Nothing for a row a reload took away. */
   function rowBody(i: number) {
+    const cells = graph.cells[i];
+    if (!cells) return null;
     const commit = rows?.[i]?.commit;
     const rp = commit ? prOf(commit) : undefined;
     return (
       <>
-        <LogGraph cells={graph.cells[i]} width={graph.width} />
+        <LogGraph cells={cells} width={graph.width} />
         {commit && (
           <CommitLines
             c={commit}
@@ -523,7 +525,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
           );
         })}
       </div>
-      {hover.hover && !dragging && (
+      {hover.hover && !dragging && graph.cells[hover.hover.row] && (
         <RevisionPopover hover={hover.hover}>{rowBody(hover.hover.row)}</RevisionPopover>
       )}
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
