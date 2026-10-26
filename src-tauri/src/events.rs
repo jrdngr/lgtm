@@ -25,10 +25,15 @@ pub struct WorkingCopyMoved {
     pub workspace: Option<String>,
 }
 
-/// File > Open Repository in this window. The window swaps itself for the start window once
-/// unsaved edits are dealt with.
+/// File > Add Repository to this window's project.
 #[derive(Clone, Serialize, Type, Event)]
-pub struct SwitchRepo {}
+pub struct AddRepo {}
+
+/// The window shows the repo with `label`, asked for from outside the window.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct ShowRepo {
+    pub label: String,
+}
 
 /// The settings were saved.
 #[derive(Clone, Serialize, Type, Event)]

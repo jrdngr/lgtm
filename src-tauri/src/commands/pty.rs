@@ -1,7 +1,8 @@
 use tauri::ipc::Channel;
-use tauri::{Manager, State, WebviewWindow};
+use tauri::{Manager, State};
 
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::pty::{Owner, PtyEvent, Ptys};
 use crate::workspaces;
 
@@ -10,7 +11,7 @@ use crate::workspaces;
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn pty_spawn(
-    window: WebviewWindow,
+    window: Frame,
     ptys: State<'_, Ptys>,
     workspace: Option<String>,
     terminal: String,

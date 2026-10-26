@@ -32,15 +32,19 @@ function reviewAt(workspace: WorkspaceName, api: DockviewApi) {
 
 const title = (c: string) => c[0].toUpperCase() + c.slice(1);
 
-function colorItems(key: string, color: PinColor | undefined): CtxEntry[] {
+/** A Color submenu, checking `color`. */
+export function colorItems(
+  color: PinColor | undefined,
+  pick: (c: PinColor | null) => void,
+): CtxEntry[] {
   return [
-    { label: "None", checked: !color, onSelect: () => setColor(key, null) },
+    { label: "None", checked: !color, onSelect: () => pick(null) },
     "-",
     ...(Object.keys(COLORS) as PinColor[]).map((c) => ({
       label: title(c),
       swatch: COLORS[c],
       checked: c === color,
-      onSelect: () => setColor(key, c),
+      onSelect: () => pick(c),
     })),
   ];
 }
@@ -86,7 +90,7 @@ export function workspaceMenu({
     { label: "Open Workspace", onSelect: open },
     "-",
     { label: pinned ? "Unpin" : "Pin to Top", onSelect: () => togglePin(key) },
-    { label: "Color", items: colorItems(key, color) },
+    { label: "Color", items: colorItems(color, (c) => setColor(key, c)) },
     "-",
     !w.missing && {
       label: "New Terminal Here",

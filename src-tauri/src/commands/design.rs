@@ -1,14 +1,13 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
 use crate::canvas::Canvas;
+use crate::frame::Frame;
 use crate::review::arch::design::{DesignDto, DesignInput, DesignItemDto};
 
 /// Every design of the repo, with its state.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn designs(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Vec<DesignItemDto>> {
     repo(&window)?
@@ -21,7 +20,7 @@ pub(crate) async fn designs(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn save_design(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: Option<String>,
     design: DesignInput,
@@ -36,7 +35,7 @@ pub(crate) async fn save_design(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn save_design_canvas(
-    window: WebviewWindow,
+    window: Frame,
     id: String,
     canvas: Canvas,
 ) -> CmdResult<DesignDto> {
@@ -46,13 +45,13 @@ pub(crate) fn save_design_canvas(
 /// Undoes the last agent pass over a design's canvas.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn undo_design_agent(window: WebviewWindow, id: String) -> CmdResult<DesignDto> {
+pub(crate) fn undo_design_agent(window: Frame, id: String) -> CmdResult<DesignDto> {
     repo(&window)?.undo_design_agent(&id).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn delete_design(window: WebviewWindow, id: String) -> CmdResult<()> {
+pub(crate) fn delete_design(window: Frame, id: String) -> CmdResult<()> {
     repo(&window)?.delete_design(&id).map_err(err)
 }
 
@@ -60,7 +59,7 @@ pub(crate) fn delete_design(window: WebviewWindow, id: String) -> CmdResult<()> 
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn design_prompt(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
 ) -> CmdResult<String> {
@@ -74,7 +73,7 @@ pub(crate) async fn design_prompt(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn revision_files(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     revision: String,
 ) -> CmdResult<Vec<String>> {
@@ -88,7 +87,7 @@ pub(crate) async fn revision_files(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn design_bookmarks(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Vec<String>> {
     repo(&window)?

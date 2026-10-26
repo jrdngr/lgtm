@@ -1,16 +1,12 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::qa::queue::Turn;
 use crate::qa::{QuestionAct, Session, SessionEdit};
 
 /// The workspace's Q&A sessions, oldest first.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn list_qa(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Vec<Session>> {
+pub(crate) async fn list_qa(window: Frame, workspace: Option<String>) -> CmdResult<Vec<Session>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     repo(&window)?.qa_sessions(&ws).map_err(err)
 }
@@ -19,7 +15,7 @@ pub(crate) async fn list_qa(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn create_qa(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     prompt: String,
     attach: Vec<String>,
@@ -31,7 +27,7 @@ pub(crate) async fn create_qa(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn delete_qa(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
 ) -> CmdResult<()> {
@@ -42,7 +38,7 @@ pub(crate) async fn delete_qa(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn edit_qa(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
     edit: SessionEdit,
@@ -54,7 +50,7 @@ pub(crate) async fn edit_qa(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn act_on_question(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     session: String,
     act: QuestionAct,
@@ -69,7 +65,7 @@ pub(crate) async fn act_on_question(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn defer_preview(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     session: String,
     id: String,
@@ -83,7 +79,7 @@ pub(crate) async fn defer_preview(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn add_qa_turn(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     session: String,
     id: String,

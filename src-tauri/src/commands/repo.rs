@@ -3,6 +3,7 @@ use std::path::Path;
 use tauri::{AppHandle, Manager, WebviewWindow};
 
 use super::{CmdResult, err, layout_path, repo_root};
+use crate::frame::Frame;
 use crate::jj::init;
 use crate::menu::WordWrapItem;
 use crate::paths::{data_dir, find_root};
@@ -11,7 +12,7 @@ use crate::{layout, recent};
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
+pub(crate) fn current_repo(window: Frame) -> Option<RepoInfo> {
     Some(RepoInfo::new(&repo_root(&window).ok()?))
 }
 
@@ -19,15 +20,6 @@ pub(crate) fn current_repo(window: WebviewWindow) -> Option<RepoInfo> {
 #[specta::specta]
 pub(crate) fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
     repo::open(&app, Path::new(&path))
-}
-
-/// Swaps this window for the start window.
-#[tauri::command]
-#[specta::specta]
-pub(crate) fn switch_repo(app: AppHandle, window: WebviewWindow) -> CmdResult<()> {
-    // Start first, so closing the last repo window doesn't quit the app.
-    repo::open_start(&app).map_err(|e| e.to_string())?;
-    window.destroy().map_err(|e| e.to_string())
 }
 
 /// Shows the window's saved Word Wrap setting as View > Word Wrap's check.
@@ -75,17 +67,15 @@ pub(crate) fn init_root(path: String) -> Option<String> {
     Some(root.display().to_string())
 }
 
-/// Makes `root` a jj repo colocated with git, then opens it.
+/// Makes `root` a jj repo colocated with git.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn init_jj(app: AppHandle, root: String) -> CmdResult<()> {
-    let path = std::path::PathBuf::from(&root);
-    let dir = path.clone();
+pub(crate) async fn init_jj(root: String) -> CmdResult<()> {
+    let dir = std::path::PathBuf::from(&root);
     tauri::async_runtime::spawn_blocking(move || init::init_colocated(&dir))
         .await
         .map_err(|e| e.to_string())?
-        .map_err(err)?;
-    repo::open(&app, &path)
+        .map_err(err)
 }
 
 /// Recently opened repos, most recent first.
@@ -100,17 +90,14 @@ pub(crate) fn recent_repos(app: AppHandle) -> CmdResult<Vec<RepoInfo>> {
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn load_layout(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Option<String>> {
+pub(crate) fn load_layout(window: Frame, workspace: Option<String>) -> CmdResult<Option<String>> {
     layout::load(&layout_path(&window, workspace.as_deref())?).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn save_layout(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     layout: String,
 ) -> CmdResult<()> {

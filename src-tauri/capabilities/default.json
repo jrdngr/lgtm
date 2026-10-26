@@ -4,7 +4,7 @@
   "description": "Start and repo windows",
   "windows": [
     "start",
-    "repo-*"
+    "project-*"
   ],
   "permissions": [
     "core:default",

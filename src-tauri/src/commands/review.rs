@@ -1,8 +1,9 @@
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
 use crate::events::LogRevsetChanged;
+use crate::frame::Frame;
 use crate::jj::{BookmarkSpot, JjAction, WorkingCopyDto};
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
 use crate::revisions::LogView;
@@ -13,7 +14,7 @@ use crate::store::MarkColor;
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn open_review(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     revset: String,
     resume: bool,
@@ -30,7 +31,7 @@ pub(crate) async fn open_review(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn context_lines(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     file: u32,
     from: u32,
@@ -44,7 +45,7 @@ pub(crate) async fn context_lines(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> {
+pub(crate) fn close_review(window: Frame, review: u32) -> CmdResult<()> {
     repo(&window)?.close(review);
     Ok(())
 }
@@ -52,10 +53,7 @@ pub(crate) fn close_review(window: WebviewWindow, review: u32) -> CmdResult<()> 
 /// The workspace's revisions log: its revset and the rows of `jj log` with its graph.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn log_view(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<LogView> {
+pub(crate) async fn log_view(window: Frame, workspace: Option<String>) -> CmdResult<LogView> {
     repo(&window)?
         .log_view(workspace.as_deref())
         .await
@@ -65,10 +63,7 @@ pub(crate) async fn log_view(
 /// The repo's current operation, empty when it can't be read.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn operation(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<String> {
+pub(crate) async fn operation(window: Frame, workspace: Option<String>) -> CmdResult<String> {
     repo(&window)?
         .operation(workspace.as_deref())
         .await
@@ -79,7 +74,7 @@ pub(crate) async fn operation(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn set_log_revset(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     revset: String,
 ) -> CmdResult<()> {
@@ -97,7 +92,7 @@ pub(crate) async fn set_log_revset(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn trunk_bookmark(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Option<String>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
@@ -108,7 +103,7 @@ pub(crate) async fn trunk_bookmark(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn revset_commits(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     revset: String,
 ) -> CmdResult<Vec<String>> {
@@ -120,7 +115,7 @@ pub(crate) async fn revset_commits(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn working_copy(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     revset: String,
 ) -> CmdResult<WorkingCopyDto> {
@@ -132,7 +127,7 @@ pub(crate) async fn working_copy(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn jj_act(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     action: JjAction,
 ) -> CmdResult<u32> {
@@ -146,7 +141,7 @@ pub(crate) async fn jj_act(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn nearest_bookmarks(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     rev: String,
 ) -> CmdResult<Vec<BookmarkSpot>> {
@@ -158,7 +153,7 @@ pub(crate) async fn nearest_bookmarks(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn push_plan(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<crate::jj::PushPlan> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
@@ -169,7 +164,7 @@ pub(crate) async fn push_plan(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn refresh_review(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     view: Option<View>,
 ) -> CmdResult<RefreshDto> {
@@ -181,7 +176,7 @@ pub(crate) async fn refresh_review(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn mark_rows(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     rows: Vec<RowRef>,
     color: Option<MarkColor>,
@@ -195,18 +190,14 @@ pub(crate) fn mark_rows(
 /// Clears a file's marks and unchecks it, in one undo step.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn clear_file_marks(
-    window: WebviewWindow,
-    review: u32,
-    file: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn clear_file_marks(window: Frame, review: u32, file: u32) -> CmdResult<StateDto> {
     repo(&window)?.clear_file(review, file).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_files_checked(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     files: Vec<u32>,
     checked: bool,
@@ -218,31 +209,27 @@ pub(crate) fn set_files_checked(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn undo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
+pub(crate) fn undo_marks(window: Frame, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.undo(review).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn redo_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
+pub(crate) fn redo_marks(window: Frame, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.redo(review).map_err(err)
 }
 
 /// Removes the marks and file checks this review's revset created.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn reset_review_marks(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
+pub(crate) fn reset_review_marks(window: Frame, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.reset(review).map_err(err)
 }
 
 /// Records the review a workspace's active review pane shows, for agents in its terminals.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn focus_review(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    review: u32,
-) -> CmdResult<()> {
+pub(crate) fn focus_review(window: Frame, workspace: Option<String>, review: u32) -> CmdResult<()> {
     repo(&window)?.focus(workspace.as_deref(), review);
     Ok(())
 }

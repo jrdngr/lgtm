@@ -1,3 +1,4 @@
+import "./frame/boot";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
@@ -12,7 +13,9 @@ loadLogLevel();
 installContextMenus();
 installDropGuard();
 
-createRoot(document.getElementById("root") as HTMLElement).render(
+const root = createRoot(document.getElementById("root") as HTMLElement);
+window.lgtmTeardown = () => root.unmount();
+root.render(
   <StrictMode>
     <Crash>
       <App />

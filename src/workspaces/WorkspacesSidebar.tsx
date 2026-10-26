@@ -1,19 +1,24 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useEffect, useState } from "react";
-import type { WorkspaceDto } from "../bindings";
+import { Fragment, useEffect, useState } from "react";
+import type { ProjectRepo, WorkspaceDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { confirmWorkspace } from "../editor/unsaved";
+import { frameRepo } from "../frame/boot";
+import { type ShellState, shell, useShell } from "../frame/shell";
+import { addRepo } from "../frame/useProjectFrame";
 import { OpenPr } from "../github/OpenPr";
 import { reloadPr } from "../github/pr";
 import { commands, errorText, unwrap } from "../ipc";
 import { RevisionsSection } from "../revisions/RevisionsSection";
 import { useGithubOff } from "../tools/agents";
-import { openMenu } from "../ui/contextMenu";
+import { type CtxEntry, openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
-import { confirmShown, showText } from "../ui/prompt";
+import { confirmShown, promptText, showText } from "../ui/prompt";
 import { SectionHeader } from "../ui/SectionHeader";
-import { type AddKind, onAddRequest } from "./addRequests";
+import { type AddKind, onAddRequest, onAsk } from "./addRequests";
+import { ForeignRow } from "./ForeignRow";
 import { arrange, forgetPin, usePins } from "./pins";
+import { RepoRow } from "./RepoRow";
 import { usePinDrag } from "./usePinDrag";
 import { useTopSplit } from "./useTopSplit";
 import type { Workspaces } from "./useWorkspaces";
@@ -57,6 +62,14 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
   }
   // Resubscribed each render, so the shortcut sees the current state.
   useEffect(() => onAddRequest(start));
+  useEffect(() =>
+    onAsk(({ kind, ws }) => {
+      const w = workspaces?.find((x) => x.name === ws);
+      if (kind === "delete") setConfirming(ws);
+      else if (w) locate(w);
+    }),
+  );
+  const project = useShell();
 
   /** Asks where a workspace's files are, then opens it there. */
   async function locate(w: WorkspaceDto) {
@@ -130,7 +143,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
     setRefreshing(false);
   }
 
-  const addItems = [
+  const addItems: CtxEntry[] = [
     { label: "New Workspace…", keys: "⇧⌘N", onSelect: () => start("workspace") },
     {
       label: "Review a PR by URL or Number…",
@@ -138,7 +151,20 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
       disabled: githubOff,
       onSelect: () => start("pr"),
     },
+    project && ("-" as const),
+    project && { label: "Add Repository…", keys: "⌘O", onSelect: () => addRepo(setError) },
   ];
+
+  async function rename() {
+    const sh = shell();
+    if (!sh || !project) return;
+    const next = await promptText("Rename Project", {
+      value: project.project.name,
+      action: "Rename",
+    });
+    const e = next && (await sh.rename(next));
+    if (e) setError(e);
+  }
 
   /** The menu of the header and the space around the rows. Text fields keep their own. */
   function menu(e: React.MouseEvent) {
@@ -147,6 +173,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
       ...addItems,
       "-",
       { label: "Refresh", onSelect: refresh },
+      project && { label: "Rename Project…", onSelect: rename },
       { label: "Hide Left Panel", keys: "⌘B", onSelect: onHide },
     ]);
   }
@@ -190,6 +217,47 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
         onDelete={() => setConfirming(w.name ?? undefined)}
         onPinDrag={pinned ? (e) => startDrag(e, key) : undefined}
         drop={pinned ? dropAt(key) : undefined}
+        nested={!!project}
+      />
+    );
+  }
+
+  /** Pinned workspaces, a hair, then the rest, under their repo. */
+  const nestedRows = (pinned: React.ReactNode[], others: React.ReactNode[]) => (
+    <>
+      {pinned}
+      {pinned.length > 0 && others.length > 0 && <li className="ws-sub" />}
+      {others}
+    </>
+  );
+
+  function repoItems(r: ProjectRepo, s: ShellState) {
+    const open = !r.asleep && !s.ui.collapsed.includes(r.label);
+    const tree = s.trees[r.label];
+    const foreign = (x: (typeof tree.top)[number]) => (
+      <ForeignRow key={workspaceKey(x.w.name)} row={x} label={r.label} />
+    );
+    return (
+      <Fragment key={r.label}>
+        <RepoRow repo={r} s={s} onError={setError} />
+        {open &&
+          (r.label === frameRepo
+            ? nestedRows(
+                top.map((w) => row(w, true)),
+                rest.map((w) => row(w, false)),
+              )
+            : tree && nestedRows(tree.top.map(foreign), tree.rest.map(foreign)))}
+      </Fragment>
+    );
+  }
+
+  /** The project's repos, pinned ones first, each with its workspaces under it. */
+  function tree(s: ShellState) {
+    const repos = arrange(s.project.repos, (r) => r.label, s.ui.pinned);
+    return (
+      <Pinned
+        top={repos.top.map((r) => repoItems(r, s))}
+        rest={<ul>{repos.rest.map((r) => repoItems(r, s))}</ul>}
       />
     );
   }
@@ -197,7 +265,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
   return (
     <div className="workspaces">
       <div ref={split.top} className="ws-top" style={split.style} onContextMenu={menu}>
-        <SectionHeader title="Workspaces">
+        <SectionHeader title={project?.project.name ?? "Workspaces"}>
           <IconButton
             icon="sync"
             label="Refresh"
@@ -239,19 +307,35 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
           </form>
         )}
         {error && <div className="review-error">{error}</div>}
-        {top.length > 0 && (
-          <>
-            <div className="ws-cap">Pinned</div>
-            <ul>{top.map((w) => row(w, true))}</ul>
-            <div className="ws-divider" />
-          </>
+        {project ? (
+          tree(project)
+        ) : (
+          <Pinned
+            top={top.map((w) => row(w, true))}
+            rest={<ul>{rest.map((w) => row(w, false))}</ul>}
+          />
         )}
-        <ul>{rest.map((w) => row(w, false))}</ul>
       </div>
       <div className="ws-split" {...split.splitter}>
         <span />
       </div>
       <RevisionsSection workspace={selected} refreshed={refreshed} />
     </div>
+  );
+}
+
+/** Pinned rows under a heading and a hair, then the rest. */
+function Pinned({ top, rest }: { top: React.ReactNode[]; rest: React.ReactNode }) {
+  return (
+    <>
+      {top.length > 0 && (
+        <>
+          <div className="ws-cap">Pinned</div>
+          <ul>{top}</ul>
+          <div className="ws-divider" />
+        </>
+      )}
+      {rest}
+    </>
   );
 }

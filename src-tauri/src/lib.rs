@@ -9,6 +9,7 @@ mod dragged;
 mod drawings;
 mod events;
 mod files;
+mod frame;
 mod github;
 mod gitmeta;
 mod html;
@@ -23,6 +24,7 @@ mod par;
 mod paths;
 mod placement;
 mod pr;
+mod project;
 mod prompts;
 mod pty;
 mod qa;
@@ -52,7 +54,7 @@ use tauri_specta::{collect_commands, collect_events};
 use html::HtmlRoots;
 use placement::Placements;
 use pty::Ptys;
-use repo::RepoWindows;
+use repo::Repos;
 
 fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::new()
@@ -64,7 +66,17 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::repo::init_root,
             commands::repo::init_jj,
             commands::repo::recent_repos,
-            commands::repo::switch_repo,
+            commands::project::current_project,
+            commands::project::add_repo,
+            commands::project::remove_repo,
+            commands::project::sleep_repo,
+            commands::project::wake_repo,
+            commands::project::set_active_repo,
+            commands::project::rename_project,
+            commands::project::save_project_ui,
+            commands::project::closed_projects,
+            commands::project::open_project,
+            commands::project::delete_project,
             commands::repo::close_window,
             commands::repo::keep_window,
             commands::repo::set_word_wrap,
@@ -235,7 +247,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::RepoChanged,
             events::ReviewOutdated,
             events::WorkingCopyMoved,
-            events::SwitchRepo,
+            events::AddRepo,
+            events::ShowRepo,
             events::WordWrap,
             events::SettingsChanged,
             events::OpenSettings,
@@ -337,7 +350,8 @@ pub fn run() {
         .menu(menu::build)
         .on_menu_event(menu::handle)
         .manage(Ptys::default())
-        .manage(RepoWindows::default())
+        .manage(Repos::default())
+        .manage(project::Projects::default())
         .manage(HtmlRoots::default())
         .register_asynchronous_uri_scheme_protocol(html::SCHEME, html::handle)
         .invoke_handler(builder.invoke_handler())
@@ -361,9 +375,11 @@ pub fn run() {
             }
             WindowEvent::Destroyed => {
                 window.state::<Placements>().save();
-                window.state::<Ptys>().kill_window(window.label());
-                window.state::<HtmlRoots>().close_window(window.label());
-                window.state::<RepoWindows>().remove(window.label());
+                #[cfg(target_os = "macos")]
+                let quitting = quit::quitting();
+                #[cfg(not(target_os = "macos"))]
+                let quitting = false;
+                project::closed(window.app_handle(), window.label(), quitting);
                 #[cfg(target_os = "macos")]
                 quit::closed(window.label());
             }

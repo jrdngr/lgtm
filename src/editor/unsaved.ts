@@ -50,16 +50,22 @@ export async function confirmWorkspace(workspace: WorkspaceName): Promise<boolea
   );
 }
 
-/** Whether every editor and terminal in the window may go, as `confirmClose` asks for one. */
-export async function confirmAll(): Promise<boolean> {
-  return confirm([...unsaved.values()], await runningPrograms(() => true));
+/** Whether every editor and terminal in the repo may go, as `confirmClose` asks for one.
+ * `before` runs before anything is asked. */
+export async function confirmAll(before?: () => void): Promise<boolean> {
+  return confirm([...unsaved.values()], await runningPrograms(() => true), before);
 }
 
 /** Asks once about `files` and `running`. Saving saves every file and stops at the first that
  * fails. Each terminal's agent is listed like the workspace's agent list, and any other
  * program by name. */
-async function confirm(files: Unsaved[], running: Running[]): Promise<boolean> {
+async function confirm(
+  files: Unsaved[],
+  running: Running[],
+  before?: () => void,
+): Promise<boolean> {
   if (files.length === 0 && running.length === 0) return true;
+  before?.();
   const programs = running.map(({ panel, workspace, program }) => {
     const agent = tabAgent(panel);
     const name = agent ? (terminalTitle(panel) ?? agent.label) : program;

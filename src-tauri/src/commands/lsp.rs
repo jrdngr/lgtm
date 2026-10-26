@@ -1,8 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err};
+use crate::frame::Frame;
 use crate::lsp::{self, At, Place};
 use crate::workspace::Workspace;
 
@@ -28,7 +27,7 @@ fn file(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn lsp_definition(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     text: Option<String>,
@@ -51,7 +50,7 @@ pub(crate) async fn lsp_definition(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn lsp_hover(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     text: Option<String>,

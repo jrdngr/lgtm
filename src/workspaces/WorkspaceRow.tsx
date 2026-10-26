@@ -3,9 +3,8 @@ import { workspaceKey } from "../core/workspace";
 import { usePr } from "../github/pr";
 import { useRoles } from "../terminal/registry";
 import { contextMenu } from "../ui/contextMenu";
-import { Icon } from "../ui/icons";
 import { Menu } from "../ui/Menu";
-import { AgentGlyph } from "./AgentGlyph";
+import { AgentGlyph, Moon } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
 import { agentName, openAgent } from "./agentTabs";
 import { COLORS, usePins } from "./pins";
@@ -34,10 +33,12 @@ function Change({ w }: { w: WorkspaceDto }) {
   );
 }
 
+/** A PR workspace's PR, as its row shows it: unset outside a stack's PRs. */
+export type RowPr = { number: number; title: string } | null | undefined;
+
 /** A PR workspace is one line, its PR. Others show their name, then their change. */
-function Lines({ w }: { w: WorkspaceDto }) {
-  const pr = usePr(w.name);
-  if (pr && !pr.stack) {
+export function Lines({ w, pr }: { w: WorkspaceDto; pr: RowPr }) {
+  if (pr) {
     return (
       <span className="workspace-title">
         <span className="pill pr">#{pr.number}</span>
@@ -72,6 +73,8 @@ interface Props {
   onPinDrag?(e: React.PointerEvent): void;
   /** Where a dragged pin would land, next to this row. */
   drop?: "before" | "after";
+  /** Under its repo, in a project's tree. */
+  nested?: boolean;
 }
 
 /** One workspace: its PR or change, its agents, and a ⋯ menu on hover. */
@@ -84,6 +87,7 @@ export function WorkspaceRow({
   onLocate,
   onPinDrag,
   drop,
+  nested,
 }: Props) {
   const pr = usePr(w.name);
   const a = useActivity(w.name);
@@ -108,7 +112,7 @@ export function WorkspaceRow({
   );
   return (
     <li
-      className={`workspace${selected ? " selected" : ""}${w.asleep ? " asleep" : ""}${color ? " colored" : ""}${drop ? ` drop-${drop}` : ""}`}
+      className={`workspace${nested ? " nested" : ""}${selected ? " selected" : ""}${w.asleep ? " asleep" : ""}${color ? " colored" : ""}${drop ? ` drop-${drop}` : ""}`}
       style={color ? ({ "--ws-color": COLORS[color] } as React.CSSProperties) : undefined}
       data-pin={onPinDrag ? key : undefined}
       onPointerDown={onPinDrag}
@@ -120,16 +124,14 @@ export function WorkspaceRow({
         onClick={onSelect}
         title={w.description.trim() || undefined}
       >
-        <Lines w={w} />
+        <Lines w={w} pr={pr && !pr.stack ? pr : null} />
       </button>
       <span className="workspace-side">
         {w.name !== null && (
           <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
         )}
         {w.asleep ? (
-          <span className="ws-moon">
-            <Icon name="moon" />
-          </span>
+          <Moon />
         ) : (
           <AgentGlyph
             a={a}

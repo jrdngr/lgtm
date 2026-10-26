@@ -17,12 +17,45 @@ export const commands = {
 	 *  else the folder itself.
 	 */
 	initRoot: (path: string) => __TAURI_INVOKE<string | null>("init_root", { path }),
-	/**  Makes `root` a jj repo colocated with git, then opens it. */
+	/**  Makes `root` a jj repo colocated with git. */
 	initJj: (root: string) => typedError<null, string>(__TAURI_INVOKE("init_jj", { root })),
 	/**  Recently opened repos, most recent first. */
 	recentRepos: () => typedError<RepoInfo[], string>(__TAURI_INVOKE("recent_repos")),
-	/**  Swaps this window for the start window. */
-	switchRepo: () => typedError<null, string>(__TAURI_INVOKE("switch_repo")),
+	/**  The project this window shows, `null` in the start window. */
+	currentProject: () => __TAURI_INVOKE<{
+	id: string,
+	name: string,
+	repos: ProjectRepo[],
+	/**  The window's own state for its repo list, as it saved it. */
+	ui: string,
+	/**  The label of the repo to show, when the window was opened for it. */
+	active: string | null,
+} | null>("current_project"),
+	/**
+	 *  Adds the repo holding `path` to this window's project. `null` when another window has it,
+	 *  which then shows it.
+	 */
+	addRepo: (path: string) => typedError<{
+	label: string,
+	root: string,
+	name: string,
+	/**  Put to sleep, or open in another window: nothing of it runs here. */
+	asleep: boolean,
+} | null, string>(__TAURI_INVOKE("add_repo", { path })),
+	/**  Ends everything of repo `label` and takes it out of the project. */
+	removeRepo: (label: string) => typedError<null, string>(__TAURI_INVOKE("remove_repo", { label })),
+	/**  Ends everything of repo `label`, which stays in the project asleep. */
+	sleepRepo: (label: string) => typedError<null, string>(__TAURI_INVOKE("sleep_repo", { label })),
+	wakeRepo: (label: string) => typedError<ProjectRepo, string>(__TAURI_INVOKE("wake_repo", { label })),
+	/**  The window shows repo `label`, which the menu's Settings and Keyboard Shortcuts open in. */
+	setActiveRepo: (label: string) => __TAURI_INVOKE<void>("set_active_repo", { label }),
+	renameProject: (name: string) => typedError<null, string>(__TAURI_INVOKE("rename_project", { name })),
+	/**  Saves the window's own state for its repo list, which `current_project` hands back. */
+	saveProjectUi: (ui: string) => typedError<null, string>(__TAURI_INVOKE("save_project_ui", { ui })),
+	/**  Saved projects no window has open, most recently used first. */
+	closedProjects: () => typedError<ProjectSummary[], string>(__TAURI_INVOKE("closed_projects")),
+	openProject: (id: string) => typedError<null, string>(__TAURI_INVOKE("open_project", { id })),
+	deleteProject: (id: string) => typedError<null, string>(__TAURI_INVOKE("delete_project", { id })),
 	/**
 	 *  Closes this window without another close request, once the window has confirmed it.
 	 *  While quitting, it stays open until every window has.
@@ -474,6 +507,7 @@ export const commands = {
 
 /** Events */
 export const events = {
+	addRepo: makeEvent<AddRepo>("add-repo"),
 	agentRevset: makeEvent<AgentRevset>("agent-revset"),
 	agentShow: makeEvent<AgentShow>("agent-show"),
 	archChanged: makeEvent<ArchChanged>("arch-changed"),
@@ -492,7 +526,7 @@ export const events = {
 	reviewOutdated: makeEvent<ReviewOutdated>("review-outdated"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
-	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
+	showRepo: makeEvent<ShowRepo>("show-repo"),
 	symbolInfoChanged: makeEvent<SymbolInfoChanged>("symbol-info-changed"),
 	systemChanged: makeEvent<SystemChanged>("system-changed"),
 	terminalAgent: makeEvent<TerminalAgent>("terminal-agent"),
@@ -515,6 +549,9 @@ export type ActorDto = {
 	name: string,
 	description: string,
 };
+
+/**  File > Add Repository to this window's project. */
+export type AddRepo = Record<string, never>;
 
 /**  How a terminal's agent stands after a hook event. */
 export type AgentHookState = "working" | "input" | "done" | "failed" | "idle" | "gone";
@@ -1862,6 +1899,33 @@ export type PreviewThreadDto = {
 	hunk: string,
 };
 
+export type ProjectDto = {
+	id: string,
+	name: string,
+	repos: ProjectRepo[],
+	/**  The window's own state for its repo list, as it saved it. */
+	ui: string,
+	/**  The label of the repo to show, when the window was opened for it. */
+	active: string | null,
+};
+
+/**  One of a project's repos. */
+export type ProjectRepo = {
+	label: string,
+	root: string,
+	name: string,
+	/**  Put to sleep, or open in another window: nothing of it runs here. */
+	asleep: boolean,
+};
+
+/**  A saved project, as the start window lists it. */
+export type ProjectSummary = {
+	id: string,
+	name: string,
+	/**  Its repos' names. */
+	repos: string[],
+};
+
 /**  An editable prompt. */
 export type Prompt = 
 /**  How takes and replies on GitHub threads are written. */
@@ -2304,6 +2368,11 @@ export type Severity = "critical" | "high" | "medium" | "low" | "info";
 
 export type ShapeKind = "rect" | "ellipse" | "diamond";
 
+/**  The window shows the repo with `label`, asked for from outside the window. */
+export type ShowRepo = {
+	label: string,
+};
+
 /**  How a change compares with the previous session. */
 export type Since = 
 /**  There's no previous session. */
@@ -2365,12 +2434,6 @@ export type StepDto = {
 };
 
 export type Swatch = "red" | "orange" | "yellow" | "green" | "cyan" | "blue" | "purple" | "pink";
-
-/**
- *  File > Open Repository in this window. The window swaps itself for the start window once
- *  unsaved edits are dealt with.
- */
-export type SwitchRepo = Record<string, never>;
 
 /**  `from` uses `to`. */
 export type SymEdgeDto = {

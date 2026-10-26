@@ -6,6 +6,7 @@ use tauri_specta::Event;
 use super::{CmdResult, err};
 use crate::events::TurnsChanged;
 use crate::files::{self, FileEntry};
+use crate::frame::Frame;
 use crate::prompts;
 use crate::syntax::{self, Segment};
 use crate::turns;
@@ -15,7 +16,7 @@ use crate::workspace::Workspace;
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn list_files(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     dir: String,
 ) -> CmdResult<Vec<FileEntry>> {
@@ -39,7 +40,7 @@ fn locate(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn read_file(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
 ) -> CmdResult<String> {
@@ -55,7 +56,7 @@ pub(crate) async fn read_file(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn read_image(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
 ) -> CmdResult<String> {
@@ -71,7 +72,7 @@ pub(crate) async fn read_image(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn save_file(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     text: String,
@@ -97,7 +98,7 @@ pub(crate) async fn save_file(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn files_at(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     paths: Vec<String>,
 ) -> CmdResult<Vec<Option<String>>> {
@@ -142,7 +143,7 @@ fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn create_path(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     dir: bool,
@@ -163,7 +164,7 @@ pub(crate) struct DroppedFile {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn add_files(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     files: Vec<DroppedFile>,
     replace: bool,
@@ -188,7 +189,7 @@ pub(crate) async fn add_files(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn drag_out(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     paths: Vec<String>,
 ) -> CmdResult<()> {
@@ -198,14 +199,14 @@ pub(crate) async fn drag_out(
         .map(|p| confined(&ws, p))
         .collect::<CmdResult<Vec<_>>>()?;
     let (done, ended) = tokio::sync::oneshot::channel();
-    start_drag(window, files, done)?;
+    start_drag((*window).clone(), files, done)?;
     ended.await.ok();
     Ok(())
 }
 
 #[cfg(target_os = "macos")]
 fn start_drag(
-    window: WebviewWindow,
+    window: Frame,
     files: Vec<PathBuf>,
     done: tokio::sync::oneshot::Sender<()>,
 ) -> CmdResult<()> {
@@ -241,7 +242,7 @@ fn start_drag(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn rename_path(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     from: String,
     to: String,
@@ -255,7 +256,7 @@ pub(crate) async fn rename_path(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn trash_path(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
 ) -> CmdResult<()> {
@@ -272,7 +273,7 @@ pub(crate) async fn trash_path(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn reveal_path(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
 ) -> CmdResult<()> {

@@ -361,16 +361,41 @@
   color: var(--faint);
 }
 
-.workspace.asleep .workspace-open {
-  opacity: 0.5;
+.workspace.asleep > .workspace-open {
+  opacity: 0.45;
 }
 
-.ws-moon {
-  display: flex;
-  color: var(--muted);
+.ws-glyph.asleep {
+  --glyph: var(--muted);
 }
 
-.ws-moon svg {
-  width: 13px;
-  height: 13px;
+.repo-row .workspace-open {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.repo-row .chevron {
+  flex: none;
+  width: 10px;
+  color: var(--soft);
+  font-weight: 400;
+}
+
+.repo-row .workspace-title {
+  flex: 1;
+}
+
+.workspace.nested .workspace-open {
+  padding-left: 24px;
+}
+
+.ws-sub {
+  height: 1px;
+  margin: 3px 0 3px 24px;
+  background: var(--hair);
+}
+
+.ws-agents.hold {
+  visibility: hidden;
 }

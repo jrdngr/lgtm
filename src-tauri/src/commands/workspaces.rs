@@ -1,6 +1,7 @@
-use tauri::{State, WebviewWindow};
+use tauri::State;
 
 use super::{CmdResult, err, layout_path, repo};
+use crate::frame::Frame;
 use crate::layout;
 use crate::pty::{Owner, Ptys};
 use crate::workspaces::{Setup, WorkspaceDto};
@@ -8,18 +9,14 @@ use crate::workspaces::{Setup, WorkspaceDto};
 /// Every workspace, the repo's main one first.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn list_workspaces(window: WebviewWindow) -> CmdResult<Vec<WorkspaceDto>> {
+pub(crate) async fn list_workspaces(window: Frame) -> CmdResult<Vec<WorkspaceDto>> {
     repo(&window)?.list_workspaces().await.map_err(err)
 }
 
 /// Remembers where workspace `name`'s files are, when they're there.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn locate_workspace(
-    window: WebviewWindow,
-    name: String,
-    root: String,
-) -> CmdResult<()> {
+pub(crate) async fn locate_workspace(window: Frame, name: String, root: String) -> CmdResult<()> {
     repo(&window)?
         .locate_workspace(&name, std::path::Path::new(&root))
         .await
@@ -29,10 +26,7 @@ pub(crate) async fn locate_workspace(
 /// The UI opened the workspace: watches it, and starts its paused background snapshots again.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn open_workspace(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<()> {
+pub(crate) async fn open_workspace(window: Frame, workspace: Option<String>) -> CmdResult<()> {
     repo(&window)?
         .open_workspace(workspace.as_deref())
         .await
@@ -43,7 +37,7 @@ pub(crate) async fn open_workspace(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn sleep_workspace(
-    window: WebviewWindow,
+    window: Frame,
     ptys: State<'_, Ptys>,
     workspace: Option<String>,
 ) -> CmdResult<()> {
@@ -60,7 +54,7 @@ pub(crate) async fn sleep_workspace(
 /// Adds a workspace on `trunk()`. Returns whether it has a `.lgtm/setup` the user let run.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn create_workspace(window: WebviewWindow, name: String) -> CmdResult<Setup> {
+pub(crate) async fn create_workspace(window: Frame, name: String) -> CmdResult<Setup> {
     repo(&window)?.create_workspace(&name).await.map_err(err)
 }
 
@@ -68,11 +62,7 @@ pub(crate) async fn create_workspace(window: WebviewWindow, name: String) -> Cmd
 /// still has `hash`, the hash of the script the user was shown.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn approve_setup(
-    window: WebviewWindow,
-    workspace: String,
-    hash: String,
-) -> CmdResult<()> {
+pub(crate) async fn approve_setup(window: Frame, workspace: String, hash: String) -> CmdResult<()> {
     let ctx = repo(&window)?;
     let ws = ctx.workspace(Some(&workspace)).await.map_err(err)?;
     ctx.approve_setup(&ws.root, &hash).map_err(err)
@@ -82,7 +72,7 @@ pub(crate) async fn approve_setup(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn delete_workspace(
-    window: WebviewWindow,
+    window: Frame,
     ptys: State<'_, Ptys>,
     name: String,
 ) -> CmdResult<()> {

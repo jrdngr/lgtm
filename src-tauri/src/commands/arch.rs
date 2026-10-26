@@ -1,6 +1,5 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::review::arch::edge::EdgeSitesDto;
 use crate::review::arch::explore::SysSymbolDto;
 use crate::review::arch::symbols::SymbolsDto;
@@ -12,7 +11,7 @@ use crate::review::arch::{ArchDto, ArchRange, HistoryDto};
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn review_arch(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     transitive: bool,
     range: Option<ArchRange>,
@@ -25,18 +24,13 @@ pub(crate) async fn review_arch(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn arch_history(window: WebviewWindow, review: u32) -> CmdResult<Vec<HistoryDto>> {
+pub(crate) async fn arch_history(window: Frame, review: u32) -> CmdResult<Vec<HistoryDto>> {
     repo(&window)?.arch_history(review).await.map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn check_look(
-    window: WebviewWindow,
-    review: u32,
-    key: String,
-    checked: bool,
-) -> CmdResult<()> {
+pub(crate) fn check_look(window: Frame, review: u32, key: String, checked: bool) -> CmdResult<()> {
     repo(&window)?
         .check_look(review, &key, checked)
         .map_err(err)
@@ -45,17 +39,14 @@ pub(crate) fn check_look(
 /// The prompt asking a terminal agent to assess the review's architecture change.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn assess_prompt(window: WebviewWindow, review: u32) -> CmdResult<String> {
+pub(crate) async fn assess_prompt(window: Frame, review: u32) -> CmdResult<String> {
     repo(&window)?.assess_prompt(review).await.map_err(err)
 }
 
 /// The system map of a workspace's working copy.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn system_map(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<SystemDto> {
+pub(crate) async fn system_map(window: Frame, workspace: Option<String>) -> CmdResult<SystemDto> {
     repo(&window)?
         .system_map(workspace.as_deref())
         .await
@@ -65,23 +56,20 @@ pub(crate) async fn system_map(
 /// What the system map shows.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn arch_view(window: WebviewWindow) -> CmdResult<ArchViewDto> {
+pub(crate) fn arch_view(window: Frame) -> CmdResult<ArchViewDto> {
     repo(&window)?.arch_view().map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn set_arch_view(window: WebviewWindow, view: ArchViewDto) -> CmdResult<()> {
+pub(crate) fn set_arch_view(window: Frame, view: ArchViewDto) -> CmdResult<()> {
     repo(&window)?.set_arch_view(&view).map_err(err)
 }
 
 /// The prompt asking a terminal agent to describe the system map.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn describe_prompt(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<String> {
+pub(crate) async fn describe_prompt(window: Frame, workspace: Option<String>) -> CmdResult<String> {
     repo(&window)?
         .describe_prompt(workspace.as_deref())
         .await
@@ -92,7 +80,7 @@ pub(crate) async fn describe_prompt(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn system_most_used(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     component: String,
 ) -> CmdResult<Vec<SysSymbolDto>> {
@@ -106,7 +94,7 @@ pub(crate) async fn system_most_used(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn system_find(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     query: String,
 ) -> CmdResult<Vec<SysSymbolDto>> {
@@ -120,7 +108,7 @@ pub(crate) async fn system_find(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn tour_prompt(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     node: String,
 ) -> CmdResult<String> {
@@ -134,7 +122,7 @@ pub(crate) async fn tour_prompt(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn system_symbols(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     component: String,
 ) -> CmdResult<SymbolsDto> {
@@ -148,7 +136,7 @@ pub(crate) async fn system_symbols(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn system_edge(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     from: String,
     to: String,

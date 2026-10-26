@@ -81,7 +81,10 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
 /// What's in `path` under `root`, without `.jj`, `.git` or links out of `root`, and with
 /// `ignore` also without what the repo ignores.
 fn children(root: &Path, path: &Path, ignore: bool) -> impl Iterator<Item = PathBuf> {
-    let depth = path.strip_prefix(root).map_or(0, |p| p.components().count()) + 1;
+    let depth = path
+        .strip_prefix(root)
+        .map_or(0, |p| p.components().count())
+        + 1;
     let target = path.to_path_buf();
     let real_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let parent = path.to_path_buf();

@@ -18,7 +18,7 @@ use super::{Hello, inputs, reports};
 use crate::bots::Summary;
 use crate::ctx::RepoCtx;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
-use crate::repo::RepoWindows;
+use crate::repo::Repos;
 use crate::review::StateDto;
 use crate::store::{Stage, Take, TakeVerdict};
 
@@ -104,7 +104,7 @@ impl Lgtm {
     /// The repo's state and its window's label.
     pub(super) fn repo(&self) -> anyhow::Result<(String, Arc<RepoCtx>)> {
         self.app
-            .state::<RepoWindows>()
+            .state::<Repos>()
             .find(Path::new(&self.hello.root))
             .context("lgtm doesn't have this repo open")
     }

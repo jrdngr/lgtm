@@ -1,13 +1,12 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::turns::TurnDto;
 
 /// The agent turns and checkpoints on the workspace's working-copy change, newest first.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn agent_turns(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Vec<TurnDto>> {
     repo(&window)?
@@ -19,10 +18,7 @@ pub(crate) async fn agent_turns(
 /// Takes a checkpoint of the workspace's working copy.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn set_checkpoint(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<()> {
+pub(crate) async fn set_checkpoint(window: Frame, workspace: Option<String>) -> CmdResult<()> {
     repo(&window)?
         .checkpoint(workspace.as_deref())
         .await
@@ -33,7 +29,7 @@ pub(crate) async fn set_checkpoint(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn undo_turn(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     turn: u32,
 ) -> CmdResult<()> {
@@ -46,6 +42,6 @@ pub(crate) async fn undo_turn(
 /// Forgets an agent turn or checkpoint.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn remove_turn(window: WebviewWindow, turn: u32) -> CmdResult<()> {
+pub(crate) fn remove_turn(window: Frame, turn: u32) -> CmdResult<()> {
     repo(&window)?.remove_turn(turn).map_err(err)
 }

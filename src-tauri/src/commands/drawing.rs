@@ -1,41 +1,36 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
 use crate::canvas::{Canvas, CanvasFocus};
 use crate::drawings::DrawingDto;
+use crate::frame::Frame;
 
 /// Every drawing of the repo, the last changed first.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn drawings(window: WebviewWindow) -> CmdResult<Vec<DrawingDto>> {
+pub(crate) fn drawings(window: Frame) -> CmdResult<Vec<DrawingDto>> {
     repo(&window)?.drawings().map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn drawing(window: WebviewWindow, id: String) -> CmdResult<DrawingDto> {
+pub(crate) fn drawing(window: Frame, id: String) -> CmdResult<DrawingDto> {
     repo(&window)?.drawing(&id).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn create_drawing(window: WebviewWindow, name: String) -> CmdResult<DrawingDto> {
+pub(crate) fn create_drawing(window: Frame, name: String) -> CmdResult<DrawingDto> {
     repo(&window)?.create_drawing(&name).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn rename_drawing(
-    window: WebviewWindow,
-    id: String,
-    name: String,
-) -> CmdResult<DrawingDto> {
+pub(crate) fn rename_drawing(window: Frame, id: String, name: String) -> CmdResult<DrawingDto> {
     repo(&window)?.rename_drawing(&id, &name).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn delete_drawing(window: WebviewWindow, id: String) -> CmdResult<()> {
+pub(crate) fn delete_drawing(window: Frame, id: String) -> CmdResult<()> {
     repo(&window)?.delete_drawing(&id).map_err(err)
 }
 
@@ -43,7 +38,7 @@ pub(crate) fn delete_drawing(window: WebviewWindow, id: String) -> CmdResult<()>
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn save_drawing_canvas(
-    window: WebviewWindow,
+    window: Frame,
     id: String,
     canvas: Canvas,
 ) -> CmdResult<DrawingDto> {
@@ -53,7 +48,7 @@ pub(crate) fn save_drawing_canvas(
 /// Undoes the last agent pass over a drawing.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn undo_drawing_agent(window: WebviewWindow, id: String) -> CmdResult<DrawingDto> {
+pub(crate) fn undo_drawing_agent(window: Frame, id: String) -> CmdResult<DrawingDto> {
     repo(&window)?.undo_drawing_agent(&id).map_err(err)
 }
 
@@ -61,7 +56,7 @@ pub(crate) fn undo_drawing_agent(window: WebviewWindow, id: String) -> CmdResult
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_canvas_focus(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     focus: Option<CanvasFocus>,
 ) -> CmdResult<()> {

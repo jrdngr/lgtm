@@ -1,16 +1,17 @@
 //! The app menu: the platform default plus Settings in the app menu, New Window, Open
-//! Repository and Close Window in File, Word Wrap and zoom in View, and Keyboard Shortcuts in
+//! Project, Add Repository and Close Window in File, Word Wrap and zoom in View, and Keyboard Shortcuts in
 //! Help. Close Window is on ⇧⌘W, leaving ⌘W to the webview, which closes the active tab.
 
 use tauri::menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event as _;
 
-use crate::events::{OpenSettings, OpenShortcuts, SwitchRepo, WordWrap};
+use crate::events::{AddRepo, OpenSettings, OpenShortcuts, WordWrap};
 use crate::{repo, zoom};
 
 const NEW_WINDOW: &str = "new-window";
-const OPEN_REPO: &str = "open-repo";
+const OPEN_PROJECT: &str = "open-project";
+const ADD_REPO: &str = "add-repo";
 const CLOSE_WINDOW: &str = "close-window";
 const WORD_WRAP: &str = "word-wrap";
 const SETTINGS: &str = "settings";
@@ -43,10 +44,11 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 remove_predefined(sub, &close_window)?;
                 sub.prepend_items(&[
                     &MenuItem::with_id(app, NEW_WINDOW, "New Window", true, Some("CmdOrCtrl+N"))?,
+                    &MenuItem::with_id(app, OPEN_PROJECT, "Open Project…", true, None::<&str>)?,
                     &MenuItem::with_id(
                         app,
-                        OPEN_REPO,
-                        "Open Repository…",
+                        ADD_REPO,
+                        "Add Repository…",
                         true,
                         Some("CmdOrCtrl+O"),
                     )?,
@@ -108,7 +110,8 @@ fn remove_predefined<R: Runtime>(sub: &Submenu<R>, text: &str) -> tauri::Result<
 pub fn handle(app: &AppHandle, event: MenuEvent) {
     let result = match event.id().as_ref() {
         NEW_WINDOW => repo::open_start(app),
-        OPEN_REPO => switch_repo(app),
+        OPEN_PROJECT => repo::open_start(app),
+        ADD_REPO => add_repo(app),
         CLOSE_WINDOW => close_window(app),
         WORD_WRAP => word_wrap(app),
         SETTINGS => open_settings(app),
@@ -134,7 +137,7 @@ fn word_wrap(app: &AppHandle) -> tauri::Result<()> {
     .emit(app)?)
 }
 
-/// The focused repo window.
+/// The focused project window.
 fn focused(app: &AppHandle) -> Option<tauri::WebviewWindow> {
     app.webview_windows()
         .into_values()
@@ -153,26 +156,33 @@ fn close_window(app: &AppHandle) -> tauri::Result<()> {
     }
 }
 
-/// Opens the Settings tab in the focused repo window.
+/// The label of the repo the focused window shows, which menu items act in.
+fn shown(app: &AppHandle) -> Option<String> {
+    let window = focused(app)?;
+    app.state::<crate::project::Projects>()
+        .active(window.label())
+}
+
+/// Opens the Settings tab in the focused window's repo.
 fn open_settings(app: &AppHandle) -> tauri::Result<()> {
-    match focused(app) {
-        Some(window) => Ok(OpenSettings {}.emit_to(app, window.label())?),
+    match shown(app) {
+        Some(label) => Ok(OpenSettings {}.emit_to(app, &label)?),
         None => Ok(()),
     }
 }
 
-/// Opens the Keyboard Shortcuts tab in the focused repo window.
+/// Opens the Keyboard Shortcuts tab in the focused window's repo.
 fn open_shortcuts(app: &AppHandle) -> tauri::Result<()> {
-    match focused(app) {
-        Some(window) => Ok(OpenShortcuts {}.emit_to(app, window.label())?),
+    match shown(app) {
+        Some(label) => Ok(OpenShortcuts {}.emit_to(app, &label)?),
         None => Ok(()),
     }
 }
 
-/// Asks the focused repo window to swap itself for the start window.
-fn switch_repo(app: &AppHandle) -> tauri::Result<()> {
+/// Asks the focused project window to add a repo, or opens the start window.
+fn add_repo(app: &AppHandle) -> tauri::Result<()> {
     match focused(app) {
-        Some(window) => Ok(SwitchRepo {}.emit_to(app, window.label())?),
+        Some(window) => Ok(AddRepo {}.emit_to(app, window.label())?),
         None => repo::open_start(app),
     }
 }

@@ -1,20 +1,19 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::review::guided::provenance::PromptDto;
 use crate::review::guided::{ChunkRisk, GuidedDto, VerdictSet};
 
 /// The review's last guided review, if it has one.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn guided(window: WebviewWindow, review: u32) -> CmdResult<Option<GuidedDto>> {
+pub(crate) fn guided(window: Frame, review: u32) -> CmdResult<Option<GuidedDto>> {
     repo(&window)?.guided(review).map_err(err)
 }
 
 /// The prompt asking a terminal agent for the review's guided review, or to update it.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn guided_prompt(window: WebviewWindow, review: u32) -> CmdResult<String> {
+pub(crate) fn guided_prompt(window: Frame, review: u32) -> CmdResult<String> {
     repo(&window)?.guided_prompt(review).map_err(err)
 }
 
@@ -22,7 +21,7 @@ pub(crate) fn guided_prompt(window: WebviewWindow, review: u32) -> CmdResult<Str
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_guided_verdicts(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     sets: Vec<VerdictSet>,
 ) -> CmdResult<GuidedDto> {
@@ -35,7 +34,7 @@ pub(crate) fn set_guided_verdicts(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn promote_excluded(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     index: u32,
     risk: ChunkRisk,
@@ -49,7 +48,7 @@ pub(crate) fn promote_excluded(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn chunk_prompts(
-    window: WebviewWindow,
+    window: Frame,
     paths: Vec<String>,
     lines: Vec<String>,
 ) -> CmdResult<Vec<PromptDto>> {

@@ -26,7 +26,7 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
 use crate::events::{AgentHookState, TerminalAgent, TurnsChanged};
-use crate::repo::RepoWindows;
+use crate::repo::Repos;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 
@@ -89,7 +89,7 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
     if let Some(hook) = first.get("hook") {
         let report: hook::HookReport = serde_json::from_value(hook.clone())?;
         tracing::debug!(terminal = report.terminal, state = ?report.state, "agent hook");
-        if let Some((label, ctx)) = app.state::<RepoWindows>().find(Path::new(&report.root)) {
+        if let Some((label, ctx)) = app.state::<Repos>().find(Path::new(&report.root)) {
             if report.state == AgentHookState::Idle {
                 ctx.new_agent_session(&report.terminal);
             }

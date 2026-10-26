@@ -1,8 +1,9 @@
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 use tauri_specta::Event;
 
 use super::{CmdResult, err, repo};
 use crate::events::ReviewStateChanged;
+use crate::frame::Frame;
 use crate::review::{RowRef, StateDto};
 use crate::store::{Author, Stage};
 
@@ -11,7 +12,7 @@ use crate::store::{Author, Stage};
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn add_comment(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     rows: Vec<RowRef>,
     body: String,
@@ -27,7 +28,7 @@ pub(crate) fn add_comment(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_thread_stage(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     comment: u32,
     stage: Stage,
@@ -40,11 +41,7 @@ pub(crate) fn set_thread_stage(
 /// Clears a GitHub thread's take, reply and agent conversation, as if it were new.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn reset_thread(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn reset_thread(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?.reset_thread(review, comment).map_err(err)
 }
 
@@ -52,7 +49,7 @@ pub(crate) fn reset_thread(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_note_done(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     comment: u32,
     done: bool,
@@ -65,18 +62,14 @@ pub(crate) fn set_note_done(
 /// Starts a GitHub draft on a note's code, with its text.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn draft_from_note(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn draft_from_note(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?.draft_from_note(review, comment).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn edit_comment(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     comment: u32,
     body: String,
@@ -89,22 +82,13 @@ pub(crate) fn edit_comment(
 /// Starts a thread on `text`, quoted from comment `of` on the PR.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn add_quote(
-    window: WebviewWindow,
-    review: u32,
-    of: u32,
-    text: String,
-) -> CmdResult<StateDto> {
+pub(crate) fn add_quote(window: Frame, review: u32, of: u32, text: String) -> CmdResult<StateDto> {
     repo(&window)?.add_quote(review, of, &text).map_err(err)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn delete_comment(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn delete_comment(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?.delete_comment(review, comment).map_err(err)
 }
 
@@ -113,7 +97,7 @@ pub(crate) fn delete_comment(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn add_chat_message(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     comment: u32,
     author: Author,
@@ -130,11 +114,7 @@ pub(crate) fn add_chat_message(
 /// Drops a thread's suggested reply.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn dismiss_suggestion(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn dismiss_suggestion(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?
         .dismiss_suggestion(review, comment)
         .map_err(err)
@@ -145,7 +125,7 @@ pub(crate) fn dismiss_suggestion(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_agent_link(
-    window: WebviewWindow,
+    window: Frame,
     terminal: String,
     linked: bool,
     thread: Option<crate::review::LinkThread>,
@@ -157,10 +137,6 @@ pub(crate) fn set_agent_link(
 /// Makes a thread's suggested reply its reply.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn take_suggestion(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) fn take_suggestion(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?.take_suggestion(review, comment).map_err(err)
 }

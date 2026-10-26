@@ -1,14 +1,15 @@
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
 use crate::events::NotesChanged;
+use crate::frame::Frame;
 use crate::notes::{GlobalStore, NoteBook, NoteDto, NoteLevel, NotesDto};
 
 /// Runs `f` on the notes `workspace` sees. With `changed`, tells every window, since global
 /// notes show in each.
 fn book<T>(
-    window: &WebviewWindow,
+    window: &Frame,
     workspace: Option<String>,
     changed: Option<&str>,
     f: impl FnOnce(&NoteBook) -> anyhow::Result<T>,
@@ -34,24 +35,20 @@ fn book<T>(
 /// Every note and folder the workspace shows: global, the repo's and its own.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn notes(window: WebviewWindow, workspace: Option<String>) -> CmdResult<NotesDto> {
+pub(crate) fn notes(window: Frame, workspace: Option<String>) -> CmdResult<NotesDto> {
     book(&window, workspace, None, |b| b.list())
 }
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn note(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    id: String,
-) -> CmdResult<NoteDto> {
+pub(crate) fn note(window: Frame, workspace: Option<String>, id: String) -> CmdResult<NoteDto> {
     book(&window, workspace, None, |b| b.get(&id))
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn create_note(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     level: NoteLevel,
     folder: String,
@@ -66,7 +63,7 @@ pub(crate) fn create_note(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn save_note(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
     body: String,
@@ -77,7 +74,7 @@ pub(crate) fn save_note(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn rename_note(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
     name: String,
@@ -89,7 +86,7 @@ pub(crate) fn rename_note(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn move_note(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     id: String,
     level: NoteLevel,
@@ -102,11 +99,7 @@ pub(crate) fn move_note(
 
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn delete_note(
-    window: WebviewWindow,
-    workspace: Option<String>,
-    id: String,
-) -> CmdResult<()> {
+pub(crate) fn delete_note(window: Frame, workspace: Option<String>, id: String) -> CmdResult<()> {
     book(&window, workspace, Some(&id), |b| b.delete(&id))
 }
 
@@ -114,7 +107,7 @@ pub(crate) fn delete_note(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn create_note_folder(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     level: NoteLevel,
     parent: String,
@@ -128,7 +121,7 @@ pub(crate) fn create_note_folder(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn rename_note_folder(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     level: NoteLevel,
     path: String,
@@ -143,7 +136,7 @@ pub(crate) fn rename_note_folder(
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn delete_note_folder(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     level: NoteLevel,
     path: String,

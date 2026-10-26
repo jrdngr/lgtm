@@ -1,6 +1,7 @@
 //! The `lgtmhtml:` scheme: a workspace's files for HTML tabs, which show pages in a sandboxed
 //! frame. A URL is `lgtmhtml://localhost/<root id>/<path>`. Each root id belongs to one
-//! window and records the files it served, so the tab can ask whether any changed.
+//! repo, served only to the window showing it, and records the files it served, so the tab
+//! can ask whether any changed.
 
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -82,8 +83,9 @@ impl HtmlRoots {
         changed
     }
 
-    /// The file at a `lgtmhtml:` URL path, for `window`, recorded as served.
-    fn locate(&self, window: &str, url_path: &str) -> Result<PathBuf, StatusCode> {
+    /// The file at a `lgtmhtml:` URL path, for a window showing the repos labelled `owners`,
+    /// recorded as served.
+    fn locate(&self, owners: &[String], url_path: &str) -> Result<PathBuf, StatusCode> {
         let decoded = percent_decode_str(url_path.trim_start_matches('/'))
             .decode_utf8()
             .map_err(|_| StatusCode::BAD_REQUEST)?;
@@ -91,7 +93,7 @@ impl HtmlRoots {
         let mut roots = self.roots.lock().unwrap();
         let root = roots
             .get_mut(id)
-            .filter(|r| r.window == window)
+            .filter(|r| owners.contains(&r.window))
             .ok_or(StatusCode::NOT_FOUND)?;
         let mut path = files::resolve(&root.dir, rel).map_err(|_| StatusCode::FORBIDDEN)?;
         if path.is_dir() {
@@ -121,15 +123,17 @@ pub fn handle<R: Runtime>(
     responder: UriSchemeResponder,
 ) {
     let app = ctx.app_handle().clone();
-    let window = ctx.webview_label().to_string();
+    let owners = app
+        .state::<crate::repo::Repos>()
+        .in_window(ctx.webview_label());
     let url_path = request.uri().path().to_string();
     tauri::async_runtime::spawn_blocking(move || {
-        responder.respond(serve(app.state::<HtmlRoots>().inner(), &window, &url_path));
+        responder.respond(serve(app.state::<HtmlRoots>().inner(), &owners, &url_path));
     });
 }
 
-fn serve(roots: &HtmlRoots, window: &str, url_path: &str) -> Response<Cow<'static, [u8]>> {
-    let found = roots.locate(window, url_path).and_then(|path| {
+fn serve(roots: &HtmlRoots, owners: &[String], url_path: &str) -> Response<Cow<'static, [u8]>> {
+    let found = roots.locate(owners, url_path).and_then(|path| {
         let bytes =
             files::read_bytes(&path, url_path, MAX_BYTES).map_err(|_| StatusCode::NOT_FOUND)?;
         Ok((content_type(&path), bytes))
@@ -272,7 +276,7 @@ mod tests {
     }
 
     fn served(roots: &HtmlRoots, url: &str) -> (StatusCode, String) {
-        let r = serve(roots, "repo-1", url);
+        let r = serve(roots, &["repo-1".into()], url);
         (r.status(), String::from_utf8_lossy(r.body()).into_owned())
     }
 
@@ -290,7 +294,7 @@ mod tests {
             (StatusCode::OK, "p{}".into())
         );
         assert_eq!(
-            serve(&roots, "repo-2", &format!("/{id}/docs/a%20b.css")).status(),
+            serve(&roots, &["repo-2".into()], &format!("/{id}/docs/a%20b.css")).status(),
             StatusCode::NOT_FOUND
         );
         assert_eq!(
@@ -328,7 +332,7 @@ mod tests {
         let roots = HtmlRoots::default();
         let id = roots.add("repo-1", dir.path().into());
         for url in [format!("/{id}/p.html"), format!("/{id}/gone.html")] {
-            let r = serve(&roots, "repo-1", &url);
+            let r = serve(&roots, &["repo-1".into()], &url);
             let csp = r.headers()[header::CONTENT_SECURITY_POLICY]
                 .to_str()
                 .unwrap();
@@ -347,7 +351,7 @@ mod tests {
         std::fs::write(dir.path().join("a.svg"), "<svg><script>1</script></svg>").unwrap();
         let roots = HtmlRoots::default();
         let id = roots.add("repo-1", dir.path().into());
-        let r = serve(&roots, "repo-1", &format!("/{id}/a.svg"));
+        let r = serve(&roots, &["repo-1".into()], &format!("/{id}/a.svg"));
         let csp = r.headers()[header::CONTENT_SECURITY_POLICY]
             .to_str()
             .unwrap();

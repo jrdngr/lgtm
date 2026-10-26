@@ -309,7 +309,13 @@ impl RepoCtx {
     /// Stops the language servers of every workspace, once nothing shows the repo.
     pub async fn stop_servers(&self) {
         let roots: Vec<PathBuf> = std::iter::once(self.main.root.clone())
-            .chain(self.workspaces.lock().unwrap().values().map(|w| w.root.clone()))
+            .chain(
+                self.workspaces
+                    .lock()
+                    .unwrap()
+                    .values()
+                    .map(|w| w.root.clone()),
+            )
             .collect();
         for root in roots {
             crate::lsp::stop(&root).await;

@@ -39,7 +39,8 @@ const valid = (v: unknown): v is Pins => {
 let pins: Pins | undefined;
 const listeners = new Set<() => void>();
 
-function current(): Pins {
+/** The pins as they are now. */
+export function pinsNow(): Pins {
   pins ??= loadState(NAME, EMPTY, valid);
   return pins;
 }
@@ -50,15 +51,15 @@ function set(next: Pins) {
   for (const l of listeners) l();
 }
 
-function subscribe(l: () => void) {
+export function subscribePins(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
 }
 
-export const usePins = () => useSyncExternalStore(subscribe, current);
+export const usePins = () => useSyncExternalStore(subscribePins, pinsNow);
 
 export function togglePin(key: string) {
-  const { pinned, colors } = current();
+  const { pinned, colors } = pinsNow();
   set({
     colors,
     pinned: pinned.includes(key) ? pinned.filter((k) => k !== key) : [...pinned, key],
@@ -66,7 +67,7 @@ export function togglePin(key: string) {
 }
 
 export function setColor(key: string, color: PinColor | null) {
-  const { pinned, colors } = current();
+  const { pinned, colors } = pinsNow();
   const next = { ...colors };
   if (color) next[key] = color;
   else delete next[key];
@@ -75,13 +76,13 @@ export function setColor(key: string, color: PinColor | null) {
 
 /** Moves pinned `key` to `index` among the pins. */
 export function movePin(key: string, index: number) {
-  const { pinned, colors } = current();
+  const { pinned, colors } = pinsNow();
   set({ colors, pinned: moved(pinned, key, index) });
 }
 
 /** Drops a deleted workspace's pin and color. */
 export function forgetPin(key: string) {
-  const { pinned, colors } = current();
+  const { pinned, colors } = pinsNow();
   if (!pinned.includes(key) && !(key in colors)) return;
   const next = { ...colors };
   delete next[key];

@@ -12,6 +12,7 @@ import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/work
 import { DesignFormHost } from "../design/DesignFormHost";
 import { requestNewDrawing } from "../drawings/store";
 import { confirmClose, confirmWorkspace } from "../editor/unsaved";
+import { useProjectFrame } from "../frame/useProjectFrame";
 import { forgetPr } from "../github/pr";
 import { openGuided } from "../guided/store";
 import { useShortcutsMenu } from "../help/open";
@@ -57,7 +58,6 @@ import {
   saveSides,
   saveWorkspace,
 } from "./sides";
-import { useCloseGuard } from "./useCloseGuard";
 import { flushLayout, WorkspaceDock } from "./WorkspaceDock";
 import { useWordWrapMenu } from "./wordWrap";
 
@@ -93,7 +93,6 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const inBottom = () => !!bottomEl?.contains(document.activeElement);
   /** The dock with focus: the bottom one when focus is in it, else the main one. */
   const api = () => (inBottom() ? bottomDockOf(selected) : dockOf(selected));
-  useCloseGuard();
   useFollowWorkingCopy();
   useTrackWorkingCopy(selected, useReviewTarget(selected));
   useTrackJjBusy();
@@ -155,6 +154,14 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     if (!workspaces.workspaces?.some((w) => w.name === selected && w.asleep)) return;
     commands.openWorkspace(selected).then(() => workspaces.reload());
   }, [workspaces.workspaces, selected]);
+
+  useProjectFrame({
+    workspaces: workspaces.workspaces,
+    select,
+    sleep,
+    showPanel: () => showView("left", "workspaces"),
+    onError: workspaces.setError,
+  });
 
   const atOutside = useAtOutside(selected);
   // The selected workspace, remembered from last time or forgotten from a terminal, may be

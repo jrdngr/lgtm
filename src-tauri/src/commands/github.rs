@@ -1,6 +1,5 @@
-use tauri::WebviewWindow;
-
 use super::{CmdResult, err, repo};
+use crate::frame::Frame;
 use crate::github::Verdict;
 use crate::pr::{DiscussionDto, Fixed, HeadDto, NearbyPrsDto, PrDto, PrPreviewDto};
 use crate::review::StateDto;
@@ -9,7 +8,7 @@ use crate::review::StateDto;
 /// one that has it. Returns the workspace.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<String> {
+pub(crate) async fn open_pr(window: Frame, input: String) -> CmdResult<String> {
     repo(&window)?.open_pr(&input).await.map_err(err)
 }
 
@@ -18,7 +17,7 @@ pub(crate) async fn open_pr(window: WebviewWindow, input: String) -> CmdResult<S
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn nearby_prs(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     refresh: bool,
 ) -> CmdResult<NearbyPrsDto> {
@@ -32,7 +31,7 @@ pub(crate) async fn nearby_prs(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn sync_stack_pr(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Option<PrDto>> {
     repo(&window)?
@@ -45,7 +44,7 @@ pub(crate) async fn sync_stack_pr(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn review_stack_pr(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     number: u32,
 ) -> CmdResult<PrDto> {
@@ -58,7 +57,7 @@ pub(crate) async fn review_stack_pr(
 /// Drops the workspace's stack PR.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn clear_stack_pr(window: WebviewWindow, workspace: Option<String>) -> CmdResult<()> {
+pub(crate) fn clear_stack_pr(window: Frame, workspace: Option<String>) -> CmdResult<()> {
     repo(&window)?
         .clear_stack_pr(workspace.as_deref())
         .map_err(err)
@@ -68,17 +67,14 @@ pub(crate) fn clear_stack_pr(window: WebviewWindow, workspace: Option<String>) -
 /// conversation and its diff with review threads.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn pr_preview(window: WebviewWindow, input: String) -> CmdResult<PrPreviewDto> {
+pub(crate) async fn pr_preview(window: Frame, input: String) -> CmdResult<PrPreviewDto> {
     repo(&window)?.pr_preview(&input).await.map_err(err)
 }
 
 /// The workspace's PR, checked out or picked from its stack, if any.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn pr_info(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<Option<PrDto>> {
+pub(crate) fn pr_info(window: Frame, workspace: Option<String>) -> CmdResult<Option<PrDto>> {
     let pr = repo(&window)?
         .pr_record(workspace.as_deref())
         .map_err(err)?;
@@ -88,10 +84,7 @@ pub(crate) fn pr_info(
 /// Opens the workspace's PR on GitHub in the browser.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn open_pr_page(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<()> {
+pub(crate) async fn open_pr_page(window: Frame, workspace: Option<String>) -> CmdResult<()> {
     repo(&window)?
         .open_pr_page(workspace.as_deref())
         .await
@@ -101,10 +94,7 @@ pub(crate) async fn open_pr_page(
 /// How the PR's head on GitHub compares with the fetched one.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn pr_head(
-    window: WebviewWindow,
-    workspace: Option<String>,
-) -> CmdResult<HeadDto> {
+pub(crate) async fn pr_head(window: Frame, workspace: Option<String>) -> CmdResult<HeadDto> {
     repo(&window)?
         .pr_head(workspace.as_deref())
         .await
@@ -116,7 +106,7 @@ pub(crate) async fn pr_head(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn refetch_pr(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     review: Option<u32>,
 ) -> CmdResult<()> {
@@ -129,7 +119,7 @@ pub(crate) async fn refetch_pr(
 /// Pulls the PR's review threads into the review as comments.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn pull_pr_comments(window: WebviewWindow, review: u32) -> CmdResult<StateDto> {
+pub(crate) async fn pull_pr_comments(window: Frame, review: u32) -> CmdResult<StateDto> {
     repo(&window)?.pull_pr_comments(review).await.map_err(err)
 }
 
@@ -138,7 +128,7 @@ pub(crate) async fn pull_pr_comments(window: WebviewWindow, review: u32) -> CmdR
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn send_threads(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     fixed: Fixed,
     verdict: Verdict,
@@ -153,11 +143,7 @@ pub(crate) async fn send_threads(
 /// Sends one ready thread to GitHub.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn send_thread(
-    window: WebviewWindow,
-    review: u32,
-    comment: u32,
-) -> CmdResult<StateDto> {
+pub(crate) async fn send_thread(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?
         .send_thread(review, comment)
         .await
@@ -168,7 +154,7 @@ pub(crate) async fn send_thread(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn pr_discussion(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<DiscussionDto> {
     repo(&window)?
@@ -182,7 +168,7 @@ pub(crate) async fn pr_discussion(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn send_combined(
-    window: WebviewWindow,
+    window: Frame,
     review: u32,
     comments: Vec<u32>,
     body: String,

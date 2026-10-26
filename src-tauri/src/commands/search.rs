@@ -1,8 +1,9 @@
-use tauri::WebviewWindow;
+use tauri::Manager;
 use tauri_specta::Event as _;
 
 use super::{CmdResult, err};
 use crate::events::SymbolInfoChanged;
+use crate::frame::Frame;
 use crate::search::{self, Hits, SymbolHit, TextQuery};
 use crate::store::InfoKey;
 use crate::symbol_info::{self, SymbolInfoDto};
@@ -11,7 +12,7 @@ use crate::symbol_info::{self, SymbolInfoDto};
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn search_text(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     query: TextQuery,
 ) -> CmdResult<Hits> {
@@ -27,7 +28,7 @@ pub(crate) async fn search_text(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn replace_text(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     query: TextQuery,
     replacement: String,
@@ -43,7 +44,7 @@ pub(crate) async fn replace_text(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn find_references(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     name: String,
 ) -> CmdResult<Hits> {
@@ -57,7 +58,7 @@ pub(crate) async fn find_references(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn workspace_symbols(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     query: String,
 ) -> CmdResult<Vec<SymbolHit>> {
@@ -71,7 +72,7 @@ pub(crate) async fn workspace_symbols(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn workspace_files(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
 ) -> CmdResult<Vec<String>> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
@@ -90,7 +91,7 @@ pub(crate) async fn workspace_files(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn request_symbol_info(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     name: String,
     path: Option<String>,
@@ -125,7 +126,7 @@ pub(crate) struct SymbolAsk {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn mark_symbol_asked(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     name: String,
@@ -142,7 +143,9 @@ pub(crate) async fn mark_symbol_asked(
         nth,
     )
     .map_err(err)?;
-    SymbolInfoChanged.emit(&window).ok();
+    SymbolInfoChanged
+        .emit_to(window.app_handle(), window.label())
+        .ok();
     Ok(())
 }
 
@@ -150,7 +153,7 @@ pub(crate) async fn mark_symbol_asked(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn symbol_infos(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     paths: Vec<String>,
 ) -> CmdResult<Vec<SymbolInfoDto>> {
@@ -162,7 +165,7 @@ pub(crate) async fn symbol_infos(
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn dismiss_symbol_info(
-    window: WebviewWindow,
+    window: Frame,
     workspace: Option<String>,
     path: String,
     name: String,
@@ -181,6 +184,8 @@ pub(crate) async fn dismiss_symbol_info(
         .unwrap()
         .delete_symbol_info(&key)
         .map_err(|e| e.to_string())?;
-    SymbolInfoChanged.emit(&window).ok();
+    SymbolInfoChanged
+        .emit_to(window.app_handle(), window.label())
+        .ok();
     Ok(())
 }

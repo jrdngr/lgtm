@@ -12,6 +12,7 @@ pub mod html;
 pub mod log;
 pub mod lsp;
 pub mod notes;
+pub mod project;
 pub mod pty;
 pub mod qa;
 pub mod repo;
@@ -24,26 +25,27 @@ pub mod workspaces;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 
 use crate::ctx::RepoCtx;
-use crate::repo::RepoWindows;
+use crate::frame::Frame;
+use crate::repo::Repos;
 use crate::workspace::Workspace;
 
 type CmdResult<T> = Result<T, String>;
 
-fn repo(window: &WebviewWindow) -> CmdResult<Arc<RepoCtx>> {
+fn repo(window: &Frame) -> CmdResult<Arc<RepoCtx>> {
     window
-        .state::<RepoWindows>()
+        .state::<Repos>()
         .get(window.label())
         .ok_or_else(|| "window has no repo".into())
 }
 
-async fn workspace(window: &WebviewWindow, name: Option<&str>) -> CmdResult<Arc<Workspace>> {
+async fn workspace(window: &Frame, name: Option<&str>) -> CmdResult<Arc<Workspace>> {
     repo(window)?.workspace(name).await.map_err(err)
 }
 
-fn repo_root(window: &WebviewWindow) -> CmdResult<PathBuf> {
+fn repo_root(window: &Frame) -> CmdResult<PathBuf> {
     Ok(repo(window)?.root.clone())
 }
 
@@ -51,7 +53,10 @@ fn err(e: anyhow::Error) -> String {
     format!("{e:#}")
 }
 
-fn layout_path(window: &WebviewWindow, workspace: Option<&str>) -> CmdResult<PathBuf> {
-    let repo_dir = crate::paths::repo_dir(&crate::paths::data_dir(window)?, &repo_root(window)?);
+fn layout_path(window: &Frame, workspace: Option<&str>) -> CmdResult<PathBuf> {
+    let repo_dir = crate::paths::repo_dir(
+        &crate::paths::data_dir(window.app_handle())?,
+        &repo_root(window)?,
+    );
     Ok(crate::layout::path(&repo_dir, workspace))
 }

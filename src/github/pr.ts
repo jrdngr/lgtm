@@ -8,7 +8,7 @@ const prs = new Map<string, PrDto | null>();
 const listeners = new Set<() => void>();
 const loading = new Map<string, Promise<PrDto | null>>();
 
-const subscribe = (l: () => void) => {
+export const subscribePrs = (l: () => void) => {
   listeners.add(l);
   return () => listeners.delete(l);
 };
@@ -61,10 +61,13 @@ export async function reloadPr(workspace: WorkspaceName): Promise<PrDto | null> 
   return r.data;
 }
 
+/** The workspace's PR as loaded so far: `undefined` until it has loaded. */
+export const loadedPr = (workspace: WorkspaceName) => prs.get(workspaceKey(workspace));
+
 /** The workspace's PR: `undefined` while loading, `null` when it has none. */
 export function usePr(workspace: WorkspaceName): PrDto | null | undefined {
   useEffect(() => {
     prOf(workspace);
   }, [workspace]);
-  return useSyncExternalStore(subscribe, () => prs.get(workspaceKey(workspace)));
+  return useSyncExternalStore(subscribePrs, () => prs.get(workspaceKey(workspace)));
 }

@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -17,35 +17,56 @@ use crate::paths::{data_dir, find_root, key, repo_dir};
 use crate::store::Store;
 use crate::watch;
 
-/// Repo state by window label. The start window has no entry.
+/// Each open repo's state by its label, and the label of the window showing it.
 #[derive(Default)]
-pub struct RepoWindows {
-    open: Mutex<HashMap<String, Arc<RepoCtx>>>,
+pub struct Repos {
+    open: Mutex<HashMap<String, (Arc<RepoCtx>, String)>>,
 }
 
-impl RepoWindows {
+impl Repos {
     pub fn get(&self, label: &str) -> Option<Arc<RepoCtx>> {
-        self.open.lock().unwrap().get(label).cloned()
+        self.open
+            .lock()
+            .unwrap()
+            .get(label)
+            .map(|(ctx, _)| ctx.clone())
     }
 
-    /// Forgets the window's repo and stops its language servers.
-    pub fn remove(&self, label: &str) {
-        let Some(ctx) = self.open.lock().unwrap().remove(label) else {
+    /// Forgets the repo and stops its language servers.
+    fn remove(&self, label: &str) {
+        let Some((ctx, _)) = self.open.lock().unwrap().remove(label) else {
             return;
         };
         tauri::async_runtime::spawn(async move { ctx.stop_servers().await });
     }
 
-    /// The window and state of the repo whose main workspace is at `root`.
+    /// The label and state of the repo whose main workspace is at `root`.
     pub fn find(&self, root: &Path) -> Option<(String, Arc<RepoCtx>)> {
         let map = self.open.lock().unwrap();
         map.iter()
-            .find(|(_, ctx)| ctx.root == root)
-            .map(|(label, ctx)| (label.clone(), ctx.clone()))
+            .find(|(_, (ctx, _))| ctx.root == root)
+            .map(|(label, (ctx, _))| (label.clone(), ctx.clone()))
     }
 
-    fn insert(&self, label: String, ctx: Arc<RepoCtx>) {
-        self.open.lock().unwrap().insert(label, ctx);
+    /// The window showing the repo with `label`.
+    pub fn window_of(&self, label: &str) -> Option<String> {
+        self.open.lock().unwrap().get(label).map(|(_, w)| w.clone())
+    }
+
+    /// The labels of the repos window `window` shows.
+    pub fn in_window(&self, window: &str) -> Vec<String> {
+        let map = self.open.lock().unwrap();
+        map.iter()
+            .filter(|(_, (_, w))| w == window)
+            .map(|(label, _)| label.clone())
+            .collect()
+    }
+
+    fn insert(&self, label: String, window: &str, ctx: Arc<RepoCtx>) {
+        self.open
+            .lock()
+            .unwrap()
+            .insert(label, (ctx, window.to_string()));
     }
 }
 
@@ -64,7 +85,7 @@ impl RepoInfo {
     }
 }
 
-fn name(root: &Path) -> String {
+pub(crate) fn name(root: &Path) -> String {
     root.file_name().map_or_else(
         || root.display().to_string(),
         |n| n.to_string_lossy().into(),
@@ -99,24 +120,31 @@ fn emitter(app: &AppHandle, label: &str) -> Emit {
     })
 }
 
-/// Focuses the window for the repo containing `path`, creating it if needed.
-pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
+/// The label of the repo at `root`, which keys its state, terminals and events.
+pub fn label_of(root: &Path) -> String {
+    format!("repo-{}", key(root))
+}
+
+/// The root of the jj repo holding `path`.
+pub fn root_of(path: &Path) -> Result<PathBuf, String> {
     let path = path
         .canonicalize()
         .map_err(|e| format!("{}: {e}", path.display()))?;
-    let root = find_root(&path).ok_or_else(|| format!("not a jj repo: {}", path.display()))?;
-    let label = format!("repo-{}", key(&root));
+    find_root(&path).ok_or_else(|| format!("not a jj repo: {}", path.display()))
+}
 
-    if let Some(window) = app.get_webview_window(&label) {
-        close_start(app);
-        window.unminimize().ok();
-        return window.set_focus().map_err(|e| e.to_string());
+/// Starts keeping the state of the repo at `root` for window `window`, unless it's open
+/// already. Returns its label.
+pub fn start(app: &AppHandle, root: &Path, window: &str) -> Result<String, String> {
+    let label = label_of(root);
+    let repos = app.state::<Repos>();
+    if repos.get(&label).is_some() {
+        return Ok(label);
     }
-
     let data_dir = data_dir(app)?;
-    let store = Store::open(&repo_dir(&data_dir, &root).join("lgtm.db"))
+    let store = Store::open(&repo_dir(&data_dir, root).join("lgtm.db"))
         .map_err(|e| format!("open mark store: {e:#}"))?;
-    let ctx = RepoCtx::new(root.clone(), Jj::new(&root), store);
+    let ctx = RepoCtx::new(root.to_path_buf(), Jj::new(root), store);
     *ctx.emit.lock().unwrap() = Some(emitter(app, &label));
     ctx.hook(&ctx.main);
     // The main workspace's watcher also reports operations made in the other workspaces.
@@ -132,18 +160,36 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
                 .unwrap_or_else(|e| tracing::error!("{e:#}"))
         }
     });
-    app.state::<RepoWindows>().insert(label.clone(), ctx);
+    repos.insert(label.clone(), window, ctx);
     tracing::info!(repo = %root.display(), "opened repo");
-    if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), &root) {
+    if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), root) {
         tracing::warn!("save recent repos: {e}");
     }
-    let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html".into()))
-        .title(name(&root))
+    Ok(label)
+}
+
+/// Ends the repo's terminals and HTML tabs, and forgets its state.
+pub fn stop(app: &AppHandle, label: &str) {
+    app.state::<crate::pty::Ptys>().kill_window(label);
+    app.state::<crate::html::HtmlRoots>().close_window(label);
+    app.state::<Repos>().remove(label);
+}
+
+/// Opens the repo holding `path`: focuses the window showing it, or else opens the project
+/// that has it, or a new project of its own.
+pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
+    crate::project::open_repo(app, &root_of(path)?)
+}
+
+/// Builds a window showing the app at `label`.
+pub fn window(app: &AppHandle, label: &str, title: &str) -> Result<(), String> {
+    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
+        .title(title)
         .inner_size(1400.0, 900.0)
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
         .disable_drag_drop_handler()
         .on_navigation(stays_in_app);
-    let window = crate::placement::place(app, &label, builder)
+    let window = crate::placement::place(app, label, builder)
         .build()
         .map_err(|e| e.to_string())?;
     crate::zoom::apply(&window);
@@ -151,7 +197,7 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn close_start(app: &AppHandle) {
+pub fn close_start(app: &AppHandle) {
     if let Some(start) = app.get_webview_window(START_LABEL) {
         start.close().ok();
     }
@@ -184,11 +230,11 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
         .map(|window| crate::zoom::apply(&window))
 }
 
-/// Opens the repo named on a command line. With none, a `launch` reopens the last repo, and
-/// otherwise, or when that fails, the start window opens.
+/// Opens the repo named on a command line. With none, a `launch` reopens the projects open at
+/// the last quit, and otherwise, or when that fails, the start window opens.
 pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool) {
     let Some(arg) = args.iter().find(|a| !a.starts_with('-')) else {
-        if !launch || open_last(app).is_err() {
+        if !launch || crate::project::reopen(app).is_err() {
             open_start(app).ok();
         }
         return;
@@ -197,15 +243,6 @@ pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool
         tracing::error!("{e}");
         open_start(app).ok();
     }
-}
-
-/// Opens the most recently opened repo that's still a jj repo.
-fn open_last(app: &AppHandle) -> Result<(), String> {
-    let last = crate::recent::load(&crate::recent::path(&data_dir(app)?))
-        .into_iter()
-        .next()
-        .ok_or("no recent repo")?;
-    open(app, &last).inspect_err(|e| tracing::error!("reopen {}: {e}", last.display()))
 }
 
 #[cfg(test)]

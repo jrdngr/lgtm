@@ -76,6 +76,17 @@ export function Glyph({ state, className = "" }: { state: Activity["state"]; cla
   );
 }
 
+/** The mark of a sleeping workspace or repo, where its agent mark goes. */
+export function Moon() {
+  return (
+    <span className="ws-agents">
+      <svg className="ws-glyph asleep" viewBox="0 0 12 12" aria-label="Asleep">
+        <path d="M9.8 7.6A4.6 4.6 0 0 1 4.4 2.2a4.6 4.6 0 1 0 5.4 5.4z" />
+      </svg>
+    </span>
+  );
+}
+
 /** How long ago `t` was, in seconds under a minute. */
 export function since(t: number) {
   const s = Math.floor((Date.now() - t) / 1000);

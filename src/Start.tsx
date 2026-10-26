@@ -1,15 +1,35 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
+import type { ProjectSummary } from "./bindings";
 import { commands, type RepoInfo } from "./ipc";
+import { contextMenu } from "./ui/contextMenu";
+
+const closedProjects = (set: (p: ProjectSummary[]) => void) =>
+  commands.closedProjects().then((r) => r.status === "ok" && set(r.data));
 
 export function Start() {
   const [error, setError] = useState<string>();
   const [initRoot, setInitRoot] = useState<string | null>(null);
   const [recent, setRecent] = useState<RepoInfo[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+
+  const loadProjects = () => closedProjects(setProjects);
 
   useEffect(() => {
     commands.recentRepos().then((r) => r.status === "ok" && setRecent(r.data));
+    closedProjects(setProjects);
   }, []);
+
+  async function openProject(id: string) {
+    const r = await commands.openProject(id);
+    setError(r.status === "error" ? r.error : undefined);
+  }
+
+  async function deleteProject(id: string) {
+    const r = await commands.deleteProject(id);
+    setError(r.status === "error" ? r.error : undefined);
+    loadProjects();
+  }
 
   async function openPath(path: string) {
     const r = await commands.openRepo(path);
@@ -19,8 +39,9 @@ export function Start() {
 
   async function initJj(root: string) {
     const r = await commands.initJj(root);
-    setError(r.status === "error" ? r.error : undefined);
     setInitRoot(null);
+    if (r.status === "error") setError(r.error);
+    else await openPath(root);
   }
 
   async function pick() {
@@ -43,6 +64,29 @@ export function Start() {
         </div>
       ) : (
         error && <p className="error">{error}</p>
+      )}
+      {projects.length > 0 && (
+        <section className="recent">
+          <h2>Projects</h2>
+          <ul>
+            {projects.map((p) => (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  onClick={() => openProject(p.id)}
+                  onContextMenu={contextMenu(() => [
+                    { label: "Open", onSelect: () => openProject(p.id) },
+                    "-",
+                    { label: "Delete Project", onSelect: () => deleteProject(p.id) },
+                  ])}
+                >
+                  <span className="name">{p.name}</span>
+                  <span className="root">{p.repos.join(", ")}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
       {recent.length > 0 && (
         <section className="recent">
