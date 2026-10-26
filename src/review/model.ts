@@ -1,4 +1,4 @@
-import type { CodeSymbol, ContextLine, FileDto, ReviewDto, RowDto } from "../bindings";
+import type { CodeSymbol, ContextLine, FileDto, MarkColor, ReviewDto, RowDto } from "../bindings";
 import type { DoneFn } from "./marks";
 import { type Filter, type RowStateFn, rowMatches } from "./rowState";
 
@@ -336,6 +336,15 @@ export function changedRows(
     }
   }
   return out;
+}
+
+/** The mark marking `rows` with `asked` sets: none when every row has it already. */
+export function toggledMark(
+  rows: Addr[],
+  asked: MarkColor | null,
+  state: RowStateFn,
+): MarkColor | null {
+  return asked !== null && rows.every((r) => state(r.file, r.row) === asked) ? null : asked;
 }
 
 export const markKey = (file: number, row: number) => `${file}:${row}`;

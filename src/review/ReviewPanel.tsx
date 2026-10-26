@@ -160,6 +160,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     review,
     files,
     lines,
+    rowState,
     s,
     c,
     setError,

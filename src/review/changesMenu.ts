@@ -7,19 +7,21 @@ import { type Sender, sendItems } from "../terminal/sendItems";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import type { CurrentReview } from "./current";
 import type { MarkSetup } from "./marks";
+import { toggledMark } from "./model";
 import { dirPaths, type TreeDir } from "./tree";
 
 const apply = (review: CurrentReview, r: Promise<CommandResult<StateDto>>) =>
   run(unwrap(r).then(review.apply));
 
-/** Marks every changed row of `file`. The first mark, when it counts as done, also checks
+/** Marks every changed row of `file`, or clears them when they all have the mark. The first mark, when it counts as done, also checks
  * the file, as marking a whole file in the review does. */
 function markFile(review: CurrentReview, setup: MarkSetup, file: number, color: MarkColor) {
   const rows = review.files[file].rows.flatMap((r, row) =>
     r.kind === "context" ? [] : [{ file, row }],
   );
-  const check = color === setup.primary ? [file] : [];
-  apply(review, commands.markRows(review.id, rows, color, check));
+  const set = toggledMark(rows, color, review.rowState);
+  const check = set !== null && set === setup.primary ? [file] : [];
+  apply(review, commands.markRows(review.id, rows, set, check));
 }
 
 export function fileMenu(

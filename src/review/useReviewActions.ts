@@ -3,7 +3,8 @@ import { type CommandResult, commands } from "../ipc";
 import { copy as copyText } from "../ui/contextMenu";
 import { draftFor } from "./comments";
 import type { MenuAction } from "./MarkMenu";
-import { changedRows, type DisplayLine, type FlatFile } from "./model";
+import { changedRows, type DisplayLine, type FlatFile, toggledMark } from "./model";
+import type { RowStateFn } from "./rowState";
 import { locatedText, selectedRowText, selectionText } from "./sendText";
 import type { Comments } from "./useComments";
 import { clearTextSelection } from "./useRowMouse";
@@ -13,6 +14,7 @@ interface Deps {
   review: ReviewDto | undefined;
   files: FlatFile[];
   lines: DisplayLine[];
+  rowState: RowStateFn;
   s: SelectionApi;
   c: Comments;
   setError(message: string | undefined): void;
@@ -53,13 +55,15 @@ export function useReviewActions(d: Deps) {
     clearTextSelection();
   }
 
-  async function applyMark(color: MarkColor | null) {
+  /** Marks the selection's changed rows `color`, or clears them when they all have it. */
+  async function applyMark(asked: MarkColor | null) {
     if (!review) return;
     const rows = changedRows(files, lines, sel.start, sel.end, true);
     if (rows.length === 0) {
       setError("No changed rows in the selection.");
       return;
     }
+    const color = toggledMark(rows, asked, d.rowState);
     const line = lines[sel.start];
     const whole = sel.level === "file" && color !== null && color === d.primary;
     const check = whole && line ? [line.file] : [];
@@ -76,14 +80,15 @@ export function useReviewActions(d: Deps) {
     );
   }
 
-  /** Marks every changed row of a file, whatever the filter shows. The primary mark also
-   * checks it. */
-  async function markFile(file: number, color: MarkColor) {
+  /** Marks every changed row of a file, whatever the filter shows, or clears them when they
+   * all have the mark. The primary mark also checks it. */
+  async function markFile(file: number, asked: MarkColor) {
     if (!review) return;
     const rows = files[file].rows.flatMap((r, row) =>
       r.kind === "context" ? [] : [{ file, row }],
     );
-    const check = color === d.primary ? [file] : [];
+    const color = toggledMark(rows, asked, d.rowState);
+    const check = color !== null && color === d.primary ? [file] : [];
     settle(await commands.markRows(review.id, rows, color, check), (next) => applied(next, check));
   }
 
