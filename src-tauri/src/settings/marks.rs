@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! [[marks]]
-//! color = "cyan"
+//! color = "green"
 //! label = "reviewed"
 //! done = true
 //! shown = true
@@ -17,6 +17,8 @@ use crate::store::MarkColor;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MarkSlot {
+    #[serde(deserialize_with = "color")]
+    #[specta(type = MarkColor)]
     pub color: MarkColor,
     /// Empty for a color with no label.
     pub label: String,
@@ -24,6 +26,13 @@ pub struct MarkSlot {
     pub done: bool,
     /// In the review header and on a number key. Hidden colors keep their marks.
     pub shown: bool,
+}
+
+/// A slot's color, reading the green once called cyan as green.
+fn color<'de, D: serde::Deserializer<'de>>(d: D) -> Result<MarkColor, D::Error> {
+    let name = String::deserialize(d)?;
+    let name = if name == "cyan" { "green".into() } else { name };
+    MarkColor::deserialize(serde::de::value::StringDeserializer::<D::Error>::new(name))
 }
 
 fn slot(color: MarkColor, label: &str, done: bool, shown: bool) -> MarkSlot {
@@ -38,7 +47,7 @@ fn slot(color: MarkColor, label: &str, done: bool, shown: bool) -> MarkSlot {
 /// Reviewed, flagged and skipped in use; the other colors unlabeled and hidden.
 pub fn defaults() -> Vec<MarkSlot> {
     let mut slots = vec![
-        slot(MarkColor::Cyan, "reviewed", true, true),
+        slot(MarkColor::Green, "reviewed", true, true),
         slot(MarkColor::Red, "flagged", false, true),
         slot(MarkColor::Gray, "skipped", true, true),
     ];
@@ -90,9 +99,17 @@ mod tests {
         normalize(&mut slots);
         assert_eq!(slots.len(), MarkColor::ALL.len());
         assert_eq!(slots[0], slot(MarkColor::Tan, "later", false, true));
-        assert_eq!(slots[1], slot(MarkColor::Cyan, "", true, false));
+        assert_eq!(slots[1], slot(MarkColor::Green, "", true, false));
         assert!(!is_done(&slots, MarkColor::Tan));
         assert_eq!(label(&slots, MarkColor::Tan), "later");
-        assert_eq!(label(&slots, MarkColor::Cyan), "cyan");
+        assert_eq!(label(&slots, MarkColor::Green), "green");
+    }
+
+    #[test]
+    fn a_slot_saved_as_cyan_reads_as_green() {
+        let s: MarkSlot =
+            toml::from_str("color = \"cyan\"\nlabel = \"reviewed\"\ndone = true\nshown = true\n")
+                .unwrap();
+        assert_eq!(s, slot(MarkColor::Green, "reviewed", true, true));
     }
 }

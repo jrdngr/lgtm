@@ -15,7 +15,7 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
 
     let b = tests::row_of(&review, 0, "fn b() {}", 0);
     let c = tests::row_of(&review, 0, "fn c() {}", 0);
-    ctx.mark(review.id, &[b], Some(MarkColor::Cyan), &[])
+    ctx.mark(review.id, &[b], Some(MarkColor::Green), &[])
         .unwrap();
     ctx.mark(review.id, &[c], Some(MarkColor::Red), &[])
         .unwrap();

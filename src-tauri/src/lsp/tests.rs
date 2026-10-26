@@ -28,7 +28,11 @@ async fn finds_definitions_in_the_repo_and_in_libraries_and_hovers() {
     }
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().canonicalize().unwrap();
-    std::fs::write(root.join("a.py"), "def greet(name: str) -> str:\n    return name\n").unwrap();
+    std::fs::write(
+        root.join("a.py"),
+        "def greet(name: str) -> str:\n    return name\n",
+    )
+    .unwrap();
     let b = root.join("b.py");
     std::fs::write(&b, "import os\nfrom a import greet\ngreet(os.sep)\n").unwrap();
 
@@ -93,5 +97,15 @@ async fn library_symbols_resolve_through_the_roots_virtualenv() {
     std::fs::write(&b, "import onlyinvenv\nonlyinvenv.hi()\n").unwrap();
 
     let defs = definition(at(&root, &b, 1, 12)).await.unwrap().unwrap();
-    assert_eq!(defs[0].path, format!("{}/onlyinvenv/__init__.py", site.parent().unwrap().strip_prefix(&root).unwrap().display()));
+    assert_eq!(
+        defs[0].path,
+        format!(
+            "{}/onlyinvenv/__init__.py",
+            site.parent()
+                .unwrap()
+                .strip_prefix(&root)
+                .unwrap()
+                .display()
+        )
+    );
 }

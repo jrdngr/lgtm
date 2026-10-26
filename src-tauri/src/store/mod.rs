@@ -184,6 +184,7 @@ fn migrate_check_fingerprints(db: &Connection) -> rusqlite::Result<()> {
 }
 
 /// Marks were once reviewed, skipped or flagged; those are now the colors they were drawn in.
+/// Reviewed's color, once cyan, is green.
 fn migrate_mark_colors(db: &Connection) -> rusqlite::Result<()> {
     let has_state: bool = db.query_row(
         "SELECT COUNT(*) > 0 FROM pragma_table_info('marks') WHERE name = 'state'",
@@ -194,10 +195,11 @@ fn migrate_mark_colors(db: &Connection) -> rusqlite::Result<()> {
         db.execute_batch(
             "ALTER TABLE marks RENAME COLUMN state TO color;
              UPDATE marks SET color = CASE color
-                 WHEN 'reviewed' THEN 'cyan' WHEN 'skipped' THEN 'gray' WHEN 'flagged' THEN 'red'
+                 WHEN 'reviewed' THEN 'green' WHEN 'skipped' THEN 'gray' WHEN 'flagged' THEN 'red'
                  ELSE color END;",
         )?;
     }
+    db.execute("UPDATE marks SET color = 'green' WHERE color = 'cyan'", [])?;
     Ok(())
 }
 
@@ -391,7 +393,7 @@ mod tests {
             .into_iter()
             .map(|m| m.color)
             .collect();
-        assert_eq!(colors, [MarkColor::Cyan, MarkColor::Red]);
+        assert_eq!(colors, [MarkColor::Green, MarkColor::Red]);
         let sql: String = store
             .db
             .query_row(

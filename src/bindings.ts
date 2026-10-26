@@ -143,7 +143,7 @@ export const commands = {
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
 	 */
-	markRows: (review: number, rows: RowRef[], color: "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
+	markRows: (review: number, rows: RowRef[], color: "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
 	/**  Clears a file's marks and unchecks it, in one undo step. */
 	clearFileMarks: (review: number, file: number) => typedError<StateDto, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
 	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
@@ -251,9 +251,9 @@ export const commands = {
 	systemEdge: (workspace: string | null, from: string, to: string) => typedError<EdgeSitesDto, string>(__TAURI_INVOKE("system_edge", { workspace, from, to })),
 	/**  Records the review a workspace's active review pane shows, for agents in its terminals. */
 	focusReview: (workspace: string | null, review: number) => typedError<null, string>(__TAURI_INVOKE("focus_review", { workspace, review })),
-	getSettings: () => __TAURI_INVOKE<Settings>("get_settings"),
+	getSettings: () => __TAURI_INVOKE<Settings_Serialize>("get_settings"),
 	/**  Saves the settings and tells every window. */
-	saveSettings: (settings: Settings) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
+	saveSettings: (settings: Settings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
 	/**  Why `settings.toml` couldn't be read, while the defaults stand in for it. */
 	settingsLoadError: () => __TAURI_INVOKE<string | null>("settings_load_error"),
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
@@ -486,7 +486,7 @@ export const events = {
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewOutdated: makeEvent<ReviewOutdated>("review-outdated"),
 	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
-	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
+	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
 	switchRepo: makeEvent<SwitchRepo>("switch-repo"),
 	symbolInfoChanged: makeEvent<SymbolInfoChanged>("symbol-info-changed"),
 	systemChanged: makeEvent<SystemChanged>("system-changed"),
@@ -1620,7 +1620,7 @@ export type LookSeverity = "low" | "medium" | "high";
 export type LookSource = "rule" | "agent" | "security";
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
-export type MarkColor = "cyan" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
+export type MarkColor = "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
 
 export type MarkDto = {
 	file: number,
@@ -1630,7 +1630,19 @@ export type MarkDto = {
 	createdAt: number | null,
 };
 
-export type MarkSlot = {
+export type MarkSlot = MarkSlot_Serialize | MarkSlot_Deserialize;
+
+export type MarkSlot_Deserialize = {
+	color: MarkColor,
+	/**  Empty for a color with no label. */
+	label: string,
+	/**  Rows with this mark count toward progress. */
+	done: boolean,
+	/**  In the review header and on a number key. Hidden colors keep their marks. */
+	shown: boolean,
+};
+
+export type MarkSlot_Serialize = {
 	color: MarkColor,
 	/**  Empty for a color with no label. */
 	label: string,
@@ -2226,7 +2238,22 @@ export type Session_Serialize = {
 	created: number | null,
 };
 
-export type Settings = {
+export type Settings = Settings_Serialize | Settings_Deserialize;
+
+/**  The settings were saved. */
+export type SettingsChanged = SettingsChanged_Serialize | SettingsChanged_Deserialize;
+
+/**  The settings were saved. */
+export type SettingsChanged_Deserialize = {
+	settings: Settings_Deserialize,
+};
+
+/**  The settings were saved. */
+export type SettingsChanged_Serialize = {
+	settings: Settings_Serialize,
+};
+
+export type Settings_Deserialize = {
 	/**
 	 *  What a terminal runs to start Claude Code, typed into its shell. lgtm also runs it to
 	 *  check Claude Code and register its MCP server.
@@ -2234,12 +2261,18 @@ export type Settings = {
 	claudeTerminal: string,
 	terminalFontSize: number,
 	/**  Every mark color, the ones in use first in key order. */
-	marks: MarkSlot[],
+	marks: MarkSlot_Deserialize[],
 };
 
-/**  The settings were saved. */
-export type SettingsChanged = {
-	settings: Settings,
+export type Settings_Serialize = {
+	/**
+	 *  What a terminal runs to start Claude Code, typed into its shell. lgtm also runs it to
+	 *  check Claude Code and register its MCP server.
+	 */
+	claudeTerminal: string,
+	terminalFontSize: number,
+	/**  Every mark color, the ones in use first in key order. */
+	marks: MarkSlot_Serialize[],
 };
 
 /**  Whether a workspace has a setup script, and whether the user let it run. */

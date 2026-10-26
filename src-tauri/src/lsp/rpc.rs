@@ -36,7 +36,12 @@ fn answer(method: &str, params: &Value, settings: &Value) -> Value {
         "workspace/configuration" => {
             let items = params["items"].as_array().map_or(&[][..], Vec::as_slice);
             let section = |i: &Value| i["section"].as_str().and_then(|s| settings.get(s)).cloned();
-            Value::Array(items.iter().map(|i| section(i).unwrap_or(Value::Null)).collect())
+            Value::Array(
+                items
+                    .iter()
+                    .map(|i| section(i).unwrap_or(Value::Null))
+                    .collect(),
+            )
         }
         _ => Value::Null,
     }
@@ -44,7 +49,12 @@ fn answer(method: &str, params: &Value, settings: &Value) -> Value {
 
 impl Rpc {
     /// Starts `program`, which gets `settings`, by section, when it asks for its configuration.
-    pub fn spawn(program: &Path, args: &[&str], cwd: &Path, settings: Value) -> anyhow::Result<Self> {
+    pub fn spawn(
+        program: &Path,
+        args: &[&str],
+        cwd: &Path,
+        settings: Value,
+    ) -> anyhow::Result<Self> {
         let mut child = Command::new(program)
             .args(args)
             .current_dir(cwd)
@@ -77,7 +87,9 @@ impl Rpc {
                     }
                     continue;
                 }
-                let Some(id) = msg["id"].as_i64() else { continue };
+                let Some(id) = msg["id"].as_i64() else {
+                    continue;
+                };
                 let reply = match msg.get("error") {
                     Some(e) => Err(e["message"].as_str().unwrap_or("error").to_string()),
                     None => Ok(msg["result"].clone()),
@@ -102,7 +114,12 @@ impl Rpc {
         self.alive.load(Ordering::SeqCst)
     }
 
-    pub async fn request(&self, method: &str, params: Value, wait: Duration) -> anyhow::Result<Value> {
+    pub async fn request(
+        &self,
+        method: &str,
+        params: Value,
+        wait: Duration,
+    ) -> anyhow::Result<Value> {
         let id = self.next.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         self.pending.lock().unwrap().insert(id, tx);

@@ -4,7 +4,7 @@ import { useSettings } from "../settings/store";
 
 /** Every mark color, in palette order. */
 export const MARK_COLORS: MarkColor[] = [
-  "cyan",
+  "green",
   "red",
   "gray",
   "orange",

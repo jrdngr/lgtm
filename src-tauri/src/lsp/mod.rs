@@ -242,7 +242,12 @@ pub async fn definition(at: At<'_>) -> anyhow::Result<Option<Vec<Place>>> {
             };
             let path = uri::path(uri.as_str()?)?;
             let start = &range["start"];
-            Some(place(&root, path, start["line"].as_u64()?, start["character"].as_u64()?))
+            Some(place(
+                &root,
+                path,
+                start["line"].as_u64()?,
+                start["character"].as_u64()?,
+            ))
         })
         .collect();
     Ok(Some(places))

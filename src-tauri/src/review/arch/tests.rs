@@ -160,7 +160,11 @@ fn python_imports_stay_in_their_own_source_root() {
         triples(&[
             ("services/a/src/main.py", "libs/one/shared/util.py", 3),
             ("services/a/src/main.py", "services/a/src/routes/x.py", 1),
-            ("services/b/src/app.py", "services/b/src/routes/__init__.py", 1),
+            (
+                "services/b/src/app.py",
+                "services/b/src/routes/__init__.py",
+                1
+            ),
             ("services/b/src/app.py", "services/b/src/schema.py", 2),
         ])
     );

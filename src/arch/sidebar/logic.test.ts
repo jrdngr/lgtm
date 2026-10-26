@@ -24,7 +24,7 @@ describe("layerDone", () => {
   const files = [{ rows: rows([" a", "+b", "+c", "+d", " e"]) }, { rows: rows(["+x"]) }];
   const marked = new Map<string, RowState>([
     ["0:1", "checked"],
-    ["0:2", "cyan"],
+    ["0:2", "green"],
   ]);
   const review = (done: (c: MarkColor) => boolean) => ({
     files,
@@ -40,7 +40,7 @@ describe("layerDone", () => {
   });
 
   const none = review(() => false);
-  const cyan = review((c) => c === "cyan");
+  const green = review((c) => c === "green");
   const all = review(() => true);
 
   test("counts changed rows once across overlapping ranges, by the marks that mean done", () => {
@@ -49,7 +49,7 @@ describe("layerDone", () => {
       [0, 2, 5],
     ]);
     expect(layerDone(none, l)).toBeCloseTo(1 / 3);
-    expect(layerDone(cyan, l)).toBeCloseTo(2 / 3);
+    expect(layerDone(green, l)).toBeCloseTo(2 / 3);
   });
 
   test("spans files, and skips ranges outside the review", () => {

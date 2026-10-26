@@ -172,7 +172,11 @@ impl<'a> Resolver<'a> {
         if let Some(r) = own.into_iter().find(|r| self.has_py_pkg(r, top)) {
             return self.py_in(r, module, names);
         }
-        match other.iter().filter(|r| self.has_py_pkg(r, top)).collect::<Vec<_>>()[..] {
+        match other
+            .iter()
+            .filter(|r| self.has_py_pkg(r, top))
+            .collect::<Vec<_>>()[..]
+        {
             [r] => self.py_in(r, module, names),
             _ => vec![],
         }
@@ -205,7 +209,11 @@ impl<'a> Resolver<'a> {
             return subs;
         }
         if module.is_empty() {
-            return (!dir.is_empty()).then(|| file("")).flatten().into_iter().collect();
+            return (!dir.is_empty())
+                .then(|| file(""))
+                .flatten()
+                .into_iter()
+                .collect();
         }
         file(&full).into_iter().collect()
     }
