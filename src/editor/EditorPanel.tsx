@@ -9,6 +9,7 @@ import { useCmFind } from "../find/useCmFind";
 import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
+import { registerEditor } from "../search/lsp";
 import { showInfos } from "../symbolInfo/editorInfo";
 import { useFolded, useSymbolInfos } from "../symbolInfo/store";
 import { type Sender, sendItems } from "../terminal/sendItems";
@@ -47,7 +48,7 @@ export function EditorPanel(props: IDockviewPanelProps<EditorParams>) {
  * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
 function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
-  const { path, line, anchor, nonce } = params;
+  const { path, line, col, anchor, nonce, readOnly } = params;
   const host = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView>();
   /** The text as last read or saved. */
@@ -92,8 +93,12 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
         });
         made = new EditorView({
           parent: host.current,
-          state: EditorState.create({ doc: text, extensions }),
+          state: EditorState.create({
+            doc: text,
+            extensions: readOnly ? [extensions, EditorState.readOnly.of(true)] : extensions,
+          }),
         });
+        registerEditor(made, path);
         saved.current = made.state.doc;
         setRendered((r) => (r === undefined ? r : text));
         const { cursor, scroll } = restore.current;
@@ -113,7 +118,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       live = false;
       made?.destroy();
     };
-  }, [api, workspace, path]);
+  }, [api, workspace, path, readOnly]);
 
   // Rendered markdown goes back to where it was scrolled, once, when its text first shows.
   useEffect(() => {
@@ -140,7 +145,8 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   useEffect(() => {
     if (!view || !line) return;
     const doc = view.state.doc;
-    const at = doc.line(Math.min(Math.max(line, 1), doc.lines)).from;
+    const target = doc.line(Math.min(Math.max(line, 1), doc.lines));
+    const at = Math.min(target.from + (col ?? 0), target.to);
     setRendered(undefined);
     view.dispatch({
       selection: { anchor: at },
@@ -148,8 +154,8 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     });
     view.focus();
     // Used: a restart brings back the cursor where it was left, not this line.
-    saveTabParams(api, { line: undefined, nonce: undefined });
-  }, [api, view, line, nonce]);
+    saveTabParams(api, { line: undefined, col: undefined, nonce: undefined });
+  }, [api, view, line, col, nonce]);
 
   // A link's anchor shows where it points, in whichever view the tab is in.
   // biome-ignore lint/correctness/useExhaustiveDependencies: `nonce` follows the same link again
@@ -198,7 +204,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   }
 
   async function save(): Promise<boolean> {
-    if (!view) return false;
+    if (!view || readOnly) return false;
     const doc = view.state.doc;
     try {
       await unwrap(commands.saveFile(workspace, path, view.state.sliceDoc()));

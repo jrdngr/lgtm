@@ -22,6 +22,8 @@ import { useReviewTarget } from "../review/target";
 import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
 import { focusLog, openMotions } from "../revisions/loadReview";
 import { watchDefinitionClicks } from "../search/definitionClick";
+import { HoverCard } from "../search/HoverCard";
+import { watchHovers } from "../search/hover";
 import { askSymbolInfo } from "../search/menu";
 import { openQuickPick } from "../search/pickStore";
 import { QuickPickHost } from "../search/QuickPick";
@@ -105,6 +107,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
   useEffect(() => watchDefinitionClicks(() => selectedRef.current), []);
+  useEffect(() => watchHovers(() => selectedRef.current), []);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
@@ -329,6 +332,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       <McpOffer />
       <PromptHost />
       <BackgroundPicker />
+      <HoverCard />
       <QuickPickHost />
       <DesignFormHost workspace={selected} />
       <div className="workbench-body">

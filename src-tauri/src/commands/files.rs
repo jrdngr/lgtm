@@ -44,6 +44,10 @@ pub(crate) async fn read_file(
     path: String,
 ) -> CmdResult<String> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
+    // A library file a definition led to, shown read-only.
+    if Path::new(&path).is_absolute() && crate::lsp::shown_external(Path::new(&path)) {
+        return files::read(Path::new(&path), &path).map_err(err);
+    }
     files::read(&contained(&ws, &path)?, &path).map_err(err)
 }
 

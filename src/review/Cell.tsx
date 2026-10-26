@@ -56,11 +56,15 @@ export function Cell({ file, fileIdx, row, index, setup, side, flag }: CellProps
   const amber = !color && index.amber.has(key);
   const commented = index.commented.has(key);
   const lineNo = side === "left" ? r.oldLine : side === "right" ? r.newLine : undefined;
+  // A line of the new side, which a language server can find in the file.
+  const onNew = side !== "left" && r.newLine !== null;
   return (
     <div
       className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${color ? " marked" : ""}${amber ? " amber" : ""}${commented ? " commented" : ""}`}
       style={color ? ({ "--m": markVar(color) } as React.CSSProperties) : undefined}
       title={amber ? "changed since marked" : markTitle(mark, setup)}
+      data-path={onNew ? file.dto.path : undefined}
+      data-line={onNew ? r.newLine : undefined}
     >
       <span className="strip" />
       <span className="flag">{flag}</span>

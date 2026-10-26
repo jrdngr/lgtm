@@ -14,6 +14,7 @@ mod gitmeta;
 mod html;
 mod jj;
 mod layout;
+mod lsp;
 mod logging;
 mod mcp;
 mod menu;
@@ -188,6 +189,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::bots::dismiss_findings,
             commands::files::list_files,
             commands::files::read_file,
+            commands::lsp::lsp_definition,
+            commands::lsp::lsp_hover,
             commands::files::read_image,
             commands::files::save_file,
             commands::files::files_at,

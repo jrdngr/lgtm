@@ -10,6 +10,7 @@ pub mod github;
 pub mod guided;
 pub mod html;
 pub mod log;
+pub mod lsp;
 pub mod notes;
 pub mod pty;
 pub mod qa;

@@ -321,6 +321,14 @@ export const commands = {
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
+	/**
+	 *  Where the symbol at 0-based `line` and UTF-16 `character` of `path` is defined, by the
+	 *  language server for the file. `text` is the file as the editor has it. `None` when no
+	 *  server on PATH takes the file.
+	 */
+	lspDefinition: (workspace: string | null, path: string, text: string | null, line: number, character: number) => typedError<Place[] | null, string>(__TAURI_INVOKE("lsp_definition", { workspace, path, text, line, character })),
+	/**  The language server's markdown about the symbol at `line` and `character` of `path`. */
+	lspHover: (workspace: string | null, path: string, text: string | null, line: number, character: number) => typedError<string | null, string>(__TAURI_INVOKE("lsp_hover", { workspace, path, text, line, character })),
 	/**  An image file's bytes as base64. */
 	readImage: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_image", { workspace, path })),
 	/**
@@ -1749,6 +1757,17 @@ export type Part = {
 export type Persona = {
 	name: string,
 	description: string,
+};
+
+/**
+ *  A place a definition is: the path relative to the workspace root, or absolute when outside
+ *  it, and its 0-based line and UTF-16 column.
+ */
+export type Place = {
+	path: string,
+	external: boolean,
+	line: number,
+	character: number,
 };
 
 /**  A thread after row `row` of hunk `hunk`. */

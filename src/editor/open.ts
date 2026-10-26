@@ -7,6 +7,10 @@ export interface EditorParams {
   path: string;
   /** 1-based line to put the cursor on. */
   line?: number;
+  /** The cursor's UTF-16 column on `line`. */
+  col?: number;
+  /** A library file a definition led to, outside the workspace. */
+  readOnly?: boolean;
   /** A link's `#anchor` to show: a heading, an element id, or a line (`L12`). */
   anchor?: string;
   /** Changes on every open, so opening an open file at a line moves its cursor again. */
@@ -31,8 +35,14 @@ export const baseName = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** Opens `path` in an editor tab, or focuses the one it's in, with the cursor at `line` or
  * showing `anchor`. */
-export function openFileIn(api: DockviewApi, path: string, line?: number, anchor?: string) {
-  const params: EditorParams = { path, line, anchor, nonce: Date.now() };
+export function openFileIn(
+  api: DockviewApi,
+  path: string,
+  line?: number,
+  anchor?: string,
+  at?: Pick<EditorParams, "col" | "readOnly">,
+) {
+  const params: EditorParams = { path, line, anchor, nonce: Date.now(), ...at };
   const open = api.getPanel(editorId(path));
   if (open) {
     open.api.updateParameters(params);
@@ -50,7 +60,13 @@ export function openFileIn(api: DockviewApi, path: string, line?: number, anchor
 }
 
 /** Opens `path` in the workspace's dock. */
-export function openFile(workspace: WorkspaceName, path: string, line?: number, anchor?: string) {
+export function openFile(
+  workspace: WorkspaceName,
+  path: string,
+  line?: number,
+  anchor?: string,
+  at?: Pick<EditorParams, "col" | "readOnly">,
+) {
   const api = dockOf(workspace);
-  if (api) openFileIn(api, path, line, anchor);
+  if (api) openFileIn(api, path, line, anchor, at);
 }
