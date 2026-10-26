@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ContextDocDto } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
+import { Lifted } from "../ui/Lifted";
 
 /** Superseded ADRs folded into one button, listing each by number and title to open. */
 export function Superseded({
@@ -21,7 +22,7 @@ export function Superseded({
         Superseded Decisions {docs.length}
       </button>
       {open && (
-        <div className={`gd-pop${right ? " right" : ""}`}>
+        <Lifted className={`gd-pop${right ? " right" : ""}`}>
           {docs.map((d) => (
             <button
               key={d.path}
@@ -36,7 +37,7 @@ export function Superseded({
               <span>{d.title}</span>
             </button>
           ))}
-        </div>
+        </Lifted>
       )}
     </span>
   );

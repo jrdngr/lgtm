@@ -8,6 +8,7 @@ import type { CurrentReview } from "../review/current";
 import type { MarkSetup } from "../review/marks";
 import type { Comments } from "../review/useComments";
 import type { CommentFolds } from "../review/useSavedView";
+import { Lifted } from "../ui/Lifted";
 import { ChunkCode } from "./ChunkCode";
 import { commentsAfter } from "./ChunkView";
 import { type ExcludedState, REASON_NAMES, RISK_NAMES, RISKS, threadSegment } from "./model";
@@ -82,7 +83,7 @@ export function ExcludedView({
             Promote <kbd>p</kbd>
           </button>
           {picking && (
-            <div className="gd-pop right">
+            <Lifted className="gd-pop right">
               {RISKS.map((risk, i) => (
                 <button key={risk} type="button" className="gd-mi" onClick={() => promote(risk)}>
                   <span className={`gd-dot risk-${risk}`} />
@@ -91,7 +92,7 @@ export function ExcludedView({
                   <kbd>{i + 1}</kbd>
                 </button>
               ))}
-            </div>
+            </Lifted>
           )}
         </span>
       </div>

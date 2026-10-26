@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ArchViewDto } from "../bindings";
+import { Lifted } from "../ui/Lifted";
 import { Chevron } from "./glyphs";
 
 type Flag = "untracked" | "tests" | "generated" | "small" | "outside" | "groups";
@@ -62,8 +63,7 @@ export function ViewPop({ view, review, onChange, onClose }: PopProps) {
     return () => window.removeEventListener("pointerdown", away, true);
   }, [onClose]);
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off what's under it
-    <div
+    <Lifted
       className="sys-genpop sys-viewpop"
       role="menu"
       aria-label="View"
@@ -96,7 +96,7 @@ export function ViewPop({ view, review, onChange, onClose }: PopProps) {
           onPick={(unaffected) => onChange({ unaffected })}
         />
       )}
-    </div>
+    </Lifted>
   );
 }
 

@@ -5,6 +5,7 @@ import { Spinner } from "../ui/Busy";
 import type { GenItem, GenKey, GenState } from "./generate";
 import { Chevron } from "./glyphs";
 import "./gen.css";
+import { Lifted } from "../ui/Lifted";
 
 const STATES: Record<GenState, string> = { fresh: "Fresh", stale: "Stale", missing: "Missing" };
 
@@ -66,8 +67,7 @@ export function GeneratePop({ items, sendKey, className, onGenerate, onClose }: 
     setPicked(next);
   };
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off what's under it
-    <div
+    <Lifted
       className={`sys-genpop${className ? ` ${className}` : ""}`}
       role="menu"
       aria-label="Generate"
@@ -93,6 +93,6 @@ export function GeneratePop({ items, sendKey, className, onGenerate, onClose }: 
           Generate {keys.length}
         </PipeButton>
       </div>
-    </div>
+    </Lifted>
   );
 }

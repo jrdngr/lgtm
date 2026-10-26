@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { MarkSlot } from "../bindings";
 import { saveSettings } from "../settings/store";
 import { IconButton } from "../ui/icons";
@@ -67,7 +68,7 @@ export function MarkPalette({ setup, place, onClose }: Props) {
   const update = (color: MarkSlot["color"], patch: Partial<MarkSlot>) =>
     save(setup.slots.map((s) => (s.color === color ? { ...s, ...patch } : s)));
 
-  return (
+  return createPortal(
     <div className="mark-palette" ref={ref} style={place}>
       <div className="mark-palette-head">Mark colors</div>
       {shown.map((s, i) => (
@@ -137,7 +138,8 @@ export function MarkPalette({ setup, place, onClose }: Props) {
       <div className="mark-palette-foot">
         {error ?? "Drag to reorder: the order sets the number keys. 0 clears a mark."}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

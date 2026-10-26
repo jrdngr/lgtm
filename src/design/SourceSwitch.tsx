@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DesignItemDto, DesignMapDto, DesignState } from "../bindings";
 import { revisionLabel, setSource, showCode, showDesign, useSource } from "./designs";
 import "./design.css";
+import { Lifted } from "../ui/Lifted";
 
 const STATES: Record<DesignState, string> = { fresh: "Fresh", stale: "Stale", missing: "Missing" };
 
@@ -104,8 +105,7 @@ function DesignPop(p: {
     return () => window.removeEventListener("pointerdown", away, true);
   }, [onClose]);
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off what's under it
-    <div
+    <Lifted
       className="dsn-pop"
       role="menu"
       aria-label="Designs"
@@ -139,6 +139,6 @@ function DesignPop(p: {
       <button type="button" className="dsn-new" onClick={p.onNew}>
         + New Design…
       </button>
-    </div>
+    </Lifted>
   );
 }

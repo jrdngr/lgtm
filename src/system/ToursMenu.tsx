@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import type { SystemDto, TourDto } from "../bindings";
 import { PipeButton } from "../terminal/PipeButton";
 import { openMenu } from "../ui/contextMenu";
+import { Lifted } from "../ui/Lifted";
 import { NEUTRAL } from "./colors";
 import { Play } from "./glyphs";
 import { containersOf } from "./scene";
@@ -72,8 +73,7 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
   );
 
   return (
-    // biome-ignore lint/a11y/useKeyWithClickEvents: keeps clicks off the canvas under it
-    <div
+    <Lifted
       className="sys-pop"
       role="menu"
       aria-label="Tours"
@@ -98,6 +98,6 @@ export function ToursMenu({ map, colors, container, onStart, onWrite, onClose }:
           </div>
         );
       })}
-    </div>
+    </Lifted>
   );
 }

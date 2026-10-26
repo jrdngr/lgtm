@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { markVar } from "./marks";
 import type { Progress, ProgressPart } from "./state";
 import "./ProgressCard.css";
@@ -18,7 +19,7 @@ export function ProgressCard({
   at?: { top: number; right: number };
 }) {
   const bar = [...parts.filter((x) => x.done), ...parts.filter((x) => !x.done)];
-  return (
+  const card = (
     <span className="progress-card" style={at && { position: "fixed", ...at }}>
       <span className="pc-totals">
         <span>
@@ -59,4 +60,6 @@ export function ProgressCard({
       </span>
     </span>
   );
+  // Fixed cards go to the body, so no pane draws over them.
+  return at ? createPortal(card, document.body) : card;
 }
