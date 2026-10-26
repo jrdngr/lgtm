@@ -40,10 +40,23 @@ export function fitTabs() {
 }
 
 /** Dockview counts hidden tabs only when the tab list's box resizes or scrolls, so a fit that
- * leaves the box the same size would keep a stale count. A scroll event makes it recount. */
+ * leaves the box the same size would keep a stale count. A scroll event makes it recount.
+ * Its count can also take in a tab that fits, so the menu hides while every shown tab fits. */
 function recountOverflow() {
-  for (const tabs of document.querySelectorAll<HTMLElement>(".dock .dv-tabs-container"))
+  for (const tabs of document.querySelectorAll<HTMLElement>(".dock .dv-tabs-container")) {
     tabs.dispatchEvent(new Event("scroll"));
+    const header = tabs.closest<HTMLElement>(".dv-tabs-and-actions-container");
+    if (header) header.dataset.tabsFit = String(allFit(tabs));
+  }
+}
+
+/** Whether every shown tab lies inside the tab list, give or take a pixel of rounding. */
+function allFit(tabs: HTMLElement) {
+  const box = tabs.getBoundingClientRect();
+  return [...tabs.querySelectorAll<HTMLElement>(".dv-tab")].every((tab) => {
+    const r = tab.getBoundingClientRect();
+    return r.width === 0 || (r.left >= box.left - 1 && r.right <= box.right + 1);
+  });
 }
 
 function fitPane(tabs: HTMLElement) {
