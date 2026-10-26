@@ -35,7 +35,15 @@ export function fitTabs() {
     frame = 0;
     for (const tabs of document.querySelectorAll<HTMLElement>(".dock .dv-tabs-container"))
       fitPane(tabs);
+    requestAnimationFrame(recountOverflow);
   });
+}
+
+/** Dockview counts hidden tabs only when the tab list's box resizes or scrolls, so a fit that
+ * leaves the box the same size would keep a stale count. A scroll event makes it recount. */
+function recountOverflow() {
+  for (const tabs of document.querySelectorAll<HTMLElement>(".dock .dv-tabs-container"))
+    tabs.dispatchEvent(new Event("scroll"));
 }
 
 function fitPane(tabs: HTMLElement) {
