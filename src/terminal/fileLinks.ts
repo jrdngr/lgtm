@@ -1,8 +1,8 @@
 import type { IDisposable, ILink, Terminal } from "@xterm/xterm";
-import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands } from "../ipc";
+import { heldLink } from "./termLinks";
 
 /** A path in a line of terminal output, by character, with the line it names, if any. */
 export interface PathAt {
@@ -52,16 +52,8 @@ export function fileLinks(term: Terminal, workspace: WorkspaceName): IDisposable
       const links: ILink[] = found.flatMap((f, i) => {
         const path = r.data[i];
         if (!path) return [];
-        return [
-          {
-            range: { start: { x: f.from + 1, y }, end: { x: f.to, y } },
-            text: text.slice(f.from, f.to),
-            decorations: { underline: true, pointerCursor: true },
-            activate(e) {
-              if (isMac ? e.metaKey : e.ctrlKey) openFile(workspace, path, f.line);
-            },
-          },
-        ];
+        const range = { start: { x: f.from + 1, y }, end: { x: f.to, y } };
+        return [heldLink(range, text.slice(f.from, f.to), () => openFile(workspace, path, f.line))];
       });
       callback(links);
     },

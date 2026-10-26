@@ -6,6 +6,7 @@ import { type ActivityState, pulse, report } from "../workspaces/activity";
 import { onAgentHook } from "./agentHooks";
 import { fileLinks } from "./fileLinks";
 import { isAgentTitle, isBusyTitle, titleLabel } from "./title";
+import { urlLinks } from "./urlLinks";
 import { createTerminal } from "./xterm";
 
 /** An xterm and the shell it runs, in an element its panel shows. */
@@ -181,6 +182,7 @@ function startSession(
 
   const subs = [
     fileLinks(term, workspace),
+    urlLinks(term),
     term.onData((data) => {
       if (pty === undefined) early += data;
       else commands.ptyWrite(pty, data);
