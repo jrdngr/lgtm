@@ -99,9 +99,11 @@ export function inActivePane(api: DockviewApi): AddPanelOptions["position"] {
   return api.activeGroup ? { referenceGroup: api.activeGroup } : undefined;
 }
 
-/** Opens a Claude tab titled `title` in the focused pane, behind the tab showing there. */
+/** Opens a Claude tab titled `title` in the focused pane, behind the tab showing there when
+ * there is one. */
 export function addClaudeBehind(api: DockviewApi, title: string) {
-  const panel = addPanel(api, "claude", { renamed: true }, inActivePane(api), undefined, true);
+  const behind = api.panels.length > 0;
+  const panel = addPanel(api, "claude", { renamed: true }, inActivePane(api), undefined, behind);
   panel.api.setTitle(title);
   return panel;
 }

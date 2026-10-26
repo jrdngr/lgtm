@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
-import { dockReady } from "../core/docks";
+import { flushSync } from "react-dom";
+import { bottom } from "../core/bottom";
+import { bottomDockOf, dockReady } from "../core/docks";
 import { addClaudeBehind } from "../core/panels";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { loadedSettings } from "../settings/store";
@@ -39,13 +41,25 @@ export function useBackgroundAsk(): BackgroundAsk | undefined {
 
 /** How long a new background terminal's agent gets to start. */
 const START_MS = 60_000;
+/** How long the bottom panel gets to come up. */
+const BOTTOM_MS = 2_000;
 /** Background terminals starting, by workspace key, so sends meanwhile wait for the same one. */
 const starting = new Map<string, Promise<string | undefined>>();
 
 /** Opens a Claude tab named `name` behind the focused one, pins it for background sends, and
  * resolves to it once its agent can take a prompt, or once it's had time to start. */
+/** The workspace's bottom dock, shown, or its main dock when the bottom one doesn't come up. */
+async function bottomDock(ws: WorkspaceName) {
+  if (!bottom.get().open) flushSync(() => bottom.set({ open: true }));
+  const until = Date.now() + BOTTOM_MS;
+  while (!bottomDockOf(ws) && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  return bottomDockOf(ws) ?? dockReady(ws);
+}
+
 async function openBackground(ws: WorkspaceName, name: string): Promise<string> {
-  const id = addClaudeBehind(await dockReady(ws), name).id;
+  const id = addClaudeBehind(await bottomDock(ws), name).id;
   pinTarget(ws, id, "background");
   const until = Date.now() + START_MS;
   while (!terminalReady(id) && Date.now() < until) {
