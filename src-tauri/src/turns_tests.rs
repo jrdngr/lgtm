@@ -176,3 +176,45 @@ async fn saves_in_a_row_make_one_edit_and_an_agent_turn_between_starts_another()
     let review = ctx.open_in(None, "@", false, &view).await.unwrap();
     assert_eq!(paths(&review), ["a.rs", "b.rs"]);
 }
+
+/// A hook turn that writes `file`.
+async fn turn_writing(ctx: &RepoCtx, d: &std::path::Path, file: &str) {
+    hook(ctx, Checkpoint::Start, None).await;
+    hook(ctx, Checkpoint::Before, Some("t")).await;
+    write(d, file, "x\n");
+    hook(ctx, Checkpoint::After, Some("t")).await;
+    hook(ctx, Checkpoint::End, None).await;
+}
+
+#[tokio::test]
+async fn squashing_a_change_moves_its_turns_after_those_of_the_change_it_went_into() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    turn_writing(&ctx, d, "a.rs").await;
+    let base = ctx
+        .workspace(None)
+        .await
+        .unwrap()
+        .jj
+        .changes("@")
+        .await
+        .unwrap();
+    let base = base[0].change_id.clone();
+    let new = JjAction::NewAfter { rev: "@".into() };
+    ctx.jj_act(None, &new).await.unwrap();
+    turn_writing(&ctx, d, "b.rs").await;
+
+    let squash = JjAction::Squash { revs: "@".into() };
+    ctx.jj_act(None, &squash).await.unwrap();
+    assert!(ctx.turns(None).await.unwrap().is_empty());
+    let edit = JjAction::Edit { rev: base };
+    ctx.jj_act(None, &edit).await.unwrap();
+    let turns = ctx.turns(None).await.unwrap();
+    let files: Vec<&[String]> = turns.iter().map(|t| t.paths.as_slice()).collect();
+    assert_eq!(files, [["b.rs".to_string()], ["a.rs".to_string()]]);
+    let view = View::Turn {
+        turns: vec![turns[0].id],
+    };
+    let review = ctx.open_in(None, "@", false, &view).await.unwrap();
+    assert_eq!(paths(&review), ["b.rs"]);
+}

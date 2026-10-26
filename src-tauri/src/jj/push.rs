@@ -174,7 +174,13 @@ mod tests {
         assert!(ok.success());
         jj(
             dir.path(),
-            &["git", "remote", "add", "origin", remote.path().to_str().unwrap()],
+            &[
+                "git",
+                "remote",
+                "add",
+                "origin",
+                remote.path().to_str().unwrap(),
+            ],
         );
         write(dir.path(), "a", "a\n");
         jj(dir.path(), &["commit", "-m", "a"]);
@@ -190,7 +196,10 @@ mod tests {
             new_bookmarks: vec![],
         };
         let err = j.act(&push).await.unwrap_err().to_string();
-        assert!(err.starts_with("Won't push bookmark main: commit "), "{err}");
+        assert!(
+            err.starts_with("Won't push bookmark main: commit "),
+            "{err}"
+        );
         assert!(err.ends_with("has no description"), "{err}");
     }
 }

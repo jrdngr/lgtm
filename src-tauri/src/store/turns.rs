@@ -193,6 +193,17 @@ impl Store {
         Ok(())
     }
 
+    /// Moves the workspace's turns on any of `from` onto `to`.
+    pub fn move_turns(&self, workspace: &str, from: &[String], to: &str) -> rusqlite::Result<()> {
+        for change in from {
+            self.db.execute(
+                "UPDATE agent_turns SET change_id = ? WHERE workspace = ? AND change_id = ?",
+                params![to, workspace, change],
+            )?;
+        }
+        Ok(())
+    }
+
     pub fn delete_turn(&self, id: i64) -> rusqlite::Result<()> {
         self.db
             .execute("DELETE FROM agent_turns WHERE id = ?", [id])?;

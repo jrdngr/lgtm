@@ -14,7 +14,7 @@ use specta::Type;
 
 use crate::ctx::{RepoCtx, now_ms};
 use crate::diff::RowKind;
-use crate::jj::{FileDiff, Jj, Range};
+use crate::jj::{FileDiff, Jj, JjAction, Range};
 use crate::store::Turn;
 use crate::workspace::Workspace;
 
@@ -277,11 +277,35 @@ impl RepoCtx {
         if !paths.iter().any(|p| p == path) {
             paths.push(path.to_string());
         }
-        let lines = counts(span_diff(&ws.jj, &start, &commit, Some(&paths)).await?.iter());
+        let lines = counts(
+            span_diff(&ws.jj, &start, &commit, Some(&paths))
+                .await?
+                .iter(),
+        );
         let store = self.store.lock().unwrap();
         store.add_turn_paths(id, &paths)?;
         store.end_turn(id, &change, &commit, lines, now_ms())?;
         Ok(true)
+    }
+
+    /// Runs `action` in the workspace and returns how many jj operations it took. A squash
+    /// moves the squashed changes' turns onto the change they went into.
+    pub async fn jj_act(&self, workspace: Option<&str>, action: &JjAction) -> anyhow::Result<u32> {
+        let ws = self.workspace(workspace).await?;
+        let JjAction::Squash { revs } = action else {
+            return ws.jj.act(action).await;
+        };
+        let ids = |cs: Vec<crate::jj::Change>| cs.into_iter().map(|c| c.change_id).collect();
+        let from: Vec<String> = ids(ws.jj.changes(revs).await?);
+        let into: Vec<String> = ids(ws.jj.changes(&format!("roots({revs})-")).await?);
+        let steps = ws.jj.act(action).await?;
+        if let [into] = into.as_slice() {
+            self.store
+                .lock()
+                .unwrap()
+                .move_turns(ws.key(), &from, into)?;
+        }
+        Ok(steps)
     }
 
     /// Takes a checkpoint of the workspace's working copy.

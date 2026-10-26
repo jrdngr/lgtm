@@ -59,7 +59,8 @@ mod tests {
     use crate::jj::test_support::{jj, repo};
 
     #[tokio::test]
-    async fn nearest_bookmarks_are_the_closest_on_each_side_set_moves_one_and_create_wants_a_new_name() {
+    async fn nearest_bookmarks_are_the_closest_on_each_side_set_moves_one_and_create_wants_a_new_name()
+     {
         let (dir, j) = repo();
         let d = dir.path();
         let j = &j;

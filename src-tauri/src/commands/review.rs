@@ -136,8 +136,10 @@ pub(crate) async fn jj_act(
     workspace: Option<String>,
     action: JjAction,
 ) -> CmdResult<u32> {
-    let ws = super::workspace(&window, workspace.as_deref()).await?;
-    ws.jj.act(&action).await.map_err(err)
+    super::repo(&window)?
+        .jj_act(workspace.as_deref(), &action)
+        .await
+        .map_err(err)
 }
 
 /// The bookmarks closest to `rev` on either side, for moving one onto it.
