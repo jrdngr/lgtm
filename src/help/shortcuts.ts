@@ -35,6 +35,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⌘⇧D"], action: "Split terminal down" },
       { keys: ["⌘]", "⌘["], action: "Next / previous pane (in an editor: indent / outdent)" },
       { keys: ["⌃⇥", "⌃⇧⇥"], action: "Next / previous tab in the focused pane" },
+      { keys: ["⌘-click"], action: "Pick tabs to drag together" },
       { keys: ["⌥⇥", "⌥⇧⇥"], action: "Next / previous pane" },
       { keys: ["⇧⌘↵"], action: "Maximize the focused pane, or restore the panes" },
       { keys: ["⌘B", "⌥⌘B"], action: "Show or hide the left / right panel" },

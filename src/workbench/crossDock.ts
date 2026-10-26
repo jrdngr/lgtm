@@ -7,6 +7,7 @@ import {
 } from "dockview-react";
 import type { WorkspaceName } from "../core/workspace";
 import { isUnsaved } from "../editor/unsaved";
+import { clearPicks, pickedWith } from "./tabPick";
 
 /** Panels being closed only to reopen in the other dock. */
 const moving = new Set<IDockviewPanel>();
@@ -14,8 +15,9 @@ const moving = new Set<IDockviewPanel>();
 /** Whether `panel` left its dock for the other one, rather than being closed. */
 export const isMoving = (panel: IDockviewPanel) => moving.has(panel);
 
-/** Lets `api` take tabs dragged from `other`, the workspace's other dock. Dockview only moves
- * tabs within one dock, so a tab from the other is closed there and reopened here. Terminals
+/** Lets `api` take tabs dragged from `other`, the workspace's other dock, with the tabs picked
+ * along with the dragged one. Dockview only moves tabs within one dock, so a tab from the other
+ * is closed there and reopened here. Terminals
  * keep their shell across it; an editor with unsaved edits can't move. */
 export function takeTabsFrom(
   api: DockviewApi,
@@ -26,8 +28,9 @@ export function takeTabsFrom(
   function dragged(data: { viewId: string; groupId: string; panelId: string | null } | undefined) {
     const from = other();
     if (!data || !from || data.viewId !== from.id) return undefined;
+    const together = data.panelId ? pickedWith(data.panelId) : [];
     const panels = data.panelId
-      ? [from.getPanel(data.panelId)]
+      ? (together.length ? together : [data.panelId]).map((id) => from.getPanel(id))
       : (from.getGroup(data.groupId)?.panels ?? []);
     const all = panels.filter((p): p is IDockviewPanel => !!p);
     if (all.length === 0 || all.some((p) => isUnsaved(workspace, p.id))) return undefined;
@@ -48,6 +51,7 @@ export function takeTabsFrom(
         // The rest join the first, in the pane it went to.
         position = "center";
       }
+      clearPicks();
       // An emptied dock keeps a pane to drop tabs back into.
       if (drag.from.groups.length === 0) drag.from.addGroup();
     }),

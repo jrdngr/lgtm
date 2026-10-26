@@ -41,6 +41,7 @@ import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
 import { useMaximized } from "./maximize";
 import { Tab } from "./Tab";
+import { moveTogether } from "./tabPick";
 
 const components = {
   review: guarded(ReviewPanel),
@@ -168,6 +169,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     api.onDidRemovePanel(panes);
     api.onDidLayoutChange(save);
     takeTabsFrom(api, () => latest.current.bottom, workspace);
+    moveTogether(api);
     trackClosed(workspace, api, "main");
     registerDock(workspace, api);
   }
@@ -195,6 +197,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     });
     api.onDidLayoutChange(save);
     takeTabsFrom(api, () => latest.current.main, workspace);
+    moveTogether(api);
     trackClosed(workspace, api, "bottom");
     registerDock(workspace, api, "bottom");
   }

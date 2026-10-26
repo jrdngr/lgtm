@@ -1,5 +1,6 @@
 import { DockviewDefaultTab, type IDockviewPanelHeaderProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
+import { isMac } from "../core/keys";
 import { activate } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { confirmClose } from "../editor/unsaved";
@@ -11,6 +12,7 @@ import { Glyph } from "../workspaces/AgentGlyph";
 import { tabState, useActivity } from "../workspaces/activity";
 import { fitTabs } from "./tabFit";
 import { tabMenu } from "./tabMenu";
+import { clearPicks, togglePick, useTabPicked } from "./tabPick";
 import { setRenaming, useRenaming } from "./tabRename";
 
 // Dockview's pointer drags start on any button, and the native context menu swallows the
@@ -19,13 +21,17 @@ window.addEventListener(
   "pointerdown",
   (e) => {
     if (!(e.target instanceof Element)) return;
-    // The tab's own buttons click without moving it.
-    if (e.target.closest(".tab-rename") || (e.button !== 0 && e.target.closest(".dv-tab"))) {
+    // The tab's own buttons click without moving it, and ⌘-click picks a tab without showing
+    // or dragging it.
+    const tab = e.target.closest(".dv-tab");
+    if (e.target.closest(".tab-rename") || (tab && (e.button !== 0 || pickKey(e)))) {
       e.stopPropagation();
     }
   },
   true,
 );
+
+const pickKey = (e: MouseEvent | React.MouseEvent) => (isMac ? e.metaKey : e.ctrlKey);
 
 /** The tab's title as a text field: Enter or leaving it renames, Escape keeps the title. */
 function RenameField({ title, onDone }: { title: string; onDone(title?: string): void }) {
@@ -65,12 +71,13 @@ function RenameField({ title, onDone }: { title: string; onDone(title?: string):
 /** The default tab, except closing an editor with unsaved edits asks first. Right-click
  * selects it and opens its menu. A terminal's tab leads with a ›_, teal on the interactive
  * pin and violet on the background one, whose titles take the same colors. A tab running
- * agents shows their most urgent state before its title. */
+ * agents shows their most urgent state before its title. ⌘-click picks tabs to drag together. */
 export function Tab(props: IDockviewPanelHeaderProps) {
   const { api, containerApi } = props;
   const workspace = useWorkspace();
   const renaming = useRenaming(api.id);
   const role = useRoles(workspace)(api.id);
+  const picked = useTabPicked(api.id);
   const [title, setTitle] = useState(api.title ?? "");
   useEffect(() => {
     // A tab coming, going or retitled changes how much room its pane's titles have.
@@ -119,7 +126,12 @@ export function Tab(props: IDockviewPanelHeaderProps) {
     <DockviewDefaultTab
       {...props}
       data-send={role}
+      data-picked={picked || undefined}
       title={title}
+      onClick={(e) => {
+        if (pickKey(e)) togglePick(api.id, api.group.activePanel?.id);
+        else clearPicks();
+      }}
       closeActionOverride={close}
       onContextMenu={(e) => {
         if (!panel) return;
