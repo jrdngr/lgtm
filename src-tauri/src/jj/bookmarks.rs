@@ -59,7 +59,7 @@ mod tests {
     use crate::jj::test_support::{jj, repo};
 
     #[tokio::test]
-    async fn nearest_bookmarks_are_the_closest_on_each_side_and_set_moves_one_either_way() {
+    async fn nearest_bookmarks_are_the_closest_on_each_side_set_moves_one_and_create_wants_a_new_name() {
         let (dir, j) = repo();
         let d = dir.path();
         let j = &j;
@@ -87,5 +87,13 @@ mod tests {
             j.act(&set).await.unwrap();
             assert_eq!(j.changes(name).await.unwrap()[0].change_id, c);
         }
+
+        let create = |name: &str| JjAction::BookmarkCreate {
+            name: name.into(),
+            rev: c.clone(),
+        };
+        j.act(&create("fresh")).await.unwrap();
+        assert_eq!(j.changes("fresh").await.unwrap()[0].change_id, c);
+        assert!(j.act(&create("far")).await.is_err());
     }
 }

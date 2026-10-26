@@ -1480,6 +1480,8 @@ export type JjAction = { kind: "edit"; rev: string } |
 { kind: "rebaseOnTrunk"; rev: string } | 
 /**  Moves the closest bookmarks behind `@` up to it. */
 { kind: "bookmarkAdvance" } | 
+/**  Makes a new bookmark `name` at `rev`. Fails when `name` is taken. */
+{ kind: "bookmarkCreate"; name: string; rev: string } | 
 /**  Moves bookmark `name` to `rev`, backwards or sideways too. */
 { kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | 
 /**

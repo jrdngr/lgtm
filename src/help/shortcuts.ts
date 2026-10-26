@@ -170,6 +170,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["na", "nb"], action: "New commit after / before the cursor" },
       { keys: ["s"], action: "Squash the selection into its parent" },
       { keys: ["ba"], action: "Advance the closest bookmark to the working copy" },
+      { keys: ["bc"], action: "Create a bookmark at the cursor" },
       { keys: ["bs"], action: "Set a nearby bookmark to the cursor" },
       { keys: ["u", "U"], action: "Undo / redo" },
       { keys: ["gf", "gp"], action: "Fetch / push" },

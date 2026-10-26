@@ -402,3 +402,9 @@ button.lr-pr.on {
   flex: none;
   overflow: visible;
 }
+
+.mo-name {
+  flex: 1;
+  min-width: 0;
+  font: 12px var(--mono);
+}

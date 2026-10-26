@@ -37,6 +37,11 @@ describe("motions", () => {
       name: "feat",
       rev: "kp",
     });
+    expect(by("bc")?.action({ ...t, bookmark: "new" })).toEqual({
+      kind: "bookmarkCreate",
+      name: "new",
+      rev: "kp",
+    });
     expect(by("gr")?.label).toBe("Rebase onto main@origin");
   });
 });

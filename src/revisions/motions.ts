@@ -4,7 +4,7 @@ import type { JjAction } from "../bindings";
 export interface MotionTarget {
   cursor: string;
   picked: string;
-  /** The bookmark picked for a motion that asks for one. */
+  /** The bookmark picked or named for a motion that asks for one. */
   bookmark?: string;
 }
 
@@ -19,6 +19,8 @@ export interface Motion {
   follow?: boolean;
   /** It moves one of the bookmarks nearest the cursor, picked first when there are several. */
   pickBookmark?: boolean;
+  /** It names a new bookmark, typed first. */
+  askName?: boolean;
   /** Off `@`, it acts on `@` or the cursor's commit, picked first. */
   pickRev?: boolean;
 }
@@ -49,6 +51,12 @@ export function motions(trunk: string | null): Motion[][] {
     ],
     [
       { keys: "ba", label: "Advance bookmark", action: () => ({ kind: "bookmarkAdvance" }) },
+      {
+        keys: "bc",
+        label: "Create bookmark",
+        action: (t) => ({ kind: "bookmarkCreate", name: t.bookmark ?? "", rev: t.cursor }),
+        askName: true,
+      },
       {
         keys: "bs",
         label: "Set bookmark",
