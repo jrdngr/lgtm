@@ -1,6 +1,6 @@
 import type { DockviewApi, SerializedDockview } from "dockview-react";
 import { logger } from "../core/log";
-import { dropStalePanels } from "../core/panels";
+import { dropStalePanels, reshowActive } from "../core/panels";
 import type { Fold } from "./fold";
 
 const log = logger("layout");
@@ -34,6 +34,7 @@ export function restoreLayout(
   if (saved) {
     try {
       api.fromJSON(saved);
+      reshowActive(api);
       dropStalePanels(api);
       // Report tabs saved under their old name.
       for (const p of api.panels) if (p.title === "Reviewers") p.api.setTitle("Report");

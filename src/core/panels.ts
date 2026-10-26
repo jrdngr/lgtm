@@ -62,7 +62,7 @@ function addPanel(
   inactive = false,
 ) {
   const terminal = component === "terminal" || component === "claude";
-  return api.addPanel({
+  const panel = api.addPanel({
     id,
     component: component === "claude" ? "terminal" : component,
     title: TITLES[component],
@@ -72,6 +72,18 @@ function addPanel(
     // Terminals keep their DOM while their tab is hidden so scrollback and state survive.
     renderer: terminal ? "always" : "onlyWhenVisible",
   });
+  if (inactive) reshowActive(api);
+  return panel;
+}
+
+/** Puts back the shown tab's content that dockview takes out of its pane when it adds a tab
+ * that's always rendered behind it, as restoring a layout does. */
+export function reshowActive(api: DockviewApi) {
+  for (const g of api.groups) {
+    const p = g.activePanel;
+    if (p?.api.renderer === "onlyWhenVisible" && !p.view.content.element.isConnected)
+      g.model.openPanel(p);
+  }
 }
 
 /** Opens a terminal in the focused pane, or split beside it when `direction` is given. With `setup`, the
