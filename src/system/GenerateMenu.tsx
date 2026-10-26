@@ -19,7 +19,7 @@ export function GenerateButton(p: {
   return (
     <button
       type="button"
-      className={`pipe sys-gen${p.className ? ` ${p.className}` : ""}${p.open ? " open" : ""}`}
+      className={`pipe bg sys-gen${p.className ? ` ${p.className}` : ""}${p.open ? " open" : ""}`}
       aria-expanded={p.open}
       aria-busy={p.busy}
       disabled={p.busy}
