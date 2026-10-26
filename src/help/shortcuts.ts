@@ -148,6 +148,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Architecture",
     shortcuts: [
+      { keys: ["click", "⌘-click"], action: "Drill down / select" },
       { keys: ["/"], action: "Find a component, file or symbol" },
       { keys: ["⌘>"], action: "Ask the send target about the selection" },
       { keys: ["←", "→"], action: "Previous / next tour step" },

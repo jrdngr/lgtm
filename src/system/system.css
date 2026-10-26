@@ -1150,9 +1150,3 @@
 .sys-world .sys-node.compact .sys-nm {
   font-size: 13px;
 }
-
-/* Holding ⌘ makes the node under the pointer read as a link. */
-.sys-canvas.cmd .sys-node:not(.frame):hover .sys-nm,
-.sys-canvas.cmd .sys-node.frame .sys-hd:hover .sys-nm {
-  text-decoration: underline;
-}

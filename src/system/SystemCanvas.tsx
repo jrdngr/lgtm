@@ -83,7 +83,6 @@ type Hover = { node: string } | { edge: string };
 export function SystemCanvas(props: Props) {
   const { layout, edges, hot, hotColor, selected, selectedEdge, stale, onSelect, onOpen } = props;
   const [hover, setHover] = useState<Hover>();
-  const cmd = useCmdHeld();
   const focus = useMemo(
     () => (props.focus ? mapFocus(edges, props.focus) : undefined),
     [edges, props.focus],
@@ -163,7 +162,7 @@ export function SystemCanvas(props: Props) {
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: Escape deselects from the panel
     <div
-      className={`sys-canvas${focus ? " sys-focus" : ""}${cmd ? " cmd" : ""}${edit ? ` cv-edit${edit.panning ? " cv-pan" : ""}` : ""}`}
+      className={`sys-canvas${focus ? " sys-focus" : ""}${edit ? ` cv-edit${edit.panning ? " cv-pan" : ""}` : ""}`}
       ref={pz.ref}
       onPointerDown={(e) => {
         const onNode = (e.target as HTMLElement).closest("button, .cv-hit");
@@ -268,8 +267,8 @@ export function SystemCanvas(props: Props) {
               onClick={(ev) => {
                 ev.stopPropagation();
                 if (pz.dragged() || edit) return;
-                if (ev.metaKey || ev.ctrlKey || (focus && n.id === props.focus)) onOpen(n.id);
-                else onSelect(n.id);
+                if (ev.metaKey || ev.ctrlKey) onSelect(n.id);
+                else onOpen(n.id);
               }}
               onDoubleClick={() => onOpen(n.id)}
               onContextMenu={(ev) => {
@@ -312,22 +311,4 @@ export function SystemCanvas(props: Props) {
       </div>
     </div>
   );
-}
-
-/** Whether ⌘ is held, so the node under the pointer reads as a link. */
-function useCmdHeld() {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    const on = (e: KeyboardEvent) => setHeld(e.metaKey);
-    const off = () => setHeld(false);
-    window.addEventListener("keydown", on);
-    window.addEventListener("keyup", on);
-    window.addEventListener("blur", off);
-    return () => {
-      window.removeEventListener("keydown", on);
-      window.removeEventListener("keyup", on);
-      window.removeEventListener("blur", off);
-    };
-  }, []);
-  return held;
 }
