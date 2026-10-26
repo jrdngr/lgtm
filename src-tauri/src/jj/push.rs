@@ -26,6 +26,20 @@ pub fn remote_binding(remote: &str) -> String {
     format!("revset-aliases.remote='\"{quoted}\"'")
 }
 
+/// The bookmarks `jj git push` refused, like one on a commit with no description. jj only
+/// warns about them and exits 0.
+pub fn refusals(args: &[&str], stderr: &str) -> Option<String> {
+    if args.get(..2) != Some(&["git", "push"]) {
+        return None;
+    }
+    let lines: Vec<&str> = stderr
+        .lines()
+        .filter_map(|l| l.strip_prefix("Warning: Won't push "))
+        .map(|l| l.trim())
+        .collect();
+    (!lines.is_empty()).then(|| format!("Won't push {}", lines.join("\nWon't push ")))
+}
+
 impl Jj {
     /// The remote `jj git push` uses: `git.push`, else the only remote, else `origin`.
     async fn push_remote(&self) -> String {
@@ -146,5 +160,37 @@ mod tests {
             .output()
             .unwrap();
         assert_eq!(String::from_utf8_lossy(&heads.stdout), "feat\nmain\n");
+    }
+
+    #[tokio::test]
+    async fn a_push_jj_refuses_fails_with_why() {
+        let (dir, j) = repo();
+        let remote = tempfile::tempdir().unwrap();
+        let ok = std::process::Command::new("git")
+            .args(["init", "-q", "--bare"])
+            .arg(remote.path())
+            .status()
+            .unwrap();
+        assert!(ok.success());
+        jj(
+            dir.path(),
+            &["git", "remote", "add", "origin", remote.path().to_str().unwrap()],
+        );
+        write(dir.path(), "a", "a\n");
+        jj(dir.path(), &["commit", "-m", "a"]);
+        jj(dir.path(), &["bookmark", "create", "main", "-r", "@-"]);
+        jj(dir.path(), &["git", "push", "-b", "main"]);
+        write(dir.path(), "b", "b\n");
+        jj(dir.path(), &["new"]);
+        jj(dir.path(), &["bookmark", "set", "main", "-r", "@-"]);
+
+        let push = JjAction::Push {
+            remote: None,
+            range: None,
+            new_bookmarks: vec![],
+        };
+        let err = j.act(&push).await.unwrap_err().to_string();
+        assert!(err.starts_with("Won't push bookmark main: commit "), "{err}");
+        assert!(err.ends_with("has no description"), "{err}");
     }
 }

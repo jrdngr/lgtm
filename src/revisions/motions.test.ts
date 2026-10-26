@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { motions, narrow, step } from "./motions";
+import { motions, narrow, retitle, step, title } from "./motions";
 
 const groups = motions("main");
 
@@ -43,5 +43,13 @@ describe("motions", () => {
       rev: "kp",
     });
     expect(by("gr")?.label).toBe("Rebase onto main@origin");
+  });
+});
+
+describe("Describe's text", () => {
+  it("edits the first line and keeps the body", () => {
+    expect(title("fix\n\nbody\n")).toBe("fix");
+    expect(retitle("fix\n\nbody\n", "Fix the cache")).toBe("Fix the cache\n\nbody\n");
+    expect(retitle("", "First")).toBe("First");
   });
 });

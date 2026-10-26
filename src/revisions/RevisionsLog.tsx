@@ -18,7 +18,7 @@ import { LogGraph } from "./LogGraph";
 import { loadReview, onFocusLog, onOpenMotions } from "./loadReview";
 import { onLogRevsetChanged, publishLogRevset } from "./logRevset";
 import { MotionPopup } from "./MotionPopup";
-import { type Motion, type MotionTarget, motions, narrow, step } from "./motions";
+import { type Motion, type MotionTarget, motions, narrow, retitle, step, title } from "./motions";
 import { NamePopup } from "./NamePopup";
 import { PrPill } from "./PrPill";
 import { RevisionPopover, useRowHover } from "./RevisionPopover";
@@ -286,7 +286,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     const target = { cursor: cursorChange, picked: range };
     const at = rows?.findIndex((r) => r.commit?.workingCopy) ?? -1;
     const here = commits[cursor];
-    if (m.askName) setNaming({ motion: m, target });
+    if (m.ask) setNaming({ motion: m, target, was: rows?.[here]?.commit?.description ?? "" });
     else if (m.pickBookmark) bookmarks.start(m, target);
     else if (m.pickRev && at >= 0 && at !== here && rows) {
       const both = [at, here].sort((a, b) => a - b);
@@ -319,14 +319,18 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const hover = useRowHover();
   const bookmarks = useBookmarkPick(workspace, runOn, setError);
   const revs = useRevPick(runOn);
-  /** The motion waiting on a name typed for it. */
-  const [naming, setNaming] = useState<{ motion: Motion; target: MotionTarget }>();
+  /** The motion waiting on a name or description typed for it. `was` is the cursor commit's
+   * description. */
+  const [naming, setNaming] = useState<{ motion: Motion; target: MotionTarget; was: string }>();
 
-  function endNaming(name?: string) {
+  function endNaming(text?: string) {
     if (!naming) return;
     setNaming(undefined);
     rootRef.current?.focus();
-    if (name) runOn(naming.motion, { ...naming.target, bookmark: name });
+    if (!text) return;
+    const { motion, target, was } = naming;
+    if (motion.ask === "description") runOn(motion, { ...target, description: retitle(was, text) });
+    else runOn(motion, { ...target, bookmark: text });
   }
 
   /** Keys while the motions are open: each narrows them until one runs. Keys no motion takes,
@@ -524,7 +528,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
       )}
       {typed !== undefined && <MotionPopup groups={narrow(groups, typed)} typed={typed} />}
       {naming && (
-        <NamePopup motion={naming.motion} onName={endNaming} onCancel={() => endNaming()} />
+        <NamePopup
+          motion={naming.motion}
+          initial={naming.motion.ask === "description" ? title(naming.was) : ""}
+          onName={endNaming}
+          onCancel={() => endNaming()}
+        />
       )}
       {bookmarks.pick && <BookmarkPopup pick={bookmarks.pick} onPick={bookmarks.choose} />}
       {revs.pick && (

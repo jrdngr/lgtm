@@ -6,6 +6,8 @@ export interface MotionTarget {
   picked: string;
   /** The bookmark picked or named for a motion that asks for one. */
   bookmark?: string;
+  /** The description typed for a motion that asks for one. */
+  description?: string;
 }
 
 /** A jj action, or a checkpoint of the working copy. */
@@ -19,8 +21,8 @@ export interface Motion {
   follow?: boolean;
   /** It moves one of the bookmarks nearest the cursor, picked first when there are several. */
   pickBookmark?: boolean;
-  /** It names a new bookmark, typed first. */
-  askName?: boolean;
+  /** It takes a new bookmark's name or the cursor commit's description, typed first. */
+  ask?: "name" | "description";
   /** Off `@`, it acts on `@` or the cursor's commit, picked first. */
   pickRev?: boolean;
 }
@@ -44,6 +46,14 @@ export function motions(trunk: string | null): Motion[][] {
     ],
     [
       {
+        keys: "d",
+        label: "Describe",
+        action: (t) => ({ kind: "describe", rev: t.cursor, message: t.description ?? "" }),
+        ask: "description",
+      },
+    ],
+    [
+      {
         keys: "s",
         label: "Squash into parent",
         action: (t) => ({ kind: "squash", revs: t.picked }),
@@ -55,7 +65,7 @@ export function motions(trunk: string | null): Motion[][] {
         keys: "bc",
         label: "Create bookmark",
         action: (t) => ({ kind: "bookmarkCreate", name: t.bookmark ?? "", rev: t.cursor }),
-        askName: true,
+        ask: "name",
       },
       {
         keys: "bs",
@@ -99,4 +109,13 @@ export function step(
   const run = all.find((m) => m.keys === next);
   if (run) return { run };
   return all.some((m) => m.keys.startsWith(next)) ? { typed: next } : undefined;
+}
+
+/** A description's first line, which Describe edits. */
+export const title = (description: string) => description.split("\n", 1)[0];
+
+/** `description` with its first line made `line`, keeping the body. */
+export function retitle(description: string, line: string): string {
+  const body = description.indexOf("\n");
+  return body < 0 ? line : line + description.slice(body);
 }

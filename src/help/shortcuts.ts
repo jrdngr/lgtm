@@ -168,6 +168,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: "Motions (⌘J)",
     shortcuts: [
       { keys: ["na", "nb"], action: "New commit after / before the cursor" },
+      { keys: ["d"], action: "Describe the cursor's commit" },
       { keys: ["s"], action: "Squash the selection into its parent" },
       { keys: ["ba"], action: "Advance the closest bookmark to the working copy" },
       { keys: ["bc"], action: "Create a bookmark at the cursor" },

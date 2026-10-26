@@ -42,6 +42,11 @@ pub enum JjAction {
         name: String,
         rev: String,
     },
+    /// Sets `rev`'s description to `message`.
+    Describe {
+        rev: String,
+        message: String,
+    },
     /// Moves bookmark `name` to `rev`, backwards or sideways too.
     BookmarkSet {
         name: String,
@@ -82,6 +87,9 @@ impl JjAction {
             JjAction::BookmarkAdvance => v(&["bookmark", "advance"]),
             JjAction::BookmarkCreate { name, rev } => {
                 v(&["bookmark", "create", "-r", rev, "--", name])
+            }
+            JjAction::Describe { rev, message } => {
+                v(&["describe", "-r", rev, &format!("--message={message}")])
             }
             JjAction::BookmarkSet { name, rev } => v(&[
                 "bookmark",
@@ -144,6 +152,21 @@ mod tests {
 
     async fn change_id(j: &Jj, rev: &str) -> String {
         j.changes(rev).await.unwrap()[0].change_id.clone()
+    }
+
+    #[tokio::test]
+    async fn describe_sets_a_commits_description_even_one_that_starts_with_a_dash() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        let j = &j;
+        jj(d, &["new"]);
+        let rev = change_id(j, "@-").await;
+        let describe = JjAction::Describe {
+            rev: rev.clone(),
+            message: "-v flag".into(),
+        };
+        j.act(&describe).await.unwrap();
+        assert_eq!(j.changes(&rev).await.unwrap()[0].description, "-v flag");
     }
 
     #[tokio::test]

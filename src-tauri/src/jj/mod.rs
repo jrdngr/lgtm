@@ -250,8 +250,12 @@ impl Jj {
         }
         let report = |holders: Option<String>| self.notify(Notice::Blocked(holders));
         let out = child::run(cmd, child::Mode::Foreground(&report)).await?;
+        let refused = push::refusals(args, &out.stderr);
         let stdout = self.check(args, out)?;
         self.resume();
+        if let Some(why) = refused {
+            bail!(why);
+        }
         Ok(stdout)
     }
 

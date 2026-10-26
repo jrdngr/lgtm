@@ -1,17 +1,20 @@
 import { useState } from "react";
 import type { Motion } from "./motions";
 
-/** A name for `motion` to use, typed in place of the motions. */
+/** A name or description for `motion` to use, typed in place of the motions, starting as
+ * `initial`. */
 export function NamePopup({
   motion,
+  initial,
   onName,
   onCancel,
 }: {
   motion: Motion;
+  initial: string;
   onName: (name: string) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initial);
 
   function onKeyDown(e: React.KeyboardEvent) {
     e.stopPropagation();
@@ -38,6 +41,7 @@ export function NamePopup({
           className="mo-name"
           // biome-ignore lint/a11y/noAutofocus: the popup opens to take the name
           autoFocus
+          onFocus={(e) => e.currentTarget.select()}
           aria-label={motion.label}
           spellCheck={false}
           autoCapitalize="off"

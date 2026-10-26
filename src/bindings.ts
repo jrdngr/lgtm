@@ -1482,6 +1482,8 @@ export type JjAction = { kind: "edit"; rev: string } |
 { kind: "bookmarkAdvance" } | 
 /**  Makes a new bookmark `name` at `rev`. Fails when `name` is taken. */
 { kind: "bookmarkCreate"; name: string; rev: string } | 
+/**  Sets `rev`'s description to `message`. */
+{ kind: "describe"; rev: string; message: string } | 
 /**  Moves bookmark `name` to `rev`, backwards or sideways too. */
 { kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | 
 /**
