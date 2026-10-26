@@ -8,6 +8,7 @@ vi.mock("./CloseDialog", () => ({ askClose: vi.fn() }));
 vi.mock("../terminal/sessions", () => ({ runningPrograms: vi.fn() }));
 vi.mock("../terminal/registry", () => ({
   terminalTitle: (id: string) => (id === "term:1" ? "Fix login" : undefined),
+  roleOf: (_ws: string, id: string) => (id === "term:1" ? "background" : undefined),
 }));
 const ask = vi.mocked(askClose);
 const running = vi.mocked(runningPrograms);
@@ -21,7 +22,7 @@ beforeEach(() => {
   running.mockImplementation(async (pick) =>
     terminals
       .filter(([id, ws, p]) => p !== null && pick(id, ws))
-      .map(([panel, , p]) => ({ panel, program: p as string })),
+      .map(([panel, workspace, p]) => ({ panel, workspace, program: p as string })),
   );
   for (const ws of [null, "feature"]) {
     for (const id of ["editor:a.ts", "editor:b.ts"]) setUnsaved(ws, id, undefined);
@@ -80,7 +81,11 @@ test("a running program asks before its terminal, workspace or window goes", asy
   expect(await confirmClose(null, "term:1")).toBe(false);
   const [files, [agent]] = ask.mock.calls[0];
   expect(files).toEqual([]);
-  expect(agent).toMatchObject({ name: "Fix login", agent: { state: "working" } });
+  expect(agent).toMatchObject({
+    name: "Fix login",
+    agent: { state: "working" },
+    role: "background",
+  });
 
   ask.mockResolvedValue(true);
   expect(await confirmWorkspace("feature")).toBe(true);

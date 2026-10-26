@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { Role } from "../terminal/registry";
 import { ago } from "../ui/time";
 import type { Activity, AgentInfo } from "./activity";
 import "./workspaces.css";
@@ -88,11 +89,13 @@ interface Props {
   a: Activity;
   /** The agent's name, like its tab's title. */
   name(agent: AgentInfo): string;
+  /** The pin of the terminal it runs in, which colors its name. */
+  role(agent: AgentInfo): Role | undefined;
   onOpen(agent: AgentInfo): void;
 }
 
 /** A workspace's most urgent agent state as a 12px mark. Hovering it lists its agents. */
-export function AgentGlyph({ a, name, onOpen }: Props) {
+export function AgentGlyph({ a, name, role, onOpen }: Props) {
   const mark = useRef<HTMLSpanElement>(null);
   const [place, setPlace] = useState<{ top: number; right: number; maxWidth: number }>();
   const leave = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -130,7 +133,9 @@ export function AgentGlyph({ a, name, onOpen }: Props) {
                 }}
               >
                 <Glyph state={g.state} />
-                <span className="ws-agent-name in-terminal">{name(g)}</span>
+                <span className="ws-agent-name in-terminal" data-send={role(g)}>
+                  {name(g)}
+                </span>
                 <span className="ws-agent-ago">{since(g.since)}</span>
               </button>
             ))}

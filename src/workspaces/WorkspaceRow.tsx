@@ -1,6 +1,7 @@
 import type { WorkspaceDto } from "../bindings";
 import { workspaceKey } from "../core/workspace";
 import { usePr } from "../github/pr";
+import { useRoles } from "../terminal/registry";
 import { contextMenu } from "../ui/contextMenu";
 import { Menu } from "../ui/Menu";
 import { AgentGlyph } from "./AgentGlyph";
@@ -83,6 +84,7 @@ export function WorkspaceRow({
   const pr = usePr(w.name);
   const a = useActivity(w.name);
   const key = workspaceKey(w.name);
+  const role = useRoles(w.name);
   const pins = usePins();
   const color = pins.colors[key];
   const dot = a.state === "done" || a.state === "failed";
@@ -122,6 +124,7 @@ export function WorkspaceRow({
         <AgentGlyph
           a={a}
           name={(g) => agentName(w.name, g)}
+          role={(g) => (g.tab ? role(g.tab) : undefined)}
           onOpen={(g) => {
             onSelect();
             openAgent(w.name, g);

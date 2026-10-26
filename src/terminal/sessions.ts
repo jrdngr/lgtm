@@ -42,6 +42,8 @@ const sessions = new Map<
 /** A program running in a terminal panel's session. */
 export interface Running {
   panel: string;
+  /** Its workspace's key. */
+  workspace: string;
   program: string;
 }
 
@@ -54,7 +56,7 @@ export async function runningPrograms(
   const running = await Promise.all(
     picked.map(async ([panel, s]) => {
       const program = await s.session.running();
-      return program === null ? [] : [{ panel, program }];
+      return program === null ? [] : [{ panel, workspace: s.workspace, program }];
     }),
   );
   return running.flat();

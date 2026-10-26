@@ -1,5 +1,5 @@
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
-import { terminalTitle } from "../terminal/registry";
+import { roleOf, terminalTitle } from "../terminal/registry";
 import { type Running, runningPrograms } from "../terminal/sessions";
 import { tabAgent } from "../workspaces/activity";
 import { askClose } from "./CloseDialog";
@@ -60,9 +60,10 @@ export async function confirmAll(): Promise<boolean> {
  * program by name. */
 async function confirm(files: Unsaved[], running: Running[]): Promise<boolean> {
   if (files.length === 0 && running.length === 0) return true;
-  const programs = running.map(({ panel, program }) => {
+  const programs = running.map(({ panel, workspace, program }) => {
     const agent = tabAgent(panel);
-    return { key: panel, name: agent ? (terminalTitle(panel) ?? agent.label) : program, agent };
+    const name = agent ? (terminalTitle(panel) ?? agent.label) : program;
+    return { key: panel, name, agent, role: roleOf(workspace, panel) };
   });
   return askClose(
     files.map((f) => f.name),

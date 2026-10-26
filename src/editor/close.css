@@ -102,7 +102,12 @@
   color: #fff;
 }
 
+/* An agent's name in its terminal's pin color: violet for background, else teal. */
 .close-name.in-terminal {
+  color: var(--teal-text);
+}
+
+.close-name.in-terminal[data-send="background"] {
   color: var(--violet-text);
 }
 

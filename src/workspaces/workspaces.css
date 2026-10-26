@@ -345,7 +345,12 @@
   white-space: nowrap;
 }
 
+/* An agent's name in its terminal's pin color: violet for background, else teal. */
 .ws-agent-name.in-terminal {
+  color: var(--teal-text);
+}
+
+.ws-agent-name.in-terminal[data-send="background"] {
   color: var(--violet-text);
 }
 

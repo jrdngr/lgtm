@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { Role } from "../terminal/registry";
 import { Busy } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { Glyph, since } from "../workspaces/AgentGlyph";
@@ -12,6 +13,8 @@ export interface ProgramRow {
   key: string;
   name: string;
   agent?: AgentInfo;
+  /** The pin of its terminal, which colors an agent's name. */
+  role?: Role;
 }
 
 type FilesChoice = "open" | "saving" | "saved" | "discarded";
@@ -122,7 +125,7 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                 </h4>
               )}
               <div className="close-list">
-                {programs.map(({ key, name, agent }) => (
+                {programs.map(({ key, name, agent, role }) => (
                   <div key={key} className="close-row">
                     {agent ? (
                       <Glyph state={agent.state} />
@@ -131,7 +134,9 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                         <Icon name="terminal" size={12} />
                       </span>
                     )}
-                    <span className={`close-name${agent ? " in-terminal" : ""}`}>{name}</span>
+                    <span className={`close-name${agent ? " in-terminal" : ""}`} data-send={role}>
+                      {name}
+                    </span>
                     {agent && <span className="close-ago">{since(agent.since)}</span>}
                   </div>
                 ))}
