@@ -32,3 +32,48 @@
   outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
+
+/* VS Code's color for what git ignores. */
+.file-tree .ignored .name {
+  color: #8c8c8c;
+}
+
+.tree-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-right: 8px;
+}
+
+.tree-name .chevron {
+  line-height: 22px;
+}
+
+.tree-name-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-name input {
+  width: 100%;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  background: var(--bg);
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.tree-name input.invalid {
+  border-color: var(--error);
+}
+
+.tree-name-error {
+  padding: 2px 4px;
+  border: 1px solid var(--error);
+  border-top: none;
+  color: var(--error);
+  white-space: pre-wrap;
+}

@@ -1292,6 +1292,8 @@ export type FileEntry = {
 	/**  Relative to the workspace root, `/`-separated. */
 	path: string,
 	dir: boolean,
+	/**  The repo ignores it. */
+	ignored: boolean,
 };
 
 export type FileRefDto = {

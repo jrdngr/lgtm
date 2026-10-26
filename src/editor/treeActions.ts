@@ -4,7 +4,7 @@ import { activate } from "../core/panels";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { run } from "../services/pathMenu";
-import { confirmAction, promptText } from "../ui/prompt";
+import { confirmAction } from "../ui/prompt";
 import { baseName, type EditorParams, editorId, openFile } from "./open";
 import { isUnsaved } from "./unsaved";
 
@@ -58,36 +58,31 @@ function closeEditors(ws: WorkspaceName, path: string): boolean {
   return open.some((p) => p.id === editorId(path));
 }
 
-const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
+export const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
 
-/** Asks for a path in `dir` and makes an empty file or folder there. A file opens in the
- * editor. Calls `made` with the new path. */
-export function create(ws: WorkspaceName, dir: string, folder: boolean, made: (p: string) => void) {
-  run(
-    (async () => {
-      const path = await promptText(folder ? "New Folder" : "New File", {
-        value: dir ? `${dir}/` : "",
-        action: "Create",
-      });
-      if (!path) return;
-      await unwrap(commands.createPath(ws, path, folder));
-      made(path);
-      if (!folder) openFile(ws, path);
-    })(),
-  );
+/** Makes an empty file or folder at `path`. A file opens in the editor. */
+export async function create(
+  ws: WorkspaceName,
+  path: string,
+  folder: boolean,
+  made: (p: string) => void,
+) {
+  await unwrap(commands.createPath(ws, path, folder));
+  made(path);
+  if (!folder) openFile(ws, path);
 }
 
-/** Asks for a new path for `path` and moves it there. A file's open editor follows it. */
-export function rename(ws: WorkspaceName, path: string, made: (p: string) => void) {
-  run(
-    (async () => {
-      const to = await promptText(`Rename ${baseName(path)}`, { value: path, action: "Rename" });
-      if (!to || to === path || !(await noUnsaved(ws, path, "rename"))) return;
-      await unwrap(commands.renamePath(ws, path, to));
-      made(to);
-      if (closeEditors(ws, path)) openFile(ws, to);
-    })(),
-  );
+/** Moves `path` to `to`. A file's open editor follows it. */
+export async function rename(
+  ws: WorkspaceName,
+  path: string,
+  to: string,
+  made: (p: string) => void,
+) {
+  if (to === path || !(await noUnsaved(ws, path, "rename"))) return;
+  await unwrap(commands.renamePath(ws, path, to));
+  made(to);
+  if (closeEditors(ws, path)) openFile(ws, to);
 }
 
 /** Moves `path` into folder `dir`, keeping its name. A file's open editor follows it. */

@@ -16,6 +16,8 @@ pub struct FileEntry {
     /// Relative to the workspace root, `/`-separated.
     pub path: String,
     pub dir: bool,
+    /// The repo ignores it.
+    pub ignored: bool,
 }
 
 /// `rel` under `root`, refusing paths that leave it or reach into `.jj` or `.git`.
@@ -44,7 +46,7 @@ pub fn workspace_file(root: &Path, path: &str) -> Option<String> {
     (abs.is_file() && contain(root, &abs).is_ok()).then_some(rel)
 }
 
-/// The entries of directory `dir` (empty for the root), directories first, skipping what
+/// The entries of directory `dir` (empty for the root), directories first, marking what
 /// `.gitignore` files in the workspace ignore. Ignore files above the root don't count, so a
 /// workspace inside its repo's ignored `.workspaces/` still lists. The walk starts at the root
 /// and follows only the way to `dir`, so ignore files between the two still apply.
@@ -54,14 +56,44 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
     } else {
         resolve(root, dir)?
     };
-    let depth = Path::new(dir).components().count() + 1;
-    let target = path.clone();
+    let kept: std::collections::HashSet<PathBuf> = children(root, &path, true).collect();
+    let mut out = Vec::new();
+    for entry in children(root, &path, false) {
+        let Ok(rel) = entry.strip_prefix(root) else {
+            continue;
+        };
+        out.push(FileEntry {
+            name: entry
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned(),
+            path: rel.to_string_lossy().replace('\\', "/"),
+            // Follows symlinks, so a link to a directory opens like one.
+            dir: entry.is_dir(),
+            ignored: !kept.contains(&entry),
+        });
+    }
+    out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.cmp(&b.name)));
+    Ok(out)
+}
+
+/// What's in `path` under `root`, without `.jj`, `.git` or links out of `root`, and with
+/// `ignore` also without what the repo ignores.
+fn children(root: &Path, path: &Path, ignore: bool) -> impl Iterator<Item = PathBuf> {
+    let depth = path.strip_prefix(root).map_or(0, |p| p.components().count()) + 1;
+    let target = path.to_path_buf();
     let real_root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
-    let walk = ignore::WalkBuilder::new(root)
+    let parent = path.to_path_buf();
+    ignore::WalkBuilder::new(root)
         .max_depth(Some(depth))
         .hidden(false)
         .parents(false)
         .require_git(false)
+        .ignore(ignore)
+        .git_ignore(ignore)
+        .git_exclude(ignore)
+        .git_global(ignore)
         .follow_links(true)
         .filter_entry(move |e| {
             let p = e.path();
@@ -70,24 +102,10 @@ pub fn list(root: &Path, dir: &str) -> anyhow::Result<Vec<FileEntry>> {
                 && (target.starts_with(p) || p.parent() == Some(target.as_path()))
                 && !(e.path_is_symlink() && leaves(&real_root, p))
         })
-        .build();
-    let mut out = Vec::new();
-    for entry in walk.flatten() {
-        if entry.path().parent() != Some(path.as_path()) {
-            continue;
-        }
-        let Ok(rel) = entry.path().strip_prefix(root) else {
-            continue;
-        };
-        out.push(FileEntry {
-            name: entry.file_name().to_string_lossy().into_owned(),
-            path: rel.to_string_lossy().replace('\\', "/"),
-            // Follows symlinks, so a link to a directory opens like one.
-            dir: entry.path().is_dir(),
-        });
-    }
-    out.sort_by(|a, b| b.dir.cmp(&a.dir).then_with(|| a.name.cmp(&b.name)));
-    Ok(out)
+        .build()
+        .flatten()
+        .filter(move |e| e.path().parent() == Some(parent.as_path()))
+        .map(|e| e.into_path())
 }
 
 /// Whether `path` resolves outside `root`, which must be canonical. A dangling link doesn't.
@@ -250,7 +268,7 @@ mod tests {
     }
 
     #[test]
-    fn lists_directories_first_without_ignored_files_or_jj() {
+    fn lists_directories_first_marking_ignored_files_without_jj() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         for d in [".jj/repo", "src", "target"] {
@@ -266,8 +284,18 @@ mod tests {
                 .map(|e| e.path)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(names(""), ["src", ".gitignore", "b.txt"]);
+        let ignored = |dir| {
+            list(&root, dir)
+                .unwrap()
+                .into_iter()
+                .filter(|e| e.ignored)
+                .map(|e| e.path)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(names(""), ["src", "target", ".gitignore", "a.log", "b.txt"]);
         assert_eq!(names("src"), ["src/main.rs"]);
+        assert_eq!(ignored(""), ["target", "a.log"]);
+        assert_eq!(ignored("target"), ["target/x"]);
     }
 
     #[test]
@@ -288,8 +316,17 @@ mod tests {
                 .map(|e| e.path)
                 .collect::<Vec<_>>()
         };
+        let ignored = |dir| {
+            list(&root, dir)
+                .unwrap()
+                .into_iter()
+                .filter(|e| e.ignored)
+                .map(|e| e.path)
+                .collect::<Vec<_>>()
+        };
         assert_eq!(names(""), ["src", ".gitignore"]);
-        assert_eq!(names("src"), ["src/main.rs"]);
+        assert_eq!(ignored(""), [] as [&str; 0]);
+        assert_eq!(ignored("src"), ["src/debug.log"]);
     }
 
     #[cfg(unix)]

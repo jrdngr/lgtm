@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FileEntry } from "../bindings";
 import { onRevealInFiles } from "../core/reveal";
 import { useSavedSet } from "../core/savedState";
@@ -13,7 +13,8 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
 import { openFile } from "./open";
-import { create, foldersOf, openToSide, rename, trash } from "./treeActions";
+import { type Naming, TreeName } from "./TreeName";
+import { create, folderOf, foldersOf, openToSide, rename, trash } from "./treeActions";
 import { useTreeDrag } from "./useTreeDrag";
 import "../review/FilesPanel.css";
 import "./tree.css";
@@ -70,6 +71,10 @@ interface DirProps {
   menu(entry: FileEntry): CtxEntry[];
   /** The folder files dragged over the tree would land in. */
   dropDir?: string;
+  naming?: Naming;
+  /** Takes the name typed for `naming`; throws to keep asking. */
+  onNamed(name: string): Promise<void>;
+  onNameCancel(): void;
 }
 
 /** A name colored by how the review changes it, with the change's letter or, for a folder,
@@ -84,7 +89,8 @@ function Name({ name, decor, dir }: { name: string; decor?: Decor; dir?: boolean
   );
 }
 
-function Dir({ dir, depth, listings, open, onToggle, decor, menu, dropDir }: DirProps) {
+function Dir(props: DirProps) {
+  const { dir, depth, listings, open, onToggle, decor, menu, dropDir, naming } = props;
   const listing = listings.get(dir);
   const pad = { paddingLeft: indent(depth) };
   const workspace = useWorkspace();
@@ -100,52 +106,71 @@ function Dir({ dir, depth, listings, open, onToggle, decor, menu, dropDir }: Dir
         {listing.error}
       </div>
     );
+  const field = (initial: string, folder: boolean) => (
+    <TreeName
+      initial={initial}
+      folder={folder}
+      pad={pad}
+      onDone={props.onNamed}
+      onCancel={props.onNameCancel}
+    />
+  );
+  const draft = naming?.kind === "new" && naming.dir === dir ? naming : undefined;
+  const firstFile = listing.findIndex((e) => !e.dir);
+  const draftAt = !draft ? -1 : draft.folder ? 0 : firstFile < 0 ? listing.length : firstFile;
+  const draftRow = draft && <li key="naming">{field("", draft.folder)}</li>;
+  const renaming = (e: FileEntry) => naming?.kind === "rename" && naming.path === e.path;
   return (
     <ul style={depth > 0 ? guideAt(depth) : undefined}>
-      {listing.map((e) => (
-        <li key={e.path}>
-          {e.dir ? (
-            <>
+      {listing.map((e, i) => (
+        <Fragment key={e.path}>
+          {i === draftAt && draftRow}
+          <li>
+            {e.dir ? (
+              <>
+                {renaming(e) ? (
+                  field(e.name, true)
+                ) : (
+                  <button
+                    type="button"
+                    style={pad}
+                    className={`dir${e.ignored ? " ignored" : ""}${dropDir === e.path ? " drop-target" : ""}`}
+                    data-path={e.path}
+                    data-dir
+                    onClick={() => onToggle(e.path)}
+                    onContextMenu={contextMenu(() => menu(e))}
+                  >
+                    <span className="chevron">{open.has(e.path) ? "▾" : "▸"}</span>
+                    <Name name={e.name} decor={decor.byDir.get(e.path)} dir />
+                  </button>
+                )}
+                {open.has(e.path) && <Dir {...props} dir={e.path} depth={depth + 1} />}
+              </>
+            ) : renaming(e) ? (
+              field(e.name, false)
+            ) : (
               <button
                 type="button"
                 style={pad}
-                className={`dir${dropDir === e.path ? " drop-target" : ""}`}
+                title={e.path}
+                className={e.ignored ? "ignored" : undefined}
                 data-path={e.path}
-                data-dir
-                onClick={() => onToggle(e.path)}
+                onClick={() => openFile(workspace, e.path)}
                 onContextMenu={contextMenu(() => menu(e))}
               >
-                <span className="chevron">{open.has(e.path) ? "▾" : "▸"}</span>
-                <Name name={e.name} decor={decor.byDir.get(e.path)} dir />
+                <span className="chevron" />
+                <Name name={e.name} decor={decor.byFile.get(e.path)} />
               </button>
-              {open.has(e.path) && (
-                <Dir
-                  dir={e.path}
-                  depth={depth + 1}
-                  {...{ listings, open, onToggle, decor, menu, dropDir }}
-                />
-              )}
-            </>
-          ) : (
-            <button
-              type="button"
-              style={pad}
-              title={e.path}
-              data-path={e.path}
-              onClick={() => openFile(workspace, e.path)}
-              onContextMenu={contextMenu(() => menu(e))}
-            >
-              <span className="chevron" />
-              <Name name={e.name} decor={decor.byFile.get(e.path)} />
-            </button>
-          )}
-        </li>
+            )}
+          </li>
+        </Fragment>
       ))}
+      {draftAt === listing.length && draftRow}
     </ul>
   );
 }
 
-/** The workspace's working copy as a tree, without ignored files, colored by how the current
+/** The workspace's working copy as a tree, ignored files grayed, colored by how the current
  * review changes it. Click a file to edit it.
  * Keyed by workspace, so a switch starts fresh. */
 export function RepoTree() {
@@ -182,15 +207,30 @@ export function RepoTree() {
     reload();
   };
   const { dropDir, dragProps } = useTreeDrag(workspace, madeAt);
+  const [naming, setNaming] = useState<Naming>();
+  /** Names a new entry in `dir`, in place. */
+  const startNew = (dir: string, folder: boolean) => {
+    setOpen((o) => new Set([...o, ...foldersOf(dir), ...(dir ? [dir] : [])]));
+    setNaming({ kind: "new", dir, folder });
+  };
+  const onNamed = async (name: string) => {
+    if (!naming) return;
+    if (naming.kind === "new") {
+      const path = naming.dir ? `${naming.dir}/${name}` : name;
+      await create(workspace, path, naming.folder, madeAt);
+    } else {
+      const dir = folderOf(naming.path);
+      await rename(workspace, naming.path, dir ? `${dir}/${name}` : name, madeAt);
+    }
+    setNaming(undefined);
+  };
   const menu = (e: FileEntry): CtxEntry[] => {
     const p = e.path;
+    const at = e.dir ? p : folderOf(p);
     const edits: CtxEntry[] = [
-      {
-        label: "New File…",
-        onSelect: () => create(workspace, e.dir ? p : (foldersOf(p).at(-1) ?? ""), false, madeAt),
-      },
-      e.dir && { label: "New Folder…", onSelect: () => create(workspace, p, true, madeAt) },
-      { label: "Rename…", onSelect: () => rename(workspace, p, madeAt) },
+      { label: "New File…", onSelect: () => startNew(at, false) },
+      { label: "New Folder…", onSelect: () => startNew(at, true) },
+      { label: "Rename…", onSelect: () => setNaming({ kind: "rename", path: p, folder: e.dir }) },
       { label: "Move to Trash…", onSelect: () => trash(workspace, p, reload) },
     ];
     if (e.dir) {
@@ -216,8 +256,8 @@ export function RepoTree() {
     ];
   };
   const rootMenu = (): CtxEntry[] => [
-    { label: "New File…", onSelect: () => create(workspace, "", false, madeAt) },
-    { label: "New Folder…", onSelect: () => create(workspace, "", true, madeAt) },
+    { label: "New File…", onSelect: () => startNew("", false) },
+    { label: "New Folder…", onSelect: () => startNew("", true) },
     "-",
     { label: "Collapse All", onSelect: () => setOpen(new Set()), disabled: open.size === 0 },
   ];
@@ -239,6 +279,9 @@ export function RepoTree() {
           decor={decor}
           menu={menu}
           dropDir={dropDir}
+          naming={naming}
+          onNamed={onNamed}
+          onNameCancel={() => setNaming(undefined)}
         />
       </div>
     </div>
