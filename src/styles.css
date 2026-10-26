@@ -684,11 +684,12 @@ kbd {
   gap: 8px;
 }
 
+/* Sized in whole pixels: at a fractional size WebKit draws the colored arc off the ring. */
 .spinner {
   flex: none;
   display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
+  width: round(0.9em, 1px);
+  height: round(0.9em, 1px);
   box-sizing: border-box;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
