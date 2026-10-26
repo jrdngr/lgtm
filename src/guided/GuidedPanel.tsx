@@ -6,7 +6,6 @@ import { commands, unwrap } from "../ipc";
 import { type CurrentReview, useCurrentReview } from "../review/current";
 import { Diffstat } from "../review/Diffstat";
 import { sumStats } from "../review/lineStat";
-import { type MarkSetup, useMarkSetup } from "../review/marks";
 import { useSendText } from "../review/useSendText";
 import { run } from "../services/pathMenu";
 import { PipeButton } from "../terminal/PipeButton";
@@ -84,8 +83,8 @@ function Row({ pick, picked, onPick, menu, className, children }: RowProps) {
   );
 }
 
-function chunkMenu(review: CurrentReview, setup: MarkSetup, states: ChunkState[]): CtxEntry[] {
-  const give = (v: Parameters<typeof giveVerdict>[3]) => run(giveVerdict(review, setup, states, v));
+function chunkMenu(review: CurrentReview, states: ChunkState[]): CtxEntry[] {
+  const give = (v: Parameters<typeof giveVerdict>[2]) => run(giveVerdict(review, states, v));
   return [
     { label: states.length > 1 ? "Approve All" : "Approve", onSelect: () => give("approved") },
     { label: states.length > 1 ? "Skip All" : "Skip", onSelect: () => give("skipped") },
@@ -98,7 +97,6 @@ function chunkMenu(review: CurrentReview, setup: MarkSetup, states: ChunkState[]
 export function GuidedPanel() {
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
-  const setup = useMarkSetup();
   const { g, error, view } = useGuidedView(review);
   const picked = usePick(workspace);
   const [sendError, setSendError] = useState<string>();
@@ -155,7 +153,7 @@ export function GuidedPanel() {
         pick={{ kind: "chunk", id: s.chunk.id }}
         picked={picked}
         onPick={pick}
-        menu={() => chunkMenu(review, setup, [s])}
+        menu={() => chunkMenu(review, [s])}
         className={s.verdict?.verdict === "skipped" && !s.changed ? "skipped" : undefined}
       >
         <VerdictMark s={s} />
@@ -187,7 +185,7 @@ export function GuidedPanel() {
           }
           shut={isShut(risk)}
           onToggle={() => toggle(risk)}
-          onContextMenu={contextMenu(() => chunkMenu(review, setup, states))}
+          onContextMenu={contextMenu(() => chunkMenu(review, states))}
         />
         {open(risk) && states.map(chunkRow)}
       </div>

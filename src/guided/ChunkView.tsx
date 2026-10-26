@@ -165,7 +165,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
   };
   const fail = (e: unknown) => setError(String(e));
   const approve = () => {
-    giveVerdict(review, setup, [s], "approved").then(advance, fail);
+    giveVerdict(review, [s], "approved").then(advance, fail);
   };
   const ask = () => send(askText(s));
   const change = () => setNoting(noting ?? "");
@@ -175,7 +175,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
     submitNextSend();
     send(changeText(s, note));
     setNoting(undefined);
-    giveVerdict(review, setup, [s], "change", note).then(advance, fail);
+    giveVerdict(review, [s], "change", note).then(advance, fail);
   }
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;

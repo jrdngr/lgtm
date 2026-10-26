@@ -75,8 +75,8 @@ export function segmentsOf(files: FlatFile[], ranges: GuidedRange[]): Segment[] 
   return out;
 }
 
-/** The changed rows of `segments`, those a verdict marks. */
-export function changedRows(files: FlatFile[], segments: Segment[]) {
+/** The changed rows of `segments`. */
+function changedRows(files: FlatFile[], segments: Segment[]) {
   return segments.flatMap((s) =>
     s.rows
       .filter((r) => files[s.file].rows[r].kind !== "context")
