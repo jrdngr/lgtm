@@ -29,19 +29,22 @@ fn frame(msg: &Value) -> Vec<u8> {
     format!("Content-Length: {}\r\n\r\n{body}", body.len()).into_bytes()
 }
 
-/// What lgtm answers a server's own request with: an empty setting for each asked, else null.
-fn answer(method: &str, params: &Value) -> Value {
+/// What lgtm answers a server's own request with: each setting section asked for from
+/// `settings`, null for those it lacks, else null.
+fn answer(method: &str, params: &Value, settings: &Value) -> Value {
     match method {
         "workspace/configuration" => {
-            let n = params["items"].as_array().map_or(0, Vec::len);
-            Value::Array(vec![Value::Null; n])
+            let items = params["items"].as_array().map_or(&[][..], Vec::as_slice);
+            let section = |i: &Value| i["section"].as_str().and_then(|s| settings.get(s)).cloned();
+            Value::Array(items.iter().map(|i| section(i).unwrap_or(Value::Null)).collect())
         }
         _ => Value::Null,
     }
 }
 
 impl Rpc {
-    pub fn spawn(program: &Path, args: &[&str], cwd: &Path) -> anyhow::Result<Self> {
+    /// Starts `program`, which gets `settings`, by section, when it asks for its configuration.
+    pub fn spawn(program: &Path, args: &[&str], cwd: &Path, settings: Value) -> anyhow::Result<Self> {
         let mut child = Command::new(program)
             .args(args)
             .current_dir(cwd)
@@ -69,7 +72,7 @@ impl Rpc {
             while let Ok(Some(msg)) = read(&mut r).await {
                 if let Some(method) = msg["method"].as_str() {
                     if !msg["id"].is_null() {
-                        let reply = json!({"jsonrpc": "2.0", "id": msg["id"], "result": answer(method, &msg["params"])});
+                        let reply = json!({"jsonrpc": "2.0", "id": msg["id"], "result": answer(method, &msg["params"], &settings)});
                         o.send(frame(&reply)).ok();
                     }
                     continue;
@@ -146,6 +149,16 @@ async fn read<R: tokio::io::AsyncBufRead + Unpin>(r: &mut R) -> anyhow::Result<O
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn configuration_requests_get_the_sections_lgtm_has() {
+        let settings = json!({"python": {"pythonPath": "/r/.venv/bin/python"}});
+        let params = json!({"items": [{"section": "python"}, {"section": "python.analysis"}, {}]});
+        assert_eq!(
+            answer("workspace/configuration", &params, &settings),
+            json!([{"pythonPath": "/r/.venv/bin/python"}, null, null])
+        );
+    }
 
     #[tokio::test]
     async fn reads_framed_messages_one_after_another() {

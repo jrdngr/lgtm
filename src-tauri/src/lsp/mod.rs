@@ -95,6 +95,22 @@ const START: Duration = Duration::from_secs(30);
 const DEFINITION: Duration = Duration::from_secs(15);
 const HOVER: Duration = Duration::from_secs(5);
 
+/// What a server of `kind` gets when it asks for settings: for Python, the interpreter of the
+/// root's virtualenv, so imports of its libraries resolve.
+fn settings(root: &Path, kind: &Kind) -> Value {
+    if kind.name != "python" {
+        return json!({});
+    }
+    let venv = [".venv", "venv"]
+        .iter()
+        .map(|d| root.join(d).join("bin/python"))
+        .find(|p| p.exists());
+    match venv {
+        Some(p) => json!({"python": {"pythonPath": p}}),
+        None => json!({}),
+    }
+}
+
 /// The running server of `kind` for `root`, started when there's none. `None` when none of the
 /// kind's commands is on PATH.
 async fn server(root: &Path, kind: &'static Kind) -> anyhow::Result<Option<Arc<Server>>> {
@@ -112,7 +128,7 @@ async fn server(root: &Path, kind: &'static Kind) -> anyhow::Result<Option<Arc<S
     else {
         return Ok(None);
     };
-    let rpc = Rpc::spawn(&program, args, root)?;
+    let rpc = Rpc::spawn(&program, args, root, settings(root, kind))?;
     let root_uri = uri::of(root);
     let name = root.file_name().map(|n| n.to_string_lossy().into_owned());
     let params = json!({

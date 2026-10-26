@@ -64,3 +64,34 @@ async fn a_file_no_server_takes_gets_none() {
     std::fs::write(&f, "# hi\n").unwrap();
     assert_eq!(definition(at(dir.path(), &f, 0, 2)).await.unwrap(), None);
 }
+
+#[tokio::test]
+async fn library_symbols_resolve_through_the_roots_virtualenv() {
+    if !pyright() {
+        return;
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().canonicalize().unwrap();
+    let made = std::process::Command::new("python3")
+        .args(["-m", "venv", "--without-pip", ".venv"])
+        .current_dir(&root)
+        .status();
+    if !made.is_ok_and(|s| s.success()) {
+        eprintln!("no python3 venv; skipped");
+        return;
+    }
+    let site = std::fs::read_dir(root.join(".venv/lib"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path()
+        .join("site-packages/onlyinvenv");
+    std::fs::create_dir_all(&site).unwrap();
+    std::fs::write(site.join("__init__.py"), "def hi() -> int:\n    return 1\n").unwrap();
+    let b = root.join("b.py");
+    std::fs::write(&b, "import onlyinvenv\nonlyinvenv.hi()\n").unwrap();
+
+    let defs = definition(at(&root, &b, 1, 12)).await.unwrap().unwrap();
+    assert_eq!(defs[0].path, format!("{}/onlyinvenv/__init__.py", site.parent().unwrap().strip_prefix(&root).unwrap().display()));
+}
