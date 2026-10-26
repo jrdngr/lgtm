@@ -8,6 +8,7 @@ import { FindBar, stepKey } from "../find/FindBar";
 import { useCmFind } from "../find/useCmFind";
 import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
+import { ReviewedCheck } from "../review/ReviewedCheck";
 import { useSendText } from "../review/useSendText";
 import { registerEditor } from "../search/lsp";
 import { showInfos } from "../symbolInfo/editorInfo";
@@ -329,6 +330,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     <div className="editor-panel" onKeyDown={onKeyDown}>
       {!html && (
         <div className="editor-path">
+          <ReviewedCheck workspace={workspace} path={path} />
           <span className="path" title={path}>
             {path}
           </span>

@@ -67,13 +67,15 @@
   color: var(--muted);
 }
 
-.file-header input[type="checkbox"] {
+.file-header input[type="checkbox"],
+input.reviewed-check {
   margin: 0;
   accent-color: var(--reviewed);
   border-radius: 3px;
 }
 
-.file-header input.ring {
+.file-header input.ring,
+input.reviewed-check.ring {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }

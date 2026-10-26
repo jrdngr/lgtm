@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
@@ -12,7 +12,8 @@ import { STATUS_LABEL } from "./FileHeader";
 import { type LineStat, lineStat, sumStats } from "./lineStat";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
-import { filterLabel, matchesFilter, type Progress, progressTitle } from "./state";
+import { ProgressCard } from "./ProgressCard";
+import { filterLabel, matchesFilter, type Progress, progressParts, progressTitle } from "./state";
 import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
 import { useSendFromMenu } from "./useSendText";
 import "./FilesPanel.css";
@@ -115,6 +116,25 @@ function Node({
   );
 }
 
+/** The share done as a ring, which shows the review's progress card on hover. */
+function HeaderProgress({ p, setup }: { p: Progress; setup: MarkSetup }) {
+  const [at, setAt] = useState<{ top: number; right: number }>();
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hovering only shows counts
+    <span
+      className="changes-progress"
+      onMouseEnter={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        setAt({ top: r.bottom + 8, right: Math.max(8, window.innerWidth - r.right) });
+      }}
+      onMouseLeave={() => setAt(undefined)}
+    >
+      <Ring done={p.done === p.changed ? 1 : Math.min(p.done / p.changed, 0.99)} percent />
+      {at && <ProgressCard p={p} parts={progressParts(p, setup)} at={at} />}
+    </span>
+  );
+}
+
 /** The current review's files as a tree with per-file progress, and per-folder counts on
  * hover. It follows the review pane's line filter. Click a file to jump to it. */
 export function FilesPanel() {
@@ -156,13 +176,7 @@ export function FilesPanel() {
           <>
             <Diffstat stat={total} />
             {p.changed > 0 && review.filter !== "all" && <span>{filter}</span>}
-            {p.changed > 0 && (
-              <Ring
-                done={p.done === p.changed ? 1 : Math.min(p.done / p.changed, 0.99)}
-                title={progressTitle(p, setup)}
-                percent
-              />
-            )}
+            {p.changed > 0 && <HeaderProgress p={p} setup={setup} />}
           </>
         }
       >
