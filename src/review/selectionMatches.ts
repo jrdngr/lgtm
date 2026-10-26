@@ -1,4 +1,4 @@
-import { type RefObject, useEffect } from "react";
+import { type RefObject, useEffect, useState } from "react";
 
 const NAME = "lgtm-match";
 const WORD = /^[\w$]+$/;
@@ -59,8 +59,9 @@ function rangesIn(code: Element, needle: string): Range[] {
 }
 
 /** Highlights every match of the selected code text across the code rendered in `rootRef`,
- * redrawing as rows scroll in. */
-export function useSelectionMatches(rootRef: RefObject<HTMLElement | null>) {
+ * redrawing as rows scroll in. Returns the text it looks for. */
+export function useSelectionMatches(rootRef: RefObject<HTMLElement | null>): string | undefined {
+  const [shown, setShown] = useState<string>();
   useEffect(() => {
     const root = rootRef.current;
     if (!root || typeof CSS === "undefined" || !("highlights" in CSS)) return;
@@ -83,6 +84,7 @@ export function useSelectionMatches(rootRef: RefObject<HTMLElement | null>) {
       const next = selectedNeedle(root);
       if (next === needle) return;
       needle = next;
+      setShown(next);
       schedule();
     };
     const rows = new MutationObserver(() => needle && schedule());
@@ -95,4 +97,5 @@ export function useSelectionMatches(rootRef: RefObject<HTMLElement | null>) {
       CSS.highlights.delete(NAME);
     };
   }, [rootRef]);
+  return shown;
 }

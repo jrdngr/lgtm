@@ -4,6 +4,7 @@ import { wordWrap } from "../workbench/wordWrap";
 import { Cell } from "./Cell";
 import { ContextRow, MoreBar } from "./ContextRows";
 import { FileHeader } from "./FileHeader";
+import { MatchRuler, matchedLines } from "./MatchRuler";
 import type { MarkSetup } from "./marks";
 import { type DisplayLine, type FlatFile, hunkKey, type Region, type ViewMode } from "./model";
 import { SplitScroll } from "./SplitScroll";
@@ -115,7 +116,11 @@ function stickyFile(
 export function DiffLines(props: Props) {
   const { files, lines, mode, index, selection, cursor, scrollRef, scrollTo } = props;
   const wrap = wordWrap.use();
-  useSelectionMatches(scrollRef);
+  const needle = useSelectionMatches(scrollRef);
+  const matched = useMemo(
+    () => (needle ? matchedLines(files, lines, needle) : []),
+    [files, lines, needle],
+  );
   // Split sides scroll sideways on their own, under `SplitScroll`.
   const splitScroll = mode === "split" && !wrap;
   const width = useMemo(
@@ -164,6 +169,7 @@ export function DiffLines(props: Props) {
   }, [scrollTo, virtualizer]);
 
   const sticky = stickyFile(lines, virtualizer);
+  const measured = virtualizer.measurementsCache;
 
   const header = (fileIdx: number) => {
     const file = files[fileIdx];
@@ -274,6 +280,13 @@ export function DiffLines(props: Props) {
 
   return (
     <>
+      {matched.length > 0 && (
+        <MatchRuler
+          starts={matched.map((i) => measured[i]?.start ?? 0)}
+          total={virtualizer.getTotalSize()}
+          scrollRef={scrollRef}
+        />
+      )}
       <div
         ref={scrollRef}
         className={`diff-scroll${wrap ? " wrap" : ""}${splitScroll ? " split" : ""}`}

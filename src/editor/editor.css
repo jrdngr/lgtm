@@ -320,6 +320,6 @@
   cursor: pointer;
 }
 
-.cm-has-ruler .cm-diff-ruler {
+.cm-ruler-on .cm-diff-ruler {
   display: block;
 }

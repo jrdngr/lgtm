@@ -271,3 +271,20 @@
   flex: none;
   color: var(--error);
 }
+
+/* Over the diff's right edge, below the anchor that sits just above it. */
+.match-ruler-anchor {
+  position: relative;
+  height: 0;
+}
+
+.match-ruler {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  z-index: 4;
+  background: #1b1b1b;
+  border-left: 1px solid var(--hair);
+  cursor: pointer;
+}
