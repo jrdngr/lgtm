@@ -152,6 +152,9 @@ impl<'a> Resolver<'a> {
             .find(|c| self.has(c) && super::extract::is_source(c))
     }
 
+    /// An absolute import resolves in the first of the importer's own roots, deepest first,
+    /// that has its top-level package, as Python would. With none, it resolves in another root
+    /// only when exactly one other root has that package.
     fn py(&self, from: &str, level: u32, module: &[String], names: &[String]) -> Vec<String> {
         if level > 0 {
             let mut dir = dir_of(from).to_string();
@@ -160,14 +163,35 @@ impl<'a> Resolver<'a> {
             }
             return self.py_in(&dir, module, names);
         }
-        self.py_roots
-            .iter()
-            .map(|r| self.py_in(r, module, names))
-            .find(|found| !found.is_empty())
-            .unwrap_or_default()
+        let Some(top) = module.first() else {
+            return vec![];
+        };
+        let (mut own, other): (Vec<&String>, Vec<&String>) =
+            self.py_roots.iter().partition(|r| under(from, r));
+        own.sort_by_key(|r| std::cmp::Reverse(r.len()));
+        if let Some(r) = own.into_iter().find(|r| self.has_py_pkg(r, top)) {
+            return self.py_in(r, module, names);
+        }
+        match other.iter().filter(|r| self.has_py_pkg(r, top)).collect::<Vec<_>>()[..] {
+            [r] => self.py_in(r, module, names),
+            _ => vec![],
+        }
     }
 
-    /// The deepest module of `module` under `dir`, or the submodules `names` of it.
+    /// Whether `dir` has a module or package `name`, namespace packages included.
+    fn has_py_pkg(&self, dir: &str, name: &str) -> bool {
+        let p = join(dir, name);
+        let prefix = format!("{p}/");
+        self.has(&format!("{p}.py"))
+            || self
+                .paths
+                .range(prefix.clone()..)
+                .take_while(|f| f.starts_with(&prefix))
+                .any(|f| f.ends_with(".py"))
+    }
+
+    /// The module `module` under `dir`, or its submodules `names`. Nothing when the module
+    /// isn't there, rather than a package above it.
     fn py_in(&self, dir: &str, module: &[String], names: &[String]) -> Vec<String> {
         let file = |m: &str| -> Option<String> {
             let p = join(dir, m);
@@ -180,16 +204,10 @@ impl<'a> Resolver<'a> {
         if !subs.is_empty() {
             return subs;
         }
-        (1..=module.len())
-            .rev()
-            .find_map(|n| file(&module[..n].join("/")))
-            .or_else(|| {
-                (module.is_empty() && !dir.is_empty())
-                    .then(|| file(""))
-                    .flatten()
-            })
-            .into_iter()
-            .collect()
+        if module.is_empty() {
+            return (!dir.is_empty()).then(|| file("")).flatten().into_iter().collect();
+        }
+        file(&full).into_iter().collect()
     }
 
     fn go(&self, path: &str) -> Option<String> {

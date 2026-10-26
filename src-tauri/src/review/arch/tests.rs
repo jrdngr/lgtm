@@ -128,6 +128,44 @@ fn python_and_go_imports_resolve_within_the_repo() {
     );
 }
 
+#[test]
+fn python_imports_stay_in_their_own_source_root() {
+    let got = imports_of(&[
+        ("services/a/pyproject.toml", "[project]\nname = \"a\"\n"),
+        ("services/a/src/__init__.py", ""),
+        ("services/a/src/routes/__init__.py", ""),
+        ("services/a/src/routes/x.py", ""),
+        (
+            "services/a/src/main.py",
+            "from src.routes.x import f\nfrom src.schema import S\nimport shared.util\n",
+        ),
+        ("services/b/pyproject.toml", "[project]\nname = \"b\"\n"),
+        ("services/b/src/__init__.py", ""),
+        ("services/b/src/routes/__init__.py", ""),
+        ("services/b/src/schema.py", ""),
+        (
+            "services/b/src/app.py",
+            "from src.routes import handler\nfrom src.schema import S\nfrom src.permissions import P\nimport common\n",
+        ),
+        // A package only one other root has, and one two other roots have.
+        ("libs/one/pyproject.toml", "[project]\nname = \"one\"\n"),
+        ("libs/one/shared/__init__.py", ""),
+        ("libs/one/shared/util.py", ""),
+        ("libs/one/common.py", ""),
+        ("libs/two/pyproject.toml", "[project]\nname = \"two\"\n"),
+        ("libs/two/common.py", ""),
+    ]);
+    assert_eq!(
+        got,
+        triples(&[
+            ("services/a/src/main.py", "libs/one/shared/util.py", 3),
+            ("services/a/src/main.py", "services/a/src/routes/x.py", 1),
+            ("services/b/src/app.py", "services/b/src/routes/__init__.py", 1),
+            ("services/b/src/app.py", "services/b/src/schema.py", 2),
+        ])
+    );
+}
+
 fn grouping() -> Grouping {
     let paths: BTreeSet<String> = [
         "core/Cargo.toml",
