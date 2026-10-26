@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Settings } from "../bindings";
+import { SavedInput } from "./AgentSettings";
 import { Row, Section } from "./parts";
 import { saveSettings } from "./store";
 
@@ -35,6 +36,24 @@ export function TerminalSettings({ settings }: { settings: Settings }) {
         />
         {error && <div className="error">{error}</div>}
       </Row>
+      <Row label="Open a background terminal" htmlFor="settings-bg-open">
+        <input
+          id="settings-bg-open"
+          type="checkbox"
+          checked={settings.backgroundAutoOpen}
+          onChange={(e) => saveSettings({ backgroundAutoOpen: e.target.checked })}
+        />
+      </Row>
+      {settings.backgroundAutoOpen && (
+        <Row label="Background terminal name" htmlFor="settings-bg-name">
+          <SavedInput
+            id="settings-bg-name"
+            value={settings.backgroundName}
+            placeholder="bg agent"
+            onSave={(v) => saveSettings({ backgroundName: v.trim() || "bg agent" })}
+          />
+        </Row>
+      )}
     </Section>
   );
 }

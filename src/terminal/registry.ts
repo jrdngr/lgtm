@@ -228,6 +228,12 @@ export function promptAgent(id: string, text: string): boolean {
 /** Whether an agent runs in terminal `id`. */
 export const terminalHasAgent = (id: string) => !!terminals.get(id)?.hasAgent();
 
+/** Whether an agent runs in terminal `id` and it can take a paste. */
+export const terminalReady = (id: string) => {
+  const t = terminals.get(id);
+  return !!t?.hasAgent() && t.canPaste();
+};
+
 /** Whether terminal `id`'s agent is working or waiting on the user. */
 export const terminalAgentBusy = (id: string) => !!terminals.get(id)?.agentBusy();
 

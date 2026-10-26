@@ -45,8 +45,10 @@ export function useSendText(
     const usable = (id: string | undefined) => terminals.find((t) => t.id === id && t.canPaste);
     const to = usable(preferred) ?? usable(sendTarget(workspace, role));
     if (to) sendTo(text, to.id, onSent, report);
-    else if (role === "background" && terminals.length)
-      keepSubmit(backgroundTarget(workspace)).then((id) => id && sendTo(text, id, onSent, report));
+    else if (role === "background")
+      keepSubmit(backgroundTarget(workspace)).then((id) => {
+        if (id || !terminals.length) sendTo(text, id, onSent, report);
+      });
     else if (terminals.length > 1) setPicking({ text, terminals, onSent, report });
     else sendTo(text, undefined, onSent, report);
   }

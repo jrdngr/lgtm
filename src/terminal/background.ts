@@ -1,11 +1,15 @@
 import { useSyncExternalStore } from "react";
-import type { WorkspaceName } from "../core/workspace";
+import { dockReady } from "../core/docks";
+import { addClaudeBehind } from "../core/panels";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
+import { loadedSettings } from "../settings/store";
 import {
   keepSubmit,
   pinTarget,
   sendTarget,
   sendToTerminal,
   type TerminalChoice,
+  terminalReady,
   workspaceTerminals,
 } from "./registry";
 
@@ -33,13 +37,45 @@ export function useBackgroundAsk(): BackgroundAsk | undefined {
   );
 }
 
-/** The workspace's background terminal. With none pinned, asks which to use and pins it.
- * Undefined when it has no terminal or the pick is dismissed. */
-export function backgroundTarget(ws: WorkspaceName): Promise<string | undefined> {
-  const pinned = sendTarget(ws, "background");
-  if (pinned) return Promise.resolve(pinned);
+/** How long a new background terminal's agent gets to start. */
+const START_MS = 60_000;
+/** Background terminals starting, by workspace key, so sends meanwhile wait for the same one. */
+const starting = new Map<string, Promise<string | undefined>>();
+
+/** Opens a Claude tab named `name` behind the focused one, pins it for background sends, and
+ * resolves to it once its agent can take a prompt, or once it's had time to start. */
+async function openBackground(ws: WorkspaceName, name: string): Promise<string> {
+  const id = addClaudeBehind(await dockReady(ws), name).id;
+  pinTarget(ws, id, "background");
+  const until = Date.now() + START_MS;
+  while (!terminalReady(id) && Date.now() < until) {
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return id;
+}
+
+/** A new background terminal when the settings say to open one, else undefined. */
+async function autoOpen(ws: WorkspaceName): Promise<string | undefined> {
+  const settings = await loadedSettings();
+  return settings.backgroundAutoOpen ? openBackground(ws, settings.backgroundName) : undefined;
+}
+
+/** The workspace's background terminal. With none pinned, opens one when the settings say
+ * to, else asks which to use and pins it. Undefined when it has no terminal or the pick is
+ * dismissed. */
+export async function backgroundTarget(ws: WorkspaceName): Promise<string | undefined> {
+  const key = workspaceKey(ws);
+  const pinned = starting.has(key) ? undefined : sendTarget(ws, "background");
+  if (pinned) return pinned;
+  let open = starting.get(key);
+  if (!open) {
+    open = autoOpen(ws).finally(() => starting.delete(key));
+    starting.set(key, open);
+  }
+  const opened = await open;
+  if (opened) return opened;
   const terminals = workspaceTerminals(ws, "background");
-  if (!terminals.length) return Promise.resolve(undefined);
+  if (!terminals.length) return undefined;
   asking?.answer(undefined);
   return new Promise((resolve) =>
     set({

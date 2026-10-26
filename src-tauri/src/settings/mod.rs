@@ -3,6 +3,8 @@
 //! ```toml
 //! claudeTerminal = "cc"
 //! terminalFontSize = 13
+//! backgroundAutoOpen = true
+//! backgroundName = "bg agent"
 //! ```
 
 pub mod marks;
@@ -32,6 +34,10 @@ pub struct Settings {
     /// check Claude Code and register its MCP server.
     pub claude_terminal: String,
     pub terminal_font_size: u16,
+    /// A background send with no background terminal opens a Claude terminal and pins it.
+    pub background_auto_open: bool,
+    /// That terminal's tab title.
+    pub background_name: String,
     /// Every mark color, the ones in use first in key order.
     pub marks: Vec<marks::MarkSlot>,
 }
@@ -41,6 +47,8 @@ impl Default for Settings {
         Self {
             claude_terminal: "claude".into(),
             terminal_font_size: 13,
+            background_auto_open: true,
+            background_name: "bg agent".into(),
             marks: marks::defaults(),
         }
     }

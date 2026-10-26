@@ -7,7 +7,7 @@ import { Row, Section } from "./parts";
 import { saveSettings } from "./store";
 
 /** A text field that saves when it loses focus or Enter is pressed. */
-function SavedInput({
+export function SavedInput({
   id,
   value,
   placeholder,

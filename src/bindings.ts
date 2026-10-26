@@ -2263,6 +2263,10 @@ export type Settings_Deserialize = {
 	 */
 	claudeTerminal: string,
 	terminalFontSize: number,
+	/**  A background send with no background terminal opens a Claude terminal and pins it. */
+	backgroundAutoOpen: boolean,
+	/**  That terminal's tab title. */
+	backgroundName: string,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot_Deserialize[],
 };
@@ -2274,6 +2278,10 @@ export type Settings_Serialize = {
 	 */
 	claudeTerminal: string,
 	terminalFontSize: number,
+	/**  A background send with no background terminal opens a Claude terminal and pins it. */
+	backgroundAutoOpen: boolean,
+	/**  That terminal's tab title. */
+	backgroundName: string,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot_Serialize[],
 };

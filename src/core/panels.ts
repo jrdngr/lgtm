@@ -59,6 +59,7 @@ function addPanel(
   params: Record<string, unknown> = {},
   position?: AddPanelOptions["position"],
   id = `${component}-${crypto.randomUUID()}`,
+  inactive = false,
 ) {
   const terminal = component === "terminal" || component === "claude";
   return api.addPanel({
@@ -67,6 +68,7 @@ function addPanel(
     title: TITLES[component],
     params: component === "claude" ? { ...params, claude: true } : params,
     position,
+    inactive,
     // Terminals keep their DOM while their tab is hidden so scrollback and state survive.
     renderer: terminal ? "always" : "onlyWhenVisible",
   });
@@ -83,6 +85,13 @@ export function addTerminal(api: DockviewApi, direction?: "right" | "below", set
 /** The focused pane, where every new tab opens. Panes split only when the user splits them. */
 export function inActivePane(api: DockviewApi): AddPanelOptions["position"] {
   return api.activeGroup ? { referenceGroup: api.activeGroup } : undefined;
+}
+
+/** Opens a Claude tab titled `title` in the focused pane, behind the tab showing there. */
+export function addClaudeBehind(api: DockviewApi, title: string) {
+  const panel = addPanel(api, "claude", { renamed: true }, inActivePane(api), undefined, true);
+  panel.api.setTitle(title);
+  return panel;
 }
 
 /** Shows a report, in the pane it's already open in if there is one. */
