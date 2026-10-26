@@ -581,6 +581,14 @@ export function useCanvasEdit(p: {
     }));
   };
 
+  // Text still being typed when the canvas closes is saved, as leaving the box would.
+  const finishTyping = useRef(() => {});
+  finishTyping.current = () => {
+    if (drafting.current) commitDraft(drafting.current);
+    if (labeling.current) commitLabel(labeling.current);
+  };
+  useEffect(() => () => finishTyping.current(), []);
+
   const groupSelection = () => {
     const items = [...idsOf(selected, "part"), ...idsOf(selected, "group")];
     if (!items.length) return;
