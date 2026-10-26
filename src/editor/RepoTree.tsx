@@ -215,12 +215,19 @@ export function RepoTree() {
       ...pathItems(workspace, p, { send: sender }),
     ];
   };
+  const rootMenu = (): CtxEntry[] => [
+    { label: "New File…", onSelect: () => create(workspace, "", false, madeAt) },
+    { label: "New Folder…", onSelect: () => create(workspace, "", true, madeAt) },
+    "-",
+    { label: "Collapse All", onSelect: () => setOpen(new Set()), disabled: open.size === 0 },
+  ];
   return (
     <div className="side-split">
       <SectionHeader title="Files" />
       <div
         className={`side-split-body file-tree${dropDir === "" ? " drop-target" : ""}`}
         ref={body}
+        onContextMenu={contextMenu(rootMenu)}
         {...dragProps}
       >
         <Dir
