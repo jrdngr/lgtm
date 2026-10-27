@@ -10,3 +10,9 @@
   height: 100%;
   border: 0;
 }
+
+/* Hidden, but laid out, so zoom changes reach it. */
+.shell iframe.away {
+  visibility: hidden;
+  pointer-events: none;
+}

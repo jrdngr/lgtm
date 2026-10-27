@@ -189,10 +189,9 @@ pub fn window(app: &AppHandle, label: &str, title: &str) -> Result<(), String> {
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
         .disable_drag_drop_handler()
         .on_navigation(stays_in_app);
-    let window = crate::placement::place(app, label, builder)
+    crate::zoom::on_load(crate::placement::place(app, label, builder))
         .build()
         .map_err(|e| e.to_string())?;
-    crate::zoom::apply(&window);
     close_start(app);
     Ok(())
 }
@@ -225,9 +224,9 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
         .title("lgtm")
         .inner_size(480.0, 420.0)
         .on_navigation(stays_in_app);
-    crate::placement::place(app, START_LABEL, builder)
+    crate::zoom::on_load(crate::placement::place(app, START_LABEL, builder))
         .build()
-        .map(|window| crate::zoom::apply(&window))
+        .map(drop)
 }
 
 /// Opens the repo named on a command line. With none, a `launch` reopens the projects open at

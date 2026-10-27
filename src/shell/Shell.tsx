@@ -6,7 +6,8 @@ import { activeFrame, api, confirmClose, setIframe, showRepo } from "./store";
 import "./shell.css";
 
 /** A project window: each awake repo in a frame of its own, the one on screen shown. Hidden
- * frames run on, as hidden workspaces do. */
+ * frames run on, as hidden workspaces do, and stay laid out at the window's size: WKWebView
+ * gives a `display: none` frame that missed a zoom change the wrong scale when it shows. */
 export function Shell() {
   const s = useSyncExternalStore(api.subscribe, api.state);
 
@@ -37,7 +38,7 @@ export function Shell() {
             ref={(el) => setIframe(r.label, el)}
             src={`?repo=${encodeURIComponent(r.label)}`}
             title={r.name}
-            hidden={r.label !== s.active}
+            className={r.label === s.active ? undefined : "away"}
           />
         ))}
     </div>

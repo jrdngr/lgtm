@@ -2,7 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::webview::PageLoadEvent;
+use tauri::{AppHandle, Manager, WebviewWindow, WebviewWindowBuilder, Wry};
 
 const LEVELS: [f64; 11] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0];
 const DEFAULT: usize = 5;
@@ -39,15 +40,29 @@ fn file(app: &AppHandle) -> Option<PathBuf> {
     app.path().app_data_dir().ok().map(|d| path(&d))
 }
 
-/// Gives a new window the saved zoom.
+/// Gives a window the saved zoom once its page has loaded. WKWebView zoomed before the first
+/// load lays the page out for the wrong size, overscaled and cut off at the bottom. Going
+/// through 1.0 makes the change a real one even if WebKit already holds the level.
 pub fn apply(window: &WebviewWindow) {
     let Some(file) = file(window.app_handle()) else {
         return;
     };
     let step = load(&file);
     if step != DEFAULT {
+        window.set_zoom(1.0).ok();
         window.set_zoom(LEVELS[step]).ok();
     }
+}
+
+/// `builder` with the saved zoom applied each time its page finishes loading.
+pub fn on_load<'a, M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'a, Wry, M>,
+) -> WebviewWindowBuilder<'a, Wry, M> {
+    builder.on_page_load(|window, payload| {
+        if payload.event() == PageLoadEvent::Finished {
+            apply(&window);
+        }
+    })
 }
 
 /// Steps the zoom `by` (or resets it with `None`) in every window and saves it.
