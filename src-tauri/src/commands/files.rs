@@ -206,7 +206,7 @@ pub(crate) async fn drag_out(
 
 #[cfg(target_os = "macos")]
 fn start_drag(
-    window: Frame,
+    window: WebviewWindow,
     files: Vec<PathBuf>,
     done: tokio::sync::oneshot::Sender<()>,
 ) -> CmdResult<()> {
