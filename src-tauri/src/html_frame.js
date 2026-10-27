@@ -192,26 +192,32 @@
     return ranges;
   }
 
+  // WebKit leaves ranges painted after their highlight is swapped out, so the two highlights
+  // are made once and refilled in place.
+  let marks;
+
   function paint() {
     if (!("highlights" in CSS)) return;
-    if (!document.getElementById("lgtm-find-style")) {
+    if (!marks) {
       const style = document.createElement("style");
-      style.id = "lgtm-find-style";
       style.textContent =
         "::highlight(lgtm-find){background-color:rgb(234 92 0 / 33%)}" +
         "::highlight(lgtm-find-current){background-color:rgb(255 170 0 / 70%);color:#1e1e1e}";
       document.head.append(style);
+      marks = { all: new Highlight(), current: new Highlight() };
+      CSS.highlights.set("lgtm-find", marks.all);
+      CSS.highlights.set("lgtm-find-current", marks.current);
     }
-    CSS.highlights.set("lgtm-find", new Highlight(...found.ranges));
+    marks.all.clear();
+    marks.current.clear();
+    for (const r of found.ranges) marks.all.add(r);
     const current = found.ranges[found.at];
-    if (current) CSS.highlights.set("lgtm-find-current", new Highlight(current));
-    else CSS.highlights.delete("lgtm-find-current");
+    if (current) marks.current.add(current);
   }
 
   function unpaint() {
-    if (!("highlights" in CSS)) return;
-    CSS.highlights.delete("lgtm-find");
-    CSS.highlights.delete("lgtm-find-current");
+    marks?.all.clear();
+    marks?.current.clear();
   }
 
   function find(m) {
