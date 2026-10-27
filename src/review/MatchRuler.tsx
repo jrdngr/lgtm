@@ -21,15 +21,25 @@ export function matchedLines(files: FlatFile[], lines: DisplayLine[], needle: st
   return out;
 }
 
-/** A strip down the review's right edge with a white tick at each line holding the selected
- * text and a band for what's on screen. A click scrolls there. */
+/** A colored tick on the ruler: where its line starts in the scrolled content, and a CSS
+ * color, which may be a `var(--…)`. */
+export interface RulerMark {
+  start: number;
+  color: string;
+}
+
+/** A strip down the review's right edge with a tick in its stage's color at each comment, a
+ * white one at each line holding the selected text, and a band for what's on screen. A click
+ * scrolls there. */
 export function MatchRuler({
   starts,
+  marks,
   total,
   scrollRef,
 }: {
   /** Where each matched line starts, in the scrolled content. */
   starts: number[];
+  marks: RulerMark[];
   total: number;
   scrollRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -51,6 +61,13 @@ export function MatchRuler({
       const y = (top: number) => (top / Math.max(total, 1)) * height;
       g.fillStyle = "rgb(255 255 255 / 9%)";
       g.fillRect(0, y(scroller.scrollTop), WIDTH, Math.max(y(height), 4));
+      const css = getComputedStyle(c);
+      for (const m of marks) {
+        g.fillStyle = m.color.startsWith("var(")
+          ? css.getPropertyValue(m.color.slice(4, -1)).trim()
+          : m.color;
+        g.fillRect(1, y(m.start), WIDTH - 2, 3);
+      }
       g.fillStyle = "#fff";
       for (const s of starts) g.fillRect(1, y(s), WIDTH - 2, 2);
     };
@@ -62,7 +79,7 @@ export function MatchRuler({
       scroller.removeEventListener("scroll", draw);
       resize.disconnect();
     };
-  }, [starts, total, scrollRef]);
+  }, [starts, marks, total, scrollRef]);
 
   return (
     <div className="match-ruler-anchor">

@@ -84,6 +84,8 @@ interface Props extends LineHandlers {
   onClearFile(file: number): void;
   onFileMenu(e: React.MouseEvent, file: number): void;
   renderComment(id: number): ReactNode;
+  /** The ruler color of comment `id`, or nothing to leave it off the ruler. */
+  commentColor?(id: number): string | undefined;
   renderInfo(key: string): ReactNode;
   /** What sits left of a row's line number, like folded Symbol Information. */
   renderFlag?(file: number, row: number): ReactNode;
@@ -170,6 +172,10 @@ export function DiffLines(props: Props) {
 
   const sticky = stickyFile(lines, virtualizer);
   const measured = virtualizer.measurementsCache;
+  const marks = lines.flatMap((line, i) => {
+    const color = line.kind === "comment" ? props.commentColor?.(line.comment) : undefined;
+    return color ? [{ start: measured[i]?.start ?? 0, color }] : [];
+  });
 
   const header = (fileIdx: number) => {
     const file = files[fileIdx];
@@ -280,9 +286,10 @@ export function DiffLines(props: Props) {
 
   return (
     <>
-      {matched.length > 0 && (
+      {(matched.length > 0 || marks.length > 0) && (
         <MatchRuler
           starts={matched.map((i) => measured[i]?.start ?? 0)}
+          marks={marks}
           total={virtualizer.getTotalSize()}
           scrollRef={scrollRef}
         />

@@ -12,6 +12,7 @@ import { useReviewFind } from "../find/useReviewFind";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
+import { stageColor } from "../model/stages";
 import { searchItems } from "../search/menu";
 import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { useTurns } from "../turns/turnsStore";
@@ -443,6 +444,12 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           onShowContext={context.show}
           renderInfo={info.render}
           renderFlag={info.flag}
+          commentColor={(id) => {
+            const x = navComments.find((n) => n.id === id);
+            if (!x) return undefined;
+            if (x.thread) return stageColor(x.thread.stage);
+            return x.done ? undefined : "var(--muted)";
+          }}
           renderComment={(id) => (
             <>
               <PrCommentsHead comments={c.onPr} id={id} />

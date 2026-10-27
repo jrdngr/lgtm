@@ -11,6 +11,18 @@ export const STAGES: [Stage, string, string][] = [
   ["done", "Done", ""],
 ];
 
+/** The CSS color of each tone `STAGES` names. */
+const TONES: Record<string, string> = {
+  amber: "var(--amber)",
+  blue: "var(--accent)",
+  purple: "var(--mark-violet)",
+  green: "var(--added)",
+};
+
+/** A stage's color, as its pill shows it. None for Done. */
+export const stageColor = (s: Stage): string | undefined =>
+  TONES[STAGES.find(([k]) => k === s)?.[2] ?? ""];
+
 export const stageName = (s: Stage) => STAGES.find(([k]) => k === s)?.[1] ?? s;
 
 export const VERDICTS: Record<TakeVerdict, [string, string]> = {
