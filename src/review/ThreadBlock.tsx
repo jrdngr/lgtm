@@ -5,6 +5,7 @@ import { GhThread } from "../github/GhThread";
 import { viewerLogin } from "../model/people";
 import { quotesOf } from "../model/prComments";
 import { openUrl } from "../services/pathMenu";
+import { useRoles } from "../terminal/registry";
 import { IconButton } from "../ui/icons";
 import { CombineDialog } from "./CombineDialog";
 import { setCurrentThread, useLink } from "./linkedAgent";
@@ -37,6 +38,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   const postsRef = useRef<HTMLDivElement>(null);
   const quoting = useQuoting(comment, c, postsRef, blockRef);
   const link = useLink(c.workspace);
+  const role = useRoles(c.workspace);
   const gh = comment.github;
   const thread = comment.thread;
   const quote = thread?.quote;
@@ -111,6 +113,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
     <div
       ref={blockRef}
       className={`comment-block thread-block${comment.file === -1 ? " on-pr" : ""}${quote ? " quote-block" : ""}${done ? " resolved" : ""}${current ? " current" : ""}`}
+      data-send={current ? role(link.terminal ?? "") : undefined}
       onClick={() => setCurrentThread(c.workspace, id)}
       onContextMenu={p.onContextMenu}
       onKeyDown={onKey}

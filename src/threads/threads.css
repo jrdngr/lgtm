@@ -139,13 +139,20 @@
   border-radius: 50%;
 }
 
-/* The terminal linked to the PR review, under the PR header. */
+/* The terminal linked to the PR review, under the PR header: violet when it's the background
+ * terminal, else teal. */
 .link-strip {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 4px 6px 4px 10px;
-  border-bottom: 1px solid var(--violet-line);
+  border-bottom: 1px solid var(--teal-line);
+  background: var(--teal-soft);
+  color: var(--teal-text);
+}
+
+.link-strip[data-send="background"] {
+  border-bottom-color: var(--violet-line);
   background: var(--violet-soft);
   color: var(--violet-text);
 }
@@ -162,7 +169,7 @@
   flex: none;
   width: 5px;
   height: 5px;
-  border: 1.5px solid var(--violet-line);
+  border: 1.5px solid currentColor;
   border-radius: 50%;
 }
 
@@ -170,7 +177,7 @@
   width: 7px;
   height: 7px;
   border: none;
-  background: var(--mark-violet);
+  background: currentColor;
   animation: link-pulse 1.2s ease-in-out infinite;
 }
 

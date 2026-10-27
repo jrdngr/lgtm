@@ -675,8 +675,14 @@ button.group-head.fold:hover:not(:disabled) {
   border-left: 3px solid var(--github);
 }
 
-/* The thread the linked agent hears I'm on. */
+/* The thread the linked agent hears I'm on, in the linked terminal's pin color. */
 .thread-block.current {
+  border-color: var(--teal);
+  border-left-color: var(--github);
+  box-shadow: 0 0 0 1px var(--teal-line);
+}
+
+.thread-block.current[data-send="background"] {
   border-color: var(--mark-violet);
   border-left-color: var(--github);
   box-shadow: 0 0 0 1px var(--violet-line);

@@ -6,6 +6,7 @@ import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar } from "../github/Post";
 import { viewerLogin } from "../model/people";
 import { STAGES } from "../model/stages";
+import { useRoles } from "../terminal/registry";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy } from "../ui/Busy";
 import { openMenu } from "../ui/contextMenu";
@@ -44,6 +45,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [snippet, setSnippet] = useState(false);
   const link = useLink(c.workspace);
+  const role = useRoles(c.workspace);
   const current = !!link.terminal && comment !== undefined && link.current === comment.id;
   const editing = c.edits.get(id);
   const gh = comment?.github;
@@ -110,7 +112,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
           <span className="spacer" />
           {gh && !ready && <span className="card-count">{gh.posts.length}</span>}
           {current && (
-            <span className="card-linked">
+            <span className="card-linked" data-send={role(link.terminal ?? "")}>
               <Icon name="terminal" size={15} />
             </span>
           )}
