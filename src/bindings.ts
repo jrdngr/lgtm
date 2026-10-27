@@ -1526,6 +1526,8 @@ export type JjAction = { kind: "edit"; rev: string } |
 { kind: "newAfter"; rev: string } | 
 /**  A new, empty commit as `rev`'s parent, after its parents, and `@` on it. */
 { kind: "newBefore"; rev: string } | 
+/**  Undoes what the commits of `revs` do to `paths`, in the newest of them. */
+{ kind: "discard"; revs: string; paths: string[] } | 
 /**  Squashes the commits of `revs` into the parent of the oldest, keeping its description. */
 { kind: "squash"; revs: string } | 
 /**  Rebases `rev` and its branch onto `trunk()`. */

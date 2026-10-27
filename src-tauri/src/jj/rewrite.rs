@@ -36,7 +36,7 @@ impl Jj {
 }
 
 /// The fileset naming exactly the file at repo-relative `path`.
-fn root_file(path: &str) -> String {
+pub(super) fn root_file(path: &str) -> String {
     format!(
         "root-file:\"{}\"",
         path.replace('\\', "\\\\").replace('"', "\\\"")

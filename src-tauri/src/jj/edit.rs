@@ -27,6 +27,11 @@ pub enum JjAction {
     NewBefore {
         rev: String,
     },
+    /// Undoes what the commits of `revs` do to `paths`, in the newest of them.
+    Discard {
+        revs: String,
+        paths: Vec<String>,
+    },
     /// Squashes the commits of `revs` into the parent of the oldest, keeping its description.
     Squash {
         revs: String,
@@ -75,6 +80,18 @@ impl JjAction {
             JjAction::Redo { .. } => v(&["redo"]),
             JjAction::NewAfter { rev } => v(&["new", "--insert-after", rev]),
             JjAction::NewBefore { rev } => v(&["new", "--insert-before", rev]),
+            JjAction::Discard { revs, paths } => {
+                let mut args = v(&[
+                    "restore",
+                    "--from",
+                    &format!("roots({revs})-"),
+                    "--into",
+                    &format!("heads({revs})"),
+                    "--",
+                ]);
+                args.extend(paths.iter().map(|p| super::rewrite::root_file(p)));
+                args
+            }
             JjAction::Squash { revs } => v(&[
                 "squash",
                 "--from",
@@ -237,6 +254,36 @@ mod tests {
             files.contains("b.txt") && files.contains("c.txt"),
             "{files}"
         );
+    }
+
+    #[tokio::test]
+    async fn discard_undoes_a_range_s_changes_to_one_file_and_keeps_the_rest() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        let j = &j;
+        write(d, "a.txt", "a\n");
+        jj(d, &["commit", "-m", "base"]);
+        write(d, "a.txt", "a2\n");
+        write(d, "b.txt", "b\n");
+        jj(d, &["commit", "-m", "one"]);
+        write(d, "a.txt", "a3\n");
+        jj(d, &["commit", "-m", "two"]);
+        let one = change_id(j, "@--").await;
+        let two = change_id(j, "@-").await;
+
+        let revs = format!("{one}::{two}");
+        let discard = JjAction::Discard {
+            revs: revs.clone(),
+            paths: vec!["a.txt".into()],
+        };
+        j.act(&discard).await.unwrap();
+        let from = format!("roots({revs})-");
+        let to = format!("heads({revs})");
+        let changed = j
+            .read(&["diff", "--name-only", "--from", &from, "--to", &to])
+            .await
+            .unwrap();
+        assert_eq!(changed.trim(), "b.txt");
     }
 
     #[tokio::test]
