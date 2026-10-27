@@ -4,12 +4,14 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
 import { watchAgentHooks } from "../terminal/agentHooks";
 import { hasTerminal, subscribeTerminals, terminalTitle } from "../terminal/registry";
-import { LINK_START, threadContext } from "./agentText";
+import { threadContext } from "./agentText";
 import { currentReview, onReviewChange } from "./current";
 
 /** A terminal whose agent is linked to a workspace's PR review. */
 interface Link {
   terminal: string;
+  /** How its agent works on the PR's threads, which lgtm's hook gives it once. */
+  brief: string;
   working: boolean;
 }
 
@@ -17,8 +19,6 @@ interface Link {
 const links = new Map<string, Link>();
 /** The thread I'm on in each workspace, by workspace key. */
 const current = new Map<string, number>();
-/** The terminal each workspace was last linked to, so linking it again needs no new brief. */
-const last = new Map<string, string>();
 /** Where a terminal's last prompt was filed, so its answer goes with it. */
 const filed = new Map<string, { review: number; thread: number } | null>();
 /** Prompts lgtm just pasted, by terminal: not filed as something I said, with the thread the
@@ -40,7 +40,8 @@ function changed() {
 
 const workspaceOf = (terminal: string) => [...links].find(([, l]) => l.terminal === terminal)?.[0];
 
-/** Tells the backend the thread I'm on, for lgtm's hook to add to the agent's prompts. */
+/** Tells the backend the brief and the thread I'm on, for lgtm's hook to add to the agent's
+ * prompts. */
 function push(key: string) {
   const link = links.get(key);
   if (!link) return;
@@ -54,10 +55,10 @@ function push(key: string) {
         review?.comments.find((c) => c.id === t.id),
       )
     : null;
-  const said = JSON.stringify(thread);
+  const said = JSON.stringify([link.brief, thread]);
   if (pushed.get(link.terminal) === said) return;
   pushed.set(link.terminal, said);
-  commands.setAgentLink(link.terminal, true, thread);
+  commands.setAgentLink(link.terminal, true, link.brief, thread);
 }
 
 function drop(key: string) {
@@ -65,18 +66,14 @@ function drop(key: string) {
   if (!link) return;
   links.delete(key);
   pushed.delete(link.terminal);
-  commands.setAgentLink(link.terminal, false, null);
+  commands.setAgentLink(link.terminal, false, null, null);
   changed();
 }
 
 /** Files a hook report from a linked terminal in the thread I was on when I sent the prompt. */
 export function mirror({ terminal, state, prompt, reply }: TerminalAgent) {
   const key = workspaceOf(terminal);
-  if (key === undefined) {
-    // An agent that leaves an unlinked terminal takes the brief with it.
-    if (state === "gone") for (const [k, t] of last) if (t === terminal) last.delete(k);
-    return;
-  }
+  if (key === undefined) return;
   const link = links.get(key);
   if (!link) return;
   if (prompt) {
@@ -84,18 +81,15 @@ export function mirror({ terminal, state, prompt, reply }: TerminalAgent) {
     const paste = pasted.get(terminal);
     pasted.delete(terminal);
     const ours = paste && Date.now() - paste.at < PASTE_MS;
-    // The brief and its answer belong to no thread; a paste's answer goes to its thread.
-    const thread = ours ? paste.thread : prompt.startsWith(LINK_START) ? null : current.get(key);
+    // A paste's answer goes to its thread.
+    const thread = ours ? paste.thread : current.get(key);
     const to = review && thread != null ? { review: review.id, thread } : null;
     filed.set(terminal, to);
     if (to && !ours) commands.addChatMessage(to.review, to.thread, "user", prompt);
   }
   const to = filed.get(terminal);
   if (reply && to) commands.addChatMessage(to.review, to.thread, "agent", reply);
-  if (state === "gone") {
-    last.delete(key);
-    return drop(key);
-  }
+  if (state === "gone") return drop(key);
   const working = state === "working";
   if (working !== link.working) {
     links.set(key, { ...link, working });
@@ -110,10 +104,7 @@ function watch() {
   watchAgentHooks(mirror);
   subscribeTerminals(() => {
     for (const [key, l] of links) {
-      if (!hasTerminal(l.terminal)) {
-        last.delete(key);
-        drop(key);
-      }
+      if (!hasTerminal(l.terminal)) drop(key);
     }
     changed();
   });
@@ -123,30 +114,21 @@ function watch() {
   });
 }
 
-/** Links `terminal`'s agent to the workspace's PR review, unlinking any other terminal. */
-export function linkAgent(workspace: WorkspaceName, terminal: string) {
+/** Links `terminal`'s agent to the workspace's PR review with `brief`, unlinking any other
+ * terminal. */
+export function linkAgent(workspace: WorkspaceName, terminal: string, brief: string) {
   watch();
   const key = workspaceKey(workspace);
   if (links.get(key)?.terminal !== terminal) drop(key);
   // A terminal is linked to one review at a time.
   for (const [other, l] of links) if (l.terminal === terminal && other !== key) links.delete(other);
-  links.set(key, { terminal, working: false });
-  last.set(key, terminal);
+  links.set(key, { terminal, brief, working: false });
   push(key);
   changed();
 }
 
 export function unlinkAgent(workspace: WorkspaceName) {
   drop(workspaceKey(workspace));
-}
-
-/** Whether linking the workspace to `terminal` again needs no new brief. */
-export function relinkable(workspace: WorkspaceName, terminal: string | undefined): boolean {
-  return (
-    terminal !== undefined &&
-    last.get(workspaceKey(workspace)) === terminal &&
-    hasTerminal(terminal)
-  );
 }
 
 /** The terminal linked to the workspace's review, outside React. */

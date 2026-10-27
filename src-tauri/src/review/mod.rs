@@ -72,6 +72,8 @@ pub struct Reviews {
     history: arch::history::HistoryCache,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
+    /// The brief each terminal's agent session last got, by terminal panel id.
+    briefed: Mutex<HashMap<String, String>>,
 }
 
 impl Default for Reviews {
@@ -85,6 +87,7 @@ impl Default for Reviews {
             configs: Default::default(),
             history: Default::default(),
             links: Mutex::default(),
+            briefed: Mutex::default(),
         }
     }
 }

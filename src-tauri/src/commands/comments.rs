@@ -120,17 +120,18 @@ pub(crate) fn dismiss_suggestion(window: Frame, review: u32, comment: u32) -> Cm
         .map_err(err)
 }
 
-/// Links terminal `terminal`'s agent to the review, with `thread` as the thread the user is on,
-/// or with `linked` false, unlinks it.
+/// Links terminal `terminal`'s agent to the review, with `brief` telling it how to work on the
+/// PR's threads and `thread` as the thread the user is on, or with `linked` false, unlinks it.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn set_agent_link(
     window: Frame,
     terminal: String,
     linked: bool,
+    brief: Option<String>,
     thread: Option<crate::review::LinkThread>,
 ) -> CmdResult<()> {
-    repo(&window)?.set_agent_link(&terminal, linked, thread);
+    repo(&window)?.set_agent_link(&terminal, linked, brief, thread);
     Ok(())
 }
 

@@ -1,24 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { CommentDto, PrDto, ThreadDto } from "../bindings";
-import {
-  LINK_START,
-  linkText,
-  reviewText,
-  threadContext,
-  triageAllText,
-  triageText,
-} from "./agentText";
+import { linkText, reviewText, threadContext, triageAllText, triageText } from "./agentText";
 import { UNTRUSTED_NOTE, untrusted } from "./untrusted";
 
 const post = (author: string, body: string) => ({ author, body, createdAt: "", pending: false });
 
 describe("linkText", () => {
-  it("names the PR, the tools and my rules, and starts so its prompt can be told apart", () => {
+  it("names the PR, the tools and my rules", () => {
     const pr = { number: 482, title: "Batch loads", author: "ann" } as PrDto;
     const text = linkText(pr, "No compliments.\n");
-    expect(text.startsWith(LINK_START)).toBe(true);
     expect(text).toContain(
-      `#482. lgtm's list_threads tool lists its threads. Its title:\n${untrusted("Batch loads", "ann")}`,
+      `PR #482. lgtm's list_threads tool lists its threads. Its title:\n${untrusted("Batch loads", "ann")}`,
     );
     expect(text).toContain(UNTRUSTED_NOTE);
     expect(text).toContain("My rules for takes and replies:\n\nNo compliments.");

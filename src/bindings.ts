@@ -343,15 +343,15 @@ export const commands = {
 	/**  Drops a thread's suggested reply. */
 	dismissSuggestion: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("dismiss_suggestion", { review, comment })),
 	/**
-	 *  Links terminal `terminal`'s agent to the review, with `thread` as the thread the user is on,
-	 *  or with `linked` false, unlinks it.
+	 *  Links terminal `terminal`'s agent to the review, with `brief` telling it how to work on the
+	 *  PR's threads and `thread` as the thread the user is on, or with `linked` false, unlinks it.
 	 */
-	setAgentLink: (terminal: string, linked: boolean, thread: {
+	setAgentLink: (terminal: string, linked: boolean, brief: string | null, thread: {
 	/**  The whole thread, for the first prompt on it. */
 	full: string,
 	/**  One line naming it, for later prompts. */
 	short: string,
-} | null) => typedError<null, string>(__TAURI_INVOKE("set_agent_link", { terminal, linked, thread })),
+} | null) => typedError<null, string>(__TAURI_INVOKE("set_agent_link", { terminal, linked, brief, thread })),
 	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
 	/**  The workspace's reports, newest first. */
 	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),

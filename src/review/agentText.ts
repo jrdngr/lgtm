@@ -34,20 +34,16 @@ const ids = (c: CommentDto) => `thread_id ${c.id} and pr ${c.thread?.pr}`;
 export const fixedText = (c: CommentDto) =>
   `Once you've made the change this thread asks for, call lgtm's fixed_threads tool with pr ${c.thread?.pr} and thread_ids [${c.id}].`;
 
-/** How the brief a linked agent gets starts, so its prompt isn't filed in a thread's chat. */
-export const LINK_START = "You're linked to lgtm's review of PR";
-
-/** What links a terminal agent to the PR review: how it finds the threads, how it hears which
- * one I'm on, and how it hands back takes and replies. */
+/** What lgtm's hook tells a linked terminal agent once: how it finds the PR's threads, how it
+ * hears which one I'm on, and how it hands back takes and replies. */
 export function linkText(pr: PrDto, rules: string): string {
   return join([
-    `${LINK_START} #${pr.number}. lgtm's list_threads tool lists its threads. Its title:\n${untrusted(pr.title, pr.author)}`,
+    `lgtm linked this terminal to its review of PR #${pr.number}. lgtm's list_threads tool lists its threads. Its title:\n${untrusted(pr.title, pr.author)}`,
     UNTRUSTED_NOTE,
-    "Each prompt I send names the thread I'm on. Read the code it points at before you answer.",
+    'lgtm adds the thread I\'m on to my prompts, so "this comment" or "the linked comment" means that thread. Read the code it points at before you answer.',
     `Use set_thread_take for your verdict, suggest_reply for a reply in my voice, and set_thread_stage to move a thread, each with pr ${pr.number}. Stop at a drafted reply: only I mark one ready. Nothing you do posts to GitHub.`,
     "When you change code a thread asks for, call fixed_threads right after that change, before the next one, so I can look each fix over on its own.",
     `My rules for takes and replies:\n\n${rules.trim()}`,
-    "Say you're ready and wait for me.",
   ]);
 }
 

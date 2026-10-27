@@ -1,28 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentHookState } from "../bindings";
 import { registerTerminal } from "../terminal/registry";
-import { LINK_START } from "./agentText";
 import {
   linkAgent,
   linkedTerminal,
   mirror,
   notePasted,
-  relinkable,
   setCurrentThread,
   unlinkAgent,
   useLink,
 } from "./linkedAgent";
 
 const added: [number, string, string][] = [];
-const links: [string, boolean, string | null][] = [];
+const links: [string, boolean, string | null, string | null][] = [];
 vi.mock("../ipc", () => ({
   commands: {
     addChatMessage: (_review: number, comment: number, author: string, text: string) => {
       added.push([comment, author, text]);
       return Promise.resolve({ status: "ok", data: null });
     },
-    setAgentLink: (terminal: string, linked: boolean, thread: { short: string } | null) => {
-      links.push([terminal, linked, thread?.short ?? null]);
+    setAgentLink: (
+      terminal: string,
+      linked: boolean,
+      brief: string | null,
+      thread: { short: string } | null,
+    ) => {
+      links.push([terminal, linked, brief, thread?.short ?? null]);
       return Promise.resolve({ status: "ok", data: null });
     },
   },
@@ -76,9 +79,7 @@ beforeEach(() => {
 describe("linked agent", () => {
   it("files each exchange in the thread I was on when I sent the prompt", () => {
     registerTerminal("t1", target);
-    linkAgent("pr", "t1");
-    report("t1", "working", { prompt: `${LINK_START} #1 "x".` });
-    report("t1", "done", { reply: "Ready." });
+    linkAgent("pr", "t1", "brief");
     setCurrentThread("pr", 7);
     report("t1", "working", { prompt: "agree?" });
     expect(useLink("pr")).toMatchObject({ terminal: "t1", title: "claude", working: true });
@@ -95,26 +96,22 @@ describe("linked agent", () => {
       [7, "agent", "No."],
       [7, "agent", "Done."],
     ]);
-    expect(links.at(-1)).toEqual(["t1", true, "lgtm: I'm on thread 8 on the PR."]);
+    expect(links.at(-1)).toEqual(["t1", true, "brief", "lgtm: I'm on thread 8 on the PR."]);
   });
 
   it("moves to another terminal by unlinking the first, and ends when the agent leaves", () => {
     registerTerminal("t2", target);
     registerTerminal("t3", target);
-    linkAgent("pr", "t2");
-    linkAgent("pr", "t3");
-    expect(links).toContainEqual(["t2", false, null]);
+    linkAgent("pr", "t2", "brief");
+    linkAgent("pr", "t3", "brief");
+    expect(links).toContainEqual(["t2", false, null, null]);
     expect(linkedTerminal("pr")).toBe("t3");
     report("t2", "working", { prompt: "elsewhere" });
     expect(added).toEqual([]);
     unlinkAgent("pr");
-    expect(relinkable("pr", "t3")).toBe(true);
-    report("t3", "gone", {});
-    // A new agent there needs the brief.
-    expect(relinkable("pr", "t3")).toBe(false);
-    linkAgent("pr", "t3");
+    expect(links.at(-1)).toEqual(["t3", false, null, null]);
+    linkAgent("pr", "t3", "brief");
     report("t3", "gone", {});
     expect(linkedTerminal("pr")).toBeUndefined();
-    expect(relinkable("pr", "t3")).toBe(false);
   });
 });
