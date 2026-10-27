@@ -157,6 +157,7 @@ impl RepoCtx {
                 workspace: name.clone(),
                 repo,
                 number,
+                pinned: false,
                 id: info.id,
                 title: info.title,
                 url: info.url,

@@ -254,6 +254,7 @@ async fn a_stack_prs_commits_stop_at_the_open_pr_below_it() {
             name: "r".into(),
         },
         number: 2,
+        pinned: false,
         id: String::new(),
         title: String::new(),
         url: String::new(),
@@ -282,4 +283,60 @@ async fn a_stack_prs_commits_stop_at_the_open_pr_below_it() {
         described(record(Some("low")).revset()).await,
         ["two", "three"]
     );
+}
+
+#[tokio::test]
+async fn a_stack_pr_stays_while_the_review_takes_in_its_commits_or_its_pinned() {
+    let up = tempfile::tempdir().unwrap();
+    upstream(up.path());
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    let j: &Jj = &ctx.main.jj;
+    j.remote_add("origin", &up.path().to_string_lossy())
+        .await
+        .unwrap();
+    j.fetch("origin", &["main"]).await.unwrap();
+    jj(d, &["new", "main@origin"]);
+    write(d, "pr", "pr");
+    jj(d, &["commit", "-m", "pr"]);
+    jj(d, &["bookmark", "create", "feat", "-r", "@-"]);
+    write(d, "fix", "fix");
+    jj(d, &["describe", "-m", "fix"]);
+    let save = |pinned: bool| {
+        let record = crate::store::PrRecord {
+            workspace: String::new(),
+            repo: crate::github::GhRepo {
+                owner: "o".into(),
+                name: "r".into(),
+            },
+            number: 2,
+            pinned,
+            id: String::new(),
+            title: String::new(),
+            url: String::new(),
+            author: String::new(),
+            base_ref: "main".into(),
+            base_remote: "origin".into(),
+            head_ref: "feat".into(),
+            head_remote: None,
+            added_remote: None,
+            head: String::new(),
+            stack: true,
+            below: None,
+        };
+        ctx.store.lock().unwrap().save_pr(&record).unwrap();
+    };
+    let has_pr = || ctx.store.lock().unwrap().pr("").unwrap().is_some();
+
+    save(false);
+    assert!(ctx.follow_review(None, "feat::@").await.unwrap());
+    assert!(has_pr());
+
+    save(true);
+    assert!(ctx.follow_review(None, "@").await.unwrap());
+    assert!(has_pr());
+
+    save(false);
+    assert!(!ctx.follow_review(None, "@").await.unwrap());
+    assert!(!has_pr());
 }

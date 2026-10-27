@@ -10,7 +10,7 @@ import { TurnRows, TurnsToggle } from "../turns/TurnRows";
 import { reloadTurns, turnsOpen, useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
-import { reviewStackPr } from "../workspaces/stack";
+import { pinStackPr, reviewStackPr } from "../workspaces/stack";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { BookmarkPopup } from "./BookmarkPopup";
 import { CommitLines } from "./CommitLines";
@@ -59,7 +59,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   );
   const head = target?.changes.at(-1)?.commitId;
   const pr = usePr(workspace);
-  const prOn = (r: RowPr) => pr?.number === r.number && pr.revset === revset;
+  const prOn = (r: RowPr) => pr?.number === r.number && (pr.stack || pr.revset === revset);
   const prOf = useRowPrs(workspace, refreshed);
   const [rows, setRows] = useState<LogRow[]>();
   const [error, setError] = useState<string>();
@@ -254,6 +254,11 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     await reviewStackPr(workspace, p.number).catch((e) => setError(errorText(e)));
   }
 
+  async function pinPr(p: RowPr, on: boolean) {
+    setError(undefined);
+    await pinStackPr(workspace, p.number, on, revset).catch((e) => setError(errorText(e)));
+  }
+
   function edit(c = cursor) {
     const rev = changeAt(c);
     if (rev) act(...editAction(rev));
@@ -421,7 +426,14 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
             lead={commit.workingCopy && <TurnsToggle turns={turns} />}
             pill={
               rp && (
-                <PrPill workspace={workspace} pr={rp} on={prOn(rp)} onReview={() => reviewPr(rp)} />
+                <PrPill
+                  workspace={workspace}
+                  pr={rp}
+                  on={prOn(rp)}
+                  pinned={prOn(rp) && !!pr?.pinned}
+                  onReview={() => reviewPr(rp)}
+                  onPin={rp.own ? undefined : (on) => pinPr(rp, on)}
+                />
               )
             }
           />

@@ -36,6 +36,9 @@ pub struct PrRecord {
     /// A stack PR's commits stop at this bookmark: the head of the open PR below it.
     #[serde(default)]
     pub below: Option<String>,
+    /// A stack PR the user pinned, which stays whatever the review is.
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 const SCHEMA: &str = "

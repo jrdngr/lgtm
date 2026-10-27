@@ -43,6 +43,7 @@ async fn pr_workspace(
             name: "r".into(),
         },
         number: 1,
+        pinned: false,
         id: String::new(),
         title: String::new(),
         url: String::new(),

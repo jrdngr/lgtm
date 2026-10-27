@@ -86,6 +86,8 @@ pub struct PrDto {
     pub revset: String,
     /// Picked from the workspace's stack rather than checked out into it.
     pub stack: bool,
+    /// A stack PR the user pinned.
+    pub pinned: bool,
 }
 
 impl From<&PrRecord> for PrDto {
@@ -101,6 +103,7 @@ impl From<&PrRecord> for PrDto {
             head: p.head.clone(),
             revset: p.revset(),
             stack: p.stack,
+            pinned: p.pinned,
         }
     }
 }

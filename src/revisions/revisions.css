@@ -238,6 +238,11 @@ button.lr-pr.on {
   background: rgb(57 197 207 / 30%);
 }
 
+.lr-pin {
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
 .picker-footer {
   display: flex;
   flex-wrap: wrap;

@@ -1,5 +1,6 @@
 //! A PR picked from a workspace's stack instead of checked out into a workspace of its own.
-//! It stays the workspace's PR while the review is its commits.
+//! It stays the workspace's PR while the review takes in any of its commits, or while it's
+//! pinned.
 
 use anyhow::bail;
 
@@ -84,14 +85,50 @@ impl RepoCtx {
         Ok(nearest.map(|n| n.bookmark.clone()))
     }
 
-    /// Drops the workspace's stack PR, as reviewing anything else does.
-    pub fn clear_stack_pr(&self, workspace: Option<&str>) -> anyhow::Result<()> {
+    /// Pins stack PR `number`, making it the workspace's PR if it isn't, or unpins it.
+    pub async fn pin_stack_pr(
+        &self,
+        workspace: Option<&str>,
+        number: u32,
+        pinned: bool,
+    ) -> anyhow::Result<PrDto> {
         let key = workspace.unwrap_or("");
-        let store = self.store.lock().unwrap();
-        if store.pr(key)?.is_some_and(|p| p.stack) {
-            store.delete_pr(key)?;
+        let current = self.store.lock().unwrap().pr(key)?;
+        let mut pr = match current {
+            Some(p) if p.number == number => p,
+            _ => {
+                self.review_stack_pr(workspace, number).await?;
+                self.store.lock().unwrap().pr(key)?.unwrap()
+            }
+        };
+        if pr.stack {
+            pr.pinned = pinned;
+            self.store.lock().unwrap().save_pr(&pr)?;
         }
-        Ok(())
+        Ok(PrDto::from(&pr))
+    }
+
+    /// Drops the workspace's stack PR once the review, `revset`, takes in none of its commits,
+    /// unless it's pinned. Whether the workspace still has a PR.
+    pub async fn follow_review(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+    ) -> anyhow::Result<bool> {
+        let key = workspace.unwrap_or("");
+        let Some(pr) = self.store.lock().unwrap().pr(key)? else {
+            return Ok(false);
+        };
+        if !pr.stack || pr.pinned {
+            return Ok(true);
+        }
+        let ws = self.workspace(workspace).await?;
+        let shared = format!("({}) & ({revset})", pr.revset());
+        if !ws.jj.commit_ids(&shared).await?.is_empty() {
+            return Ok(true);
+        }
+        self.store.lock().unwrap().delete_pr(key)?;
+        Ok(false)
     }
 
     async fn save_stack_pr(
@@ -110,6 +147,7 @@ impl RepoCtx {
             workspace: workspace.to_string(),
             repo,
             number: pr.number,
+            pinned: false,
             id: info.id,
             title: info.title,
             url: info.url,

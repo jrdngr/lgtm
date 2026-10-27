@@ -54,12 +54,33 @@ pub(crate) async fn review_stack_pr(
         .map_err(err)
 }
 
-/// Drops the workspace's stack PR.
+/// Pins stack PR `number`, making it the workspace's PR, or unpins it.
 #[tauri::command]
 #[specta::specta]
-pub(crate) fn clear_stack_pr(window: Frame, workspace: Option<String>) -> CmdResult<()> {
+pub(crate) async fn pin_stack_pr(
+    window: Frame,
+    workspace: Option<String>,
+    number: u32,
+    pinned: bool,
+) -> CmdResult<PrDto> {
     repo(&window)?
-        .clear_stack_pr(workspace.as_deref())
+        .pin_stack_pr(workspace.as_deref(), number, pinned)
+        .await
+        .map_err(err)
+}
+
+/// Drops the workspace's stack PR unless it's pinned or the review takes in any of its
+/// commits. Whether the workspace still has a PR.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn follow_review(
+    window: Frame,
+    workspace: Option<String>,
+    revset: String,
+) -> CmdResult<bool> {
+    repo(&window)?
+        .follow_review(workspace.as_deref(), &revset)
+        .await
         .map_err(err)
 }
 

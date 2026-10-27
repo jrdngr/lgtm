@@ -425,6 +425,8 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  A stack PR the user pinned. */
+	pinned: boolean,
 } | null, string>(__TAURI_INVOKE("pr_info", { workspace })),
 	/**  Opens the workspace's PR on GitHub in the browser. */
 	openPrPage: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("open_pr_page", { workspace })),
@@ -451,11 +453,18 @@ export const commands = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  A stack PR the user pinned. */
+	pinned: boolean,
 } | null, string>(__TAURI_INVOKE("sync_stack_pr", { workspace })),
 	/**  Makes stack PR `number` the workspace's PR, to review its commits. */
 	reviewStackPr: (workspace: string | null, number: number) => typedError<PrDto, string>(__TAURI_INVOKE("review_stack_pr", { workspace, number })),
-	/**  Drops the workspace's stack PR. */
-	clearStackPr: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("clear_stack_pr", { workspace })),
+	/**  Pins stack PR `number`, making it the workspace's PR, or unpins it. */
+	pinStackPr: (workspace: string | null, number: number, pinned: boolean) => typedError<PrDto, string>(__TAURI_INVOKE("pin_stack_pr", { workspace, number, pinned })),
+	/**
+	 *  Drops the workspace's stack PR unless it's pinned or the review takes in any of its
+	 *  commits. Whether the workspace still has a PR.
+	 */
+	followReview: (workspace: string | null, revset: string) => typedError<boolean, string>(__TAURI_INVOKE("follow_review", { workspace, revset })),
 	/**
 	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
 	 *  conversation and its diff with review threads.
@@ -1859,6 +1868,8 @@ export type PrDto = {
 	revset: string,
 	/**  Picked from the workspace's stack rather than checked out into it. */
 	stack: boolean,
+	/**  A stack PR the user pinned. */
+	pinned: boolean,
 };
 
 export type PrPreviewDto = {
