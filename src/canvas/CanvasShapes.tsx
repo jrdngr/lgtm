@@ -108,11 +108,26 @@ function ShapeLabel({ ed, label }: { ed: Ed; label: Label }) {
   );
 }
 
-/** The tags, each at its element's top right corner. */
+/** The tags, each at its element's top right corner: the user's, then the agent's in teal,
+ * left of the user's when both are on one element. */
 export function Tags({ ed, editing }: { ed: Ed; editing: boolean }) {
   const g = ed.gesture;
+  const mine = new Set(Object.values(ed.view.tags));
   return (
     <>
+      {Object.entries(ed.view.agentTags).map(([digit, target]) => {
+        const b = ed.tagBox(target);
+        if (!b) return null;
+        return (
+          <span
+            key={`agent-${digit}`}
+            className="cv-tag agent"
+            style={{ left: b.x + b.w - (mine.has(target) ? 24 : 0), top: b.y }}
+          >
+            {digit}
+          </span>
+        );
+      })}
       {Object.entries(ed.view.tags).map(([digit, target]) => {
         if (g?.kind === "tag" && g.digit === digit) return null;
         const b = ed.tagBox(target);

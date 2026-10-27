@@ -543,6 +543,9 @@ export function useCanvasEdit(p: {
         ...view,
         notes: view.notes.filter((n) => n.id !== d.id),
         tags: Object.fromEntries(Object.entries(view.tags).filter(([, on]) => on !== d.id)),
+        agentTags: Object.fromEntries(
+          Object.entries(view.agentTags).filter(([, on]) => on !== d.id),
+        ),
       }));
       return;
     }
@@ -720,7 +723,7 @@ export function useCanvasEdit(p: {
     ungroupSelection,
     removeSelection,
     selectionBox,
-    clearTags: () => change((view) => ({ ...view, tags: {} })),
+    clearTags: () => change((view) => ({ ...view, tags: {}, agentTags: {} })),
     selectEdge: (key: string, add: boolean) =>
       setSelected(add ? new Set([...selected, edgeRef(key)]) : new Set([edgeRef(key)])),
     resetLayout: () => change((view) => ({ ...view, positions: {}, frozen: false })),

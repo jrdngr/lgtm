@@ -90,6 +90,14 @@ pub enum CanvasOp {
     },
     /// Removes a shape, note, arrow or group (keeping its members).
     Remove { id: String },
+    /// Puts your tag `digit` (`0` to `9`) on an element to point the user at it, moving it off
+    /// any other; without a target, takes it off. Your tags are apart from the user's and
+    /// can use the same digits. An element holds one of yours.
+    Tag {
+        digit: String,
+        #[serde(alias = "id")]
+        target: Option<String>,
+    },
     /// Drops every design part's position, so the view lays itself out again.
     ResetLayout,
 }
@@ -196,6 +204,7 @@ impl ViewCanvas {
         let gone = gone || self.ungroup(id);
         if gone {
             self.tags.retain(|_, on| on != id);
+            self.agent_tags.retain(|_, on| on != id);
         }
         gone
     }
@@ -361,6 +370,24 @@ impl Canvas {
                     })
                     .with_context(at)?;
                     touched.push(id);
+                }
+                CanvasOp::Tag { digit, target } => {
+                    if !matches!(digit.as_bytes(), [b'0'..=b'9']) {
+                        bail!("{}: a tag is a digit, `0` to `9`", at());
+                    }
+                    match target {
+                        Some(t) => {
+                            if !v.taken(&t) && !is_part(&t) {
+                                bail!("{}: nothing has id `{t}`", at());
+                            }
+                            v.agent_tags.retain(|_, on| on != &t);
+                            v.agent_tags.insert(digit, t.clone());
+                            touched.push(t);
+                        }
+                        None => {
+                            v.agent_tags.remove(&digit);
+                        }
+                    }
                 }
                 CanvasOp::Ungroup { id } => {
                     if !v.ungroup(&id) {
@@ -595,6 +622,53 @@ mod tests {
             )
         );
         assert_eq!(v.shapes[1].at, Pt { x: 40, y: 50 });
+    }
+
+    #[test]
+    fn agent_tags_sit_apart_from_the_users_and_move_rather_than_double_up() {
+        let mut c = Canvas::default();
+        c.apply(
+            "main",
+            ops(serde_json::json!([
+                {"op": "shape", "id": "a"},
+                {"op": "shape", "id": "b"},
+                {"op": "tag", "digit": "1", "target": "s:a"},
+            ])),
+        )
+        .unwrap();
+        c.views
+            .get_mut("main")
+            .unwrap()
+            .tags
+            .insert("1".into(), "s:b".into());
+        c.apply(
+            "main",
+            ops(serde_json::json!([
+                {"op": "tag", "digit": "2", "target": "s:a"},
+                {"op": "tag", "digit": "3", "target": "s:b"},
+                {"op": "tag", "digit": "3"},
+            ])),
+        )
+        .unwrap();
+        let v = &c.views["main"];
+        assert_eq!(
+            v.agent_tags.iter().collect::<Vec<_>>(),
+            [(&"2".to_string(), &"s:a".to_string())]
+        );
+        assert_eq!(v.tags["1"], "s:b");
+
+        for bad in [
+            serde_json::json!([{"op": "tag", "digit": "12", "target": "s:a"}]),
+            serde_json::json!([{"op": "tag", "digit": "4", "target": "nope"}]),
+        ] {
+            assert!(c.apply("main", ops(bad)).is_err());
+        }
+        c.apply(
+            "main",
+            ops(serde_json::json!([{"op": "remove", "id": "s:a"}])),
+        )
+        .unwrap();
+        assert!(c.views["main"].agent_tags.is_empty());
     }
 
     #[test]

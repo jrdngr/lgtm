@@ -2803,6 +2803,11 @@ export type ViewCanvas = {
 	arrows?: CanvasArrow[],
 	/**  The user's numbered pointers: the element each digit, `0` to `9`, sits on. */
 	tags?: { [key in string]: string },
+	/**
+	 *  The agent's numbered pointers for the user, apart from the user's: the same digits can
+	 *  be on both.
+	 */
+	agentTags?: { [key in string]: string },
 };
 
 /**  View > Word Wrap was turned on or off. */

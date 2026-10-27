@@ -189,6 +189,9 @@ pub struct ViewCanvas {
     pub arrows: Vec<CanvasArrow>,
     /// The user's numbered pointers: the element each digit, `0` to `9`, sits on.
     pub tags: BTreeMap<String, String>,
+    /// The agent's numbered pointers for the user, apart from the user's: the same digits can
+    /// be on both.
+    pub agent_tags: BTreeMap<String, String>,
 }
 
 /// The last agent pass: how many changes it made and what it touched.

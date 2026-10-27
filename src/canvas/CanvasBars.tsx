@@ -426,7 +426,12 @@ export function EditTools({ ed, onResetLayout }: { ed: Ed; onResetLayout?(): voi
           </button>
         ))}
       </span>
-      <button type="button" className="cv-btn" disabled={!placed.size} onClick={ed.clearTags}>
+      <button
+        type="button"
+        className="cv-btn"
+        disabled={!placed.size && !Object.keys(ed.view.agentTags).length}
+        onClick={ed.clearTags}
+      >
         Clear tags
       </button>
       {onResetLayout && (

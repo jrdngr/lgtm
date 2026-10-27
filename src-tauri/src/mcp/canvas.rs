@@ -47,6 +47,8 @@ struct Current {
     view: String,
     /// The user's numbered tags: digit to element id.
     tags: BTreeMap<String, String>,
+    /// Your numbered tags for the user: digit to element id.
+    agent_tags: BTreeMap<String, String>,
     selection: Vec<String>,
     canvas: ViewCanvas,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -85,8 +87,9 @@ impl Lgtm {
         description = "The canvas the user last looked at in lgtm: a drawing, or a view of a \
         design's diagram. Returns its elements with who made each, what the user selected, and \
         their tags. Tags are the user's numbered pointers (0 to 9) to elements: when they say \
-        \"3\" or \"tag 3\", they mean the element under tag 3 here. Call it first whenever the \
-        user talks about a drawing, a diagram, a selection or a tag."
+        \"3\" or \"tag 3\", they mean the element under tag 3 here. agent_tags are yours, \
+        set with edit_canvas's tag op. Call it first whenever the user talks about a drawing, a \
+        diagram, a selection or a tag."
     )]
     async fn current_canvas(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
@@ -111,6 +114,7 @@ impl Lgtm {
             name,
             view: f.view,
             tags: view.tags.clone(),
+            agent_tags: view.agent_tags.clone(),
             selection: f.selection,
             canvas: view,
             parts: f.parts,
@@ -121,7 +125,9 @@ impl Lgtm {
     #[tool(
         description = "Draw on a drawing or a design's diagram in lgtm: add and change shapes, \
         text, sticky notes, arrows and lines, group things under labeled frames (groups nest), \
-        color them, move them, and on designs style edges. The user draws there too; \
+        color them, move them, and on designs style edges. Put your own numbered tags (0 to 9, \
+        drawn in teal apart from the user's) on elements to point the user at them, then say \
+        \"see your tag 2\" or the like. The user draws there too; \
         current_canvas shows the canvas as it is, with who made each element. Your changes may \
         move or restyle the user's; they show as one agent pass the user can undo."
     )]

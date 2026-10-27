@@ -537,3 +537,9 @@ g.cv-flash {
     display: none;
   }
 }
+
+/* The agent's tags, for pointing the user at something. */
+.cv-tag.agent {
+  background: var(--teal);
+  pointer-events: none;
+}

@@ -85,6 +85,7 @@ export function removeSelected(v: View, sel: Set<string>, ungroupAll: (v: View) 
     arrows: out.arrows.filter((a) => !arrows.has(a.id)),
     edges: Object.fromEntries(Object.entries(out.edges).filter(([k]) => !edges.has(k))),
     tags: Object.fromEntries(Object.entries(out.tags).filter(([, on]) => !gone.has(on))),
+    agentTags: Object.fromEntries(Object.entries(out.agentTags).filter(([, on]) => !gone.has(on))),
   };
   return out;
 }

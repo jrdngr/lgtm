@@ -14,6 +14,7 @@ const fullView = (v: ViewCanvas | undefined): View => ({
   notes: v?.notes ?? [],
   arrows: v?.arrows ?? [],
   tags: v?.tags ?? {},
+  agentTags: v?.agentTags ?? {},
 });
 
 /** `c` as stored, with its defaults filled in. */
