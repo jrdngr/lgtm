@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CommentDto, ReviewDto, Stage, StateDto } from "../bindings";
+import type { CommentDto, ReviewDto, Stage, StateDto, ThreadDto } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { type CommandResult, commands } from "../ipc";
 import { prComments } from "../model/prComments";
 import { confirmAction } from "../ui/prompt";
 import { fixedText, reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
+import { fixComments, fixedThreads, viewedFix } from "./fixes";
 import type { Moves } from "./follow";
 import { sendToBackgroundAgent, talk as talkTo } from "./linkCommands";
 import { type FlatFile, NEW_COMMENT } from "./model";
 
 const NONE: CommentDto[] = [];
+const NO_THREADS: ThreadDto[] = [];
 
 const without = <V>(m: ReadonlyMap<number, V>, id: number) => {
   const next = new Map(m);
@@ -73,11 +75,17 @@ export function useComments({
   const [sending, setSending] = useState<ReadonlySet<number>>(new Set());
   /** The block whose text box should take focus when it next renders. */
   const [focus, setFocus] = useState<number>();
-  const comments = review?.state.comments ?? NONE;
-  const threads = review?.state.threads;
+  const threads = review?.state.threads ?? NO_THREADS;
+  /** In the Fix view, the fix shown, whose threads are the only comments shown. */
+  const fix = viewedFix(review?.view);
+  const all = review?.state.comments ?? NONE;
+  const comments = useMemo(() => fixComments(all, threads, fix), [all, threads, fix]);
   /** Comments on the PR itself and their quotes, and threads whose file isn't in the review,
    * which show above the files. */
-  const onPr = useMemo(() => prComments(threads ?? [], comments), [threads, comments]);
+  const onPr = useMemo(
+    () => prComments(fix === undefined ? threads : fixedThreads(threads, fix), comments),
+    [threads, comments, fix],
+  );
 
   // The draft follows its rows when the diff changes, and goes when they do.
   const seen = useRef(files);
@@ -259,6 +267,8 @@ export function useComments({
     edits,
     focus,
     comments,
+    threads,
+    fix,
     onPr,
     quote,
     sendCombined,

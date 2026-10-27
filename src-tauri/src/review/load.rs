@@ -63,13 +63,14 @@ impl RepoCtx {
             }
             view => view,
         };
-        // Turns that are gone fall back to the whole review too.
+        // Turns and fixes that are gone fall back to the whole review too.
         let span = match view {
             View::Turn { turns } => self.turn_span(turns, &at_commit(ws).await?)?,
+            View::Fix { fix } => self.fix_span(*fix)?,
             _ => None,
         };
         let view = match (view, &span) {
-            (View::Turn { .. }, None) => &View::Combined,
+            (View::Turn { .. } | View::Fix { .. }, None) => &View::Combined,
             _ => view,
         };
         let spec = match span {

@@ -23,6 +23,8 @@ pub enum View {
     /// The diff of a run of agent turns and checkpoints, from the first's start to the last's
     /// end.
     Turn { turns: Vec<u32> },
+    /// The diff of a fix an agent linked to a PR thread.
+    Fix { fix: u32 },
 }
 
 /// How a change compares with the previous session.
@@ -273,7 +275,7 @@ pub async fn spec(jj: &Jj, whole: &Range, view: &View, stack: &Stack) -> anyhow:
             .ok_or_else(|| anyhow::anyhow!("change {change} is no longer in the review"))
     };
     match view {
-        View::Combined | View::Turn { .. } => Ok(Spec::Trees(whole.clone())),
+        View::Combined | View::Turn { .. } | View::Fix { .. } => Ok(Spec::Trees(whole.clone())),
         View::Change { change } => {
             let c = &stack.changes[find(change)?];
             Ok(Spec::Trees(jj.resolve(&c.commit_id).await?))

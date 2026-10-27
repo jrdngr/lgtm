@@ -218,9 +218,30 @@ impl Lgtm {
     }
 
     #[tool(
+        description = "Link the change you just made to the threads it fixes, and move them to \
+        review so the human can look it over. Call it once per fix, right after making it: lgtm \
+        links everything you changed since your last call (or since the prompt), so finish one \
+        fix and call this before you start the next. Name every thread one change fixes."
+    )]
+    async fn fixed_threads(&self, Parameters(p): Parameters<inputs::FixedThreads>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let session = self.hello.claude_session.as_deref();
+        let (review, state, fix) = ctx
+            .agent_fixed(self.workspace(), session, p.pr, &p.thread_ids)
+            .await
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok(format!(
+            "Linked +{} -{} to the threads and moved them to review.",
+            fix.added, fix.removed
+        ))
+    }
+
+    #[tool(
         description = "Move a thread to a stage: decide (the human has a call to make), \
-        fix (code to change), review (you made the change it asks for), reply (a reply to work \
-        out), or done (sent, fixed with nothing to say, or set aside). Only the human marks a reply ready. This never posts to GitHub."
+        fix (code to change), review (made; after a change of yours, call fixed_threads \
+        instead), reply (a reply to work out), or done (sent, fixed with nothing to say, or set aside). Only the human marks a \
+        reply ready. This never posts to GitHub."
     )]
     async fn set_thread_stage(&self, Parameters(p): Parameters<inputs::SetStage>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;

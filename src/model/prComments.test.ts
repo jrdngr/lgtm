@@ -7,7 +7,7 @@ const thread = (id: number, path: string): ThreadDto => ({
   path,
   line: path ? 3 : null,
   body: "",
-  state: { repo: "o/n", pr: 1, stage: "new", take: null, summary: "" },
+  state: { repo: "o/n", pr: 1, stage: "decide", take: null, summary: "" },
   github: {
     repo: "o/n",
     pr: 1,
@@ -22,6 +22,7 @@ const thread = (id: number, path: string): ThreadDto => ({
   messages: [],
   suggestion: null,
   placed: false,
+  fixes: [],
   createdAt: id,
 });
 

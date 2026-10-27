@@ -86,7 +86,7 @@ fn touches(d: &FileDiff, paths: &[String]) -> bool {
 }
 
 /// Lines added and removed in `diffs`.
-fn counts<'a>(diffs: impl Iterator<Item = &'a FileDiff>) -> (u32, u32) {
+pub(crate) fn counts<'a>(diffs: impl Iterator<Item = &'a FileDiff>) -> (u32, u32) {
     let rows = diffs.flat_map(|d| &d.hunks).flat_map(|h| &h.rows);
     rows.fold((0, 0), |(a, r), row| match row.kind {
         RowKind::Added => (a + 1, r),
@@ -153,6 +153,7 @@ impl RepoCtx {
                 }
                 let store = self.store.lock().unwrap();
                 store.prune_turns(now_ms() - KEEP_MS)?;
+                store.prune_fixes(now_ms() - KEEP_MS)?;
                 store.start_turn(ws.key(), Some(session), prompt, &change, &commit, now_ms())?;
                 Ok(true)
             }

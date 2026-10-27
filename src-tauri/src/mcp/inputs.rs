@@ -173,6 +173,14 @@ pub enum ThreadStage {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct FixedThreads {
+    /// The threads' PR number, as the prompt or list_threads gives it.
+    pub pr: u32,
+    /// The ids of the threads, from list_threads, that the change you just made fixes.
+    pub thread_ids: Vec<u32>,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct SetStage {
     /// The thread's PR number, as the prompt or list_threads gives it. lgtm refuses the call
     /// when the thread or the workspace is on another PR.

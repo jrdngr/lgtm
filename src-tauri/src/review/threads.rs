@@ -29,6 +29,8 @@ pub struct ThreadDto {
     pub suggestion: Option<String>,
     /// Whether the review shows its code.
     pub placed: bool,
+    /// Fixes an agent linked to it, oldest first.
+    pub fixes: Vec<super::fixes::FixDto>,
     pub created_at: f64,
 }
 
@@ -98,12 +100,15 @@ impl Review {
                 .iter()
                 .any(|c| c.id as i64 == id && c.rows.is_some())
         };
+        let fixes = store.fixes(self.ws.key())?;
+        let fixes_of = |id: i64| fixes.iter().filter(|f| f.thread == id).map(Into::into).collect();
         let mut threads: Vec<ThreadDto> = store
             .pr_threads(&repo, pr)?
             .into_iter()
             .map(|c| ThreadDto {
                 id: c.id as u32,
                 placed: placed(c.id),
+                fixes: fixes_of(c.id),
                 line: match &c.github {
                     Some(g) => g.line,
                     None => c.pins.last().map(|p| p.line),

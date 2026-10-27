@@ -200,3 +200,15 @@
   border-radius: 50%;
   background: var(--mark-violet);
 }
+
+/* A thread an agent linked a fix to. */
+.thread-where .fix-ic {
+  width: 11px;
+  height: 11px;
+  margin-right: 4px;
+  vertical-align: -1px;
+  fill: none;
+  stroke: var(--flagged);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}

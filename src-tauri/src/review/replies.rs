@@ -175,6 +175,7 @@ mod tests {
         };
         let t = fenced(ThreadDto {
             id: 1,
+            fixes: vec![],
             path: "a.rs".into(),
             line: Some(3),
             body: "my reply".into(),

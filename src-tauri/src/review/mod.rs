@@ -13,6 +13,9 @@ mod comment_tests;
 mod comments;
 mod context;
 mod edits;
+mod fixes;
+#[cfg(test)]
+mod fixes_tests;
 mod github;
 #[cfg(test)]
 mod github_tests;

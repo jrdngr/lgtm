@@ -8,6 +8,7 @@ import { openUrl } from "../services/pathMenu";
 import { useRoles } from "../terminal/registry";
 import { IconButton } from "../ui/icons";
 import { CombineDialog } from "./CombineDialog";
+import { FixChip } from "./FixChip";
 import { setCurrentThread, useLink } from "./linkedAgent";
 import { SnippetDiff } from "./SnippetDiff";
 import { StageStrip } from "./StageStrip";
@@ -47,6 +48,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
   /** The thread the linked agent hears I'm on. */
   const current = !!link.terminal && link.current === id;
   const editing = c.edits.get(id);
+  const fixes = c.threads.find((t) => t.id === id)?.fixes ?? [];
   const viewer = viewerLogin(c.comments);
   const changed = !!comment.path && !comment.rows;
   const canFinal = !!editing?.trim() && thread.stage !== "ready";
@@ -156,6 +158,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
         )}
         <span className="card-ctl">
           {!split && <StageStrip stage={thread.stage} onPick={(s) => c.setStage(id, s)} />}
+          {fixes.length > 0 && <FixChip workspace={c.workspace} fixes={fixes} shown={c.fix} />}
           <span className="spacer" />
           {!split && <IconButton icon="retry" label="Reset" onClick={() => c.reset(id)} />}
           {gh && (

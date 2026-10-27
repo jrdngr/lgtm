@@ -38,6 +38,7 @@ describe("finalText", () => {
       line: id,
     },
     placed: true,
+    fixes: [],
     createdAt: 0,
   });
 

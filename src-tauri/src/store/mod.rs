@@ -8,6 +8,7 @@ mod checks;
 mod comments;
 mod designs;
 mod drawings;
+mod fixes;
 mod guided;
 mod log_revsets;
 mod marks;
@@ -28,6 +29,7 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
+pub use fixes::Fix;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use guided::AgentEdit;
 pub use marks::{Mark, MarkColor};
@@ -265,6 +267,7 @@ impl Store {
         setup::create_table(&db)?;
         symbol_info::create_table(&db)?;
         turns::create_table(&db)?;
+        fixes::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

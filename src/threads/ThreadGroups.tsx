@@ -74,6 +74,11 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
         {threadLabel(t)}
       </span>
       <span className="thread-where">
+        {t.fixes.length > 0 && (
+          <svg className="fix-ic" viewBox="0 0 16 16" aria-label="Fixed">
+            <path d="M8 2.5v6M5 5.5h6M5 13h6" />
+          </svg>
+        )}
         {t.path && threadWhere(t)}
         {t.suggestion && <span className="row-suggested" />}
         {current && (

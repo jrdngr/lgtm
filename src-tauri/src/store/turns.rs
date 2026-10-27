@@ -149,6 +149,20 @@ impl Store {
             .optional()
     }
 
+    /// The workspace's latest agent turn that hasn't ended, if any.
+    pub fn running_agent_turn(&self, workspace: &str) -> rusqlite::Result<Option<Turn>> {
+        self.db
+            .query_row(
+                &format!(
+                    "SELECT {COLUMNS} FROM agent_turns WHERE workspace = ? AND session IS NOT NULL
+                     AND ended_at IS NULL ORDER BY id DESC LIMIT 1"
+                ),
+                [workspace],
+                row,
+            )
+            .optional()
+    }
+
     /// The workspace's turns and checkpoints on `change_id`, newest first.
     pub fn turns_on(&self, workspace: &str, change_id: &str) -> rusqlite::Result<Vec<Turn>> {
         let mut stmt = self.db.prepare(&format!(

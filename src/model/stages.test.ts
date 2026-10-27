@@ -26,6 +26,7 @@ function thread(id: number, stage: Stage, body = "", gh = true, path = "a.rs"): 
     messages: [],
     suggestion: null,
     placed: true,
+    fixes: [],
     createdAt: 0,
   };
 }

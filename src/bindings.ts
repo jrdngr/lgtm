@@ -113,7 +113,9 @@ export const commands = {
  *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
  *  end.
  */
-{ kind: "turn"; turns: number[] } | null) => typedError<ReviewDto_Serialize, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
+{ kind: "turn"; turns: number[] } | 
+/**  The diff of a fix an agent linked to a PR thread. */
+{ kind: "fix"; fix: number } | null) => typedError<ReviewDto_Serialize, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Unchanged lines `from` to `to` of a file's new side, for showing code between hunks. */
 	contextLines: (review: number, file: number, from: number, to: number) => typedError<ContextLine[], string>(__TAURI_INVOKE("context_lines", { review, file, from, to })),
@@ -129,7 +131,9 @@ export const commands = {
  *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
  *  end.
  */
-{ kind: "turn"; turns: number[] } | null) => typedError<RefreshDto_Serialize, string>(__TAURI_INVOKE("refresh_review", { review, view })),
+{ kind: "turn"; turns: number[] } | 
+/**  The diff of a fix an agent linked to a PR thread. */
+{ kind: "fix"; fix: number } | null) => typedError<RefreshDto_Serialize, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
 	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
 	/**  The repo's current operation, empty when it can't be read. */
@@ -1387,6 +1391,15 @@ export type Finding = {
 	facts: string[],
 	explanation: string,
 	fix?: string | null,
+};
+
+/**  A fix linked to a thread, for its chip and the Fix view. */
+export type FixDto = {
+	id: number,
+	added: number,
+	removed: number,
+	/**  When it was linked (Unix ms). */
+	at: number | null,
 };
 
 /**  What happens to a ready thread with no reply: one that was fixed as asked. */
@@ -2780,6 +2793,8 @@ export type ThreadDto_Deserialize = {
 	suggestion: string | null,
 	/**  Whether the review shows its code. */
 	placed: boolean,
+	/**  Fixes an agent linked to it, oldest first. */
+	fixes: FixDto[],
 	createdAt: number | null,
 };
 
@@ -2802,6 +2817,8 @@ export type ThreadDto_Serialize = {
 	suggestion: string | null,
 	/**  Whether the review shows its code. */
 	placed: boolean,
+	/**  Fixes an agent linked to it, oldest first. */
+	fixes: FixDto[],
 	createdAt: number | null,
 };
 
@@ -2946,7 +2963,9 @@ export type View =
  *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
  *  end.
  */
-{ kind: "turn"; turns: number[] };
+{ kind: "turn"; turns: number[] } | 
+/**  The diff of a fix an agent linked to a PR thread. */
+{ kind: "fix"; fix: number };
 
 /**  One view's drawing. */
 export type ViewCanvas = {

@@ -3,6 +3,7 @@ import type { ChangeDto, MarkColor, ReviewDto, TurnDto, View } from "../bindings
 import { turnName, turnTime } from "../turns/turnsStore";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
+import { fixChoices } from "./fixes";
 import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
@@ -77,6 +78,8 @@ export function ReviewBar(props: Props) {
   function pickKind(kind: View["kind"]) {
     if (!review) return;
     if (kind === "combined") return props.onView({ kind });
+    // A fix is opened from its thread.
+    if (kind === "fix") return;
     if (kind === "turn") {
       if (props.turns[0]) props.onView({ kind, turns: [props.turns[0].id] });
       return;
@@ -101,6 +104,9 @@ export function ReviewBar(props: Props) {
           </option>
           <option value="turn" disabled={!props.turns.length && view.kind !== "turn"}>
             Agent turn
+          </option>
+          <option value="fix" disabled={view.kind !== "fix"}>
+            Fix
           </option>
         </select>
       </span>
@@ -134,6 +140,21 @@ export function ReviewBar(props: Props) {
             {props.turns.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.kind === "checkpoint" ? `Checkpoint ${turnTime(t)}` : turnName(t)}
+              </option>
+            ))}
+          </select>
+        </span>
+      )}
+      {review && view.kind === "fix" && (
+        <span className="quiet-select change-picker">
+          <select
+            value={view.fix}
+            onChange={(e) => props.onView({ kind: "fix", fix: Number(e.target.value) })}
+            aria-label="Fix"
+          >
+            {fixChoices(review.state.threads, view.fix).map(([id, label]) => (
+              <option key={id} value={id}>
+                {label}
               </option>
             ))}
           </select>
