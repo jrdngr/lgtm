@@ -4,11 +4,9 @@ import { useArch } from "../arch/state";
 import type { BotRun } from "../bindings";
 import { BotsPanel } from "../bots/BotsPanel";
 import { useWorkspace, workspaceKey } from "../core/workspace";
-import { DrawingsPanel } from "../drawings/DrawingsPanel";
 import { RepoTree } from "../editor/RepoTree";
 import { GuidedPanel } from "../guided/GuidedPanel";
 import { needsYou } from "../model/stages";
-import { NotesPanel } from "../notes/NotesPanel";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
@@ -16,6 +14,7 @@ import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
 import { SearchPanel } from "../search/SearchPanel";
 import { CommentsPanel } from "../threads/CommentsPanel";
+import { ArtifactsPanel } from "./ArtifactsPanel";
 import { SidePanel, type SideState } from "./SidePanel";
 
 function RepoTab() {
@@ -30,8 +29,8 @@ interface Props {
   onHide(): void;
 }
 
-/** The right side panel: the repo's files; the review's changes, comments, architecture and
- * reports; Q&A; drawings; and notes. A tab turns amber for threads that need you, open high Look items,
+/** The right side panel: the repo's files, search, and the review's changes and comments; the
+ * guided review, architecture, reports and Q&A; and notes and drawings. A tab turns amber for threads that need you, open high Look items,
  * and open Q&A questions. */
 export function RightPanel({ onOpenReport, ...props }: Props) {
   const workspace = useWorkspace();
@@ -43,20 +42,28 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
       side="right"
       {...props}
       views={[
-        { id: "repo", group: "repo", title: "Files", icon: "folder", render: () => <RepoTab /> },
+        { id: "repo", group: "code", title: "Files", icon: "folder", render: () => <RepoTab /> },
         {
           id: "search",
-          group: "repo",
+          group: "code",
           title: "Search",
           icon: "search",
           render: () => <SearchPanel />,
         },
         {
           id: "changes",
-          group: "review",
+          group: "code",
           title: "Changes",
           icon: "gitTree",
           render: () => <FilesPanel />,
+        },
+        {
+          id: "comments",
+          group: "code",
+          title: "Comments",
+          icon: "comments",
+          alert: needsYou(review?.threads ?? []) > 0,
+          render: () => <CommentsPanel />,
         },
         {
           id: "guided",
@@ -64,14 +71,6 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           title: "Guided",
           icon: "guided",
           render: () => <GuidedPanel />,
-        },
-        {
-          id: "comments",
-          group: "review",
-          title: "Comments",
-          icon: "comments",
-          alert: needsYou(review?.threads ?? []) > 0,
-          render: () => <CommentsPanel />,
         },
         {
           id: "architecture",
@@ -90,25 +89,18 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
         },
         {
           id: "qa",
-          group: "qa",
+          group: "review",
           title: "Q&A",
           icon: "help",
           alert: qa.sessions.some((d) => !d.archived && openQuestions(d).length > 0),
           render: () => <QaPanel />,
         },
         {
-          id: "drawings",
-          group: "drawings",
-          title: "Drawings",
-          icon: "drawing",
-          render: () => <DrawingsPanel />,
-        },
-        {
-          id: "notes",
-          group: "drawings",
-          title: "Notes",
+          id: "artifacts",
+          group: "artifacts",
+          title: "Artifacts",
           icon: "note",
-          render: () => <NotesPanel />,
+          render: () => <ArtifactsPanel />,
         },
       ]}
     />

@@ -265,7 +265,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       openGuided(selected);
     },
     "Mod+Shift+X": () => {
-      showView("right", "drawings");
+      showView("right", "artifacts");
       requestNewDrawing();
     },
     "Mod+J": () => {

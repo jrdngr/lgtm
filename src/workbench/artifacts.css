@@ -1,0 +1,13 @@
+/* Notes and drawings share the panel's scroll, so neither fills it. */
+.artifacts-panel .notes-panel,
+.artifacts-panel .notes-tree {
+  height: auto;
+  flex: none;
+  overflow: visible;
+}
+
+.artifacts-divider {
+  margin: 6px 10px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
