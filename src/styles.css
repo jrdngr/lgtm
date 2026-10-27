@@ -410,9 +410,41 @@ kbd {
 .side-panel {
   position: relative;
   display: flex;
+  flex-direction: column;
   flex: none;
   min-width: 0;
   background: var(--bg);
+}
+
+/* A view and its tabs; the panel holds two when split. */
+.side-half {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.side-split-resizer {
+  flex: none;
+  height: 1px;
+  background: var(--border);
+  position: relative;
+}
+
+.side-split-resizer::after {
+  content: "";
+  position: absolute;
+  inset: -3px 0;
+  cursor: row-resize;
+  z-index: 1;
+}
+
+.side-split-resizer:hover::after {
+  background: var(--accent);
+}
+
+.side-tabs .side-split-toggle {
+  margin-top: auto;
+  margin-bottom: 10px;
 }
 
 .side-left {

@@ -21,10 +21,11 @@ const key = (root: string) => `lgtm:sides:${root}`;
 export function loadSides(root: string): Sides {
   try {
     const saved = JSON.parse(localStorage.getItem(key(root)) ?? "null");
-    const right = { ...DEFAULT_SIDES.right, ...saved?.right };
+    const right: SideState = { ...DEFAULT_SIDES.right, ...saved?.right };
+    const split = right.split && { ...right.split, view: movedView(right.split.view) };
     return {
       left: { ...DEFAULT_SIDES.left, ...saved?.left },
-      right: { ...right, view: movedView(right.view) },
+      right: { ...right, view: movedView(right.view), split },
       rightViews: saved?.rightViews,
     };
   } catch {

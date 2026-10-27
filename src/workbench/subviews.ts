@@ -15,6 +15,8 @@ const MOVED: Record<string, string> = {
   design: "qa",
   pr: "comments",
   walkthrough: "comments",
+  notes: "artifacts",
+  drawings: "artifacts",
 };
 
 /** The right panel view for a view id saved by any build. Older builds nested Changes under

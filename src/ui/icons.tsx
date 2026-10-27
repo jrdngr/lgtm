@@ -166,6 +166,12 @@ const PATHS = {
       <path d="M10.5 7.5h4.5l2.25 5.25" />
     </>
   ),
+  stack: (
+    <>
+      <rect x="4" y="3" width="16" height="7.5" rx="2" />
+      <rect x="4" y="13.5" width="16" height="7.5" rx="2" />
+    </>
+  ),
   note: (
     <>
       <path d="M6 3h8l4 4v14H6z" />

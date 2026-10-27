@@ -40,6 +40,7 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
   return (
     <SidePanel
       side="right"
+      splittable
       {...props}
       views={[
         { id: "repo", group: "code", title: "Files", icon: "folder", render: () => <RepoTab /> },
