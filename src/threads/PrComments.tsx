@@ -6,7 +6,7 @@ import { PrSection } from "../github/PrSection";
 import { useDiscussion } from "../github/useDiscussion";
 import { commands, unwrap } from "../ipc";
 import { viewerLogin } from "../model/people";
-import { working } from "../model/stages";
+import { untriaged, working } from "../model/stages";
 import { triageAllText } from "../review/agentText";
 import type { CurrentReview } from "../review/current";
 import { sendToBackgroundAgent, startLink } from "../review/linkCommands";
@@ -74,7 +74,7 @@ export function PrComments({ pr, review }: Props) {
   const sending = review && !off;
   const link = useLink(workspace);
   const linked = !!link.terminal;
-  const freshThreads = working(threads).filter((t) => t.state.stage === "new");
+  const freshThreads = untriaged(threads);
   const fresh = freshThreads.length;
   const canTriage = !!review && !link.working && fresh > 0;
   const onError = (message: string) => setError(message);

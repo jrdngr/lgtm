@@ -197,6 +197,11 @@ kbd {
   background: rgb(163 113 247 / 14%);
 }
 
+.pill.teal {
+  color: var(--github);
+  background: var(--review-soft);
+}
+
 .pill.pr {
   color: var(--review-text);
   background: rgb(57 197 207 / 16%);

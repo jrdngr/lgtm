@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn agents_get_githubs_posts_and_quotes_fenced() {
-        let mut state = ThreadState::new("o/n", 1, Stage::New);
+        let mut state = ThreadState::new("o/n", 1, Stage::Decide);
         state.quote = Some(Quote {
             of: 2,
             author: "eve".into(),

@@ -24,7 +24,7 @@ impl RepoCtx {
                 .posts
                 .first()
                 .map_or(String::new(), |p| p.author.clone());
-            let mut thread = crate::store::ThreadState::new(&state.repo, state.pr, Stage::New);
+            let mut thread = crate::store::ThreadState::new(&state.repo, state.pr, Stage::Decide);
             thread.quote = Some(Quote {
                 of,
                 author,

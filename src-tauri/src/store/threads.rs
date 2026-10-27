@@ -1,4 +1,4 @@
-//! GitHub threads' workflow: where each thread on a PR is, from new to done, and the agent's
+//! GitHub threads' workflow: where each thread on a PR is, from decide to done, and the agent's
 //! take on it. A comment with a thread state is a thread (on GitHub, or a draft of one); one
 //! without is a local note.
 
@@ -13,13 +13,14 @@ use super::{Comment, GhLink, Store, json_err};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum Stage {
-    /// Synced, not triaged yet.
+    /// Not triaged yet, or needs a call only the user can make.
     #[default]
-    New,
-    /// Needs a call only the user can make.
+    #[serde(alias = "new")]
     Decide,
     /// Agreed; the code is to change as asked.
     ToFix,
+    /// The agent made the change; the user is to look it over.
+    Review,
     /// A reply is being worked out.
     Reply,
     /// The reply is final, or the fix is in and needs none. Goes out with the next send.
@@ -95,7 +96,7 @@ impl ThreadState {
         let stage = if link.resolved {
             Stage::Done
         } else {
-            Stage::New
+            Stage::Decide
         };
         Self::new(&link.repo, link.pr, stage)
     }

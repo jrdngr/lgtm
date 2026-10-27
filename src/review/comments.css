@@ -748,13 +748,16 @@ button.group-head.fold:hover:not(:disabled) {
   opacity: 0.5;
 }
 
-.comment-block .stage-strip [data-stage="new"] i,
 .comment-block .stage-strip [data-stage="decide"] i {
   color: var(--amber);
 }
 
 .comment-block .stage-strip [data-stage="toFix"] i {
   color: var(--accent);
+}
+
+.comment-block .stage-strip [data-stage="review"] i {
+  color: var(--flagged);
 }
 
 .comment-block .stage-strip [data-stage="reply"] i {
@@ -779,7 +782,6 @@ button.group-head.fold:hover:not(:disabled) {
   opacity: 1;
 }
 
-.comment-block .stage-strip button.on[data-stage="new"],
 .comment-block .stage-strip button.on[data-stage="decide"] {
   color: var(--amber);
   background: rgb(210 153 34 / 14%);
@@ -788,6 +790,11 @@ button.group-head.fold:hover:not(:disabled) {
 .comment-block .stage-strip button.on[data-stage="toFix"] {
   color: var(--accent);
   background: rgb(79 140 201 / 16%);
+}
+
+.comment-block .stage-strip button.on[data-stage="review"] {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
 }
 
 .comment-block .stage-strip button.on[data-stage="reply"] {

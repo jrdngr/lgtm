@@ -4,7 +4,7 @@ import type { WorkspaceName } from "../core/workspace";
 import { type CommandResult, commands } from "../ipc";
 import { prComments } from "../model/prComments";
 import { confirmAction } from "../ui/prompt";
-import { reviewText, triageText } from "./agentText";
+import { fixedText, reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
 import type { Moves } from "./follow";
 import { sendToBackgroundAgent, talk as talkTo } from "./linkCommands";
@@ -206,7 +206,8 @@ export function useComments({
   }
 
   function sendComment(c: CommentDto) {
-    send(commentText(files, c), onDone);
+    const text = commentText(files, c);
+    send(c.thread ? `${text}\n\n${fixedText(c)}` : text, onDone);
   }
 
   /** Makes the thread the one I'm on and focuses the linked agent's terminal. */

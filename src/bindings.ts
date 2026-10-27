@@ -113,7 +113,7 @@ export const commands = {
  *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
  *  end.
  */
-{ kind: "turn"; turns: number[] } | null) => typedError<ReviewDto, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
+{ kind: "turn"; turns: number[] } | null) => typedError<ReviewDto_Serialize, string>(__TAURI_INVOKE("open_review", { workspace, revset, resume, view })),
 	closeReview: (review: number) => typedError<null, string>(__TAURI_INVOKE("close_review", { review })),
 	/**  Unchanged lines `from` to `to` of a file's new side, for showing code between hunks. */
 	contextLines: (review: number, file: number, from: number, to: number) => typedError<ContextLine[], string>(__TAURI_INVOKE("context_lines", { review, file, from, to })),
@@ -129,7 +129,7 @@ export const commands = {
  *  The diff of a run of agent turns and checkpoints, from the first's start to the last's
  *  end.
  */
-{ kind: "turn"; turns: number[] } | null) => typedError<RefreshDto, string>(__TAURI_INVOKE("refresh_review", { review, view })),
+{ kind: "turn"; turns: number[] } | null) => typedError<RefreshDto_Serialize, string>(__TAURI_INVOKE("refresh_review", { review, view })),
 	/**  The workspace's revisions log: its revset and the rows of `jj log` with its graph. */
 	logView: (workspace: string | null) => typedError<LogView, string>(__TAURI_INVOKE("log_view", { workspace })),
 	/**  The repo's current operation, empty when it can't be read. */
@@ -181,14 +181,14 @@ export const commands = {
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
 	 */
-	markRows: (review: number, rows: RowRef[], color: "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
+	markRows: (review: number, rows: RowRef[], color: "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
 	/**  Clears a file's marks and unchecks it, in one undo step. */
-	clearFileMarks: (review: number, file: number) => typedError<StateDto, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
-	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
-	undoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("undo_marks", { review })),
-	redoMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("redo_marks", { review })),
+	clearFileMarks: (review: number, file: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
+	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
+	undoMarks: (review: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("undo_marks", { review })),
+	redoMarks: (review: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("redo_marks", { review })),
 	/**  Removes the marks and file checks this review's revset created. */
-	resetReviewMarks: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_review_marks", { review })),
+	resetReviewMarks: (review: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("reset_review_marks", { review })),
 	/**  The review's architecture diff, or the diff between two of its commits. */
 	reviewArch: (review: number, transitive: boolean, range: {
 	/**  Absent for the root. */
@@ -316,28 +316,28 @@ export const commands = {
 	 *  Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
 	 *  makes it a draft for the workspace's PR on GitHub instead of a note.
 	 */
-	addComment: (review: number, rows: RowRef[], body: string, snippet: string, draft: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet, draft })),
+	addComment: (review: number, rows: RowRef[], body: string, snippet: string, draft: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet, draft })),
 	/**  Moves a thread to `stage`. */
-	setThreadStage: (review: number, comment: number, stage: Stage) => typedError<StateDto, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
+	setThreadStage: (review: number, comment: number, stage: Stage_Deserialize) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
 	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
-	resetThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
+	resetThread: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
 	/**  Marks a note done, or open again. */
-	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
+	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
 	/**  Starts a GitHub draft on a note's code, with its text. */
-	draftFromNote: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("draft_from_note", { review, comment })),
-	editComment: (review: number, comment: number, body: string) => typedError<StateDto, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
+	draftFromNote: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("draft_from_note", { review, comment })),
+	editComment: (review: number, comment: number, body: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
 	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
-	addQuote: (review: number, of: number, text: string) => typedError<StateDto, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
-	deleteComment: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
+	addQuote: (review: number, of: number, text: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
+	deleteComment: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
 	/**
 	 *  Adds a message from a synced terminal to a comment's chat. The review shows it as it
 	 *  would an agent's change, wherever the review is open.
 	 */
 	addChatMessage: (review: number, comment: number, author: Author, text: string) => typedError<null, string>(__TAURI_INVOKE("add_chat_message", { review, comment, author, text })),
 	/**  Makes a thread's suggested reply its reply. */
-	takeSuggestion: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("take_suggestion", { review, comment })),
+	takeSuggestion: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("take_suggestion", { review, comment })),
 	/**  Drops a thread's suggested reply. */
-	dismissSuggestion: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("dismiss_suggestion", { review, comment })),
+	dismissSuggestion: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("dismiss_suggestion", { review, comment })),
 	/**
 	 *  Links terminal `terminal`'s agent to the review, with `thread` as the thread the user is on,
 	 *  or with `linked` false, unlinks it.
@@ -478,21 +478,21 @@ export const commands = {
 	 */
 	refetchPr: (workspace: string | null, review: number | null) => typedError<null, string>(__TAURI_INVOKE("refetch_pr", { workspace, review })),
 	/**  Pulls the PR's review threads into the review as comments. */
-	pullPrComments: (review: number) => typedError<StateDto, string>(__TAURI_INVOKE("pull_pr_comments", { review })),
+	pullPrComments: (review: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("pull_pr_comments", { review })),
 	/**
 	 *  Sends the PR's ready threads to GitHub and submits the review with `verdict` and
 	 *  `summary`. `fixed` says what happens to ready threads with no reply.
 	 */
-	sendThreads: (review: number, fixed: Fixed, verdict: Verdict, summary: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_threads", { review, fixed, verdict, summary })),
+	sendThreads: (review: number, fixed: Fixed, verdict: Verdict, summary: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("send_threads", { review, fixed, verdict, summary })),
 	/**  Sends one ready thread to GitHub. */
-	sendThread: (review: number, comment: number) => typedError<StateDto, string>(__TAURI_INVOKE("send_thread", { review, comment })),
+	sendThread: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("send_thread", { review, comment })),
 	/**  The PR's conversation: comments and review summaries. */
 	prDiscussion: (workspace: string | null) => typedError<DiscussionDto, string>(__TAURI_INVOKE("pr_discussion", { workspace })),
 	/**
 	 *  Posts `body` to the PR's conversation as the reply of quote threads `comments`, which
 	 *  then are done.
 	 */
-	sendCombined: (review: number, comments: number[], body: string) => typedError<StateDto, string>(__TAURI_INVOKE("send_combined", { review, comments, body })),
+	sendCombined: (review: number, comments: number[], body: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("send_combined", { review, comments, body })),
 	/**  The workspace's Q&A sessions, oldest first. */
 	listQa: (workspace: string | null) => typedError<Session_Serialize[], string>(__TAURI_INVOKE("list_qa", { workspace })),
 	/**  Starts a session from a prompt. Nothing runs until it's asked. */
@@ -533,7 +533,7 @@ export const events = {
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
 	reviewOutdated: makeEvent<ReviewOutdated>("review-outdated"),
-	reviewStateChanged: makeEvent<ReviewStateChanged>("review-state-changed"),
+	reviewStateChanged: makeEvent<ReviewStateChanged_Deserialize>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
 	showRepo: makeEvent<ShowRepo>("show-repo"),
 	symbolInfoChanged: makeEvent<SymbolInfoChanged>("symbol-info-changed"),
@@ -975,7 +975,9 @@ export type CodeSymbol = {
 	hasError: boolean,
 };
 
-export type CommentDto = {
+export type CommentDto = CommentDto_Serialize | CommentDto_Deserialize;
+
+export type CommentDto_Deserialize = {
 	id: number,
 	path: string,
 	/**  The review file it belongs to. */
@@ -994,7 +996,31 @@ export type CommentDto = {
 	/**  The GitHub thread it's on, whose replies show above it. */
 	github: GhLink | null,
 	/**  Set on GitHub threads and drafts of them; notes have none. */
-	thread: ThreadState | null,
+	thread: ThreadState_Deserialize | null,
+	/**  A note the user is done with. */
+	done: boolean,
+};
+
+export type CommentDto_Serialize = {
+	id: number,
+	path: string,
+	/**  The review file it belongs to. */
+	file: number,
+	/**  Absent when its code can't be found any more. */
+	rows: RowSpan | null,
+	body: string,
+	/**  The code as it was when the comment was made. */
+	snippet: string,
+	review: string,
+	createdAt: number | null,
+	updatedAt: number | null,
+	messages: Message[],
+	/**  A reply a synced terminal agent suggested. */
+	suggestion: string | null,
+	/**  The GitHub thread it's on, whose replies show above it. */
+	github: GhLink | null,
+	/**  Set on GitHub threads and drafts of them; notes have none. */
+	thread: ThreadState_Serialize | null,
 	/**  A note the user is done with. */
 	done: boolean,
 };
@@ -2121,14 +2147,25 @@ export type RangeDto = {
 	end: number,
 };
 
-export type RefreshDto = { kind: "loaded"; review: ReviewDto; 
+export type RefreshDto = RefreshDto_Serialize | RefreshDto_Deserialize;
+
+export type RefreshDto_Deserialize = ({ kind: "loaded"; review: ReviewDto_Deserialize; 
 /**  Where rows of the review as it was went. */
-moves: RowMove[] } | 
+moves: RowMove[] }) & { changes?: never; stale?: never; state?: never } | 
 /**
  *  The review still shows the same commits in the same view, so its files are as they
  *  were.
  */
-{ kind: "same"; changes: ChangeDto[]; state: StateDto; stale: string | null };
+({ kind: "same"; changes: ChangeDto[]; state: StateDto_Deserialize; stale: string | null }) & { moves?: never; review?: never };
+
+export type RefreshDto_Serialize = ({ kind: "loaded"; review: ReviewDto_Serialize; 
+/**  Where rows of the review as it was went. */
+moves: RowMove[] }) & { changes?: never; stale?: never; state?: never } | 
+/**
+ *  The review still shows the same commits in the same view, so its files are as they
+ *  were.
+ */
+({ kind: "same"; changes: ChangeDto[]; state: StateDto_Serialize; stale: string | null }) & { moves?: never; review?: never };
 
 export type RelationDto = {
 	from: string,
@@ -2177,7 +2214,9 @@ export type Review = {
 	findings: Finding[],
 };
 
-export type ReviewDto = {
+export type ReviewDto = ReviewDto_Serialize | ReviewDto_Deserialize;
+
+export type ReviewDto_Deserialize = {
 	id: number,
 	revset: string,
 	view: View,
@@ -2188,7 +2227,28 @@ export type ReviewDto = {
 	/**  True when the view is an interdiff, whose old side is `from` rebased, not `from`. */
 	interdiff: boolean,
 	files: FileDto[],
-	state: StateDto,
+	state: StateDto_Deserialize,
+	/**  The review's changes, oldest first. */
+	changes: ChangeDto[],
+	/**  Changes in the previous session that aren't in the review any more. */
+	removedChanges: ChangeDto[],
+	/**  When the previous session started (Unix ms), if there was one. */
+	previousSession: number | null,
+	stale: string | null,
+};
+
+export type ReviewDto_Serialize = {
+	id: number,
+	revset: string,
+	view: View,
+	from: string | null,
+	to: string,
+	/**  The whole review's head, whichever view is open. */
+	head: string,
+	/**  True when the view is an interdiff, whose old side is `from` rebased, not `from`. */
+	interdiff: boolean,
+	files: FileDto[],
+	state: StateDto_Serialize,
 	/**  The review's changes, oldest first. */
 	changes: ChangeDto[],
 	/**  Changes in the previous session that aren't in the review any more. */
@@ -2207,9 +2267,18 @@ export type ReviewOutdated = {
 };
 
 /**  An agent changed review `review`'s comments or threads. */
-export type ReviewStateChanged = {
+export type ReviewStateChanged = ReviewStateChanged_Serialize | ReviewStateChanged_Deserialize;
+
+/**  An agent changed review `review`'s comments or threads. */
+export type ReviewStateChanged_Deserialize = {
 	review: number,
-	state: StateDto,
+	state: StateDto_Deserialize,
+};
+
+/**  An agent changed review `review`'s comments or threads. */
+export type ReviewStateChanged_Serialize = {
+	review: number,
+	state: StateDto_Serialize,
 };
 
 export type RiskLevel = "minimal" | "low" | "moderate" | "high" | "critical";
@@ -2408,13 +2477,33 @@ export type SpecRefDto = {
 };
 
 /**  Where a thread is in the reply workflow. */
-export type Stage = 
-/**  Synced, not triaged yet. */
+export type Stage = Stage_Serialize | Stage_Deserialize;
+
+/**  Where a thread is in the reply workflow. */
+export type Stage_Deserialize = 
+/**  Not triaged yet, or needs a call only the user can make. */
+"decide" | 
+/**  Not triaged yet, or needs a call only the user can make. */
 "new" | 
-/**  Needs a call only the user can make. */
+/**  Agreed; the code is to change as asked. */
+"toFix" | 
+/**  The agent made the change; the user is to look it over. */
+"review" | 
+/**  A reply is being worked out. */
+"reply" | 
+/**  The reply is final, or the fix is in and needs none. Goes out with the next send. */
+"ready" | 
+/**  Sent, resolved, or answered already. */
+"done";
+
+/**  Where a thread is in the reply workflow. */
+export type Stage_Serialize = 
+/**  Not triaged yet, or needs a call only the user can make. */
 "decide" | 
 /**  Agreed; the code is to change as asked. */
 "toFix" | 
+/**  The agent made the change; the user is to look it over. */
+"review" | 
 /**  A reply is being worked out. */
 "reply" | 
 /**  The reply is final, or the fix is in and needs none. Goes out with the next send. */
@@ -2423,7 +2512,10 @@ export type Stage =
 "done";
 
 /**  Everything marking and commenting can change. */
-export type StateDto = {
+export type StateDto = StateDto_Serialize | StateDto_Deserialize;
+
+/**  Everything marking and commenting can change. */
+export type StateDto_Deserialize = {
 	marks: MarkDto[],
 	/**  Per file. */
 	checks: CheckState[],
@@ -2433,12 +2525,31 @@ export type StateDto = {
 	 */
 	amber: RowRef[],
 	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
-	comments: CommentDto[],
+	comments: CommentDto_Deserialize[],
 	/**
 	 *  In a PR workspace, every thread and draft on the PR, in file order, then comments on
 	 *  the PR by time.
 	 */
-	threads: ThreadDto[],
+	threads: ThreadDto_Deserialize[],
+};
+
+/**  Everything marking and commenting can change. */
+export type StateDto_Serialize = {
+	marks: MarkDto[],
+	/**  Per file. */
+	checks: CheckState[],
+	/**
+	 *  Unreviewed rows that replaced a line whose mark was lost, or that a checked file
+	 *  didn't have when it was checked.
+	 */
+	amber: RowRef[],
+	/**  Comments on the review's files, in file and row order. Ones whose code is gone last. */
+	comments: CommentDto_Serialize[],
+	/**
+	 *  In a PR workspace, every thread and draft on the PR, in file order, then comments on
+	 *  the PR by time.
+	 */
+	threads: ThreadDto_Serialize[],
 };
 
 export type StepDto = {
@@ -2648,7 +2759,9 @@ export type TextQuery = {
 	paths: string[] | null,
 };
 
-export type ThreadDto = {
+export type ThreadDto = ThreadDto_Serialize | ThreadDto_Deserialize;
+
+export type ThreadDto_Deserialize = {
 	/**  Its comment's id. */
 	id: number,
 	/**  Empty for a comment on the PR itself. */
@@ -2657,7 +2770,29 @@ export type ThreadDto = {
 	line: number | null,
 	/**  The reply not yet sent, or a draft's text. */
 	body: string,
-	state: ThreadState,
+	state: ThreadState_Deserialize,
+	github: GhLink | null,
+	/**  The code it's on as it was, or GitHub's diff hunk. */
+	snippet: string,
+	/**  The agent conversation about it. */
+	messages: Message[],
+	/**  A reply a synced terminal agent suggested. */
+	suggestion: string | null,
+	/**  Whether the review shows its code. */
+	placed: boolean,
+	createdAt: number | null,
+};
+
+export type ThreadDto_Serialize = {
+	/**  Its comment's id. */
+	id: number,
+	/**  Empty for a comment on the PR itself. */
+	path: string,
+	/**  Its last line, as GitHub numbers it or as drafted. */
+	line: number | null,
+	/**  The reply not yet sent, or a draft's text. */
+	body: string,
+	state: ThreadState_Serialize,
 	github: GhLink | null,
 	/**  The code it's on as it was, or GitHub's diff hunk. */
 	snippet: string,
@@ -2671,16 +2806,32 @@ export type ThreadDto = {
 };
 
 /**  A thread's place in the workflow, kept across syncs and restarts. */
-export type ThreadState = {
+export type ThreadState = ThreadState_Serialize | ThreadState_Deserialize;
+
+/**  A thread's place in the workflow, kept across syncs and restarts. */
+export type ThreadState_Deserialize = {
 	/**  `owner/name` of the PR's repo. */
 	repo: string,
 	pr: number,
-	stage: Stage,
+	stage: Stage_Deserialize,
 	take: Take | null,
 	/**  A few words on what the thread asks, from triage. */
 	summary: string,
 	/**  Set on a thread that answers part of a comment on the PR itself. */
 	quote?: Quote | null,
+};
+
+/**  A thread's place in the workflow, kept across syncs and restarts. */
+export type ThreadState_Serialize = {
+	/**  `owner/name` of the PR's repo. */
+	repo: string,
+	pr: number,
+	stage: Stage_Serialize,
+	take: Take | null,
+	/**  A few words on what the thread asks, from triage. */
+	summary: string,
+	/**  Set on a thread that answers part of a comment on the PR itself. */
+	quote: Quote | null,
 };
 
 /**  A tool that's missing or too old. */

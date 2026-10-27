@@ -160,11 +160,12 @@ pub struct SetTake {
 #[derive(Clone, Copy, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ThreadStage {
-    New,
     /// The human has a call to make.
     Decide,
     /// Code to change.
     Fix,
+    /// You made the change it asks for; the human looks it over.
+    Review,
     /// A reply to work out.
     Reply,
     /// Sent, fixed with nothing to say, or set aside.

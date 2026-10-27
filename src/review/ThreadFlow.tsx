@@ -99,7 +99,7 @@ export function ThreadFlow({ comment, c, editor }: Props) {
                     Review
                   </PipeButton>
                 )}
-                {!take && comment.thread?.stage === "new" && (
+                {!take && comment.thread?.stage === "decide" && (
                   <PipeButton background onClick={() => c.triage(comment)}>
                     Triage
                   </PipeButton>

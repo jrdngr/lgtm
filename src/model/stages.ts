@@ -1,12 +1,13 @@
 import type { Fixed, Stage, TakeVerdict, ThreadDto } from "../bindings";
 import { quoted } from "./prComments";
 
-/** Stages in work order, with their name and color. New sits first: it needs triage. */
+/** Stages in work order, with their name and color. Decide sits first: untriaged threads
+ * start there. */
 export const STAGES: [Stage, string, string][] = [
-  ["new", "New", "amber"],
   ["decide", "Decide", "amber"],
   ["toFix", "Fix", "blue"],
-  ["reply", "Reply", "purple"],
+  ["review", "Review", "red"],
+  ["reply", "Reply", "teal"],
   ["ready", "Ready", "green"],
   ["done", "Done", ""],
 ];
@@ -15,7 +16,8 @@ export const STAGES: [Stage, string, string][] = [
 const TONES: Record<string, string> = {
   amber: "var(--amber)",
   blue: "var(--accent)",
-  purple: "var(--mark-violet)",
+  red: "var(--flagged)",
+  teal: "var(--github)",
   green: "var(--added)",
 };
 
@@ -48,9 +50,13 @@ export function working(threads: ThreadDto[]): ThreadDto[] {
   return threads.filter((t) => !q.has(t.id));
 }
 
-/** Threads waiting on the user: new ones to triage and ones with a call to make. */
+/** Threads waiting on the user: ones to triage or with a call to make, and fixes to look over. */
 export const needsYou = (threads: ThreadDto[]) =>
-  working(threads).filter((t) => t.state.stage === "new" || t.state.stage === "decide").length;
+  working(threads).filter((t) => t.state.stage === "decide" || t.state.stage === "review").length;
+
+/** Threads no agent has made a take on yet. */
+export const untriaged = (threads: ThreadDto[]) =>
+  working(threads).filter((t) => t.state.stage === "decide" && !t.state.take);
 
 /** A thread's one-line label: its summary, else what it quotes, else the start of its latest
  * post or draft. */

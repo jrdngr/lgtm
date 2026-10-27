@@ -27,7 +27,11 @@
   background: var(--accent);
 }
 
-.stage-seg.purple {
+.stage-seg.red {
+  background: var(--flagged);
+}
+
+.stage-seg.teal {
   background: var(--github);
 }
 

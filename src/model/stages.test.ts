@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Stage, ThreadDto } from "../bindings";
 import { prThreads } from "./prComments";
-import { byStage, needsYou, planText, sendPlan, threadLabel } from "./stages";
+import { byStage, needsYou, planText, sendPlan, threadLabel, untriaged } from "./stages";
 
 function thread(id: number, stage: Stage, body = "", gh = true, path = "a.rs"): ThreadDto {
   return {
@@ -55,32 +55,38 @@ describe("sendPlan", () => {
 
 describe("byStage", () => {
   it("orders stages for work and drops empty ones", () => {
-    const got = byStage([thread(1, "done"), thread(2, "toFix"), thread(3, "new")]);
+    const got = byStage([
+      thread(1, "done"),
+      thread(2, "toFix"),
+      thread(3, "decide"),
+      thread(4, "review"),
+    ]);
     expect(got.map(([s, ts]) => [s, ts.map((t) => t.id)])).toEqual([
-      ["new", [3]],
+      ["decide", [3]],
       ["toFix", [2]],
+      ["review", [4]],
       ["done", [1]],
     ]);
   });
 });
 
 describe("quotes", () => {
-  const quote = (id: number, of: number, stage: Stage = "new"): ThreadDto => {
+  const quote = (id: number, of: number, stage: Stage = "decide"): ThreadDto => {
     const t = thread(id, stage, "", false, "");
     t.state.quote = { of, author: "bot", text: `part of ${of}` };
     return t;
   };
   const threads = [
     quote(9, 2),
-    thread(1, "new"),
-    thread(2, "new", "", true, ""),
+    thread(1, "decide"),
+    thread(2, "decide", "", true, ""),
     quote(5, 2, "toFix"),
     thread(3, "decide", "", true, ""),
   ];
 
   it("are labeled by what they quote, and bots by their first visible line", () => {
     expect(threadLabel(threads[0])).toBe("part of 2");
-    const bot = thread(4, "new", "", true, "");
+    const bot = thread(4, "decide", "", true, "");
     bot.github?.posts.push({
       author: "bot",
       body: "<!-- pr_review:v1 -->\n\n# Claude Code Review\n\nFound one issue.",
@@ -97,5 +103,12 @@ describe("quotes", () => {
   it("stand in for that comment in what's waiting on the user", () => {
     // 1 and 3, and quote 9; comment 2 is left to its quotes.
     expect(needsYou(threads)).toBe(3);
+  });
+
+  it("stand in for that comment among the threads to triage, until a take is made", () => {
+    expect(untriaged(threads).map((t) => t.id)).toEqual([9, 1, 3]);
+    const take = { verdict: "decide" as const, why: "", question: null };
+    const taken = threads.map((t) => (t.id === 1 ? { ...t, state: { ...t.state, take } } : t));
+    expect(untriaged(taken).map((t) => t.id)).toEqual([9, 3]);
   });
 });

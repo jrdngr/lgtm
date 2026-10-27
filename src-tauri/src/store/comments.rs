@@ -367,7 +367,7 @@ mod tests {
         // A thread pulled before thread states existed gets one.
         let got = &store.pr_threads("o/n", 3).unwrap()[0];
         assert_eq!(got.github, link);
-        assert_eq!(got.thread, Some(ThreadState::new("o/n", 3, Stage::New)));
+        assert_eq!(got.thread, Some(ThreadState::new("o/n", 3, Stage::Decide)));
         assert!(store.pr_threads("o/n", 4).unwrap().is_empty());
 
         let mut thread = ThreadState::new("o/n", 3, Stage::Ready);

@@ -53,19 +53,19 @@ pub fn after_edit(stage: Stage, draft: bool, body: &str) -> Stage {
 }
 
 /// A pulled thread's stage. `old` is the thread as last pulled. `answered` means the viewer
-/// had the last word. A thread someone posted to since comes back as new, and one the viewer
+/// had the last word. A thread someone posted to since comes back to decide, and one the viewer
 /// replied to since, from anywhere, is done.
 pub fn pulled_stage(old: Option<(&ThreadState, &GhLink)>, new: &GhLink, answered: bool) -> Stage {
     let Some((state, link)) = old else {
         return if new.resolved || answered {
             Stage::Done
         } else {
-            Stage::New
+            Stage::Decide
         };
     };
     let posted = new.posts.len() > link.posts.len();
     if posted && !answered && !new.resolved {
-        Stage::New
+        Stage::Decide
     } else if (posted && answered) || (new.resolved && !link.resolved) {
         Stage::Done
     } else {
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(after_edit(Stage::Reply, true, "nit"), Stage::Ready);
         assert_eq!(after_edit(Stage::Ready, true, " "), Stage::Reply);
         assert_eq!(after_edit(Stage::Ready, false, "rewritten"), Stage::Reply);
-        assert_eq!(after_edit(Stage::New, false, "because"), Stage::Reply);
+        assert_eq!(after_edit(Stage::Decide, false, "because"), Stage::Reply);
         // Clearing a reply leaves a fixed thread ready to go without one.
         assert_eq!(after_edit(Stage::Ready, false, ""), Stage::Ready);
     }
@@ -222,7 +222,7 @@ mod tests {
     fn pulling_keeps_or_reopens_a_threads_stage() {
         let ready = ThreadState::new("o/n", 1, Stage::Ready);
         let done = ThreadState::new("o/n", 1, Stage::Done);
-        assert_eq!(pulled_stage(None, &link(1, false), false), Stage::New);
+        assert_eq!(pulled_stage(None, &link(1, false), false), Stage::Decide);
         assert_eq!(pulled_stage(None, &link(1, true), false), Stage::Done);
         assert_eq!(pulled_stage(None, &link(2, false), true), Stage::Done);
         let old = link(1, false);
@@ -232,7 +232,7 @@ mod tests {
         );
         assert_eq!(
             pulled_stage(Some((&done, &old)), &link(2, false), false),
-            Stage::New
+            Stage::Decide
         );
         assert_eq!(
             pulled_stage(Some((&done, &old)), &link(2, false), true),
