@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { onAnyShowLook } from "../arch/showLook";
 import { bottom } from "../core/bottom";
-import { bottomDockOf, dockOf, revealPanel } from "../core/docks";
+import { bottomDockOf, dockOf, onScaleChange, relayoutDocks, revealPanel } from "../core/docks";
 import { bottomKey, chord, symbolKey, tabKey } from "../core/keys";
 import { addTerminal, focusPanel, openReport } from "../core/panels";
 import { onAnyReveal } from "../core/reveal";
@@ -109,6 +109,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => watchDefinitionClicks(() => selectedRef.current), []);
   useEffect(() => watchHovers(() => selectedRef.current), []);
   useEffect(() => watchSymbolLinks(), []);
+  useEffect(() => onScaleChange(relayoutDocks), []);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
