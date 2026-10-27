@@ -95,9 +95,7 @@ export function ThreadFlow({ comment, c, editor }: Props) {
                   {body.trim() ? "Edit" : "Write reply"} <kbd>e</kbd>
                 </button>
                 {body.trim() && (
-                  <PipeButton background onClick={() => c.reviewReply(comment)}>
-                    Review
-                  </PipeButton>
+                  <PipeButton onClick={() => c.reviewReply(comment)}>Review</PipeButton>
                 )}
                 {!take && comment.thread?.stage === "decide" && (
                   <PipeButton background onClick={() => c.triage(comment)}>

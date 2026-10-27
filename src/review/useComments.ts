@@ -3,12 +3,14 @@ import type { CommentDto, ReviewDto, Stage, StateDto, ThreadDto } from "../bindi
 import type { WorkspaceName } from "../core/workspace";
 import { type CommandResult, commands } from "../ipc";
 import { prComments } from "../model/prComments";
+import { sendTarget } from "../terminal/registry";
 import { confirmAction } from "../ui/prompt";
 import { fixedText, reviewText, triageText } from "./agentText";
 import { commentText, type Draft, followDraft } from "./comments";
 import { fixComments, fixedThreads, viewedFix } from "./fixes";
 import type { Moves } from "./follow";
 import { sendToBackgroundAgent, talk as talkTo } from "./linkCommands";
+import { notePasted, setCurrentThread } from "./linkedAgent";
 import { type FlatFile, NEW_COMMENT } from "./model";
 
 const NONE: CommentDto[] = [];
@@ -231,12 +233,18 @@ export function useComments({
     sendToBackgroundAgent(workspace, triageText(files, c, rules.data), c.id, onError);
   }
 
-  /** Pastes a thread and my rules for replies into the background terminal, for its agent to
-   * review the reply and suggest a better one. */
+  /** Pastes a thread and my rules for replies into the interactive terminal, where the reply
+   * was talked over, for its agent to review the reply and suggest a better one. */
   async function reviewReply(c: CommentDto) {
     const rules = await commands.promptText("reply");
     if (rules.status === "error") return onError(rules.error);
-    sendToBackgroundAgent(workspace, reviewText(files, c, rules.data), c.id, onError);
+    setCurrentThread(workspace, c.id);
+    send(
+      reviewText(files, c, rules.data),
+      (terminal) => notePasted(terminal, c.id),
+      undefined,
+      sendTarget(workspace),
+    );
   }
 
   /** Makes a thread's suggested reply its reply. */
