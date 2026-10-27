@@ -1,5 +1,6 @@
 import type { ProjectDto } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
+import { askClose } from "../editor/CloseDialog";
 import type { FrameApi, ProjectUi, ShellApi, ShellState, Subtree } from "../frame/shell";
 import { commands } from "../ipc";
 import { COLORS, type PinColor } from "../workspaces/pins";
@@ -224,10 +225,29 @@ export const api: ShellApi = {
   refresh,
 };
 
-/** Asks each repo whether what runs in it may go, as closing the window does. */
+/** Asks once, for every awake repo, whether its unsaved files and running programs may go, as
+ * closing the window does. */
 export async function confirmClose(): Promise<boolean> {
-  for (const label of [...frames.keys()]) if (!(await mayGo(label))) return false;
-  return true;
+  const repos = awake().flatMap((r) => {
+    const frame = frames.get(r.label);
+    return frame ? [{ name: r.name, frame }] : [];
+  });
+  const all = await Promise.all(repos.map((r) => r.frame.closing()));
+  const files = all.flatMap((c, i) =>
+    c.files.map((f) => ({ ...f, where: { repo: repos[i].name, workspace: f.workspace } })),
+  );
+  const programs = all.flatMap((c, i) =>
+    c.programs.map(({ workspace, ...p }) => ({ ...p, where: { repo: repos[i].name, workspace } })),
+  );
+  if (files.length === 0 && programs.length === 0) return true;
+  return askClose(
+    files.map(({ name, where }) => ({ name, where })),
+    programs,
+    async () => {
+      for (const f of files) if (!(await f.save())) return false;
+      return true;
+    },
+  );
 }
 
 /** The repo on screen's frame, for the menu's Add Repository. */

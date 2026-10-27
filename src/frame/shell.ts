@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { ProjectDto, WorkspaceDto } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
+import type { ProgramRow } from "../editor/CloseDialog";
 import type { Role } from "../terminal/registry";
 import type { CtxEntry } from "../ui/contextMenu";
 import type { Activity, AgentInfo } from "../workspaces/activity";
@@ -28,6 +29,12 @@ export interface Subtree {
   rest: TreeRow[];
 }
 
+/** A repo's unsaved files and running programs, as the window's close asks about them. */
+export interface Closing {
+  files: { name: string; workspace: string; save(): Promise<boolean> }[];
+  programs: (ProgramRow & { workspace: string })[];
+}
+
 /** What a repo's frame does for the others. */
 export interface FrameApi {
   select(ws: WorkspaceName): void;
@@ -38,6 +45,8 @@ export interface FrameApi {
   askDelete(ws: string): void;
   /** Whether everything running in the repo may go. `before` runs before anything is asked. */
   confirmAll(before: () => void): Promise<boolean>;
+  /** What would go if the repo closed, each under its workspace's title. */
+  closing(): Promise<Closing>;
   addRepo(): void;
 }
 

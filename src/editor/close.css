@@ -130,3 +130,42 @@
   background: var(--error);
   border-color: var(--error);
 }
+
+/* Rows under their repo and workspace, in a window of several repos. */
+.close-list.grouped {
+  gap: 0;
+  padding: 4px 6px 6px;
+}
+
+.close-repo + .close-repo {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--hair);
+}
+
+.close-repo-name {
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.close-ws-name {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 6px 0 18px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.close-list.grouped .close-row {
+  padding-left: 30px;
+}
+
+.close-dialog:has(.close-list.grouped) {
+  width: min(420px, 100%);
+}

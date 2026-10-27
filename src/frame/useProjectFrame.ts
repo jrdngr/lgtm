@@ -2,7 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useRef } from "react";
 import type { WorkspaceDto } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
-import { confirmAll } from "../editor/unsaved";
+import { closing, confirmAll } from "../editor/unsaved";
 import { loadedPr, prOf, subscribePrs } from "../github/pr";
 import { commands } from "../ipc";
 import { roleOf, subscribeTerminals } from "../terminal/registry";
@@ -122,6 +122,16 @@ export function useProjectFrame(frame: Frame) {
       },
       askDelete: (ws) => ask("delete", ws),
       confirmAll,
+      async closing() {
+        const { files, programs } = await closing();
+        const list = ref.current.workspaces ?? [];
+        const title = (key: string) =>
+          list.find((w) => workspaceKey(w.name) === key)?.title ?? (key || "default");
+        return {
+          files: files.map((f) => ({ ...f, workspace: title(f.workspace) })),
+          programs: programs.map((p) => ({ ...p, workspace: title(p.workspace) })),
+        };
+      },
       addRepo: () => addRepo((e) => ref.current.onError(e)),
     });
     // Coalesced to one per frame: activity and terminals change in bursts.

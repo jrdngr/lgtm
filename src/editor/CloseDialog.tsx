@@ -5,7 +5,16 @@ import { Busy } from "../ui/Busy";
 import { Icon } from "../ui/icons";
 import { Glyph, since } from "../workspaces/AgentGlyph";
 import type { AgentInfo } from "../workspaces/activity";
+import { grouped, type Where } from "./closeGroups";
 import "./close.css";
+
+export type { Where };
+
+/** A file with unsaved edits. */
+export interface FileRow {
+  name: string;
+  where?: Where;
+}
 
 /** A running program as the dialog lists it: an agent the way the workspace's agent list shows
  * it, or else a ›_ and its name. */
@@ -15,13 +24,13 @@ export interface ProgramRow {
   agent?: AgentInfo;
   /** The pin of its terminal, which colors an agent's name. */
   role?: Role;
+  where?: Where;
 }
 
 type FilesChoice = "open" | "saving" | "saved" | "discarded";
 
 interface Props {
-  /** Names of the files with unsaved edits. */
-  files: string[];
+  files: FileRow[];
   programs: ProgramRow[];
   /** Saves every file. Resolves to whether all saved. */
   save(): Promise<boolean>;
@@ -29,6 +38,33 @@ interface Props {
 }
 
 const FILE_TAGS: Partial<Record<FilesChoice, string>> = { saved: "Saved", discarded: "Not saved" };
+
+/** The list box: rows as they come, or under their repos and workspaces when they say where. */
+function List<T extends { where?: Where }>({
+  rows,
+  row,
+}: {
+  rows: T[];
+  row: (r: T, i: number) => React.ReactNode;
+}) {
+  if (!rows.some((r) => r.where)) return <div className="close-list">{rows.map(row)}</div>;
+  let i = 0;
+  return (
+    <div className="close-list grouped">
+      {grouped(rows).map((r) => (
+        <div key={r.repo} className="close-repo">
+          <div className="close-repo-name">{r.repo}</div>
+          {r.workspaces.map((w) => (
+            <div key={w.workspace}>
+              <div className="close-ws-name">{w.workspace}</div>
+              {w.rows.map((x) => row(x, i++))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Asks about unsaved files and running programs. With both, each section has its own buttons
  * and the dialog closes once both are decided. */
@@ -95,7 +131,11 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
     >
       <div className="close-dialog" role="dialog" aria-labelledby="close-title">
         <h3 id="close-title">
-          {both ? "Before closing" : files.length ? "Save changes?" : "Stop running programs?"}
+          {both
+            ? `Before ${[...files, ...programs].some((r) => r.where) ? "quitting" : "closing"}`
+            : files.length
+              ? "Save changes?"
+              : "Stop running programs?"}
         </h3>
         <div className="close-body">
           {files.length > 0 && (
@@ -106,13 +146,14 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                   {fileTag && <span className="close-tag">{fileTag}</span>}
                 </h4>
               )}
-              <div className="close-list">
-                {files.map((name) => (
-                  <div key={name} className="close-row">
+              <List
+                rows={files}
+                row={({ name }, i) => (
+                  <div key={i} className="close-row">
                     <span className="close-name">{name}</span>
                   </div>
-                ))}
-              </div>
+                )}
+              />
               {both && !fileTag && <div className="close-section-foot">{fileButtons}</div>}
             </section>
           )}
@@ -124,8 +165,9 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                   {stop && <span className="close-tag">Stopping</span>}
                 </h4>
               )}
-              <div className="close-list">
-                {programs.map(({ key, name, agent, role }) => (
+              <List
+                rows={programs}
+                row={({ key, name, agent, role }) => (
                   <div key={key} className="close-row">
                     {agent ? (
                       <Glyph state={agent.state} />
@@ -139,8 +181,8 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
                     </span>
                     {agent && <span className="close-ago">{since(agent.since)}</span>}
                   </div>
-                ))}
-              </div>
+                )}
+              />
               {both && !stop && <div className="close-section-foot">{stopButton}</div>}
             </section>
           )}
@@ -159,7 +201,7 @@ function CloseDialog({ files, programs, save, onDone }: Props) {
 /** Shows the dialog over the window. Resolves to whether everything may close: the files were
  * saved or let go and the programs may stop. A failed save resolves to false. */
 export function askClose(
-  files: string[],
+  files: FileRow[],
   programs: ProgramRow[],
   save: () => Promise<boolean>,
 ): Promise<boolean> {

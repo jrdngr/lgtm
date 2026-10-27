@@ -53,7 +53,7 @@ test("Save All saves each file and stops at the first that fails", async () => {
   ask.mockImplementation((_files, _programs, save) => save());
 
   expect(await confirmAll()).toBe(false);
-  expect(ask.mock.calls[0][0]).toEqual(["a.ts", "b.ts"]);
+  expect(ask.mock.calls[0][0]).toEqual([{ name: "a.ts" }, { name: "b.ts" }]);
   expect(a.save).toHaveBeenCalled();
   expect(b.save).not.toHaveBeenCalled();
 });
@@ -102,7 +102,7 @@ test("unsaved edits and running programs are asked about together", async () => 
   expect(await confirmAll()).toBe(false);
   expect(ask).toHaveBeenCalledOnce();
   expect(ask.mock.calls[0].slice(0, 2)).toEqual([
-    ["a.ts"],
+    [{ name: "a.ts" }],
     [{ key: "term:3", name: "npm", agent: undefined }],
   ]);
 });

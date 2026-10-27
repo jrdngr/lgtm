@@ -2,7 +2,7 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { roleOf, terminalTitle } from "../terminal/registry";
 import { type Running, runningPrograms } from "../terminal/sessions";
 import { tabAgent } from "../workspaces/activity";
-import { askClose } from "./CloseDialog";
+import { askClose, type ProgramRow } from "./CloseDialog";
 
 interface Unsaved {
   workspace: string;
@@ -56,9 +56,26 @@ export async function confirmAll(before?: () => void): Promise<boolean> {
   return confirm([...unsaved.values()], await runningPrograms(() => true), before);
 }
 
+/** Each terminal's agent listed like the workspace's agent list, and any other program by name. */
+const rows = (running: Running[]): ProgramRow[] =>
+  running.map(({ panel, workspace, program }) => {
+    const agent = tabAgent(panel);
+    const name = agent ? (terminalTitle(panel) ?? agent.label) : program;
+    return { key: panel, name, agent, role: roleOf(workspace, panel) };
+  });
+
+/** What would go if everything in the repo closed: unsaved files and running programs, each
+ * with its workspace's key. */
+export async function closing() {
+  const running = await runningPrograms(() => true);
+  return {
+    files: [...unsaved.values()],
+    programs: rows(running).map((row, i) => ({ ...row, workspace: running[i].workspace })),
+  };
+}
+
 /** Asks once about `files` and `running`. Saving saves every file and stops at the first that
- * fails. Each terminal's agent is listed like the workspace's agent list, and any other
- * program by name. */
+ * fails. */
 async function confirm(
   files: Unsaved[],
   running: Running[],
@@ -66,14 +83,9 @@ async function confirm(
 ): Promise<boolean> {
   if (files.length === 0 && running.length === 0) return true;
   before?.();
-  const programs = running.map(({ panel, workspace, program }) => {
-    const agent = tabAgent(panel);
-    const name = agent ? (terminalTitle(panel) ?? agent.label) : program;
-    return { key: panel, name, agent, role: roleOf(workspace, panel) };
-  });
   return askClose(
-    files.map((f) => f.name),
-    programs,
+    files.map((f) => ({ name: f.name })),
+    rows(running),
     async () => {
       for (const f of files) {
         if (!(await f.save())) return false;
