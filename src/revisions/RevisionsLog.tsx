@@ -474,9 +474,12 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
                 }}
                 onMouseOver={(e) => {
                   if (drag.current !== undefined || !commit) return;
-                  // The turns toggle is a control of its own.
-                  if ((e.target as HTMLElement).closest(".lr-turns")) hover.leave();
-                  else hover.enter(i, e.currentTarget);
+                  // Only a cut-off description or bookmark list shows the row wider.
+                  const part = (e.target as HTMLElement).closest<HTMLElement>(
+                    ".lr-desc, .lr-books",
+                  );
+                  if (part && part.scrollWidth > part.clientWidth) hover.enter(i, e.currentTarget);
+                  else hover.leave();
                 }}
                 onMouseEnter={() => {
                   if (drag.current === undefined || c < 0) return;
