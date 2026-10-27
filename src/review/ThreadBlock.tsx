@@ -9,7 +9,7 @@ import { useRoles } from "../terminal/registry";
 import { IconButton } from "../ui/icons";
 import { CombineDialog } from "./CombineDialog";
 import { FixChip } from "./FixChip";
-import { setCurrentThread, useLink } from "./linkedAgent";
+import { setCurrentThread, unlinkAgent, useLink } from "./linkedAgent";
 import { SnippetDiff } from "./SnippetDiff";
 import { StageStrip } from "./StageStrip";
 import { ThreadFlow } from "./ThreadFlow";
@@ -169,7 +169,11 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
             className={`pipe-icon${current ? " on" : ""}`}
             label="Talk"
             aria-pressed={current}
-            onClick={() => c.talk(comment)}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (current) unlinkAgent(c.workspace);
+              else c.talk(comment);
+            }}
           />
         </span>
       </div>

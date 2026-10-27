@@ -34,12 +34,13 @@ async function link(workspace: WorkspaceName, onError: (message: string) => void
   review.send(linkText(pr, rules.data), (terminal) => linkAgent(workspace, terminal));
 }
 
-/** Makes thread `id` the one I'm on and focuses the linked terminal, linking one first when
- * none is. */
+/** Makes thread `id` the one I'm on and focuses the linked terminal, first linking the
+ * interactive terminal when it isn't the one linked. */
 export function talk(workspace: WorkspaceName, id: number, onError: (message: string) => void) {
   setCurrentThread(workspace, id);
   const linked = linkedTerminal(workspace);
-  if (linked) focusTerminal(linked);
+  const target = sendTarget(workspace);
+  if (linked && (!target || linked === target)) focusTerminal(linked);
   else startLink(workspace, onError);
 }
 
