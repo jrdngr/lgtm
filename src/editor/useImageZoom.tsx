@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { fitted, stepZoom } from "./htmlNav";
+import { onPinch } from "./pinch";
 import { ZoomControls, zoomKey } from "./ZoomControls";
 
 /** How an image is sized: shrunk to fit the tab (never enlarged), scaled to fill the tab,
@@ -43,6 +44,47 @@ export function useImageZoom(
   const scale = zoom === "fit" ? fill : zoom === "shrink" ? Math.min(fill, 1) : zoom;
 
   const set = (z: number) => setZoom(fitted(z));
+
+  // A pinch zooms around the point under the fingers: where that point sits in the image, as
+  // a fraction of its size, and where it was in the view.
+  const anchor = useRef<{ fx: number; fy: number; x: number; y: number }>(undefined);
+  const live = useRef({ scale, set });
+  live.current = { scale, set };
+  /** The zoom a pinch asked for that hasn't shown yet, so quick steps add up. */
+  const asked = useRef<number>(undefined);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `src` mounts the view
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    return onPinch(el, (factor, x, y) => {
+      const img = el.querySelector("img")?.getBoundingClientRect();
+      const view = el.getBoundingClientRect();
+      if (img && img.width > 0 && img.height > 0) {
+        anchor.current = {
+          fx: (x - img.left) / img.width,
+          fy: (y - img.top) / img.height,
+          x: x - view.left,
+          y: y - view.top,
+        };
+      }
+      const next = fitted((asked.current ?? live.current.scale) * factor);
+      asked.current = next;
+      live.current.set(next);
+    });
+  }, [src]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once each new zoom shows
+  useLayoutEffect(() => {
+    const el = box.current;
+    const at = anchor.current;
+    anchor.current = undefined;
+    asked.current = undefined;
+    const img = el?.querySelector("img")?.getBoundingClientRect();
+    if (!el || !at || !img) return;
+    const view = el.getBoundingClientRect();
+    el.scrollLeft += img.left - view.left + at.fx * img.width - at.x;
+    el.scrollTop += img.top - view.top + at.fy * img.height - at.y;
+  }, [scale]);
   const controls = (
     <ZoomControls zoom={scale} setZoom={set} fit={() => setZoom("fit")} fitLabel="Fit" />
   );

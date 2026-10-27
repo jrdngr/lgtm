@@ -104,6 +104,57 @@
     return width > 0 ? root.clientWidth / width : 1;
   }
 
+  // A trackpad pinch goes to the tab, which sets the zoom and hands back the point to keep
+  // under the fingers. WebKit sends gesture events; other engines send ctrl+wheel.
+  let pinchScale = 0;
+  const pinch = (factor, x, y) => post({ type: "pinch", factor, x, y });
+  addEventListener("gesturestart", (e) => {
+    e.preventDefault();
+    pinchScale = 1;
+  });
+  addEventListener("gesturechange", (e) => {
+    e.preventDefault();
+    if (!pinchScale || e.scale <= 0) return;
+    pinch(e.scale / pinchScale, e.clientX, e.clientY);
+    pinchScale = e.scale;
+  });
+  addEventListener("gestureend", (e) => {
+    e.preventDefault();
+    pinchScale = 0;
+  });
+  addEventListener(
+    "wheel",
+    (e) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+      if (!pinchScale) pinch(Math.exp(-Math.max(-50, Math.min(50, px)) * 0.01), e.clientX, e.clientY);
+    },
+    { passive: false, capture: true },
+  );
+
+  /** Sets the page's zoom, keeping what's at (x, y) there when given. Measures an element
+   * rather than doing the sums, since engines differ on how a zoomed root scrolls. */
+  function setZoom(zoom, x, y) {
+    const el = typeof x === "number" ? document.elementFromPoint(x, y) : null;
+    const before = el?.getBoundingClientRect();
+    document.documentElement.style.zoom = zoom === 1 ? "" : String(zoom);
+    if (!el || !before || !before.width || !before.height) return;
+    const fx = (x - before.left) / before.width;
+    const fy = (y - before.top) / before.height;
+    const off = () => {
+      const r = el.getBoundingClientRect();
+      return [r.left + fx * r.width - x, r.top + fy * r.height - y];
+    };
+    const [dx, dy] = off();
+    if (!dx && !dy) return;
+    scrollBy(dx, dy);
+    // Where scrolling by one unit doesn't move the page one pixel, scroll the rest scaled.
+    const [rx, ry] = off();
+    const left = (d, r) => (r && d !== r ? (r * d) / (d - r) : 0);
+    scrollBy(left(dx, rx), left(dy, ry));
+  }
+
   // Find: every match highlighted, the current one more strongly, with the count sent back.
   let found = { text: "", matchCase: false, ranges: [], at: 0 };
 
@@ -178,7 +229,7 @@
   addEventListener("message", (e) => {
     const m = e.data;
     if (e.source !== parent || !m || m.lgtm !== true) return;
-    if (m.type === "zoom") document.documentElement.style.zoom = m.zoom === 1 ? "" : String(m.zoom);
+    if (m.type === "zoom") setZoom(m.zoom, m.x, m.y);
     if (m.type === "fit") post({ type: "zoom", zoom: fitZoom() });
     if (m.type === "find") find(m);
     if (m.type === "findClose") unpaint();

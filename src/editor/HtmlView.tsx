@@ -46,6 +46,7 @@ type FrameMessage =
   | { type: "nav"; url: string }
   | { type: "open"; url: string }
   | { type: "zoom"; zoom: number }
+  | { type: "pinch"; factor: number; x: number; y: number }
   | { type: "found"; at: number; total: number }
   | { type: "scroll"; x: number; y: number }
   | { type: "scrolled"; x: number; y: number };
@@ -169,6 +170,14 @@ export const HtmlView = forwardRef<{ focus(): void }, Props>(function HtmlView(
         case "zoom":
           setZoom(fitted(m.zoom));
           break;
+        case "pinch": {
+          if (![m.factor, m.x, m.y].every(Number.isFinite)) break;
+          const next = fitted(zoomRef.current * m.factor);
+          zoomRef.current = next;
+          send(frame.current, { type: "zoom", zoom: next, x: m.x, y: m.y });
+          setZoom(next);
+          break;
+        }
         case "found":
           setFound({ at: m.at, total: m.total });
           break;
