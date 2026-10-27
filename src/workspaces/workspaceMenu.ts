@@ -20,6 +20,13 @@ export const deleteItem = (w: WorkspaceDto, onDelete: () => void): MenuItem => (
   onSelect: onDelete,
 });
 
+/** The row's Sleep, or Wake when it's asleep, in its ⋯ menu and its right-click menu. Sleep
+ * is off when `onSleep` is unset. */
+export const sleepItem = (w: WorkspaceDto, open: () => void, onSleep?: () => void): MenuItem =>
+  w.asleep
+    ? { label: "Wake", onSelect: open }
+    : { label: "Sleep", disabled: !onSleep, onSelect: () => onSleep?.() };
+
 /** Shows the workspace's review on `@`, in its review pane or a new one. A pane still loading
  * opens on the workspace's revset. */
 function reviewAt(workspace: WorkspaceName, api: DockviewApi) {
@@ -119,9 +126,7 @@ export function workspaceMenu({
     "-",
     w.name !== null && !pr && dot && { label: "Mark Agents Seen", onSelect: onClearDot },
     "-",
-    w.asleep
-      ? { label: "Wake", onSelect: open }
-      : { label: "Sleep", disabled: !onSleep, onSelect: () => onSleep?.() },
+    sleepItem(w, open, onSleep),
     "-",
     deleteItem(w, onDelete),
   ];

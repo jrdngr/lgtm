@@ -8,7 +8,7 @@ import { AgentGlyph, Moon } from "./AgentGlyph";
 import { clearFinished, useActivity } from "./activity";
 import { agentName, openAgent } from "./agentTabs";
 import { COLORS, usePins } from "./pins";
-import { deleteItem, workspaceMenu } from "./workspaceMenu";
+import { deleteItem, sleepItem, workspaceMenu } from "./workspaceMenu";
 
 /** Characters of a change id shown, its unique prefix included. */
 const ID_LENGTH = 4;
@@ -127,9 +127,11 @@ export function WorkspaceRow({
         <Lines w={w} pr={pr && !pr.stack ? pr : null} />
       </button>
       <span className="workspace-side">
-        {w.name !== null && (
-          <Menu className="reveal" label="Workspace actions" items={[deleteItem(w, onDelete)]} />
-        )}
+        <Menu
+          className="reveal"
+          label="Workspace actions"
+          items={[sleepItem(w, onSelect, onSleep), w.name !== null && deleteItem(w, onDelete)]}
+        />
         {w.asleep ? (
           <Moon />
         ) : (

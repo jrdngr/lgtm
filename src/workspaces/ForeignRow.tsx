@@ -1,11 +1,10 @@
 import { workspaceKey } from "../core/workspace";
 import { shell, type TreeAgent, type TreeRow } from "../frame/shell";
-import { openMenu } from "../ui/contextMenu";
-import { Menu } from "../ui/Menu";
+import { openMenu, tidy } from "../ui/contextMenu";
+import { Menu, type MenuItem } from "../ui/Menu";
 import { AgentGlyph, Moon } from "./AgentGlyph";
 import { COLORS } from "./pins";
 import { Lines } from "./WorkspaceRow";
-import { deleteItem } from "./workspaceMenu";
 
 /** A workspace of another repo in the project, drawn from what that repo's frame sent. Its
  * actions go to that frame. */
@@ -13,6 +12,12 @@ export function ForeignRow({ row, label }: { row: TreeRow; label: string }) {
   const s = shell();
   const { w, color } = row;
   const frame = () => s?.frame(label);
+  /** The ⋯ menu: the Sleep or Wake and Delete of the row's own menu, from its repo's frame. */
+  const items = () =>
+    tidy(frame()?.menu(w.name) ?? []).filter(
+      (i): i is MenuItem =>
+        i !== "-" && !("items" in i) && ["Sleep", "Wake", "Delete Workspace…"].includes(i.label),
+    );
   return (
     <li
       className={`workspace nested${w.asleep ? " asleep" : ""}${color ? " colored" : ""}`}
@@ -29,13 +34,7 @@ export function ForeignRow({ row, label }: { row: TreeRow; label: string }) {
         <Lines w={w} pr={row.pr} />
       </button>
       <span className="workspace-side">
-        {w.name !== null && (
-          <Menu
-            className="reveal"
-            label="Workspace actions"
-            items={[deleteItem(w, () => w.name !== null && frame()?.askDelete(w.name))]}
-          />
-        )}
+        <Menu className="reveal" label="Workspace actions" items={items()} />
         {w.asleep ? (
           <Moon />
         ) : (
