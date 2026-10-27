@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { onPinch } from "../editor/pinch";
 
 /** The world's offset in the viewport, and its scale. */
 export interface View {
@@ -34,7 +35,8 @@ export function fitView(w: number, h: number, vw: number, vh: number, left = 0, 
   return { k, x: (vw - ww * k) / 2 - left * k, y: (vh - wh * k) / 2 - top * k };
 }
 
-/** Pans by dragging the background and zooms with the wheel or a pinch, toward the pointer.
+/** Pans by dragging the background or with two fingers, and zooms with a pinch or ⌘ and the
+ * wheel, toward the pointer.
  * Fits the world whenever its size changes, or with `fitKey`, whenever that does, and again as
  * the viewport resizes until the view is panned or zoomed. `dragged()` says whether the last
  * pointer press panned, so its click can be ignored. */
@@ -69,16 +71,26 @@ export function usePanZoom(width: number, height: number, fitKey?: string, left 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
+    const zoom = (factor: number, x: number, y: number) => {
       const r = el.getBoundingClientRect();
-      // A pinch arrives as a wheel with Control held, in much smaller steps.
-      const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.002));
       fitted.current = false;
-      setView((v) => zoomAt(v, factor, e.clientX - r.left, e.clientY - r.top));
+      setView((v) => zoomAt(v, factor, x - r.left, y - r.top));
+    };
+    // Two fingers pan; a pinch, or the wheel with ⌘ held, zooms.
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) return;
+      e.preventDefault();
+      if (e.metaKey) return zoom(Math.exp(-e.deltaY * 0.002), e.clientX, e.clientY);
+      const line = e.deltaMode === 1 ? 16 : 1;
+      fitted.current = false;
+      setView((v) => ({ ...v, x: v.x - e.deltaX * line, y: v.y - e.deltaY * line }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
+    const stopPinch = onPinch(el, zoom);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      stopPinch();
+    };
   }, []);
 
   const onPointerDown = (e: React.PointerEvent) => {
