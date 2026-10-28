@@ -3,14 +3,16 @@ import type { Stage, ThreadDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { prThreads, quoted } from "../model/prComments";
-import { byStage, STAGES, threadLabel, threadWhere, VERDICTS } from "../model/stages";
+import { byStage, STAGES, threadLabel, VERDICTS } from "../model/stages";
 import type { CurrentReview } from "../review/current";
 import { setChatOpen, setCurrentThread, useLink } from "../review/linkedAgent";
+import { useRowHover } from "../revisions/RevisionPopover";
 import { openUrl, run } from "../services/pathMenu";
 import { type CtxEntry, contextMenu, copy } from "../ui/contextMenu";
 import { GroupHead } from "../ui/GroupHead";
 import { Icon } from "../ui/icons";
 import { Empty } from "../ui/SectionHeader";
+import { ThreadPopover } from "./ThreadPopover";
 
 function threadMenu(review: CurrentReview, t: ThreadDto): CtxEntry[] {
   const setStage = (s: Stage) =>
@@ -52,11 +54,12 @@ interface RowProps {
   sub?: boolean;
   /** Shows its stage as a dot. */
   dot?: boolean;
+  hover: ReturnType<typeof useRowHover>;
 }
 
-function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
+function ThreadRow({ review, t, picked, current, onPick, sub, dot, hover }: RowProps) {
   const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
-  const author = t.github && !t.state.quote ? t.github.posts[0]?.author : undefined;
+  const take = t.state.take ? VERDICTS[t.state.take.verdict][1] || "grey" : "";
   return (
     <button
       type="button"
@@ -67,24 +70,16 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
         review.jumpToComment(t.id);
       }}
       onContextMenu={contextMenu(() => threadMenu(review, t))}
+      onMouseEnter={(e) => hover.enter(t.id, e.currentTarget)}
+      onMouseLeave={hover.leave}
+      onMouseDown={hover.leave}
     >
-      <span
-        className={`take-dot ${t.state.take ? VERDICTS[t.state.take.verdict][1] || "grey" : ""}`}
-      >
-        {t.id}
-      </span>
+      <span className={`take-dot ${take}`} />
       <span className="item-text">
         {!t.github && !t.state.quote && <span className="pill purple">Draft</span>}
-        {author && <b className="thread-who">{author}</b>}
         {threadLabel(t)}
       </span>
       <span className="thread-where">
-        {t.fixes.length > 0 && (
-          <svg className="fix-ic" viewBox="0 0 16 16" aria-label="Fixed">
-            <path d="M8 2.5v6M5 5.5h6M5 13h6" />
-          </svg>
-        )}
-        {t.path && threadWhere(t)}
         {t.suggestion && <span className="row-suggested" />}
         {current && (
           <span className="row-synced">
@@ -92,7 +87,11 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
           </span>
         )}
         {dot && <span className={`dot stage-seg ${tone || "grey"}`} />}
+        <span className="thread-num">#{t.id}</span>
       </span>
+      {hover.hover?.row === t.id && (
+        <ThreadPopover t={t} rect={hover.hover.rect} take={take} onLeave={hover.leave} />
+      )}
     </button>
   );
 }
@@ -110,6 +109,7 @@ export function ThreadGroups({ review, threads }: ListProps) {
   const workspace = useWorkspace();
   const [folded, setFolded] = useState<ReadonlySet<string>>(new Set(["done"]));
   const link = useLink(workspace);
+  const hover = useRowHover();
   if (threads.length === 0) {
     return (
       <Empty>
@@ -132,6 +132,7 @@ export function ThreadGroups({ review, threads }: ListProps) {
       picked={link.current === t.id}
       current={!!link.terminal && link.current === t.id}
       onPick={() => setCurrentThread(workspace, t.id)}
+      hover={hover}
       {...extra}
     />
   );
