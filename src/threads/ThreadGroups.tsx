@@ -3,7 +3,7 @@ import type { Stage, ThreadDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import { prThreads, quoted } from "../model/prComments";
-import { byStage, STAGES, threadLabel, threadWhere } from "../model/stages";
+import { byStage, STAGES, threadLabel, threadWhere, VERDICTS } from "../model/stages";
 import type { CurrentReview } from "../review/current";
 import { setChatOpen, setCurrentThread, useLink } from "../review/linkedAgent";
 import { openUrl, run } from "../services/pathMenu";
@@ -68,6 +68,9 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
       }}
       onContextMenu={contextMenu(() => threadMenu(review, t))}
     >
+      <span
+        className={`take-dot ${t.state.take ? VERDICTS[t.state.take.verdict][1] || "grey" : ""}`}
+      />
       <span className="item-text">
         {!t.github && !t.state.quote && <span className="pill purple">Draft</span>}
         {author && <b className="thread-who">{author}</b>}

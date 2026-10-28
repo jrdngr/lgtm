@@ -55,12 +55,12 @@
 
 .thread-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 7px 1fr auto;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-height: 26px;
-  padding: 2px 10px 2px 23px;
+  padding: 2px 10px 2px 8px;
   border: none;
   border-radius: 0;
   background: none;
@@ -130,7 +130,7 @@
 }
 
 .thread-row.sub {
-  padding-left: 36px;
+  padding-left: 21px;
 }
 
 .thread-row .dot {
@@ -211,4 +211,31 @@
   stroke: var(--flagged);
   stroke-width: 2.2;
   stroke-linecap: round;
+}
+
+/* The take's verdict, left of a thread's row; empty until there's a take. */
+.take-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.take-dot.green {
+  background: var(--added);
+}
+
+.take-dot.blue {
+  background: var(--accent);
+}
+
+.take-dot.purple {
+  background: var(--mark-violet);
+}
+
+.take-dot.amber {
+  background: var(--amber);
+}
+
+.take-dot.grey {
+  background: var(--muted);
 }
