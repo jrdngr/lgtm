@@ -7,7 +7,7 @@
     <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="10" stdDeviation="10" flood-color="#000" flood-opacity=".3"/></filter>
   </defs>
   <use href="#shape" fill="#0c0e13" filter="url(#shadow)"/>
-  <g clip-path="url(#clip)"><rect width="1024" height="1024" fill="url(#bg)"/><path d="M-10 690 H180 L340 530 V-10" fill="none" stroke="#f5922e" stroke-width="112" stroke-linejoin="round" stroke-linecap="butt" /><path d="M-10 690 H700" fill="none" stroke="#1fbf62" stroke-width="112" stroke-linejoin="round" stroke-linecap="butt" /><circle cx="340" cy="330" r="52" fill="#14171e" stroke="#f2f4f7" stroke-width="20"/><circle cx="700" cy="690" r="104" fill="#14171e" stroke="#f2f4f7" stroke-width="26"/><circle cx="700" cy="690" r="46" fill="#1fbf62"/></g>
+  <g clip-path="url(#clip)"><rect width="1024" height="1024" fill="url(#bg)"/><path d="M470 1000 V650 L290 470 V-10" fill="none" stroke="#f5922e" stroke-width="112" stroke-linejoin="round"/><path d="M470 1000 V610 L680 400 V310" fill="none" stroke="#1fbf62" stroke-width="112" stroke-linejoin="round"/><circle cx="470" cy="840" r="52" fill="#14171e" stroke="#f2f4f7" stroke-width="20"/><circle cx="680" cy="310" r="104" fill="#14171e" stroke="#f2f4f7" stroke-width="26"/><circle cx="680" cy="310" r="46" fill="#1fbf62"/></g>
   <use href="#shape" fill="none" stroke="url(#rim)" stroke-width="6"/>
   <use href="#shape" fill="none" stroke="#000" stroke-opacity=".25" stroke-width="2"/>
 </svg>
