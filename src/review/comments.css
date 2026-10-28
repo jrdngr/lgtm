@@ -1119,3 +1119,10 @@ button.group-head.fold:hover:not(:disabled) {
   font: 11px var(--mono);
   color: var(--error);
 }
+
+/* A thread's id, the number agents call it by. */
+.thread-num {
+  margin-right: 7px;
+  font: var(--fs-xs) var(--mono);
+  color: var(--soft);
+}

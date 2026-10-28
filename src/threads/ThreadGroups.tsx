@@ -70,7 +70,9 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot }: RowProps) {
     >
       <span
         className={`take-dot ${t.state.take ? VERDICTS[t.state.take.verdict][1] || "grey" : ""}`}
-      />
+      >
+        {t.id}
+      </span>
       <span className="item-text">
         {!t.github && !t.state.quote && <span className="pill purple">Draft</span>}
         {author && <b className="thread-who">{author}</b>}

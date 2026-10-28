@@ -131,6 +131,7 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
           ▾
         </button>
         <span className="card-source">
+          <span className="thread-num">#{id}</span>
           <b>GitHub</b> ·{" "}
           {quote ? (
             <>
