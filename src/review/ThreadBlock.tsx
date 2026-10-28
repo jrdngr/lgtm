@@ -158,7 +158,9 @@ export function ThreadBlock({ comment, c, done, onFold, ...p }: Props) {
         )}
         <span className="card-ctl">
           {!split && <StageStrip stage={thread.stage} onPick={(s) => c.setStage(id, s)} />}
-          {fixes.length > 0 && <FixChip workspace={c.workspace} fixes={fixes} shown={c.fix} />}
+          {fixes.length > 0 && (
+            <FixChip workspace={c.workspace} fixes={fixes} shown={c.fix} view={c.view} />
+          )}
           <span className="spacer" />
           {!split && <IconButton icon="retry" label="Reset" onClick={() => c.reset(id)} />}
           {gh && (

@@ -277,6 +277,7 @@ export function useComments({
     comments,
     threads,
     fix,
+    view: review?.view,
     onPr,
     quote,
     sendCombined,

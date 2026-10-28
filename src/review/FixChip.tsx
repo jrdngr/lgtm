@@ -1,7 +1,7 @@
-import type { FixDto } from "../bindings";
+import type { FixDto, View } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
 import { openMenu } from "../ui/contextMenu";
-import { fixTime, openFix } from "./fixes";
+import { closeFix, fixTime, openFix } from "./fixes";
 
 interface Props {
   workspace: WorkspaceName;
@@ -9,11 +9,13 @@ interface Props {
   fixes: FixDto[];
   /** The fix the review shows, in the Fix view. */
   shown?: number;
+  /** The view the review shows. */
+  view?: View;
 }
 
-/** A thread's linked fixes: the latest one's line counts. Clicking it shows that fix; its menu
- * lists every one. */
-export function FixChip({ workspace, fixes, shown }: Props) {
+/** A thread's linked fixes: the latest one's line counts. Clicking it shows that fix, or while
+ * one of them shows, goes back to the view before; its menu lists every one. */
+export function FixChip({ workspace, fixes, shown, view }: Props) {
   const latest = fixes[fixes.length - 1];
   const on = fixes.some((f) => f.id === shown);
   function menu(e: React.MouseEvent) {
@@ -21,7 +23,7 @@ export function FixChip({ workspace, fixes, shown }: Props) {
       e,
       [...fixes].reverse().map((f) => ({
         label: `${fixTime(f)}  +${f.added} −${f.removed}`,
-        onSelect: () => openFix(workspace, f.id),
+        onSelect: () => openFix(workspace, f.id, view),
       })),
     );
   }
@@ -31,7 +33,8 @@ export function FixChip({ workspace, fixes, shown }: Props) {
       className={`fix-chip${on ? " on" : ""}`}
       onClick={(e) => {
         e.stopPropagation();
-        openFix(workspace, latest.id);
+        if (on) closeFix(workspace);
+        else openFix(workspace, latest.id, view);
       }}
       onContextMenu={menu}
     >

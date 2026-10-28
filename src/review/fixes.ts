@@ -1,5 +1,5 @@
 import type { CommentDto, FixDto, ThreadDto, View } from "../bindings";
-import type { WorkspaceName } from "../core/workspace";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { threadLabel } from "../model/stages";
 import { targetOf } from "./target";
 
@@ -32,7 +32,18 @@ export function fixChoices(threads: ThreadDto[], fix: number): [number, string][
   return t.fixes.map((f) => [f.id, `${name} · ${fixTime(f)}`]);
 }
 
-/** Shows fix `fix` in the workspace's review pane. */
-export function openFix(workspace: WorkspaceName, fix: number) {
+/** The view each workspace's review was on before a fix was shown, by workspace key. */
+const before = new Map<string, View>();
+
+/** Shows fix `fix` in the workspace's review pane, which was showing `from`. */
+export function openFix(workspace: WorkspaceName, fix: number, from: View | undefined) {
+  if (from && from.kind !== "fix") before.set(workspaceKey(workspace), from);
   targetOf(workspace)?.view({ kind: "fix", fix });
+}
+
+/** Takes the workspace's review back to the view it was on before a fix was shown. */
+export function closeFix(workspace: WorkspaceName) {
+  const key = workspaceKey(workspace);
+  targetOf(workspace)?.view(before.get(key) ?? { kind: "combined" });
+  before.delete(key);
 }
