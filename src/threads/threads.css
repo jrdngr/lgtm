@@ -239,3 +239,17 @@
 .take-dot.grey {
   background: var(--muted);
 }
+
+/* Send and Triage, under the Comments header, sharing its width. */
+.comments-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.comments-actions > button {
+  flex: 1;
+  justify-content: center;
+  padding: 2px 6px;
+}

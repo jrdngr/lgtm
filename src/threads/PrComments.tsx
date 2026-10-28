@@ -20,6 +20,7 @@ import { PipeButton } from "../terminal/PipeButton";
 import { useGithubOff } from "../tools/agents";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { GroupHead } from "../ui/GroupHead";
+import { IconButton } from "../ui/icons";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { LinkStrip } from "./LinkStrip";
 import { SendBox } from "./SendBox";
@@ -127,11 +128,9 @@ export function PrComments({ pr, review }: Props) {
     <div style={{ display: "contents" }} onKeyDown={onKey}>
       <div style={{ display: "contents" }} onContextMenu={headerMenu}>
         <SectionHeader title="Comments">
-          {!off && (
-            <button type="button" className="pr-head-btn" onClick={sync}>
-              Sync
-            </button>
-          )}
+          {!off && <IconButton icon="sync" label="Sync" onClick={sync} />}
+        </SectionHeader>
+        <div className="comments-actions">
           <SendNotesButton
             className="pr-head-btn"
             count={notes.unsent.length}
@@ -142,16 +141,7 @@ export function PrComments({ pr, review }: Props) {
               Triage {fresh}
             </PipeButton>
           )}
-          {review && !linked && (
-            <PipeButton
-              className="pr-head-btn"
-              onClick={() => startLink(workspace, onError)}
-              keys="l"
-            >
-              Link
-            </PipeButton>
-          )}
-        </SectionHeader>
+        </div>
       </div>
       <LinkStrip workspace={workspace} />
       {(error ?? notes.error) && <div className="review-error">{error ?? notes.error}</div>}
