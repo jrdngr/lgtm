@@ -67,10 +67,18 @@ async fn each_fix_in_a_turn_links_only_what_changed_since_the_last_one() {
     let review = ctx.open(None, "@", false).await.unwrap();
     let texts = HashMap::from([("a.rs".to_string(), head.to_string())]);
     let state = ctx
-        .add_threads(review.id, vec![thread("T1", 2), thread("T2", 3)], &texts, "PR #1")
+        .add_threads(
+            review.id,
+            vec![thread("T1", 2), thread("T2", 3)],
+            &texts,
+            "PR #1",
+        )
         .unwrap();
     let id = |gh: &str| {
-        let t = state.threads.iter().find(|t| t.github.as_ref().unwrap().thread == gh);
+        let t = state
+            .threads
+            .iter()
+            .find(|t| t.github.as_ref().unwrap().thread == gh);
         t.unwrap().id
     };
     let (t1, t2) = (id("T1"), id("T2"));
@@ -78,7 +86,9 @@ async fn each_fix_in_a_turn_links_only_what_changed_since_the_last_one() {
 
     let hook = async |point, tool| {
         let prompt = (point == Checkpoint::Start).then_some("Fix the review");
-        ctx.turn_checkpoint(None, "s", tool, point, prompt).await.unwrap();
+        ctx.turn_checkpoint(None, "s", tool, point, prompt)
+            .await
+            .unwrap();
     };
     hook(Checkpoint::Start, None).await;
     hook(Checkpoint::Before, Some("e1")).await;

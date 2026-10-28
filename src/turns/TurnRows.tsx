@@ -130,7 +130,23 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
     reloadTurns(workspace);
   }
 
-  function menu(e: React.MouseEvent, t: TurnDto) {
+  /** Moves `picked` into their own commit, between the turns before and after them. */
+  async function split(picked: TurnDto[]) {
+    try {
+      await unwrap(
+        commands.splitAtTurns(
+          workspace,
+          picked.map((p) => p.id),
+        ),
+      );
+    } catch (e) {
+      onError(String(e instanceof Error ? e.message : e));
+    }
+    reloadTurns(workspace);
+  }
+
+  function menu(e: React.MouseEvent, t: TurnDto, i: number) {
+    const picked = i >= lo && i <= hi ? turns.slice(lo, hi + 1) : [t];
     const turn = t.kind === "agent";
     const undoable = t.kind !== "checkpoint";
     openMenu(e, [
@@ -140,7 +156,12 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
         disabled: t.running,
         onSelect: () => undo(t),
       },
-      undoable && "-",
+      {
+        label: "Move to New Commit",
+        disabled: picked.some((p) => p.running),
+        onSelect: () => split(picked),
+      },
+      "-",
       turn && { label: "Copy Prompt", onSelect: () => copy(t.prompt ?? "") },
       turn && "-",
       { label: "Remove", onSelect: () => remove(t) },
@@ -161,7 +182,7 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
           setDragged([drag.current, i]);
       }}
       onClick={(e) => click(e, i)}
-      onContextMenu={(e) => menu(e, t)}
+      onContextMenu={(e) => menu(e, t, i)}
     >
       {lo >= 0 && i >= lo && i <= hi && (
         <span

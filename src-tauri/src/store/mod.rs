@@ -29,8 +29,8 @@ use std::path::Path;
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
 pub use checks::FileCheck;
-pub use fixes::Fix;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
+pub use fixes::Fix;
 pub use guided::AgentEdit;
 pub use marks::{Mark, MarkColor};
 pub use notes::NoteRow;

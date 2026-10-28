@@ -69,8 +69,7 @@ async fn a_comment_on_a_renamed_file_keeps_its_removed_rows() {
         row_of(&review, 0, "    return 1", 0),
         row_of(&review, 0, "    return 2", 0),
     ];
-    ctx.add_comment(review.id, &rows, "why?", "-1\n+2")
-        .unwrap();
+    ctx.add_comment(review.id, &rows, "why?", "-1\n+2").unwrap();
 
     let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let c = &review.state.comments[0];

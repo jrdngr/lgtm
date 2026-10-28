@@ -152,7 +152,12 @@ mod tests {
         assert_eq!(store.last_fix_end(9).unwrap(), None);
 
         store.prune_fixes(15).unwrap();
-        let threads: Vec<i64> = store.fixes("ws").unwrap().iter().map(|f| f.thread).collect();
+        let threads: Vec<i64> = store
+            .fixes("ws")
+            .unwrap()
+            .iter()
+            .map(|f| f.thread)
+            .collect();
         assert_eq!(threads, [2, 3]);
     }
 }

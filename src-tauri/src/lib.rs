@@ -240,6 +240,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::turns::agent_turns,
             commands::turns::set_checkpoint,
             commands::turns::undo_turn,
+            commands::turns::split_at_turns,
             commands::turns::remove_turn,
         ])
         .events(collect_events![

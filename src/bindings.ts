@@ -510,6 +510,8 @@ export const commands = {
 	setCheckpoint: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("set_checkpoint", { workspace })),
 	/**  Puts the files an agent turn changed back as they were before it. */
 	undoTurn: (workspace: string | null, turn: number) => typedError<null, string>(__TAURI_INVOKE("undo_turn", { workspace, turn })),
+	/**  Splits the working-copy change by time around agent turns, keeping their order. */
+	splitAtTurns: (workspace: string | null, turns: number[]) => typedError<null, string>(__TAURI_INVOKE("split_at_turns", { workspace, turns })),
 	/**  Forgets an agent turn or checkpoint. */
 	removeTurn: (turn: number) => typedError<null, string>(__TAURI_INVOKE("remove_turn", { turn })),
 };

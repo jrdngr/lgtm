@@ -218,3 +218,91 @@ async fn squashing_a_change_moves_its_turns_after_those_of_the_change_it_went_in
     let review = ctx.open_in(None, "@", false, &view).await.unwrap();
     assert_eq!(paths(&review), ["b.rs"]);
 }
+
+/// The files in `rev`'s diff; none for the root.
+async fn changed(ctx: &RepoCtx, rev: &str) -> Vec<String> {
+    let jj = &ctx.workspace(None).await.unwrap().jj;
+    if jj
+        .commit_ids(&format!("{rev} ~ root()"))
+        .await
+        .unwrap()
+        .is_empty()
+    {
+        return vec![];
+    }
+    let range = Range {
+        from: Some(format!("{rev}-")),
+        to: rev.to_string(),
+    };
+    let diffs = jj.diff(&range).await.unwrap();
+    diffs.into_iter().map(|d| d.path).collect()
+}
+
+/// Splits `@` around the turns at `picks` (newest first) of turns writing a.rs, b.rs and c.rs
+/// in turn, and returns the files in `@--`, `@-` and `@`, and the files of the turns left on `@`.
+async fn split_three(picks: &[usize]) -> [Vec<String>; 4] {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    for file in ["a.rs", "b.rs", "c.rs"] {
+        turn_writing(&ctx, d, file).await;
+    }
+    let turns = ctx.turns(None).await.unwrap();
+    let ids: Vec<u32> = picks.iter().map(|i| turns[*i].id).collect();
+    ctx.split_at_turns(None, &ids).await.unwrap();
+    for file in ["a.rs", "b.rs", "c.rs"] {
+        assert_eq!(std::fs::read_to_string(d.join(file)).unwrap(), "x\n");
+    }
+    let left = ctx.turns(None).await.unwrap();
+    let left = left.into_iter().flat_map(|t| t.paths).collect();
+    [
+        changed(&ctx, "@--").await,
+        changed(&ctx, "@-").await,
+        changed(&ctx, "@").await,
+        left,
+    ]
+}
+
+#[tokio::test]
+async fn splitting_off_the_newest_turns_puts_them_on_top_in_the_working_copy() {
+    let [below2, below, at, left] = split_three(&[1, 0]).await;
+    let none: Vec<String> = vec![];
+    assert_eq!((below2, below), (none, vec!["a.rs".into()]));
+    assert_eq!(at, ["b.rs", "c.rs"]);
+    assert_eq!(left, ["c.rs", "b.rs"]);
+}
+
+#[tokio::test]
+async fn splitting_off_the_oldest_turn_puts_it_below_the_working_copy() {
+    let [below2, below, at, left] = split_three(&[2]).await;
+    let none: Vec<String> = vec![];
+    assert_eq!((below2, below), (none, vec!["a.rs".into()]));
+    assert_eq!(at, ["b.rs", "c.rs"]);
+    assert_eq!(left, ["c.rs", "b.rs"]);
+}
+
+#[tokio::test]
+async fn splitting_off_a_middle_turn_makes_three_changes_in_order() {
+    let [below2, below, at, left] = split_three(&[1]).await;
+    let one = |f: &str| vec![f.to_string()];
+    assert_eq!((below2, below, at), (one("a.rs"), one("b.rs"), one("c.rs")));
+    assert_eq!(left, ["c.rs"]);
+}
+
+#[tokio::test]
+async fn splitting_off_a_turn_that_edits_an_earlier_one_keeps_both_edits_in_order() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    turn_writing(&ctx, d, "a.rs").await;
+    hook(&ctx, Checkpoint::Start, None).await;
+    hook(&ctx, Checkpoint::Before, Some("t")).await;
+    write(d, "a.rs", "x\ny\n");
+    hook(&ctx, Checkpoint::After, Some("t")).await;
+    hook(&ctx, Checkpoint::End, None).await;
+    let id = ctx.turns(None).await.unwrap()[0].id;
+
+    ctx.split_at_turns(None, &[id]).await.unwrap();
+    let jj = ctx.workspace(None).await.unwrap().jj.clone();
+    assert_eq!(jj.file(Some("@-"), "a.rs").await.unwrap(), b"x\n");
+    assert_eq!(changed(&ctx, "@").await, ["a.rs"]);
+    assert!(jj.commit_ids("conflicts()").await.unwrap().is_empty());
+}

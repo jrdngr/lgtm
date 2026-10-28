@@ -101,7 +101,13 @@ impl Review {
                 .any(|c| c.id as i64 == id && c.rows.is_some())
         };
         let fixes = store.fixes(self.ws.key())?;
-        let fixes_of = |id: i64| fixes.iter().filter(|f| f.thread == id).map(Into::into).collect();
+        let fixes_of = |id: i64| {
+            fixes
+                .iter()
+                .filter(|f| f.thread == id)
+                .map(Into::into)
+                .collect()
+        };
         let mut threads: Vec<ThreadDto> = store
             .pr_threads(&repo, pr)?
             .into_iter()

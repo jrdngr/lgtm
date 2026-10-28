@@ -379,6 +379,50 @@ impl RepoCtx {
         Ok(self.store.lock().unwrap().delete_turn(turn.id)?)
     }
 
+    /// Splits `@` by time around turns `ids`: what came before them, what they changed, and
+    /// the rest stay in that order, each turn going with its part.
+    pub async fn split_at_turns(&self, workspace: Option<&str>, ids: &[u32]) -> anyhow::Result<()> {
+        let ws = self.workspace(workspace).await?;
+        let _busy = ws.claim()?;
+        let (change, commit) = at(&ws).await?;
+        let mut turns = self.store.lock().unwrap().turns_on(ws.key(), &change)?;
+        turns.sort_by_key(|t| (t.started_at, t.id));
+        let picked = |t: &Turn| ids.contains(&(t.id as u32));
+        let Some(first) = turns.iter().position(picked) else {
+            bail!("no such turn");
+        };
+        if turns
+            .iter()
+            .any(|t| picked(t) && t.session.is_some() && t.end.is_none())
+        {
+            bail!("the agent is still working on it");
+        }
+        let Some((range, paths)) = self.turn_span(ids, &commit)? else {
+            bail!("no such turn");
+        };
+        let from = range.from.unwrap_or_default();
+        if span_diff(&ws.jj, &from, &range.to, paths.as_deref())
+            .await?
+            .is_empty()
+        {
+            bail!("there's nothing in them to move");
+        }
+        let (before, middle) = ws
+            .jj
+            .slice_working_copy(&from, &range.to, paths.as_deref())
+            .await?;
+        let store = self.store.lock().unwrap();
+        for t in &turns[..first] {
+            if let Some(before) = &before {
+                store.set_turn_change(t.id, before)?;
+            }
+        }
+        for t in turns.iter().filter(|t| picked(t)) {
+            store.set_turn_change(t.id, &middle)?;
+        }
+        Ok(())
+    }
+
     pub fn remove_turn(&self, id: u32) -> anyhow::Result<()> {
         Ok(self.store.lock().unwrap().delete_turn(id.into())?)
     }

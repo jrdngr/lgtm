@@ -218,6 +218,15 @@ impl Store {
         Ok(())
     }
 
+    /// Puts turn `id` on change `to`.
+    pub fn set_turn_change(&self, id: i64, to: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE agent_turns SET change_id = ? WHERE id = ?",
+            params![to, id],
+        )?;
+        Ok(())
+    }
+
     pub fn delete_turn(&self, id: i64) -> rusqlite::Result<()> {
         self.db
             .execute("DELETE FROM agent_turns WHERE id = ?", [id])?;

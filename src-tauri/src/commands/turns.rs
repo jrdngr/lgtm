@@ -39,6 +39,20 @@ pub(crate) async fn undo_turn(
         .map_err(err)
 }
 
+/// Splits the working-copy change by time around agent turns, keeping their order.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn split_at_turns(
+    window: Frame,
+    workspace: Option<String>,
+    turns: Vec<u32>,
+) -> CmdResult<()> {
+    repo(&window)?
+        .split_at_turns(workspace.as_deref(), &turns)
+        .await
+        .map_err(err)
+}
+
 /// Forgets an agent turn or checkpoint.
 #[tauri::command]
 #[specta::specta]
