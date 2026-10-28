@@ -42,6 +42,7 @@ export function linkText(pr: PrDto, rules: string): string {
     UNTRUSTED_NOTE,
     'lgtm adds the thread I\'m on to my prompts, so "this comment" or "the linked comment" means that thread. Read the code it points at before you answer.',
     `Use set_thread_take for your verdict, suggest_reply for a reply in my voice, and set_thread_stage to move a thread, each with pr ${pr.number}. Stop at a drafted reply: only I mark one ready. Nothing you do posts to GitHub.`,
+    "Whenever what we discuss changes what a reply should say, call suggest_reply with the whole new reply right away, without asking. It only offers the reply; I choose whether to use it.",
     "When you change code a thread asks for, call fixed_threads right after that change, before the next one, so I can look each fix over on its own.",
     `My rules for takes and replies:\n\n${rules.trim()}`,
   ]);

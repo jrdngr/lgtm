@@ -274,8 +274,8 @@ impl Lgtm {
 
     #[tool(
         description = "Suggest a reply to a thread, in the human's voice. It shows in the \
-        thread's chat for the human to use or not, replacing any earlier suggestion. This never \
-        posts to GitHub."
+        thread's chat for the human to use or not, replacing any earlier suggestion. Call it \
+        without asking first; the human decides whether to use it. This never posts to GitHub."
     )]
     async fn suggest_reply(&self, Parameters(p): Parameters<inputs::SuggestReply>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
