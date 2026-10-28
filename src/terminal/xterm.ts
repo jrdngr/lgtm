@@ -63,6 +63,41 @@ export function createTerminal(container: HTMLElement) {
     if (container.offsetWidth > 0 && container.offsetHeight > 0) fit.fit();
   };
   refit();
+  // A zoom change moves the pixel ratio. The saved zoom lands right after load by way of 1.0,
+  // and xterm can rebuild its glyphs for the passing ratio and miss the final one, drawing them
+  // too small. Once the ratio settles, the renderer is rebuilt at it.
+  let ratio = window.devicePixelRatio;
+  let settling: number | undefined;
+  let query: MediaQueryList | undefined;
+  /** Set when the ratio changed at all since the last rebuild, even if it came back. */
+  let moved = false;
+  const rescale = () => {
+    clearTimeout(settling);
+    settling = window.setTimeout(() => {
+      watchRatio();
+      if (window.devicePixelRatio === ratio && !moved) return;
+      ratio = window.devicePixelRatio;
+      moved = false;
+      if (webgl) {
+        webgl.dispose();
+        webgl = undefined;
+        attach();
+      }
+      refit();
+      term.refresh(0, term.rows - 1);
+    }, 100);
+  };
+  const ratioChanged = () => {
+    moved = true;
+    rescale();
+  };
+  const watchRatio = () => {
+    query?.removeEventListener("change", ratioChanged);
+    query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    query.addEventListener("change", ratioChanged);
+  };
+  watchRatio();
+  window.addEventListener("resize", rescale);
   // Follows the font size setting until the terminal is disposed.
   const unwatch = watchSettings((s) => {
     if (term.options.fontSize === s.terminalFontSize) return;
@@ -72,6 +107,9 @@ export function createTerminal(container: HTMLElement) {
   /** Stops following settings and visibility, before the terminal is disposed. */
   const release = () => {
     unwatch();
+    window.removeEventListener("resize", rescale);
+    query?.removeEventListener("change", ratioChanged);
+    clearTimeout(settling);
     shown.disconnect();
     clearTimeout(parking);
   };
