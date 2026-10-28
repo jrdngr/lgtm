@@ -86,7 +86,7 @@ async fn each_fix_in_a_turn_links_only_what_changed_since_the_last_one() {
 
     let hook = async |point, tool| {
         let prompt = (point == Checkpoint::Start).then_some("Fix the review");
-        ctx.turn_checkpoint(None, "s", tool, point, prompt)
+        ctx.turn_checkpoint(None, None, "s", tool, point, prompt)
             .await
             .unwrap();
     };

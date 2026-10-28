@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS agent_turns (
     removed INTEGER NOT NULL DEFAULT 0,
     started_at INTEGER NOT NULL,
     ended_at INTEGER,
-    human INTEGER NOT NULL DEFAULT 0
+    human INTEGER NOT NULL DEFAULT 0,
+    terminal TEXT
 );
 CREATE INDEX IF NOT EXISTS agent_turns_workspace ON agent_turns (workspace, change_id);
 ";
@@ -33,6 +34,15 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
     )?;
     if !has_human {
         db.execute_batch("ALTER TABLE agent_turns ADD COLUMN human INTEGER NOT NULL DEFAULT 0;")?;
+    }
+    // Nor do tables from before turns kept their terminal.
+    let has_terminal: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('agent_turns') WHERE name = 'terminal'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_terminal {
+        db.execute_batch("ALTER TABLE agent_turns ADD COLUMN terminal TEXT;")?;
     }
     Ok(())
 }
@@ -59,6 +69,8 @@ pub struct Turn {
     pub ended_at: Option<i64>,
     /// Files the user saved in lgtm's editor.
     pub human: bool,
+    /// The terminal panel the agent ran in.
+    pub terminal: Option<String>,
 }
 
 impl Turn {
@@ -69,7 +81,7 @@ impl Turn {
 }
 
 const COLUMNS: &str = "id, workspace, session, prompt, change_id, start, end, paths, added, \
-                       removed, started_at, ended_at, human";
+                       removed, started_at, ended_at, human, terminal";
 
 fn row(r: &rusqlite::Row) -> rusqlite::Result<Turn> {
     let paths: String = r.get(7)?;
@@ -87,6 +99,7 @@ fn row(r: &rusqlite::Row) -> rusqlite::Result<Turn> {
         started_at: r.get(10)?,
         ended_at: r.get(11)?,
         human: r.get(12)?,
+        terminal: r.get(13)?,
     })
 }
 
@@ -215,6 +228,15 @@ impl Store {
                 params![to, workspace, change],
             )?;
         }
+        Ok(())
+    }
+
+    /// Notes the terminal panel turn `id`'s agent runs in.
+    pub fn set_turn_terminal(&self, id: i64, terminal: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE agent_turns SET terminal = ? WHERE id = ?",
+            params![terminal, id],
+        )?;
         Ok(())
     }
 

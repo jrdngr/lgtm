@@ -4,6 +4,7 @@ import type { WorkspaceName } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
 import type { Cell } from "../revisions/graphCells";
 import { CELL_W } from "../revisions/LogGraph";
+import { useRoles } from "../terminal/registry";
 import { copy, openMenu } from "../ui/contextMenu";
 import { confirmAction } from "../ui/prompt";
 import { openTurns } from "./openTurn";
@@ -67,6 +68,7 @@ interface Props {
 /** One row per turn and checkpoint under `@`, newest first, while they're open. */
 export function TurnRows({ workspace, turns, shown, below, width, onError }: Props) {
   const open = turnsOpen.use();
+  const roleOf = useRoles(workspace);
   /** The row a drag or shift-click range runs from. */
   const anchor = useRef<number>(undefined);
   /** The row a drag started on, while the button is down. */
@@ -110,6 +112,12 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
   const showing = turns.flatMap((t, i) => (shown?.includes(t.id) ? [i] : []));
   const marked = dragged ?? [showing[0] ?? -1, showing.at(-1) ?? -1];
   const [lo, hi] = [Math.min(...marked), Math.max(...marked)];
+
+  /** An agent's turn is colored by the role of the terminal it ran in. */
+  function iconClass(t: TurnDto) {
+    if (t.kind !== "agent") return t.kind;
+    return `agent ${(t.terminal && roleOf(t.terminal)) || "other"}`;
+  }
 
   async function undo(t: TurnDto) {
     const ok = await confirmAction(
@@ -191,7 +199,7 @@ export function TurnRows({ workspace, turns, shown, below, width, onError }: Pro
       )}
       <GraphThrough below={below} width={width} />
       <span className="lt-body">
-        <svg className={`lt-ic ${t.kind}`} viewBox="0 0 14 14" aria-hidden="true">
+        <svg className={`lt-ic ${iconClass(t)}`} viewBox="0 0 14 14" aria-hidden="true">
           <path d={ICONS[t.kind]} />
         </svg>
         <span className="lt-p">{turnName(t)}</span>

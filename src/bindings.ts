@@ -2904,6 +2904,8 @@ export type TurnDto = {
 	kind: TurnKind,
 	/**  The prompt, for an agent's turn. */
 	prompt: string | null,
+	/**  The terminal panel the agent ran in, for an agent's turn. */
+	terminal: string | null,
 	/**  The files it changed; none for a checkpoint. */
 	paths: string[],
 	changeId: string,

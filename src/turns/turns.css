@@ -62,8 +62,16 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: var(--mark-violet);
+  stroke: var(--fg);
   stroke-width: 1.5;
+}
+
+.lt-ic.interactive {
+  stroke: var(--teal);
+}
+
+.lt-ic.background {
+  stroke: var(--violet-text);
 }
 
 .lt-ic.checkpoint {

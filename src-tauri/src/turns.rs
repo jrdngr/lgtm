@@ -53,6 +53,8 @@ pub struct TurnDto {
     pub kind: TurnKind,
     /// The prompt, for an agent's turn.
     pub prompt: Option<String>,
+    /// The terminal panel the agent ran in, for an agent's turn.
+    pub terminal: Option<String>,
     /// The files it changed; none for a checkpoint.
     pub paths: Vec<String>,
     pub change_id: String,
@@ -132,11 +134,13 @@ fn kind_of(turn: &Turn) -> TurnKind {
 }
 
 impl RepoCtx {
-    /// Records what a hook saw at `point` of `session`'s turn in workspace `workspace`.
-    /// `tool` names the tool call around a tool. Returns whether the workspace's turns changed.
+    /// Records what a hook saw at `point` of `session`'s turn in workspace `workspace`, its
+    /// agent running in terminal panel `terminal`. `tool` names the tool call around a tool.
+    /// Returns whether the workspace's turns changed.
     pub async fn turn_checkpoint(
         &self,
         workspace: Option<&str>,
+        terminal: Option<&str>,
         session: &str,
         tool: Option<&str>,
         point: Checkpoint,
@@ -154,7 +158,17 @@ impl RepoCtx {
                 let store = self.store.lock().unwrap();
                 store.prune_turns(now_ms() - KEEP_MS)?;
                 store.prune_fixes(now_ms() - KEEP_MS)?;
-                store.start_turn(ws.key(), Some(session), prompt, &change, &commit, now_ms())?;
+                let id = store.start_turn(
+                    ws.key(),
+                    Some(session),
+                    prompt,
+                    &change,
+                    &commit,
+                    now_ms(),
+                )?;
+                if let Some(terminal) = terminal {
+                    store.set_turn_terminal(id, terminal)?;
+                }
                 Ok(true)
             }
             Checkpoint::Before => {
@@ -239,6 +253,7 @@ impl RepoCtx {
                 id: t.id as u32,
                 kind: kind_of(&t),
                 prompt: t.prompt,
+                terminal: t.terminal,
                 paths: t.paths,
                 change_id: t.change_id,
                 running,

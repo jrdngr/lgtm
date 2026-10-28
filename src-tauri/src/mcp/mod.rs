@@ -104,7 +104,14 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 let workspace = report.workspace.as_deref();
                 let (tool, prompt) = (report.tool_use.as_deref(), report.prompt.as_deref());
                 match ctx
-                    .turn_checkpoint(workspace, session, tool, point, prompt)
+                    .turn_checkpoint(
+                        workspace,
+                        Some(&report.terminal),
+                        session,
+                        tool,
+                        point,
+                        prompt,
+                    )
                     .await
                 {
                     Ok(true) => {

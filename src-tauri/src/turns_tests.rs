@@ -7,7 +7,7 @@ use crate::review::tests::{repo, write};
 /// Runs a hook's checkpoint for session `s`.
 async fn hook(ctx: &RepoCtx, point: Checkpoint, tool: Option<&str>) {
     let prompt = (point == Checkpoint::Start).then_some("Fix it");
-    ctx.turn_checkpoint(None, "s", tool, point, prompt)
+    ctx.turn_checkpoint(None, None, "s", tool, point, prompt)
         .await
         .unwrap();
 }
