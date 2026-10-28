@@ -222,6 +222,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::github::review_stack_pr,
             commands::github::pin_stack_pr,
             commands::github::follow_review,
+            commands::github::drop_stack_pr,
             commands::github::pr_preview,
             commands::github::pr_head,
             commands::github::refetch_pr,

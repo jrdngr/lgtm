@@ -1,6 +1,6 @@
 //! A PR picked from a workspace's stack instead of checked out into a workspace of its own.
 //! It stays the workspace's PR while the review takes in any of its commits, or while it's
-//! pinned.
+//! pinned, and only while the revisions log shows its pill.
 
 use anyhow::bail;
 
@@ -129,6 +129,19 @@ impl RepoCtx {
         }
         self.store.lock().unwrap().delete_pr(key)?;
         Ok(false)
+    }
+
+    /// Drops the workspace's stack PR if it's PR `number`, pinned or not.
+    pub fn drop_stack_pr(&self, workspace: Option<&str>, number: u32) -> anyhow::Result<()> {
+        let key = workspace.unwrap_or("");
+        let store = self.store.lock().unwrap();
+        if store
+            .pr(key)?
+            .is_some_and(|p| p.stack && p.number == number)
+        {
+            store.delete_pr(key)?;
+        }
+        Ok(())
     }
 
     async fn save_stack_pr(

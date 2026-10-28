@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LogRow } from "../bindings";
 import type { WorkspaceName } from "../core/workspace";
-import { usePr } from "../github/pr";
+import { setPr, usePr } from "../github/pr";
 import { commands, errorText, unwrap } from "../ipc";
 import { editAction, revRowMenu } from "../review/RevisionsPanelMenu";
 import { workspaceRevset } from "../review/revset";
@@ -60,7 +60,7 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const head = target?.changes.at(-1)?.commitId;
   const pr = usePr(workspace);
   const prOn = (r: RowPr) => pr?.number === r.number && (pr.stack || pr.revset === revset);
-  const prOf = useRowPrs(workspace, refreshed);
+  const { prOf, known: prsKnown } = useRowPrs(workspace, refreshed);
   const [rows, setRows] = useState<LogRow[]>();
   const [error, setError] = useState<string>();
   /** Index into `commits` of the highlighted commit, and of the other end of a range. */
@@ -111,6 +111,14 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
     if (op.status === "ok" && op.data && op.data === shownOp.current) return;
     reload(changeAt(cursor));
   }, workspace);
+  // A stack PR stays the workspace's PR only while a row shows its pill.
+  useEffect(() => {
+    if (!pr?.stack || !rows || !prsKnown) return;
+    if (rows.some((r) => r.commit && prOf(r.commit)?.number === pr.number)) return;
+    commands.dropStackPr(workspace, pr.number).then((r) => {
+      if (r.status === "ok") setPr(workspace, null);
+    });
+  }, [workspace, pr, rows, prsKnown, prOf]);
   const reloadLatest = useRef(reload);
   reloadLatest.current = reload;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the log is keyed by workspace

@@ -465,6 +465,8 @@ export const commands = {
 	 *  commits. Whether the workspace still has a PR.
 	 */
 	followReview: (workspace: string | null, revset: string) => typedError<boolean, string>(__TAURI_INVOKE("follow_review", { workspace, revset })),
+	/**  Drops the workspace's stack PR if it's PR `number`, once the revisions log no longer shows it. */
+	dropStackPr: (workspace: string | null, number: number) => typedError<null, string>(__TAURI_INVOKE("drop_stack_pr", { workspace, number })),
 	/**
 	 *  The PR `input` names (a number or a URL), read from GitHub without fetching it: its
 	 *  conversation and its diff with review threads.

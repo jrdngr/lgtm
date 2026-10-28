@@ -84,6 +84,19 @@ pub(crate) async fn follow_review(
         .map_err(err)
 }
 
+/// Drops the workspace's stack PR if it's PR `number`, once the revisions log no longer shows it.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn drop_stack_pr(
+    window: Frame,
+    workspace: Option<String>,
+    number: u32,
+) -> CmdResult<()> {
+    repo(&window)?
+        .drop_stack_pr(workspace.as_deref(), number)
+        .map_err(err)
+}
+
 /// The PR `input` names (a number or a URL), read from GitHub without fetching it: its
 /// conversation and its diff with review threads.
 #[tauri::command]
