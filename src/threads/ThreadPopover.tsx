@@ -9,13 +9,15 @@ interface Props {
   rect: DOMRect;
   /** The take's dot class. */
   take: string;
+  /** A quote, indented under the comment it's from. */
+  sub?: boolean;
   /** Hides it. */
   onLeave(): void;
 }
 
 /** A thread's row again over it, wider and two lines tall: its whole text and id, then who
  * wrote it, where, and whether an agent fixed it. */
-export function ThreadPopover({ t, rect, take, onLeave }: Props) {
+export function ThreadPopover({ t, rect, take, sub, onLeave }: Props) {
   useEffect(() => {
     window.addEventListener("scroll", onLeave, true);
     return () => window.removeEventListener("scroll", onLeave, true);
@@ -24,11 +26,12 @@ export function ThreadPopover({ t, rect, take, onLeave }: Props) {
   const author = t.github && !t.state.quote ? t.github.posts[0]?.author : undefined;
   return createPortal(
     <div
-      className="thread-pop"
+      className={`thread-pop${sub ? " sub" : ""}`}
       style={{ left, top, minWidth: width, maxWidth: `calc(100vw - ${left + 16}px)` }}
     >
       <div className="tp-line">
         <span className={`take-dot ${take}`} />
+        {!t.github && !t.state.quote && <span className="pill purple">Draft</span>}
         <span className="tp-text">{threadLabel(t)}</span>
         <span className="thread-num">#{t.id}</span>
       </div>

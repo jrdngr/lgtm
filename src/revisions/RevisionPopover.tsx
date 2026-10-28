@@ -27,11 +27,19 @@ export function useRowHover() {
     if (current.current === row) return;
     leave();
     current.current = row;
-    timer.current = setTimeout(() => setHover({ row, rect: el.getBoundingClientRect() }), DELAY_MS);
+    timer.current = setTimeout(() => {
+      if (el.isConnected) setHover({ row, rect: el.getBoundingClientRect() });
+      else leave();
+    }, DELAY_MS);
+  }
+
+  /** Forgets row `row` when it's the one shown or waiting to show, as when it unmounts. */
+  function drop(row: number) {
+    if (current.current === row) leave();
   }
 
   useEffect(() => () => clearTimeout(timer.current), []);
-  return { hover, enter, leave };
+  return { hover, enter, leave, drop };
 }
 
 /** A revision's row again over it, as tall but wider, so its line and bookmarks aren't cut short. */

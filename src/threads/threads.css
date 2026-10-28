@@ -263,6 +263,10 @@
   pointer-events: none;
 }
 
+.thread-pop.sub {
+  padding-left: 21px;
+}
+
 .tp-line {
   display: flex;
   align-items: center;

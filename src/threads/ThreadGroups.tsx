@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Stage, ThreadDto } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { commands, unwrap } from "../ipc";
@@ -60,6 +60,11 @@ interface RowProps {
 function ThreadRow({ review, t, picked, current, onPick, sub, dot, hover }: RowProps) {
   const tone = STAGES.find(([s]) => s === t.state.stage)?.[2];
   const take = t.state.take ? VERDICTS[t.state.take.verdict][1] || "grey" : "";
+  // A row that unmounts while shown, as when its thread moves to a folded stage, gets no
+  // mouseleave.
+  const drop = useRef(hover.drop);
+  drop.current = hover.drop;
+  useEffect(() => () => drop.current(t.id), [t.id]);
   return (
     <button
       type="button"
@@ -90,7 +95,7 @@ function ThreadRow({ review, t, picked, current, onPick, sub, dot, hover }: RowP
         <span className="thread-num">#{t.id}</span>
       </span>
       {hover.hover?.row === t.id && (
-        <ThreadPopover t={t} rect={hover.hover.rect} take={take} onLeave={hover.leave} />
+        <ThreadPopover t={t} rect={hover.hover.rect} take={take} sub={sub} onLeave={hover.leave} />
       )}
     </button>
   );
