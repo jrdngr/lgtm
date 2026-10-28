@@ -6,7 +6,7 @@ use serde::Serialize;
 use specta::Type;
 
 use super::{RepoCtx, Review, StateDto, now_ms};
-use crate::store::{Comment, Conversation, GhLink, Message, Stage, Store, ThreadState};
+use crate::store::{Conversation, GhLink, Message, Stage, Store, ThreadState};
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -157,34 +157,6 @@ impl RepoCtx {
             store.set_comment_body(cid, "", now_ms())?;
             store.set_conversation(cid, &Conversation::default())?;
             Ok(store.set_thread(cid, &Some(ThreadState::from_link(&link)))?)
-        })
-    }
-
-    /// Marks a note done, or open again.
-    pub fn set_note_done(&self, id: u32, comment: u32, done: bool) -> anyhow::Result<StateDto> {
-        self.comment_edit(id, |_, store| {
-            Ok(store.set_comment_done(comment as i64, done)?)
-        })
-    }
-
-    /// Starts a GitHub draft on a note's code, with the note's text.
-    pub fn draft_from_note(&self, id: u32, comment: u32) -> anyhow::Result<StateDto> {
-        self.comment_edit(id, |review, store| {
-            let note = store.comment(comment as i64)?.context("the note is gone")?;
-            anyhow::ensure!(note.thread.is_none(), "that's already a thread");
-            let now = now_ms();
-            store.add_comment(&Comment {
-                id: 0,
-                thread: Some(review.draft_state(store, &note.body)?),
-                review: review.label.clone(),
-                created_at: now,
-                updated_at: now,
-                conversation: Conversation::default(),
-                github: None,
-                done: false,
-                ..note
-            })?;
-            Ok(())
         })
     }
 }

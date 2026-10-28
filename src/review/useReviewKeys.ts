@@ -21,7 +21,6 @@ interface Ctx {
   sendToTerminal(): void;
   applyMark(color: MarkColor | null): void;
   openMenuAtCursor(): void;
-  startComment(): void;
   /** Opens a draft for the PR on GitHub on the selection. */
   startDraft(): void;
   /** Opens the agent box of the comment at the cursor. */
@@ -138,9 +137,6 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "m":
         ctx.openMenuAtCursor();
-        break;
-      case "c":
-        if (!e.repeat) ctx.startComment();
         break;
       case "C":
         if (!e.repeat) ctx.startDraft();

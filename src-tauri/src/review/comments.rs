@@ -40,21 +40,20 @@ pub struct CommentDto {
     pub suggestion: Option<String>,
     /// The GitHub thread it's on, whose replies show above it.
     pub github: Option<GhLink>,
-    /// Set on GitHub threads and drafts of them; notes have none.
+    /// Set on GitHub threads and drafts of them.
     pub thread: Option<ThreadState>,
-    /// A note the user is done with.
-    pub done: bool,
 }
 
 impl Review {
     pub(super) fn rematch_comments(&mut self, store: &Store) -> anyhow::Result<()> {
         let comments = store.comments_for_paths(&self.paths())?;
         let pr = self.pr(store)?;
-        // GitHub threads and drafts show only in their own PR's workspace.
+        // GitHub threads and drafts show only in their own PR's workspace. Stores from before
+        // threads were the only comments may still hold notes, which never show.
         let ours = |c: &Comment| {
             c.thread
                 .as_ref()
-                .is_none_or(|t| pr.as_ref().is_some_and(|(r, n)| t.repo == *r && t.pr == *n))
+                .is_some_and(|t| pr.as_ref().is_some_and(|(r, n)| t.repo == *r && t.pr == *n))
         };
         let mut remaps = Remaps::default();
         self.comments = comments
@@ -95,7 +94,6 @@ impl Review {
             suggestion: c.conversation.suggestion,
             github: c.github,
             thread: c.thread,
-            done: c.done,
         })
     }
 
@@ -267,22 +265,18 @@ impl RepoCtx {
         Ok(review.state())
     }
 
-    /// Comments on `rows`, the changed rows of a selection. `snippet` is the code as shown.
-    /// `draft` makes it a draft of a GitHub thread on the workspace's PR instead of a note.
+    /// Starts a draft of a GitHub thread on the workspace's PR on `rows`, the changed rows of a
+    /// selection. `snippet` is the code as shown.
     pub fn add_comment(
         &self,
         id: u32,
         rows: &[RowRef],
         body: &str,
         snippet: &str,
-        draft: bool,
     ) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |review, store| {
             let (path, pins) = review.pins(store, rows)?;
-            let thread = match draft {
-                true => Some(review.draft_state(store, body)?),
-                false => None,
-            };
+            let thread = Some(review.draft_state(store, body)?);
             let now = now_ms();
             store.add_comment(&Comment {
                 id: 0,
@@ -296,7 +290,6 @@ impl RepoCtx {
                 conversation: Conversation::default(),
                 github: None,
                 thread,
-                done: false,
             })?;
             Ok(())
         })

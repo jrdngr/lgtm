@@ -37,7 +37,7 @@ const topFolded = remembered("lgtm:guidedTopFolded", false, [false, true]);
 
 const DOC_NAMES = { adr: "ADR", devlog: "Dev log", other: "Doc" };
 
-/** Comment blocks under the last row each comment covers in `segments`: its threads, notes
+/** Comment blocks under the last row each comment covers in `segments`: its threads
  * and the draft being written. */
 export function commentsAfter(
   c: Comments,
@@ -392,12 +392,7 @@ export function ChunkView({ review, setup, view, s, c, folds, send, docs, setErr
               {lines.picked.length} {lines.picked.length === 1 ? "line" : "lines"}
             </span>
             {lines.canComment && (
-              <button type="button" className="gd-btn" onClick={() => lines.comment(false)}>
-                Comment <kbd>c</kbd>
-              </button>
-            )}
-            {lines.canComment && c.canDraft && (
-              <button type="button" className="gd-btn" onClick={() => lines.comment(true)}>
+              <button type="button" className="gd-btn" onClick={() => lines.comment()}>
                 Draft <kbd>⇧C</kbd>
               </button>
             )}

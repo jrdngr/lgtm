@@ -24,8 +24,8 @@ use crate::store::{Stage, Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
-this terminal's workspace: read its state, comments, symbol graph and reports; \
-add comments; store an architecture assessment; publish review findings \
+this terminal's workspace: read its state, PR threads, symbol graph and reports; \
+store an architecture assessment; publish review findings \
 to a report; point the review \
 at code or a revset; and set the revset the revisions log lists. Tools that write to the review take its revset, from your prompt or \
 get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
@@ -130,48 +130,6 @@ impl Lgtm {
             .map_err(|e| e.to_string())?;
         review["log_revset"] = ctx.log_revset(self.workspace()).map_err(failed)?.into();
         json(&review)
-    }
-
-    #[tool(
-        description = "The human's own notes on the review, which stay in lgtm, with their \
-        lines, author and any conversation. Notes whose code is gone have no lines. GitHub \
-        review comments are threads: see list_threads."
-    )]
-    async fn list_comments(&self) -> Out {
-        let (_, ctx) = self.repo().map_err(failed)?;
-        json(&ctx.agent_comments(self.workspace()).map_err(failed)?)
-    }
-
-    #[tool(
-        description = "Comment on lines of a file in the review. The comment shows in \
-        the review marked as from a terminal agent. It anchors to the changed lines in the \
-        range, so the range must include at least one changed line."
-    )]
-    async fn add_comment(&self, Parameters(p): Parameters<inputs::AddComment>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let (review, state) = ctx
-            .agent_comment(
-                self.workspace(),
-                &p.revset,
-                &p.path,
-                p.start_line,
-                p.end_line,
-                &p.body,
-            )
-            .await
-            .map_err(failed)?;
-        self.changed(&label, review, state);
-        Ok("Added the comment.".into())
-    }
-
-    #[tool(description = "Reply to a note. The reply joins the note's conversation.")]
-    async fn reply_to_comment(&self, Parameters(p): Parameters<inputs::Reply>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
-        let (review, state) = ctx
-            .agent_reply(self.workspace(), &p.revset, p.comment_id, &p.text)
-            .map_err(failed)?;
-        self.changed(&label, review, state);
-        Ok("Replied.".into())
     }
 
     #[tool(

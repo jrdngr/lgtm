@@ -44,19 +44,18 @@ export function FindingCard(props: Props) {
   } = props;
   const workspace = useWorkspace();
   const review = useCurrentReview(workspace);
-  const [kept, setKept] = useState<"note" | "draft">();
+  const [kept, setKept] = useState(false);
   const placed = f.locations.map((loc) => (review ? place(review.files, loc) : undefined));
   const first = placed.find((p) => p);
   const notHere = review ? "Not in the open review" : "Open a review to see the code";
 
-  async function keep(draft: boolean) {
+  /** Starts a draft for the PR on the finding's code. */
+  async function keep() {
     if (!review || !first) return;
     const rows = review.files[first.file].rows;
     const snippet = unified(first.changed.map((r) => rows[r]));
     const text = findingText(f, source);
-    if (await review.commentOn(first.file, first.changed, text, snippet, draft)) {
-      setKept(draft ? "draft" : "note");
-    }
+    if (await review.commentOn(first.file, first.changed, text, snippet)) setKept(true);
   }
 
   function openLocation(i: number) {
@@ -71,11 +70,10 @@ export function FindingCard(props: Props) {
       label: "Send to Terminal",
       onSelect: () => onSend(findingText(f, source)),
     },
-    { label: "Keep as Comment", disabled: !first || !!kept, onSelect: () => keep(false) },
     canDraft && {
       label: "Draft PR Comment",
-      disabled: !first || !!kept,
-      onSelect: () => keep(true),
+      disabled: !first || kept,
+      onSelect: keep,
     },
     "-",
     { label: "Select for Batch", checked, onSelect: onCheck },
@@ -105,22 +103,12 @@ export function FindingCard(props: Props) {
             label="Send to Terminal"
             onClick={() => onSend(findingText(f, source))}
           />
-          <IconButton
-            icon={kept === "note" ? "check" : "comments"}
-            label={
-              kept === "note" ? "Kept as comment" : first ? "Keep as comment on its code" : notHere
-            }
-            disabled={!first || !!kept}
-            onClick={() => keep(false)}
-          />
           {canDraft && (
             <IconButton
-              icon={kept === "draft" ? "check" : "pr"}
-              label={
-                kept === "draft" ? "Drafted" : first ? "Draft PR comment on its code" : notHere
-              }
-              disabled={!first || !!kept}
-              onClick={() => keep(true)}
+              icon={kept ? "check" : "pr"}
+              label={kept ? "Drafted" : first ? "Draft PR comment on its code" : notHere}
+              disabled={!first || kept}
+              onClick={keep}
             />
           )}
           <IconButton

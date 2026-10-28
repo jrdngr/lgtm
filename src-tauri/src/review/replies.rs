@@ -237,7 +237,6 @@ mod tests {
             conversation: Default::default(),
             github: None,
             thread: Some(ThreadState::new("o/n", 1, Stage::Ready)),
-            done: false,
         };
         let new = || Take {
             verdict: TakeVerdict::Disagree,

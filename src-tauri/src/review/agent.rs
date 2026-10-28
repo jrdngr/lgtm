@@ -1,20 +1,15 @@
 //! What an agent in a terminal sees of a review and can do to it, through the MCP server.
-//! Agents can read everything and add comments, but never mark rows.
+//! Agents can read everything, but never mark rows.
 
 use std::collections::BTreeMap;
 
-use anyhow::{Context, bail};
 use serde::Serialize;
 
 use super::build::RowPos;
-use super::comments::RowSpan;
-use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
+use super::{RepoCtx, Review, RowRef};
 use crate::diff::{FileStatus, RowKind};
 use crate::settings::{self, marks};
-use crate::store::{Author, Comment, Conversation, MarkColor, Message};
-
-/// What comments and notes from a terminal agent record as their source review.
-const BY_AGENT: &str = "terminal agent";
+use crate::store::MarkColor;
 
 #[derive(Clone, Default, Serialize)]
 pub struct Counts {
@@ -80,52 +75,7 @@ pub struct Summary {
     pub files: Vec<FileSummary>,
 }
 
-#[derive(Serialize)]
-pub struct AgentMessage {
-    pub author: Author,
-    pub text: String,
-}
-
-#[derive(Serialize)]
-pub struct AgentComment {
-    pub id: u32,
-    pub path: String,
-    /// Absent when its code is gone.
-    pub lines: Option<String>,
-    pub body: String,
-    /// The review it was made in, and "terminal agent" when an agent made it.
-    pub by: String,
-    pub conversation: Vec<AgentMessage>,
-}
-
 impl Review {
-    /// Where the nearest change is, when `rows` (from `rows_for`) fell back to it because no
-    /// changed row of `path` is in `start..=end`.
-    fn change_outside(&self, path: &str, start: u32, end: u32, rows: &[RowRef]) -> Option<String> {
-        let file = self.files.iter().find(|f| f.path == path)?;
-        let removed = file.status == FileStatus::Removed;
-        let line = |i: u32| {
-            let r = &file.rows[i as usize];
-            if removed { r.old_line } else { r.new_line }
-        };
-        let inside: Vec<u32> = (0..file.rows.len() as u32)
-            .filter(|&i| line(i).is_some_and(|l| start <= l && l <= end))
-            .collect();
-        if let (Some(&lo), Some(&hi)) = (inside.first(), inside.last())
-            && rows.iter().any(|r| lo <= r.row && r.row <= hi)
-        {
-            return None;
-        }
-        let row = rows.first()?.row;
-        Some(match line(row) {
-            Some(l) => format!("the nearest change is at line {l}"),
-            None => format!(
-                "the nearest change removes old line {}",
-                file.rows[row as usize].old_line.unwrap_or_default()
-            ),
-        })
-    }
-
     /// A row's state; `None` for rows that don't need review: context and replaced rows.
     /// A checked file's rows count as checked whatever their marks.
     pub(super) fn row_state(&self, fi: usize, row: usize) -> Option<RowState> {
@@ -168,10 +118,6 @@ impl Review {
             (None, Some(old)) => format!("removed old lines {old}"),
             (None, None) => String::new(),
         }
-    }
-
-    fn span_lines(&self, fi: u32, rows: Option<RowSpan>) -> Option<String> {
-        rows.map(|r| self.lines(fi as usize, r.start as usize, r.end as usize))
     }
 
     pub(super) fn summary(&self) -> Summary {
@@ -226,28 +172,6 @@ impl Review {
             rows: total,
             files,
         }
-    }
-
-    pub(super) fn agent_comments(&self) -> Vec<AgentComment> {
-        self.comments
-            .iter()
-            .filter(|c| c.thread.is_none())
-            .map(|c| AgentComment {
-                id: c.id,
-                path: c.path.clone(),
-                lines: self.span_lines(c.file, c.rows),
-                body: c.body.clone(),
-                by: c.review.clone(),
-                conversation: c
-                    .messages
-                    .iter()
-                    .map(|m| AgentMessage {
-                        author: m.author,
-                        text: m.text.clone(),
-                    })
-                    .collect(),
-            })
-            .collect()
     }
 
     /// The code of `rows` and the context between them, as a unified diff with a `@@` header
@@ -348,75 +272,6 @@ impl RepoCtx {
 
     pub fn summary(&self, workspace: Option<&str>) -> anyhow::Result<Summary> {
         Ok(self.with_current(workspace, Review::summary)?.1)
-    }
-
-    pub fn agent_comments(&self, workspace: Option<&str>) -> anyhow::Result<Vec<AgentComment>> {
-        Ok(self.with_current(workspace, Review::agent_comments)?.1)
-    }
-
-    /// Comments as a terminal agent on lines `start..=end` of `path` (new side) in the review
-    /// of `revset`. Returns the review and its new state.
-    pub async fn agent_comment(
-        &self,
-        workspace: Option<&str>,
-        revset: &str,
-        path: &str,
-        start: u32,
-        end: u32,
-        body: &str,
-    ) -> anyhow::Result<(u32, StateDto)> {
-        let at = self.current_review_at(workspace, revset).await?;
-        let state = self.comment_edit(at.id, |review, store| {
-            self.check_at(review, &at)?;
-            let (lo, hi) = (start.min(end), start.max(end));
-            let rows = review
-                .rows_for(path, lo, hi)
-                .with_context(|| format!("{path} isn't one of the review's changed files"))?;
-            if let Some(near) = review.change_outside(path, lo, hi, &rows) {
-                bail!("lines {lo}-{hi} of {path} have no changes in the diff; {near}");
-            }
-            let (path, pins) = review.pins(store, &rows)?;
-            let now = now_ms();
-            store.add_comment(&Comment {
-                id: 0,
-                path,
-                pins,
-                body: body.to_string(),
-                snippet: review.snippet(&rows),
-                review: format!("{} · {BY_AGENT}", review.label),
-                created_at: now,
-                updated_at: now,
-                conversation: Conversation::default(),
-                github: None,
-                thread: None,
-                done: false,
-            })?;
-            Ok(())
-        })?;
-        Ok((at.id, state))
-    }
-
-    /// Adds a terminal agent's reply to a comment's conversation, from the review of `revset`.
-    /// Replies aren't on lines, so they don't wait for the review to show new commits.
-    pub fn agent_reply(
-        &self,
-        workspace: Option<&str>,
-        revset: &str,
-        comment: u32,
-        text: &str,
-    ) -> anyhow::Result<(u32, StateDto)> {
-        let id = self.current_review_of(workspace, revset)?;
-        let state = self.comment_edit(id, |_, store| {
-            let mut c = store
-                .comment(comment as i64)?
-                .with_context(|| format!("no comment {comment}"))?;
-            c.conversation.messages.push(Message {
-                author: Author::Agent,
-                text: text.to_string(),
-            });
-            Ok(store.set_conversation(c.id, &c.conversation)?)
-        })?;
-        Ok((id, state))
     }
 }
 

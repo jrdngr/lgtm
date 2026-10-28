@@ -124,9 +124,7 @@ export function useComments({
     if (!review || !draft) return undefined;
     const before = new Set(comments.map((c) => c.id));
     const rows = draft.rows.map((row) => ({ file: draft.file, row }));
-    const state = await apply(
-      commands.addComment(review.id, rows, body, draft.snippet, !!draft.github),
-    );
+    const state = await apply(commands.addComment(review.id, rows, body, draft.snippet));
     const saved = state?.comments.find((c) => !before.has(c.id));
     if (!saved) return undefined;
     const id = saved.id;
@@ -204,15 +202,6 @@ export function useComments({
     if (!(await confirmAction("Reset this thread? Its take and reply go.", "Reset"))) return;
     setEdits((m) => without(m, id));
     await apply(commands.resetThread(review.id, id));
-  }
-
-  async function setDone(id: number, done: boolean) {
-    if (review) await apply(commands.setNoteDone(review.id, id, done));
-  }
-
-  /** Starts a GitHub draft on the note's code, with its text. */
-  async function draftFromNote(id: number) {
-    if (review) await apply(commands.draftFromNote(review.id, id));
   }
 
   function sendComment(c: CommentDto) {
@@ -300,8 +289,6 @@ export function useComments({
     sendOne,
     setStage,
     reset,
-    setDone,
-    draftFromNote,
     canDraft,
     done: onDone,
   };

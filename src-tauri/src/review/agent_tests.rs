@@ -1,9 +1,9 @@
 use super::tests::{jj, repo, write};
 use super::*;
-use crate::store::{Author, MarkColor};
+use crate::store::MarkColor;
 
 #[tokio::test]
-async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
+async fn agents_see_marks_and_ranges_left_and_writes_wait_for_the_review() {
     let (dir, ctx) = repo();
     let d = dir.path();
     write(d, "a.rs", "fn a() {}\n");
@@ -26,65 +26,34 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     assert_eq!(marks, [("flagged", 1), ("reviewed", 1)]);
     assert_eq!(f.left, ["3-4"], "flagged rows aren't done");
 
-    let (id, state) = ctx
-        .agent_comment(None, "@", "a.rs", 3, 3, "why c?")
-        .await
-        .unwrap();
-    assert_eq!(id, review.id);
-    let c = &state.comments[0];
-    assert!(c.review.ends_with("terminal agent"), "{}", c.review);
-    assert_eq!(c.snippet, "@@ -0,0 +3,1 @@\n+fn c() {}");
-
-    let (_, state) = ctx.agent_reply(None, "@", c.id, "because").unwrap();
-    assert_eq!(state.comments[0].messages[0].author, Author::Agent);
-    let listed = ctx.agent_comments(None).unwrap();
-    assert_eq!(listed[0].lines.as_deref(), Some("3"));
-
-    assert!(
-        ctx.agent_comment(None, "@", "nope.rs", 1, 1, "x")
-            .await
-            .is_err()
-    );
-    let Err(err) = ctx.agent_comment(None, "@", "a.rs", 1, 1, "x").await else {
-        panic!("a comment on unchanged lines was added");
-    };
-    assert!(
-        err.to_string().contains("nearest change is at line 2"),
-        "{err}"
-    );
-    assert_eq!(ctx.agent_comments(None).unwrap().len(), 1);
-
+    let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
     // A write about another revset than the focused review's is refused.
-    let Err(err) = ctx.agent_comment(None, "@-", "a.rs", 3, 3, "x").await else {
-        panic!("a comment about another revset was added");
+    let Err(err) = ctx
+        .publish_findings(None, "@-", None, "x", empty(), None)
+        .await
+    else {
+        panic!("findings about another revset were published");
     };
     assert!(err.to_string().contains("moved to `@`"), "{err}");
-    assert!(ctx.agent_reply(None, "@-", c.id, "x").is_err());
-    assert_eq!(ctx.agent_comments(None).unwrap()[0].conversation.len(), 1);
-
-    let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
     let (report, _) = ctx
         .publish_findings(None, "@", None, "x", empty(), None)
         .await
         .unwrap();
 
     // Once the revset moves to other commits, even before the file watcher snapshots the edit,
-    // writes wait until the review loads them. Replies aren't on lines, so they go ahead.
+    // writes wait until the review loads them.
     write(
         d,
         "a.rs",
         "fn a() {}\nfn b() {}\nfn c() {}\nfn e() {}\nfn f() {}\n",
     );
-    let Err(err) = ctx.agent_comment(None, "@", "a.rs", 3, 3, "x").await else {
-        panic!("a comment on an out-of-date review was added");
+    let Err(err) = ctx
+        .publish_findings(None, "@", None, "x", empty(), None)
+        .await
+    else {
+        panic!("findings went into an out-of-date review");
     };
     assert!(err.to_string().contains("is reloading"), "{err}");
-    ctx.agent_reply(None, "@", c.id, "x").unwrap();
-    assert!(
-        ctx.publish_findings(None, "@", None, "x", empty(), None)
-            .await
-            .is_err()
-    );
     let label = report.label();
     let Err(err) = ctx
         .publish_findings(None, "@", Some(&label), "x", empty(), None)
@@ -94,35 +63,9 @@ async fn agents_see_marks_and_ranges_left_and_can_comment_and_reply() {
     };
     assert!(err.to_string().contains("other commits"), "{err}");
     ctx.refresh(review.id, None).await.unwrap();
-    ctx.agent_comment(None, "@", "a.rs", 5, 5, "x")
+    ctx.publish_findings(None, "@", None, "x", empty(), None)
         .await
         .unwrap();
-}
-
-#[tokio::test]
-async fn comment_ranges_match_new_side_lines_only() {
-    let (dir, ctx) = repo();
-    let d = dir.path();
-    let base: Vec<String> = (1..=20).map(|i| format!("line {i}\n")).collect();
-    write(d, "a.rs", &base.concat());
-    jj(d, &["commit", "-m", "base"]);
-    // Five lines added after line 1 (new lines 2-6), and old line 12 removed.
-    let mut new = base.clone();
-    new.remove(11);
-    for i in (1..=5).rev() {
-        new.insert(1, format!("add {i}\n"));
-    }
-    write(d, "a.rs", &new.concat());
-    let review = ctx.open(None, "@", false).await.unwrap();
-    ctx.focus(None, review.id);
-
-    let (_, state) = ctx
-        .agent_comment(None, "@", "a.rs", 6, 12, "x")
-        .await
-        .unwrap();
-    let snippet = &state.comments[0].snippet;
-    assert!(snippet.ends_with("\n+add 5"), "{snippet}");
-    assert!(!snippet.contains("line 12"), "{snippet}");
 }
 
 #[tokio::test]

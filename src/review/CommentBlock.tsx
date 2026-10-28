@@ -14,10 +14,9 @@ import { Icon, IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { ago, fullDate } from "../ui/time";
 import { Conversation } from "./Conversation";
-import { cardItems, moreItems, noteItems } from "./cardMenu";
+import { cardItems, moreItems } from "./cardMenu";
 import { useLink } from "./linkedAgent";
 import { NEW_COMMENT } from "./model";
-import { NoteReply } from "./NoteReply";
 import { StageStrip } from "./StageStrip";
 import { ThreadBlock } from "./ThreadBlock";
 import type { Comments } from "./useComments";
@@ -38,9 +37,8 @@ function StagePill({ stage }: { stage: Stage }) {
   return <span className={`pill${tone ? ` ${tone}` : ""}`}>{name}</span>;
 }
 
-/** A comment under its code: a note of yours, or a GitHub thread or draft of one, with an
- * editor for its text and its conversation. Any folds to a line; done
- * ones start folded. */
+/** A comment under its code: a GitHub thread or a draft of one, with an editor for its text
+ * and its conversation. Any folds to a line; done ones start folded. */
 export function CommentBlock({ id, comment, c, folds }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [snippet, setSnippet] = useState(false);
@@ -52,8 +50,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   const thread = comment?.thread;
   const viewer = viewerLogin(c.comments);
   const isNew = id === NEW_COMMENT;
-  const github = !!gh || !!thread || (isNew && !!c.draft?.github);
-  const done = gh?.resolved || thread?.stage === "done" || (!thread && comment?.done);
+  const done = gh?.resolved || thread?.stage === "done";
   const ready = thread?.stage === "ready" && !!gh;
   // Set by the fold toggle for the state it was in; otherwise done and final ones are folded.
   const foldState = done ? "done" : ready ? "ready" : "";
@@ -70,14 +67,6 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   });
 
   const card = comment && { comment, c };
-  /** A note of yours, not a GitHub thread or draft. */
-  const note = !!comment && !gh && !thread;
-
-  /** Edits a note's text on a click, unless the click selected some of it. */
-  function editOnClick(comment: CommentDto) {
-    if (window.getSelection()?.isCollapsed === false) return;
-    c.edit(comment);
-  }
   /** Text fields keep their own menu. */
   const onContextMenu = (e: React.MouseEvent) => {
     if (!card || (e.target instanceof Element && e.target.closest("textarea, input"))) return;
@@ -90,7 +79,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
       : (thread?.quote?.text ?? comment.body).split("\n")[0];
     return (
       <div
-        className={`comment-block folded ${github ? "gh" : "mine"}${done ? " resolved" : ""}${comment.file === -1 ? " on-pr" : ""}${thread?.quote ? " quote-block" : ""}`}
+        className={`comment-block folded gh${done ? " resolved" : ""}${comment.file === -1 ? " on-pr" : ""}${thread?.quote ? " quote-block" : ""}`}
         onContextMenu={onContextMenu}
       >
         <button
@@ -160,14 +149,10 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   const changed = comment && !comment.rows;
   const when = comment && (comment.updatedAt ?? comment.createdAt);
   const source = isNew
-    ? github
-      ? "New draft for GitHub"
-      : "New comment"
+    ? "New draft for GitHub"
     : gh
       ? thread?.summary || "GitHub"
-      : thread
-        ? "Draft for GitHub"
-        : "Comment";
+      : "Draft for GitHub";
   const canFinal = !!gh && !!body.trim() && thread?.stage !== "ready";
   const finalButton = (
     <button
@@ -181,10 +166,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
   );
 
   return (
-    <div
-      className={`comment-block ${github ? "gh" : "mine"}${done ? " resolved" : ""}`}
-      onContextMenu={onContextMenu}
-    >
+    <div className={`comment-block gh${done ? " resolved" : ""}`} onContextMenu={onContextMenu}>
       <div className="card-bar">
         {comment && (
           <button
@@ -224,61 +206,35 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
           </button>
         )}
         <span className="spacer" />
-        {note ? (
-          <span className="card-actions">
-            <button
-              type="button"
-              className="card-done"
-              aria-pressed={comment.done}
-              onClick={() => c.setDone(comment.id, !comment.done)}
-            >
-              {comment.done ? "Open again" : "✓ Done"}
-            </button>
-            {card && <Menu items={noteItems(card)} />}
-          </span>
-        ) : (
-          <span className={`card-actions${editing === undefined ? " reveal" : ""}`}>
-            {comment && editing === undefined && comment.body && (
-              <IconButton
-                icon="edit"
-                label={gh ? "Edit reply" : "Edit"}
-                onClick={() => c.edit(comment)}
-              />
-            )}
-            {comment && (
-              <IconButton
-                icon="terminal"
-                className="pipe-icon"
-                label="Send to Terminal"
-                onClick={() => c.send(comment)}
-              />
-            )}
-            {card && <Menu items={moreItems(card)} />}
-          </span>
-        )}
+        <span className={`card-actions${editing === undefined ? " reveal" : ""}`}>
+          {comment && editing === undefined && comment.body && (
+            <IconButton
+              icon="edit"
+              label={gh ? "Edit reply" : "Edit"}
+              onClick={() => c.edit(comment)}
+            />
+          )}
+          {comment && (
+            <IconButton
+              icon="terminal"
+              className="pipe-icon"
+              label="Send to Terminal"
+              onClick={() => c.send(comment)}
+            />
+          )}
+          {card && <Menu items={moreItems(card)} />}
+        </span>
       </div>
       {changed && snippet && <SnippetDiff snippet={comment.snippet} />}
       {gh && <GhThread link={gh} viewer={viewer} />}
-      {editing === undefined &&
-        !gh &&
-        comment &&
-        (note && !comment.body ? (
-          <button type="button" className="note-add" onClick={() => c.edit(comment)}>
-            Add note text…
-          </button>
-        ) : note ? (
-          // biome-ignore lint/a11y/useKeyWithClickEvents: e edits from the keyboard
-          <div className="note-text post-body" onClick={() => editOnClick(comment)}>
-            <Markdown>{comment.body}</Markdown>
+      {editing === undefined && !gh && comment && (
+        <div className="post">
+          <Avatar name={viewer ?? "You"} />
+          <div className="post-body">
+            {comment.body ? <Markdown>{comment.body}</Markdown> : <em>No text yet</em>}
           </div>
-        ) : (
-          <div className="post">
-            <Avatar name={viewer ?? "You"} />
-            <div className="post-body">
-              {comment.body ? <Markdown>{comment.body}</Markdown> : <em>No text yet</em>}
-            </div>
-          </div>
-        ))}
+        </div>
+      )}
       {editing !== undefined ? (
         <div className="card-foot editing">
           <textarea
@@ -286,9 +242,7 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
             className="comment-input"
             value={editing}
             rows={Math.min(12, Math.max(3, editing.split("\n").length))}
-            placeholder={
-              gh ? "Write a reply" : github ? "Write a comment for GitHub" : "Write a comment"
-            }
+            placeholder={gh ? "Write a reply" : "Write a comment for GitHub"}
             onChange={(e) => c.setBody(id, e.target.value)}
             onKeyDown={onBodyKey}
           />
@@ -322,9 +276,6 @@ export function CommentBlock({ id, comment, c, folds }: Props) {
         <div className="card-agent">
           <Conversation messages={comment.messages} />
         </div>
-      )}
-      {note && comment.messages.at(-1)?.author === "agent" && c.reviewId !== undefined && (
-        <NoteReply workspace={c.workspace} review={c.reviewId} comment={comment} />
       )}
     </div>
   );

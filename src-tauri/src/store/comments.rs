@@ -1,4 +1,4 @@
-//! Review comments: local notes, and GitHub threads and drafts of them. A comment is anchored
+//! Review comments: GitHub threads and drafts of them. A comment is anchored
 //! like a mark, on the first and last changed rows of the selection it was made on, and keeps
 //! the replies terminal agents gave on it.
 
@@ -114,10 +114,8 @@ pub struct Comment {
     pub updated_at: i64,
     pub conversation: Conversation,
     pub github: Option<GhLink>,
-    /// Set on threads and drafts of them; notes have none.
+    /// Set on threads and drafts of them. Stores may hold old notes without one, which never show.
     pub thread: Option<ThreadState>,
-    /// A note the user is done with.
-    pub done: bool,
 }
 
 impl Comment {
@@ -173,7 +171,7 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
 }
 
 pub(super) const COLUMNS: &str =
-    "id, path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread, done";
+    "id, path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread";
 
 fn github_to_sql(g: &Option<GhLink>) -> rusqlite::Result<String> {
     match g {
@@ -204,7 +202,6 @@ pub(super) fn row_to_comment(r: &rusqlite::Row) -> rusqlite::Result<Comment> {
         conversation: serde_json::from_str(&r.get::<_, String>(8)?).map_err(json_err)?,
         github,
         thread,
-        done: r.get(11)?,
     })
 }
 
@@ -221,8 +218,8 @@ impl Store {
     /// Inserts a comment and returns its id.
     pub fn add_comment(&self, c: &Comment) -> rusqlite::Result<i64> {
         self.db.execute(
-            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread, done)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO comments (path, pins, body, snippet, review, created_at, updated_at, workshop, github, thread)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 c.path,
                 serde_json::to_string(&c.pins).map_err(json_err)?,
@@ -234,7 +231,6 @@ impl Store {
                 serde_json::to_string(&c.conversation).map_err(json_err)?,
                 github_to_sql(&c.github)?,
                 thread_to_sql(&c.thread)?,
-                c.done,
             ],
         )?;
         Ok(self.db.last_insert_rowid())
@@ -292,14 +288,6 @@ impl Store {
         Ok(())
     }
 
-    pub fn set_comment_done(&self, id: i64, done: bool) -> rusqlite::Result<()> {
-        self.db.execute(
-            "UPDATE comments SET done = ? WHERE id = ?",
-            params![done, id],
-        )?;
-        Ok(())
-    }
-
     pub fn delete_comment(&self, id: i64) -> rusqlite::Result<()> {
         self.db.execute("DELETE FROM comments WHERE id = ?", [id])?;
         Ok(())
@@ -335,7 +323,6 @@ mod tests {
             conversation: Conversation::default(),
             github: None,
             thread: None,
-            done: false,
         };
         c.id = store.add_comment(&c).unwrap();
         assert_eq!(store.comments_for_paths(&["a.rs"]).unwrap(), [c.clone()]);
@@ -373,9 +360,8 @@ mod tests {
         let mut thread = ThreadState::new("o/n", 3, Stage::Ready);
         thread.summary = "Clamp".into();
         store.set_thread(c.id, &Some(thread.clone())).unwrap();
-        store.set_comment_done(c.id, true).unwrap();
         let got = store.comment(c.id).unwrap().unwrap();
-        assert_eq!((got.thread, got.done), (Some(thread), true));
+        assert_eq!(got.thread, Some(thread));
 
         store.delete_comment(c.id).unwrap();
         assert_eq!(store.comment(c.id).unwrap(), None);

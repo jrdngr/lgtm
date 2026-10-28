@@ -43,7 +43,6 @@ impl RepoCtx {
                 conversation: Conversation::default(),
                 github: None,
                 thread: Some(thread),
-                done: false,
             })?;
             Ok(())
         })

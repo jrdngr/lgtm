@@ -124,10 +124,10 @@ export function useReviewActions(d: Deps) {
     if (text) (recent ? d.sendRecent : d.sendText)(text, finishAction);
   }
 
-  /** Opens a note on the selection. `github` makes it a draft for the PR instead. */
-  function startComment(github = false) {
-    if (github && !d.c.canDraft) {
-      setError("Drafts for GitHub need a PR workspace. Press c for a comment.");
+  /** Opens a draft for the PR on the selection. */
+  function startDraft() {
+    if (!d.c.canDraft) {
+      setError("Drafts for GitHub need a PR workspace.");
       return;
     }
     const draft = draftFor(files, lines, sel.start, sel.end);
@@ -136,7 +136,7 @@ export function useReviewActions(d: Deps) {
       return;
     }
     setError(undefined);
-    d.c.start({ ...draft, github });
+    d.c.start(draft);
     finishAction();
   }
 
@@ -144,11 +144,10 @@ export function useReviewActions(d: Deps) {
     d.closeMenu();
     if (action === "copy") copy();
     else if (action === "location") copyLocated();
-    else if (action === "draft") startComment(true);
+    else if (action === "draft") startDraft();
     else if (action === "open") d.openInEditor();
     else if (action === "collapse") d.collapseHunk();
     else if (action === "agent") sendSelection();
-    else if (action === "comment") startComment();
     else applyMark(action === "clear" ? null : action);
   }
 
@@ -160,7 +159,7 @@ export function useReviewActions(d: Deps) {
     step,
     resetMarks,
     copy,
-    startComment,
+    startDraft,
     pick,
     sendSelection,
   };

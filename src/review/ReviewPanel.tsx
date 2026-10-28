@@ -19,7 +19,6 @@ import { useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
 import { CommentBlock } from "./CommentBlock";
 import { commentSlots } from "./comments";
-import { useCurrentReview } from "./current";
 import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
 import { MarkMenu } from "./MarkMenu";
@@ -34,7 +33,6 @@ import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
 import { useContextLines } from "./useContextLines";
-import { useNotes } from "./useNotes";
 import { usePublishReview } from "./usePublishReview";
 import { usePublishTarget } from "./usePublishTarget";
 import { useReview } from "./useReview";
@@ -71,7 +69,6 @@ function keepsFocus(t: EventTarget) {
 
 export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) {
   const workspace = useWorkspace();
-  const notes = useNotes(useCurrentReview(workspace), workspace);
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
@@ -243,16 +240,10 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     focusRoot,
   });
 
-  async function commentOn(
-    file: number,
-    rows: number[],
-    body: string,
-    snippet: string,
-    draft = false,
-  ) {
+  async function commentOn(file: number, rows: number[], body: string, snippet: string) {
     if (!review) return false;
     const refs = rows.map((row) => ({ file, row }));
-    const r = await commands.addComment(review.id, refs, body, snippet, draft);
+    const r = await commands.addComment(review.id, refs, body, snippet);
     if (r.status === "error") {
       setError(r.error);
       return false;
@@ -339,8 +330,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     sendToTerminal: () => a.sendSelection(true),
     applyMark: a.applyMark,
     openMenuAtCursor,
-    startComment: a.startComment,
-    startDraft: () => a.startComment(true),
+    startDraft: a.startDraft,
     openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
     stepHunk,
@@ -404,7 +394,6 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         setup={setup}
         onMark={a.applyMark}
         onReset={a.resetMarks}
-        send={{ count: notes.unsent.length, onSend: notes.sendOpen }}
       />
       <ReviewNotes review={review} stale={stale} />
       <PrNote p={pr} />
@@ -447,8 +436,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           commentColor={(id) => {
             const x = navComments.find((n) => n.id === id);
             if (!x) return undefined;
-            if (x.thread) return stageColor(x.thread.stage);
-            return x.done ? undefined : "var(--muted)";
+            return x.thread ? stageColor(x.thread.stage) : undefined;
           }}
           renderComment={(id) => (
             <>

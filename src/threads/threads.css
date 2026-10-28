@@ -229,7 +229,7 @@
   background: var(--muted);
 }
 
-/* Send and Triage, under the Comments header, sharing its width. */
+/* Triage, under the Comments header, across its width. */
 .comments-actions {
   display: flex;
   gap: 6px;

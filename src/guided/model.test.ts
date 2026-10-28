@@ -143,7 +143,6 @@ describe("commentedThreads", () => {
     suggestion: null,
     github: null,
     thread: gh ? { repo: "o/r", pr: 1, stage: "new", take: null, summary: "" } : null,
-    done: false,
   });
 
   it("lists PR threads on code no chunk holds, and leaves out notes", () => {

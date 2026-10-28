@@ -8,7 +8,6 @@ import "./MarkMenu.css";
 export type MenuAction =
   | MarkColor
   | "clear"
-  | "comment"
   | "draft"
   | "agent"
   | "copy"
@@ -17,7 +16,6 @@ export type MenuAction =
   | "collapse";
 
 const LETTERS: Record<string, MenuAction> = {
-  c: "comment",
   C: "draft",
   a: "agent",
   o: "open",
@@ -77,7 +75,6 @@ export function MarkMenu({
   const items: Item[] = [
     { action: "clear", key: "0", label: "Clear Mark" },
     "-",
-    { action: "comment", key: "c", label: "Comment" },
     ...(canDraft ? [{ action: "draft", key: "C", label: "Draft PR Comment" } as const] : []),
     { action: "agent", key: "a", label: "Send to Agent" },
     "-",

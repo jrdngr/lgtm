@@ -19,8 +19,6 @@ export interface Draft {
   rows: number[];
   /** The selection's rows in `file` as a diff. */
   snippet: string;
-  /** A draft for the PR on GitHub, rather than a note. */
-  github?: boolean;
 }
 
 /** A draft on display lines `start..=end`: their changed rows in the last file that has any.
@@ -100,15 +98,6 @@ export function commentText(files: FlatFile[], c: CommentDto): string {
   return [codeText(files, c), c.body.trim(), conversationText(c.messages)]
     .filter(Boolean)
     .join("\n\n");
-}
-
-/** Notes sent to the agent together, each with its id, asking it to answer each in its own
- * conversation so the reply shows under the note. */
-export function notesText(files: FlatFile[], notes: CommentDto[], revset: string): string {
-  const ask = `Answer each comment below with lgtm's reply_to_comment tool (revset \`${revset}\`, the comment's id), so the reply shows under that comment.`;
-  return [ask, ...notes.map((c) => `Comment ${c.id}:\n\n${commentText(files, c)}`)].join(
-    "\n\n---\n\n",
-  );
 }
 
 /** Where a comment's code is, or the code as it was if it's gone. */

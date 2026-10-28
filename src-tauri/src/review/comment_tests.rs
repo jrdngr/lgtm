@@ -1,5 +1,6 @@
 //! Comment tests against real jj repos.
 
+use super::github_tests::pr_workspace;
 use super::tests::{repo, row_of, write};
 use super::*;
 
@@ -13,16 +14,17 @@ pub(super) fn row_text(review: &ReviewDto, file: u32, row: u32) -> String {
 
 #[tokio::test]
 async fn comments_follow_their_code_and_outlive_it() {
-    let (dir, ctx) = repo();
-    let d = dir.path();
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let d = &pr_workspace(&mut ctx, base.path()).await.root;
     write(d, "a.rs", "fn a() {\n    one();\n    two();\n}\n");
-    let review = ctx.open(None, "@", false).await.unwrap();
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let rows = [
         row_of(&review, 0, "    one();", 0),
         row_of(&review, 0, "    two();", 0),
     ];
     let state = ctx
-        .add_comment(review.id, &rows, "why two?", "+one\n+two", false)
+        .add_comment(review.id, &rows, "why two?", "+one\n+two")
         .unwrap();
     assert_eq!(state.comments.len(), 1);
 
@@ -32,7 +34,7 @@ async fn comments_follow_their_code_and_outlive_it() {
         "a.rs",
         "fn z() {}\n\nfn a() {\n    one();\n    two();\n}\n",
     );
-    let review = ctx.open(None, "@", false).await.unwrap();
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let c = &review.state.comments[0];
     let span = c.rows.unwrap();
     assert_eq!(row_text(&review, c.file, span.start), "    one();");
@@ -44,7 +46,7 @@ async fn comments_follow_their_code_and_outlive_it() {
 
     // With its code gone, the comment stays on its file without rows.
     write(d, "a.rs", "fn z() {}\n");
-    let review = ctx.open(None, "@", false).await.unwrap();
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let c = &review.state.comments[0];
     assert_eq!((c.rows, c.snippet.as_str()), (None, "+one\n+two"));
 
@@ -54,22 +56,23 @@ async fn comments_follow_their_code_and_outlive_it() {
 
 #[tokio::test]
 async fn a_comment_on_a_renamed_file_keeps_its_removed_rows() {
-    let (dir, ctx) = repo();
-    let d = dir.path();
+    let (_dir, mut ctx) = repo();
+    let base = tempfile::tempdir().unwrap();
+    let d = &pr_workspace(&mut ctx, base.path()).await.root;
     write(d, "old.py", "def f():\n    a = 1\n    return 1\n");
     super::tests::jj(d, &["new", "-m", "change"]);
     std::fs::rename(d.join("old.py"), d.join("new.py")).unwrap();
     write(d, "new.py", "def f():\n    a = 1\n    return 2\n");
-    let review = ctx.open(None, "@", false).await.unwrap();
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     assert_eq!(review.files[0].old_path.as_deref(), Some("old.py"));
     let rows = [
         row_of(&review, 0, "    return 1", 0),
         row_of(&review, 0, "    return 2", 0),
     ];
-    ctx.add_comment(review.id, &rows, "why?", "-1\n+2", false)
+    ctx.add_comment(review.id, &rows, "why?", "-1\n+2")
         .unwrap();
 
-    let review = ctx.open(None, "@", false).await.unwrap();
+    let review = ctx.open(Some("pr1"), "@", false).await.unwrap();
     let c = &review.state.comments[0];
     let span = c.rows.unwrap();
     assert_eq!(row_text(&review, c.file, span.start), "    return 1");

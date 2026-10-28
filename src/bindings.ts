@@ -317,18 +317,14 @@ export const commands = {
 	/**  Registers this app's `lgtm mcp` with Claude Code at user scope. */
 	registerMcp: () => typedError<null, string>(__TAURI_INVOKE("register_mcp")),
 	/**
-	 *  Comments on the changed `rows` of a selection. `snippet` is the code as shown. `draft`
-	 *  makes it a draft for the workspace's PR on GitHub instead of a note.
+	 *  Starts a draft for the workspace's PR on GitHub on the changed `rows` of a selection.
+	 *  `snippet` is the code as shown.
 	 */
-	addComment: (review: number, rows: RowRef[], body: string, snippet: string, draft: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet, draft })),
+	addComment: (review: number, rows: RowRef[], body: string, snippet: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_comment", { review, rows, body, snippet })),
 	/**  Moves a thread to `stage`. */
 	setThreadStage: (review: number, comment: number, stage: Stage_Deserialize) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_thread_stage", { review, comment, stage })),
 	/**  Clears a GitHub thread's take, reply and agent conversation, as if it were new. */
 	resetThread: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("reset_thread", { review, comment })),
-	/**  Marks a note done, or open again. */
-	setNoteDone: (review: number, comment: number, done: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_note_done", { review, comment, done })),
-	/**  Starts a GitHub draft on a note's code, with its text. */
-	draftFromNote: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("draft_from_note", { review, comment })),
 	editComment: (review: number, comment: number, body: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("edit_comment", { review, comment, body })),
 	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
 	addQuote: (review: number, of: number, text: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
@@ -999,10 +995,8 @@ export type CommentDto_Deserialize = {
 	suggestion: string | null,
 	/**  The GitHub thread it's on, whose replies show above it. */
 	github: GhLink | null,
-	/**  Set on GitHub threads and drafts of them; notes have none. */
+	/**  Set on GitHub threads and drafts of them. */
 	thread: ThreadState_Deserialize | null,
-	/**  A note the user is done with. */
-	done: boolean,
 };
 
 export type CommentDto_Serialize = {
@@ -1023,10 +1017,8 @@ export type CommentDto_Serialize = {
 	suggestion: string | null,
 	/**  The GitHub thread it's on, whose replies show above it. */
 	github: GhLink | null,
-	/**  Set on GitHub threads and drafts of them; notes have none. */
+	/**  Set on GitHub threads and drafts of them. */
 	thread: ThreadState_Serialize | null,
-	/**  A note the user is done with. */
-	done: boolean,
 };
 
 export type CompStatus = 

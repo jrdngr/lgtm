@@ -475,46 +475,6 @@
   color: var(--muted);
 }
 
-/* The Comments view's All / PR / Notes filter. */
-.comments-filter {
-  display: flex;
-  flex: none;
-  margin: 8px 10px 4px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.comments-filter .option {
-  flex: 1;
-  padding: 3px 0;
-  border: none;
-  border-right: 1px solid var(--border);
-  border-radius: 0;
-  background: none;
-  font-size: var(--fs-sm);
-  color: var(--muted);
-}
-
-.comments-filter .option:last-child {
-  border-right: none;
-}
-
-.comments-filter .option:hover:not(:disabled) {
-  color: var(--fg);
-}
-
-.comments-filter .option.on {
-  color: var(--fg);
-  background: var(--raise);
-}
-
-.comments-filter b {
-  margin-left: 4px;
-  font-weight: 600;
-  color: var(--soft);
-}
-
 /* The PR's state, as a card atop its threads. */
 .comments-scroll > .pr-head {
   margin: 6px 10px;
@@ -567,60 +527,12 @@
   color: var(--soft);
 }
 
-/* A file's notes start under its path: folder quiet, name bright. */
-.note-file {
-  padding: 6px 10px 2px 23px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: var(--fs-xs) var(--mono);
-  color: var(--muted);
-}
-
-.note-file b {
-  font-weight: 600;
-  color: var(--fg);
-}
-
-.notes-only .note-file {
-  padding-left: 10px;
-}
-
-.comment-item {
-  display: grid;
-  grid-template-columns: 14px 1fr auto;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 3px 10px 3px 13px;
-  border: none;
-  border-radius: 0;
-  background: none;
-  text-align: left;
-}
-
-.comment-item:hover:not(:disabled) {
-  background: var(--hover);
-}
-
 .item-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: var(--fs-sm);
-}
-
-.comment-item .item-text code {
-  font: var(--fs-xs) var(--mono);
-}
-
-.item-where {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font: var(--fs-xs) var(--mono);
-  color: var(--faint);
 }
 
 /* A thread's reply heading: Reply draft or Final, and the take behind it. */
@@ -649,21 +561,6 @@
 .take-question {
   margin-top: 4px;
   color: var(--amber);
-}
-
-.item-icon {
-  display: flex;
-  justify-content: center;
-  color: var(--accent);
-}
-
-.item-icon svg {
-  width: 13px;
-  height: 13px;
-}
-
-.notes-only .comment-item {
-  padding-left: 0;
 }
 
 button.group-head.fold:hover:not(:disabled) {
@@ -935,8 +832,7 @@ button.group-head.fold:hover:not(:disabled) {
   opacity: 0.8;
 }
 
-/* A note's Done and ⋯ buttons, and its text, which edits on a click. */
-.card-actions .card-done,
+/* A card's ⋯ button. */
 .card-actions .menu > button {
   margin-left: 4px;
   padding: 0 9px;
@@ -953,32 +849,10 @@ button.group-head.fold:hover:not(:disabled) {
   color: var(--fg);
 }
 
-.card-actions .card-done:hover:not(:disabled),
 .card-actions .menu > button:hover:not(:disabled),
 .card-actions .menu > button.open {
   border-color: var(--accent);
   background: var(--raise);
-}
-
-.note-add {
-  display: block;
-  width: 100%;
-  padding: 8px 10px;
-  border: none;
-  background: none;
-  text-align: left;
-  font-style: italic;
-  color: var(--faint);
-  cursor: text;
-}
-
-.note-add:hover:not(:disabled) {
-  color: var(--muted);
-}
-
-.note-text {
-  padding: 8px 10px;
-  cursor: text;
 }
 
 /* Comments on the PR sit above the files, with their quotes under them. */

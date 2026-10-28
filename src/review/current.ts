@@ -35,15 +35,9 @@ export interface CurrentReview {
   show(path: string, line: number | null): void;
   /** Scrolls the review pane to a row, or its file when the row is hidden. */
   jumpToRow(file: number, row: number): void;
-  /** Adds a note on changed `rows` of `file`, or with `draft`, a draft for the PR on GitHub.
-   * Resolves to whether it worked. */
-  commentOn(
-    file: number,
-    rows: number[],
-    body: string,
-    snippet: string,
-    draft?: boolean,
-  ): Promise<boolean>;
+  /** Starts a draft for the PR on GitHub on changed `rows` of `file`. Resolves to whether it
+   * worked. */
+  commentOn(file: number, rows: number[], body: string, snippet: string): Promise<boolean>;
   /** In a PR workspace: fetches the PR again, and pulls its threads into the review. */
   refetchPr(): void;
   /** `quiet` skips the error when the review isn't the whole PR. */

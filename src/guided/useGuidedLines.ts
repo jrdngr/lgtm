@@ -106,11 +106,12 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
     return undefined;
   }
 
-  function comment(github: boolean, picks = picked) {
+  /** Starts a draft for the PR on the picked lines. */
+  function comment(picks = picked) {
     const target = commentRows(picks);
     if (!target) return setError("Pick changed lines to comment on.");
     const [file, rows] = target;
-    c.start({ file, rows, snippet: unified(rows.map((r) => review.files[file].rows[r])), github });
+    c.start({ file, rows, snippet: unified(rows.map((r) => review.files[file].rows[r])) });
     clear();
   }
 
@@ -195,11 +196,9 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
         if (!has || e.repeat) return false;
         mark(null);
         return true;
-      case "c":
       case "C":
-        if (!has || !commentRows(picked) || e.repeat) return false;
-        if (e.key === "C" && !c.canDraft) return false;
-        comment(e.key === "C");
+        if (!has || !commentRows(picked) || e.repeat || !c.canDraft) return false;
+        comment();
         return true;
     }
     const color = has && !e.repeat ? colorForKey(setup, e.key) : undefined;
@@ -209,14 +208,12 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
   }
 
   function menu(picks: RowRef[]): CtxEntry[] {
-    const canComment = !!commentRows(picks);
+    const canComment = c.canDraft && !!commentRows(picks);
     return [
       { label: "Send to Terminal", keys: "⌘>", onSelect: () => sendPicked(picks) },
       { label: "Copy", keys: "⌘C", onSelect: () => copyPicked(picks) },
       "-",
-      canComment && { label: "Comment", keys: "c", onSelect: () => comment(false, picks) },
-      canComment &&
-        c.canDraft && { label: "Draft", keys: "⇧C", onSelect: () => comment(true, picks) },
+      canComment && { label: "Draft", keys: "⇧C", onSelect: () => comment(picks) },
       {
         label: "Mark",
         items: [
@@ -254,7 +251,7 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
     onKey,
     clear,
     comment,
-    canComment: !!commentRows(picked),
+    canComment: c.canDraft && !!commentRows(picked),
   };
 }
 

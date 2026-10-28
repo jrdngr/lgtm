@@ -17,31 +17,6 @@ pub struct Revset {
     pub revset: String,
 }
 
-#[derive(Deserialize, JsonSchema)]
-pub struct AddComment {
-    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another, or the revset moves to commits the review hasn't loaded.
-    pub revset: String,
-    /// Repository-relative path of a file in the review.
-    pub path: String,
-    /// First line on the new side of the diff (the old side for a deleted file).
-    pub start_line: u32,
-    /// Last line, inclusive.
-    pub end_line: u32,
-    /// The comment, in markdown.
-    pub body: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-pub struct Reply {
-    /// The review's revset, as the prompt or get_review gives it. lgtm refuses the call once
-    /// its review shows another, or the revset moves to commits the review hasn't loaded.
-    pub revset: String,
-    /// The comment's id, from list_comments.
-    pub comment_id: u32,
-    pub text: String,
-}
-
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Severity {

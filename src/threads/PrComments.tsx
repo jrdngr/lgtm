@@ -1,6 +1,5 @@
 import { useState } from "react";
 import type { CommentDto, PrDto, ThreadDto } from "../bindings";
-import { remembered } from "../core/remembered";
 import { useWorkspace } from "../core/workspace";
 import { PrSection } from "../github/PrSection";
 import { useDiscussion } from "../github/useDiscussion";
@@ -11,15 +10,11 @@ import { triageAllText } from "../review/agentText";
 import type { CurrentReview } from "../review/current";
 import { sendToBackgroundAgent, startLink } from "../review/linkCommands";
 import { useLink } from "../review/linkedAgent";
-import { NoNotes, NoteList } from "../review/NoteList";
-import { SendNotesButton } from "../review/SendNotesButton";
-import { useNotes } from "../review/useNotes";
 import { run } from "../services/pathMenu";
 import { openSettings } from "../settings/open";
 import { PipeButton } from "../terminal/PipeButton";
 import { useGithubOff } from "../tools/agents";
 import { contextMenu, copy } from "../ui/contextMenu";
-import { GroupHead } from "../ui/GroupHead";
 import { IconButton } from "../ui/icons";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
 import { LinkStrip } from "./LinkStrip";
@@ -27,47 +22,17 @@ import { SendBox } from "./SendBox";
 import { ThreadGroups } from "./ThreadGroups";
 import { finalText } from "./text";
 
-type Filter = "all" | "pr" | "notes";
-
-const shownFilter = remembered<Filter>("lgtm:commentsFilter", "all", ["all", "pr", "notes"]);
-const notesFolded = remembered("lgtm:notesFolded", false, [true, false]);
-
-function FilterBar({ pr, notes }: { pr: number; notes: number }) {
-  const filter = shownFilter.use();
-  const option = (f: Filter, label: string, count?: number) => (
-    <button
-      type="button"
-      className={filter === f ? "option on" : "option"}
-      aria-pressed={filter === f}
-      onClick={() => shownFilter.set(f)}
-    >
-      {label}
-      {count !== undefined && <b>{count}</b>}
-    </button>
-  );
-  return (
-    <div className="comments-filter">
-      {option("all", "All")}
-      {option("pr", "PR", pr)}
-      {option("notes", "Comments", notes)}
-    </div>
-  );
-}
-
 interface Props {
   pr: PrDto;
   review: CurrentReview | undefined;
 }
 
 /** A PR workspace's comments: the PR's state and conversation, every thread on it by stage,
- * your notes, and the box that sends what's ready. */
+ * and the box that sends what's ready. */
 export function PrComments({ pr, review }: Props) {
   const workspace = useWorkspace();
   const off = useGithubOff();
   const discussion = useDiscussion(workspace, pr);
-  const filter = shownFilter.use();
-  const shut = notesFolded.use();
-  const notes = useNotes(review, workspace);
   const [confirm, setConfirm] = useState(0);
   const [error, setError] = useState<string>();
   const threads = review?.threads ?? [];
@@ -107,8 +72,6 @@ export function PrComments({ pr, review }: Props) {
     },
     { label: "Edit Reply Prompt…", onSelect: () => openSettings(workspace, "prompts") },
     sending && { label: "Send Ready to GitHub…", onSelect: () => setConfirm((n) => n + 1) },
-    "-",
-    ...notes.menu(),
   ]);
 
   function onKey(e: React.KeyboardEvent) {
@@ -121,65 +84,29 @@ export function PrComments({ pr, review }: Props) {
     e.preventDefault();
   }
 
-  const showPr = filter !== "notes";
-  const showNotes = filter !== "pr";
-  const openThreads = working(threads).filter((t) => t.state.stage !== "done").length;
   return (
     <div style={{ display: "contents" }} onKeyDown={onKey}>
       <div style={{ display: "contents" }} onContextMenu={headerMenu}>
         <SectionHeader title="Comments">
           {!off && <IconButton icon="sync" label="Sync" onClick={sync} />}
         </SectionHeader>
-        <div className="comments-actions">
-          <SendNotesButton
-            className="pr-head-btn"
-            count={notes.unsent.length}
-            onSend={notes.sendOpen}
-          />
-          {canTriage && (
+        {canTriage && (
+          <div className="comments-actions">
             <PipeButton background className="pr-head-btn" onClick={triage} keys="t">
               Triage {fresh}
             </PipeButton>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       <LinkStrip workspace={workspace} />
-      {(error ?? notes.error) && <div className="review-error">{error ?? notes.error}</div>}
-      <FilterBar pr={openThreads} notes={notes.open.length} />
+      {error && <div className="review-error">{error}</div>}
       <div className="comments-scroll">
-        {showPr && (
-          <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
+        <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
+        {review ? (
+          <ThreadGroups review={review} threads={threads} />
+        ) : (
+          <Empty>No review open</Empty>
         )}
-        {showPr &&
-          (review ? (
-            <ThreadGroups review={review} threads={threads} />
-          ) : (
-            <Empty>No review open</Empty>
-          ))}
-        {showNotes &&
-          review &&
-          (notes.notes.length === 0 ? (
-            filter === "notes" && <NoNotes />
-          ) : (
-            <div className="notes-group">
-              <GroupHead
-                name="Comments"
-                count={`${notes.open.length} open`}
-                shut={shut}
-                onToggle={() => notesFolded.set(!shut)}
-                onContextMenu={contextMenu(notes.menu)}
-              />
-              {!shut && (
-                <NoteList
-                  review={review}
-                  notes={notes.notes}
-                  canDraft
-                  showDone={notes.showDone}
-                  setShowDone={notes.setShowDone}
-                />
-              )}
-            </div>
-          ))}
       </div>
       {sending && (
         <SendBox
