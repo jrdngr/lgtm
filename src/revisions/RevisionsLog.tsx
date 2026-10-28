@@ -431,7 +431,14 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
         {commit && (
           <CommitLines
             c={commit}
-            lead={commit.workingCopy && <TurnsToggle turns={turns} />}
+            lead={
+              commit.workingCopy && (
+                <TurnsToggle
+                  turns={turns}
+                  onClose={() => onTurn && target?.view({ kind: "combined" })}
+                />
+              )
+            }
             pill={
               rp && (
                 <PrPill

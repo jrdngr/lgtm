@@ -13,8 +13,8 @@ import "./turns.css";
 
 const ROW_H = 24;
 
-/** The toggle on `@`'s second line that shows its turns. */
-export function TurnsToggle({ turns }: { turns: TurnDto[] }) {
+/** The toggle on `@`'s second line that shows its turns. `onClose` runs when it hides them. */
+export function TurnsToggle({ turns, onClose }: { turns: TurnDto[]; onClose?: () => void }) {
   const open = turnsOpen.use();
   if (!turns.length) return null;
   return (
@@ -24,7 +24,10 @@ export function TurnsToggle({ turns }: { turns: TurnDto[] }) {
       aria-expanded={open}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
-      onClick={() => turnsOpen.set(!open)}
+      onClick={() => {
+        turnsOpen.set(!open);
+        if (open) onClose?.();
+      }}
     >
       <svg viewBox="0 0 10 10" aria-hidden="true">
         <path d={open ? "M2 3.5l3 3 3-3" : "M3.5 2l3 3-3 3"} />
