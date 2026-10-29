@@ -379,11 +379,11 @@ export const commands = {
 	 *  root, or absolute inside it. Terminals ask this of the paths in their output.
 	 */
 	filesAt: (workspace: string | null, paths: string[]) => typedError<(string | null)[], string>(__TAURI_INVOKE("files_at", { workspace, paths })),
-	/**  Makes an empty file, or a folder when `dir`. */
+	/**  Makes an empty file, or a folder when `dir`, recorded as the user's edit. */
 	createPath: (workspace: string | null, path: string, dir: boolean) => typedError<null, string>(__TAURI_INVOKE("create_path", { workspace, path, dir })),
 	/**
-	 *  Writes dropped files, over files already there when `replace`, then snapshots. Returns the
-	 *  paths that were taken and left alone.
+	 *  Writes dropped files, over files already there when `replace`, recorded as the user's edit.
+	 *  Returns the paths that were taken and left alone.
 	 */
 	addFiles: (workspace: string | null, files: DroppedFile[], replace: boolean) => typedError<string[], string>(__TAURI_INVOKE("add_files", { workspace, files, replace })),
 	/**
@@ -391,14 +391,17 @@ export const commands = {
 	 *  the drag ends.
 	 */
 	dragOut: (workspace: string | null, paths: string[]) => typedError<null, string>(__TAURI_INVOKE("drag_out", { workspace, paths })),
-	/**  Renames or moves a file or folder, then snapshots so reviews of `@` pick it up. */
+	/**
+	 *  Renames or moves a file or folder, recorded as the user's edit so reviews of `@` pick it
+	 *  up and it can be undone.
+	 */
 	renamePath: (workspace: string | null, from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { workspace, from, to })),
 	/**
 	 *  Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
-	 *  name is taken there, then snapshots. Returns the copy's path.
+	 *  name is taken there, recorded as the user's edit. Returns the copy's path.
 	 */
 	copyPath: (workspace: string | null, from: string, dir: string) => typedError<string, string>(__TAURI_INVOKE("copy_path", { workspace, from, dir })),
-	/**  Moves a file or folder to the Trash, then snapshots. */
+	/**  Moves a file or folder to the Trash, recorded as the user's edit. */
 	trashPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { workspace, path })),
 	/**  Shows a path in Finder. `""` is the workspace's root. */
 	revealPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("reveal_path", { workspace, path })),
@@ -2924,7 +2927,7 @@ export type TurnDto = {
 
 /**  Who made a turn. */
 export type TurnKind = "agent" | 
-/**  The user, saving files in lgtm's editor. */
+/**  The user, saving files in lgtm's editor or changing them in the Files sidebar. */
 "edit" | "checkpoint";
 
 /**  An agent's turn in the workspace started, changed files or ended, or the user saved a file. */
