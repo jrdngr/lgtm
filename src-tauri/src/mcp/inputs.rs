@@ -12,6 +12,12 @@ pub struct Show {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct Snapshot {
+    /// What the snapshot holds, in a few words, like `Fix the off-by-one in paging`.
+    pub label: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct Revset {
     /// A jj revset, like `@`, `@-::@` or `trunk()..@`.
     pub revset: String,

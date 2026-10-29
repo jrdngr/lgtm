@@ -37,7 +37,8 @@ questions, and sends their decisions back to this terminal. When they talk a que
 over here instead and that changes it, rewrite it there with qa_rewrite. On a PR's threads, \
 stop at a drafted reply: only the human marks a reply ready to send. When they talk about a \
 drawing, a diagram, a selection or a numbered tag, read it with current_canvas first. When \
-they talk about their notes, find them with list_notes.";
+they talk about their notes, find them with list_notes. When they ask for work in separate \
+snapshots, call start_snapshot before each part.";
 
 pub(super) type Out = Result<String, String>;
 
@@ -88,6 +89,7 @@ impl Lgtm {
                 + Self::canvas_router()
                 + Self::notes_router()
                 + Self::revisions_router()
+                + Self::snapshots_router()
                 + Self::qa_router()
                 + Self::symbol_info_router(),
         }

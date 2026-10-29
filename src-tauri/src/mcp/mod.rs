@@ -17,6 +17,7 @@ pub mod register;
 mod reports;
 mod revisions;
 mod server;
+mod snapshots;
 mod symbol_info;
 
 use std::path::{Path, PathBuf};

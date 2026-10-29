@@ -352,3 +352,33 @@ async fn a_folder_moved_in_the_files_sidebar_is_its_own_edit_and_undoing_it_move
     assert!(!d.join("lib/src/a.rs").exists());
     assert_eq!(std::fs::read_to_string(d.join("srcish.rs")).unwrap(), "y\n");
 }
+
+#[tokio::test]
+async fn a_snapshot_started_mid_turn_takes_the_edits_after_it_under_its_label() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    hook(&ctx, Checkpoint::Start, None).await;
+    hook(&ctx, Checkpoint::Before, Some("t1")).await;
+    write(d, "a.rs", "1\n");
+    hook(&ctx, Checkpoint::After, Some("t1")).await;
+    ctx.turn_checkpoint(None, None, "s", None, Checkpoint::Start, Some("Fix b"))
+        .await
+        .unwrap();
+    hook(&ctx, Checkpoint::Before, Some("t2")).await;
+    write(d, "b.rs", "2\n");
+    hook(&ctx, Checkpoint::After, Some("t2")).await;
+    hook(&ctx, Checkpoint::End, None).await;
+
+    let turns = ctx.turns(None).await.unwrap();
+    let got: Vec<_> = turns
+        .iter()
+        .map(|t| (t.prompt.as_deref(), t.paths.clone(), t.running))
+        .collect();
+    assert_eq!(
+        got,
+        [
+            (Some("Fix b"), vec!["b.rs".to_string()], false),
+            (Some("Fix it"), vec!["a.rs".to_string()], false),
+        ]
+    );
+}
