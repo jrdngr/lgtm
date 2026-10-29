@@ -2910,7 +2910,10 @@ export type Turn = {
 export type TurnDto = {
 	id: number,
 	kind: TurnKind,
-	/**  The prompt, for an agent's turn. */
+	/**
+	 *  The prompt, for an agent's turn, or what the user did in the Files sidebar, for an
+	 *  edit made there.
+	 */
 	prompt: string | null,
 	/**  The terminal panel the agent ran in, for an agent's turn. */
 	terminal: string | null,

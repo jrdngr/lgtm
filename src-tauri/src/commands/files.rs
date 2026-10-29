@@ -140,20 +140,21 @@ fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 }
 
 /// Snapshots after the user changed `roots` from the Files sidebar, recording the change as
-/// their edit when `before`, `@`'s commit before it, is known.
+/// their edit named `label` when `before`, `@`'s commit before it, is known.
 async fn record_change(
     window: &Frame,
     workspace: Option<String>,
     ws: &Workspace,
     roots: &[String],
     before: anyhow::Result<String>,
+    label: String,
 ) -> CmdResult<()> {
     let Ok(before) = before else {
         return ws.snapshot().await.map_err(err);
     };
     let repo = super::repo(window)?;
     if repo
-        .record_files_change(ws, roots, &before)
+        .record_files_change(ws, roots, &before, &label)
         .await
         .map_err(err)?
     {
@@ -162,6 +163,16 @@ async fn record_change(
             .ok();
     }
     Ok(())
+}
+
+/// "Rename" naming only the new name when `to` stays in `from`'s folder, else "Move".
+fn move_label(from: &str, to: &str) -> String {
+    let parent = |p: &str| p.rsplit_once('/').map(|(dir, _)| dir.to_string());
+    match to.rsplit_once('/') {
+        _ if parent(from) != parent(to) => format!("Move {from} → {to}"),
+        Some((_, name)) => format!("Rename {from} → {name}"),
+        None => format!("Rename {from} → {to}"),
+    }
 }
 
 /// Makes an empty file, or a folder when `dir`, recorded as the user's edit.
@@ -176,7 +187,8 @@ pub(crate) async fn create_path(
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let before = turns::working_commit(&ws).await;
     files::create(&confined(&ws, &path)?, &path, dir).map_err(err)?;
-    record_change(&window, workspace, &ws, &[path], before).await
+    let label = format!("New {path}");
+    record_change(&window, workspace, &ws, &[path], before, label).await
 }
 
 /// A file dropped into the workspace: where it goes and its contents as base64.
@@ -210,7 +222,11 @@ pub(crate) async fn add_files(
             added.push(f.path);
         }
     }
-    record_change(&window, workspace, &ws, &added, before).await?;
+    let label = match added.as_slice() {
+        [one] => format!("Add {one}"),
+        many => format!("Add {} files", many.len()),
+    };
+    record_change(&window, workspace, &ws, &added, before, label).await?;
     Ok(taken)
 }
 
@@ -281,7 +297,8 @@ pub(crate) async fn rename_path(
     let ws = super::workspace(&window, workspace.as_deref()).await?;
     let before = turns::working_commit(&ws).await;
     files::rename(&confined(&ws, &from)?, &confined(&ws, &to)?, &to).map_err(err)?;
-    record_change(&window, workspace, &ws, &[from, to], before).await
+    let label = move_label(&from, &to);
+    record_change(&window, workspace, &ws, &[from, to], before, label).await
 }
 
 /// Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
@@ -304,7 +321,16 @@ pub(crate) async fn copy_path(
     let to = files::copy_into(&confined(&ws, &from)?, &dir_abs).map_err(err)?;
     let rel = to.strip_prefix(&ws.root).map_err(|e| e.to_string())?;
     let rel = rel.to_string_lossy().into_owned();
-    record_change(&window, workspace, &ws, std::slice::from_ref(&rel), before).await?;
+    let label = format!("Copy {from} → {rel}");
+    record_change(
+        &window,
+        workspace,
+        &ws,
+        std::slice::from_ref(&rel),
+        before,
+        label,
+    )
+    .await?;
     Ok(rel)
 }
 
@@ -323,7 +349,8 @@ pub(crate) async fn trash_path(
     }
     let before = turns::working_commit(&ws).await;
     trash::delete(&abs).map_err(|e| format!("can't move {path} to the Trash: {e}"))?;
-    record_change(&window, workspace, &ws, &[path], before).await
+    let label = format!("Trash {path}");
+    record_change(&window, workspace, &ws, &[path], before, label).await
 }
 
 /// Shows a path in Finder. `""` is the workspace's root.
@@ -363,4 +390,17 @@ pub(crate) fn dropped_paths() -> Vec<String> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::move_label;
+
+    #[test]
+    fn a_move_within_its_folder_is_a_rename_naming_the_new_name() {
+        assert_eq!(move_label("src/a.rs", "src/b.rs"), "Rename src/a.rs → b.rs");
+        assert_eq!(move_label("a.rs", "b.rs"), "Rename a.rs → b.rs");
+        assert_eq!(move_label("src", "lib/src"), "Move src → lib/src");
+        assert_eq!(move_label("lib/src", "src"), "Move lib/src → src");
+    }
 }

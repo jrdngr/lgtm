@@ -122,18 +122,19 @@ impl Store {
         Ok(self.db.last_insert_rowid())
     }
 
-    /// Starts the user's saved edits from `start`. Returns its id.
+    /// Starts the user's edit from `start`, named `label` when it isn't saves. Returns its id.
     pub fn start_edit(
         &self,
         workspace: &str,
         change_id: &str,
         start: &str,
+        label: Option<&str>,
         at: i64,
     ) -> rusqlite::Result<i64> {
         self.db.execute(
-            "INSERT INTO agent_turns (workspace, change_id, start, paths, started_at, human)
-             VALUES (?, ?, ?, '[]', ?, 1)",
-            params![workspace, change_id, start, at],
+            "INSERT INTO agent_turns (workspace, prompt, change_id, start, paths, started_at, human)
+             VALUES (?, ?, ?, ?, '[]', ?, 1)",
+            params![workspace, label, change_id, start, at],
         )?;
         Ok(self.db.last_insert_rowid())
     }

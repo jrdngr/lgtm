@@ -322,21 +322,32 @@ async fn a_folder_moved_in_the_files_sidebar_is_its_own_edit_and_undoing_it_move
     // Changed alongside, but not under the moved folder.
     write(d, "srcish.rs", "y\n");
     let roots = ["src".to_string(), "lib/src".to_string()];
-    assert!(ctx.record_files_change(&ws, &roots, &before).await.unwrap());
+    let label = "Move src → lib/src";
+    assert!(
+        ctx.record_files_change(&ws, &roots, &before, label)
+            .await
+            .unwrap()
+    );
+    // A save right after doesn't join a Files sidebar edit.
+    save(&ctx, "notes.md", "n2\n").await;
 
     let turns = ctx.turns(None).await.unwrap();
-    let edits: Vec<_> = turns.iter().map(|t| (t.kind, t.paths.clone())).collect();
+    let edits: Vec<_> = turns
+        .iter()
+        .map(|t| (t.prompt.as_deref(), t.paths.clone()))
+        .collect();
     assert_eq!(
         edits,
         [
+            (None, vec!["notes.md".to_string()]),
             (
-                TurnKind::Edit,
+                Some(label),
                 vec!["lib/src/a.rs".to_string(), "src/a.rs".to_string()]
             ),
-            (TurnKind::Edit, vec!["notes.md".to_string()]),
+            (None, vec!["notes.md".to_string()]),
         ]
     );
-    ctx.undo_turn(None, turns[0].id).await.unwrap();
+    ctx.undo_turn(None, turns[1].id).await.unwrap();
     assert!(d.join("src/a.rs").exists());
     assert!(!d.join("lib/src/a.rs").exists());
     assert_eq!(std::fs::read_to_string(d.join("srcish.rs")).unwrap(), "y\n");

@@ -52,7 +52,8 @@ pub enum TurnKind {
 pub struct TurnDto {
     pub id: u32,
     pub kind: TurnKind,
-    /// The prompt, for an agent's turn.
+    /// The prompt, for an agent's turn, or what the user did in the Files sidebar, for an
+    /// edit made there.
     pub prompt: Option<String>,
     /// The terminal panel the agent ran in, for an agent's turn.
     pub terminal: Option<String>,
@@ -275,30 +276,31 @@ impl RepoCtx {
         path: &str,
         before: &str,
     ) -> anyhow::Result<bool> {
-        self.record_edit(ws, &[path.to_string()], before, true)
+        self.record_edit(ws, &[path.to_string()], before, None)
             .await
     }
 
     /// Records a change the user made in the Files sidebar to `roots` (files or folders) as an
-    /// edit of its own, `before` being `@`'s commit before it. Returns whether the workspace's
-    /// turns changed.
+    /// edit of its own named `label`, `before` being `@`'s commit before it. Returns whether
+    /// the workspace's turns changed.
     pub async fn record_files_change(
         &self,
         ws: &Workspace,
         roots: &[String],
         before: &str,
+        label: &str,
     ) -> anyhow::Result<bool> {
-        self.record_edit(ws, roots, before, false).await
+        self.record_edit(ws, roots, before, Some(label)).await
     }
 
-    /// Records the files under `roots` that changed since `before` as the user's edit, joining
-    /// the last edit when `join` and nothing came between.
+    /// Records the files under `roots` that changed since `before` as the user's edit: one of
+    /// its own named `label`, else joining the last edit of saves when nothing came between.
     async fn record_edit(
         &self,
         ws: &Workspace,
         roots: &[String],
         before: &str,
-        join: bool,
+        label: Option<&str>,
     ) -> anyhow::Result<bool> {
         let (change, commit) = at(ws).await?;
         if commit == before {
@@ -324,10 +326,10 @@ impl RepoCtx {
         let (id, start, mut paths) = {
             let store = self.store.lock().unwrap();
             let last = store.turns_on(ws.key(), &change)?.into_iter().next();
-            match last.filter(|t| join && t.human) {
+            match last.filter(|t| label.is_none() && t.human && t.prompt.is_none()) {
                 Some(t) => (t.id, t.start, t.paths),
                 None => (
-                    store.start_edit(ws.key(), &change, before, now_ms())?,
+                    store.start_edit(ws.key(), &change, before, label, now_ms())?,
                     before.to_string(),
                     vec![],
                 ),

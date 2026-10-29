@@ -44,7 +44,7 @@ export function turnsLabel(turns: TurnDto[]): string {
 
 /** A turn's name: its prompt's first line, the names of the files saved, or "Checkpoint". */
 export function turnName(t: TurnDto): string {
-  if (t.kind === "edit") return t.paths.map((p) => p.split("/").pop()).join(", ");
+  if (t.kind === "edit" && !t.prompt) return t.paths.map((p) => p.split("/").pop()).join(", ");
   return t.prompt?.split("\n")[0] ?? "Checkpoint";
 }
 
