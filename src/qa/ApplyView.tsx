@@ -101,7 +101,7 @@ export function ApplyView({ ws, d, busy, focusKey, onSend }: Props) {
                 onClick={go}
                 keys="⌘↵"
               >
-                {d.sent != null ? "Send Again" : "Answers"}
+                {d.sent != null ? "Send Again" : "Send Answers"}
               </PipeButton>
             </div>
           </>

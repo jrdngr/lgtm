@@ -287,6 +287,7 @@ export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
               onSelect={setSel}
               onDecide={(i) => decide(i)}
               onExplain={!ahead && !agentBusy && q.state !== "dropped" ? explain : undefined}
+              explainInBackground={background}
               deps={<Deps d={d} q={q} onPick={show} />}
               sources={<Sources ws={ws} q={q} />}
               under={(i) =>

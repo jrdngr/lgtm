@@ -22,6 +22,8 @@ interface Props {
   onDecide?(option: number): void;
   /** Asks the agent to explain option `i`. No button without it. */
   onExplain?(option: number): void;
+  /** Explaining goes to the background terminal. */
+  explainInBackground?: boolean;
   /** Under the subject: what it depends on and what depends on it. */
   deps?: ReactNode;
   /** At the foot of the context: the files the agent read for it. */
@@ -145,7 +147,7 @@ export function QuestionCard({
               {p.onExplain && (
                 <button
                   type="button"
-                  className="qq-explain pipe-icon bg"
+                  className={`qq-explain pipe-icon${p.explainInBackground ? " bg" : ""}`}
                   title={`Explain option ${i + 1}`}
                   aria-label={`Explain option ${i + 1}`}
                   onClick={() => p.onExplain?.(i)}
