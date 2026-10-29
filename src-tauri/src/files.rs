@@ -1,10 +1,14 @@
 //! A workspace's working-copy files, for the file tree and the editor.
 
+mod copy;
+
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, bail};
 use serde::Serialize;
 use specta::Type;
+
+pub use copy::copy_into;
 
 /// Past this the editor won't open a file.
 const MAX_BYTES: u64 = 4 * 1024 * 1024;

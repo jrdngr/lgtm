@@ -393,6 +393,11 @@ export const commands = {
 	dragOut: (workspace: string | null, paths: string[]) => typedError<null, string>(__TAURI_INVOKE("drag_out", { workspace, paths })),
 	/**  Renames or moves a file or folder, then snapshots so reviews of `@` pick it up. */
 	renamePath: (workspace: string | null, from: string, to: string) => typedError<null, string>(__TAURI_INVOKE("rename_path", { workspace, from, to })),
+	/**
+	 *  Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
+	 *  name is taken there, then snapshots. Returns the copy's path.
+	 */
+	copyPath: (workspace: string | null, from: string, dir: string) => typedError<string, string>(__TAURI_INVOKE("copy_path", { workspace, from, dir })),
 	/**  Moves a file or folder to the Trash, then snapshots. */
 	trashPath: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("trash_path", { workspace, path })),
 	/**  Shows a path in Finder. `""` is the workspace's root. */

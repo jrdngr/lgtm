@@ -99,6 +99,12 @@ export function moveInto(ws: WorkspaceName, path: string, dir: string, made: (p:
   );
 }
 
+/** Copies `path` into folder `dir`, as "name copy" when its name is taken there. */
+export function copyInto(ws: WorkspaceName, path: string, dir: string, made: (p: string) => void) {
+  if (dir === path || dir.startsWith(`${path}/`)) return;
+  run(unwrap(commands.copyPath(ws, path, dir)).then(made));
+}
+
 /** Moves `path` to the Trash after asking. */
 export function trash(ws: WorkspaceName, path: string, done: () => void) {
   run(

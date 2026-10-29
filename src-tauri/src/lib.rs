@@ -209,6 +209,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::add_files,
             commands::files::drag_out,
             commands::files::rename_path,
+            commands::files::copy_path,
             commands::files::trash_path,
             commands::files::reveal_path,
             commands::files::dropped_paths,

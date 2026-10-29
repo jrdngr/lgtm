@@ -252,6 +252,28 @@ pub(crate) async fn rename_path(
     ws.snapshot().await.map_err(err)
 }
 
+/// Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
+/// name is taken there, then snapshots. Returns the copy's path.
+#[tauri::command]
+#[specta::specta]
+pub(crate) async fn copy_path(
+    window: Frame,
+    workspace: Option<String>,
+    from: String,
+    dir: String,
+) -> CmdResult<String> {
+    let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let dir_abs = if dir.is_empty() {
+        ws.root.clone()
+    } else {
+        confined(&ws, &dir)?
+    };
+    let to = files::copy_into(&confined(&ws, &from)?, &dir_abs).map_err(err)?;
+    ws.snapshot().await.map_err(err)?;
+    let rel = to.strip_prefix(&ws.root).map_err(|e| e.to_string())?;
+    Ok(rel.to_string_lossy().into_owned())
+}
+
 /// Moves a file or folder to the Trash, then snapshots.
 #[tauri::command]
 #[specta::specta]
