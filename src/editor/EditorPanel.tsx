@@ -60,9 +60,10 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
   const [error, setError] = useState<string>();
   /** How the tab was left, for bringing it back after a restart. */
   const restore = useRef(params);
-  /** The text shown rendered, or undefined while editing. HTML opens rendered. */
+  /** The text shown rendered, or undefined while editing. Files with a rendered view open in
+   * it. */
   const [rendered, setRendered] = useState(
-    (params.view ?? (isHtml(path) ? "rendered" : "editor")) === "rendered" ? "" : undefined,
+    (params.view ?? (renders(path) ? "rendered" : "editor")) === "rendered" ? "" : undefined,
   );
   const renderedRef = useRef<{ focus(): void }>(null);
   const saveRef = useRef(async () => false);
