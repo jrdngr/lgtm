@@ -2,7 +2,8 @@
 //! a prompt is sent, around each tool that can write files, and when the agent stops. A
 //! turn's diff runs from its first snapshot to its last over the files its tools changed, so
 //! edits made in the working copy between tool calls stay out of it. Saving a file in lgtm's
-//! editor snapshots around the save, and saves in a row make one edit of the user's. A
+//! editor snapshots around the save, and saves in a row make one edit of the user's. Each
+//! change made in the Files sidebar is an edit of its own. A
 //! checkpoint is a snapshot the user takes, diffed whole against `@` as it is now.
 
 use std::collections::HashMap;
@@ -40,7 +41,7 @@ pub enum Checkpoint {
 #[serde(rename_all = "camelCase")]
 pub enum TurnKind {
     Agent,
-    /// The user, saving files in lgtm's editor.
+    /// The user, saving files in lgtm's editor or changing them in the Files sidebar.
     Edit,
     Checkpoint,
 }
@@ -274,14 +275,56 @@ impl RepoCtx {
         path: &str,
         before: &str,
     ) -> anyhow::Result<bool> {
+        self.record_edit(ws, &[path.to_string()], before, true)
+            .await
+    }
+
+    /// Records a change the user made in the Files sidebar to `roots` (files or folders) as an
+    /// edit of its own, `before` being `@`'s commit before it. Returns whether the workspace's
+    /// turns changed.
+    pub async fn record_files_change(
+        &self,
+        ws: &Workspace,
+        roots: &[String],
+        before: &str,
+    ) -> anyhow::Result<bool> {
+        self.record_edit(ws, roots, before, false).await
+    }
+
+    /// Records the files under `roots` that changed since `before` as the user's edit, joining
+    /// the last edit when `join` and nothing came between.
+    async fn record_edit(
+        &self,
+        ws: &Workspace,
+        roots: &[String],
+        before: &str,
+        join: bool,
+    ) -> anyhow::Result<bool> {
         let (change, commit) = at(ws).await?;
         if commit == before {
+            return Ok(false);
+        }
+        let under = |p: &str| {
+            roots.iter().any(|r| {
+                p == r
+                    || p.strip_prefix(r.as_str())
+                        .is_some_and(|s| s.starts_with('/'))
+            })
+        };
+        let changed: Vec<String> = span_diff(&ws.jj, before, &commit, None)
+            .await?
+            .into_iter()
+            .flat_map(|d| [Some(d.path), d.old_path])
+            .flatten()
+            .filter(|p| under(p))
+            .collect();
+        if changed.is_empty() {
             return Ok(false);
         }
         let (id, start, mut paths) = {
             let store = self.store.lock().unwrap();
             let last = store.turns_on(ws.key(), &change)?.into_iter().next();
-            match last.filter(|t| t.human) {
+            match last.filter(|t| join && t.human) {
                 Some(t) => (t.id, t.start, t.paths),
                 None => (
                     store.start_edit(ws.key(), &change, before, now_ms())?,
@@ -290,8 +333,10 @@ impl RepoCtx {
                 ),
             }
         };
-        if !paths.iter().any(|p| p == path) {
-            paths.push(path.to_string());
+        for p in changed {
+            if !paths.contains(&p) {
+                paths.push(p);
+            }
         }
         let lines = counts(
             span_diff(&ws.jj, &start, &commit, Some(&paths))

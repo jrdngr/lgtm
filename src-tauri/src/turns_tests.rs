@@ -306,3 +306,38 @@ async fn splitting_off_a_turn_that_edits_an_earlier_one_keeps_both_edits_in_orde
     assert_eq!(changed(&ctx, "@").await, ["a.rs"]);
     assert!(jj.commit_ids("conflicts()").await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn a_folder_moved_in_the_files_sidebar_is_its_own_edit_and_undoing_it_moves_it_back() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    std::fs::create_dir_all(d.join("src")).unwrap();
+    write(d, "src/a.rs", "1\n");
+    write(d, "srcish.rs", "x\n");
+    save(&ctx, "notes.md", "n\n").await;
+    let ws = ctx.workspace(None).await.unwrap();
+    let before = working_commit(&ws).await.unwrap();
+    std::fs::create_dir_all(d.join("lib")).unwrap();
+    std::fs::rename(d.join("src"), d.join("lib/src")).unwrap();
+    // Changed alongside, but not under the moved folder.
+    write(d, "srcish.rs", "y\n");
+    let roots = ["src".to_string(), "lib/src".to_string()];
+    assert!(ctx.record_files_change(&ws, &roots, &before).await.unwrap());
+
+    let turns = ctx.turns(None).await.unwrap();
+    let edits: Vec<_> = turns.iter().map(|t| (t.kind, t.paths.clone())).collect();
+    assert_eq!(
+        edits,
+        [
+            (
+                TurnKind::Edit,
+                vec!["lib/src/a.rs".to_string(), "src/a.rs".to_string()]
+            ),
+            (TurnKind::Edit, vec!["notes.md".to_string()]),
+        ]
+    );
+    ctx.undo_turn(None, turns[0].id).await.unwrap();
+    assert!(d.join("src/a.rs").exists());
+    assert!(!d.join("lib/src/a.rs").exists());
+    assert_eq!(std::fs::read_to_string(d.join("srcish.rs")).unwrap(), "y\n");
+}

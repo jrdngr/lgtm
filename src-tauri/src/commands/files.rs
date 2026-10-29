@@ -139,7 +139,32 @@ fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     Ok(abs)
 }
 
-/// Makes an empty file, or a folder when `dir`.
+/// Snapshots after the user changed `roots` from the Files sidebar, recording the change as
+/// their edit when `before`, `@`'s commit before it, is known.
+async fn record_change(
+    window: &Frame,
+    workspace: Option<String>,
+    ws: &Workspace,
+    roots: &[String],
+    before: anyhow::Result<String>,
+) -> CmdResult<()> {
+    let Ok(before) = before else {
+        return ws.snapshot().await.map_err(err);
+    };
+    let repo = super::repo(window)?;
+    if repo
+        .record_files_change(ws, roots, &before)
+        .await
+        .map_err(err)?
+    {
+        TurnsChanged { workspace }
+            .emit_to(window.app_handle(), window.label())
+            .ok();
+    }
+    Ok(())
+}
+
+/// Makes an empty file, or a folder when `dir`, recorded as the user's edit.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn create_path(
@@ -149,7 +174,9 @@ pub(crate) async fn create_path(
     dir: bool,
 ) -> CmdResult<()> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    files::create(&confined(&ws, &path)?, &path, dir).map_err(err)
+    let before = turns::working_commit(&ws).await;
+    files::create(&confined(&ws, &path)?, &path, dir).map_err(err)?;
+    record_change(&window, workspace, &ws, &[path], before).await
 }
 
 /// A file dropped into the workspace: where it goes and its contents as base64.
@@ -159,8 +186,8 @@ pub(crate) struct DroppedFile {
     data: String,
 }
 
-/// Writes dropped files, over files already there when `replace`, then snapshots. Returns the
-/// paths that were taken and left alone.
+/// Writes dropped files, over files already there when `replace`, recorded as the user's edit.
+/// Returns the paths that were taken and left alone.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn add_files(
@@ -171,16 +198,19 @@ pub(crate) async fn add_files(
 ) -> CmdResult<Vec<String>> {
     use base64::Engine as _;
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    let mut taken = vec![];
+    let before = turns::working_commit(&ws).await;
+    let (mut taken, mut added) = (vec![], vec![]);
     for f in files {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(&f.data)
             .map_err(|e| format!("can't read {}: {e}", f.path))?;
         if !files::put(&confined(&ws, &f.path)?, &f.path, &bytes, replace).map_err(err)? {
             taken.push(f.path);
+        } else {
+            added.push(f.path);
         }
     }
-    ws.snapshot().await.map_err(err)?;
+    record_change(&window, workspace, &ws, &added, before).await?;
     Ok(taken)
 }
 
@@ -238,7 +268,8 @@ fn start_drag(
     Err("dragging files out needs macOS".into())
 }
 
-/// Renames or moves a file or folder, then snapshots so reviews of `@` pick it up.
+/// Renames or moves a file or folder, recorded as the user's edit so reviews of `@` pick it
+/// up and it can be undone.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn rename_path(
@@ -248,12 +279,13 @@ pub(crate) async fn rename_path(
     to: String,
 ) -> CmdResult<()> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
+    let before = turns::working_commit(&ws).await;
     files::rename(&confined(&ws, &from)?, &confined(&ws, &to)?, &to).map_err(err)?;
-    ws.snapshot().await.map_err(err)
+    record_change(&window, workspace, &ws, &[from, to], before).await
 }
 
 /// Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
-/// name is taken there, then snapshots. Returns the copy's path.
+/// name is taken there, recorded as the user's edit. Returns the copy's path.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn copy_path(
@@ -268,13 +300,15 @@ pub(crate) async fn copy_path(
     } else {
         confined(&ws, &dir)?
     };
+    let before = turns::working_commit(&ws).await;
     let to = files::copy_into(&confined(&ws, &from)?, &dir_abs).map_err(err)?;
-    ws.snapshot().await.map_err(err)?;
     let rel = to.strip_prefix(&ws.root).map_err(|e| e.to_string())?;
-    Ok(rel.to_string_lossy().into_owned())
+    let rel = rel.to_string_lossy().into_owned();
+    record_change(&window, workspace, &ws, std::slice::from_ref(&rel), before).await?;
+    Ok(rel)
 }
 
-/// Moves a file or folder to the Trash, then snapshots.
+/// Moves a file or folder to the Trash, recorded as the user's edit.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn trash_path(
@@ -287,8 +321,9 @@ pub(crate) async fn trash_path(
     if abs == ws.root {
         return Err("can't trash the workspace".into());
     }
+    let before = turns::working_commit(&ws).await;
     trash::delete(&abs).map_err(|e| format!("can't move {path} to the Trash: {e}"))?;
-    ws.snapshot().await.map_err(err)
+    record_change(&window, workspace, &ws, &[path], before).await
 }
 
 /// Shows a path in Finder. `""` is the workspace's root.
