@@ -2,8 +2,9 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { bottom } from "../core/bottom";
-import { useWorkspace } from "../core/workspace";
+import { useWorkspace, workspaceRoot } from "../core/workspace";
 import { commands } from "../ipc";
+import { repoRelative } from "../qa/readFirstPaths";
 import { loadedSettings } from "../settings/store";
 import { openMenu } from "../ui/contextMenu";
 import { watchAgentHooks } from "./agentHooks";
@@ -78,7 +79,8 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
     };
     // Bubble phase, after xterm selects the word under the pointer, so Copy can take it.
     container.addEventListener("contextmenu", onMenu);
-    // Dropped files paste their paths, from Finder or from the app's file trees.
+    // Dropped files paste their paths, from Finder or from the app's file trees: relative to
+    // the workspace's root when inside it.
     const files = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
     const onDragOver = (e: DragEvent) => {
       if (!files(e)) return;
@@ -90,7 +92,8 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
       e.preventDefault();
       commands.droppedPaths().then((paths) => {
         if (!paths.length) return;
-        term.paste(shellPaths(paths));
+        const root = workspaceRoot(workspace);
+        term.paste(shellPaths(paths.map((p) => repoRelative(p, root))));
         api.setActive();
         term.focus();
       });
