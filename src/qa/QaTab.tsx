@@ -5,6 +5,7 @@ import { type SendOutcome, useSendText } from "../review/useSendText";
 import { openSettings } from "../settings/open";
 import { focusTerminal } from "../terminal/registry";
 import { useAgentsOff } from "../tools/agents";
+import { Spinner } from "../ui/Busy";
 import { copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
@@ -135,7 +136,7 @@ export function QaTab({ api }: IDockviewPanelProps) {
       </header>
       {d && busy && (busy.kind !== "answer" || busy.activity) && (
         <div className="qa-busy">
-          <span className="qa-spin" />
+          <Spinner className="qa-spin" />
           <span>
             {busyName(busy)}
             {busy.activity && ` · ${busy.activity}`}

@@ -37,11 +37,15 @@ function Shape({ state }: { state: Activity["state"] }) {
       return (
         <>
           <circle className="ws-track" cx="6" cy="6" r="4.5" fill="none" strokeWidth="2" />
-          <path
+          <circle
             className="ws-spin"
-            d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5"
+            cx="6"
+            cy="6"
+            r="4.5"
+            pathLength="100"
             fill="none"
             strokeWidth="2"
+            strokeDasharray="25 75"
             strokeLinecap="round"
           />
         </>

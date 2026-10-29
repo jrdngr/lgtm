@@ -260,6 +260,7 @@
   stroke: rgb(79 140 201 / 30%);
 }
 
+/* A whole circle dashed down to an arc, so WebKit repaints all of it as it turns. */
 .ws-glyph .ws-spin {
   transform-origin: 6px 6px;
   animation: ws-spin 0.9s linear infinite;

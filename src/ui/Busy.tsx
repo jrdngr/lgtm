@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 /** A spinning ring. */
-export function Spinner() {
+export function Spinner({ className }: { className?: string }) {
   return (
-    <svg className="spinner" viewBox="0 0 16 16" aria-hidden>
+    <svg className={`spinner${className ? ` ${className}` : ""}`} viewBox="0 0 16 16" aria-hidden>
       <circle className="spinner-track" cx="8" cy="8" r="6.5" />
       <circle className="spinner-arc" cx="8" cy="8" r="6.5" pathLength="100" />
     </svg>

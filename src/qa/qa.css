@@ -123,19 +123,9 @@
 }
 
 .qa-spin {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--accent);
-  border-right-color: transparent;
-  border-radius: 50%;
-  animation: qa-spin 0.8s linear infinite;
-}
-
-@keyframes qa-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  width: 11px;
+  height: 11px;
+  color: var(--accent);
 }
 
 .qa-body {
@@ -420,8 +410,7 @@
 }
 
 .qq-bar.updating .qa-spin {
-  border-color: currentColor;
-  border-right-color: transparent;
+  color: inherit;
 }
 
 .qq-bar.decided {

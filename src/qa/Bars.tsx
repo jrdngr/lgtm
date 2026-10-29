@@ -1,3 +1,4 @@
+import { Spinner } from "../ui/Busy";
 import { answerLabel, isAuto, type Question } from "./model";
 
 interface Props {
@@ -24,13 +25,13 @@ export function Bars({ q, blockedBy, updating, rewriting, agentBusy, ...p }: Pro
       {q.state === "deferred" && <div className="qq-bar deferred">Deferred</div>}
       {updating.length > 0 && (
         <div className="qq-bar updating">
-          <span className="qa-spin" />
+          <Spinner className="qa-spin" />
           Updating {updating.join(", ")}
         </div>
       )}
       {rewriting && (
         <div className="qq-bar updating">
-          <span className="qa-spin" />
+          <Spinner className="qa-spin" />
           Rewriting {q.id}
         </div>
       )}
