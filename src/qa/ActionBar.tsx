@@ -20,6 +20,8 @@ interface Props {
   auto: boolean;
   canAnswer: boolean;
   agentBusy: boolean;
+  /** Discussing goes to the background terminal. */
+  background: boolean;
   /** The option picked out. */
   sel: number;
   /** What's being written under the question. */
@@ -112,7 +114,12 @@ export function ActionBar({
         </>
       )}
       {q.state !== "dropped" && q.state !== "deferred" && (
-        <PipeButton background className="qq-btn" onClick={() => p.onMode("discuss")} keys="d">
+        <PipeButton
+          background={p.background}
+          className="qq-btn"
+          onClick={() => p.onMode("discuss")}
+          keys="d"
+        >
           Discuss
         </PipeButton>
       )}

@@ -89,12 +89,13 @@ export function QaTab({ api }: IDockviewPanelProps) {
 
   if (!state.loaded) return null;
 
-  /** Pastes text into a terminal, the one whose agent asked when it still can, and remembers
-   * which one took it. */
+  /** Pastes the answers into a terminal, the one whose agent asked when it still can, remembers
+   * which one took them, and closes the tab. */
   function send(text: string) {
-    const report = (o: SendOutcome) => {
-      if ("error" in o) setError(ws, o.error);
-      else if (d) edit(ws, d, { kind: "sent", terminal: o.terminal });
+    const report = async (o: SendOutcome) => {
+      if ("error" in o) return setError(ws, o.error);
+      if (d) await edit(ws, d, { kind: "sent", terminal: o.terminal });
+      api.close();
     };
     sendText(text, undefined, report, d?.terminal ?? undefined);
   }

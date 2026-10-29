@@ -4,12 +4,14 @@ import { commands } from "../ipc";
 import { notePasted } from "../review/linkedAgent";
 import { watchAgentHooks } from "../terminal/agentHooks";
 import {
+  hasTerminal,
   interruptAgent,
   promptAgent,
   sendTarget,
   terminalAgentBusy,
   terminalHasAgent,
   terminalTitle,
+  useRoles,
 } from "../terminal/registry";
 import type { Session } from "./model";
 import { act, type BusyKind, setBusy, setError } from "./store";
@@ -25,6 +27,14 @@ function home(ws: WorkspaceName, d: Session) {
   if (d.terminal && terminalHasAgent(d.terminal)) return { id: d.terminal, takeover: false };
   const target = sendTarget(ws, "background");
   return target && terminalHasAgent(target) ? { id: target, takeover: true } : undefined;
+}
+
+/** Whether the session's steps and answers go to the background terminal: they go to its own
+ * terminal while that's open, else the background terminal takes the session over. */
+export function useGoesToBackground(ws: WorkspaceName, d: Session): boolean {
+  const roleOf = useRoles(ws);
+  if (d.terminal && hasTerminal(d.terminal)) return roleOf(d.terminal) === "background";
+  return true;
 }
 
 const takeoverText = (d: Session) =>

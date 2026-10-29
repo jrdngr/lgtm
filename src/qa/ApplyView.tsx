@@ -6,6 +6,7 @@ import { PipeButton } from "../terminal/PipeButton";
 import { edit } from "./actions";
 import { answerLabel, applyText, isAuto, openQuestions, type Session } from "./model";
 import { type Busy, showQuestion } from "./store";
+import { useGoesToBackground } from "./terminalSteps";
 
 interface Props {
   ws: WorkspaceName;
@@ -20,6 +21,7 @@ interface Props {
  * to write. */
 export function ApplyView({ ws, d, busy, focusKey, onSend }: Props) {
   const [note, setNote] = useState(d.note);
+  const background = useGoesToBackground(ws, d);
   const rootRef = useRef<HTMLDivElement>(null);
   const locked = !!busy || d.archived;
   const decided = d.queue.questions.filter((q) => q.state === "decided");
@@ -92,7 +94,13 @@ export function ApplyView({ ws, d, busy, focusKey, onSend }: Props) {
             />
             <div className="qq-actions">
               <span className="spacer" />
-              <PipeButton background className="qq-btn" disabled={locked} onClick={go} keys="⌘↵">
+              <PipeButton
+                background={background}
+                className="qq-btn"
+                disabled={locked}
+                onClick={go}
+                keys="⌘↵"
+              >
                 {d.sent != null ? "Send Again" : "Answers"}
               </PipeButton>
             </div>

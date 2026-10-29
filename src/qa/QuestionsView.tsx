@@ -30,6 +30,7 @@ import {
 import { QuestionCard } from "./QuestionCard";
 import { Rail } from "./Rail";
 import { act, type Busy, clearJump, setError, setView } from "./store";
+import { useGoesToBackground } from "./terminalSteps";
 
 const isEditable = (t: EventTarget) =>
   t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement;
@@ -48,6 +49,7 @@ interface Props {
  * answered; the rest, auto answers among them, can be looked at with [ ]. Number keys pick an
  * option, ↵ decides it, and the agent then updates the questions that depend on it. */
 export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
+  const background = useGoesToBackground(ws, d);
   const [want, setWant] = useState(jump);
   const [sel, setSel] = useState(0);
   const [mode, setMode] = useState<Mode>();
@@ -335,6 +337,7 @@ export function QuestionsView({ ws, d, busy, focusKey, jump }: Props) {
               auto={auto}
               canAnswer={canAnswer}
               agentBusy={agentBusy}
+              background={background}
               sel={sel}
               last={last}
               browse={all.length > 1}
