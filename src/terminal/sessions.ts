@@ -20,7 +20,7 @@ export interface Session {
   running(): Promise<string | null>;
   /** Whether an agent runs in it: its hooks say so, or the title does in a Claude tab. */
   hasAgent(): boolean;
-  /** Whether its agent is working or waiting on the user, or was just prompted. */
+  /** Whether its agent is working (and writing) or waiting on the user, or was just prompted. */
   agentBusy(): boolean;
   /** Marks its agent busy until its hooks report or the prompt has had time to land. */
   prompted(): void;
@@ -103,6 +103,9 @@ export function releaseSession(id: string) {
 const SUBMIT_DELAY_MS = 150;
 /** How long a prompt counts as busy before the agent's hooks report on it. */
 const PROMPTED_MS = 15_000;
+/** How long a working agent can go without output before it counts as done: Claude Code's
+ * spinner writes every second while it works, so this means its Stop hook was lost. */
+const QUIET_MS = 20_000;
 
 function startSession(
   id: string,
@@ -128,6 +131,8 @@ function startSession(
   let launched = false;
   /** Until when a prompt that hooks haven't reported on yet counts as busy. */
   let promptedUntil = 0;
+  /** When the PTY last wrote or a hook last reported. */
+  let lastData = 0;
   /** Whether the PTY exited. */
   let exited = false;
   const set = (state: ActivityState) => {
@@ -138,6 +143,7 @@ function startSession(
   const channel = new Channel<PtyEvent>();
   channel.onmessage = (e) => {
     if (e.kind === "data") {
+      lastData = Date.now();
       term.write(e.data);
       pulse(activity);
     } else {
@@ -151,6 +157,7 @@ function startSession(
   const unhook = onAgentHook(id, (state) => {
     hooked = true;
     promptedUntil = 0;
+    lastData = Date.now();
     set(state === "working" ? "running" : state);
     pulse(activity);
   });
@@ -203,7 +210,10 @@ function startSession(
     refit,
     title: () => title,
     hasAgent: () => !exited && agent !== "gone",
-    agentBusy: () => agent === "running" || agent === "input" || Date.now() < promptedUntil,
+    agentBusy: () =>
+      (agent === "running" && Date.now() - lastData < QUIET_MS) ||
+      agent === "input" ||
+      Date.now() < promptedUntil,
     prompted() {
       promptedUntil = Date.now() + PROMPTED_MS;
     },

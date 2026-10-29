@@ -153,10 +153,12 @@ function prompt(
       else if (started && r.state === "failed") finish(undefined, `The agent in ${title} failed`);
       else if (started) finish(r.reply ?? undefined);
     });
-    // A lost hook mustn't hold the terminal's queue: the step ends with its agent or PTY, and
-    // starts once the agent is free even if no hook says so.
+    // A lost hook mustn't hold the terminal's queue: the step ends with its agent or PTY, or
+    // once the agent it started on is free, and starts once the agent is free, even if no hook
+    // says so.
     const check = window.setInterval(() => {
       if (!terminalHasAgent(to.id)) finish(undefined, `The agent in ${title} ended`);
+      else if (started && !terminalAgentBusy(to.id)) finish();
       else if (!sent && !terminalAgentBusy(to.id)) send();
     }, CHECK_MS);
     stops.set(d.id, () => {

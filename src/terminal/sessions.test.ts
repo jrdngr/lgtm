@@ -13,7 +13,14 @@ vi.mock("../ipc", () => ({
     ptyKill: (id: number) => killed.push(id),
   },
 }));
-vi.mock("./agentHooks", () => ({ onAgentHook: () => () => {} }));
+/** The last session's agent hook listener. */
+let hook = (_: string) => {};
+vi.mock("./agentHooks", () => ({
+  onAgentHook: (_: string, l: (state: string) => void) => {
+    hook = l;
+    return () => {};
+  },
+}));
 vi.mock("./xterm", () => ({
   createTerminal: () => ({
     term: {
@@ -97,5 +104,18 @@ describe("terminal sessions", () => {
     expect(s.agentBusy()).toBe(true);
     await vi.advanceTimersByTimeAsync(15_000);
     expect(s.agentBusy()).toBe(false);
+  });
+
+  it("stop counting a working agent as busy once it has written nothing for a while", async () => {
+    const s = openSession("t7", box(), null, false);
+    await settle();
+    hook("working");
+    await vi.advanceTimersByTimeAsync(19_000);
+    expect(s.agentBusy()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(s.agentBusy()).toBe(false);
+    hook("input");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(s.agentBusy()).toBe(true);
   });
 });
