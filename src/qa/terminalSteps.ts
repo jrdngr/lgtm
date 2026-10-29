@@ -22,19 +22,18 @@ const START_MS = 15_000;
 const CHECK_MS = 1000;
 
 /** The terminal whose agent runs the session's steps: the one that asked, while its agent is
- * there, else the background terminal's agent, which takes the session over. */
+ * there, else the interactive terminal's agent, which takes the session over. */
 function home(ws: WorkspaceName, d: Session) {
   if (d.terminal && terminalHasAgent(d.terminal)) return { id: d.terminal, takeover: false };
-  const target = sendTarget(ws, "background");
+  const target = sendTarget(ws);
   return target && terminalHasAgent(target) ? { id: target, takeover: true } : undefined;
 }
 
 /** Whether the session's steps and answers go to the background terminal: they go to its own
- * terminal while that's open, else the background terminal takes the session over. */
+ * terminal while that's open, else the interactive terminal takes the session over. */
 export function useGoesToBackground(ws: WorkspaceName, d: Session): boolean {
   const roleOf = useRoles(ws);
-  if (d.terminal && hasTerminal(d.terminal)) return roleOf(d.terminal) === "background";
-  return true;
+  return !!d.terminal && hasTerminal(d.terminal) && roleOf(d.terminal) === "background";
 }
 
 const takeoverText = (d: Session) =>

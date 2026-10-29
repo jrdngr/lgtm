@@ -74,7 +74,6 @@ export function QaTab({ api }: IDockviewPanelProps) {
     ws,
     (e) => setError(ws, e),
     () => rootRef.current?.focus(),
-    "background",
   );
   const d = state.fresh ? undefined : state.sessions.find((x) => x.id === state.current);
   const busy = d ? state.busy[d.id] : undefined;
