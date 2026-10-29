@@ -139,6 +139,7 @@
     const el = typeof x === "number" ? document.elementFromPoint(x, y) : null;
     const before = el?.getBoundingClientRect();
     document.documentElement.style.zoom = zoom === 1 ? "" : String(zoom);
+    settleLater();
     if (!el || !before || !before.width || !before.height) return;
     const fx = (x - before.left) / before.width;
     const fy = (y - before.top) / before.height;
@@ -153,6 +154,20 @@
     const [rx, ry] = off();
     const left = (d, r) => (r && d !== r ? (r * d) / (d - r) : 0);
     scrollBy(left(dx, rx), left(dy, ry));
+  }
+
+  // After a zoom, WebKit can draw the page at one scroll position while clicks land at
+  // another, until something scrolls it. Once zooming stops, a scroll there and back brings
+  // the two together.
+  let settling;
+  function settleLater() {
+    clearTimeout(settling);
+    settling = setTimeout(() => {
+      const [x, y] = [scrollX, scrollY];
+      document.documentElement.getBoundingClientRect();
+      scrollTo(x, y > 0 ? y - 1 : y + 1);
+      scrollTo(x, y);
+    }, 150);
   }
 
   // Find: every match highlighted, the current one more strongly, with the count sent back.
