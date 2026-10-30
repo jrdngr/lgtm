@@ -189,6 +189,8 @@ pub struct TerminalAgent {
     pub session: Option<String>,
     /// The user ended the session.
     pub ended: bool,
+    /// The name the user gave the session in Claude Code, when the event looked for it.
+    pub title: Option<String>,
 }
 
 /// How a terminal's agent stands after a hook event.

@@ -73,3 +73,11 @@ pub(crate) fn pty_kill(ptys: State<Ptys>, id: u32) {
 pub(crate) fn pty_running(ptys: State<Ptys>, id: u32) -> Option<String> {
     ptys.running(id)
 }
+
+/// The name the user gave the Claude Code session in terminal panel `terminal` with
+/// `/rename`, if it has one.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn terminal_session_title(terminal: String) -> Option<String> {
+    crate::mcp::session_title::of_terminal(&terminal)
+}

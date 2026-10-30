@@ -18,6 +18,7 @@ import { currentReview } from "../review/current";
 import { targetOf } from "../review/target";
 import { pathItems, run } from "../services/pathMenu";
 import { targetItems } from "../terminal/sendItems";
+import { refreshName } from "../terminal/sessionTitle";
 import { type CtxEntry, copy } from "../ui/contextMenu";
 import { confirmAction } from "../ui/prompt";
 import { moveAcross } from "./crossDock";
@@ -76,6 +77,7 @@ export function tabMenu({ workspace, api, panel, inBottom, close }: Tab): CtxEnt
   const path = kind === "editor" ? (panel.params as EditorParams | undefined)?.path : undefined;
   return [
     terminal && { label: "Rename", onSelect: () => setRenaming(panel.id) },
+    terminal && { label: "Refresh Name", onSelect: () => refreshName(panel) },
     "-",
     ...(terminal ? targetItems(workspace, panel.id) : []),
     path && {

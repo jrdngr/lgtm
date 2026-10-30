@@ -81,6 +81,11 @@ export const commands = {
 	ptyKill: (id: number) => __TAURI_INVOKE<void>("pty_kill", { id }),
 	/**  The program running in the foreground of PTY `id`, when it isn't the shell itself. */
 	ptyRunning: (id: number) => __TAURI_INVOKE<string | null>("pty_running", { id }),
+	/**
+	 *  The name the user gave the Claude Code session in terminal panel `terminal` with
+	 *  `/rename`, if it has one.
+	 */
+	terminalSessionTitle: (terminal: string) => __TAURI_INVOKE<string | null>("terminal_session_title", { terminal }),
 	/**  Every workspace, the repo's main one first. */
 	listWorkspaces: () => typedError<WorkspaceDto[], string>(__TAURI_INVOKE("list_workspaces")),
 	/**  Remembers where workspace `name`'s files are, when they're there. */
@@ -2763,6 +2768,8 @@ export type TerminalAgent = {
 	session: string | null,
 	/**  The user ended the session. */
 	ended: boolean,
+	/**  The name the user gave the session in Claude Code, when the event looked for it. */
+	title: string | null,
 };
 
 /**  What the agent found running the tests that cover a chunk. */

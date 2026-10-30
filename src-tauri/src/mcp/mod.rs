@@ -17,6 +17,7 @@ pub mod register;
 mod reports;
 mod revisions;
 mod server;
+pub mod session_title;
 mod snapshots;
 mod symbol_info;
 
@@ -133,7 +134,11 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 let mut write = write;
                 write.write_all(format!("{line}\n").as_bytes()).await.ok();
             }
+            if let Some(transcript) = &report.transcript {
+                session_title::remember(&report.terminal, transcript);
+            }
             TerminalAgent {
+                title: report.title,
                 terminal: report.terminal,
                 state: report.state,
                 prompt: report.prompt,

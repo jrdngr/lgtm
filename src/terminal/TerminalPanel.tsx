@@ -23,6 +23,8 @@ type Params = {
   claudeSession?: string;
   /** The user named the tab, so its agent's title doesn't. */
   renamed?: boolean;
+  /** The name the user gave the Claude Code session, which names the tab over its title. */
+  sessionTitle?: string;
 };
 
 export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps<Params>) {
@@ -105,11 +107,16 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
     const unwatch = watchAgentHooks((r) => {
       if (r.terminal !== api.id) return;
       const saved = current().claudeSession;
-      if (r.ended) api.updateParameters({ claudeSession: undefined });
+      if (r.ended) api.updateParameters({ claudeSession: undefined, sessionTitle: undefined });
       else if (r.session && r.session !== saved) api.updateParameters({ claudeSession: r.session });
+      if (r.title && r.title !== current().sessionTitle) {
+        api.updateParameters({ sessionTitle: r.title });
+        if (!current().renamed) api.setTitle(r.title);
+      }
     });
     const titled = term.onTitleChange((t) => {
-      if (isAgentTitle(t) && !current().renamed) api.setTitle(titleLabel(t));
+      const { renamed, sessionTitle } = current();
+      if (isAgentTitle(t) && !renamed && !sessionTitle) api.setTitle(titleLabel(t));
     });
 
     const sub = api.onDidActiveChange(({ isActive }) => isActive && term.focus());

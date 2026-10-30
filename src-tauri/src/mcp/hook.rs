@@ -58,6 +58,13 @@ pub(super) struct HookReport {
     /// The tool call a `PreToolUse` or `PostToolUse` event is about.
     #[serde(default)]
     pub tool_use: Option<String>,
+    /// The session's transcript file.
+    #[serde(default)]
+    pub transcript: Option<String>,
+    /// The name the user gave the session, looked for when a prompt starts or the agent
+    /// stops.
+    #[serde(default)]
+    pub title: Option<String>,
 }
 
 /// Claude Code's tools that can change files.
@@ -153,6 +160,16 @@ fn reply(input: &serde_json::Value) -> Option<String> {
     last_text(&transcript)
 }
 
+/// The session's name, on the events after which the user may have renamed it.
+fn title(input: &serde_json::Value) -> Option<String> {
+    match input["hook_event_name"].as_str()? {
+        "UserPromptSubmit" | "Stop" | "SessionStart" => {
+            super::session_title::read(std::path::Path::new(input["transcript_path"].as_str()?))
+        }
+        _ => None,
+    }
+}
+
 /// The text of the last assistant entry in a JSONL transcript that has any, unless the user
 /// spoke after it.
 fn last_text(transcript: &str) -> Option<String> {
@@ -211,6 +228,8 @@ pub fn main() -> i32 {
         workspace: var("LGTM_WORKSPACE"),
         checkpoint: checkpoint(&input),
         tool_use: input["tool_use_id"].as_str().map(str::to_string),
+        transcript: input["transcript_path"].as_str().map(str::to_string),
+        title: title(&input),
     };
     // The app answers once it has the prompt's context, and after any snapshot, which has
     // to land before the tool runs.

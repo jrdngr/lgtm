@@ -69,6 +69,7 @@ const report = (
     reply: said.reply ?? null,
     session: null,
     ended: false,
+    title: null,
   });
 
 beforeEach(() => {
