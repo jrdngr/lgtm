@@ -87,19 +87,3 @@ export function relayoutDocks() {
     for (const api of all) api.layout(api.width + 1, api.height, true);
   });
 }
-
-/** Calls `f` whenever the window's scale changes: zooming or moving to another screen. */
-export function onScaleChange(f: () => void): () => void {
-  let query: MediaQueryList | undefined;
-  const watch = () => {
-    query?.removeEventListener("change", changed);
-    query = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
-    query.addEventListener("change", changed);
-  };
-  function changed() {
-    watch();
-    f();
-  }
-  watch();
-  return () => query?.removeEventListener("change", changed);
-}

@@ -2,6 +2,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
+import { onScaleSettled } from "../core/scale";
 import { watchSettings } from "../settings/store";
 import { monoFamily } from "../ui/fonts";
 
@@ -74,41 +75,17 @@ export function createTerminal(container: HTMLElement) {
     if (container.offsetWidth > 0 && container.offsetHeight > 0) fit.fit();
   };
   refit();
-  // A zoom change moves the pixel ratio. The saved zoom lands right after load by way of 1.0,
-  // and xterm can rebuild its glyphs for the passing ratio and miss the final one, drawing them
-  // too small. Once the ratio settles, the renderer is rebuilt at it.
-  let ratio = window.devicePixelRatio;
-  let settling: number | undefined;
-  let query: MediaQueryList | undefined;
-  /** Set when the ratio changed at all since the last rebuild, even if it came back. */
-  let moved = false;
-  const rescale = () => {
-    clearTimeout(settling);
-    settling = window.setTimeout(() => {
-      watchRatio();
-      if (window.devicePixelRatio === ratio && !moved) return;
-      ratio = window.devicePixelRatio;
-      moved = false;
-      if (webgl) {
-        webgl.dispose();
-        webgl = undefined;
-        attach();
-      }
-      refit();
-      term.refresh(0, term.rows - 1);
-    }, 100);
-  };
-  const ratioChanged = () => {
-    moved = true;
-    rescale();
-  };
-  const watchRatio = () => {
-    query?.removeEventListener("change", ratioChanged);
-    query = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-    query.addEventListener("change", ratioChanged);
-  };
-  watchRatio();
-  window.addEventListener("resize", rescale);
+  // xterm can keep glyphs rasterized for a passing pixel ratio and draw them too small, so the
+  // renderer is rebuilt once a scale change settles.
+  const unscale = onScaleSettled(() => {
+    if (webgl) {
+      webgl.dispose();
+      webgl = undefined;
+      attach();
+    }
+    refit();
+    term.refresh(0, term.rows - 1);
+  });
   /** The family it was last asked for, which may still be loading. */
   let family = term.options.fontFamily;
   let released = false;
@@ -139,9 +116,7 @@ export function createTerminal(container: HTMLElement) {
   const release = () => {
     released = true;
     unwatch();
-    window.removeEventListener("resize", rescale);
-    query?.removeEventListener("change", ratioChanged);
-    clearTimeout(settling);
+    unscale();
     shown.disconnect();
     clearTimeout(parking);
   };

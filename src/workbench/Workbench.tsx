@@ -3,11 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { onAnyShowLook } from "../arch/showLook";
 import { bottom } from "../core/bottom";
-import { bottomDockOf, dockOf, onScaleChange, relayoutDocks, revealPanel } from "../core/docks";
+import { bottomDockOf, dockOf, relayoutDocks, revealPanel } from "../core/docks";
 import { bottomKey, chord, symbolKey, tabKey } from "../core/keys";
 import { addTerminal, focusPanel, openReport } from "../core/panels";
 import { onAnyReveal } from "../core/reveal";
 import { setStateRepo } from "../core/savedState";
+import { onScaleSettled } from "../core/scale";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { DesignFormHost } from "../design/DesignFormHost";
 import { requestNewDrawing } from "../drawings/store";
@@ -109,7 +110,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   useEffect(() => watchDefinitionClicks(() => selectedRef.current), []);
   useEffect(() => watchHovers(() => selectedRef.current), []);
   useEffect(() => watchSymbolLinks(), []);
-  useEffect(() => onScaleChange(relayoutDocks), []);
+  useEffect(() => onScaleSettled(relayoutDocks), []);
 
   function select(name: WorkspaceName, setup = false) {
     setSelected(name);
