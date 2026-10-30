@@ -3,7 +3,7 @@ import type { MarkColor, MarkSlot } from "../bindings";
 import { useSettings } from "../settings/store";
 
 /** Every mark color, in palette order. */
-export const MARK_COLORS: MarkColor[] = [
+const MARK_COLORS: MarkColor[] = [
   "green",
   "red",
   "gray",

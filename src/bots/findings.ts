@@ -13,7 +13,7 @@ export const SEVERITY_NAMES: Record<Severity, string> = {
 };
 
 /** Emoji badges, for finding text sent out as comments and prompts. */
-export const BADGES: Record<Severity, string> = {
+const BADGES: Record<Severity, string> = {
   critical: "🔴 CRITICAL",
   high: "🟠 HIGH",
   medium: "🟡 MEDIUM",

@@ -29,7 +29,7 @@ const meets = (a: Box, b: Box, gap: number) =>
   a.x < b.x + b.w + gap && b.x < a.x + a.w + gap && a.y < b.y + b.h + gap && b.y < a.y + a.h + gap;
 
 /** The nearest spot to (`x`, `y`) where a `w` by `h` box clears `taken`, searching outward. */
-export function openSpot(x: number, y: number, w: number, h: number, taken: Box[]) {
+function openSpot(x: number, y: number, w: number, h: number, taken: Box[]) {
   const step = 30;
   for (let ring = 0; ring < 60; ring++) {
     for (let i = -ring; i <= ring; i++) {

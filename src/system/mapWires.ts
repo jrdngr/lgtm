@@ -55,7 +55,7 @@ export function edgesOf(edges: SEdge[], id: string): SEdge[] {
 }
 
 /** What a review-changed edge's pill says. */
-export function statusLabel(e: SEdge) {
+function statusLabel(e: SEdge) {
   if (e.status === "removed") return "removed";
   return `new · ${e.label ?? `${e.imports} ${e.imports === 1 ? "site" : "sites"}`}`;
 }

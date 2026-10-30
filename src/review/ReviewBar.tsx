@@ -202,7 +202,6 @@ function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSe
   const [hover, setHover] = useState(false);
   const parts = progressParts(p, setup);
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hovering only shows counts
     <span
       className="progress"
       onMouseEnter={() => setHover(true)}

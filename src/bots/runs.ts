@@ -33,7 +33,7 @@ export async function refreshRun(id: number) {
   else forgetRun(id);
 }
 
-export async function loadRuns(workspace: WorkspaceName) {
+async function loadRuns(workspace: WorkspaceName) {
   const r = await commands.botRuns(workspace);
   if (r.status !== "ok") return;
   for (const run of r.data) runs.set(run.id, run);

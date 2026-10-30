@@ -1,5 +1,5 @@
 /** GitHub's id for a heading: lower case, punctuation dropped, spaces to dashes. */
-export function slug(heading: string): string {
+function slug(heading: string): string {
   return heading
     .trim()
     .toLowerCase()

@@ -2,7 +2,7 @@ import type { Cell } from "./graphCells";
 
 /** A graph cell's width and a line's height, in px. */
 export const CELL_W = 8;
-export const LINE_H = 22;
+const LINE_H = 22;
 
 function Segments({ c, x, y }: { c: Cell; x: number; y: number }) {
   const cx = x + CELL_W / 2;

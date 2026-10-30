@@ -18,7 +18,7 @@ interface Props {
 /** The list's width. */
 const DROP = 330;
 
-export function TargetSwatch({ t }: { t: Target }) {
+function TargetSwatch({ t }: { t: Target }) {
   const round = t.kind === "person" || t.kind === "external";
   return <span className={`sys-sw${round ? " round" : ""}`} style={{ background: t.color }} />;
 }

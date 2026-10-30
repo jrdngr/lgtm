@@ -131,10 +131,10 @@ fn word_wrap(app: &AppHandle) -> tauri::Result<()> {
     let Some(item) = app.try_state::<WordWrapItem<tauri::Wry>>() else {
         return Ok(());
     };
-    Ok(WordWrap {
+    WordWrap {
         on: item.0.is_checked()?,
     }
-    .emit(app)?)
+    .emit(app)
 }
 
 /// The focused project window.

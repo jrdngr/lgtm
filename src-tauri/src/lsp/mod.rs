@@ -80,8 +80,9 @@ struct Server {
     docs: Mutex<HashMap<PathBuf, (i64, String)>>,
 }
 
-static SERVERS: LazyLock<tokio::sync::Mutex<HashMap<(PathBuf, &'static str), Arc<Server>>>> =
-    LazyLock::new(Default::default);
+/// Running servers by workspace root and language.
+type Servers = HashMap<(PathBuf, &'static str), Arc<Server>>;
+static SERVERS: LazyLock<tokio::sync::Mutex<Servers>> = LazyLock::new(Default::default);
 
 /// Files outside every workspace that a definition led to, which the editor may show.
 static EXTERNAL: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(Default::default);

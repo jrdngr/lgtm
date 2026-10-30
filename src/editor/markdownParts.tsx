@@ -64,7 +64,6 @@ function Link({ href, children }: { href?: string; children?: React.ReactNode })
   const follow = useContext(LinkContext);
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: a ⌘-click shortcut; the text stays plain text to the keyboard
-    // biome-ignore lint/a11y/noStaticElementInteractions: as above
     <span
       className="md-link"
       onClick={(e) => {

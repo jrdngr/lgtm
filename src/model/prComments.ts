@@ -1,10 +1,10 @@
 import type { CommentDto, ThreadDto } from "../bindings";
 
 /** A comment on the PR itself, rather than on its code. */
-export const onPr = (t: { path: string; github: unknown }) => !t.path && !!t.github;
+const onPr = (t: { path: string; github: unknown }) => !t.path && !!t.github;
 
 /** The comment `t` quotes part of, if it's a quote. */
-export const quoteOf = (t: ThreadDto) => t.state.quote?.of;
+const quoteOf = (t: ThreadDto) => t.state.quote?.of;
 
 /** Comments on the PR, each followed by its quotes in the order they were made. */
 export function prThreads(threads: ThreadDto[]): ThreadDto[] {
@@ -13,7 +13,7 @@ export function prThreads(threads: ThreadDto[]): ThreadDto[] {
 }
 
 /** Threads on code whose file the review doesn't show, like one deleted since. */
-export function lostThreads(threads: ThreadDto[], comments: CommentDto[]): ThreadDto[] {
+function lostThreads(threads: ThreadDto[], comments: CommentDto[]): ThreadDto[] {
   const shown = new Set(comments.map((c) => c.id));
   return threads.filter((t) => t.path && !shown.has(t.id));
 }

@@ -21,7 +21,7 @@ function subscribe(l: () => void) {
   return () => listeners.delete(l);
 }
 
-export function archView(review: number): ArchView {
+function archView(review: number): ArchView {
   return views.get(review) ?? EMPTY;
 }
 
@@ -35,7 +35,7 @@ export function reloadArch(review: number) {
   setArchView(review, { version: archView(review).version + 1 });
 }
 
-export function useArchView(review: number | undefined): ArchView {
+function useArchView(review: number | undefined): ArchView {
   return useSyncExternalStore(subscribe, () => (review === undefined ? EMPTY : archView(review)));
 }
 

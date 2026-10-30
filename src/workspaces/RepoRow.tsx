@@ -9,7 +9,7 @@ import { COLORS } from "./pins";
 import { colorItems } from "./workspaceMenu";
 
 /** The most urgent agent state of the repo's workspaces. */
-export function rollup(s: ShellState, label: string): Activity["state"] {
+function rollup(s: ShellState, label: string): Activity["state"] {
   const tree = s.trees[label];
   const states = [...(tree?.top ?? []), ...(tree?.rest ?? [])].map((r) => r.a.state);
   const ranked = AGENT_STATES.filter((st) => states.includes(st));

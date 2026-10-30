@@ -3,7 +3,7 @@ import type { ArchViewDto } from "../bindings";
 import { commands, unwrap } from "../ipc";
 
 /** What the map shows until the repo's stored view loads. */
-export const DEFAULT_VIEW: ArchViewDto = {
+const DEFAULT_VIEW: ArchViewDto = {
   untracked: false,
   tests: false,
   generated: false,
@@ -17,7 +17,8 @@ export const DEFAULT_VIEW: ArchViewDto = {
 let view = DEFAULT_VIEW;
 /** Counts the views stored, so the map loads again after each. */
 let saved = 0;
-let loading: Promise<void> | undefined;
+/** Whether the stored view was asked for yet. */
+let asked = false;
 const listeners = new Set<() => void>();
 
 const subscribe = (f: () => void) => {
@@ -34,7 +35,9 @@ function put(next: ArchViewDto) {
 export function useArchView(): [ArchViewDto, (change: Partial<ArchViewDto>) => void] {
   const current = useSyncExternalStore(subscribe, () => view);
   useEffect(() => {
-    loading ??= unwrap(commands.archView()).then(put, () => {});
+    if (asked) return;
+    asked = true;
+    unwrap(commands.archView()).then(put, () => {});
   }, []);
   return [current, setArchView];
 }

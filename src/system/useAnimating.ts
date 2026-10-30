@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 /** How long a canvas's collapse or its undoing animates. */
-export const ANIMATE_MS = 550;
+const ANIMATE_MS = 550;
 
 /** Whether `key` changed less than `ANIMATE_MS` ago, true from the first render with a new
  * key, since a refit lands in that render. */

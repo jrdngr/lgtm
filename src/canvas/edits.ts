@@ -64,10 +64,6 @@ export function setTag(v: View, digit: string, target: string, toggle = false): 
   return { ...v, tags: { ...tags, [digit]: target } };
 }
 
-/** The tag on `target`, if it has one. */
-export const tagOf = (v: View, target: string) =>
-  Object.entries(v.tags).find(([, on]) => on === target)?.[0];
-
 /** `v` without the selected shapes, notes, arrows, groups (keeping their members) and edge
  * styles, and without the tags on them. Parts stay. */
 export function removeSelected(v: View, sel: Set<string>, ungroupAll: (v: View) => View): View {

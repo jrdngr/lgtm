@@ -1,4 +1,3 @@
-import { SIGN } from "../model/sign";
 import type { DisplayLine, FlatFile } from "./model";
 
 /** Where the selected rows are, for an agent to read itself: per file and hunk, the path with
@@ -82,13 +81,6 @@ export function selectedRowText(
   return text.length ? text.join("\n") : undefined;
 }
 
-/** File-flat `rows` of one file, in order, as one diff block per hunk. */
-export function rowsText(f: FlatFile, rows: number[]): string {
-  return hunks(f, rows)
-    .map((group) => block(f, group))
-    .join("\n\n");
-}
-
 /** `rows` split per hunk, since rows in different hunks aren't adjacent. */
 function hunks(f: FlatFile, rows: number[]): number[][] {
   const out: number[][] = [];
@@ -110,9 +102,4 @@ function location(f: FlatFile, rows: number[]): string {
   const [lo, hi] = [Math.min(...span), Math.max(...span)];
   const where = `${f.dto.path}:${lo === hi ? lo : `${lo}-${hi}`}`;
   return newLines.length ? where : `${where} (removed)`;
-}
-
-function block(f: FlatFile, rows: number[]): string {
-  const body = rows.map((r) => `${SIGN[f.rows[r].kind]}${f.rows[r].text}`).join("\n");
-  return `${location(f, rows)}\n\`\`\`diff\n${body}\n\`\`\``;
 }

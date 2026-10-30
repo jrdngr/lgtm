@@ -105,7 +105,7 @@ export const clearJump = (ws: WorkspaceName) =>
   set(ws, (s) => (s.jump ? { ...s, jump: undefined } : s));
 
 /** Puts a session the backend returned in place of the old one. */
-export function applySession(ws: WorkspaceName, d: Session) {
+function applySession(ws: WorkspaceName, d: Session) {
   set(ws, (s) => {
     const has = s.sessions.some((x) => x.id === d.id);
     const sessions = has ? s.sessions.map((x) => (x.id === d.id ? d : x)) : [...s.sessions, d];

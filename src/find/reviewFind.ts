@@ -9,7 +9,7 @@ export interface LineMatch {
 
 /** The code texts a line shows, in the order its `.code` elements render: one per side in
  * split mode, so a context row on both sides counts twice, as it shows. */
-export function lineTexts(files: FlatFile[], line: DisplayLine, mode: ViewMode): string[] {
+function lineTexts(files: FlatFile[], line: DisplayLine, mode: ViewMode): string[] {
   if (line.kind === "context")
     return mode === "split" ? [line.line.text, line.line.text] : [line.line.text];
   if (line.kind !== "rows") return [];

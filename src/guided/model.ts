@@ -85,11 +85,10 @@ function changedRows(files: FlatFile[], segments: Segment[]) {
 }
 
 /** How many changed lines `segments` hold. */
-export const lineCount = (files: FlatFile[], segments: Segment[]) =>
-  changedRows(files, segments).length;
+const lineCount = (files: FlatFile[], segments: Segment[]) => changedRows(files, segments).length;
 
 /** How many lines `segments` add and remove. */
-export function segmentStat(files: FlatFile[], segments: Segment[]): LineStat {
+function segmentStat(files: FlatFile[], segments: Segment[]): LineStat {
   const stat = { added: 0, removed: 0 };
   for (const { file, row } of changedRows(files, segments)) {
     if (files[file].rows[row].kind === "added") stat.added++;
@@ -187,7 +186,7 @@ export function progressOf(states: ChunkState[]): Progress {
 const isThread = (c: CommentDto) => !!(c.github || c.thread) && !c.thread?.quote && !!c.rows;
 
 /** Whether comment `c`'s rows fall in `segments`. */
-export function inSegments(c: CommentDto, segments: Segment[]): boolean {
+function inSegments(c: CommentDto, segments: Segment[]): boolean {
   const span = c.rows;
   if (!span) return false;
   return segments.some(

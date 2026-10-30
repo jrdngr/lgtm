@@ -10,6 +10,7 @@ use crate::workspaces;
 /// shell first runs its `.lgtm/setup`, if the user let it.
 #[tauri::command]
 #[specta::specta]
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn pty_spawn(
     window: Frame,
     ptys: State<'_, Ptys>,

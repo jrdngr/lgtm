@@ -119,7 +119,7 @@ pub struct ReviewDto {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum RefreshDto {
     Loaded {
-        review: ReviewDto,
+        review: Box<ReviewDto>,
         /// Where rows of the review as it was went.
         moves: Vec<RowMove>,
     },
@@ -137,7 +137,7 @@ impl RefreshDto {
     /// The reloaded review and where its rows went.
     pub fn loaded(self) -> (ReviewDto, Vec<RowMove>) {
         match self {
-            Self::Loaded { review, moves } => (review, moves),
+            Self::Loaded { review, moves } => (*review, moves),
             Self::Same { .. } => panic!("the refresh kept the review as it was"),
         }
     }
@@ -410,7 +410,10 @@ impl RepoCtx {
         review.view = loaded.dto.view.clone();
         let store = self.store.lock().unwrap();
         let (review, moves) = review.swap_in(&store, loaded, id)?;
-        Ok(RefreshDto::Loaded { review, moves })
+        Ok(RefreshDto::Loaded {
+            review: Box::new(review),
+            moves,
+        })
     }
 }
 

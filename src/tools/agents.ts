@@ -4,7 +4,6 @@ import { flag } from "./flag";
  * features (triage, Q&A) are off then. */
 const agents = flag();
 
-export const agentsOff = agents.get;
 export const useAgentsOff = agents.use;
 
 /** Whether `gh` is missing or too old. GitHub features (PR workspaces, publishing) are off. */

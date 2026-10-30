@@ -91,7 +91,7 @@ function reach(out: Map<string, Step[]>, from: string[]) {
 const SLACK = 2;
 /** The most links to walk looking for paths. */
 const STEPS = 20_000;
-export const MAX_PATHS = 5;
+const MAX_PATHS = 5;
 
 /** Up to `cap` simple paths from `from` to `to` that use no hop twice, fewest hops first: the
  * shortest, then those up to SLACK hops longer. Searches one length at a time, so a longer path

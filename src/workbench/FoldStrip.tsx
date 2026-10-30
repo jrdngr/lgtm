@@ -95,7 +95,6 @@ export function Fold({
       {folded &&
         createPortal(
           // biome-ignore lint/a11y/useKeyWithClickEvents: each title is a button; the rest of the strip is extra room to click
-          // biome-ignore lint/a11y/noStaticElementInteractions: as above
           <div
             className={`fold-strip ${folded.axis}`}
             onClick={(e) => e.target === e.currentTarget && unfold(api, group)}

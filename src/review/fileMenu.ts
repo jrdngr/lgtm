@@ -9,7 +9,7 @@ import type { FlatFile } from "./model";
 import type { Progress } from "./state";
 
 /** The colors in use as menu items, each on its number key. */
-export function markItems(setup: MarkSetup, onMark: (color: MarkColor) => void): CtxEntry[] {
+function markItems(setup: MarkSetup, onMark: (color: MarkColor) => void): CtxEntry[] {
   return setup.shown.map((s, i) => ({
     label: setup.label(s.color),
     keys: String(i + 1),

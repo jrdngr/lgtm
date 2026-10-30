@@ -24,7 +24,7 @@ const LIST = 5;
 const base = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** What Ask sends a terminal agent about a symbol. */
-export const symbolPrompt = (s: SymNodeDto) =>
+const symbolPrompt = (s: SymNodeDto) =>
   `Explain \`${s.name}\` in ${s.path}:${s.line}: what it does, who calls it and what it relies on. Keep it short.`;
 
 /** The selected symbol: where it is, its signature, and its callers and calls. */

@@ -120,7 +120,6 @@ function Node({
 function HeaderProgress({ p, setup }: { p: Progress; setup: MarkSetup }) {
   const [at, setAt] = useState<{ top: number; right: number }>();
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: hovering only shows counts
     <span
       className="changes-progress"
       onMouseEnter={(e) => {

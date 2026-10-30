@@ -25,7 +25,7 @@ import { canMaximize, toggleMaximize } from "./maximize";
 import { setRenaming } from "./tabRename";
 
 /** Closes `panels` one by one, each editor asking about unsaved edits. Cancel stops there. */
-export async function closePanels(workspace: WorkspaceName, panels: IDockviewPanel[]) {
+async function closePanels(workspace: WorkspaceName, panels: IDockviewPanel[]) {
   for (const p of panels) {
     if (!(await confirmClose(workspace, p.id))) return;
     p.api.close();

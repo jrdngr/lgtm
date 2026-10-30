@@ -104,7 +104,6 @@ export const personId = (name: string) => `p:${name}`;
 export const externalId = (name: string) => `x:${name}`;
 export const containerId = (id: string) => `c:${id}`;
 export const componentId = (id: string) => `k:${id}`;
-export { groupId } from "./groups";
 export const SYSTEM = "sys";
 
 /** Past this many nodes a row wraps. */
@@ -602,7 +601,7 @@ const affected = (n: SNode) => !!n.status && n.status !== "upstream";
 
 /** `scene` without the nodes the review doesn't affect, rows packed again within each tier.
  * The whole scene when it affects none. */
-export function affectedOnly(scene: Scene, per: number): Scene {
+function affectedOnly(scene: Scene, per: number): Scene {
   if (scene.frames) return affectedFrames(scene);
   const groups: Row[] = [];
   for (const r of scene.inside) {

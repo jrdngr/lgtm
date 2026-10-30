@@ -35,7 +35,7 @@ function treeRow(w: WorkspaceDto): TreeRow {
 }
 
 /** The repo's rows, as the other repos' frames draw them. */
-export function subtree(list: WorkspaceDto[]): Subtree {
+function subtree(list: WorkspaceDto[]): Subtree {
   const { top, rest } = arrange(list, (w) => workspaceKey(w.name), pinsNow().pinned);
   return { top: top.map(treeRow), rest: rest.map(treeRow) };
 }

@@ -66,7 +66,7 @@ export function SymbolsView(p: Props) {
 }
 
 /** Whether the review adds the symbol's file or changes rows in it. */
-export function symbolStatus(files: FlatFile[], s: SymNodeDto): SymStatus | undefined {
+function symbolStatus(files: FlatFile[], s: SymNodeDto): SymStatus | undefined {
   const f = files.find((x) => x.dto.path === s.path);
   if (!f) return undefined;
   if (f.dto.status === "added") return "added";

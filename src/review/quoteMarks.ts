@@ -12,7 +12,7 @@ function redraw() {
 }
 
 /** The range of `text` inside `root`'s text, ignoring differences in whitespace. */
-export function findRange(root: Node, text: string): Range | undefined {
+function findRange(root: Node, text: string): Range | undefined {
   const want = text.replace(/\s+/g, " ").trim();
   if (!want) return undefined;
   // Each character of the flattened text, with where it came from.

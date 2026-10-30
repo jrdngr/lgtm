@@ -29,7 +29,7 @@ export function useHover(): Hover | undefined {
   );
 }
 
-export const hideHover = () => set(undefined);
+const hideHover = () => set(undefined);
 
 const WAIT_MS = 350;
 const WORD = /[\p{L}\p{N}_$]/u;

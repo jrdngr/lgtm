@@ -1,5 +1,4 @@
 import type { ChangeDto, View } from "../bindings";
-import type { WorkspaceName } from "../core/workspace";
 import { workspaceStore } from "./workspaceStore";
 
 /** What a workspace's active review pane reviews, for the revision picker in the header.
@@ -23,7 +22,6 @@ export interface ReviewTarget {
 }
 
 const store = workspaceStore<ReviewTarget>();
-const openers = new Set<(workspace: WorkspaceName) => void>();
 
 export const publishTarget = store.publish;
 /** Clears the workspace's target only if `owner` is still it. */
@@ -32,15 +30,3 @@ export const targetOf = store.get;
 export const isTarget = store.isOwner;
 export const useReviewTarget = store.use;
 export const onTargetChange = store.subscribe;
-
-/** Asks the header to open the revision picker, as `@` in a review does. */
-export function openRevisions(workspace: WorkspaceName) {
-  for (const o of openers) o(workspace);
-}
-
-export function onOpenRevisions(f: (workspace: WorkspaceName) => void) {
-  openers.add(f);
-  return () => {
-    openers.delete(f);
-  };
-}

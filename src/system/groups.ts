@@ -11,7 +11,7 @@ export interface Group {
   containers: string[];
 }
 
-export const groupId = (name: string) => `g:${name}`;
+const groupId = (name: string) => `g:${name}`;
 
 /** Names the group of containers the description left out. */
 const OTHER = "Other";

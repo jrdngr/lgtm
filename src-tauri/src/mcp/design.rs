@@ -21,7 +21,7 @@ pub enum Change {
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub enum Built {
+pub enum BuildState {
     /// The code has it as designed.
     Built,
     /// The code doesn't have it yet.
@@ -54,7 +54,7 @@ pub struct External {
     pub kind: String,
     pub description: String,
     pub change: Change,
-    pub built: Option<Built>,
+    pub built: Option<BuildState>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -70,7 +70,7 @@ pub struct Container {
     /// Ids of removed containers it takes over from.
     pub replaces: Vec<String>,
     pub spec: Vec<SpecRef>,
-    pub built: Option<Built>,
+    pub built: Option<BuildState>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -80,7 +80,7 @@ pub struct Interface {
     pub signature: String,
     pub description: String,
     pub spec: Vec<SpecRef>,
-    pub built: Option<Built>,
+    pub built: Option<BuildState>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -98,7 +98,7 @@ pub struct Component {
     pub replaces: Vec<String>,
     pub spec: Vec<SpecRef>,
     pub interfaces: Vec<Interface>,
-    pub built: Option<Built>,
+    pub built: Option<BuildState>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -108,7 +108,7 @@ pub struct Relation {
     pub to: String,
     pub label: String,
     pub change: Change,
-    pub built: Option<Built>,
+    pub built: Option<BuildState>,
 }
 
 #[derive(Deserialize, Serialize, JsonSchema)]

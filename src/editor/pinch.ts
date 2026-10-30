@@ -6,7 +6,7 @@ interface GestureEvent extends UIEvent {
 }
 
 /** How much a ctrl+wheel (a pinch, outside WebKit) zooms, from its deltaY. */
-export function wheelFactor(e: Pick<WheelEvent, "deltaY" | "deltaMode">): number {
+function wheelFactor(e: Pick<WheelEvent, "deltaY" | "deltaMode">): number {
   const px = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
   return Math.exp(-Math.max(-50, Math.min(50, px)) * 0.01);
 }

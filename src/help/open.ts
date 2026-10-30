@@ -8,7 +8,7 @@ import type { WorkspaceName } from "../core/workspace";
 const ID = "shortcuts";
 
 /** Opens the Keyboard Shortcuts tab in the workspace's dock, or focuses it. */
-export function openShortcuts(workspace: WorkspaceName) {
+function openShortcuts(workspace: WorkspaceName) {
   const api = dockOf(workspace);
   if (!api) return;
   const open = api.getPanel(ID);

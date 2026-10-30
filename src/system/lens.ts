@@ -28,7 +28,7 @@ export interface Lens {
 }
 
 /** Added and removed rows of a file. */
-export function fileDelta(rows: RowDto[]): Delta {
+function fileDelta(rows: RowDto[]): Delta {
   let add = 0;
   let del = 0;
   for (const r of rows) {

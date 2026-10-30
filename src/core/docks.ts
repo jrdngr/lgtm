@@ -63,9 +63,6 @@ export function inDock(workspace: WorkspaceName, id: string) {
   return !dockOf(workspace) || !!panelIn(workspace, id);
 }
 
-/** Whether the panel `id` is in one of the workspace's docks. */
-export const hasPanel = (workspace: WorkspaceName, id: string) => !!panelIn(workspace, id);
-
 /** Brings the panel `id` forward in whichever of the workspace's docks has it, showing the
  * bottom panel when it's there. Returns the panel, or undefined when neither dock has it. */
 export function revealPanel(workspace: WorkspaceName, id: string) {

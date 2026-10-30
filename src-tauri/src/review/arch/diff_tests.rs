@@ -76,7 +76,6 @@ fn model() -> Model {
             caller("ui/view.ts", 1, "api/client.ts"),
             caller("app/main.ts", 2, "ui/view.ts"),
         ],
-        ..Model::default()
     }
 }
 

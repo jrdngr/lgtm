@@ -483,8 +483,10 @@ impl Jj {
 }
 
 const FILE_MARK: &[u8] = b"\0lgtm-file\0";
-/// File hashes by commit and path, `None` where the file isn't there. Commits never change.
-static HASHES: std::sync::LazyLock<std::sync::Mutex<HashMap<(String, String), Option<String>>>> =
+/// File hashes by commit and path, `None` where the file isn't there.
+type Hashes = HashMap<(String, String), Option<String>>;
+/// The hashes looked up so far. Commits never change.
+static HASHES: std::sync::LazyLock<std::sync::Mutex<Hashes>> =
     std::sync::LazyLock::new(Default::default);
 
 /// Past this many files the hash cache starts over.

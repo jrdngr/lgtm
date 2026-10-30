@@ -56,7 +56,7 @@ const findBar = (open: () => void) => () => {
 };
 
 /** Keeps the file's own line endings, so saving a CRLF file doesn't rewrite every line. */
-export function lineEnding(text: string): Extension {
+function lineEnding(text: string): Extension {
   return text.includes("\r\n") ? EditorState.lineSeparator.of("\r\n") : [];
 }
 

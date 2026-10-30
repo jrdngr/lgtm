@@ -7,7 +7,7 @@ import { UNTRUSTED_NOTE, untrusted } from "./untrusted";
 /** A thread for a terminal agent: what's quoted or posted, its code, the take and the reply
  * so far.
  * GitHub's text is fenced, so a prompt holding it needs `UNTRUSTED_NOTE`. */
-export function threadText(files: FlatFile[], c: CommentDto): string[] {
+function threadText(files: FlatFile[], c: CommentDto): string[] {
   const quote = c.thread?.quote;
   const take = c.thread?.take;
   const posts = c.github?.posts.map((p) => untrusted(p.body.trim(), p.author)) ?? [];

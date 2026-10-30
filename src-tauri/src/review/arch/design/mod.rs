@@ -362,6 +362,21 @@ impl RepoCtx {
     }
 }
 
+fn check_view(view: &str) -> anyhow::Result<()> {
+    let ok = matches!(view, "context" | "containers")
+        || view
+            .strip_prefix("components/")
+            .or_else(|| view.strip_prefix("interfaces/"))
+            .is_some_and(|rest| !rest.is_empty());
+    if !ok {
+        bail!(
+            "no view `{view}`: use context, containers, components/<container id> or \
+             interfaces/<component id>"
+        );
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -491,19 +506,4 @@ mod tests {
             ["docs/design/a.md", "docs/design/b/c.md", "x.md"]
         );
     }
-}
-
-fn check_view(view: &str) -> anyhow::Result<()> {
-    let ok = matches!(view, "context" | "containers")
-        || view
-            .strip_prefix("components/")
-            .or_else(|| view.strip_prefix("interfaces/"))
-            .is_some_and(|rest| !rest.is_empty());
-    if !ok {
-        bail!(
-            "no view `{view}`: use context, containers, components/<container id> or \
-             interfaces/<component id>"
-        );
-    }
-    Ok(())
 }

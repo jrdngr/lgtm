@@ -25,8 +25,6 @@ const TONES: Record<string, string> = {
 export const stageColor = (s: Stage): string | undefined =>
   TONES[STAGES.find(([k]) => k === s)?.[2] ?? ""];
 
-export const stageName = (s: Stage) => STAGES.find(([k]) => k === s)?.[1] ?? s;
-
 export const VERDICTS: Record<TakeVerdict, [string, string]> = {
   agree: ["Agree", "green"],
   change: ["Change", "blue"],

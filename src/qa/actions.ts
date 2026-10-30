@@ -18,7 +18,7 @@ const about = (d: Session) => `lgtm Q&A "${d.title}" (session ${d.id})`;
 
 /** Has the agent update the questions that depend on `id` after it was decided. Nothing runs
  * when none do. */
-export function updateAfter(ws: WorkspaceName, d: Session, id: string) {
+function updateAfter(ws: WorkspaceName, d: Session, id: string) {
   if (!dependents(d, id).length) return;
   return runInTerminal(ws, d, {
     kind: "answer",

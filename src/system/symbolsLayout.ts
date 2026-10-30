@@ -50,7 +50,7 @@ const FILE_GAP = 24;
 const INSET = 22;
 
 export const symKey = (id: number) => `s${id}`;
-export const chipKey = (side: ChipBox["side"], component: string) => `${side}:${component}`;
+const chipKey = (side: ChipBox["side"], component: string) => `${side}:${component}`;
 
 /** How many columns of files the frame holds. */
 const fileColumns = (n: number) => (n <= 2 ? Math.max(1, n) : n <= 6 ? 2 : 3);

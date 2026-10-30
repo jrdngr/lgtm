@@ -13,7 +13,7 @@ const LETTER: Record<Decor, string> = { conflict: "!", added: "A", renamed: "R",
 export const decorLetter = (d: Decor) => LETTER[d];
 
 /** Removed files aren't on disk, so as in VS Code they don't color their folders. */
-export function fileDecor(f: FileDto): Decor | undefined {
+function fileDecor(f: FileDto): Decor | undefined {
   if (f.conflict) return "conflict";
   if (f.status === "removed") return undefined;
   if (f.status === "added" || f.status === "copied") return "added";

@@ -120,10 +120,3 @@ export function conversationText(messages: Message[]): string {
   });
   return said.length ? ["Our conversation about it:", ...said].join("\n\n") : "";
 }
-
-/** Where a row is, as `file.ts:12`, or just the file name without a row. */
-export function rowLabel(files: FlatFile[], file: number, path: string, row?: number): string {
-  const r = row !== undefined ? files[file]?.rows[row] : undefined;
-  const line = r ? (r.newLine ?? r.oldLine) : undefined;
-  return `${path.split("/").pop()}${line != null ? `:${line}` : ""}`;
-}

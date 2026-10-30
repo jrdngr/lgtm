@@ -24,8 +24,3 @@ export function openPrPreview(api: DockviewApi, pr: { number: number; url: strin
   open.api.setTitle(title);
   activate(open);
 }
-
-/** Closes the preview tab if it shows `url`, once the PR has a workspace of its own. */
-export function closePrPreview(api: DockviewApi, url: string) {
-  if (urlOf(api) === url) api.getPanel(ID)?.api.close();
-}

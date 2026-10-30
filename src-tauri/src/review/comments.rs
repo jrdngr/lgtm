@@ -71,14 +71,15 @@ impl Review {
     /// Where a comment goes, or `None` when none of the review's files is its file.
     fn place(&self, store: &Store, remaps: &mut Remaps, c: Comment) -> Option<CommentDto> {
         let (mut file, mut rows) = self.placement(store, remaps, &c.path, &c.pins)?;
-        if rows.is_none() && c.github.as_ref().is_some_and(|g| !g.outdated) {
-            if let Some(r) = self.near_last_pin(store, remaps, &c.path, &c.pins) {
-                file = r.file;
-                rows = Some(RowSpan {
-                    start: r.row,
-                    end: r.row,
-                });
-            }
+        if rows.is_none()
+            && c.github.as_ref().is_some_and(|g| !g.outdated)
+            && let Some(r) = self.near_last_pin(store, remaps, &c.path, &c.pins)
+        {
+            file = r.file;
+            rows = Some(RowSpan {
+                start: r.row,
+                end: r.row,
+            });
         }
         Some(CommentDto {
             id: c.id as u32,

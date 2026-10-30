@@ -44,7 +44,7 @@ export const hasDrift = (m: DesignMapDto) =>
 
 /** How a node is marked: by what the design changes, or once code lands, by whether it's
  * built. Nothing when the design alone shows, or for what it keeps as is. */
-export function markOf(
+function markOf(
   change: DesignChange,
   built: DesignBuilt | null,
   drift: boolean,

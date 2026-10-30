@@ -1,5 +1,6 @@
-/* A collapsed group shows only its strip. */
+/* A collapsed group shows only its strip, over dockview's own display rules. */
 .group-folded > :not(.fold-strip) {
+  /* biome-ignore lint/complexity/noImportantStyles: dockview sets display on its parts */
   display: none !important;
 }
 

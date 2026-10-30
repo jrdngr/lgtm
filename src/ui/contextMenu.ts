@@ -33,7 +33,7 @@ const NAMED: Record<string, string> = { "↵": "Enter", "`": "Backquote", "⌫":
 
 /** `⇧⌘T` as an accelerator string, `Shift+Cmd+T`. Undefined for what a menu can't show,
  * like the two-key `za`, so the item shows without a shortcut. */
-export function accelerator(keys: string): string | undefined {
+function accelerator(keys: string): string | undefined {
   const mods: string[] = [];
   let rest = keys;
   while (rest && MODS[rest[0]]) {

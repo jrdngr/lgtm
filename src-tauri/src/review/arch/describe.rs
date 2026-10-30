@@ -171,7 +171,7 @@ pub(super) fn map_text(map: &SystemDto) -> String {
         writeln!(out, "- `{}` in `{}`: {} files", c.id, c.container, c.files).unwrap();
     }
     let mut edges: Vec<_> = map.edges.iter().collect();
-    edges.sort_by(|a, b| b.imports.cmp(&a.imports));
+    edges.sort_by_key(|e| std::cmp::Reverse(e.imports));
     let hidden = edges.len().saturating_sub(MAX_EDGES);
     out.push_str("\nEdges (from -> to: import sites):\n\n");
     for e in edges.into_iter().take(MAX_EDGES) {

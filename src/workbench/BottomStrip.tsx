@@ -35,7 +35,6 @@ export function BottomStrip({ api, workspace }: { api: DockviewApi; workspace: W
   const open = () => flushSync(() => bottom.set({ open: true }));
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: each title is a button; the rest of the strip is extra room to click
-    // biome-ignore lint/a11y/noStaticElementInteractions: as above
     <div
       className="fold-strip y bottom-strip"
       onClick={(e) => e.target === e.currentTarget && open()}

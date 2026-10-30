@@ -30,7 +30,7 @@ import "../review/comments.css";
 import "./guided.css";
 
 /** A verdict's glyph in a chunk row. */
-export function VerdictMark({ s }: { s: ChunkState }) {
+function VerdictMark({ s }: { s: ChunkState }) {
   if (s.changed) return <span className="gd-v changed">↻</span>;
   if (s.verdict?.verdict === "approved") return <span className="gd-v approved">✓</span>;
   if (s.verdict?.verdict === "change") return <span className="gd-v change">↺</span>;

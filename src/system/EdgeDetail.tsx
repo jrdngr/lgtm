@@ -26,7 +26,7 @@ interface Props {
 const base = (path: string) => path.slice(path.lastIndexOf("/") + 1);
 
 /** What Ask sends a terminal agent about an edge. */
-export const edgePrompt = (from: string, to: string) =>
+const edgePrompt = (from: string, to: string) =>
   `Explain how ${from} uses ${to} in this repository: what it imports and why. Keep it short and point me at the import sites.`;
 
 /** An import between two components or containers: where it happens and what it takes. */

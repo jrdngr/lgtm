@@ -292,7 +292,7 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         let ignored = |dir| {
-            list(&root, dir)
+            list(root, dir)
                 .unwrap()
                 .into_iter()
                 .filter(|e| e.ignored)
