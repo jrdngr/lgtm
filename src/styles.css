@@ -3,7 +3,6 @@
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs: 13px;
-  --mono: Menlo, ui-monospace, monospace;
   --bg: #1e1e1e;
   --panel: #252526;
   --fg: #d4d4d4;
@@ -57,7 +56,7 @@
   --rev-unique: #c586c0;
   --rev-bookmark: #d670d6;
   color-scheme: dark;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--sans);
   font-size: var(--fs);
   color: var(--fg);
   background: var(--bg);

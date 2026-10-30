@@ -195,9 +195,7 @@
 }
 
 .preview-file {
-  font:
-    12px / 20px Menlo,
-    monospace;
+  font: 12px / 20px var(--mono);
 }
 
 .preview-file-header {
@@ -225,7 +223,5 @@
   max-height: 120px;
   overflow: auto;
   color: var(--muted);
-  font:
-    11px Menlo,
-    monospace;
+  font: 11px var(--mono);
 }

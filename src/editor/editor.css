@@ -8,9 +8,7 @@
   padding: 3px 10px;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
-  font:
-    11px Menlo,
-    monospace;
+  font: 11px var(--mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -77,9 +75,7 @@
 }
 
 .markdown-view code {
-  font:
-    12px Menlo,
-    monospace;
+  font: 12px var(--mono);
   background: var(--panel);
   padding: 1px 4px;
   border-radius: 3px;
@@ -284,9 +280,7 @@
   border: 1px solid #4a4a4a;
   border-radius: 6px;
   box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
-  font:
-    12px / 20px Menlo,
-    monospace;
+  font: 12px / 20px var(--mono);
 }
 
 .cm-diff-peek-row {

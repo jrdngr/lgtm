@@ -34,7 +34,7 @@
 .menu-key {
   width: 10px;
   color: var(--muted);
-  font-family: Menlo, monospace;
+  font-family: var(--mono);
 }
 
 .menu-count {

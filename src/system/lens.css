@@ -514,10 +514,7 @@
   flex: none;
   padding: 0 4px;
   border-radius: 4px;
-  font:
-    600 10px -apple-system,
-    system-ui,
-    sans-serif;
+  font: 600 10px var(--sans);
   line-height: 15px;
 }
 
@@ -774,10 +771,7 @@
 .sys-sym.chip {
   border-style: dashed;
   background: #1b1c1f;
-  font:
-    12.5px -apple-system,
-    system-ui,
-    sans-serif;
+  font: 12.5px var(--sans);
 }
 
 .sys-sym-comp {

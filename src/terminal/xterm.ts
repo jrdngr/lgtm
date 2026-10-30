@@ -3,6 +3,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { watchSettings } from "../settings/store";
+import { monoFamily } from "../ui/fonts";
 
 /** How long a terminal stays hidden before it gives up its WebGL context. */
 const PARK_MS = 30_000;
@@ -10,7 +11,7 @@ const PARK_MS = 30_000;
 /** Opens an xterm in `container`, on WebGL when the webview supports it. */
 export function createTerminal(container: HTMLElement) {
   const term = new Terminal({
-    fontFamily: "Menlo, monospace",
+    fontFamily: monoFamily("system"),
     fontSize: 13,
     scrollback: 10_000,
     macOptionIsMeta: true,
@@ -108,14 +109,29 @@ export function createTerminal(container: HTMLElement) {
   };
   watchRatio();
   window.addEventListener("resize", rescale);
-  // Follows the font size setting until the terminal is disposed.
+  /** The family it was last asked for, which may still be loading. */
+  let family = term.options.fontFamily;
+  let released = false;
+  // Follows the font settings until the terminal is disposed.
   const unwatch = watchSettings((s) => {
-    if (term.options.fontSize === s.terminalFontSize) return;
-    term.options.fontSize = s.terminalFontSize;
-    refit();
+    if (term.options.fontSize !== s.terminalFontSize) {
+      term.options.fontSize = s.terminalFontSize;
+      refit();
+    }
+    const next = monoFamily(s.fonts);
+    if (next === family) return;
+    family = next;
+    // xterm measures its cells once per family, so a bundled font is loaded before it's used.
+    const done = () => {
+      if (released || family !== next) return;
+      term.options.fontFamily = next;
+      refit();
+    };
+    document.fonts.load(`${s.terminalFontSize}px ${next}`).then(done, done);
   });
   /** Stops following settings and visibility, before the terminal is disposed. */
   const release = () => {
+    released = true;
     unwatch();
     window.removeEventListener("resize", rescale);
     query?.removeEventListener("change", ratioChanged);

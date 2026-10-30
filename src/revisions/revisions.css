@@ -146,9 +146,7 @@
 .lg-at {
   fill: var(--rev-at);
   stroke: none;
-  font:
-    700 13px Menlo,
-    monospace;
+  font: 700 13px var(--mono);
 }
 
 .lr-lines {

@@ -20,7 +20,7 @@ import { linkClicks } from "./linkClicks";
 const theme = EditorView.theme(
   {
     "&": { height: "100%", background: "var(--bg)", color: "var(--fg)" },
-    ".cm-scroller": { font: "12px / 20px Menlo, monospace" },
+    ".cm-scroller": { font: "12px / 20px var(--mono)" },
     ".cm-gutters": { background: "var(--bg)", color: "var(--muted)", border: "none" },
     ".cm-activeLine, .cm-activeLineGutter": { background: "rgb(255 255 255 / 4%)" },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {

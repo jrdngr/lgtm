@@ -1419,6 +1419,12 @@ export type FocusPart = {
 	h: number,
 };
 
+export type Fonts = 
+/**  San Francisco and Menlo. */
+"system" | 
+/**  Geist and Geist Mono, bundled with the app. */
+"geist";
+
 /**
  *  The GitHub thread a comment is on: a review thread on code, or a comment or review summary
  *  on the PR, whose comment's path is empty. The comment's body is then a reply not yet sent.
@@ -2430,6 +2436,8 @@ export type Settings_Deserialize = {
 	 */
 	claudeTerminal: string,
 	terminalFontSize: number,
+	/**  The typefaces for text and code across the app, terminals included. */
+	fonts: Fonts,
 	/**  A background send with no background terminal opens a Claude terminal and pins it. */
 	backgroundAutoOpen: boolean,
 	/**  That terminal's tab title. */
@@ -2445,6 +2453,8 @@ export type Settings_Serialize = {
 	 */
 	claudeTerminal: string,
 	terminalFontSize: number,
+	/**  The typefaces for text and code across the app, terminals included. */
+	fonts: Fonts,
 	/**  A background send with no background terminal opens a Claude terminal and pins it. */
 	backgroundAutoOpen: boolean,
 	/**  That terminal's tab title. */

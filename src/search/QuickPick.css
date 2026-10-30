@@ -50,9 +50,7 @@
   width: 16px;
   flex: none;
   text-align: center;
-  font:
-    11px Menlo,
-    monospace;
+  font: 11px var(--mono);
   color: var(--muted);
 }
 
@@ -87,7 +85,5 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font:
-    11.5px Menlo,
-    monospace;
+  font: 11.5px var(--mono);
 }

@@ -7,11 +7,13 @@ import { Crash } from "./ui/Crash";
 import "./styles.css";
 import { installContextMenus } from "./ui/contextMenu";
 import { installDropGuard } from "./ui/dropGuard";
+import { installFonts } from "./ui/fonts";
 
 installErrorLogging();
 loadLogLevel();
 installContextMenus();
 installDropGuard();
+installFonts();
 
 const root = createRoot(document.getElementById("root") as HTMLElement);
 window.lgtmTeardown = () => root.unmount();

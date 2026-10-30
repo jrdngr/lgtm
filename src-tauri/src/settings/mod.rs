@@ -3,6 +3,7 @@
 //! ```toml
 //! claudeTerminal = "cc"
 //! terminalFontSize = 13
+//! fonts = "system"
 //! backgroundAutoOpen = true
 //! backgroundName = "bg agent"
 //! ```
@@ -34,6 +35,8 @@ pub struct Settings {
     /// check Claude Code and register its MCP server.
     pub claude_terminal: String,
     pub terminal_font_size: u16,
+    /// The typefaces for text and code across the app, terminals included.
+    pub fonts: Fonts,
     /// A background send with no background terminal opens a Claude terminal and pins it.
     pub background_auto_open: bool,
     /// That terminal's tab title.
@@ -47,11 +50,21 @@ impl Default for Settings {
         Self {
             claude_terminal: "claude".into(),
             terminal_font_size: 13,
+            fonts: Fonts::System,
             background_auto_open: true,
             background_name: "bg agent".into(),
             marks: marks::defaults(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum Fonts {
+    /// San Francisco and Menlo.
+    System,
+    /// Geist and Geist Mono, bundled with the app.
+    Geist,
 }
 
 static CURRENT: RwLock<Option<Settings>> = RwLock::new(None);

@@ -773,10 +773,7 @@
 .sys-li .sys-n {
   margin-left: auto;
   color: var(--sys-quiet);
-  font:
-    12px -apple-system,
-    system-ui,
-    sans-serif;
+  font: 12px var(--sans);
   font-variant-numeric: tabular-nums;
 }
 

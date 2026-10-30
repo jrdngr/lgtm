@@ -55,10 +55,7 @@
   margin-top: 4px;
   overflow: hidden;
   color: #c9ccd2;
-  font:
-    11.5px ui-monospace,
-    Menlo,
-    monospace;
+  font: 11.5px var(--mono);
   text-align: left;
   white-space: nowrap;
 }
@@ -325,10 +322,7 @@
   align-items: center;
   gap: 8px;
   padding: 4px 6px;
-  font:
-    12px ui-monospace,
-    Menlo,
-    monospace;
+  font: 12px var(--mono);
 }
 
 .dsn-file .p {
@@ -340,7 +334,7 @@
 
 .dsn-file .n {
   color: #c9ccd2;
-  font-family: -apple-system, system-ui, sans-serif;
+  font-family: var(--sans);
 }
 
 .dsn-file button {
@@ -389,10 +383,7 @@
   border: none;
   background: transparent;
   color: #e6e6e6;
-  font:
-    12px ui-monospace,
-    Menlo,
-    monospace;
+  font: 12px var(--mono);
   text-align: left;
 }
 
@@ -631,10 +622,7 @@
   border: none;
   background: none;
   color: #79b8ff;
-  font:
-    12px ui-monospace,
-    Menlo,
-    monospace;
+  font: 12px var(--mono);
   cursor: pointer;
 }
 
@@ -668,10 +656,7 @@
 }
 
 .dsn-sig {
-  font:
-    600 14px ui-monospace,
-    Menlo,
-    monospace;
+  font: 600 14px var(--mono);
 }
 
 /* Sidebar */

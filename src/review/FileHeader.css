@@ -7,7 +7,7 @@
   background: var(--panel);
   border-top: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: var(--sans);
   font-size: 13px;
   cursor: pointer;
 }

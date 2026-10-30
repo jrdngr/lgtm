@@ -2,6 +2,7 @@ import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
 import { commands } from "../ipc";
 import { AgentSettings } from "./AgentSettings";
+import { AppearanceSettings } from "./AppearanceSettings";
 import type { SettingsParams } from "./open";
 import { PromptSettings } from "./PromptSettings";
 import { useSettings } from "./store";
@@ -40,6 +41,7 @@ export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
         {settings ? (
           <>
             <AgentSettings settings={settings} />
+            <AppearanceSettings settings={settings} />
             <TerminalSettings settings={settings} />
             <ToolSettings />
             <PromptSettings />

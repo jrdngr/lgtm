@@ -31,9 +31,7 @@
   display: inline-block;
   margin-top: 2px;
   padding: 2px 6px;
-  font:
-    12px Menlo,
-    monospace;
+  font: 12px var(--mono);
   background: var(--bg);
   border-radius: 4px;
   user-select: all;

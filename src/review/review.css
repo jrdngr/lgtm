@@ -42,9 +42,7 @@
   padding: 6px 10px;
   color: var(--error);
   white-space: pre-wrap;
-  font:
-    12px Menlo,
-    monospace;
+  font: 12px var(--mono);
   border-bottom: 1px solid var(--border);
 }
 
@@ -52,9 +50,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  font:
-    12px / 20px Menlo,
-    monospace;
+  font: 12px / 20px var(--mono);
 }
 
 /* Rows scroll sideways; everything else stays in view at the visible width. */
@@ -127,9 +123,7 @@
 
 .split-scroll {
   display: flex;
-  font:
-    12px / 20px Menlo,
-    monospace;
+  font: 12px / 20px var(--mono);
 }
 
 .split-bar {

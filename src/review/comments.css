@@ -4,10 +4,7 @@
   border: 1px solid var(--hair);
   border-radius: 6px;
   background: var(--panel);
-  font:
-    var(--fs) -apple-system,
-    system-ui,
-    sans-serif;
+  font: var(--fs) var(--sans);
   white-space: normal;
   -webkit-user-select: text;
   user-select: text;
@@ -863,10 +860,7 @@ button.group-head.fold:hover:not(:disabled) {
   padding: 6px 12px;
   background: var(--panel);
   border-bottom: 1px solid var(--hair);
-  font:
-    var(--fs-sm) -apple-system,
-    system-ui,
-    sans-serif;
+  font: var(--fs-sm) var(--sans);
 }
 
 .pr-comments-head .faint {
