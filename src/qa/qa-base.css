@@ -1,0 +1,135 @@
+.qa {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+}
+
+.qa .faint,
+.qa-panel .faint {
+  color: var(--faint);
+  font-size: var(--fs-sm);
+}
+
+.qa-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.qa-steps {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.qa-step.s-prompt {
+  --step: var(--mark-violet);
+}
+
+.qa-step.s-questions {
+  --step: var(--accent);
+}
+
+.qa-step.s-apply {
+  --step: var(--added);
+}
+
+.qa-step button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  font: inherit;
+  color: color-mix(in srgb, var(--step) 60%, var(--faint));
+  border: none;
+  background: none;
+}
+
+.qa-step button:disabled {
+  opacity: 1;
+}
+
+.qa-dot {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  color: var(--step);
+  border: 2px solid var(--step);
+  border-radius: 50%;
+}
+
+.qa-step.done .qa-dot,
+.qa-step.reached .qa-dot {
+  background: color-mix(in srgb, var(--step) 25%, transparent);
+}
+
+.qa-step.current button,
+.qa-step.reached button {
+  color: var(--step);
+}
+
+.qa-step.current .qa-dot {
+  color: var(--bg);
+  background: var(--step);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--step) 25%, transparent);
+}
+
+.qa-step.todo {
+  opacity: 0.5;
+}
+
+.qa-step.todo .qa-dot {
+  border-style: dashed;
+}
+
+.qa-step:not(.current) button:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.qa-step-line {
+  width: 28px;
+  height: 2px;
+  margin: 0 8px;
+  background: var(--border);
+}
+
+.qa-step-line.to-questions.on {
+  background: linear-gradient(90deg, var(--mark-violet), var(--accent));
+}
+
+.qa-step-line.to-apply.on {
+  background: linear-gradient(90deg, var(--accent), var(--added));
+}
+
+.qa-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  background: rgb(79 140 201 / 8%);
+  border-bottom: 1px solid var(--border);
+}
+
+.qa-spin {
+  width: 11px;
+  height: 11px;
+  color: var(--accent);
+}
+
+.qa-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}

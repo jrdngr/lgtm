@@ -1,0 +1,237 @@
+/* Nodes and edges with the lens */
+.sys-node.changed {
+  border: 1.5px solid #e3b341;
+}
+
+.sys-node.component.changed {
+  background: #2a2617;
+}
+
+.sys-node.added {
+  border: 1.5px solid #3fb950;
+}
+
+.sys-node.component.added {
+  background: #18281c;
+}
+
+.sys-node.impacted {
+  border: 1px dashed #6f8db0;
+}
+
+.sys-delta {
+  flex: none;
+  margin-left: auto;
+  font: 600 11px var(--mono);
+}
+
+.sys-dc {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.sys-dc .add {
+  color: #3fb950;
+}
+
+.sys-dc .del {
+  color: #f85149;
+}
+
+.sys-node:not(.compact, .small) .sys-delta.compact-only {
+  display: none;
+}
+
+.sys-delta.new {
+  color: #7ee093;
+}
+
+.sys-cnt {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 6%);
+  font: 600 11px var(--mono);
+}
+
+.sys-node.small .sys-cnt {
+  display: none;
+}
+
+.sys-flag {
+  display: grid;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f85149;
+  box-shadow: 0 0 0 2px var(--sys-bg);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sys-tile.c {
+  box-shadow: inset 0 0 0 1.5px #e3b341;
+}
+
+.sys-edges .sys-ehit {
+  stroke: transparent;
+  stroke-width: 12px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.sys-epill {
+  position: absolute;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.sys-epill.added {
+  background: rgb(63 185 80 / 16%);
+  color: #7ee093;
+}
+
+.sys-epill.removed {
+  background: rgb(248 81 73 / 16%);
+  color: #ff8a80;
+}
+
+/* Detail with the lens */
+.sys-chip.amb {
+  background: rgb(227 179 65 / 14%);
+  color: #f0cf7a;
+}
+
+.sys-chip.grn {
+  background: rgb(63 185 80 / 14%);
+  color: #7ee093;
+}
+
+.sys-chip.red {
+  background: rgb(248 81 73 / 14%);
+  color: #ff8a80;
+}
+
+.sys-btn-n,
+.sys-btn-at {
+  color: #a9abb1;
+  font-weight: 400;
+}
+
+.sys-btn-at {
+  font: 11px var(--mono);
+}
+
+.sys-btn.sm {
+  height: 26px;
+}
+
+.sys-title.mono {
+  font: 650 16px var(--mono);
+}
+
+.sys-to {
+  color: #a9abb1;
+  font-weight: 400;
+}
+
+.sys-sig {
+  padding: 8px 10px;
+  border: 1px solid var(--sys-line);
+  border-radius: 8px;
+  background: #151618;
+  color: var(--sys-soft);
+  font: 12px var(--mono);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.sys-look {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 3px 0;
+  border: none;
+  background: none;
+  color: #e2e2e2;
+  font-size: 12.5px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.sys-sev {
+  flex: none;
+  margin-top: 2px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.sys-sev.hi {
+  background: rgb(248 81 73 / 18%);
+  color: #ff8a80;
+}
+
+.sys-sev.md {
+  background: rgb(227 179 65 / 16%);
+  color: #f0cf7a;
+}
+
+.sys-sev.lo {
+  background: #2b2d32;
+  color: #b9bcc2;
+}
+
+.sys-pill.chg {
+  border-color: rgb(227 179 65 / 55%);
+  color: #f0cf7a;
+}
+
+.sys-li.added,
+.sys-li.added .sys-lbl,
+.sys-li.added .sys-arr {
+  color: #7ee093;
+}
+
+.sys-li.removed .sys-lbl {
+  color: #ff8a80;
+}
+
+.sys-li .sys-n {
+  display: flex;
+  gap: 6px;
+}
+
+.sys-n .add,
+.sys-at.add {
+  color: #3fb950;
+}
+
+.sys-n .del {
+  color: #f85149;
+}
+
+.sys-n.delta {
+  color: #7ee093;
+  font: 600 11px var(--mono);
+}
+
+.sys-at {
+  margin-left: auto;
+  color: #a9abb1;
+  font-size: 11.5px;
+}

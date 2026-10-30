@@ -1,0 +1,139 @@
+/* Symbols and the map: quiet at rest, collapsing around a selection */
+.sys-canvas.sys-focus {
+  background-image: none;
+}
+
+.sys-sctx {
+  transition: opacity 300ms;
+}
+
+.sys-focus .sys-sctx {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sys-world .sys-sym {
+  top: 0;
+  left: 0;
+}
+
+.sys-world.anim {
+  transition: transform 550ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.sys-world.anim .sys-sym,
+.sys-world.anim .sys-node {
+  transition:
+    transform 550ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    width 550ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    height 550ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 300ms;
+}
+
+.sys-world.anim .sys-node {
+  overflow: hidden;
+}
+
+.sys-sym.gone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sys-sym.chip {
+  border-style: dashed;
+  background: #1b1c1f;
+  font: 12.5px var(--sans);
+}
+
+.sys-sym-comp {
+  color: var(--sys-quiet);
+}
+
+.sys-hair path {
+  fill: none;
+  stroke: #8b8f97;
+  stroke-opacity: 0.22;
+  stroke-width: 1;
+  transition: stroke-opacity 150ms;
+}
+
+.sys-hair.off path {
+  stroke-opacity: 0.06;
+}
+
+.sys-flinks {
+  animation: sys-links-in 250ms ease-out 350ms backwards;
+}
+
+@keyframes sys-links-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sys-world.anim,
+  .sys-world.anim .sys-sym,
+  .sys-world.anim .sys-node,
+  .sys-flinks {
+    transition: none;
+    animation: none;
+  }
+}
+
+.sys-tdot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.sys-tplay {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid #e6e6e6;
+  border-radius: 7px;
+  background: #e6e6e6;
+  color: #16171a;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.sys-tplay:hover {
+  background: #fff;
+}
+
+.sys-tplay-n {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.sys-desc-state .pipe.sm {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.sys-desc-state {
+  display: inline-flex;
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 14px;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border: 1px solid rgb(210 153 34 / 55%);
+  border-radius: 8px;
+  background: rgb(210 153 34 / 14%);
+  color: #e8b64a;
+  font-size: 12px;
+  font-weight: 600;
+}

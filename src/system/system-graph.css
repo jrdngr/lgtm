@@ -1,0 +1,295 @@
+/* A collapsed graph's labels sit by their neighbor and fade away behind a hover. */
+.sys-elabel.at-start,
+.sys-epill.at-start {
+  transform: translate(0, -50%);
+}
+
+.sys-elabel.at-end,
+.sys-epill.at-end {
+  transform: translate(-100%, -50%);
+}
+
+.sys-elabel.live,
+.sys-epill.live {
+  pointer-events: auto;
+  cursor: default;
+}
+
+.sys-focus .sys-elabel.faint,
+.sys-focus .sys-epill.faint {
+  opacity: 0.06;
+}
+
+.sys-elabel.alone {
+  z-index: 1;
+  max-width: none;
+}
+
+.sys-num {
+  display: grid;
+  position: absolute;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e6e6e6;
+  color: #16171a;
+  font-size: 11px;
+  font-weight: 700;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.sys-boundary {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid #2f3136;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 1.5%);
+  pointer-events: none;
+}
+
+.sys-boundary > span {
+  display: flex;
+  position: absolute;
+  top: -10px;
+  left: 16px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  background: var(--sys-bg);
+  color: #9a9da3;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sys-band {
+  position: absolute;
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.sys-band span {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sys-node {
+  display: flex;
+  position: absolute;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #303237;
+  border-radius: 12px;
+  background: var(--sys-card);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 28%);
+  color: var(--sys-text);
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+
+.sys-node:hover {
+  border-color: #4a4d54;
+}
+
+.sys-world .sys-node {
+  top: 0;
+  left: 0;
+}
+
+.sys-node.dim {
+  opacity: 0.3;
+}
+
+.sys-node.gone {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sys-hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sys-nm {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sys-chip {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: #2b2d32;
+  color: #b9bcc2;
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.sys-node > .sys-chip {
+  align-self: flex-start;
+}
+
+.sys-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.sys-tile {
+  height: 11px;
+  border-radius: 3px;
+}
+
+.sys-go {
+  display: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #0f1a26;
+}
+
+.sys-node.container:hover .sys-go {
+  display: grid;
+}
+
+.sys-node.store {
+  border-radius: 12px 12px 22px 22px;
+}
+
+.sys-node.external {
+  border: 1px dashed #45484e;
+  background: #1a1b1e;
+  box-shadow: none;
+}
+
+.sys-node.external .sys-nm {
+  color: #c9cbd0;
+}
+
+.sys-node.person {
+  align-items: center;
+  justify-content: center;
+  border-radius: 40px 40px 12px 12px;
+}
+
+.sys-node.system {
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1.5px solid #4a4d54;
+}
+
+.sys-node.system .sys-nm {
+  font-size: 17px;
+}
+
+.sys-blocks {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sys-block {
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+  padding: 6px 8px;
+  border-radius: 6px;
+  color: #e8e8e8;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sys-node.component {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 12px;
+  border-color: #33363c;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 25%);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.sys-node.component .sys-nm {
+  font-size: 13.5px;
+}
+
+.sys-node.group .sys-blocks {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sys-node.group.frame {
+  justify-content: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #34363c;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 2.5%);
+  box-shadow: none;
+}
+
+.sys-node.small {
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 22%);
+}
+
+.sys-node.small .sys-nm {
+  font-size: 13px;
+}
+
+.sys-node.door {
+  flex-direction: row;
+  align-items: center;
+  padding: 0 12px;
+  border-style: dashed;
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+.sys-stale {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.sys-node.removed {
+  border-style: dashed;
+  border-color: var(--error);
+  opacity: 0.7;
+}
+
+.sys-node.changed {
+  border-color: var(--amber);
+}
+
+.sys-node.added {
+  border-color: var(--added);
+}

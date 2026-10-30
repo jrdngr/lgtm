@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { SystemDescDto, SystemDto } from "../bindings";
+import { computedTiers } from "./componentsScene";
 import { layout } from "./layout";
 import type { Lens } from "./lens";
-import { affectedIds, computedTiers, type Scene, sceneOf } from "./scene";
+import { affectedIds, type Scene, sceneOf } from "./scene";
 
 const comp = (id: string, container: string, files = 1) => ({
   id,

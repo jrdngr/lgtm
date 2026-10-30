@@ -1,0 +1,113 @@
+/* Symbols */
+.sys-cl {
+  position: absolute;
+  color: var(--sys-quiet);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sys-file-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid #2c2e33;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.sys-file-box.tour {
+  border-color: #5b9bd5;
+  background: rgb(91 155 213 / 8%);
+}
+
+.sys-file-box span {
+  position: absolute;
+  top: 7px;
+  left: 10px;
+  right: 10px;
+  overflow: hidden;
+  color: #a9abb1;
+  font: 11px var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sys-file-box b {
+  color: #e6e6e6;
+  font-weight: 600;
+}
+
+.sys-sym {
+  display: flex;
+  position: absolute;
+  align-items: center;
+  gap: 7px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border: 1px solid var(--sys-edge);
+  border-radius: 8px;
+  background: var(--sys-card);
+  color: var(--sys-text);
+  font: 12.5px var(--mono);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+
+.sys-sym-nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-sym.out {
+  border-style: dashed;
+  background: #1b1c1f;
+  color: var(--sys-soft);
+}
+
+.sys-sym.changed {
+  border: 1.5px solid #e3b341;
+  background: #2a2617;
+}
+
+.sys-sym.added {
+  border: 1.5px solid #3fb950;
+  background: #18281c;
+}
+
+.sys-sym.sel {
+  border: 1.5px solid #5b9bd5;
+  background: #22344a;
+}
+
+.sys-sym.tour {
+  border: 1.5px solid #5b9bd5;
+  background: #22344a;
+  box-shadow: 0 0 0 5px rgb(91 155 213 / 22%);
+}
+
+.sys-sym.dim {
+  opacity: 0.35;
+}
+
+.sys-k {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 4px;
+  font: 600 10px var(--sans);
+  line-height: 15px;
+}
+
+.sys-k.function,
+.sys-k.module {
+  background: rgb(91 155 213 / 18%);
+  color: #9fc3e6;
+}
+
+.sys-k.class,
+.sys-k.section {
+  background: rgb(168 121 240 / 18%);
+  color: #c9adff;
+}

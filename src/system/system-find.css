@@ -1,0 +1,126 @@
+/* Find */
+.sys-scrim {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: rgb(10 10 12 / 55%);
+}
+
+.sys-find {
+  position: absolute;
+  z-index: 4;
+  top: 86px;
+  left: 50%;
+  width: min(560px, calc(100% - 48px));
+  overflow: hidden;
+  border: 1px solid #3a3c42;
+  border-radius: 14px;
+  background: #232429;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 55%);
+  transform: translateX(-50%);
+}
+
+.sys-find-q {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 16px;
+  border-bottom: 1px solid #33353a;
+  color: #9a9da3;
+}
+
+.sys-find-q input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  color: #f4f4f4;
+  font-size: 15px;
+}
+
+.sys-find-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.sys-find-grp {
+  padding: 10px 16px 4px;
+  color: var(--sys-head);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.sys-find-r {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: #e2e2e2;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.sys-find-r.on {
+  background: #2c3e52;
+}
+
+.sys-find-r .mono {
+  overflow: hidden;
+  font: 13px var(--mono);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sys-find-r mark {
+  background: none;
+  color: #8bc1f2;
+  font-weight: 700;
+}
+
+.sys-find-path {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: #9a9da3;
+  font-size: 12px;
+}
+
+.sys-find-foot {
+  display: flex;
+  gap: 14px;
+  padding: 9px 16px;
+  border-top: 1px solid #33353a;
+  color: var(--sys-quiet);
+  font-size: 11.5px;
+}
+
+/* A node in a collapsed graph: its header alone. */
+.sys-world .sys-node.compact {
+  gap: 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 12px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.sys-world .sys-node.compact > :not(.sys-hd),
+.sys-world .sys-node.compact .sys-hd > .sys-chip {
+  display: none;
+}
+
+.sys-world .sys-node.compact .sys-nm {
+  font-size: 13px;
+}

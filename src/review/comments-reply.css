@@ -1,0 +1,211 @@
+/* Looks like an empty text box; starts the reply. */
+.card-foot .reply-field {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 7px;
+  text-align: left;
+  color: var(--faint);
+  background: var(--bg);
+}
+
+.msg-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg-md {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.msg-md > :first-child {
+  margin-top: 0;
+}
+
+.msg-md > :last-child {
+  margin-bottom: 0;
+}
+
+.msg-md p,
+.msg-md ul,
+.msg-md ol {
+  margin: 4px 0;
+}
+
+.msg-md ul,
+.msg-md ol {
+  padding-left: 20px;
+}
+
+.msg-md code {
+  font: 11.5px var(--mono);
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--hover);
+}
+
+.msg-md pre {
+  margin: 4px 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  border-radius: 4px;
+  background: var(--bg);
+}
+
+.msg-md pre code {
+  padding: 0;
+  background: none;
+}
+
+.comment-input {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.comment-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.snippet-diff {
+  overflow-x: auto;
+  background: var(--bg);
+  border-bottom: 1px solid var(--hair);
+  font: var(--fs-sm) var(--mono);
+}
+
+.snip-row {
+  display: grid;
+  grid-template-columns: 7ch 7ch max-content;
+  min-width: 100%;
+  width: max-content;
+}
+
+.snip-row.added {
+  background: var(--add);
+}
+
+.snip-row.removed {
+  background: var(--del);
+}
+
+.snip-row.hunk {
+  color: var(--muted);
+  background: var(--panel);
+}
+
+.snip-num {
+  padding: 0 6px;
+  color: var(--faint);
+  text-align: right;
+  user-select: none;
+}
+
+.snip-code {
+  padding: 0 10px 0 6px;
+  white-space: pre;
+}
+
+.snip-more {
+  display: block;
+  width: 100%;
+  padding: 0 6px;
+  border: none;
+  color: var(--muted);
+  background: var(--panel);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.snip-more:hover {
+  color: var(--fg);
+}
+
+.card-agent {
+  padding: 0 10px 8px;
+  border-top: 1px solid var(--hair);
+}
+
+.conversation {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msg-who {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.msg-agent .msg-who {
+  color: var(--accent);
+}
+
+.comment-block .stage-strip:disabled {
+  opacity: 0.45;
+}
+
+.cell.commented .flag {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.comment-list {
+  height: 100%;
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.comment-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.comment-list li button {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+}
+
+.comment-list li button:hover {
+  background: var(--selection);
+}
+
+.comment-list .tree-total button {
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.comment-where {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.comment-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}

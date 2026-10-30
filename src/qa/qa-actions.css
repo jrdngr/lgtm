@@ -1,0 +1,276 @@
+/* Action bar: one row, primary first, keys inside the buttons */
+
+.qq-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.qq-actions button.primary kbd {
+  color: inherit;
+  border-color: rgb(255 255 255 / 30%);
+}
+
+.qq .qq-actions {
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+}
+
+.qq-actions .spacer {
+  flex: 1;
+}
+
+.qq .qq-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px 0 12px;
+  color: var(--fg);
+  background: var(--raise);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.qq .qq-btn:hover:not(:disabled) {
+  border-color: var(--border);
+  background: #343437;
+}
+
+/* Sends keep their target's color: teal, or violet for the background terminal. */
+.qq .qq-btn.pipe {
+  color: var(--teal-text);
+  background: var(--teal-soft);
+  border-color: var(--teal-line);
+}
+
+.qq .qq-btn.pipe:hover:not(:disabled) {
+  border-color: var(--teal);
+  background: rgb(47 191 160 / 26%);
+}
+
+.qq .qq-btn.pipe.bg {
+  color: var(--violet-text);
+  background: var(--violet-soft);
+  border-color: var(--violet-line);
+}
+
+.qq .qq-btn.pipe.bg:hover:not(:disabled) {
+  border-color: var(--mark-violet);
+  background: rgb(163 113 247 / 26%);
+}
+
+.qq .qq-explain.pipe-icon {
+  color: var(--teal-text);
+}
+
+.qq .qq-explain.pipe-icon.bg {
+  color: var(--violet-text);
+}
+
+.qq .qq-btn.primary {
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.qq .qq-btn.primary:hover:not(:disabled) {
+  background: #5b98d5;
+}
+
+.qq .qq-btn.primary kbd {
+  color: #fff;
+  background: rgb(0 0 0 / 18%);
+  border-color: transparent;
+}
+
+.qq .qq-btn.ghost {
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+}
+
+.qq .qq-btn.ghost:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.qq .qq-bar .qq-btn.ghost {
+  color: inherit;
+}
+
+.qq .qq-btn:disabled {
+  opacity: 0.45;
+}
+
+.qq-group {
+  display: inline-flex;
+}
+
+.qq .qq-group .qq-btn {
+  margin-left: -1px;
+  border-radius: 0;
+}
+
+.qq .qq-group .qq-btn:first-child {
+  margin-left: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.qq .qq-group .qq-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.qq-browse {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+
+/* Defer */
+
+.qq-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: start center;
+  padding: 70px 16px 16px;
+  background: rgb(0 0 0 / 45%);
+}
+
+.qq-modal {
+  display: grid;
+  gap: 12px;
+  width: min(440px, 100%);
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+}
+
+.qq-modal h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.qq-modal p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.qq-modal ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qq-modal li {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--qq-violet-soft);
+}
+
+.qq .qq-modal li code {
+  padding: 0;
+  color: var(--qq-violet);
+  background: none;
+  border: none;
+}
+
+.qq-modal li small {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+
+.qq-modal-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.qq .qq-btn.defer,
+.qq .qq-btn.defer:hover:not(:disabled) {
+  font-weight: 600;
+  color: #fff;
+  background: var(--qq-violet);
+  border-color: var(--qq-violet);
+}
+
+.qq .qq-btn.defer kbd {
+  color: #fff;
+  background: rgb(0 0 0 / 18%);
+  border-color: transparent;
+}
+
+.qq-input {
+  box-sizing: border-box;
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.qq-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.qq-discussion {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hair);
+}
+
+.qq-turn {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.qq-turn.you {
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--raise);
+  white-space: pre-wrap;
+}
+
+/* Claude Code's spinner color. */
+.qq-thinking {
+  color: rgb(215 119 87);
+}
+
+.qq-turn .markdown-view {
+  padding: 0;
+  overflow: visible;
+}
+
+.qq-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 12px;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}

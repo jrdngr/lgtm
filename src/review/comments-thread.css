@@ -1,0 +1,264 @@
+/* A GitHub thread: blue edge, its stages in the bar, and the reply workflow under it. */
+.thread-block {
+  border-left: 3px solid var(--github);
+}
+
+/* The thread the linked agent hears I'm on, in the linked terminal's pin color. */
+.thread-block.current {
+  border-color: var(--teal);
+  border-left-color: var(--github);
+  box-shadow: 0 0 0 1px var(--teal-line);
+}
+
+.thread-block.current[data-send="background"] {
+  border-color: var(--mark-violet);
+  border-left-color: var(--github);
+  box-shadow: 0 0 0 1px var(--violet-line);
+}
+
+/* The stage strip and the buttons after it, kept on one line. */
+.thread-block .card-ctl {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.thread-block > .card-bar::before {
+  display: none;
+}
+
+.thread-block .card-source {
+  color: var(--muted);
+}
+
+.thread-block .card-source b {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+/* Never squeezed: the bar wraps it, with the buttons after it, onto a line of its own
+ * instead. */
+.comment-block .stage-strip {
+  display: inline-flex;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.comment-block .stage-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: none;
+  border-right: 1px solid var(--hair);
+  border-radius: 0;
+  background: none;
+  font-size: var(--fs-xs);
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.comment-block .stage-strip button:last-child {
+  border-right: none;
+}
+
+.comment-block .stage-strip button:hover:not(.on) {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.comment-block .stage-strip i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.comment-block .stage-strip [data-stage="decide"] i {
+  color: var(--amber);
+}
+
+.comment-block .stage-strip [data-stage="toFix"] i {
+  color: var(--accent);
+}
+
+.comment-block .stage-strip [data-stage="review"] i {
+  color: var(--flagged);
+}
+
+.comment-block .stage-strip [data-stage="reply"] i {
+  color: var(--github);
+}
+
+.comment-block .stage-strip [data-stage="ready"] i {
+  color: var(--added);
+}
+
+.comment-block .stage-strip [data-stage="done"] i {
+  color: var(--muted);
+}
+
+.comment-block .stage-strip button.on {
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.comment-block .stage-strip button.on i {
+  opacity: 1;
+}
+
+.comment-block .stage-strip button.on[data-stage="decide"] {
+  color: var(--amber);
+  background: rgb(210 153 34 / 14%);
+}
+
+.comment-block .stage-strip button.on[data-stage="toFix"] {
+  color: var(--accent);
+  background: rgb(79 140 201 / 16%);
+}
+
+.comment-block .stage-strip button.on[data-stage="review"] {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
+.comment-block .stage-strip button.on[data-stage="reply"] {
+  color: var(--github);
+  background: var(--review-soft);
+}
+
+.comment-block .stage-strip button.on[data-stage="ready"] {
+  color: var(--added);
+  background: rgb(63 185 80 / 14%);
+}
+
+.thread-block .flow {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--hair);
+  background: var(--bg);
+  border-radius: 0 0 6px 0;
+}
+
+.thread-block .flow-sec {
+  display: grid;
+  gap: 6px;
+}
+
+.thread-block .flow-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.thread-block .flow-ver {
+  margin-left: -4px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
+
+.thread-block .flow-take,
+.thread-block .flow-draft-text {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.thread-block .flow-take {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--hair);
+}
+
+.thread-block .flow-take p {
+  margin: 0;
+}
+
+.thread-block .flow-why > :first-child {
+  margin-top: 0;
+}
+
+.thread-block .flow-why > :last-child {
+  margin-bottom: 0;
+}
+
+.thread-block .flow-why ul {
+  padding-left: 18px;
+}
+
+.thread-block .flow-question {
+  color: var(--amber);
+}
+
+.thread-block .flow-draft-text {
+  border: 1px solid var(--review-soft);
+}
+
+.thread-block .flow-draft-text.final {
+  border-color: rgb(63 185 80 / 40%);
+}
+
+.thread-block .flow-draft-text > :first-child {
+  margin-top: 0;
+}
+
+.thread-block .flow-draft-text > :last-child {
+  margin-bottom: 0;
+}
+
+.thread-block .flow-none {
+  color: var(--faint);
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-buttons button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: var(--fs-sm);
+}
+
+.thread-block .flow-buttons button.flow-final {
+  border-color: var(--added);
+  background: var(--added);
+  color: #0b1f10;
+  font-weight: 600;
+}
+
+.thread-block .flow-buttons button.flow-final:hover:not(:disabled) {
+  background: var(--added);
+  filter: brightness(1.1);
+}
+
+.thread-block button.flow-final kbd {
+  color: inherit;
+  border-color: rgb(255 255 255 / 35%);
+  opacity: 0.8;
+}

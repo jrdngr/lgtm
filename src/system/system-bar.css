@@ -1,0 +1,221 @@
+.sys-panel {
+  --sys-bg: #161719;
+  --sys-card: #212226;
+  --sys-line: #2b2c30;
+  --sys-edge: #33363c;
+  --sys-text: #ececec;
+  --sys-soft: #c4c6cb;
+  --sys-quiet: #8b8d93;
+  --sys-head: #7d8087;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--sys-bg);
+  color: #d8d8d8;
+  outline: none;
+}
+
+.sys-grow {
+  flex: 1;
+}
+
+.sys-error {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--sys-line);
+  font-size: var(--fs-sm);
+}
+
+.sys-work {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Toolbar */
+/* A bar too narrow for everything wraps its tools onto a second row. */
+.sys-bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  box-sizing: border-box;
+  min-height: 46px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--sys-line);
+  overflow: hidden;
+  container-type: inline-size;
+}
+
+.sys-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 10px;
+  margin-left: auto;
+}
+
+.sys-nav {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.sys-back {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #33353a;
+  border-radius: 8px;
+  background: #1f2023;
+  color: #e6e6e6;
+}
+
+.sys-back:disabled {
+  border-color: #2a2c30;
+  background: #1a1b1e;
+  color: #4f5258;
+}
+
+.sys-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+  overflow: hidden;
+}
+
+.sys-crumb {
+  min-width: 0;
+  padding: 2px 3px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--sys-soft);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.sys-cn {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sys-crumb:hover:not(.on) {
+  color: var(--sys-text);
+}
+
+.sys-crumb.on {
+  color: var(--sys-text);
+  font-weight: 600;
+}
+
+.sys-sep {
+  flex: none;
+  color: var(--sys-soft);
+  font-size: 12.5px;
+}
+
+.sys-sw {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.sys-sw.round {
+  border-radius: 50%;
+}
+
+.sys-sw.dashed {
+  box-sizing: border-box;
+  border: 1px dashed #6f7279;
+}
+
+.sys-levels {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  margin-left: 10px;
+}
+
+.sys-levels button {
+  padding: 2px 9px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--sys-soft);
+  font-size: 12px;
+}
+
+.sys-levels button:hover:not(:disabled, .on) {
+  color: var(--sys-text);
+}
+
+.sys-levels button.on {
+  background: #2a2c31;
+  color: var(--sys-text);
+}
+
+.sys-levels button:disabled {
+  opacity: 0.4;
+}
+
+.sys-tool {
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  height: 30px;
+  border: 1px solid #33353a;
+  border-radius: 8px;
+  background: #1f2023;
+  color: #d8d8d8;
+  font-size: 12px;
+}
+
+.sys-tool {
+  gap: 6px;
+  padding: 0 10px;
+}
+
+.sys-tool:hover:not(:disabled) {
+  background: #26282c;
+}
+
+.sys-tool:disabled {
+  color: #55585f;
+}
+
+.sys-tool.on {
+  border-color: #3d5a7a;
+  background: #2a3442;
+  color: #cfe3f7;
+}
+
+.sys-tool kbd,
+.sys-find-foot kbd {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #2a2c30;
+  color: var(--sys-quiet);
+  font: 10.5px var(--mono);
+}
+
+.sys-x {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #9fb9d3;
+}

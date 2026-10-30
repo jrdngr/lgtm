@@ -1,0 +1,186 @@
+.qq-options {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qq-option-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.qq .qq-option {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.qq .qq-option:hover:not(:disabled) {
+  border-color: var(--border);
+  background: var(--hover);
+}
+
+.qq .qq-option:disabled {
+  opacity: 1;
+}
+
+.qq .qq-option.selected,
+.qq .qq-option.selected:hover {
+  border-color: var(--accent);
+  background: var(--qq-accent-soft);
+}
+
+.qq .qq-option.qq-changed {
+  border-color: rgb(210 153 34 / 55%);
+}
+
+.qq-num {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  font: 600 var(--fs-sm) var(--mono);
+  color: var(--muted);
+  background: var(--raise);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.qq-option.selected .qq-num {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.qq-option-body {
+  min-width: 0;
+}
+
+.qq-option-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.qq-option-body ul {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: var(--muted);
+}
+
+.qq-means {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.qq-option-body ul.qq-tradeoffs {
+  gap: 3px;
+  margin-top: 6px;
+  padding: 0;
+  list-style: none;
+  color: var(--fg);
+}
+
+.qq-tradeoffs:empty {
+  display: none;
+}
+
+.qq-tradeoffs li {
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.qq-tag {
+  padding: 0 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-align: center;
+  text-transform: uppercase;
+  border-radius: 3px;
+}
+
+.qq-tag.pros {
+  color: var(--added);
+  background: var(--qq-green-soft);
+}
+
+.qq-tag.cons {
+  color: var(--mark-orange);
+  background: rgb(240 136 62 / 13%);
+}
+
+.qq-tag.risks {
+  color: var(--flagged);
+  background: rgb(248 81 73 / 14%);
+}
+
+.qq .pill {
+  padding: 1px 6px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+
+.qq .pill.rec {
+  color: var(--added);
+  background: var(--qq-green-soft);
+}
+
+.qq .pill.yours {
+  color: var(--accent);
+  background: var(--qq-accent-soft);
+}
+
+.qq .pill.was {
+  color: var(--amber);
+  background: var(--qq-amber-soft);
+}
+
+.qq .qq-explain {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  margin-top: 8px;
+  padding: 0;
+  color: var(--faint);
+  background: none;
+  border: none;
+  border-radius: 6px;
+}
+
+.qq .qq-explain:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--hover);
+}
+
+.qq-rec {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--qq-green-soft);
+}
+
+.qq-rec b {
+  color: var(--added);
+}
