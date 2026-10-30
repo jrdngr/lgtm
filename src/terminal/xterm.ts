@@ -39,6 +39,16 @@ export function createTerminal(container: HTMLElement) {
         w.dispose();
         if (webgl === w) webgl = undefined;
       });
+      // Rows drawn in the frame where the glyph atlas adds or merges a page can point at
+      // glyphs that moved and stay blank until they change, so the screen is redrawn after.
+      let redraw: number | undefined;
+      w.onAddTextureAtlasCanvas(() => {
+        if (redraw !== undefined) return;
+        redraw = requestAnimationFrame(() => {
+          redraw = undefined;
+          term.refresh(0, term.rows - 1);
+        });
+      });
       term.loadAddon(w);
       webgl = w;
     } catch {
