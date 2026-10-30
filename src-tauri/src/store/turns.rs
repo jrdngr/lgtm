@@ -163,6 +163,20 @@ impl Store {
             .optional()
     }
 
+    /// The latest agent turn running in terminal panel `terminal`, if any.
+    pub fn running_terminal_turn(&self, terminal: &str) -> rusqlite::Result<Option<Turn>> {
+        self.db
+            .query_row(
+                &format!(
+                    "SELECT {COLUMNS} FROM agent_turns WHERE terminal = ? AND session IS NOT NULL
+                     AND ended_at IS NULL ORDER BY id DESC LIMIT 1"
+                ),
+                [terminal],
+                row,
+            )
+            .optional()
+    }
+
     /// The workspace's latest agent turn that hasn't ended, if any.
     pub fn running_agent_turn(&self, workspace: &str) -> rusqlite::Result<Option<Turn>> {
         self.db
@@ -291,6 +305,27 @@ mod tests {
         assert!(store.running_turn("s").unwrap().is_none());
         assert!(store.turns_on("ws", "c1").unwrap().is_empty());
         assert_eq!(store.turns_on("ws", "c2").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_terminals_running_turn_is_its_latest_unended_agent_turn() {
+        let store = Store::in_memory();
+        let ended = store
+            .start_turn("ws", Some("s"), None, "c", "a", 1)
+            .unwrap();
+        store.set_turn_terminal(ended, "t1").unwrap();
+        store.end_turn(ended, "c", "b", (1, 0), 2).unwrap();
+        let running = store
+            .start_turn("ws", Some("s2"), None, "c", "b", 3)
+            .unwrap();
+        store.set_turn_terminal(running, "t1").unwrap();
+        let other = store
+            .start_turn("ws", Some("s3"), None, "c", "b", 4)
+            .unwrap();
+        store.set_turn_terminal(other, "t2").unwrap();
+        let turn = store.running_terminal_turn("t1").unwrap().unwrap();
+        assert_eq!((turn.id, turn.session.as_deref()), (running, Some("s2")));
+        assert!(store.running_terminal_turn("t3").unwrap().is_none());
     }
 
     #[test]

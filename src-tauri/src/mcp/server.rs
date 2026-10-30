@@ -111,6 +111,18 @@ impl Lgtm {
             .context("lgtm doesn't have this repo open")
     }
 
+    /// The agent's Claude Code session, as its hooks last reported it: the id Claude Code gave
+    /// this server at launch goes stale when the agent resumes or clears its conversation.
+    pub(super) fn agent_session(&self, ctx: &RepoCtx) -> Option<String> {
+        let terminal = self.hello.terminal.as_deref();
+        let turn = terminal.and_then(|t| {
+            let store = ctx.store.lock().unwrap();
+            store.running_terminal_turn(t).ok().flatten()
+        });
+        turn.and_then(|t| t.session)
+            .or_else(|| self.hello.claude_session.clone())
+    }
+
     fn changed(&self, label: &str, review: u32, state: StateDto) {
         ReviewStateChanged { review, state }
             .emit_to(&self.app, label)
@@ -185,9 +197,9 @@ impl Lgtm {
     )]
     async fn fixed_threads(&self, Parameters(p): Parameters<inputs::FixedThreads>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
-        let session = self.hello.claude_session.as_deref();
+        let session = self.agent_session(&ctx);
         let (review, state, fix) = ctx
-            .agent_fixed(self.workspace(), session, p.pr, &p.thread_ids)
+            .agent_fixed(self.workspace(), session.as_deref(), p.pr, &p.thread_ids)
             .await
             .map_err(failed)?;
         self.changed(&label, review, state);

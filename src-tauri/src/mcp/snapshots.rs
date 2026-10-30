@@ -21,9 +21,7 @@ impl Lgtm {
     async fn start_snapshot(&self, Parameters(p): Parameters<inputs::Snapshot>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let session = self
-            .hello
-            .claude_session
-            .as_deref()
+            .agent_session(&ctx)
             .ok_or("lgtm doesn't know this agent's session")?;
         let name = p.label.lines().next().unwrap_or("").trim();
         if name.is_empty() {
@@ -32,7 +30,7 @@ impl Lgtm {
         ctx.turn_checkpoint(
             self.workspace(),
             self.hello.terminal.as_deref(),
-            session,
+            &session,
             None,
             Checkpoint::Start,
             Some(name),
