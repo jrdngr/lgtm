@@ -29,11 +29,12 @@ vi.mock("./xterm", () => ({
       registerLinkProvider: sub,
       onData: sub,
       onTitleChange,
-      onResize: sub,
+      onResize,
       dispose() {},
     },
     refit() {},
     release() {},
+    fontsReady: Promise.resolve(),
   }),
 }));
 const sub = () => ({ dispose() {} });
@@ -44,9 +45,16 @@ const onTitleChange = (l: (t: string) => void) => {
   return sub();
 };
 
+/** The last session's resize listeners. */
+let resizes: ((size: { cols: number; rows: number }) => void)[] = [];
+const onResize = (l: (size: { cols: number; rows: number }) => void) => {
+  resizes.push(l);
+  return { dispose: () => (resizes = resizes.filter((r) => r !== l)) };
+};
+
 const { openSession, releaseSession } = await import("./sessions");
 const box = () => document.body.appendChild(document.createElement("div"));
-const settle = () => vi.advanceTimersByTimeAsync(0);
+const settle = () => vi.advanceTimersByTimeAsync(250);
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -66,6 +74,17 @@ describe("terminal sessions", () => {
     expect(target.contains(after.host)).toBe(true);
     expect(spawned).toHaveLength(1);
     expect(killed).toEqual([]);
+  });
+
+  it("start the shell once the terminal has stopped resizing", async () => {
+    resizes = [];
+    openSession("t8", box(), null, false);
+    await vi.advanceTimersByTimeAsync(200);
+    for (const r of resizes) r({ cols: 100, rows: 30 });
+    await vi.advanceTimersByTimeAsync(200);
+    expect(spawned).toHaveLength(0);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(spawned).toHaveLength(1);
   });
 
   it("keep the shell when the panel unmounts before it mounts again", async () => {

@@ -112,6 +112,11 @@ export function createTerminal(container: HTMLElement) {
   /** The family it was last asked for, which may still be loading. */
   let family = term.options.fontFamily;
   let released = false;
+  let fontsSet: () => void = () => {};
+  /** Resolves once the font settings are in use, so the cells have their final size. */
+  const fontsReady = new Promise<void>((done) => {
+    fontsSet = done;
+  });
   // Follows the font settings until the terminal is disposed.
   const unwatch = watchSettings((s) => {
     if (term.options.fontSize !== s.terminalFontSize) {
@@ -119,13 +124,14 @@ export function createTerminal(container: HTMLElement) {
       refit();
     }
     const next = monoFamily(s.fonts);
-    if (next === family) return;
+    if (next === family) return fontsSet();
     family = next;
     // xterm measures its cells once per family, so a bundled font is loaded before it's used.
     const done = () => {
       if (released || family !== next) return;
       term.options.fontFamily = next;
       refit();
+      fontsSet();
     };
     document.fonts.load(`${s.terminalFontSize}px ${next}`).then(done, done);
   });
@@ -139,5 +145,5 @@ export function createTerminal(container: HTMLElement) {
     shown.disconnect();
     clearTimeout(parking);
   };
-  return { term, refit, release };
+  return { term, refit, release, fontsReady };
 }

@@ -106,6 +106,30 @@ const PROMPTED_MS = 15_000;
 /** How long a working agent can go without output before it counts as done: Claude Code's
  * spinner writes every second while it works, so this means its Stop hook was lost. */
 const QUIET_MS = 20_000;
+/** How long a terminal's size holds still before its shell starts. */
+const SETTLE_MS = 250;
+/** The longest a shell waits for its terminal's size to hold still. */
+const SETTLE_MAX_MS = 2000;
+
+/** Resolves once `term` goes `SETTLE_MS` without resizing, or after `SETTLE_MAX_MS`. A program
+ * drawing a full screen, like a resumed Claude Code, can lose rows to a resize in the middle of
+ * its first draw. */
+function settled(term: Terminal): Promise<void> {
+  return new Promise((done) => {
+    let quiet = window.setTimeout(finish, SETTLE_MS);
+    const cap = window.setTimeout(finish, SETTLE_MAX_MS);
+    const sub = term.onResize(() => {
+      clearTimeout(quiet);
+      quiet = window.setTimeout(finish, SETTLE_MS);
+    });
+    function finish() {
+      clearTimeout(quiet);
+      clearTimeout(cap);
+      sub.dispose();
+      done();
+    }
+  });
+}
 
 function startSession(
   id: string,
@@ -114,7 +138,7 @@ function startSession(
   setup: boolean,
   command?: Promise<string | undefined>,
 ): Session {
-  const { term, refit, release } = createTerminal(host);
+  const { term, refit, release, fontsReady } = createTerminal(host);
   let pty: number | undefined;
   /** Input from before the PTY's id came back, like the terminal's replies to a program that
    * queries it as soon as it starts. */
@@ -166,8 +190,9 @@ function startSession(
   // starts at the size the terminal has by then, since a program may only read it once.
   let cols = term.cols;
   let rows = term.rows;
-  const started = (command ?? Promise.resolve(undefined)).then((run) => {
+  const started = Promise.all([command, fontsReady]).then(async ([run]) => {
     refit();
+    await settled(term);
     ({ cols, rows } = term);
     launched = run !== undefined;
     return commands.ptySpawn(workspace, id, cols, rows, setup, run ?? null, channel);
