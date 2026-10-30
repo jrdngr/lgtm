@@ -260,9 +260,9 @@
   stroke: rgb(79 140 201 / 30%);
 }
 
-/* A whole circle dashed down to an arc, so WebKit repaints all of it as it turns. */
-.ws-glyph .ws-spin {
-  transform-origin: 6px 6px;
+/* The whole mark turns, as Spinner does: WebKit repaints a turning element inside an SVG only
+   partly. */
+.ws-glyph.working {
   animation: ws-spin 0.9s linear infinite;
 }
 
@@ -283,7 +283,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ws-glyph .ws-spin,
+  .ws-glyph.working,
   .ws-glyph .ws-halo {
     animation: none;
   }
@@ -291,7 +291,7 @@
 
 @keyframes ws-spin {
   to {
-    transform: rotate(360deg);
+    rotate: 360deg;
   }
 }
 

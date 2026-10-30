@@ -38,7 +38,6 @@ function Shape({ state }: { state: Activity["state"] }) {
         <>
           <circle className="ws-track" cx="6" cy="6" r="4.5" fill="none" strokeWidth="2" />
           <circle
-            className="ws-spin"
             cx="6"
             cy="6"
             r="4.5"
