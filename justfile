@@ -16,10 +16,11 @@ go:
     jj new main@origin
     just dev
 
-# Typecheck, lint, and run all tests
+# Check formatting, typecheck, lint, and run all tests
 test:
     scripts/case-check.sh
     pnpm check
+    cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings
     pnpm test
 
 # Build the release binary and macOS app
