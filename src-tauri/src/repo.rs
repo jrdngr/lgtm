@@ -185,6 +185,8 @@ pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
 pub fn window(app: &AppHandle, label: &str, title: &str) -> Result<(), String> {
     let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
         .title(title)
+        // The app is dark only, so its title bar is too, whatever macOS's appearance.
+        .theme(Some(tauri::Theme::Dark))
         .inner_size(1400.0, 900.0)
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
         .disable_drag_drop_handler()
@@ -222,6 +224,7 @@ pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
     }
     let builder = WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
         .title("lgtm")
+        .theme(Some(tauri::Theme::Dark))
         .inner_size(480.0, 420.0)
         .on_navigation(stays_in_app);
     crate::zoom::on_load(crate::placement::place(app, START_LABEL, builder))
