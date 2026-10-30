@@ -1,4 +1,4 @@
-import type { DockviewApi } from "dockview-react";
+import type { DockviewApi, DockviewGroupPanel } from "dockview-react";
 import { flushSync } from "react-dom";
 import { bottom } from "./bottom";
 import { activate } from "./panels";
@@ -77,13 +77,13 @@ export function revealPanel(workspace: WorkspaceName, id: string) {
   return panel;
 }
 
-/** Lays every dock out again, a pixel narrower and then back, so panes drawn over the grid
- * (terminals, HTML tabs) move to their groups. Used after the window's scale changes, which
- * leaves them where the old scale put them. */
+/** Moves panes drawn over the grid (terminals, editors) back over their groups. Their
+ * positions are measured in CSS pixels, so a scale change leaves them where the old scale put
+ * them. */
 export function relayoutDocks() {
   const all = [...docks.main.values(), ...docks.bottom.values()];
-  for (const api of all) api.layout(Math.max(0, api.width - 1), api.height, true);
-  requestAnimationFrame(() => {
-    for (const api of all) api.layout(api.width + 1, api.height, true);
-  });
+  // Dockview types groups it hands out as the interface; they're always the class.
+  const groups = all.flatMap((api) => api.groups as DockviewGroupPanel[]);
+  for (const container of new Set(groups.map((g) => g.model.renderContainer)))
+    container.updateAllPositions();
 }
