@@ -161,7 +161,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     workspaces: workspaces.workspaces,
     select,
     sleep,
-    showPanel: () => showView("left", "workspaces"),
+    showPanel: () => showView("left", "workspaces", false),
     onError: workspaces.setError,
   });
 
@@ -199,11 +199,11 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   const toggle = (side: "left" | "right") => updateSide(side, (s) => ({ ...s, open: !s.open }));
 
-  /** Opens the side panel on `view` and focuses it. */
-  function showView(side: "left" | "right", view: string) {
+  /** Opens the side panel on `view` and focuses it, unless what it opens for takes focus. */
+  function showView(side: "left" | "right", view: string, focus = true) {
     updateSide(side, (s) => ({ ...s, open: true, view }));
     const body = side === "left" ? leftBody : rightBody;
-    requestAnimationFrame(() => body.current?.focus());
+    if (focus) requestAnimationFrame(() => body.current?.focus());
   }
 
   /** Hides the bottom panel when focus is in it or it has no tabs, and otherwise shows and
@@ -242,8 +242,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
 
   /** Starts adding a workspace or PR in the Workspaces panel, showing it first. */
   function addFromPanel(kind: AddKind) {
-    showView("left", "workspaces");
-    requestAnimationFrame(() => requestAdd(kind));
+    showView("left", "workspaces", false);
+    requestAdd(kind);
   }
 
   const panelKeys: Partial<Record<string, () => void>> = {
@@ -251,8 +251,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
     "Mod+Shift+K": () => {
-      showView("left", "workspaces");
-      requestAnimationFrame(() => requestAnimationFrame(focusLog));
+      showView("left", "workspaces", false);
+      focusLog();
     },
     "Mod+Shift+E": () => showView("right", "changes"),
     "Mod+Shift+R": () => showView("right", "repo"),
@@ -270,8 +270,8 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       requestNewDrawing();
     },
     "Mod+J": () => {
-      showView("left", "workspaces");
-      requestAnimationFrame(() => requestAnimationFrame(openMotions));
+      showView("left", "workspaces", false);
+      openMotions();
     },
     "Mod+Shift+J": () => reviewRevset(selected, "@"),
     "Mod+Shift+ENTER": () => {

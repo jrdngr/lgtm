@@ -84,7 +84,7 @@ export function useProjectFrame(frame: Frame) {
     const ask = (kind: "delete" | "locate", ws: string) => {
       here();
       ref.current.showPanel();
-      requestAnimationFrame(() => requestAnimationFrame(() => requestAsk({ kind, ws })));
+      requestAsk({ kind, ws });
     };
     function menu(ws: WorkspaceName): CtxEntry[] {
       const list = ref.current.workspaces ?? [];

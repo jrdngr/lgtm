@@ -1,5 +1,6 @@
 import { dockOf } from "../core/docks";
 import { openReviewTab } from "../core/panels";
+import { requests } from "../core/request";
 import type { WorkspaceName } from "../core/workspace";
 import { setWorkspaceRevset } from "../review/revset";
 import { targetOf } from "../review/target";
@@ -18,30 +19,14 @@ export async function loadReview(
   return undefined;
 }
 
-const focusers = new Set<() => void>();
+const focuses = requests<void>();
 
 /** Gives keys to the revisions log. */
-export function focusLog() {
-  for (const f of focusers) f();
-}
+export const focusLog = () => focuses.send();
+export const onFocusLog = focuses.listen;
 
-export function onFocusLog(f: () => void) {
-  focusers.add(f);
-  return () => {
-    focusers.delete(f);
-  };
-}
-
-const motionOpeners = new Set<() => void>();
+const motions = requests<void>();
 
 /** Opens the revisions log's motions. */
-export function openMotions() {
-  for (const f of motionOpeners) f();
-}
-
-export function onOpenMotions(f: () => void) {
-  motionOpeners.add(f);
-  return () => {
-    motionOpeners.delete(f);
-  };
-}
+export const openMotions = () => motions.send();
+export const onOpenMotions = motions.listen;
