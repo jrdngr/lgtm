@@ -134,7 +134,9 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                 let mut write = write;
                 write.write_all(format!("{line}\n").as_bytes()).await.ok();
             }
-            if let Some(transcript) = &report.transcript {
+            if report.ended {
+                session_title::forget(&report.terminal);
+            } else if let Some(transcript) = &report.transcript {
                 session_title::remember(&report.terminal, transcript);
             }
             TerminalAgent {

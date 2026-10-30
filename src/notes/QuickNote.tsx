@@ -7,6 +7,7 @@ import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
 import { PipeButton } from "../terminal/PipeButton";
+import { submitNextSend } from "../terminal/registry";
 import { ErrorLine } from "../ui/ErrorLine";
 import { stampName } from "./store";
 
@@ -53,8 +54,10 @@ export function QuickNote({ workspace }: { workspace: WorkspaceName }) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (!mod || e.key !== "Enter") return;
     e.preventDefault();
-    if (e.shiftKey) send();
-    else save();
+    if (e.shiftKey) {
+      if (!empty) submitNextSend();
+      send();
+    } else save();
   }
 
   return (

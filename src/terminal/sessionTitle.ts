@@ -4,9 +4,11 @@ import { terminalTitle } from "./registry";
 import { isAgentTitle, titleLabel } from "./title";
 
 /** Names terminal tab `panel` after its Claude Code session: the name given with `/rename`,
- * else the title Claude Code shows. A name the user typed on the tab gives way. */
+ * else the title Claude Code shows. A name the user typed on the tab gives way. A session name
+ * already known stays when the transcript no longer holds it. */
 export async function refreshName(panel: IDockviewPanel) {
-  const named = await commands.terminalSessionTitle(panel.id);
+  const found = await commands.terminalSessionTitle(panel.id);
+  const named = found ?? (panel.params?.sessionTitle as string | undefined);
   const shown = terminalTitle(panel.id);
   const title = named ?? (shown && isAgentTitle(shown) ? titleLabel(shown) : undefined);
   panel.api.updateParameters({ sessionTitle: named ?? undefined, renamed: false });

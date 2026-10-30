@@ -22,6 +22,13 @@ pub fn remember(terminal: &str, transcript: &str) {
         .insert(terminal.to_string(), PathBuf::from(transcript));
 }
 
+/// Forgets terminal `terminal`'s transcript, once its session has ended.
+pub fn forget(terminal: &str) {
+    if let Some(map) = TRANSCRIPTS.lock().unwrap().as_mut() {
+        map.remove(terminal);
+    }
+}
+
 /// The name of the session terminal `terminal` last reported, if it has one.
 pub fn of_terminal(terminal: &str) -> Option<String> {
     let transcript = TRANSCRIPTS.lock().unwrap().as_ref()?.get(terminal)?.clone();
