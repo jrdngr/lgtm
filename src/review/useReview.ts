@@ -1,7 +1,7 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useRef, useState } from "react";
 import { events, type ReviewDto, type StateDto, type View } from "../bindings";
-import type { WorkspaceName } from "../core/workspace";
+import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
 import { prFollowsReview } from "../workspaces/stack";
 import { onRepoChanged } from "../workspaces/useRepoChanged";
@@ -127,8 +127,15 @@ export function useReview(workspace: WorkspaceName) {
     const stateSub = events.reviewStateChanged(win).listen((e) => {
       if (e.payload.review === current.current?.id) setStateRef.current(e.payload.state);
     });
+    // A turn's diff grows with the files its agent's tools change, and ends when it stops.
+    const turnsSub = events.turnsChanged(win).listen((e) => {
+      const turn = current.current?.view.kind === "turn";
+      if (turn && workspaceKey(e.payload.workspace) === workspaceKey(workspace))
+        refreshRef.current();
+    });
     return () => {
       unchanged();
+      turnsSub.then((un) => un());
       staleSub.then((un) => un());
       outdatedSub.then((un) => un());
       stateSub.then((un) => un());

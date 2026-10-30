@@ -382,3 +382,26 @@ async fn a_snapshot_started_mid_turn_takes_the_edits_after_it_under_its_label() 
         ]
     );
 }
+
+#[tokio::test]
+async fn a_running_turns_view_takes_in_files_its_tools_add_after_the_working_copy_changed() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    hook(&ctx, Checkpoint::Start, None).await;
+    hook(&ctx, Checkpoint::Before, Some("t1")).await;
+    write(d, "a.rs", "1\n");
+    hook(&ctx, Checkpoint::After, Some("t1")).await;
+    let id = ctx.turns(None).await.unwrap()[0].id;
+    let view = View::Turn { turns: vec![id] };
+    let review = ctx.open_in(None, "@", false, &view).await.unwrap();
+    assert_eq!(paths(&review), ["a.rs"]);
+
+    hook(&ctx, Checkpoint::Before, Some("t2")).await;
+    write(d, "b.rs", "2\n");
+    // The repo watcher refreshes on the new working copy before the tool's hook lands.
+    ctx.workspace(None).await.unwrap().snapshot().await.unwrap();
+    ctx.refresh(review.id, None).await.unwrap();
+    hook(&ctx, Checkpoint::After, Some("t2")).await;
+    let refreshed = ctx.refresh(review.id, None).await.unwrap().loaded().0;
+    assert_eq!(paths(&refreshed), ["a.rs", "b.rs"]);
+}

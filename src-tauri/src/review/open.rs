@@ -153,7 +153,9 @@ impl RepoCtx {
             let mut review = review.lock().unwrap();
             anyhow::ensure!(review.load_gen == load_gen, SUPERSEDED);
             // Commit ids name their contents, so the same ones in the same view diff the same.
+            // A turn's files and end change without new commits.
             if review.shown.as_ref() == Some(&view)
+                && !matches!(view, View::Turn { .. })
                 && review.whole == listed.whole
                 && review.commits == listed.commits()
             {
