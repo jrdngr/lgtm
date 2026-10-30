@@ -6,6 +6,7 @@ import { loadState, saveState } from "../core/savedState";
 import type { WorkspaceName } from "../core/workspace";
 import { commands, errorText, unwrap } from "../ipc";
 import { useSendText } from "../review/useSendText";
+import { PipeButton } from "../terminal/PipeButton";
 import { ErrorLine } from "../ui/ErrorLine";
 import { stampName } from "./store";
 
@@ -66,9 +67,9 @@ export function QuickNote({ workspace }: { workspace: WorkspaceName }) {
         onKeyDown={onKeyDown}
       />
       <div className="quick-note-actions">
-        <button type="button" disabled={empty} onClick={send}>
-          Send<kbd>⇧⌘↵</kbd>
-        </button>
+        <PipeButton disabled={empty} onClick={send} keys="⇧⌘↵">
+          Send
+        </PipeButton>
         <button type="button" className="primary" disabled={empty} onClick={save}>
           Save<kbd>⌘↵</kbd>
         </button>
