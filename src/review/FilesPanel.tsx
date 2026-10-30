@@ -76,8 +76,14 @@ function Node({
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
           <Diffstat stat={stats[node.file]} />
-          <MarkCounts progress={p} setup={setup} notDone />
-          {p.changed > 0 && <Ring done={p.done / p.changed} title={progressTitle(p, setup)} />}
+          {setup.enabled ? (
+            <>
+              <MarkCounts progress={p} setup={setup} notDone />
+              {p.changed > 0 && <Ring done={p.done / p.changed} title={progressTitle(p, setup)} />}
+            </>
+          ) : (
+            (isDone(p) || check === "checked") && <Ring done={1} />
+          )}
         </button>
       </li>
     );

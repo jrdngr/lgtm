@@ -72,7 +72,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const { loaded, loading, error, setError, stale, open, refresh, setState } = useReview(workspace);
   const [mode, setMode] = useState<ViewMode>("unified");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [picked, setFilter] = useState<Filter>("all");
   const [menu, setMenu] = useState<MenuAt>();
   const [scrollTo, setScrollTo] = useState<{ line: number; center?: boolean }>();
   const keepFile = useRef<(file: number) => void>(undefined);
@@ -84,7 +84,9 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
   const review = loaded?.review;
   const turns = useTurns(workspace);
   const setup = useMarkSetup();
-  const { files, index, rowState, progress } = useReviewState(review, setup.done);
+  // A mark color's filter shows nothing while marks are off.
+  const filter: Filter = setup.enabled || picked === "all" || picked === "left" ? picked : "all";
+  const { files, index, rowState, progress } = useReviewState(review, setup);
   /** Whether rows changed since they were marked or their file was checked show amber. */
   const amber = amberRows.use();
   const shown = useMemo(

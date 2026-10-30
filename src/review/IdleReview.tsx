@@ -41,7 +41,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
   const [revset, setRevset] = useState(() => workspaceRevset(workspace) ?? "@");
   const review = loaded?.review;
   const setup = useMarkSetup();
-  const { files, index, rowState, progress } = useReviewState(review, setup.done);
+  const { files, index, rowState, progress } = useReviewState(review, setup);
   const published = useRef<CurrentReview>(undefined);
   const target = useRef<ReviewTarget>(undefined);
 

@@ -193,7 +193,7 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
         clear();
         return true;
       case "0":
-        if (!has || e.repeat) return false;
+        if (!setup.enabled || !has || e.repeat) return false;
         mark(null);
         return true;
       case "C":
@@ -214,7 +214,7 @@ export function useGuidedLines({ workspace, review, setup, segments, c, send, se
       { label: "Copy", keys: "⌘C", onSelect: () => copyPicked(picks) },
       "-",
       canComment && { label: "Draft", keys: "⇧C", onSelect: () => comment(picks) },
-      {
+      setup.enabled && {
         label: "Mark",
         items: [
           ...setup.shown.map((s, i) => ({

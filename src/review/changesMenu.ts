@@ -53,18 +53,22 @@ export function fileMenu(
       checked,
       onSelect: () => apply(review, commands.setFilesChecked(review.id, [file], !checked)),
     },
-    {
-      label: "Mark File With",
-      items: setup.shown.map((s, i) => ({
-        label: setup.label(s.color),
-        keys: `${i + 1}`,
-        onSelect: () => markFile(review, setup, file, s.color),
-      })),
-    },
-    {
-      label: "Clear Marks in File",
-      onSelect: () => apply(review, commands.clearFileMarks(review.id, file)),
-    },
+    ...(setup.enabled
+      ? [
+          {
+            label: "Mark File With",
+            items: setup.shown.map((s, i) => ({
+              label: setup.label(s.color),
+              keys: `${i + 1}`,
+              onSelect: () => markFile(review, setup, file, s.color),
+            })),
+          },
+          {
+            label: "Clear Marks in File",
+            onSelect: () => apply(review, commands.clearFileMarks(review.id, file)),
+          },
+        ]
+      : []),
     "-",
     {
       label: "Discard Changes",

@@ -133,7 +133,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       }
       case "0":
-        if (!e.repeat) ctx.applyMark(null);
+        if (ctx.setup.enabled && !e.repeat) ctx.applyMark(null);
         break;
       case "m":
         ctx.openMenuAtCursor();

@@ -185,8 +185,11 @@ describe("fileProgress", () => {
     review: "r",
     createdAt: 0,
   });
-  const indexed = (marks: ReturnType<typeof mark>[], check: CheckState = "unchecked") =>
-    indexState({ marks, checks: [check], amber: [], comments: [], threads: [] });
+  const indexed = (
+    marks: ReturnType<typeof mark>[],
+    check: CheckState = "unchecked",
+    marksOn = true,
+  ) => indexState({ marks, checks: [check], amber: [], comments: [], threads: [] }, marksOn);
   const done = (c: MarkColor) => c !== "red";
 
   it("counts rows that need review by mark, leaving out a change's removed rows", () => {
@@ -211,6 +214,16 @@ describe("fileProgress", () => {
       done: 1,
       changed: 2,
     });
+  });
+
+  it("leaves marks out while marks are off, so only a checked file is done", () => {
+    const marks = [mark(1, "green"), mark(3, "green")];
+    expect(
+      fileProgress(files, rowStates(files, indexed(marks, "unchecked", false)), done)[0],
+    ).toEqual({ marks: {}, byFile: 0, done: 0, changed: 2 });
+    expect(
+      fileProgress(files, rowStates(files, indexed(marks, "checked", false)), done)[0].done,
+    ).toBe(2);
   });
 });
 

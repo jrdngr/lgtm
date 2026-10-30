@@ -28,6 +28,8 @@ export type DoneFn = (color: MarkColor) => boolean;
 
 /** What each color means, from the settings. */
 export interface MarkSetup {
+  /** Lines can be marked. Without marks, a file is reviewed only by checking it. */
+  enabled: boolean;
   slots: MarkSlot[];
   /** The colors in use, in key order: the first is on 1. */
   shown: MarkSlot[];
@@ -37,10 +39,11 @@ export interface MarkSetup {
   primary: MarkColor | undefined;
 }
 
-export function markSetup(slots: MarkSlot[]): MarkSetup {
+export function markSetup(slots: MarkSlot[], enabled = true): MarkSetup {
   const by = new Map(slots.map((s) => [s.color, s]));
-  const shown = slots.filter((s) => s.shown);
+  const shown = enabled ? slots.filter((s) => s.shown) : [];
   return {
+    enabled,
     slots,
     shown,
     done: (c) => by.get(c)?.done ?? true,
@@ -50,8 +53,10 @@ export function markSetup(slots: MarkSlot[]): MarkSetup {
 }
 
 export function useMarkSetup(): MarkSetup {
-  const slots = useSettings()?.marks ?? DEFAULT_SLOTS;
-  return useMemo(() => markSetup(slots), [slots]);
+  const settings = useSettings();
+  const slots = settings?.marks ?? DEFAULT_SLOTS;
+  const enabled = settings?.reviewMarks ?? false;
+  return useMemo(() => markSetup(slots, enabled), [slots, enabled]);
 }
 
 /** The color shown at number key `key` ("1".."9"), if one is in use there. */

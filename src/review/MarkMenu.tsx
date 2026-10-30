@@ -23,7 +23,7 @@ const LETTERS: Record<string, MenuAction> = {
 
 /** The menu item a key picks: a mark color's number, 0 to clear, or an action's letter. */
 export function menuAction(key: string, setup: MarkSetup): MenuAction | undefined {
-  if (key === "0") return "clear";
+  if (key === "0") return setup.enabled ? "clear" : undefined;
   return colorForKey(setup, key) ?? LETTERS[key];
 }
 
@@ -73,8 +73,9 @@ export function MarkMenu({
 }: Props) {
   const { ref, place } = useKeptInside(x, y);
   const items: Item[] = [
-    { action: "clear", key: "0", label: "Clear Mark" },
-    "-",
+    ...(setup.enabled
+      ? [{ action: "clear", key: "0", label: "Clear Mark" } as const, "-" as const]
+      : []),
     ...(canDraft ? [{ action: "draft", key: "C", label: "Draft PR Comment" } as const] : []),
     { action: "agent", key: "a", label: "Send to Agent" },
     "-",
@@ -111,9 +112,11 @@ export function MarkMenu({
             </button>
           ),
         )}
-        <div className="menu-count">
-          {changed} changed {plural(changed)}
-        </div>
+        {setup.enabled && (
+          <div className="menu-count">
+            {changed} changed {plural(changed)}
+          </div>
+        )}
         {setup.shown.map((s, i) => (
           <button type="button" key={s.color} onClick={() => onPick(s.color)}>
             <span className="menu-key">{i + 1}</span>

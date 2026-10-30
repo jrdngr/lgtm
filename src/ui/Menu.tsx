@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { IconButton } from "./icons";
+import { Icon, IconButton } from "./icons";
 
 export interface MenuItem {
   label: string;
@@ -9,6 +9,8 @@ export interface MenuItem {
   title?: string;
   /** Destructive: shown in red. */
   danger?: boolean;
+  /** A setting it turns on and off, checked while on. */
+  checked?: boolean;
 }
 
 interface Props {
@@ -121,6 +123,7 @@ export function Menu({ items, label = "More actions", text, className }: Props) 
                 }}
               >
                 {item.label}
+                {item.checked && <Icon name="check" size={13} />}
               </button>
             ))}
           </div>,

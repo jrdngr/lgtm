@@ -15,9 +15,10 @@ export interface MarkIndex {
   commented: Set<string>;
 }
 
-export function indexState(state: StateDto): MarkIndex {
+/** Without `marks` in use, the review's marks are left out. */
+export function indexState(state: StateDto, marks = true): MarkIndex {
   return {
-    marks: new Map(state.marks.map((m) => [markKey(m.file, m.row), m])),
+    marks: new Map(marks ? state.marks.map((m) => [markKey(m.file, m.row), m]) : []),
     checks: state.checks,
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
     commented: commentedRows(state.comments),

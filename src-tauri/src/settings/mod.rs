@@ -6,6 +6,7 @@
 //! fonts = "system"
 //! backgroundAutoOpen = true
 //! backgroundName = "bg agent"
+//! reviewMarks = false
 //! ```
 
 pub mod marks;
@@ -41,6 +42,8 @@ pub struct Settings {
     pub background_auto_open: bool,
     /// That terminal's tab title.
     pub background_name: String,
+    /// Lines can be marked with colors. Without marks, a file is reviewed only by checking it.
+    pub review_marks: bool,
     /// Every mark color, the ones in use first in key order.
     pub marks: Vec<marks::MarkSlot>,
 }
@@ -53,6 +56,7 @@ impl Default for Settings {
             fonts: Fonts::System,
             background_auto_open: true,
             background_name: "bg agent".into(),
+            review_marks: false,
             marks: marks::defaults(),
         }
     }

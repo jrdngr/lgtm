@@ -2447,6 +2447,8 @@ export type Settings_Deserialize = {
 	backgroundAutoOpen: boolean,
 	/**  That terminal's tab title. */
 	backgroundName: string,
+	/**  Lines can be marked with colors. Without marks, a file is reviewed only by checking it. */
+	reviewMarks: boolean,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot_Deserialize[],
 };
@@ -2464,6 +2466,8 @@ export type Settings_Serialize = {
 	backgroundAutoOpen: boolean,
 	/**  That terminal's tab title. */
 	backgroundName: string,
+	/**  Lines can be marked with colors. Without marks, a file is reviewed only by checking it. */
+	reviewMarks: boolean,
 	/**  Every mark color, the ones in use first in key order. */
 	marks: MarkSlot_Serialize[],
 };

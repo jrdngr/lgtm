@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ChangeDto, MarkColor, ReviewDto, TurnDto, View } from "../bindings";
+import { saveSettings } from "../settings/store";
 import { turnName, turnTime } from "../turns/turnsStore";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
@@ -185,13 +186,20 @@ export function ReviewBar(props: Props) {
         />
       </span>
       <span className="spacer" />
-      <MarkBar
-        setup={props.setup}
-        onMark={review ? props.onMark : undefined}
-        onFilter={props.onFilter}
-      />
+      {props.setup.enabled && (
+        <MarkBar
+          setup={props.setup}
+          onMark={review ? props.onMark : undefined}
+          onFilter={props.onFilter}
+        />
+      )}
       {review && <ProgressBar progress={props.progress} setup={props.setup} />}
-      <ResetMenu disabled={!review} onReset={props.onReset} onDone={props.onDone} />
+      <ReviewMenu
+        disabled={!review}
+        marks={props.setup.enabled}
+        onReset={props.onReset}
+        onDone={props.onDone}
+      />
     </div>
   );
 }
@@ -227,9 +235,10 @@ function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSe
   );
 }
 
-/** The ⋯ menu holding Reset, which asks inline before clearing every mark. */
-function ResetMenu(props: { disabled: boolean; onReset(): void; onDone(): void }) {
-  const { disabled, onReset } = props;
+/** The ⋯ menu: the review marks setting, and Reset, which asks inline before clearing every
+ * mark. */
+function ReviewMenu(props: { disabled: boolean; marks: boolean; onReset(): void; onDone(): void }) {
+  const { disabled, marks, onReset } = props;
   const [confirming, setConfirming] = useState(false);
   const close = () => {
     setConfirming(false);
@@ -245,7 +254,7 @@ function ResetMenu(props: { disabled: boolean; onReset(): void; onDone(): void }
           close();
         }}
       >
-        Clear every mark in this review?
+        {marks ? "Clear every mark in this review?" : "Uncheck every file in this review?"}
         <button
           type="button"
           className="danger"
@@ -267,8 +276,12 @@ function ResetMenu(props: { disabled: boolean; onReset(): void; onDone(): void }
       label="Review actions"
       items={[
         {
+          label: "Use review marks",
+          checked: marks,
+          onSelect: () => saveSettings({ reviewMarks: !marks }),
+        },
+        {
           label: "Reset review…",
-          title: "Clear every mark in this review",
           danger: true,
           disabled,
           onSelect: () => setConfirming(true),

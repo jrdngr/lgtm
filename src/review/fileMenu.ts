@@ -49,13 +49,17 @@ export function fileMenu(d: Deps, file: number): CtxEntry[] {
       onSelect: () => d.toggleFile(file),
     },
     "-",
-    { label: "Mark File With", items: markItems(d.setup, (c) => d.markFile(file, c)) },
-    {
-      label: "Clear Marks in File",
-      disabled: !marked && !checked,
-      onSelect: () => d.clearFile(file),
-    },
-    "-",
+    ...(d.setup.enabled
+      ? ([
+          { label: "Mark File With", items: markItems(d.setup, (c) => d.markFile(file, c)) },
+          {
+            label: "Clear Marks in File",
+            disabled: !marked && !checked,
+            onSelect: () => d.clearFile(file),
+          },
+          "-",
+        ] as CtxEntry[])
+      : []),
     { label: "Open File", keys: "o", disabled: removed, onSelect: () => d.openFile(path) },
     { label: "Copy Path", onSelect: () => copy(absolutePath(d.workspace, path)) },
     {
