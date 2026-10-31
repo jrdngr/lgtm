@@ -2287,6 +2287,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "blake3",
+ "cc",
  "drag",
  "futures",
  "getrandom 0.4.3",

@@ -223,7 +223,7 @@ fn last_row(node: Node) -> usize {
 
 fn kind_of(node_kind: &str) -> SymbolKind {
     match node_kind {
-        "mod_item" | "internal_module" => SymbolKind::Module,
+        "mod_item" | "internal_module" | "module" => SymbolKind::Module,
         k if k.contains("function") || k.contains("method") || k == "lexical_declaration" => {
             SymbolKind::Function
         }

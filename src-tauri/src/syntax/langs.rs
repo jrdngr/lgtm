@@ -63,6 +63,16 @@ impl Lang {
     }
 }
 
+unsafe extern "C" {
+    fn tree_sitter_gorp() -> *const ();
+}
+
+/// Gorp's grammar, compiled from `grammars/gorp` by the build script.
+// SAFETY: `tree_sitter_gorp` is the generated parser's entry point and returns its static
+// `TSLanguage`.
+const GORP: tree_sitter_language::LanguageFn =
+    unsafe { tree_sitter_language::LanguageFn::from_raw(tree_sitter_gorp) };
+
 /// Markdown's inline grammar, which only runs injected into the block grammar.
 static MD_INLINE: LazyLock<HighlightConfiguration> = LazyLock::new(|| {
     Lang::new(
@@ -299,6 +309,12 @@ pub(super) static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|
             Lang::new(tree_sitter_hcl::LANGUAGE.into(), "hcl", HCL_HIGHLIGHTS, ""),
         ),
         (
+            "gorp",
+            Lang::new(GORP.into(), "gorp", GORP_HIGHLIGHTS, "")
+                .symbols(GORP_SYMBOLS)
+                .leading(&["comment"]),
+        ),
+        (
             "dockerfile",
             Lang::new(
                 tree_sitter_containerfile::LANGUAGE.into(),
@@ -319,6 +335,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         _ if name.starts_with("Dockerfile.") || name.starts_with("Containerfile.") => {
             return Some("dockerfile");
         }
+        _ if name.ends_with(".gorp.lock") => return Some("gorp"),
         _ => {}
     }
     let ext = name.rsplit_once('.')?.1.to_ascii_lowercase();
@@ -342,6 +359,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "mk" => "make",
         "hcl" | "tf" | "tfvars" | "terraform" => "hcl",
         "dockerfile" | "containerfile" => "dockerfile",
+        "gorp" => "gorp",
         _ => return None,
     })
 }

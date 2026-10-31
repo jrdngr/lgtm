@@ -13,7 +13,7 @@ fn symbols(path: &str, src: &str) -> Vec<(String, u32, u32)> {
 
 #[test]
 fn every_language_builds() {
-    assert_eq!(LazyLock::force(&LANGS).len(), 19);
+    assert_eq!(LazyLock::force(&LANGS).len(), 20);
 }
 
 #[test]
@@ -242,4 +242,33 @@ fn rendered_fence_highlights_by_grammar_name() {
 #[test]
 fn unknown_extension_has_no_parser() {
     assert!(parse("notes.txt", "hi").is_none());
+}
+
+#[test]
+fn gorp_highlights_by_capture_precedence_and_outlines_components() {
+    let src = "component TodoList {\n  state: TodoListState\n  add(title: Text) -> Id {\n    property when not title |> trim |> empty {\n      state.items == !EmptyTitle\n    }\n  }\n}\n";
+    let lines = highlight_file("todo.gorp", src);
+    let class_at = |line: usize, col: u32| {
+        let mut end = 0;
+        let seg = lines[line].iter().find(|s| {
+            end += s.1;
+            end > col
+        });
+        seg.and_then(|s| s.0).map(|c| HIGHLIGHT_NAMES[c as usize])
+    };
+    assert_eq!(class_at(0, 0), Some("keyword"));
+    assert_eq!(class_at(0, 10), Some("type"));
+    assert_eq!(class_at(1, 9), Some("type"));
+    assert_eq!(class_at(2, 2), Some("function"));
+    assert_eq!(class_at(2, 6), Some("variable.parameter"));
+    assert_eq!(class_at(3, 18), Some("keyword"));
+    assert_eq!(class_at(3, 31), Some("function"));
+    assert_eq!(class_at(4, 6), Some("variable.builtin"));
+    assert_eq!(class_at(4, 12), Some("property"));
+    assert_eq!(class_at(4, 22), Some("constructor"));
+    assert_eq!(
+        symbols("todo.gorp", src),
+        [("TodoList".into(), 1, 8), ("add".into(), 3, 7)]
+    );
+    assert!(!highlight_file("report.gorp.lock", "type A = B")[0].is_empty());
 }
