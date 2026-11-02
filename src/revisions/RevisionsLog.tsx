@@ -82,8 +82,13 @@ export function RevisionsLog({ workspace, refreshed, trunk }: Props) {
   const changeAt = (k: number) => commitAt(k)?.changeId;
   /** The operation the rows are of, so a repo change they already show doesn't reload. */
   const shownOp = useRef("");
+  /** The last reload started. One that finishes after a later one drops its rows, which can
+   * be from before a jj action the later one ran after. */
+  const reloads = useRef(0);
   async function reload(keep?: string) {
+    const n = ++reloads.current;
     const r = await commands.logView(workspace);
+    if (n !== reloads.current) return;
     if (r.status === "error") return setError(r.error);
     const { revset, rows, error, operation } = r.data;
     shownOp.current = operation;

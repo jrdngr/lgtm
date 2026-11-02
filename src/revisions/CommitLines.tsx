@@ -16,7 +16,7 @@ export function CommitLines({
   pill?: React.ReactNode;
   lead?: React.ReactNode;
 }) {
-  const flags = [c.divergent && "divergent"].filter((f) => f !== false);
+  const flags = [c.conflict && "conflict", c.divergent && "divergent"].filter((f) => f !== false);
   const author = showAuthor.use();
   const date = showDate.use();
   const meta = [author && c.author, date && when(c.time ?? 0)].filter(Boolean).join(" · ");
