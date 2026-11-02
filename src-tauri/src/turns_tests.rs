@@ -219,6 +219,58 @@ async fn squashing_a_change_moves_its_turns_after_those_of_the_change_it_went_in
     assert_eq!(paths(&review), ["b.rs"]);
 }
 
+/// Writes `file` in a change of its own described `description`, with no turn, and starts
+/// a new change after it.
+async fn change_writing(ctx: &RepoCtx, d: &std::path::Path, file: &str, description: &str) {
+    write(d, file, "x\n");
+    let describe = JjAction::Describe {
+        rev: "@".into(),
+        message: description.into(),
+    };
+    ctx.jj_act(None, &describe).await.unwrap();
+    let new = JjAction::NewAfter { rev: "@".into() };
+    ctx.jj_act(None, &new).await.unwrap();
+}
+
+#[tokio::test]
+async fn squashed_changes_with_no_turns_become_edits_named_by_their_descriptions() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    change_writing(&ctx, d, "a.rs", "Add a").await;
+    change_writing(&ctx, d, "b.rs", "Add b").await;
+    turn_writing(&ctx, d, "c.rs").await;
+    let new = JjAction::NewAfter { rev: "@".into() };
+    ctx.jj_act(None, &new).await.unwrap();
+    change_writing(&ctx, d, "d.rs", "Add d").await;
+
+    let squash = JjAction::Squash {
+        revs: "@---::@-".into(),
+    };
+    ctx.jj_act(None, &squash).await.unwrap();
+    let edit = JjAction::Edit { rev: "@-".into() };
+    ctx.jj_act(None, &edit).await.unwrap();
+    let turns = ctx.turns(None).await.unwrap();
+    let names: Vec<(Option<&str>, &[String])> = turns
+        .iter()
+        .map(|t| (t.prompt.as_deref(), t.paths.as_slice()))
+        .collect();
+    let files = |f: &str| vec![f.to_string()];
+    assert_eq!(
+        names,
+        [
+            (Some("Add d"), files("d.rs").as_slice()),
+            (Some("Fix it"), files("c.rs").as_slice()),
+            (Some("Add b"), files("b.rs").as_slice()),
+            (Some("Add a"), files("a.rs").as_slice()),
+        ]
+    );
+    let view = View::Turn {
+        turns: vec![turns[2].id],
+    };
+    let review = ctx.open_in(None, "@", false, &view).await.unwrap();
+    assert_eq!(paths(&review), ["b.rs"]);
+}
+
 /// The files in `rev`'s diff; none for the root.
 async fn changed(ctx: &RepoCtx, rev: &str) -> Vec<String> {
     let jj = &ctx.workspace(None).await.unwrap().jj;

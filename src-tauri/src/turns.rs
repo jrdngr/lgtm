@@ -135,6 +135,32 @@ fn kind_of(turn: &Turn) -> TurnKind {
     }
 }
 
+/// A change being squashed, or the one it goes into.
+struct Squashed {
+    change: crate::jj::Change,
+    turns: Vec<Turn>,
+    /// Where its diff starts, its files and lines, when it has no turns and becomes an edit.
+    edit: Option<(String, Vec<String>, (u32, u32))>,
+}
+
+/// When the edit for squashed change `i` of `parts` (oldest first) starts, so it sorts among
+/// the turns of the others by where its change was: right after the turns of the changes
+/// before it, else right before those of the ones after, else now.
+fn squashed_at(parts: &[Squashed], i: usize) -> i64 {
+    let times = |ps: &[Squashed]| {
+        ps.iter()
+            .flat_map(|p| p.turns.iter().map(|t| t.started_at))
+            .collect::<Vec<_>>()
+    };
+    if let Some(before) = times(&parts[..i]).into_iter().max() {
+        return before + 1;
+    }
+    match times(&parts[i + 1..]).into_iter().min() {
+        Some(after) => after - 1,
+        None => now_ms(),
+    }
+}
+
 impl RepoCtx {
     /// Records what a hook saw at `point` of `session`'s turn in workspace `workspace`, its
     /// agent running in terminal panel `terminal`. `tool` names the tool call around a tool.
@@ -352,21 +378,62 @@ impl RepoCtx {
     }
 
     /// Runs `action` in the workspace and returns how many jj operations it took. A squash
-    /// moves the squashed changes' turns onto the change they went into.
+    /// moves the squashed changes' turns onto the change they went into, after an edit named
+    /// by its description for each of those changes, the one they went into among them, that
+    /// had no turns.
     pub async fn jj_act(&self, workspace: Option<&str>, action: &JjAction) -> anyhow::Result<u32> {
         let ws = self.workspace(workspace).await?;
         let JjAction::Squash { revs } = action else {
             return ws.jj.act(action).await;
         };
-        let ids = |cs: Vec<crate::jj::Change>| cs.into_iter().map(|c| c.change_id).collect();
-        let from: Vec<String> = ids(ws.jj.changes(revs).await?);
-        let into: Vec<String> = ids(ws.jj.changes(&format!("roots({revs})-")).await?);
-        let steps = ws.jj.act(action).await?;
-        if let [into] = into.as_slice() {
-            self.store
+        let into = ws.jj.changes(&format!("roots({revs})-")).await?;
+        let [into] = into.as_slice() else {
+            return ws.jj.act(action).await;
+        };
+        let into = into.change_id.clone();
+        let stack = ws
+            .jj
+            .changes_with_parents(&format!("roots({revs})- | ({revs})"))
+            .await?;
+        let mut parts = Vec::new();
+        for (change, parent) in stack {
+            let turns = self
+                .store
                 .lock()
                 .unwrap()
-                .move_turns(ws.key(), &from, into)?;
+                .turns_on(ws.key(), &change.change_id)?;
+            let edit = match parent {
+                Some(parent) if turns.is_empty() && !change.empty => {
+                    let diffs = span_diff(&ws.jj, &parent, &change.commit_id, None).await?;
+                    let lines = counts(diffs.iter());
+                    Some((parent, diffs.into_iter().map(|d| d.path).collect(), lines))
+                }
+                _ => None,
+            };
+            parts.push(Squashed {
+                change,
+                turns,
+                edit,
+            });
+        }
+        let steps = ws.jj.act(action).await?;
+        let store = self.store.lock().unwrap();
+        let from: Vec<String> = parts
+            .iter()
+            .map(|p| p.change.change_id.clone())
+            .filter(|c| *c != into)
+            .collect();
+        store.move_turns(ws.key(), &from, &into)?;
+        for (i, part) in parts.iter().enumerate() {
+            let Some((start, paths, lines)) = &part.edit else {
+                continue;
+            };
+            let at = squashed_at(&parts, i);
+            let description = &part.change.description;
+            let label = (!description.is_empty()).then_some(description.as_str());
+            let id = store.start_edit(ws.key(), &into, start, label, at)?;
+            store.add_turn_paths(id, paths)?;
+            store.end_turn(id, &into, &part.change.commit_id, *lines, at)?;
         }
         Ok(steps)
     }
