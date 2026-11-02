@@ -9,7 +9,7 @@ use super::build::{FileSide, Keyed, ReviewFile};
 use super::{Review, RowRef};
 use crate::anchor::{self, Candidate, MarkRef, Side};
 use crate::diff::FileStatus;
-use crate::store::{FileCheck, Mark, Store};
+use crate::store::{Edit, FileCheck, Mark, Store};
 
 /// A file's check and whether it still covers every changed row and the file's fingerprint.
 #[derive(Clone)]
@@ -29,6 +29,20 @@ impl Review {
         self.baseline.extend(self.matched.values().map(|m| m.id));
         self.amber = self.find_amber(store, &marks);
         self.rematch_comments(store)
+    }
+
+    /// Rematches after `edit`, which changes only marks and checks: marks only when it
+    /// changes some, then checks and amber rows. Comments stay as they were.
+    pub(super) fn rematch_edit(&mut self, store: &Store, edit: &Edit) -> anyhow::Result<()> {
+        let marks = store.marks_for_paths(&self.paths())?;
+        if !edit.marks_added.is_empty() || !edit.marks_removed.is_empty() {
+            self.matched = self.match_marks(store, &marks);
+            self.baseline.extend(self.matched.values().map(|m| m.id));
+        }
+        let checks = store.checks_for_paths(&self.paths())?;
+        self.checks = self.files.iter().map(|f| match_check(f, &checks)).collect();
+        self.amber = self.find_amber(store, &marks);
+        Ok(())
     }
 
     /// Every path a mark or check in this review could be stored under.

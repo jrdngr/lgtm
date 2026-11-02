@@ -72,7 +72,7 @@ impl RepoCtx {
             let applied = store.apply(&edit)?;
             review.undo.push(applied);
             review.redo.clear();
-            review.rematch(&store)?;
+            review.rematch_edit(&store, &edit)?;
             review.save_session(&store)?;
         }
         Ok(review.state())
@@ -100,13 +100,16 @@ impl RepoCtx {
             if undo {
                 store.apply(&edit.inverse())?;
                 review.undo.pop();
-                review.redo.push(edit);
             } else {
                 store.apply(&edit)?;
                 review.redo.pop();
+            }
+            review.rematch_edit(&store, &edit)?;
+            if undo {
+                review.redo.push(edit);
+            } else {
                 review.undo.push(edit);
             }
-            review.rematch(&store)?;
             review.save_session(&store)?;
         }
         Ok(review.state())

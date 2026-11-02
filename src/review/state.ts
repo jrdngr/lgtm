@@ -30,7 +30,7 @@ export function indexState(state: StateDto, marks = true): MarkIndex {
 export function rowStates(files: FlatFile[], index: MarkIndex): RowStateFn {
   return (file, row) => {
     if (index.checks[file] === "checked") return "checked";
-    const mark = index.marks.get(markKey(file, row));
+    const mark = index.marks.size ? index.marks.get(markKey(file, row)) : undefined;
     if (mark) return mark.color;
     return files[file]?.dto.skipped ? "skipped" : "unmarked";
   };
