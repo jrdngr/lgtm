@@ -19,12 +19,32 @@ async fn agents_see_marks_and_ranges_left_and_writes_wait_for_the_review() {
         .unwrap();
     ctx.mark(review.id, &[c], Some(MarkColor::Red), &[])
         .unwrap();
-    let summary = ctx.summary(None).unwrap();
+    let summary = ctx.summary_with(None, true).unwrap();
     let f = &summary.files[0];
     assert_eq!((f.rows.done, f.rows.left), (1, 2));
     let marks: Vec<_> = f.rows.marks.iter().map(|(k, n)| (k.as_str(), *n)).collect();
     assert_eq!(marks, [("flagged", 1), ("reviewed", 1)]);
     assert_eq!(f.left, ["3-4"], "flagged rows aren't done");
+    let marked: Vec<_> = f
+        .marked
+        .iter()
+        .map(|(k, r)| (k.as_str(), r.clone()))
+        .collect();
+    assert_eq!(
+        marked,
+        [
+            ("flagged", vec!["3".to_string()]),
+            ("reviewed", vec!["2".to_string()])
+        ]
+    );
+
+    // Without marks in use, marked rows are left like any other.
+    let f = &ctx.summary_with(None, false).unwrap().files[0];
+    assert_eq!(
+        (f.rows.done, f.rows.left, f.left.clone()),
+        (0, 3, vec!["2-4".to_string()])
+    );
+    assert!(f.rows.marks.is_empty() && f.marked.is_empty());
 
     let empty = || serde_json::json!({ "verdict": "ok", "findings": [] });
     // A write about another revset than the focused review's is refused.

@@ -58,14 +58,23 @@ pub struct FileSummary {
     pub status: FileStatus,
     /// The reviewer ticked the whole file off.
     pub checked: bool,
+    /// The reviewer checked the file, but it changed since, so it's no longer checked.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub changed_since_checked: bool,
     pub rows: Counts,
     /// Line ranges of changed code that isn't done.
     pub left: Vec<String>,
+    /// Line ranges of marked rows, by the mark's label. Empty when marks aren't in use.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub marked: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Summary {
+    /// Whether the reviewer marks lines. Without marks, files are reviewed only by checking
+    /// them, and no row counts as marked.
+    pub marks: bool,
     pub revset: String,
     /// The diff's old and new commits.
     pub from: Option<String>,
@@ -77,8 +86,9 @@ pub struct Summary {
 
 impl Review {
     /// A row's state; `None` for rows that don't need review: context and replaced rows.
-    /// A checked file's rows count as checked whatever their marks.
-    pub(super) fn row_state(&self, fi: usize, row: usize) -> Option<RowState> {
+    /// A checked file's rows count as checked whatever their marks, and without `marks` in
+    /// use no row has one.
+    pub(super) fn row_state(&self, fi: usize, row: usize, marks: bool) -> Option<RowState> {
         let file = &self.files[fi];
         let pos = &file.rows[row];
         if pos.kind == RowKind::Context || pos.replaced {
@@ -87,7 +97,8 @@ impl Review {
         if self.checks[fi].as_ref().is_some_and(|c| c.current) {
             return Some(RowState::Checked);
         }
-        Some(match self.matched.get(&RowRef::new(fi, row as u32)) {
+        let matched = marks.then(|| self.matched.get(&RowRef::new(fi, row as u32)));
+        Some(match matched.flatten() {
             Some(m) => RowState::Mark(m.color),
             None if file.skipped => RowState::Skipped,
             None => RowState::Unmarked,
@@ -120,7 +131,8 @@ impl Review {
         }
     }
 
-    pub(super) fn summary(&self) -> Summary {
+    /// The review's state, as an agent sees it, with `marks` in use or not.
+    pub(super) fn summary(&self, marks: bool) -> Summary {
         let slots = settings::get().marks;
         let mut total = Counts::default();
         let files = self
@@ -130,16 +142,32 @@ impl Review {
             .map(|(fi, f)| {
                 let mut counts = Counts::default();
                 let mut left = Vec::new();
+                let mut marked: BTreeMap<String, Vec<String>> = BTreeMap::new();
                 let mut run: Option<(usize, usize)> = None;
+                let mut mark_run: Option<(MarkColor, usize, usize)> = None;
                 for row in 0..f.rows.len() {
-                    let Some(state) = self.row_state(fi, row) else {
+                    let state = self.row_state(fi, row, marks);
+                    let color = match state {
+                        Some(RowState::Mark(c)) => Some(c),
+                        _ => None,
+                    };
+                    // Rows that don't need review keep a mark's run going.
+                    if state.is_some() && mark_run.is_some_and(|(c, ..)| Some(c) != color) {
+                        let (c, a, b) = mark_run.take().unwrap();
+                        let label = marks::label(&slots, c);
+                        marked.entry(label).or_default().push(self.lines(fi, a, b));
+                    }
+                    if let Some(c) = color {
+                        mark_run = Some(mark_run.map_or((c, row, row), |(c, a, _)| (c, a, row)));
+                    }
+                    let Some(state) = state else {
                         if let Some((a, b)) = run.take() {
                             left.push(self.lines(fi, a, b));
                         }
                         continue;
                     };
-                    if let RowState::Mark(color) = state {
-                        *counts.marks.entry(marks::label(&slots, color)).or_default() += 1;
+                    if let Some(c) = color {
+                        *counts.marks.entry(marks::label(&slots, c)).or_default() += 1;
                     }
                     if state.done(&slots) {
                         counts.done += 1;
@@ -154,18 +182,26 @@ impl Review {
                 if let Some((a, b)) = run {
                     left.push(self.lines(fi, a, b));
                 }
+                if let Some((c, a, b)) = mark_run {
+                    let label = marks::label(&slots, c);
+                    marked.entry(label).or_default().push(self.lines(fi, a, b));
+                }
                 total.add(&counts);
+                let check = self.checks[fi].as_ref();
                 FileSummary {
                     path: f.path.clone(),
                     old_path: f.old_path.clone(),
                     status: f.status,
-                    checked: self.checks[fi].as_ref().is_some_and(|c| c.current),
+                    checked: check.is_some_and(|c| c.current),
+                    changed_since_checked: check.is_some_and(|c| !c.current),
                     rows: counts,
                     left,
+                    marked,
                 }
             })
             .collect();
         Summary {
+            marks,
             revset: self.revset.clone(),
             from: self.from.clone(),
             to: self.to.clone(),
@@ -270,8 +306,13 @@ impl RepoCtx {
         Ok((id, f(&review)))
     }
 
+    /// The current review's state, with marks in use as the settings say.
     pub fn summary(&self, workspace: Option<&str>) -> anyhow::Result<Summary> {
-        Ok(self.with_current(workspace, Review::summary)?.1)
+        self.summary_with(workspace, settings::get().review_marks)
+    }
+
+    pub fn summary_with(&self, workspace: Option<&str>, marks: bool) -> anyhow::Result<Summary> {
+        Ok(self.with_current(workspace, |r| r.summary(marks))?.1)
     }
 }
 

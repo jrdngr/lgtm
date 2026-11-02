@@ -133,10 +133,11 @@ impl Lgtm {
 #[tool_router]
 impl Lgtm {
     #[tool(
-        description = "The open review: its revset and commits, and per file the changed \
-        rows the human has marked (by mark label), how many count as done, and the line \
-        ranges still left. Also the revset the revisions log lists (log_revset), null for \
-        jj's default."
+        description = "The open review as the human has reviewed it so far: its revset and \
+        commits, whether the human marks lines (marks), and per file whether it's checked or \
+        changed since it was checked, how many changed rows count as done, the line ranges \
+        still left, and, with marks in use, the line ranges of each mark (by mark label). Also \
+        the revset the revisions log lists (log_revset), null for jj's default."
     )]
     async fn get_review(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
