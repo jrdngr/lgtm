@@ -11,7 +11,7 @@ interface Props {
 
 /** A small swatch and count for each mark color the rows have, in key order. */
 export function MarkCounts({ progress, setup, notDone }: Props) {
-  const counts = setup.slots.filter((s) => {
+  const counts = [...setup.slots, ...setup.agent].filter((s) => {
     const n = progress.marks[s.color] ?? 0;
     return n > 0 && !(notDone && s.done);
   });

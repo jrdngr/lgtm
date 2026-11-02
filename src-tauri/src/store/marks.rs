@@ -22,6 +22,10 @@ pub enum MarkColor {
     Yellow,
     Blue,
     Tan,
+    /// An agent's mark for rows it reviewed, which count as done.
+    AgentReviewed,
+    /// An agent's mark for rows it flagged, which don't.
+    AgentFlagged,
 }
 
 impl MarkColor {
@@ -36,6 +40,13 @@ impl MarkColor {
         Self::Blue,
         Self::Tan,
     ];
+
+    /// An agent's marks, which the user can't set.
+    pub const AGENT: [MarkColor; 2] = [Self::AgentReviewed, Self::AgentFlagged];
+
+    pub fn is_agent(self) -> bool {
+        Self::AGENT.contains(&self)
+    }
 
     /// The color's name, as stored.
     pub fn name(self) -> String {

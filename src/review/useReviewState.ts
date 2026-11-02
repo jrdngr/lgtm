@@ -7,6 +7,7 @@ import { fileProgress, indexState, rowStates } from "./state";
 const NO_STATE: StateDto = {
   marks: [],
   checks: [],
+  agentChecks: [],
   amber: [],
   comments: [],
   threads: [],

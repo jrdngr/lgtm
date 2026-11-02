@@ -16,6 +16,8 @@ export const STATUS_LABEL = {
 interface Props {
   dto: FileDto;
   check: CheckState;
+  /** The check is an agent's. */
+  agent: boolean;
   progress: Progress;
   setup: MarkSetup;
   collapsed: boolean;
@@ -49,7 +51,9 @@ export function FileHeader(props: Props) {
       </button>
       <input
         type="checkbox"
-        className={allDone ? "ring" : undefined}
+        className={
+          [allDone && "ring", props.agent && "agent"].filter(Boolean).join(" ") || undefined
+        }
         checked={checked}
         title={checked ? "Done. Uncheck to restore line marks" : "Mark file done"}
         onMouseDown={stop}

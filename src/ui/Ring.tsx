@@ -7,14 +7,16 @@ interface Props {
   title?: string;
   /** Show the percent beside the ring. */
   percent?: boolean;
+  /** Who checked it off, which colors the check: the user green, an agent cyan. */
+  by?: "user" | "agent";
 }
 
 /** How much of something is reviewed: a small filling ring, or a green check once it's all
  * done. */
-export function Ring({ done, title, percent }: Props) {
+export function Ring({ done, title, percent, by }: Props) {
   if (done >= 1) {
     return (
-      <span className="ring-wrap done" title={title}>
+      <span className={`ring-wrap done${by ? ` by-${by}` : ""}`} title={title}>
         <Icon name="check" size={13} />
       </span>
     );

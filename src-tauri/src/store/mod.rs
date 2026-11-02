@@ -97,7 +97,8 @@ CREATE TABLE IF NOT EXISTS file_checks (
     new_hashes BLOB NOT NULL,
     review TEXT NOT NULL,
     created_at INTEGER NOT NULL,
-    fingerprint INTEGER
+    fingerprint INTEGER,
+    agent INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS file_checks_path ON file_checks (path);
 CREATE TABLE IF NOT EXISTS sessions (
@@ -161,6 +162,7 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
     migrate_autoincrement(db)?;
     migrate_mark_colors(db)?;
     migrate_check_fingerprints(db)?;
+    migrate_check_agents(db)?;
     migrate_verdict_names(db)
 }
 
@@ -184,6 +186,19 @@ fn migrate_check_fingerprints(db: &Connection) -> rusqlite::Result<()> {
     )?;
     if !has_fingerprint {
         db.execute_batch("ALTER TABLE file_checks ADD COLUMN fingerprint INTEGER;")?;
+    }
+    Ok(())
+}
+
+/// Checks from before agents could check files are the user's.
+fn migrate_check_agents(db: &Connection) -> rusqlite::Result<()> {
+    let has_agent: bool = db.query_row(
+        "SELECT COUNT(*) > 0 FROM pragma_table_info('file_checks') WHERE name = 'agent'",
+        [],
+        |r| r.get(0),
+    )?;
+    if !has_agent {
+        db.execute_batch("ALTER TABLE file_checks ADD COLUMN agent INTEGER NOT NULL DEFAULT 0;")?;
     }
     Ok(())
 }

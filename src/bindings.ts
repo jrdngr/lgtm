@@ -190,7 +190,11 @@ export const commands = {
 	 *  Marks changed rows, or clears their marks when `color` is null. Files in `check` are
 	 *  checked in the same undo step.
 	 */
-	markRows: (review: number, rows: RowRef[], color: "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | null, check: number[]) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
+	markRows: (review: number, rows: RowRef[], color: "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | 
+/**  An agent's mark for rows it reviewed, which count as done. */
+"agentReviewed" | 
+/**  An agent's mark for rows it flagged, which don't. */
+"agentFlagged" | null, check: number[]) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("mark_rows", { review, rows, color, check })),
 	/**  Clears a file's marks and unchecks it, in one undo step. */
 	clearFileMarks: (review: number, file: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("clear_file_marks", { review, file })),
 	setFilesChecked: (review: number, files: number[], checked: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_files_checked", { review, files, checked })),
@@ -1729,7 +1733,11 @@ export type LookSeverity = "low" | "medium" | "high";
 export type LookSource = "rule" | "agent" | "security";
 
 /**  A mark's color. What each one means is the user's: see `settings::marks`. */
-export type MarkColor = "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan";
+export type MarkColor = "green" | "red" | "gray" | "orange" | "violet" | "pink" | "yellow" | "blue" | "tan" | 
+/**  An agent's mark for rows it reviewed, which count as done. */
+"agentReviewed" | 
+/**  An agent's mark for rows it flagged, which don't. */
+"agentFlagged";
 
 export type MarkDto = {
 	file: number,
@@ -2555,6 +2563,8 @@ export type StateDto_Deserialize = {
 	marks: MarkDto[],
 	/**  Per file. */
 	checks: CheckState[],
+	/**  Files whose check is an agent's. */
+	agentChecks: number[],
 	/**
 	 *  Unreviewed rows that replaced a line whose mark was lost, or that a checked file
 	 *  didn't have when it was checked.
@@ -2574,6 +2584,8 @@ export type StateDto_Serialize = {
 	marks: MarkDto[],
 	/**  Per file. */
 	checks: CheckState[],
+	/**  Files whose check is an agent's. */
+	agentChecks: number[],
 	/**
 	 *  Unreviewed rows that replaced a line whose mark was lost, or that a checked file
 	 *  didn't have when it was checked.

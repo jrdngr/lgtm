@@ -19,6 +19,8 @@ export interface CurrentReview {
   /** Whether rows with a mark count as done. */
   done: DoneFn;
   checks: CheckState[];
+  /** Files whose check is an agent's. */
+  agentChecks: ReadonlySet<number>;
   filter: Filter;
   comments: CommentDto[];
   /** In a PR workspace, every thread and draft on the PR. */

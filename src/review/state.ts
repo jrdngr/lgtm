@@ -10,6 +10,8 @@ export const plural = (n: number) => (n === 1 ? "row" : "rows");
 export interface MarkIndex {
   marks: Map<string, MarkDto>;
   checks: CheckState[];
+  /** Files whose check is an agent's. */
+  agentChecks: Set<number>;
   amber: Set<string>;
   /** Rows inside a comment. */
   commented: Set<string>;
@@ -20,6 +22,7 @@ export function indexState(state: StateDto, marks = true): MarkIndex {
   return {
     marks: new Map(marks ? state.marks.map((m) => [markKey(m.file, m.row), m]) : []),
     checks: state.checks,
+    agentChecks: new Set(state.agentChecks),
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
     commented: commentedRows(state.comments),
   };
@@ -99,7 +102,7 @@ export interface ProgressPart {
 
 /** The parts with rows, marks in setup order, then rows done by their file, then unmarked. */
 export function progressParts(p: Progress, setup: MarkSetup): ProgressPart[] {
-  const marked = setup.slots
+  const marked = [...setup.slots, ...setup.agent]
     .filter((s) => (p.marks[s.color] ?? 0) > 0)
     .map((s) => ({
       key: s.color,
@@ -118,7 +121,7 @@ export function progressParts(p: Progress, setup: MarkSetup): ProgressPart[] {
 
 /** The counts behind a progress figure, for a tooltip. */
 export function progressTitle(p: Progress, setup: MarkSetup) {
-  const parts = setup.slots
+  const parts = [...setup.slots, ...setup.agent]
     .filter((s) => (p.marks[s.color] ?? 0) > 0)
     .map((s) => `${p.marks[s.color]} ${setup.label(s.color)}`);
   if (p.byFile > 0) parts.push(`${p.byFile} in checked or skipped files`);

@@ -90,6 +90,7 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       rowState,
       done: setup.done,
       checks: index.checks,
+      agentChecks: index.agentChecks,
       filter: "all",
       comments: review.state.comments,
       threads: review.state.threads,

@@ -74,6 +74,10 @@ input.reviewed-check {
   border-radius: 3px;
 }
 
+.file-header input.agent {
+  accent-color: var(--mark-cyan);
+}
+
 .file-header input.ring,
 input.reviewed-check.ring {
   outline: 2px solid var(--accent);

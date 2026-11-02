@@ -20,7 +20,7 @@ use crate::ctx::RepoCtx;
 use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
 use crate::repo::Repos;
 use crate::review::StateDto;
-use crate::store::{Stage, Take, TakeVerdict};
+use crate::store::{MarkColor, Stage, Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
@@ -29,7 +29,7 @@ store an architecture assessment; publish review findings \
 to a report; point the review \
 at code or a revset; and set the revset the revisions log lists. Tools that write to the review take its revset, from your prompt or \
 get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
-or list_threads; lgtm refuses a write once the review or PR has moved on. You can't mark code. Lines are on the new side of the diff. To work \
+or list_threads; lgtm refuses a write once the review or PR has moved on. You can check files and mark lines with marks of your own, which the human sees apart from theirs. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
 answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
@@ -145,6 +145,52 @@ impl Lgtm {
             .map_err(|e| e.to_string())?;
         review["log_revset"] = ctx.log_revset(self.workspace()).map_err(failed)?.into();
         json(&review)
+    }
+
+    #[tool(
+        description = "Check or uncheck files in the open review as reviewed, as yourself: \
+        the human sees your checks apart from theirs. Their own checks stay as they are."
+    )]
+    async fn check_files(&self, Parameters(p): Parameters<inputs::CheckFiles>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let (review, state) = ctx
+            .agent_check_files(self.workspace(), &p.revset, &p.paths, p.checked)
+            .await
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok(if p.checked { "Checked." } else { "Unchecked." }.into())
+    }
+
+    #[tool(
+        description = "Mark changed lines of a file in the open review with your own marks: \
+        reviewed (counts as done) or flagged (doesn't). The human sees your marks apart from \
+        theirs, and lines they marked keep their marks. Leave mark out to clear yours. Marks \
+        show only while the human uses marks (get_review's marks)."
+    )]
+    async fn mark_lines(&self, Parameters(p): Parameters<inputs::MarkLines>) -> Out {
+        let (label, ctx) = self.repo().map_err(failed)?;
+        let color = p.mark.map(|m| match m {
+            inputs::AgentMark::Reviewed => MarkColor::AgentReviewed,
+            inputs::AgentMark::Flagged => MarkColor::AgentFlagged,
+        });
+        let (review, state) = ctx
+            .agent_mark_lines(
+                self.workspace(),
+                &p.revset,
+                &p.path,
+                &p.lines,
+                &p.removed_lines,
+                color,
+            )
+            .await
+            .map_err(failed)?;
+        self.changed(&label, review, state);
+        Ok(if color.is_some() {
+            "Marked."
+        } else {
+            "Cleared."
+        }
+        .into())
     }
 
     #[tool(

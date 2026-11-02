@@ -30,7 +30,7 @@ function changeLabel(c: ChangeDto) {
 
 /** All, Not done, and each color in use, plus the current one if it was since removed. */
 function filterOptions(setup: MarkSetup, current: Filter): [Filter, string][] {
-  const colors = setup.shown.map((s) => s.color);
+  const colors = [...setup.shown, ...setup.agent].map((s) => s.color);
   if (current !== "all" && current !== "left" && !colors.includes(current)) colors.push(current);
   const label = (c: MarkColor) => setup.label(c).replace(/^./, (x) => x.toUpperCase());
   return [

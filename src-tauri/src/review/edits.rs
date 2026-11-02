@@ -17,8 +17,8 @@ impl RepoCtx {
         check: &[u32],
     ) -> anyhow::Result<StateDto> {
         self.edit(id, |review, store| {
-            let mut edit = review.mark_edit(store, rows, color)?;
-            let checks = review.check_edit(check, true);
+            let mut edit = review.mark_edit(store, rows, color, false)?;
+            let checks = review.check_edit(check, true, false);
             edit.checks_removed = checks.checks_removed;
             edit.checks_added = checks.checks_added;
             Ok(edit)
@@ -38,14 +38,40 @@ impl RepoCtx {
                         .collect()
                 })
                 .unwrap_or_default();
-            let mut edit = review.mark_edit(store, &rows, None)?;
-            edit.checks_removed = review.check_edit(&[file], false).checks_removed;
+            let mut edit = review.mark_edit(store, &rows, None, false)?;
+            edit.checks_removed = review.check_edit(&[file], false, false).checks_removed;
             Ok(edit)
         })
     }
 
     pub fn set_checked(&self, id: u32, files: &[u32], checked: bool) -> anyhow::Result<StateDto> {
-        self.edit(id, |review, _| Ok(review.check_edit(files, checked)))
+        self.edit(id, |review, _| Ok(review.check_edit(files, checked, false)))
+    }
+
+    /// Checks or unchecks files as an agent. The user's checks stay as they are.
+    pub fn agent_set_checked(
+        &self,
+        id: u32,
+        files: &[u32],
+        checked: bool,
+    ) -> anyhow::Result<StateDto> {
+        self.edit(id, |review, _| Ok(review.check_edit(files, checked, true)))
+    }
+
+    /// Marks rows with an agent's `color`, or clears the agent's marks on them when it's
+    /// `None`. Rows the user marked keep their marks.
+    pub fn agent_mark(
+        &self,
+        id: u32,
+        rows: &[RowRef],
+        color: Option<MarkColor>,
+    ) -> anyhow::Result<StateDto> {
+        if color.is_some_and(|c| !c.is_agent()) {
+            anyhow::bail!("agents mark only with their own colors");
+        }
+        self.edit(id, |review, store| {
+            review.mark_edit(store, rows, color, true)
+        })
     }
 
     /// Removes the marks and checks this review's revset created.
@@ -117,11 +143,13 @@ impl RepoCtx {
 }
 
 impl Review {
+    /// Marks `rows` `color`, or clears them. An `agent` leaves the user's marks alone.
     fn mark_edit(
         &self,
         store: &Store,
         rows: &[RowRef],
         color: Option<MarkColor>,
+        agent: bool,
     ) -> anyhow::Result<Edit> {
         let created_at = now_ms();
         let mut edit = Edit::default();
@@ -133,7 +161,9 @@ impl Review {
                     continue;
                 }
                 let existing = self.matched.get(&rref);
-                if existing.map(|m| m.color) == color {
+                if existing.map(|m| m.color) == color
+                    || (agent && existing.is_some_and(|m| !m.color.is_agent()))
+                {
                     continue;
                 }
                 let Some(color) = color else {
@@ -158,8 +188,10 @@ impl Review {
         Ok(edit)
     }
 
-    /// Checking replaces any older check with one covering the file's changed rows now.
-    fn check_edit(&self, files: &[u32], checked: bool) -> Edit {
+    /// Checking replaces any older check with one covering the file's changed rows now. The
+    /// user's check replaces an agent's. An `agent` never removes the user's check, and
+    /// replaces it only once it's out of date.
+    fn check_edit(&self, files: &[u32], checked: bool, agent: bool) -> Edit {
         let mut edit = Edit::default();
         for &f in files {
             let (Some(file), Some(existing)) =
@@ -167,7 +199,11 @@ impl Review {
             else {
                 continue;
             };
-            if checked && existing.as_ref().is_some_and(|c| c.current) {
+            let current = existing.as_ref().filter(|c| c.current);
+            if checked && current.is_some_and(|c| agent || !c.check.agent) {
+                continue;
+            }
+            if !checked && agent && existing.as_ref().is_some_and(|c| !c.check.agent) {
                 continue;
             }
             edit.checks_removed
@@ -188,6 +224,7 @@ impl Review {
                     fingerprint: Some(file.fingerprint),
                     review: self.label.clone(),
                     created_at: now_ms(),
+                    agent,
                 });
             }
         }

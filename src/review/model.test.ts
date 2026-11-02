@@ -189,7 +189,11 @@ describe("fileProgress", () => {
     marks: ReturnType<typeof mark>[],
     check: CheckState = "unchecked",
     marksOn = true,
-  ) => indexState({ marks, checks: [check], amber: [], comments: [], threads: [] }, marksOn);
+  ) =>
+    indexState(
+      { marks, checks: [check], agentChecks: [], amber: [], comments: [], threads: [] },
+      marksOn,
+    );
   const done = (c: MarkColor) => c !== "red";
 
   it("counts rows that need review by mark, leaving out a change's removed rows", () => {

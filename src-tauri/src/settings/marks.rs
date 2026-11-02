@@ -55,11 +55,12 @@ pub fn defaults() -> Vec<MarkSlot> {
     slots
 }
 
-/// Keeps one slot per color, adding any missing color hidden at the end.
+/// Keeps one slot per color, adding any missing color hidden at the end. Agents' colors
+/// aren't the user's to set up.
 pub fn normalize(slots: &mut Vec<MarkSlot>) {
     let mut seen = Vec::new();
     slots.retain(|s| {
-        let first = !seen.contains(&s.color);
+        let first = !seen.contains(&s.color) && !s.color.is_agent();
         seen.push(s.color);
         first
     });
@@ -72,6 +73,11 @@ pub fn normalize(slots: &mut Vec<MarkSlot>) {
 
 /// Whether rows with `color` count as done.
 pub fn is_done(slots: &[MarkSlot], color: MarkColor) -> bool {
+    match color {
+        MarkColor::AgentReviewed => return true,
+        MarkColor::AgentFlagged => return false,
+        _ => {}
+    }
     slots
         .iter()
         .find(|s| s.color == color)
@@ -80,6 +86,11 @@ pub fn is_done(slots: &[MarkSlot], color: MarkColor) -> bool {
 
 /// The label a color goes by, or its name when it has none.
 pub fn label(slots: &[MarkSlot], color: MarkColor) -> String {
+    match color {
+        MarkColor::AgentReviewed => return "agent reviewed".into(),
+        MarkColor::AgentFlagged => return "agent flagged".into(),
+        _ => {}
+    }
     slots
         .iter()
         .find(|s| s.color == color && !s.label.trim().is_empty())

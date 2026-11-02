@@ -24,6 +24,8 @@ interface Data {
   rowState: RowStateFn;
   done: DoneFn;
   checks: CheckState[];
+  /** Files whose check is an agent's. */
+  agentChecks: ReadonlySet<number>;
   filter: Filter;
 }
 
@@ -46,7 +48,7 @@ export function usePublishReview(
   api: DockviewPanelApi,
   workspace: WorkspaceName,
   review: ReviewDto | undefined,
-  { files, progress, rowState, done, checks, filter }: Data,
+  { files, progress, rowState, done, checks, agentChecks, filter }: Data,
   actions: Actions,
 ) {
   const published = useRef<CurrentReview>(undefined);
@@ -67,6 +69,7 @@ export function usePublishReview(
         rowState,
         done,
         checks,
+        agentChecks,
         filter,
         comments: review?.state.comments ?? [],
         threads: review?.state.threads ?? [],
@@ -101,7 +104,7 @@ export function usePublishReview(
       sub.dispose();
       off();
     };
-  }, [api, workspace, review, files, progress, rowState, done, checks, filter]);
+  }, [api, workspace, review, files, progress, rowState, done, checks, agentChecks, filter]);
 
   useEffect(() => () => retractReview(workspace, published.current), [workspace]);
 

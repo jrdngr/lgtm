@@ -183,6 +183,7 @@ export function DiffLines(props: Props) {
       <FileHeader
         dto={file.dto}
         check={index.checks[fileIdx] ?? "unchecked"}
+        agent={index.agentChecks.has(fileIdx)}
         progress={props.progress[fileIdx]}
         setup={props.setup}
         collapsed={props.collapsedFiles.has(file.dto.path)}

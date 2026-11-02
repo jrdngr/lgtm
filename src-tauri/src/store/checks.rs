@@ -16,9 +16,11 @@ pub struct FileCheck {
     pub fingerprint: Option<i64>,
     pub review: String,
     pub created_at: i64,
+    /// An agent checked it, not the user.
+    pub agent: bool,
 }
 
-const COLUMNS: &str = "id, path, old_hashes, new_hashes, review, created_at, fingerprint";
+const COLUMNS: &str = "id, path, old_hashes, new_hashes, review, created_at, fingerprint, agent";
 
 fn row_to_check(r: &rusqlite::Row) -> rusqlite::Result<FileCheck> {
     Ok(FileCheck {
@@ -29,13 +31,15 @@ fn row_to_check(r: &rusqlite::Row) -> rusqlite::Result<FileCheck> {
         review: r.get(4)?,
         created_at: r.get(5)?,
         fingerprint: r.get(6)?,
+        agent: r.get(7)?,
     })
 }
 
 pub(super) fn insert(tx: &Transaction, c: &FileCheck) -> rusqlite::Result<FileCheck> {
     tx.execute(
-        "INSERT INTO file_checks (id, path, old_hashes, new_hashes, review, created_at, fingerprint)
-         VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO file_checks
+         (id, path, old_hashes, new_hashes, review, created_at, fingerprint, agent)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         params![
             (c.id != 0).then_some(c.id),
             c.path,
@@ -44,6 +48,7 @@ pub(super) fn insert(tx: &Transaction, c: &FileCheck) -> rusqlite::Result<FileCh
             c.review,
             c.created_at,
             c.fingerprint,
+            c.agent,
         ],
     )?;
     Ok(FileCheck {
@@ -78,6 +83,7 @@ mod tests {
             fingerprint: Some(4),
             review: "r".into(),
             created_at: 5,
+            agent: true,
         };
         let added = store
             .apply(&Edit {

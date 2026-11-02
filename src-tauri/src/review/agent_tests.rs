@@ -256,3 +256,95 @@ async fn reports_rename_to_unique_ids_and_back() {
         format!("R{}", a.id)
     );
 }
+
+#[tokio::test]
+async fn agent_checks_never_replace_or_remove_the_users_and_theirs_replace_the_agents() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn a() {}\n");
+    write(d, "b.rs", "fn b() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    ctx.focus(None, review.id);
+    let check = |paths: &[&str], on: bool| {
+        let paths: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
+        let ctx = &ctx;
+        async move {
+            ctx.agent_check_files(None, "@", &paths, on)
+                .await
+                .unwrap()
+                .1
+        }
+    };
+
+    ctx.set_checked(review.id, &[0], true).unwrap();
+    let state = check(&["a.rs", "b.rs"], true).await;
+    assert_eq!(state.checks, [CheckState::Checked; 2]);
+    assert_eq!(state.agent_checks, [1], "a.rs stays the user's");
+    let state = check(&["a.rs"], false).await;
+    assert_eq!(
+        state.checks[0],
+        CheckState::Checked,
+        "the agent can't uncheck the user's"
+    );
+
+    let state = ctx.set_checked(review.id, &[1], true).unwrap();
+    assert!(
+        state.agent_checks.is_empty(),
+        "the user's check replaced the agent's"
+    );
+    let summary = ctx.summary_with(None, false).unwrap();
+    assert!(
+        summary
+            .files
+            .iter()
+            .all(|f| f.checked && !f.checked_by_agent)
+    );
+}
+
+#[tokio::test]
+async fn agent_marks_leave_the_users_and_clearing_clears_only_the_agents() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn a() {}\nfn b() {}\nfn c() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    ctx.focus(None, review.id);
+    let b = tests::row_of(&review, 0, "fn b() {}", 0);
+    ctx.mark(review.id, &[b], Some(MarkColor::Red), &[])
+        .unwrap();
+    let mark = |lines: &[&str], color| {
+        let lines: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+        let ctx = &ctx;
+        async move {
+            ctx.agent_mark_lines(None, "@", "a.rs", &lines, &[], color)
+                .await
+        }
+    };
+
+    let state = mark(&["1-3"], Some(MarkColor::AgentReviewed))
+        .await
+        .unwrap()
+        .1;
+    let colors: Vec<MarkColor> = state.marks.iter().map(|m| m.color).collect();
+    use MarkColor::{AgentReviewed, Red};
+    assert_eq!(colors, [AgentReviewed, Red, AgentReviewed]);
+    let summary = ctx.summary_with(None, true).unwrap();
+    assert_eq!(
+        summary.files[0].left,
+        ["2"],
+        "agent reviewed rows are done, flagged ones not"
+    );
+    let marked: Vec<_> = summary.files[0].marked.keys().cloned().collect();
+    assert_eq!(marked, ["agent reviewed", "flagged"]);
+
+    let state = mark(&["1-3"], None).await.unwrap().1;
+    let colors: Vec<MarkColor> = state.marks.iter().map(|m| m.color).collect();
+    assert_eq!(colors, [Red]);
+    let Err(err) = mark(&["9"], Some(MarkColor::AgentFlagged)).await else {
+        panic!("marked lines with no changed rows");
+    };
+    assert!(err.to_string().contains("no changed rows"), "{err}");
+    let Err(err) = ctx.agent_mark(review.id, &[b], Some(Red)) else {
+        panic!("an agent marked with the user's color");
+    };
+    assert!(err.to_string().contains("own colors"), "{err}");
+}

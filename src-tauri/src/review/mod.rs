@@ -1,6 +1,7 @@
 //! A loaded review: its diff, file sides, anchors, and the marks and checks matched onto it.
 
 mod agent;
+mod agent_edits;
 #[cfg(test)]
 mod agent_tests;
 pub(crate) mod arch;
@@ -186,6 +187,8 @@ pub struct StateDto {
     pub marks: Vec<MarkDto>,
     /// Per file.
     pub checks: Vec<CheckState>,
+    /// Files whose check is an agent's.
+    pub agent_checks: Vec<u32>,
     /// Unreviewed rows that replaced a line whose mark was lost, or that a checked file
     /// didn't have when it was checked.
     pub amber: Vec<RowRef>,
@@ -321,9 +324,17 @@ impl Review {
                 Some(_) => CheckState::ChangedSinceReviewed,
             })
             .collect();
+        let agent_checks = (0..self.checks.len() as u32)
+            .filter(|&f| {
+                self.checks[f as usize]
+                    .as_ref()
+                    .is_some_and(|c| c.check.agent)
+            })
+            .collect();
         StateDto {
             marks,
             checks,
+            agent_checks,
             amber: self.amber.clone(),
             comments: self.comments.clone(),
             threads: self.threads.clone(),

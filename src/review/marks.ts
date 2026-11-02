@@ -23,6 +23,12 @@ export const DEFAULT_SLOTS: MarkSlot[] = MARK_COLORS.map((color, i) => ({
   shown: i < 3,
 }));
 
+/** An agent's marks, which the user can't set: reviewed rows count as done. */
+const AGENT_SLOTS: MarkSlot[] = [
+  { color: "agentReviewed", label: "agent reviewed", done: true, shown: true },
+  { color: "agentFlagged", label: "agent flagged", done: false, shown: true },
+];
+
 /** Whether rows marked `color` count as done. */
 export type DoneFn = (color: MarkColor) => boolean;
 
@@ -33,6 +39,8 @@ export interface MarkSetup {
   slots: MarkSlot[];
   /** The colors in use, in key order: the first is on 1. */
   shown: MarkSlot[];
+  /** An agent's colors, after the user's; none without marks. */
+  agent: MarkSlot[];
   done: DoneFn;
   label(color: MarkColor): string;
   /** The first color in use, when it counts as done: the mark that checks a whole file. */
@@ -40,12 +48,13 @@ export interface MarkSetup {
 }
 
 export function markSetup(slots: MarkSlot[], enabled = true): MarkSetup {
-  const by = new Map(slots.map((s) => [s.color, s]));
+  const by = new Map([...slots, ...AGENT_SLOTS].map((s) => [s.color, s]));
   const shown = enabled ? slots.filter((s) => s.shown) : [];
   return {
     enabled,
     slots,
     shown,
+    agent: enabled ? AGENT_SLOTS : [],
     done: (c) => by.get(c)?.done ?? true,
     label: (c) => by.get(c)?.label.trim() || c,
     primary: shown[0]?.done ? shown[0].color : undefined,

@@ -71,6 +71,7 @@ export function review(files: FileDto[]): ReviewDto {
     state: {
       marks: [],
       checks: files.map(() => "unchecked"),
+      agentChecks: [],
       amber: [],
       comments: [],
       threads: [],

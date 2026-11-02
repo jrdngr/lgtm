@@ -1,5 +1,5 @@
 //! What an agent in a terminal sees of a review and can do to it, through the MCP server.
-//! Agents can read everything, but never mark rows.
+//! Agents can read everything; what they can change is in `agent_edits`.
 
 use std::collections::BTreeMap;
 
@@ -58,6 +58,9 @@ pub struct FileSummary {
     pub status: FileStatus,
     /// The reviewer ticked the whole file off.
     pub checked: bool,
+    /// The check is an agent's, not the reviewer's.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub checked_by_agent: bool,
     /// The reviewer checked the file, but it changed since, so it's no longer checked.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub changed_since_checked: bool,
@@ -193,6 +196,7 @@ impl Review {
                     old_path: f.old_path.clone(),
                     status: f.status,
                     checked: check.is_some_and(|c| c.current),
+                    checked_by_agent: check.is_some_and(|c| c.check.agent),
                     changed_since_checked: check.is_some_and(|c| !c.current),
                     rows: counts,
                     left,

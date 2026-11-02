@@ -263,7 +263,15 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     api,
     workspace,
     review,
-    { files, progress, rowState, done: setup.done, checks: index.checks, filter },
+    {
+      files,
+      progress,
+      rowState,
+      done: setup.done,
+      checks: index.checks,
+      agentChecks: index.agentChecks,
+      filter,
+    },
     {
       jump,
       jumpToComment,

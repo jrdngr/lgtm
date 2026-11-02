@@ -58,6 +58,7 @@ function Node({
     const dto = review.files[node.file].dto;
     const check = review.checks[node.file];
     const changed = check === "changedSinceReviewed";
+    const by = check === "checked" && review.agentChecks.has(node.file) ? "agent" : "user";
     const cls = [
       (isDone(p) || check === "checked") && "done",
       dto.status === "removed" && "removed",
@@ -79,10 +80,16 @@ function Node({
           {setup.enabled ? (
             <>
               <MarkCounts progress={p} setup={setup} notDone />
-              {p.changed > 0 && <Ring done={p.done / p.changed} title={progressTitle(p, setup)} />}
+              {p.changed > 0 && (
+                <Ring
+                  done={p.done / p.changed}
+                  title={progressTitle(p, setup)}
+                  by={check === "checked" ? by : undefined}
+                />
+              )}
             </>
           ) : (
-            (isDone(p) || check === "checked") && <Ring done={1} />
+            (isDone(p) || check === "checked") && <Ring done={1} by={by} />
           )}
         </button>
       </li>

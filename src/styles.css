@@ -39,6 +39,8 @@
   --mark-yellow: #e3b341;
   --mark-blue: #58a6ff;
   --mark-tan: #b08968;
+  --mark-agentReviewed: var(--mark-cyan);
+  --mark-agentFlagged: #d670d6;
   --raise: #2c2c2e;
   --hair: #303030;
   --faint: #5f6368;
@@ -660,6 +662,14 @@ kbd {
 
 .ring-wrap.done {
   color: var(--added);
+}
+
+.ring-wrap.by-user svg {
+  stroke: var(--mark-green);
+}
+
+.ring-wrap.by-agent svg {
+  stroke: var(--mark-cyan);
 }
 
 .ring {

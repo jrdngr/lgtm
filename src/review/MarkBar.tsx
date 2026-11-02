@@ -13,8 +13,8 @@ interface Props {
 }
 
 /** The mark colors in use, in key order: labeled ones as a box with the label, the rest as a
- * square, each striped in its color and checked when it counts as done. Clicking one marks the selection and right-clicking filters to it. The + opens the
- * palette. */
+ * square, each striped in its color and checked when it counts as done. Clicking one marks the selection and right-clicking filters to it. An agent's colors
+ * follow, which only filter. The + opens the palette. */
 export function MarkBar({ setup, onMark, onFilter }: Props) {
   const [place, setPlace] = useState<{ top: number; right: number }>();
   return (
@@ -41,6 +41,22 @@ export function MarkBar({ setup, onMark, onFilter }: Props) {
           </button>
         );
       })}
+      {setup.agent.map((s) => (
+        <button
+          type="button"
+          key={s.color}
+          className={`mark-chip${s.done ? " done" : ""}`}
+          style={{ borderLeftColor: markVar(s.color) }}
+          title={`${s.label}: right-click to show only these rows`}
+          onMouseDown={(e) => e.preventDefault()}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            onFilter(s.color);
+          }}
+        >
+          {s.label}
+        </button>
+      ))}
       <IconButton
         icon="plus"
         label="Mark colors"
