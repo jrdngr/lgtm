@@ -15,6 +15,9 @@ import { shellPaths } from "./shellPaths";
 import { terminalMenu } from "./terminalMenu";
 import { isAgentTitle, titleLabel } from "./title";
 
+/** How long a terminal's box holds still before the terminal takes its size. */
+const RESIZE_SETTLE_MS = 100;
+
 type Params = {
   setup?: boolean;
   /** Starts Claude Code once the shell is up, for a new Claude tab. */
@@ -120,7 +123,13 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
     });
 
     const sub = api.onDidActiveChange(({ isActive }) => isActive && term.focus());
-    const observer = new ResizeObserver(session.refit);
+    // One resize once the layout holds still: a program redrawing a full screen, like Claude
+    // Code, can lose rows to a second resize in the middle of its redraw.
+    let resizing: number | undefined;
+    const observer = new ResizeObserver(() => {
+      clearTimeout(resizing);
+      resizing = window.setTimeout(session.refit, RESIZE_SETTLE_MS);
+    });
     observer.observe(container);
     if (api.isActive) term.focus();
 
@@ -131,6 +140,7 @@ export function TerminalPanel({ api, containerApi, params }: IDockviewPanelProps
       container.removeEventListener("dragover", onDragOver);
       container.removeEventListener("drop", onDrop);
       observer.disconnect();
+      clearTimeout(resizing);
       sub.dispose();
       unwatch();
       titled.dispose();
