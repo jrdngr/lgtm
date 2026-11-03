@@ -17,6 +17,7 @@ anyhow = "1"
 blake3 = "1"
 dirs = "6"
 globset = "0.4.20"
+ignore = "0.4.33"
 rusqlite = { version = "0.40", features = ["bundled"] }
 rustix = { version = "1", features = ["process"] }
 serde = { version = "1", features = ["derive"] }

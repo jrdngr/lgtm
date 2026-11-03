@@ -2532,8 +2532,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "lgtm-core",
+ "notify",
  "ratatui",
  "rmcp",
+ "serde_json",
  "tokio",
 ]
 
@@ -2610,6 +2612,7 @@ dependencies = [
  "cc",
  "dirs 6.0.0",
  "globset",
+ "ignore",
  "rusqlite",
  "rustix",
  "serde",

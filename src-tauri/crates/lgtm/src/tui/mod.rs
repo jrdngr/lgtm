@@ -1,5 +1,6 @@
 //! The review UI: a picker over the jj log, and the review of what was picked.
 
+mod editor;
 mod highlight;
 mod keybar;
 mod load;
@@ -8,15 +9,17 @@ mod picker;
 mod review;
 mod term;
 mod theme;
+mod watch;
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
 use lgtm_core::jj::Jj;
 use lgtm_core::paths;
 use lgtm_core::store::Store;
-use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 
@@ -51,9 +54,14 @@ pub fn run(revset: Option<String>) -> i32 {
     let store = paths::data_dir()
         .zip(paths::find_root(&root))
         .and_then(|(data, main)| Store::open(&paths::repo_dir(&data, &main).join("lgtm.db")).ok());
+    let snapshots = Arc::new(AtomicBool::new(false));
+    let watcher = loader.watch(&root, snapshots.clone()).ok();
     let mut app = App {
         root,
         loader,
+        _watcher: watcher,
+        snapshots,
+        edit: None,
         version: store.as_ref().and_then(|s| s.data_version().ok()),
         store,
         polled: Instant::now(),
@@ -69,7 +77,7 @@ pub fn run(revset: Option<String>) -> i32 {
         app.open(revset);
     }
     let mut term = Term::start();
-    let result = app.run(&mut term.terminal, &rx);
+    let result = app.run(&mut term, &rx);
     term.stop();
     match result {
         Ok(()) => 0,
@@ -83,6 +91,11 @@ pub fn run(revset: Option<String>) -> i32 {
 struct App {
     root: PathBuf,
     loader: Loader,
+    _watcher: Option<notify::RecommendedWatcher>,
+    /// Whether the watcher snapshots edits, while the review shows the working copy.
+    snapshots: Arc<AtomicBool>,
+    /// The file and line to open the editor at, once the frame is drawn.
+    edit: Option<(String, u32)>,
     picker: Picker,
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
@@ -108,9 +121,39 @@ impl App {
         self.review = Some(Review::new(self.loads, revset));
     }
 
-    fn run(&mut self, terminal: &mut DefaultTerminal, rx: &Receiver<Msg>) -> anyhow::Result<()> {
+    /// Loads what's on screen again after a jj operation.
+    fn reload(&mut self) {
+        self.loader.log();
+        if let Some(r) = self.review.as_mut() {
+            self.loads += 1;
+            r.id = self.loads;
+            self.loader.review(self.loads, r.revset.clone());
+        }
+    }
+
+    /// Opens the editor at `path`, a path in the workspace, and `line`.
+    fn open_editor(&mut self, term: &mut Term, path: &str, line: u32) {
+        let failed = match editor::open(&self.root.join(path), line) {
+            editor::Open::Detached(argv) => editor::spawn(&argv).err(),
+            editor::Open::Here(argv) => term
+                .suspended(|| {
+                    std::process::Command::new(&argv[0])
+                        .args(&argv[1..])
+                        .status()
+                })
+                .err(),
+        };
+        if let (Some(e), Some(r)) = (failed, self.review.as_mut()) {
+            r.notice = Some(format!("couldn't open the editor: {e}"));
+        }
+    }
+
+    fn run(&mut self, term: &mut Term, rx: &Receiver<Msg>) -> anyhow::Result<()> {
         loop {
-            terminal.draw(|f| {
+            if let Some((path, line)) = self.edit.take() {
+                self.open_editor(term, &path, line);
+            }
+            term.terminal.draw(|f| {
                 let area = f.area();
                 self.draw(&mut Canvas::new(f.buffer_mut(), area));
             })?;
@@ -154,8 +197,10 @@ impl App {
             Msg::Diff { id, result } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.loaded(result);
+                    self.snapshots.store(r.working_copy(), Ordering::Relaxed);
                 }
             }
+            Msg::Changed => self.reload(),
             Msg::Highlight { id, file, sides } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.highlighted(file, sides);
@@ -183,9 +228,14 @@ impl App {
             return false;
         }
         if let Some(r) = self.review.as_mut() {
-            if let review::Outcome::Back = r.key(key, self.store.as_mut()) {
-                self.review = None;
-                return self.direct;
+            match r.key(key, self.store.as_mut()) {
+                review::Outcome::Back => {
+                    self.review = None;
+                    self.snapshots.store(false, Ordering::Relaxed);
+                    return self.direct;
+                }
+                review::Outcome::Edit(path, line) => self.edit = Some((path, line)),
+                review::Outcome::None => {}
             }
             return false;
         }

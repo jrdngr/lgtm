@@ -11,3 +11,4 @@ pub mod paths;
 pub mod review;
 pub mod store;
 pub mod syntax;
+pub mod watch;

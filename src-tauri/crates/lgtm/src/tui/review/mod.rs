@@ -1,11 +1,13 @@
 //! Reviewing a commit or range: its diff, unified or side by side, beside its file list.
 
 mod draw;
+mod edit;
 mod marking;
 pub mod marks;
+mod reload;
 pub mod rows;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use lgtm_core::jj::{Change, FileDiff};
 use lgtm_core::store::Store;
@@ -18,6 +20,8 @@ use rows::Line;
 pub enum Outcome {
     None,
     Back,
+    /// Open the editor on this file, a path in the workspace, at this line.
+    Edit(String, u32),
 }
 
 pub struct Review {
@@ -39,8 +43,11 @@ pub struct Review {
     /// Screen rows the diff had when last drawn.
     height: usize,
     marks: Option<marks::Marks>,
+    /// Whether marks have been matched once, after which reviewed hunks stay as folded as
+    /// the user left them.
+    built_once: bool,
     /// A failure to show until the next key.
-    notice: Option<String>,
+    pub notice: Option<String>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -54,6 +61,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file"),
     ("n", "next not reviewed"),
+    ("e", "edit"),
     ("t", "side by side"),
     ("q", "back"),
 ];
@@ -76,21 +84,42 @@ impl Review {
             list_top: 0,
             height: 0,
             marks: None,
+            built_once: false,
             notice: None,
         }
     }
 
+    /// Takes the review's changes and diff, first or after a reload. A reload keeps the
+    /// cursor on the same line of the same file, folded hunks folded, and each file's colors
+    /// until its new ones come.
     pub fn loaded(&mut self, result: anyhow::Result<(Vec<Change>, Vec<FileDiff>)>) {
-        match result {
-            Ok((changes, files)) => {
-                self.changes = changes;
-                self.sides = files.iter().map(|_| None).collect();
-                self.files = files;
-                self.error = None;
-                self.relayout();
+        let (changes, files) = match result {
+            Ok(loaded) => loaded,
+            Err(e) => {
+                self.error = Some(format!("{e:#}"));
+                return;
             }
-            Err(e) => self.error = Some(format!("{e:#}")),
-        }
+        };
+        let at = self.current().map(|l| reload::Spot::of(&self.files, l));
+        let folded = reload::folded_keys(&self.files, &self.folded);
+        let mut old_sides: HashMap<String, Sides> = self
+            .files
+            .iter()
+            .zip(std::mem::take(&mut self.sides))
+            .filter_map(|(f, s)| Some((f.path.clone(), s?)))
+            .collect();
+        self.sides = files.iter().map(|f| old_sides.remove(&f.path)).collect();
+        self.folded = reload::refold(&files, &folded);
+        self.changes = changes;
+        self.files = files;
+        self.error = None;
+        self.lines = rows::lines(&self.files, &self.folded, self.split);
+        self.cursor = at.map_or(0, |at| at.find(&self.files, &self.lines));
+    }
+
+    /// Whether the review shows the working copy, whose edits it follows.
+    pub fn working_copy(&self) -> bool {
+        self.changes.iter().any(|c| c.working_copy)
     }
 
     pub fn highlighted(&mut self, file: usize, sides: Sides) {
@@ -181,6 +210,11 @@ impl Review {
             KeyCode::Char('}') => self.jump(true, |l| matches!(l, Line::File(_))),
             KeyCode::Char('{') => self.jump(false, |l| matches!(l, Line::File(_))),
             KeyCode::Enter => self.toggle_fold(),
+            KeyCode::Char('e') => {
+                if let Some((path, line)) = self.edit_target() {
+                    return Outcome::Edit(path, line);
+                }
+            }
             KeyCode::Char('t') => {
                 self.split = !self.split;
                 self.relayout();
@@ -203,6 +237,7 @@ impl Review {
             review,
             flag,
             ("n", "next", false),
+            ("e", "edit", false),
             ("t", "split", self.split),
             ("?", "keys", false),
             ("q", "back", false),

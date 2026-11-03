@@ -1,6 +1,7 @@
 //! Reads from jj off the UI thread. Results come back as messages the event loop drains.
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::Sender;
 
 use lgtm_core::anchor::MatchConfig;
@@ -26,6 +27,8 @@ pub enum Msg {
         file: usize,
         sides: Sides,
     },
+    /// A jj operation landed: commits may have changed.
+    Changed,
     /// Every file's review state, in diff order, for matching marks.
     Built {
         id: u64,
@@ -54,6 +57,17 @@ impl Loader {
             jj: Arc::new(jj),
             tx,
         })
+    }
+
+    /// Watches the workspace at `root` for new operations, and for edits to snapshot while
+    /// `snapshots` is set. Watches until the watcher is dropped.
+    pub fn watch(
+        &self,
+        root: &std::path::Path,
+        snapshots: Arc<AtomicBool>,
+    ) -> anyhow::Result<notify::RecommendedWatcher> {
+        let _entered = self.rt.enter();
+        super::watch::start(root, self.jj.clone(), self.tx.clone(), snapshots)
     }
 
     pub fn log(&self) {

@@ -21,12 +21,14 @@ impl Review {
         if let Some(store) = store {
             self.rematch(store);
         }
-        let reviewed: Vec<(usize, usize)> = self
-            .hunks()
-            .filter(|&(f, h)| self.hunk_state(f, h) == State::Reviewed)
-            .collect();
-        self.folded.extend(reviewed);
-        self.relayout();
+        if !std::mem::replace(&mut self.built_once, true) {
+            let reviewed: Vec<(usize, usize)> = self
+                .hunks()
+                .filter(|&(f, h)| self.hunk_state(f, h) == State::Reviewed)
+                .collect();
+            self.folded.extend(reviewed);
+            self.relayout();
+        }
     }
 
     /// Matches marks again, after the store changed.
