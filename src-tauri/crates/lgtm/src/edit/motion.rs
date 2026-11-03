@@ -25,10 +25,40 @@ pub fn right(b: &Buffer, at: usize) -> usize {
 /// `by` lines down (up when negative) from `at`, at `column` or `at`'s own. Returns where
 /// and the column to keep.
 pub fn vertical(b: &Buffer, at: usize, by: isize, column: Option<usize>) -> (usize, usize) {
-    let line = b.line_of(at);
+    vertical_folded(b, at, by, column, &[])
+}
+
+/// `vertical`, stepping over the lines that closed folds hide: going down past a fold, and up
+/// onto the line it's shown on.
+pub fn vertical_folded(
+    b: &Buffer,
+    at: usize,
+    by: isize,
+    column: Option<usize>,
+    hidden: &[(usize, usize)],
+) -> (usize, usize) {
+    let mut line = b.line_of(at);
     let column = column.unwrap_or(at - b.line_start(line));
-    let target = (line as isize + by).clamp(0, b.last_line() as isize) as usize;
-    let to = (b.line_start(target) + column).min(line_max(b, target));
+    for _ in 0..by.unsigned_abs() {
+        let next = if by > 0 {
+            let past = hidden
+                .iter()
+                .find(|&&(s, _)| s == line)
+                .map_or(line, |&(_, e)| e);
+            (past + 1).min(b.last_line())
+        } else {
+            let up = line.saturating_sub(1);
+            hidden
+                .iter()
+                .find(|&&(s, e)| s < up && up <= e)
+                .map_or(up, |&(s, _)| s)
+        };
+        if next == line {
+            break;
+        }
+        line = next;
+    }
+    let to = (b.line_start(line) + column).min(line_max(b, line));
     (to, column)
 }
 

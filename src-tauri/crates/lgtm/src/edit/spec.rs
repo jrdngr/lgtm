@@ -115,7 +115,14 @@ pub fn run(start: &str, spec: &str) -> String {
 pub fn run_in(mut b: Buffer, spec: &str) -> String {
     let mut k = Keys::default();
     for key in keys(spec) {
-        k.press(&mut b, key, View { height: 10 });
+        k.press(
+            &mut b,
+            key,
+            View {
+                height: 10,
+                hidden: &[],
+            },
+        );
     }
     marked(&b, k.mode)
 }

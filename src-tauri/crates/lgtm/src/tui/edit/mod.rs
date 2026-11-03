@@ -10,6 +10,7 @@ use lgtm_core::syntax::Segment;
 use ratatui::crossterm::event::KeyEvent;
 
 use crate::edit::buffer::{Buffer, Sel};
+use crate::edit::fold::Folds;
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
 
@@ -27,6 +28,7 @@ pub struct Open {
     left: usize,
     /// Highlight segments per line, and the buffer version they're for.
     colors: Option<(u64, Vec<Vec<Segment>>)>,
+    folds: Folds,
 }
 
 impl Open {
@@ -36,6 +38,7 @@ impl Open {
             top: 0,
             left: 0,
             colors: None,
+            folds: Folds::default(),
         }
     }
 }
@@ -111,14 +114,23 @@ impl Editor {
         if self.prompt.is_some() {
             return self.prompt_key(key);
         }
-        let view = View {
-            height: self.height,
-        };
         let Some(open) = self.open.get_mut(self.cur) else {
             return Outcome::Back;
         };
+        open.folds.update(&open.buf);
+        let hidden = open.folds.hidden();
+        let view = View {
+            height: self.height,
+            hidden: &hidden,
+        };
         let action = self.keys.press(&mut open.buf, key, view);
         self.act(action);
+        if let Some(open) = self.open.get_mut(self.cur) {
+            // Whatever moved the cursor into a closed fold opens it.
+            open.folds.update(&open.buf);
+            let line = open.buf.line_of(open.buf.sel.head);
+            open.folds.reveal(line);
+        }
         Outcome::None
     }
 
@@ -142,6 +154,12 @@ impl Editor {
                 Err(e) => self.notice = Some(format!("couldn't paste: {e}")),
             },
             Action::Notice(n) => self.notice = Some(n),
+            Action::Fold(fold) => {
+                if let Some(open) = self.open.get_mut(self.cur) {
+                    let line = open.buf.line_of(open.buf.sel.head);
+                    open.folds.apply(fold, line);
+                }
+            }
         }
     }
 }

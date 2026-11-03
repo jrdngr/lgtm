@@ -1,4 +1,6 @@
-use super::spec::check;
+use super::fold;
+use super::keys::{Keys, View};
+use super::spec::{buffer_named, check, keys, marked};
 
 #[test]
 fn h_and_l_stay_on_the_line() {
@@ -158,4 +160,98 @@ fn star_searches_the_selection_and_n_wraps_around() {
         ("[F]oo foo Foo", "*n", "Foo foo [F]oo"),
         ("[f]oo Foo", "*n", "foo [F]oo"),
     ]);
+}
+
+#[test]
+fn mi_and_ma_select_words_pairs_and_quotes() {
+    check(&[
+        ("ab c[d]e fg", "miw", "ab [cde] fg"),
+        ("ab c[d]e fg", "maw", "ab [cde ]fg"),
+        ("ab c[d]e", "maw", "ab[ cde]"),
+        ("f(a, [b])", "mi(", "f([a, b])"),
+        ("f(a, [b])", "ma)", "f[(a, b)]"),
+        ("{x {[y]} z}", "mi{", "{x {[y]} z}"),
+        ("{x {y} [z]}", "mi{", "{[x {y} z]}"),
+        ("s = \"a [b]\"", "mi\"", "s = \"[a b]\""),
+        ("s = 'a[b]'", "ma'", "s = ['ab']"),
+    ]);
+}
+
+fn run_rs(start: &str, spec: &str) -> String {
+    super::spec::run_in(buffer_named(start, "t.rs"), spec)
+}
+
+#[test]
+fn mif_and_maf_select_the_function_around_the_cursor() {
+    let src = "fn a() {\n    let [x] = 1;\n}\n";
+    assert_eq!(run_rs(src, "mif"), "fn a() {[\n    let x = 1;\n]}\n");
+    assert_eq!(run_rs(src, "maf"), "[fn a() {\n    let x = 1;\n}]\n");
+}
+
+#[test]
+fn alt_o_grows_to_syntax_nodes_and_alt_i_steps_back() {
+    let src = "fn a() { f([x] + 1); }";
+    assert_eq!(run_rs(src, "<A-o>"), "fn a() { f([x + 1]); }");
+    assert_eq!(run_rs(src, "<A-o><A-o>"), "fn a() { f[(x + 1)]; }");
+    assert_eq!(run_rs(src, "<A-o><A-o><A-i>"), "fn a() { f([x + 1]); }");
+    assert_eq!(run_rs(src, "<A-o><A-o><A-i><A-i>"), src);
+}
+
+fn spans(name: &str, text: &str) -> Vec<(usize, usize)> {
+    let b = buffer_named(text, name);
+    fold::ranges(&b).iter().map(|r| (r.start, r.end)).collect()
+}
+
+#[test]
+fn rust_folds_cover_items_bodies_and_use_runs() {
+    let src = "use a;\nuse b;\n\nfn f() {\n    if x {\n        y();\n    }\n}\n";
+    assert_eq!(spans("t.rs", src), vec![(0, 1), (3, 7), (4, 6)]);
+}
+
+#[test]
+fn typescript_and_markdown_fold_by_syntax() {
+    let ts = "import a from \"a\";\nimport b from \"b\";\nfunction f() {\n  return 1;\n}\n";
+    assert_eq!(spans("t.ts", ts), vec![(0, 1), (2, 4)]);
+    let md = "# A\ntext\n\n## B\nmore\n";
+    let md_spans = spans("t.md", md);
+    assert!(md_spans.contains(&(0, 4)), "{md_spans:?}");
+    assert!(md_spans.contains(&(3, 4)), "{md_spans:?}");
+}
+
+#[test]
+fn files_without_a_grammar_fold_by_indent() {
+    let txt = "a\n  b\n\n  c\n    d\ne\n";
+    assert_eq!(spans("t.txt", txt), vec![(0, 4), (3, 4)]);
+}
+
+#[test]
+fn folds_toggle_hide_lines_and_reveal_the_cursor() {
+    let b = buffer_named("a\n  b\n  c\n    d\ne\n", "t.txt");
+    let mut f = fold::Folds::default();
+    f.update(&b);
+    f.apply(fold::Fold::Toggle, 0);
+    assert_eq!(f.visible(b.last_line()), vec![0, 4]);
+    f.apply(fold::Fold::Toggle, 0);
+    assert_eq!(f.visible(b.last_line()), vec![0, 1, 2, 3, 4]);
+    f.apply(fold::Fold::CloseAll, 0);
+    assert_eq!(f.hidden(), vec![(0, 3)]);
+    f.reveal(3);
+    assert_eq!(f.visible(b.last_line()), vec![0, 1, 2, 3, 4]);
+}
+
+#[test]
+fn j_steps_over_a_closed_fold() {
+    let mut b = buffer_named("[a]\n  b\n  c\nd", "t.txt");
+    let mut k = Keys::default();
+    for key in keys("j") {
+        k.press(
+            &mut b,
+            key,
+            View {
+                height: 10,
+                hidden: &[(0, 2)],
+            },
+        );
+    }
+    assert_eq!(marked(&b, k.mode), "a\n  b\n  c\n[d]");
 }

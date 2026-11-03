@@ -3,6 +3,8 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use super::fold::Fold;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cmd {
     Left,
@@ -46,6 +48,12 @@ pub enum Cmd {
     Outdent,
     Join,
     ToggleCase,
+    /// `mi` and `ma`, with the object's char after: whether it's around.
+    Object(bool),
+    /// `Alt-o` and `Alt-i`.
+    Grow,
+    Shrink,
+    Fold(Fold),
     /// `ms`, `md`, `mr`, with the chars that follow.
     SurroundAdd,
     SurroundDelete,
@@ -167,6 +175,10 @@ pub const BINDS: &[Bind] = &[
     b("<", Outdent, Both, "outdent"),
     b("J", Join, Both, "join lines"),
     b("~", ToggleCase, Both, "toggle case"),
+    b("m i", Object(false), Both, "inside an object"),
+    b("m a", Object(true), Both, "around an object"),
+    b("A-o", Grow, Both, "grow to the syntax node"),
+    b("A-i", Shrink, Both, "shrink to a syntax node"),
     b("m s", SurroundAdd, Both, "add surround"),
     b("m d", SurroundDelete, Both, "delete surround"),
     b("m r", SurroundReplace, Both, "replace surround"),
@@ -176,6 +188,13 @@ pub const BINDS: &[Bind] = &[
     b("n", SearchNext, Both, "next match"),
     b("N", SearchPrev, Both, "previous match"),
     b("*", SearchSelection, Both, "search the selection"),
+    b("z z", Fold(Fold::Toggle), Both, "toggle"),
+    b("z c", Fold(Fold::Close), Both, "close"),
+    b("z o", Fold(Fold::Open), Both, "open"),
+    b("z M", Fold(Fold::CloseAll), Both, "close all"),
+    b("z R", Fold(Fold::OpenAll), Both, "open all"),
+    b("z m", Fold(Fold::CloseLevel), Both, "close a level"),
+    b("z r", Fold(Fold::OpenLevel), Both, "open a level"),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),

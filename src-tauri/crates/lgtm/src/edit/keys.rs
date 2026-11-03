@@ -3,8 +3,10 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::buffer::{Buffer, Sel};
+use super::fold::Fold;
 use super::keymap::{self, Cmd, Found};
 use super::motion;
+use super::objects;
 use super::ops::{self, Register};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -29,12 +31,16 @@ pub enum Action {
     Paste,
     /// Something the buffer couldn't do, to show.
     Notice(String),
+    /// Open or close folds at the cursor's line.
+    Fold(Fold),
 }
 
-/// The screen's size, for keys that move by it.
+/// The screen around the buffer: its size, for keys that move by it, and the closed folds,
+/// which `j` and `k` step over.
 #[derive(Clone, Copy)]
-pub struct View {
+pub struct View<'a> {
     pub height: usize,
+    pub hidden: &'a [(usize, usize)],
 }
 
 /// A command waiting for the char typed after it.
@@ -49,6 +55,8 @@ enum Await {
     SurroundDelete,
     /// `mr`: the pair to replace, once typed.
     SurroundReplace(Option<char>),
+    /// `mi` or `ma`: whether it's around.
+    Object(bool),
 }
 
 #[derive(Default)]
@@ -62,6 +70,8 @@ pub struct Keys {
     register: Register,
     /// What `n` and `N` look for.
     pub search: Option<String>,
+    /// Selections `Alt-o` grew from, for `Alt-i` to go back through.
+    grown: Vec<Sel>,
 }
 
 impl Keys {
@@ -128,8 +138,8 @@ impl Keys {
         self.take(b, (to, to));
     }
 
-    fn vertical(&self, b: &mut Buffer, by: isize) {
-        let (to, column) = motion::vertical(b, b.sel.head, by, b.column);
+    fn vertical(&self, b: &mut Buffer, by: isize, hidden: &[(usize, usize)]) {
+        let (to, column) = motion::vertical_folded(b, b.sel.head, by, b.column, hidden);
         b.column = Some(column);
         self.go(b, to);
     }
@@ -148,10 +158,10 @@ impl Keys {
         match cmd {
             Cmd::Left => self.go(b, motion::left(b, head)),
             Cmd::Right => self.go(b, motion::right(b, head)),
-            Cmd::Down => self.vertical(b, 1),
-            Cmd::Up => self.vertical(b, -1),
-            Cmd::HalfDown => self.vertical(b, half),
-            Cmd::HalfUp => self.vertical(b, -half),
+            Cmd::Down => self.vertical(b, 1, view.hidden),
+            Cmd::Up => self.vertical(b, -1, view.hidden),
+            Cmd::HalfDown => self.vertical(b, half, view.hidden),
+            Cmd::HalfUp => self.vertical(b, -half, view.hidden),
             Cmd::NextWord(big) => self.take(b, motion::next_word_start(b, head, big)),
             Cmd::WordEnd(big) => self.take(b, motion::next_word_end(b, head, big)),
             Cmd::PrevWord(big) => self.take(b, motion::prev_word_start(b, head, big)),
@@ -227,6 +237,27 @@ impl Keys {
                 self.edit(b);
                 ops::toggle_case(b);
             }
+            Cmd::Object(around) => self.awaiting = Some(Await::Object(around)),
+            Cmd::Grow => match objects::grow(b) {
+                Some((from, to)) => {
+                    self.grown.push(b.sel);
+                    b.sel = Sel::new(from, to);
+                }
+                None => return Action::Notice("no syntax node around the selection".into()),
+            },
+            Cmd::Shrink => {
+                let inside = |s: &Sel| s.from() >= b.sel.from() && s.to() <= b.sel.to();
+                match self.grown.pop().filter(inside) {
+                    Some(sel) => b.sel = sel,
+                    None => {
+                        self.grown.clear();
+                        if let Some((from, to)) = objects::shrink(b) {
+                            b.sel = Sel::new(from, to);
+                        }
+                    }
+                }
+            }
+            Cmd::Fold(fold) => return Action::Fold(fold),
             Cmd::SurroundAdd => self.awaiting = Some(Await::SurroundAdd),
             Cmd::SurroundDelete => self.awaiting = Some(Await::SurroundDelete),
             Cmd::SurroundReplace => self.awaiting = Some(Await::SurroundReplace(None)),
@@ -279,6 +310,10 @@ impl Keys {
                     return Action::Notice(format!("no {c} around the selection"));
                 }
             }
+            Await::Object(around) => match objects::object(b, c, around) {
+                Some((from, to)) => self.take(b, (from, to)),
+                None => return Action::Notice(format!("no {c} object here")),
+            },
             Await::SurroundReplace(None) => self.awaiting = Some(Await::SurroundReplace(Some(c))),
             Await::SurroundReplace(Some(from)) => {
                 self.edit(b);

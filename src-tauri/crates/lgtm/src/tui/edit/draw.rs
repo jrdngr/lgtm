@@ -52,6 +52,7 @@ impl Editor {
             Mode::Insert => vec![("Esc", "normal", false)],
             Mode::Normal | Mode::Select => vec![
                 ("space", "menu", false),
+                ("z", "fold", false),
                 ("i", "insert", false),
                 ("v", "select", self.keys.mode == Mode::Select),
                 ("/", "search", false),
@@ -80,31 +81,39 @@ impl Editor {
             return;
         };
         open.recolor();
+        open.folds.update(&open.buf);
         let last = open.buf.last_line();
+        let visible = open.folds.visible(last);
         let num_w = (last + 1).to_string().len().max(3) as u16;
         // A column for the diff gutter, the numbers, then a space before the text.
         let code_x = body.x + 1 + num_w + 2;
         let width = body.right().saturating_sub(code_x) as usize;
-        open.scroll(body.height as usize, width);
-        let (top, left) = (open.top, open.left);
+        open.scroll(&visible, body.height as usize, width);
+        let first = visible.partition_point(|&l| l < open.top);
+        let left = open.left;
         let b = &open.buf;
         let colors = open
             .colors
             .as_ref()
             .map(|(_, c)| c.as_slice())
             .unwrap_or(&[]);
+        let hidden = open.folds.hidden();
         let cursor_line = b.line_of(b.sel.head);
-        for row in 0..body.height {
-            let line = top + row as usize;
-            if line > last {
-                break;
-            }
-            let y = body.y + row;
+        for (row, &line) in visible
+            .iter()
+            .skip(first)
+            .take(body.height as usize)
+            .enumerate()
+        {
+            let y = body.y + row as u16;
             let num = if line == cursor_line { FG } else { FAINT };
             let n = format!("{:>w$}", line + 1, w = num_w as usize);
             c.put(body.x + 1, y, &n, theme::fg(num).bg(BG));
             let segs = colors.get(line).map(Vec::as_slice).unwrap_or(&[]);
-            draw_line(c, b, mode, line, segs, code_x, y, left, width);
+            let end = draw_line(c, b, mode, line, segs, code_x, y, left, width);
+            if let Some(&(_, fold_end)) = hidden.iter().find(|&&(s, _)| s == line) {
+                draw_fold(c, b, fold_end, code_x, y, end.saturating_sub(left));
+            }
         }
     }
 }
@@ -124,15 +133,20 @@ impl Open {
         self.colors = Some((self.buf.version, colors));
     }
 
-    /// Scrolls so the cursor is in view, `height` lines by `width` columns.
-    fn scroll(&mut self, height: usize, width: usize) {
+    /// Scrolls so the cursor is in view, `height` of the `visible` lines by `width` columns.
+    fn scroll(&mut self, visible: &[usize], height: usize, width: usize) {
         let b = &self.buf;
         let line = b.line_of(b.sel.head);
-        if line < self.top {
-            self.top = line;
-        } else if height > 0 && line >= self.top + height {
-            self.top = line + 1 - height;
-        }
+        let at = visible.partition_point(|&l| l < line);
+        let top = visible.partition_point(|&l| l < self.top);
+        let top = if at < top {
+            at
+        } else if height > 0 && at >= top + height {
+            at + 1 - height
+        } else {
+            top
+        };
+        self.top = visible.get(top).copied().unwrap_or(0);
         let col = column(b, b.sel.head);
         if col < self.left {
             self.left = col;
@@ -175,6 +189,18 @@ fn char_colors(text: &str, segs: &[Segment]) -> Vec<Color> {
     out
 }
 
+/// After a closed fold's first line: a mark for the hidden lines, and the last line when
+/// it's only a closing bracket or so.
+fn draw_fold(c: &mut Canvas, b: &Buffer, end: usize, x0: u16, y: u16, col: usize) {
+    let x = c.put(x0 + col as u16, y, " ⋯ ", theme::fg(FAINT).bg(BG));
+    let last = b.slice(b.line_start(end), b.line_end(end));
+    let last = last.trim();
+    if last.chars().count() <= 3 {
+        c.put(x, y, last, theme::fg(FG).bg(BG));
+    }
+}
+
+/// Draws a line of text. Returns the column after it.
 #[allow(clippy::too_many_arguments)]
 fn draw_line(
     c: &mut Canvas,
@@ -186,7 +212,7 @@ fn draw_line(
     y: u16,
     left: usize,
     width: usize,
-) {
+) -> usize {
     let start = b.line_start(line);
     let end = b.line_end(line);
     let text: String = b.text.slice(start..end).chars().collect();
@@ -227,6 +253,7 @@ fn draw_line(
     } else if selected(eol) && eol < b.len() {
         cell(c, col, " ", theme::fg(FG).bg(SEL));
     }
+    col
 }
 
 #[cfg(test)]
