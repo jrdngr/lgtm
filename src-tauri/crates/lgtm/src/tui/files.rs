@@ -197,6 +197,8 @@ impl FileTree {
             KeyCode::Char('p' | 'k') if ctrl => self.step(-1),
             KeyCode::PageDown => self.step(20),
             KeyCode::PageUp => self.step(-20),
+            KeyCode::Home => self.sel = 0,
+            KeyCode::End => self.step(isize::MAX / 2),
             KeyCode::Enter => match self.rows.get(self.sel).cloned() {
                 Some(Row::File { path, .. }) => return Outcome::Open(path),
                 Some(Row::Dir { path, open, .. }) if !searching => self.set_open(&path, !open),

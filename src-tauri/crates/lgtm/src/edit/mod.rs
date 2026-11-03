@@ -12,6 +12,6 @@ pub mod objects;
 pub mod ops;
 
 #[cfg(test)]
-mod spec;
+pub mod spec;
 #[cfg(test)]
 mod tests;

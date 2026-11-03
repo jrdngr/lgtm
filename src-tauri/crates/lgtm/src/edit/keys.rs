@@ -37,6 +37,8 @@ pub enum Action {
     Pick(Pick),
     /// Go to the review.
     Review,
+    /// Move to the file tree.
+    Sidebar,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -287,6 +289,7 @@ impl Keys {
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Review => return Action::Review,
+            Cmd::Sidebar => return Action::Sidebar,
             Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,

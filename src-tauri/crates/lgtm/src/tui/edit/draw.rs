@@ -57,6 +57,14 @@ impl Editor {
     }
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
+        if self.in_sidebar {
+            return vec![
+                ("↑ ↓", "move", false),
+                ("← →", "close, open", false),
+                ("Enter", "open", false),
+                ("Esc", "back", false),
+            ];
+        }
         let conflict = self.open.get(self.cur).is_some_and(|o| o.conflict);
         let mut hints = match self.keys.mode {
             Mode::Insert => vec![("Esc", "normal", false)],
@@ -90,7 +98,8 @@ impl Editor {
 
     /// Draws the sidebar, when there's room, and returns what's left for the text.
     fn draw_sidebar(&mut self, c: &mut Canvas, body: Rect) -> Rect {
-        if body.width < MIN_SIDEBAR_WIDTH || self.sidebar.paths().is_empty() || body.height < 2 {
+        let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > SIDEBAR * 2;
+        if !room || self.sidebar.paths().is_empty() || body.height < 2 {
             return body;
         }
         let open = &self.open;

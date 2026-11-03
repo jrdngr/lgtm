@@ -69,6 +69,8 @@ pub enum Cmd {
     Pick(Pick),
     /// Go to the review, on the cursor's line.
     Review,
+    /// Move to the file tree beside the text.
+    Sidebar,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -214,6 +216,7 @@ pub const BINDS: &[Bind] = &[
     b("space f", Pick(Pick::Files), Both, "files"),
     b("space b", Pick(Pick::Buffers), Both, "buffers"),
     b("space /", Pick(Pick::Grep), Both, "search"),
+    b("space e", Sidebar, Both, "file tree"),
     b("space r", Review, Both, "review"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),

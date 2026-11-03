@@ -87,6 +87,8 @@ pub struct Editor {
     finder: Option<finder::Finder>,
     /// The repo's files beside the text, open down to the buffer in view.
     sidebar: FileTree,
+    /// Whether keys go to the sidebar.
+    in_sidebar: bool,
 }
 
 impl Editor {
@@ -101,6 +103,7 @@ impl Editor {
             height: 20,
             finder: None,
             sidebar: FileTree::default(),
+            in_sidebar: false,
         }
     }
 
@@ -192,6 +195,51 @@ impl Editor {
         }
     }
 
+    /// Moves in the sidebar's tree, opens and closes its folders, and opens its files.
+    fn sidebar_key(&mut self, key: KeyEvent) {
+        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let code = match key.code {
+            KeyCode::Char('j') if !ctrl => KeyCode::Down,
+            KeyCode::Char('k') if !ctrl => KeyCode::Up,
+            KeyCode::Char('h') => KeyCode::Left,
+            KeyCode::Char('l') => KeyCode::Right,
+            KeyCode::Char('d') if ctrl => KeyCode::PageDown,
+            KeyCode::Char('u') if ctrl => KeyCode::PageUp,
+            KeyCode::Char('g') => KeyCode::Home,
+            KeyCode::Char('G') => KeyCode::End,
+            KeyCode::Esc | KeyCode::Tab | KeyCode::Char('q' | ' ') => {
+                self.leave_sidebar();
+                return;
+            }
+            code @ (KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::Enter) => code,
+            _ => return,
+        };
+        let key = KeyEvent::new(code, KeyModifiers::NONE);
+        if let crate::tui::files::Outcome::Open(path) = self.sidebar.key(key) {
+            match self.open(&path, 0) {
+                Ok(()) => self.in_sidebar = false,
+                Err(e) => self.notice = Some(format!("couldn't open {path}: {e}")),
+            }
+        }
+    }
+
+    /// Back to the text, the tree's cursor back on the buffer in view.
+    fn leave_sidebar(&mut self) {
+        self.in_sidebar = false;
+        if let Some(name) = self.current().map(|b| b.name.clone()) {
+            self.sidebar.reveal(&name);
+        }
+    }
+
     /// Opens a list of `kind` to pick from.
     pub fn pick(&mut self, kind: Pick) {
         let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
@@ -262,6 +310,10 @@ impl Editor {
         if self.finder.is_some() {
             return self.finder_key(key);
         }
+        if self.in_sidebar {
+            self.sidebar_key(key);
+            return Outcome::None;
+        }
         let Some(open) = self.open.get_mut(self.cur) else {
             return Outcome::Back;
         };
@@ -310,6 +362,7 @@ impl Editor {
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
             Action::Review => {}
+            Action::Sidebar => self.in_sidebar = true,
             Action::Split { right } => self.split(None, right),
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
@@ -357,5 +410,33 @@ mod tests {
         // Undo brings the edits back.
         e.open[0].buf.undo();
         assert_eq!(e.open[0].buf.text.to_string(), "xone\n");
+    }
+
+    fn press(e: &mut Editor, keys: &str) {
+        for key in crate::edit::spec::keys(keys) {
+            e.key(key);
+        }
+    }
+
+    #[test]
+    fn space_e_moves_to_the_file_tree_where_folders_open_and_enter_opens_a_file() {
+        let (dir, mut e) = editor_on("one\n");
+        std::fs::create_dir(dir.path().join("b")).unwrap();
+        std::fs::write(dir.path().join("b/c.txt"), "see\n").unwrap();
+        e.set_files(vec!["a.txt".into(), "b/c.txt".into()]);
+        e.sidebar.reveal("a.txt");
+        press(&mut e, "<space>ek");
+        assert_eq!(e.sidebar.selected(), Some("b"));
+        press(&mut e, "lj");
+        assert_eq!(e.sidebar.selected(), Some("b/c.txt"));
+        // Keys that edit text do nothing here.
+        press(&mut e, "d");
+        press(&mut e, "<ret>");
+        assert_eq!(e.current().map(|b| b.name.as_str()), Some("b/c.txt"));
+        assert_eq!(e.open[0].buf.text.to_string(), "one\n");
+        press(&mut e, "d");
+        assert_eq!(e.open[1].buf.text.to_string(), "ee\n");
+        press(&mut e, "<space>e<esc>");
+        assert_eq!(e.sidebar.selected(), Some("b/c.txt"));
     }
 }
