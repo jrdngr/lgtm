@@ -159,6 +159,12 @@ impl Review {
             };
             let x = area.x + 3 + 2 * depth as u16;
             c.put(x, y, &name, style.bg(bg));
+            if let tree::Entry::File { file, .. } = entry {
+                let open = self.open_comments(*file);
+                if open > 0 {
+                    c.put_right(y, 1, &format!(" {open}"), theme::fg(ACCENT).bg(bg));
+                }
+            }
         }
     }
 

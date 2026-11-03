@@ -18,6 +18,8 @@ pub struct Input {
     row: usize,
     /// The first row of a comment on a range, as (hunk, row).
     start: Option<(usize, usize)>,
+    /// Whether this edits comment `number` rather than writing a new one.
+    editing: bool,
     number: i64,
     pub text: String,
 }
@@ -77,7 +79,8 @@ impl Review {
     /// The notes under rows and at the tops of files, for the layout.
     pub(super) fn notes(&self) -> Notes {
         let mut notes = Notes::default();
-        for (c, at) in &self.comments {
+        let editing = self.input.as_ref().filter(|i| i.editing).map(|i| i.number);
+        for (c, at) in self.comments.iter().filter(|(c, _)| Some(c.number) != editing) {
             let note = (NoteKey::Comment(c.number), self.comment_lines(c).len());
             match *at {
                 Some(at) => notes.at_row.entry(at).or_default().push(note),
@@ -115,6 +118,18 @@ impl Review {
         wrap(&format!("{text} "), self.width.saturating_sub(9))
     }
 
+    /// How many open comments a file has: the agent's, and its PR threads while they show.
+    pub(super) fn open_comments(&self, file: usize) -> usize {
+        let path = &self.files[file].path;
+        let comments = self.comments.iter().filter(|(c, _)| &c.path == path).count();
+        let threads = if self.hide_pr {
+            0
+        } else {
+            self.threads.iter().filter(|t| t.file == file).count()
+        };
+        comments + threads
+    }
+
     pub(super) fn comment(&self, number: i64) -> Option<&AgentComment> {
         self.comments
             .iter()
@@ -141,6 +156,7 @@ impl Review {
                     hunk,
                     row,
                     start,
+                    editing: false,
                     number,
                     text: String::new(),
                 });
@@ -148,6 +164,25 @@ impl Review {
             }
             Err(e) => self.notice = Some(format!("{e:#}")),
         }
+    }
+
+    /// Edits the comment the cursor is on, in a box where it is.
+    pub(super) fn edit_comment(&mut self, number: i64) {
+        let Some((c, Some((file, hunk, row)))) =
+            self.comments.iter().find(|(c, _)| c.number == number)
+        else {
+            return;
+        };
+        self.input = Some(Input {
+            file: *file,
+            hunk: *hunk,
+            row: *row,
+            start: None,
+            editing: true,
+            number,
+            text: c.body.clone(),
+        });
+        self.relayout();
     }
 
     /// Deletes the comment the cursor is on.
@@ -182,8 +217,14 @@ impl Review {
                 let input = self.input.take().expect("checked above");
                 let body = input.text.trim();
                 if let (false, Some(store)) = (body.is_empty(), store) {
-                    let saved = self.comment_at(&input, body);
-                    if let Err(e) = store.add_agent_comment(&saved) {
+                    let saved = if input.editing {
+                        store.set_agent_comment_body(input.number, body)
+                    } else {
+                        store
+                            .add_agent_comment(&self.comment_at(&input, body))
+                            .map(drop)
+                    };
+                    if let Err(e) = saved {
                         self.notice = Some(format!("{e:#}"));
                     }
                     self.load_comments(store);

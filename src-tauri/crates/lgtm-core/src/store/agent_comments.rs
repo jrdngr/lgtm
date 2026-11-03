@@ -134,6 +134,15 @@ impl Store {
         Ok(n > 0)
     }
 
+    /// Replaces comment `C<number>`'s text.
+    pub fn set_agent_comment_body(&self, number: i64, body: &str) -> rusqlite::Result<()> {
+        self.db.execute(
+            "UPDATE agent_comments SET body = ? WHERE number = ?",
+            params![body, number],
+        )?;
+        Ok(())
+    }
+
     pub fn delete_agent_comment(&self, number: i64) -> rusqlite::Result<()> {
         self.db
             .execute("DELETE FROM agent_comments WHERE number = ?", [number])?;
@@ -179,6 +188,8 @@ mod tests {
             [(1, false), (2, true)]
         );
         assert_eq!(found[1].start, Some((1, "fn a() {".into())));
+        store.set_agent_comment_body(1, "why 2?").unwrap();
+        assert_eq!(store.agent_comments_for_paths(&["a.rs"]).unwrap()[0].body, "why 2?");
         // A deleted comment's number isn't reused while a later one exists.
         store.delete_agent_comment(1).unwrap();
         assert_eq!(store.add_agent_comment(&comment("a.rs")).unwrap().number, 3);

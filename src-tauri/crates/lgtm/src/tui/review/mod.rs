@@ -101,7 +101,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("g G", "top, bottom"),
     ("[ ]", "hunk"),
     ("{ }", "file"),
-    ("Enter", "fold file"),
+    ("Enter", "fold file, edit comment"),
     ("Tab", "file list"),
     ("Enter", "open, close folder (file list)"),
     ("r f", "review, flag hunk"),
@@ -316,13 +316,6 @@ impl Review {
         }
     }
 
-    /// Folds or unfolds the cursor's file, and puts the cursor on its header.
-    fn toggle_fold(&mut self) {
-        if let Some(line) = self.current() {
-            self.toggle_file(line.file());
-        }
-    }
-
     pub(super) fn toggle_file(&mut self, file: usize) {
         let path = self.files[file].path.clone();
         if !self.folded.remove(&path) {
@@ -393,7 +386,14 @@ impl Review {
             KeyCode::Char('}') => self.jump_file(true),
             KeyCode::Char('{') => self.jump_file(false),
             KeyCode::Char('h') => self.toggle_group(),
-            KeyCode::Enter => self.toggle_fold(),
+            KeyCode::Enter => match self.current() {
+                Some(Line::File(f)) => self.toggle_file(f),
+                Some(Line::Note {
+                    key: rows::NoteKey::Comment(n),
+                    ..
+                }) => self.edit_comment(n),
+                _ => {}
+            },
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
             KeyCode::Char('e') => {
