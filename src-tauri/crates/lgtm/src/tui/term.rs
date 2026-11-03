@@ -1,12 +1,13 @@
 //! Terminal setup. Where the terminal speaks the kitty keyboard protocol, Shift's own presses
-//! and releases come through, so the key bar can show what Shift changes while it's held.
+//! and releases come through, so the key bar can show what Shift changes while it's held. The
+//! mouse is captured for clicks and the wheel.
 
 use std::io::stdout;
 
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{
-    KeyCode, KeyEvent, KeyModifiers, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
-    PushKeyboardEnhancementFlags,
+    DisableMouseCapture, EnableMouseCapture, KeyCode, KeyEvent, KeyModifiers,
+    KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
 };
 use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::supports_keyboard_enhancement;
@@ -19,6 +20,7 @@ pub struct Term {
 impl Term {
     pub fn start() -> Self {
         let terminal = ratatui::init();
+        let _ = execute!(stdout(), EnableMouseCapture);
         Self {
             terminal,
             enhanced: enhance(),
@@ -30,11 +32,13 @@ impl Term {
         self.release();
         let out = run();
         self.terminal = ratatui::init();
+        let _ = execute!(stdout(), EnableMouseCapture);
         self.enhanced = enhance();
         out
     }
 
     fn release(&self) {
+        let _ = execute!(stdout(), DisableMouseCapture);
         if self.enhanced {
             let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
         }

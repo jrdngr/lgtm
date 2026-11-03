@@ -183,13 +183,22 @@ impl App {
                 let area = f.area();
                 self.draw(&mut Canvas::new(f.buffer_mut(), area));
             })?;
-            if event::poll(Duration::from_millis(50))?
-                && let Event::Key(key) = event::read()?
-            {
-                if term::is_shift(&key) {
-                    self.shift = key.kind != KeyEventKind::Release;
-                } else if key.kind != KeyEventKind::Release && self.key(term::plain(key)) {
-                    return Ok(());
+            if event::poll(Duration::from_millis(50))? {
+                match event::read()? {
+                    Event::Key(key) if term::is_shift(&key) => {
+                        self.shift = key.kind != KeyEventKind::Release;
+                    }
+                    Event::Key(key) => {
+                        if key.kind != KeyEventKind::Release && self.key(term::plain(key)) {
+                            return Ok(());
+                        }
+                    }
+                    Event::Mouse(ev) => {
+                        if let (Some(r), false) = (self.review.as_mut(), self.help) {
+                            r.mouse(ev);
+                        }
+                    }
+                    _ => {}
                 }
             }
             while let Ok(msg) = rx.try_recv() {

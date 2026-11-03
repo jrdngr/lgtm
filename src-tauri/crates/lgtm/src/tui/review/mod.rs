@@ -9,12 +9,17 @@ pub mod marks;
 mod reload;
 pub mod rows;
 mod threads;
+mod tree;
 
 use std::collections::{HashMap, HashSet};
 
+use lgtm_core::diff::RowKind;
 use lgtm_core::jj::{Change, FileDiff};
 use lgtm_core::store::Store;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
+use ratatui::layout::{Position, Rect};
 
 use super::highlight::Sides;
 use super::keybar::Hint;
@@ -40,7 +45,8 @@ pub struct Review {
     files: Vec<FileDiff>,
     sides: Vec<Option<Sides>>,
     error: Option<String>,
-    folded: HashSet<(usize, usize)>,
+    /// Folded files, by path, so they stay folded across reloads.
+    folded: HashSet<String>,
     split: bool,
     lines: Vec<Line>,
     cursor: usize,
@@ -50,6 +56,9 @@ pub struct Review {
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
+    /// Where the file list and the diff were last drawn, for the mouse.
+    list_area: Rect,
+    diff_area: Rect,
     marks: Option<marks::Marks>,
     /// Whether marks have been matched once, after which reviewed hunks stay as folded as
     /// the user left them.
@@ -71,7 +80,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("g G", "top, bottom"),
     ("[ ]", "hunk"),
     ("{ }", "file"),
-    ("Enter", "fold hunk"),
+    ("Enter", "fold file"),
     ("Tab", "file list"),
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file"),
@@ -103,6 +112,8 @@ impl Review {
             in_list: false,
             list_top: 0,
             height: 0,
+            list_area: Rect::default(),
+            diff_area: Rect::default(),
             marks: None,
             built_once: false,
             comments: vec![],
@@ -126,7 +137,6 @@ impl Review {
             }
         };
         let at = self.current().map(|l| reload::Spot::of(&self.files, l));
-        let folded = reload::folded_keys(&self.files, &self.folded);
         let mut old_sides: HashMap<String, Sides> = self
             .files
             .iter()
@@ -134,7 +144,6 @@ impl Review {
             .filter_map(|(f, s)| Some((f.path.clone(), s?)))
             .collect();
         self.sides = files.iter().map(|f| old_sides.remove(&f.path)).collect();
-        self.folded = reload::refold(&files, &folded);
         self.changes = changes;
         self.files = files;
         self.error = None;
@@ -173,7 +182,10 @@ impl Review {
     }
 
     fn layout(&self) -> Vec<Line> {
-        rows::lines_with(&self.files, &self.folded, self.split, &self.notes())
+        let folded: HashSet<usize> = (0..self.files.len())
+            .filter(|&f| self.folded.contains(&self.files[f].path))
+            .collect();
+        rows::lines_with(&self.files, &folded, self.split, &self.notes())
     }
 
     fn relayout(&mut self) {
@@ -217,15 +229,81 @@ impl Review {
         self.cursor = rows::find(&self.lines, (to, None, None));
     }
 
+    /// The hunk `line` is in. A file with one hunk has no divider, so its header stands for it.
+    fn hunk_at(&self, line: Line) -> Option<usize> {
+        line.hunk().or(match line {
+            Line::File(f) if self.files[f].hunks.len() == 1 => Some(0),
+            _ => None,
+        })
+    }
+
+    /// Where each hunk starts on screen: its first changed line. Folded files have none.
+    fn hunk_starts(&self) -> Vec<usize> {
+        let mut seen = HashSet::new();
+        let mut out = Vec::new();
+        for (i, &line) in self.lines.iter().enumerate() {
+            let start = match line {
+                Line::Code {
+                    file,
+                    hunk,
+                    old,
+                    new,
+                } => {
+                    let rows = &self.files[file].hunks[hunk].rows;
+                    let changed = [old, new]
+                        .into_iter()
+                        .flatten()
+                        .any(|r| rows[r].kind != RowKind::Context);
+                    changed.then_some((file, hunk))
+                }
+                Line::File(_) | Line::Hunk(..) | Line::Note { .. } => None,
+            };
+            if let Some(key) = start
+                && seen.insert(key)
+            {
+                out.push(i);
+            }
+        }
+        out
+    }
+
+    /// Moves the cursor to the next or previous hunk's start.
+    fn jump_hunk(&mut self, forward: bool) {
+        let starts = self.hunk_starts();
+        let found = if forward {
+            starts.into_iter().find(|&i| i > self.cursor)
+        } else {
+            starts.into_iter().rev().find(|&i| i < self.cursor)
+        };
+        if let Some(i) = found {
+            self.cursor = i;
+        }
+    }
+
+    /// Folds or unfolds the cursor's file, and puts the cursor on its header.
     fn toggle_fold(&mut self) {
-        let Some(line) = self.current() else { return };
-        let Some(hunk) = line.hunk() else { return };
-        let key = (line.file(), hunk);
-        if !self.folded.remove(&key) {
-            self.folded.insert(key);
+        if let Some(line) = self.current() {
+            self.toggle_file(line.file());
+        }
+    }
+
+    pub(super) fn toggle_file(&mut self, file: usize) {
+        let path = self.files[file].path.clone();
+        if !self.folded.remove(&path) {
+            self.folded.insert(path);
         }
         self.lines = self.layout();
-        self.cursor = rows::find(&self.lines, (key.0, Some(key.1), None));
+        self.cursor = rows::find(&self.lines, (file, None, None));
+    }
+
+    pub(super) fn set_folded(&mut self, file: usize, folded: bool) {
+        let path = self.files[file].path.clone();
+        if folded {
+            self.folded.insert(path);
+        } else {
+            self.folded.remove(&path);
+        }
+        self.relayout();
     }
 
     pub fn key(&mut self, key: KeyEvent, mut store: Option<&mut Store>) -> Outcome {
@@ -257,8 +335,8 @@ impl Review {
             KeyCode::PageUp => self.by(-(self.height.max(1) as isize)),
             KeyCode::Char('g') | KeyCode::Home => self.cursor = 0,
             KeyCode::Char('G') | KeyCode::End => self.by(isize::MAX / 2),
-            KeyCode::Char(']') => self.jump(true, |l| matches!(l, Line::Hunk(..))),
-            KeyCode::Char('[') => self.jump(false, |l| matches!(l, Line::Hunk(..))),
+            KeyCode::Char(']') => self.jump_hunk(true),
+            KeyCode::Char('[') => self.jump_hunk(false),
             KeyCode::Char('}') => self.jump(true, |l| matches!(l, Line::File(_))),
             KeyCode::Char('{') => self.jump(false, |l| matches!(l, Line::File(_))),
             KeyCode::Enter => self.toggle_fold(),
@@ -278,6 +356,45 @@ impl Review {
             _ => {}
         }
         Outcome::None
+    }
+
+    /// A click on a file in the list goes to it, a click on a file's header folds or unfolds
+    /// it, a click elsewhere in the diff moves the cursor there, and the wheel scrolls.
+    pub fn mouse(&mut self, ev: MouseEvent) {
+        let at = Position::new(ev.column, ev.row);
+        match ev.kind {
+            MouseEventKind::ScrollDown => self.scroll(3),
+            MouseEventKind::ScrollUp => self.scroll(-3),
+            MouseEventKind::Down(MouseButton::Left) if self.list_area.contains(at) => {
+                if let Some(f) = self.list_file_at(ev.row) {
+                    self.in_list = false;
+                    self.cursor = rows::find(&self.lines, (f, None, None));
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left) if self.diff_area.contains(at) => {
+                let i = self.top + (ev.row - self.diff_area.y) as usize;
+                match self.lines.get(i) {
+                    Some(&Line::File(f)) => self.toggle_file(f),
+                    Some(_) => self.cursor = i,
+                    None => {}
+                }
+                self.in_list = false;
+            }
+            _ => {}
+        }
+    }
+
+    /// Scrolls the diff `n` lines, keeping the cursor on screen.
+    fn scroll(&mut self, n: isize) {
+        let last = self.lines.len().saturating_sub(1);
+        let max_top = self.lines.len().saturating_sub(self.height);
+        self.top = (self.top as isize + n).clamp(0, max_top as isize) as usize;
+        let margin = (self.height / 4).min(3);
+        let low = if self.top == 0 { 0 } else { self.top + margin };
+        let high = (self.top + self.height)
+            .saturating_sub(margin + 1)
+            .min(last);
+        self.cursor = self.cursor.clamp(low.min(high), high);
     }
 
     /// The key bar. With Shift held, r and f become R and F.
@@ -352,33 +469,47 @@ mod tests {
         r
     }
 
+    fn on_change(file: usize, hunk: usize) -> Option<Line> {
+        Some(Line::Code {
+            file,
+            hunk,
+            old: Some(0),
+            new: None,
+        })
+    }
+
     #[test]
-    fn brackets_move_between_hunks_and_braces_between_files() {
+    fn brackets_move_between_first_changed_lines_and_braces_between_files() {
         let mut r = review();
         press(&mut r, KeyCode::Char(']'));
+        assert_eq!(r.current(), on_change(0, 0));
         press(&mut r, KeyCode::Char(']'));
-        assert_eq!(r.current(), Some(Line::Hunk(0, 1)));
+        assert_eq!(r.current(), on_change(0, 1));
         press(&mut r, KeyCode::Char('}'));
         assert_eq!(r.current(), Some(Line::File(1)));
         press(&mut r, KeyCode::Char('['));
-        assert_eq!(r.current(), Some(Line::Hunk(0, 1)));
+        assert_eq!(r.current(), on_change(0, 1));
         press(&mut r, KeyCode::Char('{'));
         assert_eq!(r.current(), Some(Line::File(0)));
     }
 
     #[test]
-    fn enter_folds_the_hunk_under_the_cursor_and_unfolds_it_again() {
+    fn enter_folds_the_file_under_the_cursor_and_unfolds_it_again() {
         let mut r = review();
         press(&mut r, KeyCode::Char(']'));
-        press(&mut r, KeyCode::Down);
         press(&mut r, KeyCode::Enter);
+        assert_eq!(r.current(), Some(Line::File(0)));
+        press(&mut r, KeyCode::Down);
+        assert_eq!(r.current(), Some(Line::File(1)));
+        // Brackets skip the folded file.
+        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Char(']'));
+        assert_eq!(r.current(), on_change(1, 0));
+        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Enter);
+        press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::Hunk(0, 0)));
-        press(&mut r, KeyCode::Down);
-        assert_eq!(r.current(), Some(Line::Hunk(0, 1)));
-        press(&mut r, KeyCode::Up);
-        press(&mut r, KeyCode::Enter);
-        press(&mut r, KeyCode::Down);
-        assert!(matches!(r.current(), Some(Line::Code { hunk: 0, .. })));
     }
 
     #[test]

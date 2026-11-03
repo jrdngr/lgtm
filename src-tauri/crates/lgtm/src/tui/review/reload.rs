@@ -1,7 +1,5 @@
 //! Keeping the reader's place across a reload, when edits or jj operations change the diff:
-//! the cursor stays on the same line of the same file, and folded hunks stay folded.
-
-use std::collections::HashSet;
+//! the cursor stays on the same line of the same file, and folded files stay folded.
 
 use lgtm_core::diff::Row;
 use lgtm_core::jj::FileDiff;
@@ -140,43 +138,12 @@ impl Spot {
     }
 }
 
-/// Folded hunks by file path and where they start in the old and new file.
-pub fn folded_keys(
-    files: &[FileDiff],
-    folded: &HashSet<(usize, usize)>,
-) -> Vec<(String, u32, u32)> {
-    folded
-        .iter()
-        .filter_map(|&(f, h)| {
-            let file = files.get(f)?;
-            let hunk = file.hunks.get(h)?;
-            Some((file.path.clone(), hunk.old_start, hunk.new_start))
-        })
-        .collect()
-}
-
-/// The hunks of `files` to fold again: those of a folded hunk's file that start where it did
-/// on either side.
-pub fn refold(files: &[FileDiff], keys: &[(String, u32, u32)]) -> HashSet<(usize, usize)> {
-    let mut out = HashSet::new();
-    for (f, file) in files.iter().enumerate() {
-        for (h, hunk) in file.hunks.iter().enumerate() {
-            let was = keys.iter().any(|(path, old, new)| {
-                *path == file.path && (*old == hunk.old_start || *new == hunk.new_start)
-            });
-            if was {
-                out.insert((f, h));
-            }
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tui::review::rows;
     use lgtm_core::diff::{FileStatus, Hunk, RowKind};
+    use std::collections::HashSet;
 
     fn hunk(old_start: u32, new_start: u32, kinds: &[(RowKind, &str)]) -> Hunk {
         let (mut old, mut new) = (old_start, new_start);
@@ -232,7 +199,7 @@ mod tests {
         )];
         let lines = rows::lines(&before, &HashSet::new(), false);
         // On `c`, new line 12.
-        let spot = Spot::of(&before, lines[4]);
+        let spot = Spot::of(&before, lines[3]);
         let after = [
             file("a.rs", vec![hunk(1, 1, &[(A, "new file")])]),
             file(
@@ -253,26 +220,5 @@ mod tests {
         };
         let row = &after[file].hunks[hunk].rows[old.unwrap()];
         assert_eq!((row.text.as_str(), row.new_line), ("c", Some(13)));
-    }
-
-    #[test]
-    fn a_folded_hunk_stays_folded_and_holds_the_cursor_that_was_in_it() {
-        let before = [file(
-            "a.rs",
-            vec![hunk(1, 1, &[(A, "x")]), hunk(20, 21, &[(C, "a"), (A, "b")])],
-        )];
-        let folded = HashSet::from([(0, 1)]);
-        let open = rows::lines(&before, &HashSet::new(), false);
-        let spot = Spot::of(&before, open[5]);
-        let keys = folded_keys(&before, &folded);
-        // The first hunk is gone, so the folded one starts a line higher in the new file.
-        let after = [file(
-            "a.rs",
-            vec![hunk(20, 20, &[(C, "a"), (A, "b"), (A, "c")])],
-        )];
-        let refolded = refold(&after, &keys);
-        assert_eq!(refolded, HashSet::from([(0, 0)]));
-        let lines = rows::lines(&after, &refolded, false);
-        assert_eq!(lines[spot.find(&after, &lines)], Line::Hunk(0, 0));
     }
 }

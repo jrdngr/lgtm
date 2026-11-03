@@ -1,5 +1,5 @@
-//! The review's screen lines: each file's header, then each hunk's header and rows, unified or
-//! paired side by side.
+//! The review's screen lines: each file's header, then its hunks' rows, unified or paired side
+//! by side, with a divider line above each hunk where a file has more than one.
 
 use std::collections::{HashMap, HashSet};
 
@@ -100,14 +100,14 @@ impl Line {
 }
 
 #[cfg(test)]
-pub fn lines(files: &[FileDiff], folded: &HashSet<(usize, usize)>, split: bool) -> Vec<Line> {
+pub fn lines(files: &[FileDiff], folded: &HashSet<usize>, split: bool) -> Vec<Line> {
     lines_with(files, folded, split, &Notes::default())
 }
 
-/// The lines of `files`, with `notes` under their rows. A row in a folded hunk shows none.
+/// The lines of `files`, with `notes` under their rows. A folded file shows only its header.
 pub fn lines_with(
     files: &[FileDiff],
-    folded: &HashSet<(usize, usize)>,
+    folded: &HashSet<usize>,
     split: bool,
     notes: &Notes,
 ) -> Vec<Line> {
@@ -124,11 +124,13 @@ pub fn lines_with(
     };
     for (f, file) in files.iter().enumerate() {
         out.push(Line::File(f));
+        if folded.contains(&f) {
+            continue;
+        }
         note_lines(&mut out, f, None, notes.at_file.get(&f));
         for (h, hunk) in file.hunks.iter().enumerate() {
-            out.push(Line::Hunk(f, h));
-            if folded.contains(&(f, h)) {
-                continue;
+            if file.hunks.len() > 1 {
+                out.push(Line::Hunk(f, h));
             }
             let code = |(old, new)| Line::Code {
                 file: f,
@@ -262,22 +264,35 @@ mod tests {
     }
 
     #[test]
-    fn a_folded_hunk_keeps_only_its_header() {
-        let files = [file(vec![vec![C, A], vec![R]])];
-        let folded = HashSet::from([(0, 0)]);
+    fn a_folded_file_keeps_only_its_header_and_one_hunk_has_no_divider() {
+        let files = [file(vec![vec![C, A], vec![R]]), file(vec![vec![R]])];
+        let code = |file, hunk| Line::Code {
+            file,
+            hunk,
+            old: Some(0),
+            new: None,
+        };
         assert_eq!(
-            lines(&files, &folded, false),
+            lines(&files, &HashSet::new(), false),
             vec![
                 Line::File(0),
                 Line::Hunk(0, 0),
-                Line::Hunk(0, 1),
+                code(0, 0),
                 Line::Code {
                     file: 0,
-                    hunk: 1,
-                    old: Some(0),
+                    hunk: 0,
+                    old: Some(1),
                     new: None
                 },
+                Line::Hunk(0, 1),
+                code(0, 1),
+                Line::File(1),
+                code(1, 0),
             ]
+        );
+        assert_eq!(
+            lines(&files, &HashSet::from([0]), false),
+            vec![Line::File(0), Line::File(1), code(1, 0)]
         );
     }
 
@@ -287,7 +302,7 @@ mod tests {
         let unified = lines(&files, &HashSet::new(), false);
         let split = lines(&files, &HashSet::new(), true);
         // The second added row is on its own line side by side.
-        let at = find(&split, unified[5].spot());
+        let at = find(&split, unified[4].spot());
         assert_eq!(
             split[at],
             Line::Code {
@@ -297,8 +312,8 @@ mod tests {
                 new: Some(3)
             }
         );
-        // A row inside a folded hunk falls back to the hunk's header.
-        let folded = lines(&files, &HashSet::from([(0, 0)]), false);
-        assert_eq!(folded[find(&folded, unified[5].spot())], Line::Hunk(0, 0));
+        // A row inside a folded file falls back to the file's header.
+        let folded = lines(&files, &HashSet::from([0]), false);
+        assert_eq!(folded[find(&folded, unified[4].spot())], Line::File(0));
     }
 }

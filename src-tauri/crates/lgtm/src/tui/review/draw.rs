@@ -5,9 +5,9 @@ use lgtm_core::jj::FileDiff;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use super::Review;
 use super::marks::State;
 use super::rows::{Line, NoteKey};
+use super::{Review, tree};
 use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
@@ -100,6 +100,7 @@ impl Review {
         } else {
             0
         };
+        self.list_area = Rect::default();
         if list > 0 {
             self.draw_list(c, Rect::new(body.x, body.y, list, body.height));
             for y in body.top()..body.bottom() {
@@ -112,41 +113,58 @@ impl Review {
     }
 
     fn draw_list(&mut self, c: &mut Canvas, area: Rect) {
+        self.list_area = area;
         let selected = self.current().map_or(0, Line::file);
+        let entries = tree::tree(self.files.iter().map(|f| f.path.as_str()));
+        let at = entries
+            .iter()
+            .position(|e| matches!(e, tree::Entry::File { file, .. } if *file == selected))
+            .unwrap_or(0);
         let height = area.height.saturating_sub(1) as usize;
-        if selected < self.list_top {
-            self.list_top = selected;
-        } else if height > 0 && selected >= self.list_top + height {
-            self.list_top = selected + 1 - height;
+        if at < self.list_top {
+            self.list_top = at;
+        } else if height > 0 && at >= self.list_top + height {
+            self.list_top = at + 1 - height;
         }
         let mut c = Canvas::new(&mut *c.buf, area);
-        for (n, (i, f)) in self
-            .files
-            .iter()
-            .enumerate()
-            .skip(self.list_top)
-            .take(height)
-            .enumerate()
-        {
+        for (n, entry) in entries.iter().skip(self.list_top).take(height).enumerate() {
             let y = area.y + 1 + n as u16;
-            let bg = if i == selected { SEL } else { BG };
-            c.fill(area.x, y, area.width, bg);
-            let (mark, color) = icon(self.file_state(i));
-            c.put(area.x + 1, y, mark, theme::fg(color).bg(bg));
-            let name = f.path.rsplit('/').next().unwrap_or(&f.path);
-            let dir = &f.path[..f.path.len() - name.len()];
-            let x = c.put(area.x + 3, y, dir, theme::fg(MUTED).bg(bg));
-            let style = if self.in_list && i == selected {
-                theme::bold(FG)
-            } else {
-                theme::fg(FG)
-            };
-            c.put(x, y, name, style.bg(bg));
+            match entry {
+                tree::Entry::Dir { name, depth } => {
+                    c.fill(area.x, y, area.width, BG);
+                    let x = area.x + 3 + 2 * *depth as u16;
+                    c.put(x, y, &format!("{name}/"), theme::fg(MUTED).bg(BG));
+                }
+                tree::Entry::File { file, name, depth } => {
+                    let bg = if *file == selected { SEL } else { BG };
+                    c.fill(area.x, y, area.width, bg);
+                    let (mark, color) = icon(self.file_state(*file));
+                    c.put(area.x + 1, y, mark, theme::fg(color).bg(bg));
+                    let style = if self.in_list && *file == selected {
+                        theme::bold(FG)
+                    } else {
+                        theme::fg(FG)
+                    };
+                    let x = area.x + 3 + 2 * *depth as u16;
+                    c.put(x, y, name, style.bg(bg));
+                }
+            }
+        }
+    }
+
+    /// The file on the list's screen row `y`, if any.
+    pub(super) fn list_file_at(&self, y: u16) -> Option<usize> {
+        let n = y.checked_sub(self.list_area.y + 1)? as usize;
+        let entries = tree::tree(self.files.iter().map(|f| f.path.as_str()));
+        match entries.get(self.list_top + n)? {
+            tree::Entry::File { file, .. } => Some(*file),
+            tree::Entry::Dir { .. } => None,
         }
     }
 
     fn draw_diff(&mut self, c: &mut Canvas) {
         let area = c.area;
+        self.diff_area = area;
         let height = area.height as usize;
         self.height = height;
         let margin = (height / 4).min(3);
@@ -162,11 +180,11 @@ impl Review {
                 .hunk()
                 .and_then(|h| bar(self.hunk_state(line.file(), h)));
             match line {
-                Line::File(f) => file_header(c, y, &self.files[f], cursor),
-                Line::Hunk(f, h) => {
-                    let folded = self.folded.contains(&(f, h));
-                    hunk_header(c, y, &self.files[f].hunks[h], folded, cursor)
+                Line::File(f) => {
+                    let folded = self.folded.contains(&self.files[f].path);
+                    file_header(c, y, &self.files[f], folded, cursor)
                 }
+                Line::Hunk(..) => hunk_divider(c, y, cursor),
                 Line::Code {
                     file,
                     hunk,
@@ -262,11 +280,15 @@ impl Review {
     }
 }
 
-fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, cursor: bool) {
+/// A file's header, with `▸` when it's folded.
+fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, folded: bool, cursor: bool) {
     let bg = if cursor { SEL } else { PANEL };
     let x0 = c.area.x;
     c.fill(x0, y, c.area.width, bg);
     let mut x = x0 + 1;
+    if folded {
+        x = c.put(x, y, "▸ ", theme::fg(MUTED).bg(bg));
+    }
     if let Some(old) = &f.old_path {
         x = c.put(x, y, old, theme::fg(MUTED).bg(bg));
         x = c.put(x, y, " → ", theme::fg(MUTED).bg(bg));
@@ -293,26 +315,13 @@ fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, cursor: bool) {
     );
 }
 
-fn hunk_header(c: &mut Canvas, y: u16, h: &lgtm_core::diff::Hunk, folded: bool, cursor: bool) {
+/// The divider above a hunk, in a file with more than one.
+fn hunk_divider(c: &mut Canvas, y: u16, cursor: bool) {
     let bg = if cursor { SEL } else { BG };
     let x0 = c.area.x;
     c.fill(x0, y, c.area.width, bg);
-    let mut x = x0 + 2;
-    if folded {
-        x = c.put(x, y, "▸ ", theme::fg(MUTED).bg(bg));
-    }
-    let range = format!(
-        "@@ -{},{} +{},{} @@",
-        h.old_start, h.old_lines, h.new_start, h.new_lines
-    );
-    x = c.put(x, y, &range, theme::fg(ACCENT).bg(bg));
-    if !h.section.is_empty() {
-        c.put(x + 1, y, h.section.trim(), theme::fg(MUTED).bg(bg));
-    }
-    if folded {
-        let changed = h.rows.iter().filter(|r| r.kind != RowKind::Context).count();
-        c.put_right(y, 1, &format!("{changed} lines"), theme::fg(FAINT).bg(bg));
-    }
+    let width = c.area.width.saturating_sub(3) as usize;
+    c.put(x0 + 2, y, &"╌".repeat(width), theme::fg(HAIR).bg(bg));
 }
 
 fn row_bg(r: &Row) -> Color {

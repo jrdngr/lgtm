@@ -7,10 +7,9 @@ use lgtm_core::store::{MarkColor, Store};
 
 use super::Review;
 use super::marks::{Marks, State};
-use super::rows::{self, Line};
 
 impl Review {
-    /// Takes every file's review state, matches marks onto it, and folds reviewed hunks.
+    /// Takes every file's review state, matches marks onto it, and folds reviewed files.
     pub fn built(&mut self, files: Vec<ReviewFile>, cfg: MatchConfig, store: Option<&Store>) {
         let hunk_rows = self
             .files
@@ -22,9 +21,9 @@ impl Review {
             self.rematch(store);
         }
         if !std::mem::replace(&mut self.built_once, true) {
-            let reviewed: Vec<(usize, usize)> = self
-                .hunks()
-                .filter(|&(f, h)| self.hunk_state(f, h) == State::Reviewed)
+            let reviewed: Vec<String> = (0..self.files.len())
+                .filter(|&f| self.file_state(f) == State::Reviewed)
+                .map(|f| self.files[f].path.clone())
                 .collect();
             self.folded.extend(reviewed);
             self.relayout();
@@ -40,13 +39,6 @@ impl Review {
         }
         self.load_comments(store);
         self.load_threads(store);
-    }
-
-    fn hunks(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
-        self.files
-            .iter()
-            .enumerate()
-            .flat_map(|(f, d)| (0..d.hunks.len()).map(move |h| (f, h)))
     }
 
     pub fn hunk_state(&self, file: usize, hunk: usize) -> State {
@@ -65,32 +57,26 @@ impl Review {
         self.marks.as_ref()?.percent()
     }
 
-    /// Moves to the next hunk header after the cursor that isn't reviewed, wrapping around.
+    /// Moves to the start of the next hunk after the cursor that isn't reviewed, wrapping
+    /// around.
     fn next_unreviewed(&mut self) {
-        let wanted = |l: &Line| match *l {
-            Line::Hunk(f, h) => self.hunk_state(f, h) != State::Reviewed,
-            _ => false,
-        };
-        let after = self.lines.iter().skip(self.cursor + 1).position(wanted);
-        let found = after
-            .map(|i| self.cursor + 1 + i)
-            .or_else(|| self.lines.iter().position(wanted));
+        let wanted: Vec<usize> = self
+            .hunk_starts()
+            .into_iter()
+            .filter(|&i| {
+                let line = self.lines[i];
+                let hunk = self.hunk_at(line).unwrap_or_default();
+                self.hunk_state(line.file(), hunk) != State::Reviewed
+            })
+            .collect();
+        let found = wanted
+            .iter()
+            .find(|&&i| i > self.cursor)
+            .or(wanted.first())
+            .copied();
         if let Some(i) = found {
             self.cursor = i;
         }
-    }
-
-    fn set_folds(&mut self, keys: impl IntoIterator<Item = (usize, usize)>, folded: bool) {
-        for key in keys {
-            if folded {
-                self.folded.insert(key);
-            } else {
-                self.folded.remove(&key);
-            }
-        }
-        let spot = self.current().map(|l| l.spot());
-        self.lines = self.layout();
-        self.cursor = spot.map_or(0, |s| rows::find(&self.lines, s));
     }
 
     /// Handles a marking key. Returns whether `key` was one.
@@ -102,12 +88,12 @@ impl Review {
             self.next_unreviewed();
             return true;
         }
+        let hunk = self.current().and_then(|l| self.hunk_at(l));
         let (Some(line), Some(marks), Some(store)) = (self.current(), self.marks.as_mut(), store)
         else {
             return true;
         };
         let file = line.file();
-        let hunk = line.hunk();
         let result = match key {
             'r' | 'f' if hunk.is_none() => return true,
             'r' => marks.toggle(store, file, hunk, MarkColor::Green),
@@ -119,26 +105,15 @@ impl Review {
             self.notice = Some(format!("{e:#}"));
             return true;
         }
-        match key {
-            'r' => {
-                let hunk = hunk.unwrap_or_default();
-                let reviewed = self.hunk_state(file, hunk) == State::Reviewed;
-                self.set_folds([(file, hunk)], reviewed);
-                if reviewed {
-                    self.next_unreviewed();
-                }
+        // A file folds once it's all reviewed, and the cursor moves on.
+        if matches!(key, 'r' | 'R') {
+            let reviewed = self.file_state(file) == State::Reviewed;
+            if reviewed || key == 'R' {
+                self.set_folded(file, reviewed);
             }
-            'R' => {
-                let reviewed = self.file_state(file) == State::Reviewed;
-                let hunks: Vec<_> = (0..self.files[file].hunks.len())
-                    .map(|h| (file, h))
-                    .collect();
-                self.set_folds(hunks, reviewed);
-                if reviewed {
-                    self.next_unreviewed();
-                }
+            if reviewed {
+                self.next_unreviewed();
             }
-            _ => {}
         }
         true
     }
