@@ -550,13 +550,12 @@ impl Review {
     }
 
     /// Scrolls the diff `n` lines, the cursor moving with it to stay where it is on screen.
+    /// Once the view can't scroll further the cursor keeps going, to the first or last line.
     fn scroll(&mut self, n: isize) {
         let max_top = self.lines.len().saturating_sub(self.height);
-        let top = (self.top as isize + n).clamp(0, max_top as isize) as usize;
-        let moved = top as isize - self.top as isize;
-        self.top = top;
+        self.top = (self.top as isize + n).clamp(0, max_top as isize) as usize;
         let last = self.lines.len().saturating_sub(1);
-        self.cursor = (self.cursor as isize + moved).clamp(0, last as isize) as usize;
+        self.cursor = (self.cursor as isize + n).clamp(0, last as isize) as usize;
     }
 
     /// The key bar. With Shift held, r and f become R and F.
@@ -645,6 +644,21 @@ mod tests {
             old: Some(0),
             new: None,
         })
+    }
+
+    #[test]
+    fn the_wheel_keeps_moving_the_cursor_once_the_view_stops_at_the_top_or_bottom() {
+        let mut r = review();
+        r.height = 3;
+        let last = r.lines.len() - 1;
+        r.scroll(3);
+        assert_eq!((r.top, r.cursor), (3, 3));
+        r.scroll(-1);
+        assert_eq!((r.top, r.cursor), (2, 2));
+        r.scroll(-3);
+        assert_eq!((r.top, r.cursor), (0, 0));
+        r.scroll(100);
+        assert_eq!((r.top, r.cursor), (last + 1 - 3, last));
     }
 
     #[test]
