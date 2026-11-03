@@ -8,5 +8,9 @@ license = "MIT"
 [dependencies]
 anyhow = "1"
 lgtm-core = { path = "../lgtm-core" }
+ratatui = "0.30"
 rmcp = "3.5.1"
-tokio = { version = "1", features = ["rt", "io-std", "macros"] }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "io-std", "macros"] }
+
+[dev-dependencies]
+lgtm-core = { path = "../lgtm-core", features = ["test-support"] }

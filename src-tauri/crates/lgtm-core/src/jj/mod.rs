@@ -35,7 +35,7 @@ pub use bookmarks::BookmarkSpot;
 pub use child::end_all;
 pub use diff::{DiffPath, FileDiff, Range};
 pub use edit::JjAction;
-pub use log::LogRow;
+pub use log::{LogCommit, LogRow};
 pub use near::{NearBookmark, StackSide};
 pub use push::PushPlan;
 pub use workspace::WorkspaceInfo;

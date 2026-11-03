@@ -2,6 +2,7 @@
 //! and hooks.
 
 mod route;
+mod tui;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -9,10 +10,12 @@ fn main() {
         Some("mcp") => route::mcp(),
         Some("hook") => route::hook(),
         Some("gc") => route::gc(&args[1..]),
-        _ => {
-            eprintln!("lgtm: the review UI isn't built yet");
-            2
+        Some("-h" | "--help") => {
+            println!("usage: lgtm [revset]\n       lgtm mcp | hook | gc");
+            0
         }
+        Some(revset) => tui::run(Some(revset.to_string())),
+        None => tui::run(None),
     };
     std::process::exit(code);
 }
