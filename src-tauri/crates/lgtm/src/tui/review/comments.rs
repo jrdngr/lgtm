@@ -60,7 +60,7 @@ impl Review {
             Ok(found) => {
                 self.comments = found
                     .into_iter()
-                    .filter(|c| !c.done)
+                    .filter(|c| self.show_resolved || !c.done)
                     .map(|c| {
                         let at = place(&self.files, &c);
                         (c, at)
@@ -176,8 +176,10 @@ impl Review {
 
     /// Edits the comment the cursor is on, in a box where it is.
     pub(super) fn edit_comment(&mut self, number: i64) {
-        let Some((c, Some((file, hunk, row)))) =
-            self.comments.iter().find(|(c, _)| c.number == number)
+        let Some((c, Some((file, hunk, row)))) = self
+            .comments
+            .iter()
+            .find(|(c, _)| c.number == number && !c.done)
         else {
             return;
         };

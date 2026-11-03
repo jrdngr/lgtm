@@ -80,12 +80,13 @@ impl Review {
     }
 
     fn get_comments(&self) -> Response {
-        if self.comments.is_empty() && self.threads.is_empty() {
+        if self.comments.iter().all(|(c, _)| c.done) && self.threads.is_empty() {
             return Ok("No open comments.".into());
         }
         let mut comments: Vec<_> = self
             .comments
             .iter()
+            .filter(|(c, _)| !c.done)
             .map(|(c, at)| {
                 let line = at.and_then(|(f, h, r)| {
                     let row = &self.files[f].hunks[h].rows[r];

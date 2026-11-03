@@ -91,6 +91,8 @@ pub struct Review {
     pr: Option<(String, u32)>,
     threads: Vec<threads::Thread>,
     hide_pr: bool,
+    /// Whether comments the agent resolved show too.
+    show_resolved: bool,
     /// A failure to show until the next key.
     pub notice: Option<String>,
 }
@@ -115,10 +117,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("t", "side by side"),
     ("p", "pull PR comments"),
     ("H", "hide PR comments"),
-    (
-        ":",
-        "command: review, flag, clear [path], clear-all, pull, split, edit, q",
-    ),
+    (":", "command (:? lists them)"),
     ("q", "back"),
 ];
 
@@ -159,6 +158,7 @@ impl Review {
             pr: None,
             threads: vec![],
             hide_pr: false,
+            show_resolved: false,
             notice: None,
         }
     }

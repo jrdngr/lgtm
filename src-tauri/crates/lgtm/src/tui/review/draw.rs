@@ -250,17 +250,22 @@ impl Review {
                     return;
                 };
                 let bg = if cursor { SEL } else { NOTE };
+                let (accent, fg) = if comment.done {
+                    (MUTED, MUTED)
+                } else {
+                    (ACCENT, FG)
+                };
                 c.fill(x0, y, w, bg);
-                c.put(x0, y, "▎", theme::fg(ACCENT).bg(bg));
+                c.put(x0, y, "▎", theme::fg(accent).bg(bg));
                 let id = format!("C{n} ");
                 let lines = self.comment_lines(comment);
                 let text = lines.get(part).map_or("", String::as_str);
                 let x = if part == 0 {
-                    c.put(x0 + 2, y, &id, theme::bold(ACCENT).bg(bg))
+                    c.put(x0 + 2, y, &id, theme::bold(accent).bg(bg))
                 } else {
                     x0 + 2 + id.len() as u16
                 };
-                c.put(x, y, text, theme::fg(FG).bg(bg));
+                c.put(x, y, text, theme::fg(fg).bg(bg));
             }
             NoteKey::Thread(id) => {
                 let Some(t) = self.thread(id) else { return };

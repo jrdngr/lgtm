@@ -360,6 +360,7 @@ impl App {
                 r.draw(c, body);
                 if let Some((text, offers)) = r.prompt() {
                     keybar::prompt(c, bottom, &text, offers);
+                    keybar::menu(c, body, &r.command_menu());
                     return;
                 }
                 (r.hints(self.shift), review::KEYS)

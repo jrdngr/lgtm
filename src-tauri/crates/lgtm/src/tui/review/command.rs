@@ -7,16 +7,25 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::{Outcome, Review};
 
-/// Commands, with whether each takes a path.
-const COMMANDS: &[(&str, bool)] = &[
-    ("review", true),
-    ("flag", true),
-    ("clear", true),
-    ("clear-all", false),
-    ("pull", false),
-    ("split", false),
-    ("edit", false),
-    ("q", false),
+/// Commands, with whether each takes a path, and what they do.
+const COMMANDS: &[(&str, bool, &str)] = &[
+    (
+        "review",
+        true,
+        "review a file or folder, or the current file",
+    ),
+    ("flag", true, "flag a file or folder, or the current file"),
+    (
+        "clear",
+        true,
+        "clear marks on a file or folder, or the current file",
+    ),
+    ("clear-all", false, "clear every mark in the review"),
+    ("resolved", false, "show or hide resolved comments"),
+    ("pull", false, "pull PR comments"),
+    ("split", false, "side by side"),
+    ("edit", false, "open the editor"),
+    ("q", false, "back"),
 ];
 
 #[derive(Default)]
@@ -99,6 +108,30 @@ impl Review {
         Some((format!(":{}", cmd.text), &cmd.offers))
     }
 
+    /// The commands whose names start with what's typed, each with a word on what it takes
+    /// and what it does: all of them for `?`. None once a path is being typed.
+    pub fn command_menu(&self) -> Vec<(String, &'static str)> {
+        let Some(cmd) = &self.cmd else {
+            return vec![];
+        };
+        let typed = cmd.text.as_str();
+        if typed.contains(' ') {
+            return vec![];
+        }
+        COMMANDS
+            .iter()
+            .filter(|(c, ..)| typed == "?" || c.starts_with(typed))
+            .map(|&(c, path, what)| {
+                let name = if path {
+                    format!("{c} [path]")
+                } else {
+                    c.to_string()
+                };
+                (name, what)
+            })
+            .collect()
+    }
+
     /// Every file path in the review, and every folder with a `/` after it.
     fn paths(&self) -> Vec<String> {
         let mut out = BTreeSet::new();
@@ -137,7 +170,7 @@ impl Review {
                 let options = if line.text.contains(' ') {
                     self.paths()
                 } else {
-                    COMMANDS.iter().map(|(c, _)| c.to_string()).collect()
+                    COMMANDS.iter().map(|(c, ..)| c.to_string()).collect()
                 };
                 if let Some(line) = self.cmd.as_mut() {
                     complete(line, &options);
@@ -166,7 +199,13 @@ impl Review {
             return Outcome::None;
         };
         let path = words.next();
-        let takes_path = COMMANDS.iter().find(|(c, _)| *c == name).map(|(_, p)| *p);
+        if name == "?" {
+            return Outcome::None;
+        }
+        let takes_path = COMMANDS
+            .iter()
+            .find(|(c, ..)| *c == name)
+            .map(|(_, p, _)| *p);
         match takes_path {
             None => {
                 self.notice = Some(format!("no command `{name}`"));
@@ -206,6 +245,12 @@ impl Review {
             "split" => {
                 self.split = !self.split;
                 self.relayout();
+            }
+            "resolved" => {
+                self.show_resolved = !self.show_resolved;
+                if let Some(store) = store {
+                    self.load_comments(store);
+                }
             }
             "edit" => {
                 if let Some((path, line)) = self.edit_target() {
