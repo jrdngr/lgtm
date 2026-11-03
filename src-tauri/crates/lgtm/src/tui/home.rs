@@ -36,7 +36,7 @@ impl Default for Home {
         Self {
             picker: Picker::default(),
             files: FileTree::default(),
-            focus: Focus::Files,
+            focus: Focus::Revisions,
         }
     }
 }
