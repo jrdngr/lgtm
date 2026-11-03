@@ -1,9 +1,11 @@
 //! Reviewing a commit or range: its diff, unified or side by side, beside its file list.
 
 mod agent;
+mod command;
 mod comments;
 mod draw;
 mod edit;
+mod list;
 mod marking;
 pub mod marks;
 mod reload;
@@ -51,8 +53,12 @@ pub struct Review {
     lines: Vec<Line>,
     cursor: usize,
     top: usize,
+    /// Whether the mouse put the cursor where it is, so the view stays put around it.
+    pinned: bool,
     /// Whether keys move through the file list rather than the diff.
     in_list: bool,
+    /// The folder picked in the file list, when one is rather than a file.
+    list_dir: Option<String>,
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
@@ -66,6 +72,8 @@ pub struct Review {
     /// Open comments for the agent, each with where it is.
     comments: Vec<comments::Placed>,
     input: Option<comments::Input>,
+    cmd: Option<command::CmdLine>,
+    confirm: Option<command::Confirm>,
     /// The PR whose threads show, as `(owner/name, number)`.
     pr: Option<(String, u32)>,
     threads: Vec<threads::Thread>,
@@ -83,7 +91,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Enter", "fold file"),
     ("Tab", "file list"),
     ("r f", "review, flag hunk"),
-    ("R F", "review, flag file"),
+    ("R F", "review, flag file or folder"),
     ("n", "next not reviewed"),
     ("c", "comment for the agent"),
     ("d", "delete comment"),
@@ -91,6 +99,10 @@ pub const KEYS: &[(&str, &str)] = &[
     ("t", "side by side"),
     ("p", "pull PR comments"),
     ("H", "hide PR comments"),
+    (
+        ":",
+        "command: review, flag, clear [path], clear-all, pull, split, edit, q",
+    ),
     ("q", "back"),
 ];
 
@@ -109,7 +121,9 @@ impl Review {
             lines: vec![],
             cursor: 0,
             top: 0,
+            pinned: false,
             in_list: false,
+            list_dir: None,
             list_top: 0,
             height: 0,
             list_area: Rect::default(),
@@ -118,6 +132,8 @@ impl Review {
             built_once: false,
             comments: vec![],
             input: None,
+            cmd: None,
+            confirm: None,
             pr: None,
             threads: vec![],
             hide_pr: false,
@@ -219,16 +235,6 @@ impl Review {
         self.cursor = (self.cursor as isize + n).clamp(0, last.max(0)) as usize;
     }
 
-    /// Moves the cursor to the header of the file `n` files on from the cursor's.
-    fn go_to_file(&mut self, n: isize) {
-        let Some(file) = self.current().map(Line::file) else {
-            return;
-        };
-        let last = self.files.len().saturating_sub(1) as isize;
-        let to = (file as isize + n).clamp(0, last) as usize;
-        self.cursor = rows::find(&self.lines, (to, None, None));
-    }
-
     /// The hunk `line` is in. A file with one hunk has no divider, so its header stands for it.
     fn hunk_at(&self, line: Line) -> Option<usize> {
         line.hunk().or(match line {
@@ -310,6 +316,10 @@ impl Review {
         let half = (self.height / 2).max(1) as isize;
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         self.notice = None;
+        self.pinned = false;
+        if self.cmd.is_some() || self.confirm.is_some() {
+            return self.command_key(key, store);
+        }
         if self.typing() {
             self.input_key(key, store.as_deref());
             return Outcome::None;
@@ -323,10 +333,12 @@ impl Review {
         }
         match key.code {
             KeyCode::Char('q') => return Outcome::Back,
-            KeyCode::Tab => self.in_list = !self.in_list,
-            KeyCode::Esc | KeyCode::Enter if self.in_list => self.in_list = false,
-            KeyCode::Char('j') | KeyCode::Down if self.in_list => self.go_to_file(1),
-            KeyCode::Char('k') | KeyCode::Up if self.in_list => self.go_to_file(-1),
+            KeyCode::Char(':') => self.start_command(),
+            KeyCode::Tab => self.set_in_list(!self.in_list),
+            KeyCode::Esc | KeyCode::Enter if self.in_list => self.set_in_list(false),
+            KeyCode::Char('j') | KeyCode::Down if self.in_list => self.list_step(1),
+            KeyCode::Char('k') | KeyCode::Up if self.in_list => self.list_step(-1),
+            KeyCode::Char(c @ ('R' | 'F')) if self.in_list => self.list_mark(c, store),
             KeyCode::Char('j') | KeyCode::Down => self.by(1),
             KeyCode::Char('k') | KeyCode::Up => self.by(-1),
             KeyCode::Char('d') if ctrl => self.by(half),
@@ -362,13 +374,14 @@ impl Review {
     /// it, a click elsewhere in the diff moves the cursor there, and the wheel scrolls.
     pub fn mouse(&mut self, ev: MouseEvent) {
         let at = Position::new(ev.column, ev.row);
+        self.pinned = true;
         match ev.kind {
             MouseEventKind::ScrollDown => self.scroll(3),
             MouseEventKind::ScrollUp => self.scroll(-3),
             MouseEventKind::Down(MouseButton::Left) if self.list_area.contains(at) => {
-                if let Some(f) = self.list_file_at(ev.row) {
-                    self.in_list = false;
-                    self.cursor = rows::find(&self.lines, (f, None, None));
+                if let Some(entry) = self.list_entry_at(ev.row) {
+                    self.in_list = matches!(entry, tree::Entry::Dir { .. });
+                    self.pick_entry(&entry);
                 }
             }
             MouseEventKind::Down(MouseButton::Left) if self.diff_area.contains(at) => {
@@ -378,9 +391,16 @@ impl Review {
                     Some(_) => self.cursor = i,
                     None => {}
                 }
-                self.in_list = false;
+                self.set_in_list(false);
             }
             _ => {}
+        }
+    }
+
+    fn set_in_list(&mut self, on: bool) {
+        self.in_list = on;
+        if !on {
+            self.list_dir = None;
         }
     }
 
@@ -396,6 +416,13 @@ impl Review {
 
     /// The key bar. With Shift held, r and f become R and F.
     pub fn hints(&self, shift: bool) -> Vec<Hint<'static>> {
+        if self.cmd.is_some() {
+            return vec![
+                ("Tab", "complete", false),
+                ("Enter", "run", false),
+                ("Esc", "cancel", false),
+            ];
+        }
         if self.typing() {
             return vec![("Enter", "save", false), ("Esc", "cancel", false)];
         }

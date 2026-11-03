@@ -3,7 +3,7 @@
 use ratatui::layout::Rect;
 
 use super::paint::Canvas;
-use super::theme::{self, ACCENT, FG, GREEN, HAIR, PANEL};
+use super::theme::{self, ACCENT, FG, GREEN, HAIR, MUTED, PANEL};
 
 /// A hint: its keys, space-separated when a pair goes both ways, its label, and whether what
 /// it toggles is on.
@@ -26,6 +26,16 @@ pub fn draw(c: &mut Canvas, y: u16, hints: &[Hint]) {
             theme::fg(if *on { GREEN } else { FG }).bg(PANEL),
         );
         x += 3;
+    }
+}
+
+/// A line being typed, with what Tab offers after it.
+pub fn prompt(c: &mut Canvas, y: u16, text: &str, offers: &[String]) {
+    c.fill(c.area.x, y, c.area.width, PANEL);
+    let x = c.put(c.area.x + 1, y, text, theme::fg(FG).bg(PANEL));
+    let mut x = c.put(x, y, " ", theme::fg(FG).bg(ACCENT)) + 2;
+    for offer in offers {
+        x = c.put(x, y, offer, theme::fg(MUTED).bg(PANEL)) + 2;
     }
 }
 

@@ -6,8 +6,10 @@ use std::collections::BTreeMap;
 /// A line of the tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry {
+    /// A directory: what it shows as, its path, and how deep it is.
     Dir {
         name: String,
+        path: String,
         depth: usize,
     },
     /// A review file by index, and its name.
@@ -37,11 +39,17 @@ pub fn tree<'a>(paths: impl IntoIterator<Item = &'a str>) -> Vec<Entry> {
         node.files.push((name.to_string(), i));
     }
     let mut out = Vec::new();
-    emit(&root, 0, &mut out);
+    emit(&root, "", 0, &mut out);
     out
 }
 
-fn emit(node: &Node, depth: usize, out: &mut Vec<Entry>) {
+/// Whether `path` is inside the directory `dir`.
+pub fn inside(path: &str, dir: &str) -> bool {
+    path.strip_prefix(dir)
+        .is_some_and(|rest| rest.starts_with('/'))
+}
+
+fn emit(node: &Node, parent: &str, depth: usize, out: &mut Vec<Entry>) {
     // Directories and files by name, together, as jj orders paths.
     let mut names: Vec<(&str, Option<&Node>, usize)> = node
         .dirs
@@ -65,8 +73,17 @@ fn emit(node: &Node, depth: usize, out: &mut Vec<Entry>) {
             name = format!("{name}/{next}");
             dir = inner;
         }
-        out.push(Entry::Dir { name, depth });
-        emit(dir, depth + 1, out);
+        let path = if parent.is_empty() {
+            name.clone()
+        } else {
+            format!("{parent}/{name}")
+        };
+        out.push(Entry::Dir {
+            name,
+            path: path.clone(),
+            depth,
+        });
+        emit(dir, &path, depth + 1, out);
     }
 }
 
@@ -82,8 +99,9 @@ mod tests {
             "src/tui/review/b.rs",
             "src/main.rs",
         ]);
-        let dir = |name: &str, depth| Entry::Dir {
+        let dir = |name: &str, path: &str, depth| Entry::Dir {
             name: name.into(),
+            path: path.into(),
             depth,
         };
         let file = |file, name: &str, depth| Entry::File {
@@ -95,12 +113,14 @@ mod tests {
             got,
             [
                 file(1, "README.md", 0),
-                dir("src", 0),
+                dir("src", "src", 0),
                 file(3, "main.rs", 1),
-                dir("tui/review", 1),
+                dir("tui/review", "src/tui/review", 1),
                 file(0, "a.rs", 2),
                 file(2, "b.rs", 2),
             ]
         );
+        assert!(inside("src/tui/a.rs", "src"));
+        assert!(!inside("srcs/a.rs", "src"));
     }
 }

@@ -98,7 +98,7 @@ impl Review {
             'r' | 'f' if hunk.is_none() => return true,
             'r' => marks.toggle(store, file, hunk, MarkColor::Green),
             'f' => marks.toggle(store, file, hunk, MarkColor::Red),
-            'R' => marks.toggle_check(store, file),
+            'R' => marks.toggle_checks(store, &[file]),
             _ => marks.toggle(store, file, None, MarkColor::Red),
         };
         if let Err(e) = result {

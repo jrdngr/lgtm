@@ -280,23 +280,91 @@ impl Marks {
         color: MarkColor,
     ) -> anyhow::Result<()> {
         let rows = self.rows(file, hunk, true);
+        self.toggle_rows(store, rows, color)
+    }
+
+    /// Marks every row of the files `color`, or clears them when they all have it.
+    pub fn toggle_files(
+        &mut self,
+        store: &mut Store,
+        files: &[usize],
+        color: MarkColor,
+    ) -> anyhow::Result<()> {
+        let rows = files
+            .iter()
+            .flat_map(|&f| self.rows(f, None, true))
+            .collect();
+        self.toggle_rows(store, rows, color)
+    }
+
+    fn toggle_rows(
+        &mut self,
+        store: &mut Store,
+        rows: Vec<RowRef>,
+        color: MarkColor,
+    ) -> anyhow::Result<()> {
         let all = !rows.is_empty()
             && rows
                 .iter()
                 .all(|r| self.matched.get(r).is_some_and(|m| m.color == color));
-        let edit =
-            self.marking(now_ms())
-                .mark_edit(store, &rows, (!all).then_some(color), false)?;
+        self.set_rows(store, &rows, (!all).then_some(color))
+    }
+
+    fn set_rows(
+        &mut self,
+        store: &mut Store,
+        rows: &[RowRef],
+        color: Option<MarkColor>,
+    ) -> anyhow::Result<()> {
+        let edit = self
+            .marking(now_ms())
+            .mark_edit(store, rows, color, false)?;
         store.apply(&edit)?;
         self.rematch(store)
     }
 
-    /// Checks the file, or unchecks it when the user's check is current.
-    pub fn toggle_check(&mut self, store: &mut Store, file: usize) -> anyhow::Result<()> {
-        let checked = self.checked(file) == Some(false);
-        let edit = self
-            .marking(now_ms())
-            .check_edit(&[file as u32], !checked, false);
+    /// Marks every row of the files `color`.
+    pub fn mark_files(
+        &mut self,
+        store: &mut Store,
+        files: &[usize],
+        color: MarkColor,
+    ) -> anyhow::Result<()> {
+        let rows: Vec<RowRef> = files
+            .iter()
+            .flat_map(|&f| self.rows(f, None, true))
+            .collect();
+        self.set_rows(store, &rows, Some(color))
+    }
+
+    /// Checks the files, or unchecks them when the user's check is current on each.
+    pub fn toggle_checks(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<()> {
+        let all = files.iter().all(|&f| self.checked(f) == Some(false));
+        self.set_checks(store, files, !all)
+    }
+
+    pub fn set_checks(
+        &mut self,
+        store: &mut Store,
+        files: &[usize],
+        checked: bool,
+    ) -> anyhow::Result<()> {
+        let files: Vec<u32> = files.iter().map(|&f| f as u32).collect();
+        let edit = self.marking(now_ms()).check_edit(&files, checked, false);
+        store.apply(&edit)?;
+        self.rematch(store)
+    }
+
+    /// Clears every mark and check on the files, the agent's too.
+    pub fn clear(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<()> {
+        let rows: Vec<RowRef> = files
+            .iter()
+            .flat_map(|&f| self.rows(f, None, true))
+            .collect();
+        let marking = self.marking(now_ms());
+        let mut edit = marking.mark_edit(store, &rows, None, false)?;
+        let ids: Vec<u32> = files.iter().map(|&f| f as u32).collect();
+        edit.checks_removed = marking.check_edit(&ids, false, false).checks_removed;
         store.apply(&edit)?;
         self.rematch(store)
     }
@@ -406,14 +474,14 @@ mod tests {
     fn a_flagged_row_outranks_a_check_and_flags_are_not_done() {
         let mut store = Store::in_memory();
         let mut m = marks();
-        m.toggle_check(&mut store, 0).unwrap();
+        m.toggle_checks(&mut store, &[0]).unwrap();
         assert_eq!(m.state(0, Some(1)), State::Reviewed);
         assert_eq!(m.percent(), Some(100));
         m.toggle(&mut store, 0, Some(1), MarkColor::Red).unwrap();
         assert_eq!(m.state(0, Some(1)), State::Flagged);
         assert_eq!(m.state(0, None), State::Flagged);
         assert_eq!(m.percent(), Some(50));
-        m.toggle_check(&mut store, 0).unwrap();
+        m.toggle_checks(&mut store, &[0]).unwrap();
         assert_eq!(m.state(0, Some(0)), State::None);
         assert_eq!(m.percent(), Some(0));
     }

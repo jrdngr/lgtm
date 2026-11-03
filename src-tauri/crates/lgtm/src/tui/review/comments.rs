@@ -71,7 +71,7 @@ impl Review {
     }
 
     pub fn typing(&self) -> bool {
-        self.input.is_some()
+        self.input.is_some() || self.cmd.is_some() || self.confirm.is_some()
     }
 
     /// The notes under rows and at the tops of files, for the layout.

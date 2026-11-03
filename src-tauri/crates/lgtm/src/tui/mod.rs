@@ -358,6 +358,10 @@ impl App {
             Some(r) => {
                 r.title(c, x, top);
                 r.draw(c, body);
+                if let Some((text, offers)) = r.prompt() {
+                    keybar::prompt(c, bottom, &text, offers);
+                    return;
+                }
                 (r.hints(self.shift), review::KEYS)
             }
             None => {

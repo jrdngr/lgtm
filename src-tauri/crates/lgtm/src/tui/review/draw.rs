@@ -114,12 +114,8 @@ impl Review {
 
     fn draw_list(&mut self, c: &mut Canvas, area: Rect) {
         self.list_area = area;
-        let selected = self.current().map_or(0, Line::file);
-        let entries = tree::tree(self.files.iter().map(|f| f.path.as_str()));
-        let at = entries
-            .iter()
-            .position(|e| matches!(e, tree::Entry::File { file, .. } if *file == selected))
-            .unwrap_or(0);
+        let entries = self.entries();
+        let at = self.list_at(&entries);
         let height = area.height.saturating_sub(1) as usize;
         if at < self.list_top {
             self.list_top = at;
@@ -127,39 +123,35 @@ impl Review {
             self.list_top = at + 1 - height;
         }
         let mut c = Canvas::new(&mut *c.buf, area);
-        for (n, entry) in entries.iter().skip(self.list_top).take(height).enumerate() {
-            let y = area.y + 1 + n as u16;
-            match entry {
-                tree::Entry::Dir { name, depth } => {
-                    c.fill(area.x, y, area.width, BG);
-                    let x = area.x + 3 + 2 * *depth as u16;
-                    c.put(x, y, &format!("{name}/"), theme::fg(MUTED).bg(BG));
+        for (n, entry) in entries.iter().enumerate().skip(self.list_top).take(height) {
+            let y = area.y + 1 + (n - self.list_top) as u16;
+            let picked = n == at;
+            let bg = if picked { SEL } else { BG };
+            c.fill(area.x, y, area.width, bg);
+            let (state, name, depth, color) = match entry {
+                tree::Entry::Dir { name, path, depth } => {
+                    (self.dir_state(path), format!("{name}/"), depth, MUTED)
                 }
                 tree::Entry::File { file, name, depth } => {
-                    let bg = if *file == selected { SEL } else { BG };
-                    c.fill(area.x, y, area.width, bg);
-                    let (mark, color) = icon(self.file_state(*file));
-                    c.put(area.x + 1, y, mark, theme::fg(color).bg(bg));
-                    let style = if self.in_list && *file == selected {
-                        theme::bold(FG)
-                    } else {
-                        theme::fg(FG)
-                    };
-                    let x = area.x + 3 + 2 * *depth as u16;
-                    c.put(x, y, name, style.bg(bg));
+                    (self.file_state(*file), name.clone(), depth, FG)
                 }
-            }
+            };
+            let (mark, mark_color) = icon(state);
+            c.put(area.x + 1, y, mark, theme::fg(mark_color).bg(bg));
+            let style = if self.in_list && picked {
+                theme::bold(FG)
+            } else {
+                theme::fg(color)
+            };
+            let x = area.x + 3 + 2 * *depth as u16;
+            c.put(x, y, &name, style.bg(bg));
         }
     }
 
-    /// The file on the list's screen row `y`, if any.
-    pub(super) fn list_file_at(&self, y: u16) -> Option<usize> {
+    /// The list entry on the list's screen row `y`, if any.
+    pub(super) fn list_entry_at(&self, y: u16) -> Option<tree::Entry> {
         let n = y.checked_sub(self.list_area.y + 1)? as usize;
-        let entries = tree::tree(self.files.iter().map(|f| f.path.as_str()));
-        match entries.get(self.list_top + n)? {
-            tree::Entry::File { file, .. } => Some(*file),
-            tree::Entry::Dir { .. } => None,
-        }
+        self.entries().get(self.list_top + n).cloned()
     }
 
     fn draw_diff(&mut self, c: &mut Canvas) {
@@ -167,7 +159,11 @@ impl Review {
         self.diff_area = area;
         let height = area.height as usize;
         self.height = height;
-        let margin = (height / 4).min(3);
+        let margin = if self.pinned && (self.top..self.top + height).contains(&self.cursor) {
+            0
+        } else {
+            (height / 4).min(3)
+        };
         if self.cursor < self.top + margin {
             self.top = self.cursor.saturating_sub(margin);
         } else if self.cursor + margin >= self.top + height {
