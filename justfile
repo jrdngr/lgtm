@@ -47,8 +47,6 @@ build-tui:
 install-tui:
     mkdir -p ~/.local/bin
     install -m 755 src-tauri/target/release/lgtm ~/.local/bin/lgtm
-    -cargo uninstall --quiet lgtm 2>/dev/null
-    rm -f "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
 
 # Build the app and the `lgtm` command, put the app in /Applications, replacing any copy
 # there, and install the command
