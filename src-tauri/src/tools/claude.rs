@@ -1,7 +1,7 @@
 //! The command that starts Claude Code, from the `claudeTerminal` setting, for running it
-//! outside a terminal. A command on PATH runs as
-//! is. Otherwise the login shell says what the name is: an alias is expanded once and run
-//! directly, and a function runs through the shell on every call.
+//! outside a terminal. The login shell says what a name is: an alias is expanded once and run
+//! directly, and a function runs through the shell on every call. A name the shell doesn't
+//! know, or a path, runs as is when it's on PATH.
 
 use std::io::Read;
 use std::process::Stdio;
@@ -142,7 +142,9 @@ fn resolve_with(
         args: before.iter().chain(rest).cloned().collect(),
         via_shell: false,
     };
-    if on_path(first) {
+    // A path runs as is. A name is the shell's to say, since an alias like `cc` comes before
+    // a program of that name on PATH.
+    if first.contains('/') && on_path(first) {
         return Ok(direct(first, &[]));
     }
     let through_shell = Resolved {
@@ -152,7 +154,13 @@ fn resolve_with(
             .to_vec(),
         via_shell: true,
     };
-    Ok(match interpret(&lookup(first)?) {
+    let said = match lookup(first) {
+        Ok(said) => said,
+        Err(_) if on_path(first) => return Ok(direct(first, &[])),
+        Err(e) => return Err(e),
+    };
+    Ok(match interpret(&said) {
+        Lookup::Missing if on_path(first) => direct(first, &[]),
         Lookup::Path(path) => direct(&path, &[]),
         Lookup::Alias(alias) if on_path(&alias[0]) => direct(&alias[0], &alias[1..]),
         Lookup::Alias(_) | Lookup::Shell => through_shell,
@@ -261,6 +269,11 @@ mod tests {
         let function = resolve("cc", "cc").unwrap();
         assert_eq!(function.program, "/bin/zsh");
         assert_eq!(function.args, ["-l", "-i", "-c", "cc \"$@\"", "lgtm"]);
+
+        // An alias wins over a program of the same name on PATH, as in the shell.
+        let on_path_too = |n: &str| n == "cc" || n == "claude";
+        let cc = resolve_with("cc", "/bin/zsh", on_path_too, shell("alias cc='claude'")).unwrap();
+        assert_eq!((cc.program.as_str(), cc.via_shell), ("claude", false));
 
         // An alias to something that isn't on PATH, like another alias, needs the shell too.
         assert!(resolve("cc", "alias cc='uc claude'").unwrap().via_shell);
