@@ -4,6 +4,7 @@
 pub mod anchor;
 pub mod config;
 pub mod diff;
+pub mod fuzzy;
 pub mod github;
 pub mod gitmeta;
 pub mod jj;

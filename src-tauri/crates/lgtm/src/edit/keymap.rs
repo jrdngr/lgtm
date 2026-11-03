@@ -66,8 +66,18 @@ pub enum Cmd {
     SearchSelection,
     ClipboardYank,
     ClipboardPaste,
+    Pick(Pick),
     Command,
     Escape,
+}
+
+/// The lists `space` opens to pick from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pick {
+    Files,
+    Buffers,
+    /// Lines of the repo's files that hold some text.
+    Grep,
 }
 
 /// The modes a binding works in.
@@ -195,6 +205,9 @@ pub const BINDS: &[Bind] = &[
     b("z R", Fold(Fold::OpenAll), Both, "open all"),
     b("z m", Fold(Fold::CloseLevel), Both, "close a level"),
     b("z r", Fold(Fold::OpenLevel), Both, "open a level"),
+    b("space f", Pick(Pick::Files), Both, "files"),
+    b("space b", Pick(Pick::Buffers), Both, "buffers"),
+    b("space /", Pick(Pick::Grep), Both, "search"),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),

@@ -3,16 +3,19 @@
 mod clipboard;
 mod command;
 mod draw;
+mod finder;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use lgtm_core::syntax::Segment;
 use ratatui::crossterm::event::KeyEvent;
 
 use crate::edit::buffer::{Buffer, Sel};
 use crate::edit::fold::Folds;
+use crate::edit::keymap::Pick;
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
+use crate::tui::files::FileTree;
 
 pub enum Outcome {
     None,
@@ -51,6 +54,7 @@ fn go_line(b: &mut Buffer, line: usize) {
 }
 
 pub struct Editor {
+    root: PathBuf,
     pub open: Vec<Open>,
     cur: usize,
     keys: Keys,
@@ -60,35 +64,86 @@ pub struct Editor {
     pub notice: Option<String>,
     /// Lines of text the editor had when last drawn.
     height: usize,
+    /// The list `space` opened, over the text.
+    finder: Option<finder::Finder>,
+    /// The repo's files beside the text, open down to the buffer in view.
+    sidebar: FileTree,
 }
 
 impl Editor {
-    pub fn new() -> Self {
+    pub fn new(root: &Path) -> Self {
         Self {
+            root: root.to_path_buf(),
             open: vec![],
             cur: 0,
             keys: Keys::default(),
             prompt: None,
             notice: None,
             height: 20,
+            finder: None,
+            sidebar: FileTree::default(),
         }
     }
 
-    /// Opens the file `name` in the workspace at `root` at `line`, from 1, or goes to it when
-    /// it's open already.
-    pub fn open(&mut self, root: &Path, name: &str, line: u32) -> std::io::Result<()> {
-        let at = match self.open.iter().position(|o| o.buf.name == name) {
-            Some(i) => i,
+    /// Takes the repo's files, for the sidebar and `space f`.
+    pub fn set_files(&mut self, paths: Vec<String>) {
+        self.sidebar.set_paths(paths);
+    }
+
+    /// Opens the file `name`, a path in the workspace, at `line`, from 1, or goes to it when
+    /// it's open already. Line 0 leaves an open file's cursor where it was.
+    pub fn open(&mut self, name: &str, line: u32) -> std::io::Result<()> {
+        let (at, new) = match self.open.iter().position(|o| o.buf.name == name) {
+            Some(i) => (i, false),
             None => {
-                let buf = Buffer::open(&root.join(name), name)?;
+                let buf = Buffer::open(&self.root.join(name), name)?;
                 self.open.push(Open::new(buf));
-                self.open.len() - 1
+                (self.open.len() - 1, true)
             }
         };
         self.cur = at;
         self.keys.mode = Mode::Normal;
-        go_line(&mut self.open[at].buf, line as usize);
+        if line > 0 || new {
+            go_line(&mut self.open[at].buf, line as usize);
+        }
+        self.sidebar.reveal(name);
         Ok(())
+    }
+
+    /// Opens a list of `kind` to pick from.
+    pub fn pick(&mut self, kind: Pick) {
+        let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
+        let paths: Vec<(String, bool)> = match kind {
+            Pick::Buffers => self
+                .open
+                .iter()
+                .map(|o| (o.buf.name.clone(), o.buf.dirty()))
+                .collect(),
+            Pick::Files | Pick::Grep => self
+                .sidebar
+                .paths()
+                .iter()
+                .map(|p| (p.clone(), dirty(p)))
+                .collect(),
+        };
+        self.finder = Some(finder::Finder::new(kind, &self.root, paths));
+    }
+
+    fn finder_key(&mut self, key: KeyEvent) -> Outcome {
+        let Some(f) = self.finder.as_mut() else {
+            return Outcome::None;
+        };
+        match f.key(key) {
+            finder::Outcome::None => {}
+            finder::Outcome::Close => self.finder = None,
+            finder::Outcome::Open(path, line) => {
+                self.finder = None;
+                if let Err(e) = self.open(&path, line) {
+                    self.notice = Some(format!("couldn't open {path}: {e}"));
+                }
+            }
+        }
+        Outcome::None
     }
 
     pub fn current(&self) -> Option<&Buffer> {
@@ -106,13 +161,19 @@ impl Editor {
 
     /// Whether keys are going into text, so screen-wide keys like `?` aren't theirs.
     pub fn typing(&self) -> bool {
-        self.prompt.is_some() || self.keys.mode == Mode::Insert || self.keys.waiting()
+        self.prompt.is_some()
+            || self.finder.is_some()
+            || self.keys.mode == Mode::Insert
+            || self.keys.waiting()
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
         if self.prompt.is_some() {
             return self.prompt_key(key);
+        }
+        if self.finder.is_some() {
+            return self.finder_key(key);
         }
         let Some(open) = self.open.get_mut(self.cur) else {
             return Outcome::Back;
@@ -154,6 +215,7 @@ impl Editor {
                 Err(e) => self.notice = Some(format!("couldn't paste: {e}")),
             },
             Action::Notice(n) => self.notice = Some(n),
+            Action::Pick(kind) => self.pick(kind),
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
                     let line = open.buf.line_of(open.buf.sel.head);

@@ -8,7 +8,9 @@ use ratatui::layout::Rect;
 use super::keybar::Hint;
 use super::load::Target;
 use super::paint::Canvas;
-use super::theme::{self, ACCENT, AMBER, BG, FAINT, FG, FUCHSIA, GREEN, MUTED, RED, SEL, UNIQUE};
+use super::theme::{
+    self, ACCENT, AMBER, BG, FAINT, FG, FUCHSIA, GREEN, MUTED, PANEL, RED, SEL, UNIQUE,
+};
 use super::versions::{self, Versions};
 
 pub enum Outcome {
@@ -42,17 +44,6 @@ pub struct Picker {
     /// The snapshot the cursor is on, by its change and place among the shown ones.
     on: Option<(String, usize)>,
 }
-
-pub const KEYS: &[(&str, &str)] = &[
-    ("j k", "move"),
-    ("g G", "first, last"),
-    ("Space", "range"),
-    ("Esc", "clear range"),
-    ("Enter", "open"),
-    ("s", "snapshots"),
-    ("a", "every snapshot"),
-    ("q", "quit"),
-];
 
 impl Picker {
     pub fn loaded(&mut self, result: anyhow::Result<Vec<LogRow>>) {
@@ -346,7 +337,8 @@ impl Picker {
         (items, on.unwrap_or(row))
     }
 
-    pub fn draw(&mut self, c: &mut Canvas, body: Rect) {
+    /// Draws the log into `body`, the cursor's row lit when `focused`.
+    pub fn draw(&mut self, c: &mut Canvas, body: Rect, focused: bool) {
         let x0 = body.x;
         if let Some(e) = &self.error {
             c.put_lines(x0 + 1, body.y + 1, e, theme::fg(RED));
@@ -364,7 +356,11 @@ impl Picker {
         let now = now();
         for (n, &item) in items.iter().skip(self.top).take(height).enumerate() {
             let y = body.y + 1 + n as u16;
-            let bg = if n + self.top == cursor { SEL } else { BG };
+            let bg = match n + self.top == cursor {
+                true if focused => SEL,
+                true => PANEL,
+                false => BG,
+            };
             c.fill(x0, y, body.width, bg);
             match item {
                 Item::Row(i) => self.draw_row(c, x0, y, i, bg, now),

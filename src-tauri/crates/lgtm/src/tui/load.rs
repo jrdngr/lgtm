@@ -40,6 +40,8 @@ impl Target {
 
 pub enum Msg {
     Log(anyhow::Result<Vec<LogRow>>),
+    /// The working copy's files.
+    Files(anyhow::Result<Vec<String>>),
     /// The versions of the change `rev`, newest first.
     Versions {
         rev: String,
@@ -112,6 +114,14 @@ impl Loader {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let _ = tx.send(Msg::Log(jj.log_rows(None).await));
+        });
+    }
+
+    /// Lists the working copy's files.
+    pub fn files(&self) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let _ = tx.send(Msg::Files(jj.files("@").await));
         });
     }
 

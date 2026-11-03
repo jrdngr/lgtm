@@ -4,7 +4,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::buffer::{Buffer, Sel};
 use super::fold::Fold;
-use super::keymap::{self, Cmd, Found};
+use super::keymap::{self, Cmd, Found, Pick};
 use super::motion;
 use super::objects;
 use super::ops::{self, Register};
@@ -33,6 +33,8 @@ pub enum Action {
     Notice(String),
     /// Open or close folds at the cursor's line.
     Fold(Fold),
+    /// Open a list to pick from.
+    Pick(Pick),
 }
 
 /// The screen around the buffer: its size, for keys that move by it, and the closed folds,
@@ -277,6 +279,7 @@ impl Keys {
                 return Action::Copy(b.slice(b.sel.from(), b.sel.to() + 1));
             }
             Cmd::ClipboardPaste => return Action::Paste,
+            Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}

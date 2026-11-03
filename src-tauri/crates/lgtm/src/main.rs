@@ -11,16 +11,8 @@ mod tui;
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let pr = args.iter().position(|a| a == "--pr").map(|i| {
-        let pr = args.get(i + 1).cloned();
-        args.drain(i..(i + 2).min(args.len()));
-        pr
-    });
-    if let Some(None) = pr {
-        eprintln!("lgtm: --pr needs a PR number or URL");
-        std::process::exit(2);
-    }
-    let pr = pr.flatten();
+    let pr = take_flag(&mut args, "--pr", "a PR number or URL");
+    let revset = take_flag(&mut args, "-r", "a revset");
     let code = match args.first().map(String::as_str) {
         Some("mcp") => route::mcp(),
         Some("hook") => route::hook(),
@@ -28,25 +20,41 @@ fn main() {
         Some("snap") => snap::run(&args[1..]),
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [revset]\n       lgtm <file>[:line]\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
+                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line]\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
             );
             0
         }
-        Some(arg) => tui::run(start(arg), pr),
-        None => tui::run(tui::Start::Home, pr),
+        _ if revset.is_some() && !args.is_empty() => {
+            eprintln!("lgtm: -r opens a review, not a file");
+            2
+        }
+        Some(arg) => tui::run(file(arg), pr),
+        None => match revset {
+            Some(r) => tui::run(tui::Start::Revset(r), pr),
+            None => tui::run(tui::Start::Home, pr),
+        },
     };
     std::process::exit(code);
 }
 
-/// What an argument opens: a file there is, with `:line` after it or not, else a revset.
-fn start(arg: &str) -> tui::Start {
-    let (path, line) = match arg.rsplit_once(':') {
-        Some((path, line)) if line.parse::<u32>().is_ok() => (path, line.parse().unwrap_or(1)),
-        _ => (arg, 1),
-    };
-    if std::path::Path::new(path).is_file() {
-        tui::Start::File(path.into(), line)
-    } else {
-        tui::Start::Revset(arg.to_string())
+/// Takes `flag` and the value after it out of `args`, exiting when the value is missing.
+fn take_flag(args: &mut Vec<String>, flag: &str, needs: &str) -> Option<String> {
+    let i = args.iter().position(|a| a == flag)?;
+    let value = args.get(i + 1).cloned();
+    args.drain(i..(i + 2).min(args.len()));
+    if value.is_none() {
+        eprintln!("lgtm: {flag} needs {needs}");
+        std::process::exit(2);
+    }
+    value
+}
+
+/// The file an argument opens, with `:line` after it or not.
+fn file(arg: &str) -> tui::Start {
+    match arg.rsplit_once(':') {
+        Some((path, line)) if line.parse::<u32>().is_ok() => {
+            tui::Start::File(path.into(), line.parse().unwrap_or(1))
+        }
+        _ => tui::Start::File(arg.into(), 1),
     }
 }

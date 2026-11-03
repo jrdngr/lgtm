@@ -11,10 +11,14 @@ use crate::edit::keymap;
 use crate::edit::keys::Mode;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
-use crate::tui::theme::{self, ACCENT, AMBER, BG, FAINT, FG, GREEN, MUTED, PANEL, RED, SEL};
+use crate::tui::theme::{self, ACCENT, AMBER, BG, FAINT, FG, GREEN, HAIR, MUTED, PANEL, RED, SEL};
 
 /// Columns a tab takes.
 const TAB: usize = 4;
+/// Columns the sidebar takes, with its border.
+const SIDEBAR: u16 = 30;
+/// The narrowest screen that shows the sidebar.
+const MIN_SIDEBAR_WIDTH: u16 = 100;
 
 impl Editor {
     /// Writes the file's name into the top bar from `x`, and on its right the cursor's line
@@ -74,7 +78,35 @@ impl Editor {
             .collect()
     }
 
-    pub fn draw(&mut self, c: &mut Canvas, body: Rect) {
+    /// Draws the sidebar, when there's room, and returns what's left for the text.
+    fn draw_sidebar(&mut self, c: &mut Canvas, body: Rect) -> Rect {
+        if body.width < MIN_SIDEBAR_WIDTH || self.sidebar.paths().is_empty() || body.height < 2 {
+            return body;
+        }
+        let open = &self.open;
+        let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
+        let tree = Rect::new(body.x, body.y + 1, SIDEBAR - 1, body.height - 1);
+        self.sidebar.draw(c, tree, true, &marked);
+        for y in body.y..body.bottom() {
+            c.put(body.x + SIDEBAR, y, "│", theme::fg(HAIR).bg(BG));
+        }
+        Rect::new(
+            body.x + SIDEBAR + 1,
+            body.y,
+            body.width - SIDEBAR - 1,
+            body.height,
+        )
+    }
+
+    pub fn draw(&mut self, c: &mut Canvas, full: Rect) {
+        let body = self.draw_sidebar(c, full);
+        self.draw_text(c, body);
+        if let Some(f) = self.finder.as_mut() {
+            f.draw(c, full);
+        }
+    }
+
+    fn draw_text(&mut self, c: &mut Canvas, body: Rect) {
         self.height = body.height as usize;
         let mode = self.keys.mode;
         let Some(open) = self.open.get_mut(self.cur) else {

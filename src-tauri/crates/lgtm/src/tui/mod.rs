@@ -2,8 +2,10 @@
 
 mod edit;
 mod editor;
+mod files;
 mod github;
 mod highlight;
+mod home;
 mod keybar;
 mod load;
 mod paint;
@@ -31,7 +33,6 @@ use ratatui::layout::Rect;
 
 use load::{Loader, Msg, Target};
 use paint::Canvas;
-use picker::Picker;
 use review::Review;
 use settings::Settings;
 use term::Term;
@@ -93,6 +94,7 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         }
     };
     let store = store(&root);
+    let buffers = edit::Editor::new(&root);
     let snapshots = Arc::new(AtomicBool::new(false));
     let watcher = loader.watch(&root, snapshots.clone()).ok();
     let mut app = App {
@@ -107,10 +109,10 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         store,
         polled: Instant::now(),
         shift: false,
-        picker: Picker::default(),
+        home: home::Home::default(),
         review: None,
         direct: matches!(start, Start::Revset(_)),
-        buffers: edit::Editor::new(),
+        buffers,
         screen: Screen::Home,
         editor_back: None,
         pr,
@@ -120,13 +122,14 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         settings: settings::load(),
     };
     app.loader.log();
+    app.loader.files();
     match start {
         Start::Home => {}
         Start::Revset(revset) => app.open(Target::Revset(revset)),
         Start::File(path, line) => {
             let cwd = std::env::current_dir().unwrap_or_default();
             let name = workspace_name(&app.root, &cwd.join(path));
-            if let Err(e) = app.buffers.open(&app.root, &name, line) {
+            if let Err(e) = app.buffers.open(&name, line) {
                 eprintln!("lgtm: couldn't open {name}: {e}");
                 return 1;
             }
@@ -157,7 +160,7 @@ struct App {
     snapshots: Arc<AtomicBool>,
     /// The file and line to open the editor at, once the frame is drawn.
     edit: Option<(String, u32)>,
-    picker: Picker,
+    home: home::Home,
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
     direct: bool,
@@ -201,6 +204,7 @@ impl App {
     /// Loads what's on screen again after a jj operation.
     fn reload(&mut self) {
         self.loader.log();
+        self.loader.files();
         if let Some(r) = self.review.as_mut() {
             self.loads += 1;
             r.id = self.loads;
@@ -281,8 +285,8 @@ impl App {
     fn message(&mut self, msg: Msg) {
         match msg {
             Msg::Log(result) => {
-                self.picker.loaded(result);
-                for rev in self.picker.versions_revs() {
+                self.home.picker.loaded(result);
+                for rev in self.home.picker.versions_revs() {
                     self.loader.versions(rev);
                 }
             }
@@ -301,7 +305,7 @@ impl App {
                         })
                         .collect())
                 });
-                self.picker.versions_loaded(&rev, labeled);
+                self.home.picker.versions_loaded(&rev, labeled);
             }
             Msg::Diff { id, result } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
@@ -310,6 +314,13 @@ impl App {
                         r.load_comments(store);
                     }
                     self.snapshots.store(r.working_copy(), Ordering::Relaxed);
+                }
+            }
+            Msg::Files(result) => {
+                // Without jj's list the tree keeps what it had.
+                if let Ok(paths) = result {
+                    self.home.files.set_paths(paths.clone());
+                    self.buffers.set_files(paths);
                 }
             }
             Msg::Changed => self.reload(),
@@ -375,7 +386,10 @@ impl App {
                 },
             };
         }
-        let typing = self.review.as_ref().is_some_and(Review::typing);
+        let typing = match self.review.as_ref() {
+            Some(r) => r.typing(),
+            None => self.home.typing(),
+        };
         if key.code == KeyCode::Char('?') && !typing {
             self.help = true;
             return false;
@@ -404,15 +418,22 @@ impl App {
             }
             return false;
         }
-        match self.picker.key(key) {
-            picker::Outcome::Open(target) => self.open(target),
-            picker::Outcome::Versions(revs) => {
+        match self.home.key(key) {
+            home::Outcome::Open(target) => self.open(target),
+            home::Outcome::Versions(revs) => {
                 for rev in revs {
                     self.loader.versions(rev);
                 }
             }
-            picker::Outcome::Quit => return true,
-            picker::Outcome::None => {}
+            home::Outcome::Edit(path) => match self.buffers.open(&path, 0) {
+                Ok(()) => {
+                    self.screen = Screen::Editor;
+                    self.editor_back = Some(Screen::Home);
+                }
+                Err(e) => self.buffers.notice = Some(format!("couldn't open {path}: {e}")),
+            },
+            home::Outcome::Quit => return true,
+            home::Outcome::None => {}
         }
         false
     }
@@ -447,8 +468,8 @@ impl App {
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));
-                self.picker.draw(c, body);
-                (self.picker.hints(), picker::KEYS)
+                self.home.draw(c, body);
+                (self.home.hints(), home::KEYS)
             }
         };
         keybar::draw(c, bottom, &hints);
