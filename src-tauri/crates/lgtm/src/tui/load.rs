@@ -7,7 +7,7 @@ use std::sync::mpsc::Sender;
 use lgtm_core::anchor::MatchConfig;
 use lgtm_core::config::{Config, ConfigTexts};
 use lgtm_core::diff::FileStatus;
-use lgtm_core::jj::{Change, FileDiff, Jj, LogRow};
+use lgtm_core::jj::{Change, FileDiff, Jj, LogRow, Range, Version};
 use lgtm_core::review::file::{ReviewFile, Sides as Commits, Text};
 use tokio::runtime::Runtime;
 use tokio::sync::Semaphore;
@@ -15,8 +15,36 @@ use tokio::task::JoinSet;
 
 use super::highlight::Sides;
 
+/// What a review shows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    Revset(String),
+    /// From one version of a change to a later one. `span` names the versions.
+    Between {
+        from: String,
+        to: String,
+        change: String,
+        span: String,
+    },
+}
+
+impl Target {
+    /// What the review is called.
+    pub fn name(&self) -> String {
+        match self {
+            Target::Revset(r) => r.clone(),
+            Target::Between { change, span, .. } => format!("{change} {span}"),
+        }
+    }
+}
+
 pub enum Msg {
     Log(anyhow::Result<Vec<LogRow>>),
+    /// The versions of the change `rev`, newest first.
+    Versions {
+        rev: String,
+        result: anyhow::Result<Vec<Version>>,
+    },
     /// A review's changes, oldest first, and its diff. `id` tells a stale load apart.
     Diff {
         id: u64,
@@ -29,6 +57,11 @@ pub enum Msg {
     },
     /// A jj operation landed: commits may have changed.
     Changed,
+    /// An agent's request over MCP, and where its answer goes.
+    Agent {
+        req: crate::agent::Request,
+        reply: std::sync::mpsc::Sender<crate::agent::Response>,
+    },
     /// Every file's review state, in diff order, for matching marks.
     Built {
         id: u64,
@@ -77,13 +110,31 @@ impl Loader {
         });
     }
 
-    /// Loads `revset`'s diff, then each file's highlighting, then every file's review state.
-    pub fn review(&self, id: u64, revset: String) {
+    /// Loads the versions of the change `rev`.
+    pub fn versions(&self, rev: String) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let result = jj.versions(&rev).await;
+            let _ = tx.send(Msg::Versions { rev, result });
+        });
+    }
+
+    /// Loads `target`'s diff, then each file's highlighting, then every file's review state.
+    pub fn review(&self, id: u64, target: Target) {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let cached = ConfigTexts::default();
             let result = async {
-                let range = jj.resolve(&revset).await?;
+                let (range, revset) = match target {
+                    Target::Revset(revset) => (jj.resolve(&revset).await?, revset),
+                    Target::Between { from, to, .. } => (
+                        Range {
+                            from: Some(from),
+                            to: to.clone(),
+                        },
+                        to,
+                    ),
+                };
                 let (changes, files, config) = tokio::try_join!(
                     jj.changes(&revset),
                     jj.diff(&range),

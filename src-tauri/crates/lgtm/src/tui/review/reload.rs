@@ -31,7 +31,7 @@ enum At {
 impl Spot {
     pub fn of(files: &[FileDiff], line: Line) -> Self {
         let file = &files[line.file()];
-        let at = match line {
+        let at = match line.code() {
             Line::File(_) => At::File,
             Line::Hunk(_, h) => At::Hunk {
                 new_start: file.hunks[h].new_start,
@@ -44,6 +44,7 @@ impl Spot {
                     text: row.text.clone(),
                 }
             }
+            Line::Note { .. } => unreachable!("code() maps notes to their rows"),
         };
         Self {
             path: file.path.clone(),

@@ -1,6 +1,7 @@
 //! Per-repo SQLite store for marks, file checks, comments, review sessions, reports,
 //! designs, drawings and notes. lgtm's global store is one too, holding only global notes.
 
+mod agent_comments;
 mod arch;
 mod asleep;
 mod bots;
@@ -19,6 +20,7 @@ mod qa;
 pub mod report;
 mod sessions;
 mod setup;
+mod snap_labels;
 mod symbol_info;
 mod threads;
 mod turns;
@@ -28,6 +30,7 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
+pub use agent_comments::AgentComment;
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
 pub use fixes::Fix;
@@ -283,6 +286,8 @@ impl Store {
         symbol_info::create_table(&db)?;
         turns::create_table(&db)?;
         fixes::create_table(&db)?;
+        agent_comments::create_table(&db)?;
+        snap_labels::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

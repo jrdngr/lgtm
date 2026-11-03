@@ -1,6 +1,6 @@
 //! Claude Code registers `lgtm mcp` and `lgtm hook` once. Inside a desktop app terminal they
-//! hand over to the app's binary, which talks to the app. Anywhere else there's nothing to talk
-//! to yet, so `mcp` serves no tools and `hook` does nothing.
+//! hand over to the app's binary, which talks to the app. Anywhere else in a jj workspace
+//! `mcp` serves the terminal app's tools, and `hook` does nothing.
 
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
@@ -30,7 +30,16 @@ pub fn mcp() -> i32 {
     if let Some(app) = app_terminal() {
         return hand_over(&app, &["mcp".into()]);
     }
-    stub("This session isn't in an lgtm terminal, so lgtm has nothing to offer.")
+    let socket = std::env::current_dir()
+        .ok()
+        .and_then(|d| crate::agent::workspace(&d))
+        .and_then(|root| crate::agent::socket_path(&root));
+    match socket {
+        Some(socket) => crate::mcp::serve(socket),
+        None => serve_stdio(Stub(
+            "This session isn't in a jj workspace, so lgtm has nothing to offer.",
+        )),
+    }
 }
 
 pub fn hook() -> i32 {
@@ -76,13 +85,14 @@ impl rmcp::ServerHandler for Stub {
     }
 }
 
-fn stub(why: &'static str) -> i32 {
+/// Serves `server` on stdin and stdout until the client goes.
+pub fn serve_stdio(server: impl rmcp::ServerHandler) -> i32 {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .expect("tokio runtime");
     let served = rt.block_on(async {
-        Stub(why)
+        server
             .serve((tokio::io::stdin(), tokio::io::stdout()))
             .await?
             .waiting()

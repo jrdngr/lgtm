@@ -25,11 +25,14 @@ pub const GREEN: Color = rgb(0x3fb950);
 pub const RED: Color = rgb(0xf85149);
 pub const CYAN: Color = rgb(0x39c5cf);
 pub const FUCHSIA: Color = rgb(0xd670d6);
+pub const AMBER: Color = rgb(0xd29922);
 pub const UNIQUE: Color = rgb(0xc586c0);
 
 pub const ADD: Color = tint((46, 160, 67), 15);
 pub const DEL: Color = tint((248, 81, 73), 15);
 pub const SEL: Color = tint((79, 140, 201), 28);
+/// Behind a comment for the agent.
+pub const NOTE: Color = tint((79, 140, 201), 12);
 pub const BLANK: Color = tint((60, 60, 60), 35);
 
 pub fn fg(c: Color) -> Style {

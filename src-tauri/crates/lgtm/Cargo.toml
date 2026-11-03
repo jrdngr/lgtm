@@ -11,6 +11,7 @@ lgtm-core = { path = "../lgtm-core" }
 notify = "8.2.0"
 ratatui = "0.30"
 rmcp = "3.5.1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "io-std", "macros"] }
 

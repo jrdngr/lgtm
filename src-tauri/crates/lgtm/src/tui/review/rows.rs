@@ -1,7 +1,7 @@
 //! The review's screen lines: each file's header, then each hunk's header and rows, unified or
 //! paired side by side.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use lgtm_core::diff::{Row, RowKind};
 use lgtm_core::jj::FileDiff;
@@ -17,12 +17,41 @@ pub enum Line {
         old: Option<usize>,
         new: Option<usize>,
     },
+    /// A line of a note under a row, or at the top of a file when its code is gone.
+    Note {
+        file: usize,
+        /// The hunk and row it's under.
+        at: Option<(usize, usize)>,
+        key: NoteKey,
+        part: usize,
+    },
+}
+
+/// What a note line belongs to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NoteKey {
+    /// A comment for the agent, by number.
+    Comment(i64),
+    /// The comment being written.
+    Input,
+}
+
+/// Notes by where they go, each with how many lines it takes.
+#[derive(Default)]
+pub struct Notes {
+    /// Under a row, by file, hunk and row.
+    pub at_row: HashMap<(usize, usize, usize), Vec<(NoteKey, usize)>>,
+    /// At the top of a file.
+    pub at_file: HashMap<usize, Vec<(NoteKey, usize)>>,
 }
 
 impl Line {
     pub fn file(self) -> usize {
         match self {
-            Line::File(f) | Line::Hunk(f, _) | Line::Code { file: f, .. } => f,
+            Line::File(f)
+            | Line::Hunk(f, _)
+            | Line::Code { file: f, .. }
+            | Line::Note { file: f, .. } => f,
         }
     }
 
@@ -30,6 +59,25 @@ impl Line {
         match self {
             Line::File(_) => None,
             Line::Hunk(_, h) | Line::Code { hunk: h, .. } => Some(h),
+            Line::Note { at, .. } => at.map(|(h, _)| h),
+        }
+    }
+
+    /// The code line a note line belongs to: its row, or its file's header.
+    pub fn code(self) -> Line {
+        match self {
+            Line::Note {
+                file,
+                at: Some((hunk, row)),
+                ..
+            } => Line::Code {
+                file,
+                hunk,
+                old: Some(row),
+                new: None,
+            },
+            Line::Note { file, at: None, .. } => Line::File(file),
+            line => line,
         }
     }
 
@@ -44,14 +92,37 @@ impl Line {
                 old,
                 new,
             } => (file, Some(hunk), new.or(old)),
+            Line::Note { file, at, .. } => (file, at.map(|(h, _)| h), at.map(|(_, r)| r)),
         }
     }
 }
 
+#[cfg(test)]
 pub fn lines(files: &[FileDiff], folded: &HashSet<(usize, usize)>, split: bool) -> Vec<Line> {
+    lines_with(files, folded, split, &Notes::default())
+}
+
+/// The lines of `files`, with `notes` under their rows. A row in a folded hunk shows none.
+pub fn lines_with(
+    files: &[FileDiff],
+    folded: &HashSet<(usize, usize)>,
+    split: bool,
+    notes: &Notes,
+) -> Vec<Line> {
     let mut out = Vec::new();
+    let note_lines = |out: &mut Vec<Line>, file, at, list: Option<&Vec<(NoteKey, usize)>>| {
+        for &(key, height) in list.into_iter().flatten() {
+            out.extend((0..height).map(|part| Line::Note {
+                file,
+                at,
+                key,
+                part,
+            }));
+        }
+    };
     for (f, file) in files.iter().enumerate() {
         out.push(Line::File(f));
+        note_lines(&mut out, f, None, notes.at_file.get(&f));
         for (h, hunk) in file.hunks.iter().enumerate() {
             out.push(Line::Hunk(f, h));
             if folded.contains(&(f, h)) {
@@ -63,10 +134,18 @@ pub fn lines(files: &[FileDiff], folded: &HashSet<(usize, usize)>, split: bool) 
                 old,
                 new,
             };
-            if split {
-                out.extend(pairs(&hunk.rows).into_iter().map(code));
+            let pairs = if split {
+                pairs(&hunk.rows)
             } else {
-                out.extend((0..hunk.rows.len()).map(|i| code((Some(i), None))));
+                (0..hunk.rows.len()).map(|i| (Some(i), None)).collect()
+            };
+            for (old, new) in pairs {
+                out.push(code((old, new)));
+                let mut rows: Vec<usize> = [old, new].into_iter().flatten().collect();
+                rows.dedup();
+                for row in rows {
+                    note_lines(&mut out, f, Some((h, row)), notes.at_row.get(&(f, h, row)));
+                }
             }
         }
     }

@@ -1,7 +1,10 @@
 //! `lgtm`: terminal code review for jj, and the command Claude Code runs for lgtm's MCP server
 //! and hooks.
 
+mod agent;
+mod mcp;
 mod route;
+mod snap;
 mod tui;
 
 fn main() {
@@ -10,8 +13,9 @@ fn main() {
         Some("mcp") => route::mcp(),
         Some("hook") => route::hook(),
         Some("gc") => route::gc(&args[1..]),
+        Some("snap") => snap::run(&args[1..]),
         Some("-h" | "--help") => {
-            println!("usage: lgtm [revset]\n       lgtm mcp | hook | gc");
+            println!("usage: lgtm [revset]\n       lgtm snap <label>\n       lgtm mcp | hook | gc");
             0
         }
         Some(revset) => tui::run(Some(revset.to_string())),

@@ -65,6 +65,14 @@ pub struct Change {
     pub description: String,
 }
 
+/// A version of a change in its evolution log.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Version {
+    pub commit_id: String,
+    /// When it was made, as hours and minutes.
+    pub clock: String,
+}
+
 const CHANGE_TEMPLATE: &str = r#"change_id.short(12) ++ "\t" ++ commit_id ++ "\t"
   ++ change_id.shortest().prefix().len() ++ "\t" ++ if(current_working_copy, "1", "0") ++ "\t"
   ++ if(conflict, "1", "0") ++ "\t" ++ if(empty, "1", "0") ++ "\t" ++ if(divergent, "1", "0") ++ "\t"
@@ -348,6 +356,31 @@ impl Jj {
             .read_lossy(&["file", "list", "-r", rev, "-T", r#"path ++ "\n""#])
             .await?;
         Ok(out.lines().map(str::to_string).collect())
+    }
+
+    /// The commits `rev` evolved from, newest first, starting with `rev` itself, each with
+    /// the time it was made.
+    pub async fn versions(&self, rev: &str) -> anyhow::Result<Vec<Version>> {
+        let out = self
+            .read(&[
+                "evolog",
+                "--no-graph",
+                "-r",
+                rev,
+                "-T",
+                r#"commit.commit_id() ++ "\t" ++ commit.committer().timestamp().format("%H:%M") ++ "\n""#,
+            ])
+            .await?;
+        Ok(out
+            .lines()
+            .filter_map(|l| {
+                let (id, clock) = l.split_once('\t')?;
+                Some(Version {
+                    commit_id: id.to_string(),
+                    clock: clock.to_string(),
+                })
+            })
+            .collect())
     }
 
     /// Commit IDs `commit` evolved from, newest first, starting with `commit` itself.

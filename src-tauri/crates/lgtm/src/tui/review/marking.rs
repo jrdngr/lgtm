@@ -31,13 +31,14 @@ impl Review {
         }
     }
 
-    /// Matches marks again, after the store changed.
+    /// Matches marks and comments again, after the store changed.
     pub fn rematch(&mut self, store: &Store) {
         if let Some(m) = self.marks.as_mut()
             && let Err(e) = m.rematch(store)
         {
             self.notice = Some(format!("{e:#}"));
         }
+        self.load_comments(store);
     }
 
     fn hunks(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
@@ -87,7 +88,7 @@ impl Review {
             }
         }
         let spot = self.current().map(|l| l.spot());
-        self.lines = rows::lines(&self.files, &self.folded, self.split);
+        self.lines = self.layout();
         self.cursor = spot.map_or(0, |s| rows::find(&self.lines, s));
     }
 

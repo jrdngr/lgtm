@@ -1,5 +1,7 @@
 //! Reviewing a commit or range: its diff, unified or side by side, beside its file list.
 
+mod agent;
+mod comments;
 mod draw;
 mod edit;
 mod marking;
@@ -15,6 +17,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::highlight::Sides;
 use super::keybar::Hint;
+use super::load::Target;
 use rows::Line;
 
 pub enum Outcome {
@@ -25,6 +28,8 @@ pub enum Outcome {
 }
 
 pub struct Review {
+    pub target: Target,
+    /// What the review is called: its revset, or its versions' names.
     pub revset: String,
     /// Tells this review's loads apart from an earlier one's.
     pub id: u64,
@@ -46,6 +51,9 @@ pub struct Review {
     /// Whether marks have been matched once, after which reviewed hunks stay as folded as
     /// the user left them.
     built_once: bool,
+    /// Open comments for the agent, each with where it is.
+    comments: Vec<comments::Placed>,
+    input: Option<comments::Input>,
     /// A failure to show until the next key.
     pub notice: Option<String>,
 }
@@ -61,15 +69,18 @@ pub const KEYS: &[(&str, &str)] = &[
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file"),
     ("n", "next not reviewed"),
+    ("c", "comment for the agent"),
+    ("d", "delete comment"),
     ("e", "edit"),
     ("t", "side by side"),
     ("q", "back"),
 ];
 
 impl Review {
-    pub fn new(id: u64, revset: String) -> Self {
+    pub fn new(id: u64, target: Target) -> Self {
         Self {
-            revset,
+            revset: target.name(),
+            target,
             id,
             changes: vec![],
             files: vec![],
@@ -85,6 +96,8 @@ impl Review {
             height: 0,
             marks: None,
             built_once: false,
+            comments: vec![],
+            input: None,
             notice: None,
         }
     }
@@ -113,7 +126,7 @@ impl Review {
         self.changes = changes;
         self.files = files;
         self.error = None;
-        self.lines = rows::lines(&self.files, &self.folded, self.split);
+        self.lines = self.layout();
         self.cursor = at.map_or(0, |at| at.find(&self.files, &self.lines));
     }
 
@@ -128,9 +141,13 @@ impl Review {
         }
     }
 
+    fn layout(&self) -> Vec<Line> {
+        rows::lines_with(&self.files, &self.folded, self.split, &self.notes())
+    }
+
     fn relayout(&mut self) {
         let spot = self.lines.get(self.cursor).map(|l| l.spot());
-        self.lines = rows::lines(&self.files, &self.folded, self.split);
+        self.lines = self.layout();
         self.cursor = spot.map_or(0, |s| rows::find(&self.lines, s));
     }
 
@@ -176,18 +193,22 @@ impl Review {
         if !self.folded.remove(&key) {
             self.folded.insert(key);
         }
-        self.lines = rows::lines(&self.files, &self.folded, self.split);
+        self.lines = self.layout();
         self.cursor = rows::find(&self.lines, (key.0, Some(key.1), None));
     }
 
-    pub fn key(&mut self, key: KeyEvent, store: Option<&mut Store>) -> Outcome {
+    pub fn key(&mut self, key: KeyEvent, mut store: Option<&mut Store>) -> Outcome {
         let half = (self.height / 2).max(1) as isize;
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         self.notice = None;
+        if self.typing() {
+            self.input_key(key, store.as_deref());
+            return Outcome::None;
+        }
         if let KeyCode::Char(c) = key.code
             && !ctrl
             && !self.in_list
-            && self.mark_key(c, store)
+            && self.mark_key(c, store.as_deref_mut())
         {
             return Outcome::None;
         }
@@ -210,6 +231,8 @@ impl Review {
             KeyCode::Char('}') => self.jump(true, |l| matches!(l, Line::File(_))),
             KeyCode::Char('{') => self.jump(false, |l| matches!(l, Line::File(_))),
             KeyCode::Enter => self.toggle_fold(),
+            KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
+            KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
             KeyCode::Char('e') => {
                 if let Some((path, line)) = self.edit_target() {
                     return Outcome::Edit(path, line);
@@ -226,6 +249,9 @@ impl Review {
 
     /// The key bar. With Shift held, r and f become R and F.
     pub fn hints(&self, shift: bool) -> Vec<Hint<'static>> {
+        if self.typing() {
+            return vec![("Enter", "save", false), ("Esc", "cancel", false)];
+        }
         let (review, flag) = if shift {
             (("R", "review file", false), ("F", "flag file", false))
         } else {
@@ -237,6 +263,7 @@ impl Review {
             review,
             flag,
             ("n", "next", false),
+            ("c", "comment", false),
             ("e", "edit", false),
             ("t", "split", self.split),
             ("?", "keys", false),
@@ -284,7 +311,7 @@ mod tests {
     }
 
     fn review() -> Review {
-        let mut r = Review::new(1, "@".into());
+        let mut r = Review::new(1, Target::Revset("@".into()));
         r.loaded(Ok((vec![], vec![file("a.rs", 2), file("b.rs", 1)])));
         r
     }

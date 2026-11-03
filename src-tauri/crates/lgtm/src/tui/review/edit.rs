@@ -9,7 +9,7 @@ impl Review {
     /// The cursor's file and its line in the new file. A removed row opens where it was
     /// removed. `None` on a removed file.
     pub fn edit_target(&self) -> Option<(String, u32)> {
-        let line = self.current()?;
+        let line = self.current()?.code();
         let file = &self.files[line.file()];
         if file.status == FileStatus::Removed {
             return None;
@@ -26,6 +26,7 @@ impl Review {
                     .find_map(|r| r.new_line)
                     .unwrap_or(hunk.new_start + hunk.new_lines)
             }
+            Line::Note { .. } => unreachable!("code() maps notes to their rows"),
         };
         Some((file.path.clone(), at.max(1)))
     }

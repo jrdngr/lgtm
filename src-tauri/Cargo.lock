@@ -2535,6 +2535,7 @@ dependencies = [
  "notify",
  "ratatui",
  "rmcp",
+ "serde",
  "serde_json",
  "tokio",
 ]

@@ -7,8 +7,10 @@ mod load;
 mod paint;
 mod picker;
 mod review;
+mod serve;
 mod term;
 mod theme;
+mod versions;
 mod watch;
 
 use std::path::{Path, PathBuf};
@@ -23,27 +25,38 @@ use lgtm_core::store::Store;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
 
-use load::{Loader, Msg};
+use load::{Loader, Msg, Target};
 use paint::Canvas;
 use picker::Picker;
 use review::Review;
 use term::Term;
 use theme::{ACCENT, BG, FG, PANEL};
 
-/// The jj workspace `cwd` is in: the nearest ancestor holding a `.jj` directory.
-fn workspace(cwd: &Path) -> Option<PathBuf> {
-    cwd.ancestors()
-        .find(|p| p.join(".jj").is_dir())
-        .map(Path::to_path_buf)
+/// The store of the repo the workspace at `root` belongs to, shared with the desktop app.
+pub fn store(root: &Path) -> Option<Store> {
+    paths::data_dir()
+        .zip(paths::find_root(root))
+        .and_then(|(data, main)| Store::open(&paths::repo_dir(&data, &main).join("lgtm.db")).ok())
 }
 
 /// Runs the UI in the jj workspace around the current directory, opening `revset` when given.
 pub fn run(revset: Option<String>) -> i32 {
-    let Some(root) = std::env::current_dir().ok().and_then(|d| workspace(&d)) else {
+    let Some(root) = std::env::current_dir()
+        .ok()
+        .and_then(|d| crate::agent::workspace(&d))
+    else {
         eprintln!("lgtm: not in a jj repo");
         return 1;
     };
     let (tx, rx) = mpsc::channel();
+    let server = match crate::agent::socket_path(&root).map(|p| serve::start(&p, tx.clone())) {
+        Some(Ok(s)) => Some(s),
+        Some(Err(e)) => {
+            eprintln!("lgtm: {e:#}");
+            return 1;
+        }
+        None => None,
+    };
     let loader = match Loader::new(Jj::new(&root), tx) {
         Ok(l) => l,
         Err(e) => {
@@ -51,15 +64,14 @@ pub fn run(revset: Option<String>) -> i32 {
             return 1;
         }
     };
-    let store = paths::data_dir()
-        .zip(paths::find_root(&root))
-        .and_then(|(data, main)| Store::open(&paths::repo_dir(&data, &main).join("lgtm.db")).ok());
+    let store = store(&root);
     let snapshots = Arc::new(AtomicBool::new(false));
     let watcher = loader.watch(&root, snapshots.clone()).ok();
     let mut app = App {
         root,
         loader,
         _watcher: watcher,
+        _server: server,
         snapshots,
         edit: None,
         version: store.as_ref().and_then(|s| s.data_version().ok()),
@@ -74,7 +86,7 @@ pub fn run(revset: Option<String>) -> i32 {
     };
     app.loader.log();
     if let Some(revset) = revset {
-        app.open(revset);
+        app.open(Target::Revset(revset));
     }
     let mut term = Term::start();
     let result = app.run(&mut term, &rx);
@@ -92,6 +104,8 @@ struct App {
     root: PathBuf,
     loader: Loader,
     _watcher: Option<notify::RecommendedWatcher>,
+    /// Where agents ask this app about the review, over MCP.
+    _server: Option<serve::Server>,
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
     /// The file and line to open the editor at, once the frame is drawn.
@@ -115,10 +129,10 @@ struct App {
 const POLL: Duration = Duration::from_millis(250);
 
 impl App {
-    fn open(&mut self, revset: String) {
+    fn open(&mut self, target: Target) {
         self.loads += 1;
-        self.loader.review(self.loads, revset.clone());
-        self.review = Some(Review::new(self.loads, revset));
+        self.loader.review(self.loads, target.clone());
+        self.review = Some(Review::new(self.loads, target));
     }
 
     /// Loads what's on screen again after a jj operation.
@@ -127,7 +141,7 @@ impl App {
         if let Some(r) = self.review.as_mut() {
             self.loads += 1;
             r.id = self.loads;
-            self.loader.review(self.loads, r.revset.clone());
+            self.loader.review(self.loads, r.target.clone());
         }
     }
 
@@ -193,14 +207,46 @@ impl App {
 
     fn message(&mut self, msg: Msg) {
         match msg {
-            Msg::Log(result) => self.picker.loaded(result),
+            Msg::Log(result) => {
+                self.picker.loaded(result);
+                if let Some(rev) = self.picker.versions_rev() {
+                    self.loader.versions(rev.to_string());
+                }
+            }
+            Msg::Versions { rev, result } => {
+                let labeled = result.and_then(|list| {
+                    let ids: Vec<String> = list.iter().map(|v| v.commit_id.clone()).collect();
+                    let mut labels = match self.store.as_ref() {
+                        Some(store) => store.snapshot_labels(&ids)?,
+                        None => Default::default(),
+                    };
+                    Ok(list
+                        .into_iter()
+                        .map(|v| {
+                            let label = labels.remove(&v.commit_id);
+                            (v, label)
+                        })
+                        .collect())
+                });
+                self.picker.versions_loaded(&rev, labeled);
+            }
             Msg::Diff { id, result } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.loaded(result);
+                    if let Some(store) = self.store.as_ref() {
+                        r.load_comments(store);
+                    }
                     self.snapshots.store(r.working_copy(), Ordering::Relaxed);
                 }
             }
             Msg::Changed => self.reload(),
+            Msg::Agent { req, reply } => {
+                let answer = match self.review.as_mut() {
+                    Some(r) => r.answer(req, self.store.as_mut()),
+                    None => Err("lgtm has no review open".into()),
+                };
+                let _ = reply.send(answer);
+            }
             Msg::Highlight { id, file, sides } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.highlighted(file, sides);
@@ -223,7 +269,8 @@ impl App {
             self.help = false;
             return false;
         }
-        if key.code == KeyCode::Char('?') {
+        let typing = self.review.as_ref().is_some_and(Review::typing);
+        if key.code == KeyCode::Char('?') && !typing {
             self.help = true;
             return false;
         }
@@ -240,7 +287,8 @@ impl App {
             return false;
         }
         match self.picker.key(key) {
-            picker::Outcome::Open(revset) => self.open(revset),
+            picker::Outcome::Open(target) => self.open(target),
+            picker::Outcome::Versions(rev) => self.loader.versions(rev),
             picker::Outcome::Quit => return true,
             picker::Outcome::None => {}
         }

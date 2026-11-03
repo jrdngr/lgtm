@@ -7,12 +7,13 @@ use ratatui::style::Color;
 
 use super::Review;
 use super::marks::State;
-use super::rows::Line;
+use super::rows::{Line, NoteKey};
 use crate::tui::highlight::{self, Sides};
+use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
-    self, ACCENT, ADD, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, PANEL, RED,
-    SEL, UNIQUE,
+    self, ACCENT, ADD, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, NOTE,
+    PANEL, RED, SEL, UNIQUE,
 };
 
 /// Width of a line number column.
@@ -62,8 +63,16 @@ impl Review {
             }
             [one] => {
                 let x = id(c, x, one);
-                let summary = one.description.lines().next().unwrap_or("");
-                c.put(x + 2, y, summary, theme::fg(FG).bg(PANEL));
+                match &self.target {
+                    Target::Between { span, .. } => {
+                        let x = c.put(x + 2, y, "◇ ", theme::fg(AMBER).bg(PANEL));
+                        c.put(x, y, span, theme::fg(FG).bg(PANEL));
+                    }
+                    Target::Revset(_) => {
+                        let summary = one.description.lines().next().unwrap_or("");
+                        c.put(x + 2, y, summary, theme::fg(FG).bg(PANEL));
+                    }
+                }
             }
             [oldest, .., newest] => {
                 let x = id(c, x, oldest);
@@ -165,9 +174,60 @@ impl Review {
                         unified_row(c, y, sides, r, cursor);
                     }
                 }
+                Line::Note { key, part, .. } => self.draw_note(c, y, key, part, cursor),
             }
             if let Some(color) = gutter {
                 c.put(area.x, y, "▌", theme::fg(color));
+            }
+        }
+    }
+}
+
+impl Review {
+    fn draw_note(&self, c: &mut Canvas, y: u16, key: NoteKey, part: usize, cursor: bool) {
+        let x0 = c.area.x + 2;
+        let w = c.area.width.saturating_sub(3);
+        match key {
+            NoteKey::Comment(n) => {
+                let Some(comment) = self.comment(n) else {
+                    return;
+                };
+                let bg = if cursor { SEL } else { NOTE };
+                c.fill(x0, y, w, bg);
+                c.put(x0, y, "▎", theme::fg(ACCENT).bg(bg));
+                let id = format!("C{n} ");
+                let text = comment.body.lines().nth(part).unwrap_or("");
+                let x = if part == 0 {
+                    c.put(x0 + 2, y, &id, theme::bold(ACCENT).bg(bg))
+                } else {
+                    x0 + 2 + id.len() as u16
+                };
+                c.put(x, y, text, theme::fg(FG).bg(bg));
+            }
+            NoteKey::Input => {
+                let border = theme::fg(ACCENT).bg(BG);
+                c.fill(x0, y, w, BG);
+                let inner = w.saturating_sub(2) as usize;
+                match part {
+                    0 => {
+                        let head = format!("╭─ C{} ", self.input_number());
+                        let rule = inner.saturating_sub(head.chars().count() - 1);
+                        c.put(x0, y, &format!("{head}{}╮", "─".repeat(rule)), border);
+                    }
+                    1 => {
+                        let text = self.input().map_or("", |i| i.text.as_str());
+                        let room = inner.saturating_sub(3);
+                        let skip = text.chars().count().saturating_sub(room);
+                        let shown: String = text.chars().skip(skip).collect();
+                        c.put(x0, y, "│", border);
+                        let x = c.put(x0 + 2, y, &shown, theme::fg(FG).bg(BG));
+                        c.put(x, y, "▏", theme::bold(FG).bg(BG));
+                        c.put(x0 + w - 1, y, "│", border);
+                    }
+                    _ => {
+                        c.put(x0, y, &format!("╰{}╯", "─".repeat(inner)), border);
+                    }
+                }
             }
         }
     }
