@@ -204,7 +204,9 @@ pub fn find(lines: &[Line], spot: (usize, Option<usize>, Option<usize>)) -> usiz
                 .position(|l| *l == hunk.map_or(Line::File(file), |h| Line::Hunk(file, h)))
         })
         .or_else(|| lines.iter().position(|l| *l == Line::File(file)))
-        .unwrap_or(0)
+        // A file that isn't shown gives way to the next one, or the last.
+        .or_else(|| lines.iter().position(|l| l.file() > file))
+        .unwrap_or(lines.len().saturating_sub(1))
 }
 
 #[cfg(test)]
@@ -294,6 +296,20 @@ mod tests {
             lines(&files, &HashSet::from([0]), false),
             vec![Line::File(0), Line::File(1), code(1, 0)]
         );
+    }
+
+    #[test]
+    fn a_file_not_shown_gives_way_to_the_next_one_or_the_last() {
+        let files = [
+            file(vec![vec![A]]),
+            file(vec![vec![A]]),
+            file(vec![vec![A]]),
+        ];
+        let mut shown = lines(&files, &HashSet::new(), false);
+        shown.retain(|l| l.file() != 1);
+        assert_eq!(shown[find(&shown, (1, Some(0), Some(0)))], Line::File(2));
+        shown.retain(|l| l.file() != 2);
+        assert_eq!(find(&shown, (2, None, None)), shown.len() - 1);
     }
 
     #[test]

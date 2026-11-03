@@ -178,12 +178,14 @@ impl Review {
     pub(super) fn toggle_reviewed_open(&mut self) {
         self.reviewed_open = !self.reviewed_open;
         self.list_pick = Some(Pick::Reviewed);
+        self.relayout();
     }
 
     /// Sets reviewed files apart in the list, or puts them back.
     pub(super) fn toggle_group(&mut self) {
         self.group_reviewed = !self.group_reviewed;
         self.list_pick = None;
+        self.relayout();
     }
 
     /// R checks the list's pick and F flags it, or undoes that when it's all done already.

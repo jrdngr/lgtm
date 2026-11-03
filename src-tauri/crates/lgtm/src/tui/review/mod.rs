@@ -241,7 +241,12 @@ impl Review {
         let folded: HashSet<usize> = (0..self.files.len())
             .filter(|&f| self.folded.contains(&self.files[f].path))
             .collect();
-        rows::lines_with(&self.files, &folded, self.split, &self.notes())
+        let mut lines = rows::lines_with(&self.files, &folded, self.split, &self.notes());
+        // Reviewed files set apart show only while their heading is open.
+        if self.group_reviewed && !self.reviewed_open {
+            lines.retain(|l| !self.reviewed(l.file()));
+        }
+        lines
     }
 
     fn relayout(&mut self) {
