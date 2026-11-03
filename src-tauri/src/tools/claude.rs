@@ -162,7 +162,11 @@ fn resolve_with(
     Ok(match interpret(&said) {
         Lookup::Missing if on_path(first) => direct(first, &[]),
         Lookup::Path(path) => direct(&path, &[]),
-        Lookup::Alias(alias) if on_path(&alias[0]) => direct(&alias[0], &alias[1..]),
+        Lookup::Alias(alias) if on_path(&alias[0]) => {
+            // The shell expands `~` in an alias's words when it runs it.
+            let alias: Vec<String> = alias.iter().map(|w| expand_home(w)).collect();
+            direct(&alias[0], &alias[1..])
+        }
         Lookup::Alias(_) | Lookup::Shell => through_shell,
         Lookup::Missing => {
             bail!("`{first}` isn't a command, alias or function in your login shell")
@@ -260,6 +264,10 @@ mod tests {
             (plain.program.as_str(), plain.args.as_slice()),
             ("claude", &["--debug".to_string()][..])
         );
+
+        let settings = resolve("cc", "alias cc='claude --settings ~/s.json'").unwrap();
+        let home = std::env::var("HOME").unwrap();
+        assert_eq!(settings.args, ["--settings", &format!("{home}/s.json")]);
 
         let alias = resolve("cc -x", "alias cc='ucode claude'").unwrap();
         assert_eq!(alias.program, "ucode");
