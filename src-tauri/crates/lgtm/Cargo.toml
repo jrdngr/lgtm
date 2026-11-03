@@ -9,6 +9,7 @@ license = "MIT"
 anyhow = "1"
 lgtm-core = { path = "../lgtm-core" }
 notify = "8.2.0"
+ropey = "1.6"
 ratatui = "0.30"
 rmcp = "3.5.1"
 serde = { version = "1", features = ["derive"] }

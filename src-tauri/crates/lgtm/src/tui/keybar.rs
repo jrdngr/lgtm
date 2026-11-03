@@ -1,17 +1,26 @@
 //! The key hints along the bottom, and the `?` list of every key.
 
 use ratatui::layout::Rect;
+use ratatui::style::Color;
 
 use super::paint::Canvas;
-use super::theme::{self, ACCENT, FG, GREEN, HAIR, MUTED, PANEL};
+use super::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
 
 /// A hint: its keys, space-separated when a pair goes both ways, its label, and whether what
 /// it toggles is on.
 pub type Hint<'a> = (&'a str, &'a str, bool);
 
 pub fn draw(c: &mut Canvas, y: u16, hints: &[Hint]) {
+    draw_badged(c, y, None, hints);
+}
+
+/// The key bar after a badge naming the mode, like `NOR`, in its color.
+pub fn draw_badged(c: &mut Canvas, y: u16, badge: Option<(&str, Color)>, hints: &[Hint]) {
     c.fill(c.area.x, y, c.area.width, PANEL);
     let mut x = c.area.x + 1;
+    if let Some((label, color)) = badge {
+        x = c.put(x, y, &format!(" {label} "), theme::bold(BG).bg(color)) + 2;
+    }
     for (keys, label, on) in hints {
         for (i, key) in keys.split(' ').enumerate() {
             if i > 0 {

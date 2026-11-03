@@ -1,5 +1,6 @@
-//! The review UI: a picker over the jj log, and the review of what was picked.
+//! The terminal UI: a picker over the jj log, the review of what was picked, and the editor.
 
+mod edit;
 mod editor;
 mod github;
 mod highlight;
@@ -43,8 +44,24 @@ pub fn store(root: &Path) -> Option<Store> {
         .and_then(|(data, main)| Store::open(&paths::repo_dir(&data, &main).join("lgtm.db")).ok())
 }
 
-/// Runs the UI in the jj workspace around the current directory, opening `revset` when given.
-pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
+/// What the UI opens on.
+pub enum Start {
+    Home,
+    Revset(String),
+    /// A file, as given relative to the current directory, at a line from 1.
+    File(PathBuf, u32),
+}
+
+/// Which screen is up.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Screen {
+    Home,
+    Review,
+    Editor,
+}
+
+/// Runs the UI in the jj workspace around the current directory, opening `start`.
+pub fn run(start: Start, pr: Option<String>) -> i32 {
     let Some(root) = std::env::current_dir()
         .ok()
         .and_then(|d| crate::agent::workspace(&d))
@@ -92,7 +109,10 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
         shift: false,
         picker: Picker::default(),
         review: None,
-        direct: revset.is_some(),
+        direct: matches!(start, Start::Revset(_)),
+        buffers: edit::Editor::new(),
+        screen: Screen::Home,
+        editor_back: None,
         pr,
         prs: HashMap::new(),
         help: false,
@@ -100,8 +120,18 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
         settings: settings::load(),
     };
     app.loader.log();
-    if let Some(revset) = revset {
-        app.open(Target::Revset(revset));
+    match start {
+        Start::Home => {}
+        Start::Revset(revset) => app.open(Target::Revset(revset)),
+        Start::File(path, line) => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let name = workspace_name(&app.root, &cwd.join(path));
+            if let Err(e) = app.buffers.open(&app.root, &name, line) {
+                eprintln!("lgtm: couldn't open {name}: {e}");
+                return 1;
+            }
+            app.screen = Screen::Editor;
+        }
     }
     let mut term = Term::start();
     let result = app.run(&mut term, &rx);
@@ -131,6 +161,10 @@ struct App {
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
     direct: bool,
+    buffers: edit::Editor,
+    screen: Screen,
+    /// The screen leaving the editor goes back to. `None` quits.
+    editor_back: Option<Screen>,
     /// The PR given on the command line, whose threads `p` pulls.
     pr: Option<String>,
     /// The PR pulled for each review, by its name.
@@ -161,6 +195,7 @@ impl App {
             review.set_pr(pr.clone());
         }
         self.review = Some(review);
+        self.screen = Screen::Review;
     }
 
     /// Loads what's on screen again after a jj operation.
@@ -210,7 +245,8 @@ impl App {
                         }
                     }
                     Event::Mouse(ev) => {
-                        if let (Some(r), false) = (self.review.as_mut(), self.help) {
+                        let reviewing = self.screen == Screen::Review && !self.help;
+                        if let (Some(r), true) = (self.review.as_mut(), reviewing) {
                             r.mouse(ev);
                         }
                     }
@@ -311,11 +347,33 @@ impl App {
     /// Handles a key. Returns whether to quit.
     fn key(&mut self, key: KeyEvent) -> bool {
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            return true;
+            let unsaved = self.buffers.unsaved();
+            if unsaved.is_empty() {
+                return true;
+            }
+            self.buffers.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
+            self.screen = Screen::Editor;
+            return false;
         }
         if self.help {
             self.help = false;
             return false;
+        }
+        if self.screen == Screen::Editor {
+            if key.code == KeyCode::Char('?') && !self.buffers.typing() {
+                self.help = true;
+                return false;
+            }
+            return match self.buffers.key(key) {
+                edit::Outcome::None => false,
+                edit::Outcome::Back => match self.editor_back {
+                    Some(screen) => {
+                        self.screen = screen;
+                        false
+                    }
+                    None => true,
+                },
+            };
         }
         let typing = self.review.as_ref().is_some_and(Review::typing);
         if key.code == KeyCode::Char('?') && !typing {
@@ -332,6 +390,7 @@ impl App {
             match outcome {
                 review::Outcome::Back => {
                     self.review = None;
+                    self.screen = Screen::Home;
                     self.snapshots.store(false, Ordering::Relaxed);
                     return self.direct;
                 }
@@ -371,6 +430,10 @@ impl App {
         let body = Rect::new(area.x, top + 1, area.width, area.height - 2);
         c.fill(area.x, top, area.width, PANEL);
         let x = c.put(area.x + 1, top, "lgtm", theme::bold(ACCENT).bg(PANEL)) + 2;
+        if self.screen == Screen::Editor {
+            self.draw_editor(c, x, body);
+            return;
+        }
         let (hints, keys) = match self.review.as_mut() {
             Some(r) => {
                 r.title(c, x, top);
@@ -392,6 +455,55 @@ impl App {
         if self.help {
             keybar::help(c, body, keys);
         }
+    }
+}
+
+impl App {
+    fn draw_editor(&mut self, c: &mut Canvas, x: u16, body: Rect) {
+        let (top, bottom) = (c.area.y, c.area.bottom() - 1);
+        let e = &mut self.buffers;
+        e.title(c, x, top);
+        e.draw(c, body);
+        if let Some(text) = e.prompt() {
+            keybar::prompt(c, bottom, &text, &[]);
+            keybar::menu(c, body, &e.command_menu());
+            return;
+        }
+        keybar::draw_badged(c, bottom, Some(e.badge()), &e.hints());
+        let pending = e.pending_menu();
+        if !pending.is_empty() {
+            keybar::menu(c, body, &pending);
+        }
+        if self.help {
+            let keys: Vec<(&str, &str)> = crate::edit::keymap::BINDS
+                .iter()
+                .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down"))
+                .map(|b| (b.keys, b.label))
+                .collect();
+            keybar::help(c, body, &keys);
+        }
+    }
+}
+
+/// `file`'s path in the workspace at `root`, or the whole path when it's outside it.
+fn workspace_name(root: &Path, file: &Path) -> String {
+    let file = normalize(file);
+    let root = normalize(root);
+    match file.strip_prefix(&root) {
+        Ok(rel) => rel.to_string_lossy().into_owned(),
+        Err(_) => file.to_string_lossy().into_owned(),
+    }
+}
+
+/// `path` without `.` and `..` parts, and through symlinks where it exists.
+fn normalize(path: &Path) -> PathBuf {
+    if let Ok(real) = path.canonicalize() {
+        return real;
+    }
+    // A new file: its folder through symlinks, then its name.
+    match (path.parent(), path.file_name()) {
+        (Some(dir), Some(name)) => normalize(dir).join(name),
+        _ => path.to_path_buf(),
     }
 }
 

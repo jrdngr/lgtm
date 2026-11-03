@@ -3,6 +3,7 @@
 
 mod agent;
 mod config;
+mod edit;
 mod mcp;
 mod route;
 mod snap;
@@ -27,12 +28,25 @@ fn main() {
         Some("snap") => snap::run(&args[1..]),
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [revset]\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
+                "usage: lgtm [--pr <number>] [revset]\n       lgtm <file>[:line]\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
             );
             0
         }
-        Some(revset) => tui::run(Some(revset.to_string()), pr),
-        None => tui::run(None, pr),
+        Some(arg) => tui::run(start(arg), pr),
+        None => tui::run(tui::Start::Home, pr),
     };
     std::process::exit(code);
+}
+
+/// What an argument opens: a file there is, with `:line` after it or not, else a revset.
+fn start(arg: &str) -> tui::Start {
+    let (path, line) = match arg.rsplit_once(':') {
+        Some((path, line)) if line.parse::<u32>().is_ok() => (path, line.parse().unwrap_or(1)),
+        _ => (arg, 1),
+    };
+    if std::path::Path::new(path).is_file() {
+        tui::Start::File(path.into(), line)
+    } else {
+        tui::Start::Revset(arg.to_string())
+    }
 }
