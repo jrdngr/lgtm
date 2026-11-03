@@ -1,5 +1,6 @@
 //! Opening the editor at a line: in a pane beside this one in the herdr desktop app, as its
-//! own window for a GUI editor, else in this terminal while the review waits.
+//! own window for a GUI editor, else in this terminal while the review waits. The command comes
+//! from the config's `editor` template.
 
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -13,15 +14,6 @@ pub enum Open {
     Here(Vec<String>),
 }
 
-/// The user's editor: `$VISUAL`, else `$EDITOR`, else vi.
-fn editor() -> String {
-    ["VISUAL", "EDITOR"]
-        .into_iter()
-        .filter_map(|v| std::env::var(v).ok())
-        .find(|e| !e.trim().is_empty())
-        .unwrap_or_else(|| "vi".into())
-}
-
 /// Editors with windows of their own.
 fn gui(name: &str) -> bool {
     matches!(
@@ -30,30 +22,27 @@ fn gui(name: &str) -> bool {
     )
 }
 
-/// The command that opens `path` at `line` in `editor`, a command line with any arguments.
-pub fn argv(editor: &str, path: &Path, line: u32) -> Vec<String> {
-    let mut argv: Vec<String> = editor.split_whitespace().map(String::from).collect();
-    let name = argv
-        .first()
-        .and_then(|p| Path::new(p).file_name())
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
+/// The command that opens `path` at `line`, from `template`, a command line with `{file}` and
+/// `{line}` in it. Without `{file}` the path goes at the end.
+pub fn argv(template: &str, path: &Path, line: u32) -> Vec<String> {
     let path = path.to_string_lossy();
-    match name.as_str() {
-        "code" | "code-insiders" | "cursor" | "windsurf" => {
-            argv.extend(["-g".into(), format!("{path}:{line}")])
-        }
-        "zed" | "subl" | "sublime_text" => argv.push(format!("{path}:{line}")),
-        _ => argv.extend([format!("+{line}"), path.into_owned()]),
+    let mut argv: Vec<String> = template
+        .split_whitespace()
+        .map(|a| {
+            a.replace("{file}", &path)
+                .replace("{line}", &line.to_string())
+        })
+        .collect();
+    if !template.contains("{file}") {
+        argv.push(path.into_owned());
     }
     argv
 }
 
 /// How to open `path` at `line`. In a herdr terminal a terminal editor gets a pane to the
 /// right.
-pub fn open(path: &Path, line: u32) -> Open {
-    let editor = editor();
-    let argv = argv(&editor, path, line);
+pub fn open(template: &str, path: &Path, line: u32) -> Open {
+    let argv = argv(template, path, line);
     let name = Path::new(&argv[0])
         .file_name()
         .map(|n| n.to_string_lossy().into_owned())
@@ -90,13 +79,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn each_kind_of_editor_gets_the_line_its_own_way() {
+    fn the_template_gets_the_file_and_line() {
         let p = Path::new("/r/src/a.rs");
-        assert_eq!(argv("nvim", p, 12), ["nvim", "+12", "/r/src/a.rs"]);
-        assert_eq!(argv("code -w", p, 3), ["code", "-w", "-g", "/r/src/a.rs:3"]);
+        assert_eq!(argv("hx {file}:{line}", p, 12), ["hx", "/r/src/a.rs:12"]);
         assert_eq!(
-            argv("/usr/local/bin/zed", p, 7),
-            ["/usr/local/bin/zed", "/r/src/a.rs:7"]
+            argv("nvim +{line} {file}", p, 3),
+            ["nvim", "+3", "/r/src/a.rs"]
         );
+        assert_eq!(argv("subl -w", p, 7), ["subl", "-w", "/r/src/a.rs"]);
     }
 }

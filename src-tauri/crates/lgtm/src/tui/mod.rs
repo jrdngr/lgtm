@@ -50,6 +50,13 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
         eprintln!("lgtm: not in a jj repo");
         return 1;
     };
+    let config = match crate::config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("lgtm: {e:#}");
+            return 1;
+        }
+    };
     let (tx, rx) = mpsc::channel();
     let server = match crate::agent::socket_path(&root).map(|p| serve::start(&p, tx.clone())) {
         Some(Ok(s)) => Some(s),
@@ -71,6 +78,7 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
     let watcher = loader.watch(&root, snapshots.clone()).ok();
     let mut app = App {
         root,
+        editor: config.editor,
         loader,
         _watcher: watcher,
         _server: server,
@@ -106,6 +114,8 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
 
 struct App {
     root: PathBuf,
+    /// The command template that opens the editor.
+    editor: String,
     loader: Loader,
     _watcher: Option<notify::RecommendedWatcher>,
     /// Where agents ask this app about the review, over MCP.
@@ -159,7 +169,7 @@ impl App {
 
     /// Opens the editor at `path`, a path in the workspace, and `line`.
     fn open_editor(&mut self, term: &mut Term, path: &str, line: u32) {
-        let failed = match editor::open(&self.root.join(path), line) {
+        let failed = match editor::open(&self.editor, &self.root.join(path), line) {
             editor::Open::Detached(argv) => editor::spawn(&argv).err(),
             editor::Open::Here(argv) => term
                 .suspended(|| {

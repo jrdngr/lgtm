@@ -1,4 +1,4 @@
-//! App-wide settings from `settings.toml` in lgtm's config dir, edited on the Settings tab.
+//! App-wide settings from `app-settings.toml` in lgtm's config dir, edited on the Settings tab.
 //!
 //! ```toml
 //! claudeTerminal = "cc"
@@ -18,16 +18,9 @@ use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-const FILE: &str = "settings.toml";
+const FILE: &str = "app-settings.toml";
 
-/// lgtm's config: `$XDG_CONFIG_HOME/lgtm`, falling back to `~/.config`.
-pub fn config_dir() -> Option<PathBuf> {
-    let config = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .or_else(|| std::env::home_dir().map(|h| h.join(".config")))?;
-    Some(config.join("lgtm"))
-}
+pub use lgtm_core::paths::config_dir;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -160,7 +153,7 @@ pub fn save(mut settings: Settings) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Writes `settings` to `path`. With `backup`, copies the file there to `settings.toml.bak`
+/// Writes `settings` to `path`. With `backup`, copies the file there to `app-settings.toml.bak`
 /// first, so a file that couldn't be read isn't lost.
 fn write(path: &Path, settings: &Settings, backup: bool) -> anyhow::Result<()> {
     std::fs::create_dir_all(path.parent().context("settings path has no parent")?)?;
@@ -212,7 +205,7 @@ mod tests {
         let file = dir.path().join(FILE);
         std::fs::write(&file, "claud = \"cc\"\n").unwrap();
         write(&file, &Settings::default(), true).unwrap();
-        let bak = std::fs::read_to_string(dir.path().join("settings.toml.bak")).unwrap();
+        let bak = std::fs::read_to_string(dir.path().join("app-settings.toml.bak")).unwrap();
         assert_eq!(bak, "claud = \"cc\"\n");
         assert_eq!(load_from(&file).unwrap(), Settings::default());
     }

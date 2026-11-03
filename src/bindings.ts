@@ -305,7 +305,7 @@ export const commands = {
 	getSettings: () => __TAURI_INVOKE<Settings_Serialize>("get_settings"),
 	/**  Saves the settings and tells every window. */
 	saveSettings: (settings: Settings_Deserialize) => typedError<null, string>(__TAURI_INVOKE("save_settings", { settings })),
-	/**  Why `settings.toml` couldn't be read, while the defaults stand in for it. */
+	/**  Why `app-settings.toml` couldn't be read, while the defaults stand in for it. */
 	settingsLoadError: () => __TAURI_INVOKE<string | null>("settings_load_error"),
 	/**  How the Claude command resolves. `refresh` asks the login shell again. */
 	claudeCommand: (refresh: boolean) => typedError<ClaudeCommand, string>(__TAURI_INVOKE("claude_command", { refresh })),

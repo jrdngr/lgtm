@@ -1,0 +1,7 @@
+# lgtm's settings, with their defaults. Put the ones you change in ~/.config/lgtm/config.toml
+# ($XDG_CONFIG_HOME/lgtm/config.toml when that's set); anything left out keeps its default.
+
+# The command that opens a file at a line. {file} is the file's path and {line} the line
+# number. Without {file}, the path goes at the end.
+# Examples: "nvim +{line} {file}", "code -g {file}:{line}", "zed {file}:{line}"
+editor = "hx {file}:{line}"

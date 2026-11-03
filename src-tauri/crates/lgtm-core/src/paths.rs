@@ -23,6 +23,16 @@ pub fn key(root: &Path) -> String {
     blake3::hash(root.as_os_str().as_encoded_bytes()).to_hex()[..16].to_string()
 }
 
+/// lgtm's config: `$XDG_CONFIG_HOME/lgtm`, falling back to `~/.config/lgtm`. Both apps keep
+/// their settings there.
+pub fn config_dir() -> Option<PathBuf> {
+    let config = std::env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::home_dir().map(|h| h.join(".config")))?;
+    Some(config.join("lgtm"))
+}
+
 /// The desktop app's bundle identifier, which names its data directory.
 pub const APP_ID: &str = "dev.lgtm.app";
 

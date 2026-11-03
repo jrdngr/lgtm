@@ -133,7 +133,7 @@ The defaults, on `1`–`3`:
 - **flagged**: red, "come back to this", not done.
 - **skipped**: grey, done.
 
-The setup is global, in `settings.toml`, the same in every repo.
+The setup is global, in `app-settings.toml`, the same in every repo.
 
 One derived state:
 

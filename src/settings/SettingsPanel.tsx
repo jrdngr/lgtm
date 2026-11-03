@@ -10,7 +10,7 @@ import { TerminalSettings } from "./TerminalSettings";
 import { ToolSettings } from "./ToolSettings";
 import "./settings.css";
 
-/** App settings, saved to `~/.config/lgtm/settings.toml`, and the prompt files. */
+/** App settings, saved to `~/.config/lgtm/app-settings.toml`, and the prompt files. */
 export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
   const settings = useSettings();
   const body = useRef<HTMLDivElement>(null);
@@ -34,8 +34,8 @@ export function SettingsPanel({ params }: IDockviewPanelProps<SettingsParams>) {
         <h1>Settings</h1>
         {loadError && (
           <p className="settings-warn">
-            settings.toml couldn't be read, so the defaults are in use: {loadError}. The next change
-            here backs the file up to settings.toml.bak and replaces it.
+            app-settings.toml couldn't be read, so the defaults are in use: {loadError}. The next
+            change here backs the file up to app-settings.toml.bak and replaces it.
           </p>
         )}
         {settings ? (

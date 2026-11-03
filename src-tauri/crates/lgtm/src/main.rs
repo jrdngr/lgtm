@@ -2,6 +2,7 @@
 //! and hooks.
 
 mod agent;
+mod config;
 mod mcp;
 mod route;
 mod snap;
