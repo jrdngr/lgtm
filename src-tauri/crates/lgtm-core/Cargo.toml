@@ -16,6 +16,7 @@ cc = "1"
 anyhow = "1"
 blake3 = "1"
 dirs = "6"
+globset = "0.4.20"
 rusqlite = { version = "0.40", features = ["bundled"] }
 rustix = { version = "1", features = ["process"] }
 serde = { version = "1", features = ["derive"] }
@@ -23,6 +24,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 similar = "3"
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 tempfile = { version = "3", optional = true }
+toml = "1.1.8"
 tokio = { version = "1", features = ["process", "sync", "macros", "rt-multi-thread", "time", "io-util"] }
 tracing = "0.1"
 tree-sitter = "0.27"

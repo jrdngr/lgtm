@@ -6,13 +6,16 @@ mod load;
 mod paint;
 mod picker;
 mod review;
+mod term;
 mod theme;
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use lgtm_core::jj::Jj;
+use lgtm_core::paths;
+use lgtm_core::store::Store;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::layout::Rect;
@@ -21,6 +24,7 @@ use load::{Loader, Msg};
 use paint::Canvas;
 use picker::Picker;
 use review::Review;
+use term::Term;
 use theme::{ACCENT, BG, FG, PANEL};
 
 /// The jj workspace `cwd` is in: the nearest ancestor holding a `.jj` directory.
@@ -44,9 +48,16 @@ pub fn run(revset: Option<String>) -> i32 {
             return 1;
         }
     };
+    let store = paths::data_dir()
+        .zip(paths::find_root(&root))
+        .and_then(|(data, main)| Store::open(&paths::repo_dir(&data, &main).join("lgtm.db")).ok());
     let mut app = App {
         root,
         loader,
+        version: store.as_ref().and_then(|s| s.data_version().ok()),
+        store,
+        polled: Instant::now(),
+        shift: false,
         picker: Picker::default(),
         review: None,
         direct: revset.is_some(),
@@ -57,9 +68,9 @@ pub fn run(revset: Option<String>) -> i32 {
     if let Some(revset) = revset {
         app.open(revset);
     }
-    let mut terminal = ratatui::init();
-    let result = app.run(&mut terminal, &rx);
-    ratatui::restore();
+    let mut term = Term::start();
+    let result = app.run(&mut term.terminal, &rx);
+    term.stop();
     match result {
         Ok(()) => 0,
         Err(e) => {
@@ -78,7 +89,17 @@ struct App {
     direct: bool,
     help: bool,
     loads: u64,
+    /// The repo's store, shared with the desktop app. `None` when it couldn't be opened.
+    store: Option<Store>,
+    /// The store's data version when last read, to notice the app's writes.
+    version: Option<i64>,
+    polled: Instant,
+    /// Whether Shift is held, where the terminal reports it.
+    shift: bool,
 }
+
+/// How often to look for another app's writes to the store.
+const POLL: Duration = Duration::from_millis(250);
 
 impl App {
     fn open(&mut self, revset: String) {
@@ -95,14 +116,35 @@ impl App {
             })?;
             if event::poll(Duration::from_millis(50))?
                 && let Event::Key(key) = event::read()?
-                && key.kind != KeyEventKind::Release
-                && self.key(key)
             {
-                return Ok(());
+                if term::is_shift(&key) {
+                    self.shift = key.kind != KeyEventKind::Release;
+                } else if key.kind != KeyEventKind::Release && self.key(term::plain(key)) {
+                    return Ok(());
+                }
             }
             while let Ok(msg) = rx.try_recv() {
                 self.message(msg);
             }
+            if self.polled.elapsed() >= POLL {
+                self.polled = Instant::now();
+                self.poll_store();
+            }
+        }
+    }
+
+    /// Rematches marks when another app wrote to the store.
+    fn poll_store(&mut self) {
+        let Some(store) = self.store.as_ref() else {
+            return;
+        };
+        let version = store.data_version().ok();
+        if version == self.version {
+            return;
+        }
+        self.version = version;
+        if let Some(r) = self.review.as_mut() {
+            r.rematch(store);
         }
     }
 
@@ -117,6 +159,11 @@ impl App {
             Msg::Highlight { id, file, sides } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.highlighted(file, sides);
+                }
+            }
+            Msg::Built { id, files, cfg } => {
+                if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
+                    r.built(files, cfg, self.store.as_ref());
                 }
             }
         }
@@ -136,7 +183,7 @@ impl App {
             return false;
         }
         if let Some(r) = self.review.as_mut() {
-            if let review::Outcome::Back = r.key(key) {
+            if let review::Outcome::Back = r.key(key, self.store.as_mut()) {
                 self.review = None;
                 return self.direct;
             }
@@ -167,7 +214,7 @@ impl App {
             Some(r) => {
                 r.title(c, x, top);
                 r.draw(c, body);
-                (r.hints(), review::KEYS)
+                (r.hints(self.shift), review::KEYS)
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));

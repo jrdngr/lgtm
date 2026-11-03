@@ -43,7 +43,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use specta::Type;
 
 use crate::anchor::MatchConfig;
@@ -145,21 +145,7 @@ impl RefreshDto {
     }
 }
 
-/// A row by file index and its index among the file's rows, counting across hunks.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
-pub struct RowRef {
-    pub file: u32,
-    pub row: u32,
-}
-
-impl RowRef {
-    pub(super) fn new(file: usize, row: u32) -> Self {
-        Self {
-            file: file as u32,
-            row,
-        }
-    }
-}
+pub use lgtm_core::review::RowRef;
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

@@ -340,6 +340,12 @@ impl Store {
         })
     }
 
+    /// Changes whenever another connection commits, so polling it notices another app's
+    /// writes.
+    pub fn data_version(&self) -> rusqlite::Result<i64> {
+        self.db.query_row("PRAGMA data_version", [], |r| r.get(0))
+    }
+
     pub fn line_hashes(&self, commit: &str, path: &str) -> rusqlite::Result<Option<Vec<i64>>> {
         let mut stmt = self
             .db
@@ -395,6 +401,34 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn data_version_changes_only_for_another_connections_writes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lgtm.db");
+        let mut ours = Store::open(&path).unwrap();
+        let theirs = Store::open(&path).unwrap();
+        let seen = ours.data_version().unwrap();
+        let check = FileCheck {
+            id: 0,
+            path: "a.rs".into(),
+            old_hashes: vec![],
+            new_hashes: vec![1],
+            fingerprint: None,
+            review: "@".into(),
+            created_at: 1,
+            agent: false,
+        };
+        let edit = Edit {
+            checks_added: vec![check],
+            ..Edit::default()
+        };
+        ours.apply(&edit).unwrap();
+        assert_eq!(ours.data_version().unwrap(), seen);
+        let before = theirs.data_version().unwrap();
+        ours.apply(&edit).unwrap();
+        assert_ne!(theirs.data_version().unwrap(), before);
+    }
 
     #[test]
     fn old_tables_gain_autoincrement_and_mark_colors_and_keep_their_rows() {

@@ -1,11 +1,14 @@
 //! Reviewing a commit or range: its diff, unified or side by side, beside its file list.
 
 mod draw;
+mod marking;
+pub mod marks;
 pub mod rows;
 
 use std::collections::HashSet;
 
 use lgtm_core::jj::{Change, FileDiff};
+use lgtm_core::store::Store;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::highlight::Sides;
@@ -35,6 +38,9 @@ pub struct Review {
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
+    marks: Option<marks::Marks>,
+    /// A failure to show until the next key.
+    notice: Option<String>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -45,6 +51,9 @@ pub const KEYS: &[(&str, &str)] = &[
     ("{ }", "file"),
     ("Enter", "fold hunk"),
     ("Tab", "file list"),
+    ("r f", "review, flag hunk"),
+    ("R F", "review, flag file"),
+    ("n", "next not reviewed"),
     ("t", "side by side"),
     ("q", "back"),
 ];
@@ -66,6 +75,8 @@ impl Review {
             in_list: false,
             list_top: 0,
             height: 0,
+            marks: None,
+            notice: None,
         }
     }
 
@@ -140,9 +151,17 @@ impl Review {
         self.cursor = rows::find(&self.lines, (key.0, Some(key.1), None));
     }
 
-    pub fn key(&mut self, key: KeyEvent) -> Outcome {
+    pub fn key(&mut self, key: KeyEvent, store: Option<&mut Store>) -> Outcome {
         let half = (self.height / 2).max(1) as isize;
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        self.notice = None;
+        if let KeyCode::Char(c) = key.code
+            && !ctrl
+            && !self.in_list
+            && self.mark_key(c, store)
+        {
+            return Outcome::None;
+        }
         match key.code {
             KeyCode::Char('q') => return Outcome::Back,
             KeyCode::Tab => self.in_list = !self.in_list,
@@ -171,10 +190,19 @@ impl Review {
         Outcome::None
     }
 
-    pub fn hints(&self) -> Vec<Hint<'static>> {
+    /// The key bar. With Shift held, r and f become R and F.
+    pub fn hints(&self, shift: bool) -> Vec<Hint<'static>> {
+        let (review, flag) = if shift {
+            (("R", "review file", false), ("F", "flag file", false))
+        } else {
+            (("r", "review hunk", false), ("f", "flag hunk", false))
+        };
         vec![
             ("[ ]", "hunk", false),
             ("{ }", "file", false),
+            review,
+            flag,
+            ("n", "next", false),
             ("t", "split", self.split),
             ("?", "keys", false),
             ("q", "back", false),
@@ -217,7 +245,7 @@ mod tests {
     }
 
     fn press(r: &mut Review, code: KeyCode) {
-        r.key(KeyEvent::new(code, KeyModifiers::NONE));
+        r.key(KeyEvent::new(code, KeyModifiers::NONE), None);
     }
 
     fn review() -> Review {

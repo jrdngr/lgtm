@@ -1,7 +1,6 @@
 mod bots;
 mod canvas;
 mod commands;
-mod config;
 mod ctx;
 mod dragged;
 mod drawings;
@@ -39,7 +38,7 @@ mod workspace;
 mod workspaces;
 mod zoom;
 
-pub use lgtm_core::{anchor, diff};
+pub use lgtm_core::{anchor, config, diff};
 use lgtm_core::{github, jj, store, syntax};
 use std::path::Path;
 

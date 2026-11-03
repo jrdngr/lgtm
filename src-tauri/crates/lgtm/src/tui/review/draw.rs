@@ -6,19 +6,50 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 use super::Review;
+use super::marks::State;
 use super::rows::Line;
 use crate::tui::highlight::{self, Sides};
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
-    self, ACCENT, ADD, BG, BLANK, DEL, FAINT, FG, GREEN, HAIR, MUTED, PANEL, RED, SEL, UNIQUE,
+    self, ACCENT, ADD, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, PANEL, RED,
+    SEL, UNIQUE,
 };
 
 /// Width of a line number column.
 const NUM: u16 = 4;
 
+/// The gutter color of a hunk in `state`.
+fn bar(state: State) -> Option<Color> {
+    match state {
+        State::Reviewed => Some(GREEN),
+        State::Agent => Some(CYAN),
+        State::Flagged => Some(RED),
+        State::AgentFlagged => Some(FUCHSIA),
+        State::None | State::Partial => None,
+    }
+}
+
+/// A file's icon in the file list.
+fn icon(state: State) -> (&'static str, Color) {
+    match state {
+        State::Reviewed => ("✓", GREEN),
+        State::Agent => ("✓", CYAN),
+        State::Flagged => ("!", RED),
+        State::AgentFlagged => ("!", FUCHSIA),
+        State::Partial => ("◐", GREEN),
+        State::None => (" ", FAINT),
+    }
+}
+
 impl Review {
-    /// Writes the review's ids and description into the top bar from `x`.
+    /// Writes the review's ids and description into the top bar from `x`, and on its right
+    /// how much is reviewed, or a failure.
     pub fn title(&self, c: &mut Canvas, x: u16, y: u16) {
+        if let Some(notice) = &self.notice {
+            c.put_right(y, 1, notice, theme::fg(RED).bg(PANEL));
+        } else if let Some(pct) = self.percent() {
+            c.put_right(y, 1, &format!("{pct}%"), theme::fg(GREEN).bg(PANEL));
+        }
         let id = |c: &mut Canvas, x: u16, ch: &lgtm_core::jj::Change| {
             let id: String = ch.change_id.chars().take(8).collect();
             let unique = (ch.unique as usize).min(id.len());
@@ -83,6 +114,8 @@ impl Review {
             let y = area.y + 1 + n as u16;
             let bg = if i == selected { SEL } else { BG };
             c.fill(area.x, y, area.width, bg);
+            let (mark, color) = icon(self.file_state(i));
+            c.put(area.x + 1, y, mark, theme::fg(color).bg(bg));
             let name = f.path.rsplit('/').next().unwrap_or(&f.path);
             let dir = &f.path[..f.path.len() - name.len()];
             let x = c.put(area.x + 3, y, dir, theme::fg(MUTED).bg(bg));
@@ -108,6 +141,9 @@ impl Review {
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;
             let cursor = n == self.cursor;
+            let gutter = line
+                .hunk()
+                .and_then(|h| bar(self.hunk_state(line.file(), h)));
             match line {
                 Line::File(f) => file_header(c, y, &self.files[f], cursor),
                 Line::Hunk(f, h) => {
@@ -129,6 +165,9 @@ impl Review {
                         unified_row(c, y, sides, r, cursor);
                     }
                 }
+            }
+            if let Some(color) = gutter {
+                c.put(area.x, y, "▌", theme::fg(color));
             }
         }
     }

@@ -23,6 +23,7 @@ pub const HAIR: Color = rgb(0x303030);
 pub const ACCENT: Color = rgb(0x4f8cc9);
 pub const GREEN: Color = rgb(0x3fb950);
 pub const RED: Color = rgb(0xf85149);
+pub const CYAN: Color = rgb(0x39c5cf);
 pub const FUCHSIA: Color = rgb(0xd670d6);
 pub const UNIQUE: Color = rgb(0xc586c0);
 
