@@ -9,6 +9,7 @@ mod paint;
 mod picker;
 mod review;
 mod serve;
+mod settings;
 mod term;
 mod theme;
 mod versions;
@@ -31,6 +32,7 @@ use load::{Loader, Msg, Target};
 use paint::Canvas;
 use picker::Picker;
 use review::Review;
+use settings::Settings;
 use term::Term;
 use theme::{ACCENT, BG, FG, PANEL};
 
@@ -95,6 +97,7 @@ pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
         prs: HashMap::new(),
         help: false,
         loads: 0,
+        settings: settings::load(),
     };
     app.loader.log();
     if let Some(revset) = revset {
@@ -141,6 +144,8 @@ struct App {
     polled: Instant,
     /// Whether Shift is held, where the terminal reports it.
     shift: bool,
+    /// The review's toggles, as last left.
+    settings: Settings,
 }
 
 /// How often to look for another app's writes to the store.
@@ -151,6 +156,7 @@ impl App {
         self.loads += 1;
         self.loader.review(self.loads, target.clone());
         let mut review = Review::new(self.loads, target);
+        review.apply(&self.settings);
         if let Some(pr) = self.prs.get(&review.revset) {
             review.set_pr(pr.clone());
         }
@@ -317,7 +323,13 @@ impl App {
             return false;
         }
         if let Some(r) = self.review.as_mut() {
-            match r.key(key, self.store.as_mut()) {
+            let outcome = r.key(key, self.store.as_mut());
+            let settings = r.settings();
+            if settings != self.settings {
+                settings::save(&settings);
+                self.settings = settings;
+            }
+            match outcome {
                 review::Outcome::Back => {
                     self.review = None;
                     self.snapshots.store(false, Ordering::Relaxed);

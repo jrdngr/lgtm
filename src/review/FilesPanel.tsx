@@ -37,7 +37,7 @@ const REVIEWED_OPEN = "/reviewed";
 /** Whether reviewed files go in their own collapsed list, remembered across windows. */
 function useHideReviewed() {
   const [on, setOn] = useState(() =>
-    loadState(HIDE_REVIEWED, false, (v): v is boolean => typeof v === "boolean"),
+    loadState(HIDE_REVIEWED, true, (v): v is boolean => typeof v === "boolean"),
   );
   const toggle = () =>
     setOn((prev) => {

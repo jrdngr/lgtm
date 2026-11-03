@@ -28,6 +28,7 @@ use ratatui::layout::{Position, Rect};
 use super::highlight::Sides;
 use super::keybar::Hint;
 use super::load::Target;
+use super::settings::Settings;
 use rows::Line;
 
 pub enum Outcome {
@@ -122,6 +123,23 @@ pub const KEYS: &[(&str, &str)] = &[
 ];
 
 impl Review {
+    /// The toggles, to keep for the next review and run.
+    pub fn settings(&self) -> Settings {
+        Settings {
+            hide_reviewed: self.group_reviewed,
+            split: self.split,
+            hide_pr: self.hide_pr,
+            show_resolved: self.show_resolved,
+        }
+    }
+
+    pub fn apply(&mut self, s: &Settings) {
+        self.group_reviewed = s.hide_reviewed;
+        self.split = s.split;
+        self.hide_pr = s.hide_pr;
+        self.show_resolved = s.show_resolved;
+    }
+
     pub fn new(id: u64, target: Target) -> Self {
         Self {
             revset: target.name(),
