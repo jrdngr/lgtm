@@ -34,6 +34,7 @@ use rows::Line;
 pub enum Outcome {
     None,
     Back,
+    Quit,
     /// Open the editor on this file, a path in the workspace, at this line.
     Edit(String, u32),
     /// Pull the PR's threads from GitHub.

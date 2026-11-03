@@ -335,6 +335,7 @@ impl App {
                     self.snapshots.store(false, Ordering::Relaxed);
                     return self.direct;
                 }
+                review::Outcome::Quit => return true,
                 review::Outcome::Edit(path, line) => self.edit = Some((path, line)),
                 review::Outcome::Pull => {
                     let pr = r.pr().map(|(_, n)| n.to_string()).or(self.pr.clone());
