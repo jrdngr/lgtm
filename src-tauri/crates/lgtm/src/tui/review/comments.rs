@@ -80,7 +80,11 @@ impl Review {
     pub(super) fn notes(&self) -> Notes {
         let mut notes = Notes::default();
         let editing = self.input.as_ref().filter(|i| i.editing).map(|i| i.number);
-        for (c, at) in self.comments.iter().filter(|(c, _)| Some(c.number) != editing) {
+        for (c, at) in self
+            .comments
+            .iter()
+            .filter(|(c, _)| Some(c.number) != editing)
+        {
             let note = (NoteKey::Comment(c.number), self.comment_lines(c).len());
             match *at {
                 Some(at) => notes.at_row.entry(at).or_default().push(note),
@@ -121,7 +125,11 @@ impl Review {
     /// How many open comments a file has: the agent's, and its PR threads while they show.
     pub(super) fn open_comments(&self, file: usize) -> usize {
         let path = &self.files[file].path;
-        let comments = self.comments.iter().filter(|(c, _)| &c.path == path).count();
+        let comments = self
+            .comments
+            .iter()
+            .filter(|(c, _)| &c.path == path)
+            .count();
         let threads = if self.hide_pr {
             0
         } else {

@@ -109,6 +109,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("h", "hide reviewed files"),
     ("J K", "select lines"),
     ("c", "comment for the agent, on the selected lines"),
+    ("C", "next comment"),
     ("d", "delete comment"),
     ("e", "edit"),
     ("t", "side by side"),
@@ -247,6 +248,26 @@ impl Review {
             self.lines[..self.cursor].iter().rposition(&is)
         };
         if let Some(i) = found {
+            self.cursor = i;
+        }
+    }
+
+    /// Moves to the first line of the next open comment or PR thread, wrapping around.
+    fn next_comment(&mut self) {
+        let starts: Vec<usize> = (0..self.lines.len())
+            .filter(|&i| {
+                matches!(
+                    self.lines[i],
+                    Line::Note {
+                        key: rows::NoteKey::Comment(_) | rows::NoteKey::Thread(_),
+                        part: 0,
+                        ..
+                    }
+                )
+            })
+            .collect();
+        let next = starts.iter().find(|&&i| i > self.cursor).or(starts.first());
+        if let Some(&i) = next {
             self.cursor = i;
         }
     }
@@ -395,6 +416,7 @@ impl Review {
                 _ => {}
             },
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
+            KeyCode::Char('C') => self.next_comment(),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
             KeyCode::Char('e') => {
                 if let Some((path, line)) = self.edit_target() {
@@ -592,9 +614,13 @@ mod tests {
     }
 
     #[test]
-    fn enter_folds_the_file_under_the_cursor_and_unfolds_it_again() {
+    fn enter_on_a_file_header_folds_the_file_and_unfolds_it_again() {
         let mut r = review();
         press(&mut r, KeyCode::Char(']'));
+        // Enter on code does nothing.
+        press(&mut r, KeyCode::Enter);
+        assert_eq!(r.current(), on_change(0, 0));
+        press(&mut r, KeyCode::Char('{'));
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), Some(Line::File(0)));
         press(&mut r, KeyCode::Down);

@@ -189,7 +189,10 @@ mod tests {
         );
         assert_eq!(found[1].start, Some((1, "fn a() {".into())));
         store.set_agent_comment_body(1, "why 2?").unwrap();
-        assert_eq!(store.agent_comments_for_paths(&["a.rs"]).unwrap()[0].body, "why 2?");
+        assert_eq!(
+            store.agent_comments_for_paths(&["a.rs"]).unwrap()[0].body,
+            "why 2?"
+        );
         // A deleted comment's number isn't reused while a later one exists.
         store.delete_agent_comment(1).unwrap();
         assert_eq!(store.add_agent_comment(&comment("a.rs")).unwrap().number, 3);

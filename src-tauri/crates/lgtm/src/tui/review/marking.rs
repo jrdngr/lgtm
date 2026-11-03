@@ -1,6 +1,8 @@
 //! Marking from the keyboard: r and f on the cursor's hunk, R and F on its file, and moving on
 //! to the next hunk that isn't reviewed.
 
+use std::collections::HashSet;
+
 use lgtm_core::anchor::MatchConfig;
 use lgtm_core::review::file::ReviewFile;
 use lgtm_core::store::{MarkColor, Store};
@@ -9,8 +11,10 @@ use super::Review;
 use super::marks::{Marks, State};
 
 impl Review {
-    /// Takes every file's review state, matches marks onto it, and folds reviewed files.
+    /// Takes every file's review state and matches marks onto it. The first time it folds
+    /// reviewed files; after that it opens files that stopped being reviewed.
     pub fn built(&mut self, files: Vec<ReviewFile>, cfg: MatchConfig, store: Option<&Store>) {
+        let before = self.reviewed_paths();
         let hunk_rows = self
             .files
             .iter()
@@ -20,14 +24,27 @@ impl Review {
         if let Some(store) = store {
             self.rematch(store);
         }
+        let reviewed = self.reviewed_paths();
         if !std::mem::replace(&mut self.built_once, true) {
-            let reviewed: Vec<String> = (0..self.files.len())
-                .filter(|&f| self.file_state(f) == State::Reviewed)
-                .map(|f| self.files[f].path.clone())
-                .collect();
             self.folded.extend(reviewed);
-            self.relayout();
+        } else {
+            // A reviewed file that changed since opens again.
+            for path in before.difference(&reviewed) {
+                self.folded.remove(path);
+            }
         }
+        self.relayout();
+    }
+
+    /// The reviewed files' paths, by the marks as last matched.
+    fn reviewed_paths(&self) -> HashSet<String> {
+        let Some(marks) = &self.marks else {
+            return HashSet::new();
+        };
+        (0..marks.file_count())
+            .filter(|&f| marks.state(f, None) == State::Reviewed)
+            .map(|f| marks.path(f).to_string())
+            .collect()
     }
 
     /// Matches marks and comments again, after the store changed.
