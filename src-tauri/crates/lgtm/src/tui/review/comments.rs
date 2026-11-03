@@ -65,11 +65,18 @@ impl Review {
                         let at = place(&self.files, &c);
                         (c, at)
                     })
+                    .filter(|(c, at)| c.review == self.revset || self.on_change(*at))
                     .collect();
             }
             Err(e) => self.notice = Some(format!("{e:#}")),
         }
         self.relayout();
+    }
+
+    /// Whether a comment is on a changed row. A comment made in another review shows here
+    /// only then: on context, or nowhere, it's about another change.
+    fn on_change(&self, at: Option<(usize, usize, usize)>) -> bool {
+        at.is_some_and(|(f, h, r)| self.files[f].hunks[h].rows[r].kind != RowKind::Context)
     }
 
     pub fn typing(&self) -> bool {

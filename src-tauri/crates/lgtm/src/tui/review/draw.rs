@@ -37,8 +37,7 @@ fn icon(state: State) -> (&'static str, Color) {
         State::Agent => ("✓", CYAN),
         State::Flagged => ("!", RED),
         State::AgentFlagged => ("!", FUCHSIA),
-        State::Partial => ("◐", GREEN),
-        State::None => (" ", FAINT),
+        State::Partial | State::None => (" ", FAINT),
     }
 }
 
