@@ -1,5 +1,5 @@
-//! `lgtm snap <label>`: snapshots the working copy and labels the snapshot, so the review
-//! picker lists it under its change.
+//! `lgtm snap <label>`: starts a step named `label`. It snapshots the working copy and labels
+//! the snapshot, so the review picker lists it under its change and opens the edits after it.
 
 use lgtm_core::jj::Jj;
 

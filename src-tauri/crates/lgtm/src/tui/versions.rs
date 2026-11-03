@@ -1,10 +1,8 @@
 //! A change's snapshots under its row in the picker: labeled ones, or every version in its
-//! evolog with `a`. Opening some reviews what they changed, from the version before them.
-
-use lgtm_core::jj::Version;
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+//! evolog with `a`. Each starts a step, so opening some reviews what was done after them.
 
 use super::load::Target;
+use lgtm_core::jj::Version;
 
 pub struct Versions {
     /// The change's row in the picker.
@@ -21,16 +19,8 @@ pub struct Versions {
     anchor: Option<usize>,
 }
 
-pub enum Key {
-    None,
-    Close,
-    Open(Target),
-}
-
-/// A shown version: its index in the list, whether it's picked and where in the range, and
-/// the version with its label.
+/// A shown version: where it is in the picked range, and the version with its label.
 pub struct Shown<'a> {
-    pub sel: bool,
     pub mark: Option<&'static str>,
     pub version: &'a Version,
     pub label: Option<&'a str>,
@@ -82,79 +72,71 @@ impl Versions {
             .unwrap_or_else(|| v.commit_id.chars().take(8).collect())
     }
 
-    /// What the picked versions changed: from the shown version before the oldest picked
-    /// one, or the change's parents, to the newest picked one.
+    /// What was done after the picked versions: from the oldest picked one to the next shown
+    /// version after the newest, or the change as it is now.
     fn target(&self) -> Option<Target> {
         let (newest, oldest) = self.range();
         if self.list.is_empty() {
             return None;
         }
-        let shown = self.shown_indexes();
-        let before = shown.iter().find(|&&i| i > oldest);
-        // The newest version follows the change as it's edited.
-        let to = match newest {
-            0 => self.rev.clone(),
-            i => self.list[i].0.commit_id.clone(),
+        let after = self.shown_indexes().into_iter().rev().find(|&i| i < newest);
+        let to = match after {
+            Some(i) => self.list[i].0.commit_id.clone(),
+            // The change follows its edits.
+            None => self.rev.clone(),
         };
-        let change: String = self.rev.chars().take(8).collect();
         let span = if newest == oldest {
             self.name(newest)
         } else {
             format!("{} → {}", self.name(oldest), self.name(newest))
         };
-        Some(match before {
-            Some(&b) => Target::Between {
-                from: self.list[b].0.commit_id.clone(),
-                to,
-                change,
-                span,
-            },
-            None => Target::Revset(to),
+        Some(Target::Between {
+            from: self.list[oldest].0.commit_id.clone(),
+            to,
+            change: self.rev.chars().take(8).collect(),
+            span,
         })
     }
 
-    fn step(&mut self, down: bool) {
-        let shown = self.shown_indexes();
-        let next = if down {
-            shown.into_iter().find(|&i| i > self.sel)
-        } else {
-            shown.into_iter().rev().find(|&i| i < self.sel)
-        };
-        if let Some(i) = next {
+    /// Puts the cursor on the `j`th shown version.
+    pub fn select(&mut self, j: usize) {
+        if let Some(&i) = self.shown_indexes().get(j) {
             self.sel = i;
         }
     }
 
-    pub fn key(&mut self, key: KeyEvent) -> Key {
-        match key.code {
-            KeyCode::Char('j') | KeyCode::Down => self.step(true),
-            KeyCode::Char('k') | KeyCode::Up => self.step(false),
-            KeyCode::Char(' ') => {
-                self.anchor = match self.anchor {
-                    Some(_) => None,
-                    None => Some(self.sel),
-                }
-            }
-            KeyCode::Char('a') => {
-                self.all = !self.all;
-                let shown = self.shown_indexes();
-                if !shown.contains(&self.sel) {
-                    self.sel = shown.first().copied().unwrap_or(0);
-                }
-                if self.anchor.is_some_and(|a| !shown.contains(&a)) {
-                    self.anchor = None;
-                }
-            }
-            KeyCode::Esc if self.anchor.is_some() => self.anchor = None,
-            KeyCode::Esc | KeyCode::Char('s') => return Key::Close,
-            KeyCode::Enter => {
-                if let Some(t) = self.target() {
-                    return Key::Open(t);
-                }
-            }
-            _ => {}
+    /// Where the cursor is among the shown versions, if they're shown at all.
+    pub fn at(&self) -> Option<usize> {
+        self.shown_indexes().iter().position(|&i| i == self.sel)
+    }
+
+    /// Starts a range at the cursor, or drops it.
+    pub fn toggle_anchor(&mut self) {
+        self.anchor = match self.anchor {
+            Some(_) => None,
+            None => Some(self.sel),
         }
-        Key::None
+    }
+
+    pub fn clear_anchor(&mut self) {
+        self.anchor = None;
+    }
+
+    /// Shows unlabeled versions too, or hides them.
+    pub fn set_all(&mut self, all: bool) {
+        self.all = all;
+        let shown = self.shown_indexes();
+        if !shown.contains(&self.sel) {
+            self.sel = shown.first().copied().unwrap_or(0);
+        }
+        if self.anchor.is_some_and(|a| !shown.contains(&a)) {
+            self.anchor = None;
+        }
+    }
+
+    /// What Enter opens: what the picked versions changed.
+    pub fn open(&self) -> Option<Target> {
+        self.target()
     }
 
     /// The versions to show, in order.
@@ -171,7 +153,6 @@ impl Versions {
                         _ => "│",
                     });
                 Shown {
-                    sel: i == self.sel,
                     mark,
                     version: &self.list[i].0,
                     label: self.list[i].1.as_deref(),
@@ -184,7 +165,6 @@ impl Versions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ratatui::crossterm::event::KeyModifiers;
 
     fn versions() -> Versions {
         let mut v = Versions::new(0, "wkpzrmvq".into());
@@ -203,63 +183,41 @@ mod tests {
         v
     }
 
-    fn press(v: &mut Versions, code: KeyCode) -> Key {
-        v.key(KeyEvent::new(code, KeyModifiers::NONE))
-    }
-
-    fn opened(k: Key) -> Target {
-        match k {
-            Key::Open(t) => t,
-            _ => panic!("nothing opened"),
-        }
-    }
-
-    fn between(from: &str, to: &str, span: &str) -> Target {
-        Target::Between {
+    fn between(from: &str, to: &str, span: &str) -> Option<Target> {
+        Some(Target::Between {
             from: from.into(),
             to: to.into(),
             change: "wkpzrmvq".into(),
             span: span.into(),
-        }
+        })
     }
 
     #[test]
-    fn a_labeled_snapshot_opens_from_the_label_before_it() {
+    fn a_snapshot_opens_what_was_done_until_the_next_one() {
         let mut v = versions();
-        // The newest version follows the change itself.
-        assert_eq!(
-            opened(press(&mut v, KeyCode::Enter)),
-            between("c2", "wkpzrmvq", "third")
-        );
-        press(&mut v, KeyCode::Char('j'));
-        assert_eq!(
-            opened(press(&mut v, KeyCode::Enter)),
-            between("c0", "c2", "second")
-        );
-        // The oldest shown one opens the whole change as it was then.
-        press(&mut v, KeyCode::Char('j'));
-        assert_eq!(
-            opened(press(&mut v, KeyCode::Enter)),
-            Target::Revset("c0".into())
-        );
+        // The newest snapshot runs to the change as it's edited.
+        assert_eq!(v.open(), between("c4", "wkpzrmvq", "third"));
+        v.select(1);
+        assert_eq!(v.open(), between("c2", "c4", "second"));
+        v.select(2);
+        assert_eq!(v.open(), between("c0", "c2", "first"));
     }
 
     #[test]
-    fn a_range_spans_its_ends_and_a_shows_every_version() {
+    fn a_range_spans_its_ends_and_all_shows_every_version() {
         let mut v = versions();
-        press(&mut v, KeyCode::Char(' '));
-        press(&mut v, KeyCode::Char('j'));
-        assert_eq!(
-            opened(press(&mut v, KeyCode::Enter)),
-            between("c0", "wkpzrmvq", "second → third")
-        );
-        press(&mut v, KeyCode::Esc);
-        press(&mut v, KeyCode::Char('a'));
+        v.select(1);
+        v.toggle_anchor();
+        v.select(2);
+        assert_eq!(v.open(), between("c0", "c4", "first → second"));
+        v.clear_anchor();
+        v.set_all(true);
         assert_eq!(v.shown().len(), 5);
-        press(&mut v, KeyCode::Char('j'));
-        assert_eq!(
-            opened(press(&mut v, KeyCode::Enter)),
-            between("c0", "c1", "c1")
-        );
+        assert_eq!(v.at(), Some(4));
+        v.select(3);
+        assert_eq!(v.open(), between("c1", "c2", "c1"));
+        // Hiding unlabeled versions moves the cursor off a hidden one.
+        v.set_all(false);
+        assert_eq!(v.at(), Some(0));
     }
 }

@@ -1,5 +1,5 @@
-//! Picking what to review from the jj log: one commit, a range picked with Space, or a
-//! change's snapshots with `s`.
+//! Picking what to review from the jj log: one commit, a range picked with Space, or
+//! snapshots, which `s` shows under every change.
 
 use lgtm_core::jj::LogRow;
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
@@ -14,29 +14,33 @@ use super::versions::{self, Versions};
 pub enum Outcome {
     None,
     Open(Target),
-    /// Load the versions of this change.
-    Versions(String),
+    /// Load the versions of these changes.
+    Versions(Vec<String>),
     Quit,
 }
 
-/// A line of the picker: a row of the log, or a version under it.
+/// A line of the picker: a row of the log, or the `j`th snapshot shown under the `k`th
+/// change's row.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Item {
     Row(usize),
-    Version(usize),
+    Version(usize, usize),
 }
 
 #[derive(Default)]
 pub struct Picker {
     rows: Vec<LogRow>,
     error: Option<String>,
-    /// Index into `rows`, always a commit's row once there is one.
+    /// Index into `rows`, always a commit's row once there is one. With the cursor on a
+    /// snapshot, its change's row.
     sel: usize,
     /// The other end of a range, set with Space.
     anchor: Option<usize>,
     top: usize,
-    /// The snapshots open under a change's row.
-    versions: Option<Versions>,
+    /// Every change's snapshots, under its row, while they're open.
+    snapshots: Option<Vec<Versions>>,
+    /// The snapshot the cursor is on, by its change and place among the shown ones.
+    on: Option<(String, usize)>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -61,10 +65,6 @@ impl Picker {
                     id_at(&self.rows, Some(self.sel)),
                     id_at(&self.rows, self.anchor),
                 );
-                let open = self
-                    .versions
-                    .as_ref()
-                    .map(|v| id_at(&self.rows, Some(v.row)));
                 self.rows = rows;
                 self.error = None;
                 let find = |id: Option<String>| {
@@ -77,15 +77,28 @@ impl Picker {
                     .or_else(|| self.commits().first().copied())
                     .unwrap_or(0);
                 self.anchor = find(anchor);
-                if let Some(open) = open {
-                    match find(open) {
-                        Some(row) => self.versions.as_mut().expect("open").row = row,
-                        None => self.versions = None,
-                    }
+                if let Some(old) = self.snapshots.take() {
+                    self.snapshots = Some(self.all_versions(old));
                 }
             }
             Err(e) => self.error = Some(format!("{e:#}")),
         }
+    }
+
+    /// A change's versions for every commit row, keeping those already loaded.
+    fn all_versions(&self, mut old: Vec<Versions>) -> Vec<Versions> {
+        self.commits()
+            .into_iter()
+            .filter_map(|i| {
+                let rev = self.id(i)?;
+                let mut v = match old.iter().position(|v| v.rev() == rev) {
+                    Some(k) => old.swap_remove(k),
+                    None => Versions::new(i, rev),
+                };
+                v.row = i;
+                Some(v)
+            })
+            .collect()
     }
 
     /// The indexes of commits' rows.
@@ -114,9 +127,13 @@ impl Picker {
         })
     }
 
-    /// The change whose versions are open, if any.
-    pub fn versions_rev(&self) -> Option<&str> {
-        Some(self.versions.as_ref()?.rev())
+    /// The changes whose versions are open.
+    pub fn versions_revs(&self) -> Vec<String> {
+        self.snapshots
+            .iter()
+            .flatten()
+            .map(|v| v.rev().to_string())
+            .collect()
     }
 
     /// Takes the versions of the change `rev`, each with its label.
@@ -125,7 +142,7 @@ impl Picker {
         rev: &str,
         result: anyhow::Result<Vec<(lgtm_core::jj::Version, Option<String>)>>,
     ) {
-        let Some(v) = self.versions.as_mut().filter(|v| v.rev() == rev) else {
+        let Some(v) = self.snapshots.iter_mut().flatten().find(|v| v.rev() == rev) else {
             return;
         };
         match result {
@@ -134,6 +151,10 @@ impl Picker {
                 v.loaded(list);
             }
             Err(e) => v.error = Some(format!("{e:#}")),
+        }
+        // The cursor's snapshot may be gone.
+        if self.on.as_ref().is_some_and(|(r, _)| r == rev) {
+            self.on = None;
         }
     }
 
@@ -148,55 +169,130 @@ impl Picker {
         })
     }
 
-    fn step(&mut self, down: bool) {
-        let next = if down {
-            self.commits().into_iter().find(|&i| i > self.sel)
-        } else {
-            self.commits().into_iter().rev().find(|&i| i < self.sel)
-        };
-        if let Some(i) = next {
-            self.sel = i;
+    /// The versions of the change the cursor's on a snapshot of.
+    fn on_versions(&mut self) -> Option<(&mut Versions, usize)> {
+        let (rev, j) = self.on.clone()?;
+        let v = self
+            .snapshots
+            .iter_mut()
+            .flatten()
+            .find(|v| v.rev() == rev)?;
+        Some((v, j))
+    }
+
+    /// Clears every range, of rows and of snapshots.
+    fn clear_ranges(&mut self) {
+        self.anchor = None;
+        self.snapshots
+            .iter_mut()
+            .flatten()
+            .for_each(Versions::clear_anchor);
+    }
+
+    fn anchored(&self) -> bool {
+        self.anchor.is_some() || self.snapshots.iter().flatten().any(Versions::anchored)
+    }
+
+    /// Moves the cursor to `item`. A snapshot range ends when the cursor leaves its change.
+    fn go(&mut self, item: Item) {
+        let left = self.on.as_ref().map(|(rev, _)| rev.clone());
+        match item {
+            Item::Row(i) => {
+                self.sel = i;
+                self.on = None;
+            }
+            Item::Version(k, j) => {
+                let Some(v) = self.snapshots.as_mut().and_then(|s| s.get_mut(k)) else {
+                    return;
+                };
+                v.select(j);
+                self.sel = v.row;
+                self.on = Some((v.rev().to_string(), j));
+            }
+        }
+        let now = self.on.as_ref().map(|(rev, _)| rev);
+        if left.is_some() && left.as_ref() != now {
+            self.snapshots
+                .iter_mut()
+                .flatten()
+                .for_each(Versions::clear_anchor);
         }
     }
 
-    pub fn key(&mut self, key: KeyEvent) -> Outcome {
-        if let Some(v) = self.versions.as_mut() {
-            if key.code == KeyCode::Char('q') {
-                return Outcome::Quit;
-            }
-            match v.key(key) {
-                versions::Key::Open(target) => return Outcome::Open(target),
-                versions::Key::Close => self.versions = None,
-                versions::Key::None => {}
-            }
+    fn step(&mut self, down: bool) {
+        let (items, cursor) = self.items();
+        let is_line = |item: &Item| match *item {
+            Item::Row(i) => self.rows[i].commit.is_some(),
+            Item::Version(..) => true,
+        };
+        let next = if down {
+            items[cursor + 1..].iter().find(|it| is_line(it))
+        } else {
+            items[..cursor].iter().rev().find(|it| is_line(it))
+        };
+        if let Some(&item) = next {
+            self.go(item);
+        }
+    }
+
+    /// Opens every change's snapshots, or closes them.
+    fn toggle_snapshots(&mut self) -> Outcome {
+        if self.snapshots.take().is_some() {
+            self.on = None;
             return Outcome::None;
         }
+        self.anchor = None;
+        self.snapshots = Some(self.all_versions(vec![]));
+        Outcome::Versions(self.versions_revs())
+    }
+
+    /// Shows every version in each change's evolog, or only the labeled ones.
+    fn toggle_all(&mut self) {
+        let Some(list) = self.snapshots.as_mut() else {
+            return;
+        };
+        let all = !list.first().is_some_and(|v| v.all);
+        list.iter_mut().for_each(|v| v.set_all(all));
+        let at = self.on_versions().and_then(|(v, _)| v.at());
+        self.on = at.and_then(|j| Some((self.on.take()?.0, j)));
+    }
+
+    pub fn key(&mut self, key: KeyEvent) -> Outcome {
         match key.code {
-            KeyCode::Char('s') => {
-                if let Some(rev) = self.id(self.sel) {
-                    self.anchor = None;
-                    self.versions = Some(Versions::new(self.sel, rev.clone()));
-                    return Outcome::Versions(rev);
-                }
-            }
+            KeyCode::Char('s') => return self.toggle_snapshots(),
+            KeyCode::Char('a') => self.toggle_all(),
             KeyCode::Char('j') | KeyCode::Down => self.step(true),
             KeyCode::Char('k') | KeyCode::Up => self.step(false),
             KeyCode::Char('g') | KeyCode::Home => {
-                self.sel = self.commits().first().copied().unwrap_or(0)
+                self.go(Item::Row(self.commits().first().copied().unwrap_or(0)))
             }
             KeyCode::Char('G') | KeyCode::End => {
-                self.sel = self.commits().last().copied().unwrap_or(0)
+                self.go(Item::Row(self.commits().last().copied().unwrap_or(0)))
             }
-            KeyCode::Char(' ') => {
-                self.anchor = match self.anchor {
-                    Some(_) => None,
-                    None => Some(self.sel),
+            KeyCode::Char(' ') => match self.on_versions() {
+                Some((v, _)) => {
+                    v.toggle_anchor();
+                    self.anchor = None;
+                }
+                None => {
+                    let had = self.anchor.is_some();
+                    self.clear_ranges();
+                    self.anchor = (!had).then_some(self.sel);
+                }
+            },
+            KeyCode::Esc if self.anchored() => self.clear_ranges(),
+            KeyCode::Esc => {
+                if self.snapshots.is_some() {
+                    return self.toggle_snapshots();
                 }
             }
-            KeyCode::Esc => self.anchor = None,
             KeyCode::Enter => {
-                if let Some(revset) = self.revset() {
-                    return Outcome::Open(Target::Revset(revset));
+                let target = match self.on_versions() {
+                    Some((v, _)) => v.open(),
+                    None => self.revset().map(Target::Revset),
+                };
+                if let Some(t) = target {
+                    return Outcome::Open(t);
                 }
             }
             KeyCode::Char('q') => return Outcome::Quit,
@@ -207,18 +303,18 @@ impl Picker {
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
         let mut hints = vec![("Enter", "open", false), ("Space", "range", false)];
-        match &self.versions {
-            Some(v) => {
-                hints.push(("a", "evolog", v.all));
-                let esc = if v.anchored() { "clear" } else { "close" };
-                hints.push(("Esc", esc, false));
-            }
-            None => {
-                if self.anchor.is_some() {
-                    hints.push(("Esc", "clear", false));
+        if self.anchored() {
+            hints.push(("Esc", "clear", false));
+        }
+        match &self.snapshots {
+            Some(list) => {
+                let all = list.first().is_some_and(|v| v.all);
+                hints.push(("a", "evolog", all));
+                if !self.anchored() {
+                    hints.push(("Esc", "close", false));
                 }
-                hints.push(("s", "snapshots", false));
             }
+            None => hints.push(("s", "snapshots", false)),
         }
         hints.extend([("?", "keys", false), ("q", "quit", false)]);
         hints
@@ -227,22 +323,27 @@ impl Picker {
     /// The picker's lines, and which one the cursor is on.
     fn items(&self) -> (Vec<Item>, usize) {
         let mut items = Vec::new();
-        let mut cursor = 0;
+        let (mut row, mut on) = (0, None);
+        let list = self.snapshots.as_deref().unwrap_or_default();
         for i in 0..self.rows.len() {
-            if self.versions.is_none() && i == self.sel {
-                cursor = items.len();
+            if i == self.sel {
+                row = items.len();
             }
             items.push(Item::Row(i));
-            if let Some(v) = self.versions.as_ref().filter(|v| v.row == i) {
-                for (j, shown) in v.shown().iter().enumerate() {
-                    if shown.sel {
-                        cursor = items.len();
+            for (k, v) in list.iter().enumerate().filter(|(_, v)| v.row == i) {
+                for j in 0..v.shown().len() {
+                    if self
+                        .on
+                        .as_ref()
+                        .is_some_and(|(r, at)| r == v.rev() && *at == j)
+                    {
+                        on = Some(items.len());
                     }
-                    items.push(Item::Version(j));
+                    items.push(Item::Version(k, j));
                 }
             }
         }
-        (items, cursor)
+        (items, on.unwrap_or(row))
     }
 
     pub fn draw(&mut self, c: &mut Canvas, body: Rect) {
@@ -258,11 +359,8 @@ impl Picker {
         } else if height > 0 && cursor >= self.top + height {
             self.top = cursor + 1 - height;
         }
-        let shown = self
-            .versions
-            .as_ref()
-            .map(Versions::shown)
-            .unwrap_or_default();
+        let list = self.snapshots.as_deref().unwrap_or_default();
+        let shown: Vec<_> = list.iter().map(Versions::shown).collect();
         let now = now();
         for (n, &item) in items.iter().skip(self.top).take(height).enumerate() {
             let y = body.y + 1 + n as u16;
@@ -270,10 +368,10 @@ impl Picker {
             c.fill(x0, y, body.width, bg);
             match item {
                 Item::Row(i) => self.draw_row(c, x0, y, i, bg, now),
-                Item::Version(j) => draw_version(c, x0, y, &shown[j], bg),
+                Item::Version(k, j) => draw_version(c, x0, y, &shown[k][j], bg),
             }
         }
-        let error = self.versions.as_ref().and_then(|v| v.error.as_deref());
+        let error = list.iter().find_map(|v| v.error.as_deref());
         if let Some(e) = error {
             let y = body.y + 1 + items.len().saturating_sub(self.top).min(height) as u16;
             c.put_lines(x0 + 1, y, e, theme::fg(RED));
@@ -439,6 +537,44 @@ mod tests {
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+    }
+
+    fn version(id: &str, label: Option<&str>) -> (lgtm_core::jj::Version, Option<String>) {
+        let v = lgtm_core::jj::Version {
+            commit_id: id.into(),
+            clock: "15:00".into(),
+        };
+        (v, label.map(str::to_string))
+    }
+
+    #[test]
+    fn s_shows_every_changes_snapshots_and_j_walks_through_them() {
+        let mut p = Picker::default();
+        p.loaded(Ok(vec![commit("aaa", false), commit("bbb", false)]));
+        match press(&mut p, KeyCode::Char('s')) {
+            Outcome::Versions(revs) => assert_eq!(revs, ["aaa", "bbb"]),
+            _ => panic!("no versions asked for"),
+        }
+        p.versions_loaded("aaa", Ok(vec![version("a1", Some("one"))]));
+        p.versions_loaded(
+            "bbb",
+            Ok(vec![version("b2", None), version("b1", Some("two"))]),
+        );
+        press(&mut p, KeyCode::Char('j'));
+        assert!(matches!(
+            press(&mut p, KeyCode::Enter),
+            Outcome::Open(Target::Between { from, .. }) if from == "a1"
+        ));
+        press(&mut p, KeyCode::Char('j'));
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "bbb");
+        // The unlabeled version stays hidden.
+        press(&mut p, KeyCode::Char('j'));
+        assert!(matches!(
+            press(&mut p, KeyCode::Enter),
+            Outcome::Open(Target::Between { from, to, .. }) if from == "b1" && to == "bbb"
+        ));
+        press(&mut p, KeyCode::Char('s'));
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "bbb");
     }
 
     #[test]

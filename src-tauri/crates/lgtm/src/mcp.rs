@@ -14,9 +14,10 @@ const INSTRUCTIONS: &str = "lgtm is the terminal code review app open in this wo
 The human reviews a change there, marks hunks reviewed or flagged, and leaves numbered \
 comments for you (C1, C2, ...). Read them with get_comments, and once you've dealt with one, \
 mark it done with resolve_comment. You can check files and mark lines with marks of your \
-own, which the human sees apart from theirs. Lines are on the new side of the diff. After \
-each step of your work, run `lgtm snap \"<what the step did>\"` in the workspace so the human \
-can review that step on its own.";
+own, which the human sees apart from theirs. Lines are on the new side of the diff. Before \
+each step of your work, run `lgtm snap \"<what the step will do>\"` in the workspace. The \
+step's edits, until the next snap, show under that name so the human can review the step on \
+its own.";
 
 #[derive(Clone)]
 pub struct Tui {

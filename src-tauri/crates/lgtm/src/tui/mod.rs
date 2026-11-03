@@ -240,8 +240,8 @@ impl App {
         match msg {
             Msg::Log(result) => {
                 self.picker.loaded(result);
-                if let Some(rev) = self.picker.versions_rev() {
-                    self.loader.versions(rev.to_string());
+                for rev in self.picker.versions_revs() {
+                    self.loader.versions(rev);
                 }
             }
             Msg::Versions { rev, result } => {
@@ -334,7 +334,11 @@ impl App {
         }
         match self.picker.key(key) {
             picker::Outcome::Open(target) => self.open(target),
-            picker::Outcome::Versions(rev) => self.loader.versions(rev),
+            picker::Outcome::Versions(revs) => {
+                for rev in revs {
+                    self.loader.versions(rev);
+                }
+            }
             picker::Outcome::Quit => return true,
             picker::Outcome::None => {}
         }
