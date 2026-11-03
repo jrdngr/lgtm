@@ -5,9 +5,6 @@ log := "lgtm_lib=info,lgtm_core=info,ui=info,warn"
 # Hourly log files, the last 24 kept, at most 50 MB each
 export LGTM_LOG_DIR := justfile_directory() / "logs"
 
-# Recipes also get their arguments as $1, $2, …, so `"$@"` passes them on unsplit
-set positional-arguments
-
 # Run the app with hot reload
 dev:
     pnpm install --frozen-lockfile
@@ -16,9 +13,9 @@ dev:
 # Fetch, start a new change on main@origin, and run the app
 app: fresh dev
 
-# Fetch, start a new change on main@origin, and run the terminal app, optionally on a revset
-tui *revset: fresh
-    cargo run --manifest-path src-tauri/Cargo.toml -p lgtm -- "$@"
+# Fetch, start a new change on main@origin, and install the `lgtm` command
+tui: fresh
+    cargo install --locked --path src-tauri/crates/lgtm
 
 [private]
 fresh:
