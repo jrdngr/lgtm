@@ -173,6 +173,10 @@ impl Review {
         self.diff_area = area;
         let height = area.height as usize;
         self.height = height;
+        if self.width != area.width as usize {
+            self.width = area.width as usize;
+            self.relayout();
+        }
         // At least one line, for the file header pinned at the top.
         let margin = if self.pinned && (self.top + 1..self.top + height).contains(&self.cursor) {
             1
@@ -243,7 +247,8 @@ impl Review {
                 c.fill(x0, y, w, bg);
                 c.put(x0, y, "▎", theme::fg(ACCENT).bg(bg));
                 let id = format!("C{n} ");
-                let text = comment.body.lines().nth(part).unwrap_or("");
+                let lines = self.comment_lines(comment);
+                let text = lines.get(part).map_or("", String::as_str);
                 let x = if part == 0 {
                     c.put(x0 + 2, y, &id, theme::bold(ACCENT).bg(bg))
                 } else {
@@ -273,6 +278,7 @@ impl Review {
                 c.put(x, y, line.text, theme::fg(FG).bg(bg));
             }
             NoteKey::Input => {
+                let lines = self.input_lines();
                 let border = theme::fg(ACCENT).bg(BG);
                 c.fill(x0, y, w, BG);
                 let inner = w.saturating_sub(2) as usize;
@@ -282,14 +288,13 @@ impl Review {
                         let rule = inner.saturating_sub(head.chars().count() - 1);
                         c.put(x0, y, &format!("{head}{}╮", "─".repeat(rule)), border);
                     }
-                    1 => {
-                        let text = self.input().map_or("", |i| i.text.as_str());
-                        let room = inner.saturating_sub(3);
-                        let skip = text.chars().count().saturating_sub(room);
-                        let shown: String = text.chars().skip(skip).collect();
+                    _ if part <= lines.len() => {
                         c.put(x0, y, "│", border);
-                        let x = c.put(x0 + 2, y, &shown, theme::fg(FG).bg(BG));
-                        c.put(x, y, "▏", theme::bold(FG).bg(BG));
+                        let text = lines[part - 1].trim_end_matches(' ');
+                        let x = c.put(x0 + 2, y, text, theme::fg(FG).bg(BG));
+                        if part == lines.len() {
+                            c.put(x, y, "▏", theme::bold(FG).bg(BG));
+                        }
                         c.put(x0 + w - 1, y, "│", border);
                     }
                     _ => {

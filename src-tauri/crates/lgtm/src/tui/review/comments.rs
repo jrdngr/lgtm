@@ -9,6 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::Review;
 use super::rows::{Line, NoteKey, Notes};
+use super::wrap::wrap;
 
 /// A comment being written under a row.
 pub struct Input {
@@ -20,9 +21,6 @@ pub struct Input {
     number: i64,
     pub text: String,
 }
-
-/// Lines the comment input takes: its top border, its text, its bottom border.
-pub const INPUT_HEIGHT: usize = 3;
 
 /// A comment, and the file, hunk and row it's on now. `None` when its code is gone.
 pub type Placed = (AgentComment, Option<(usize, usize, usize)>);
@@ -80,7 +78,7 @@ impl Review {
     pub(super) fn notes(&self) -> Notes {
         let mut notes = Notes::default();
         for (c, at) in &self.comments {
-            let note = (NoteKey::Comment(c.number), c.body.lines().count().max(1));
+            let note = (NoteKey::Comment(c.number), self.comment_lines(c).len());
             match *at {
                 Some(at) => notes.at_row.entry(at).or_default().push(note),
                 None => {
@@ -100,9 +98,21 @@ impl Review {
                 .at_row
                 .entry((i.file, i.hunk, i.row))
                 .or_default()
-                .push((NoteKey::Input, INPUT_HEIGHT));
+                .push((NoteKey::Input, self.input_lines().len() + 2));
         }
         notes
+    }
+
+    /// A comment's body wrapped to the diff, beside its number.
+    pub(super) fn comment_lines(&self, c: &AgentComment) -> Vec<String> {
+        let id = format!("C{} ", c.number).len();
+        wrap(&c.body, self.width.saturating_sub(5 + id))
+    }
+
+    /// The comment being written, wrapped inside its box, with room for the cursor.
+    pub(super) fn input_lines(&self) -> Vec<String> {
+        let text = self.input.as_ref().map_or("", |i| i.text.as_str());
+        wrap(&format!("{text} "), self.width.saturating_sub(9))
     }
 
     pub(super) fn comment(&self, number: i64) -> Option<&AgentComment> {
@@ -110,10 +120,6 @@ impl Review {
             .iter()
             .map(|(c, _)| c)
             .find(|c| c.number == number)
-    }
-
-    pub(super) fn input(&self) -> Option<&Input> {
-        self.input.as_ref()
     }
 
     pub(super) fn input_number(&self) -> i64 {
@@ -187,9 +193,11 @@ impl Review {
             }
             KeyCode::Backspace => {
                 input.text.pop();
+                self.relayout();
             }
             KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
                 input.text.push(c);
+                self.relayout();
             }
             _ => {}
         }

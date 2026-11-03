@@ -13,6 +13,7 @@ mod reload;
 pub mod rows;
 mod threads;
 mod tree;
+mod wrap;
 
 use std::collections::{HashMap, HashSet};
 
@@ -72,6 +73,8 @@ pub struct Review {
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
+    /// Columns the diff had when last drawn, which notes wrap to.
+    width: usize,
     /// Where the file list and the diff were last drawn, for the mouse.
     list_area: Rect,
     diff_area: Rect,
@@ -143,6 +146,7 @@ impl Review {
             closed_dirs: HashSet::new(),
             list_top: 0,
             height: 0,
+            width: 80,
             list_area: Rect::default(),
             diff_area: Rect::default(),
             marks: None,
