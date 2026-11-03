@@ -12,6 +12,13 @@ fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let pr = take_flag(&mut args, "--pr", "a PR number or URL");
     let revset = take_flag(&mut args, "-r", "a revset");
+    let split = match args.iter().position(|a| a == tui::SPLIT_FLAG) {
+        Some(i) => {
+            args.remove(i);
+            true
+        }
+        None => false,
+    };
     let code = match args.first().map(String::as_str) {
         Some("mcp") => route::mcp(),
         Some("hook") => route::hook(),
@@ -27,10 +34,10 @@ fn main() {
             eprintln!("lgtm: -r opens a review, not a file");
             2
         }
-        Some(arg) => tui::run(file(arg), pr),
+        Some(arg) => tui::run(file(arg), pr, split),
         None => match revset {
-            Some(r) => tui::run(tui::Start::Revset(r), pr),
-            None => tui::run(tui::Start::Home, pr),
+            Some(r) => tui::run(tui::Start::Revset(r), pr, split),
+            None => tui::run(tui::Start::Home, pr, split),
         },
     };
     std::process::exit(code);

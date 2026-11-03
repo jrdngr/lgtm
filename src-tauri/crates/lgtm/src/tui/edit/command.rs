@@ -11,6 +11,8 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
     ("reload", "read the file again, over edits"),
+    ("vsplit", "open in a pane to the right"),
+    ("split", "open in a pane below"),
     ("N", "go to line N"),
 ];
 
@@ -68,6 +70,19 @@ impl Editor {
     }
 
     pub(super) fn run_command(&mut self, line: &str) -> Outcome {
+        let (name, arg) = line.split_once(' ').unwrap_or((line, ""));
+        let arg = Some(arg.trim()).filter(|a| !a.is_empty());
+        match name {
+            "vsplit" | "vs" => {
+                self.split(arg, true);
+                return Outcome::None;
+            }
+            "split" | "sp" => {
+                self.split(arg, false);
+                return Outcome::None;
+            }
+            _ => {}
+        }
         match line {
             "w" => {
                 self.save();

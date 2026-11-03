@@ -4,6 +4,9 @@ mod clipboard;
 mod command;
 mod draw;
 mod finder;
+mod split;
+
+pub use split::FLAG as SPLIT_FLAG;
 
 use std::path::{Path, PathBuf};
 
@@ -164,6 +167,31 @@ impl Editor {
         Ok(())
     }
 
+    /// Opens `file`, else the buffer in view at its cursor's line, in a herdr pane to the
+    /// right or below. Outside herdr `file` opens as a buffer here.
+    pub fn split(&mut self, file: Option<&str>, right: bool) {
+        let here = self
+            .current()
+            .map(|b| (b.name.clone(), b.line_of(b.sel.head) as u32 + 1));
+        let (name, line) = match (file, here) {
+            (Some(f), Some((name, line))) if f == name => (name, line),
+            (Some(f), _) => (f.to_string(), 1),
+            (None, Some(at)) => at,
+            (None, None) => return,
+        };
+        let failed = if split::herdr() {
+            split::open(&self.root.join(&name), line, right).err()
+        } else if file.is_some() {
+            self.open(&name, 0).err()
+        } else {
+            self.notice = Some("no herdr pane to split".into());
+            return;
+        };
+        if let Some(e) = failed {
+            self.notice = Some(format!("couldn't open {name}: {e}"));
+        }
+    }
+
     /// Opens a list of `kind` to pick from.
     pub fn pick(&mut self, kind: Pick) {
         let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
@@ -282,6 +310,7 @@ impl Editor {
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
             Action::Review => {}
+            Action::Split { right } => self.split(None, right),
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
                     let line = open.buf.line_of(open.buf.sel.head);

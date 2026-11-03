@@ -60,17 +60,27 @@ enum Screen {
     Editor,
 }
 
-/// Runs the UI in the jj workspace around the current directory, opening `start`.
-pub fn run(start: Start, pr: Option<String>) -> i32 {
-    let Some(root) = std::env::current_dir()
-        .ok()
-        .and_then(|d| crate::agent::workspace(&d))
+pub use edit::SPLIT_FLAG;
+
+/// Runs the UI in the jj workspace around the file it opens, else around the current
+/// directory, opening `start`. A `split` is a second one beside another, which keeps the MCP
+/// socket.
+pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let near = match &start {
+        Start::File(path, _) => cwd.join(path).parent().map(Path::to_path_buf),
+        _ => None,
+    };
+    let Some(root) = near
+        .and_then(|d| crate::agent::workspace(&normalize(&d)))
+        .or_else(|| crate::agent::workspace(&cwd))
     else {
         eprintln!("lgtm: not in a jj repo");
         return 1;
     };
     let (tx, rx) = mpsc::channel();
-    let server = match crate::agent::socket_path(&root).map(|p| serve::start(&p, tx.clone())) {
+    let socket = crate::agent::socket_path(&root).filter(|_| !split);
+    let server = match socket.map(|p| serve::start(&p, tx.clone())) {
         Some(Ok(s)) => Some(s),
         Some(Err(e)) => {
             eprintln!("lgtm: {e:#}");
@@ -117,7 +127,6 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         Start::Home => {}
         Start::Revset(revset) => app.open(Target::Revset(revset)),
         Start::File(path, line) => {
-            let cwd = std::env::current_dir().unwrap_or_default();
             let name = workspace_name(&app.root, &cwd.join(path));
             if let Err(e) = app.buffers.open(&name, line) {
                 eprintln!("lgtm: couldn't open {name}: {e}");

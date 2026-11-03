@@ -69,6 +69,10 @@ pub enum Cmd {
     Pick(Pick),
     /// Go to the review, on the cursor's line.
     Review,
+    /// Open the file in a pane to the right, or below.
+    Split {
+        right: bool,
+    },
     Command,
     Escape,
 }
@@ -211,6 +215,8 @@ pub const BINDS: &[Bind] = &[
     b("space b", Pick(Pick::Buffers), Both, "buffers"),
     b("space /", Pick(Pick::Grep), Both, "search"),
     b("space r", Review, Both, "review"),
+    b("C-w v", Split { right: true }, Both, "split to the right"),
+    b("C-w s", Split { right: false }, Both, "split below"),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),

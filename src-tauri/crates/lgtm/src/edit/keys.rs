@@ -37,6 +37,10 @@ pub enum Action {
     Pick(Pick),
     /// Go to the review.
     Review,
+    /// Open the file in a pane to the right, or below.
+    Split {
+        right: bool,
+    },
 }
 
 /// The screen around the buffer: its size, for keys that move by it, and the closed folds,
@@ -283,6 +287,7 @@ impl Keys {
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Review => return Action::Review,
+            Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}
