@@ -384,17 +384,14 @@ impl Review {
         }
     }
 
-    /// Scrolls the diff `n` lines, keeping the cursor on screen.
+    /// Scrolls the diff `n` lines, the cursor moving with it to stay where it is on screen.
     fn scroll(&mut self, n: isize) {
-        let last = self.lines.len().saturating_sub(1);
         let max_top = self.lines.len().saturating_sub(self.height);
-        self.top = (self.top as isize + n).clamp(0, max_top as isize) as usize;
-        let margin = (self.height / 4).min(3);
-        let low = if self.top == 0 { 0 } else { self.top + margin };
-        let high = (self.top + self.height)
-            .saturating_sub(margin + 1)
-            .min(last);
-        self.cursor = self.cursor.clamp(low.min(high), high);
+        let top = (self.top as isize + n).clamp(0, max_top as isize) as usize;
+        let moved = top as isize - self.top as isize;
+        self.top = top;
+        let last = self.lines.len().saturating_sub(1);
+        self.cursor = (self.cursor as isize + moved).clamp(0, last as isize) as usize;
     }
 
     /// The key bar. With Shift held, r and f become R and F.
