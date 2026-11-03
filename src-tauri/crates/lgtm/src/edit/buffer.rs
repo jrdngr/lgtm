@@ -204,6 +204,13 @@ impl Buffer {
         self.sel.head = self.sel.head.min(max);
     }
 
+    /// The text of chars `from..to`.
+    pub fn slice(&self, from: usize, to: usize) -> String {
+        self.text
+            .slice(from.min(self.len())..to.min(self.len()))
+            .to_string()
+    }
+
     /// `line`'s leading spaces and tabs.
     pub fn indent(&self, line: usize) -> String {
         let start = self.line_start(line);

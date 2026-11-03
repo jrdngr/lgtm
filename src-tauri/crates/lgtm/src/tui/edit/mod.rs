@@ -1,5 +1,6 @@
 //! The editor screen: open buffers, the one in view, the `:` command line, and the keys.
 
+mod clipboard;
 mod command;
 mod draw;
 
@@ -50,8 +51,8 @@ pub struct Editor {
     pub open: Vec<Open>,
     cur: usize,
     keys: Keys,
-    /// The `:` line being typed.
-    cmd: Option<String>,
+    /// The `:` or `/` line being typed.
+    prompt: Option<command::Prompt>,
     /// A failure or warning to show until the next key.
     pub notice: Option<String>,
     /// Lines of text the editor had when last drawn.
@@ -64,7 +65,7 @@ impl Editor {
             open: vec![],
             cur: 0,
             keys: Keys::default(),
-            cmd: None,
+            prompt: None,
             notice: None,
             height: 20,
         }
@@ -102,13 +103,13 @@ impl Editor {
 
     /// Whether keys are going into text, so screen-wide keys like `?` aren't theirs.
     pub fn typing(&self) -> bool {
-        self.cmd.is_some() || self.keys.mode == Mode::Insert || !self.keys.pending().is_empty()
+        self.prompt.is_some() || self.keys.mode == Mode::Insert || self.keys.waiting()
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
-        if self.cmd.is_some() {
-            return self.command_key(key);
+        if self.prompt.is_some() {
+            return self.prompt_key(key);
         }
         let view = View {
             height: self.height,
@@ -116,10 +117,31 @@ impl Editor {
         let Some(open) = self.open.get_mut(self.cur) else {
             return Outcome::Back;
         };
-        match self.keys.press(&mut open.buf, key, view) {
-            Action::None => {}
-            Action::Command => self.cmd = Some(String::new()),
-        }
+        let action = self.keys.press(&mut open.buf, key, view);
+        self.act(action);
         Outcome::None
+    }
+
+    /// Does what a key asked of the screen.
+    fn act(&mut self, action: Action) {
+        match action {
+            Action::None => {}
+            Action::Command => self.prompt = Some(command::Prompt::new(command::Line::Command)),
+            Action::Search => self.prompt = Some(command::Prompt::new(command::Line::Search)),
+            Action::Copy(text) => {
+                if let Err(e) = clipboard::copy(&text) {
+                    self.notice = Some(format!("couldn't copy: {e}"));
+                }
+            }
+            Action::Paste => match clipboard::paste() {
+                Ok(text) => {
+                    if let Some(open) = self.open.get_mut(self.cur) {
+                        self.keys.paste_text(&mut open.buf, &text);
+                    }
+                }
+                Err(e) => self.notice = Some(format!("couldn't paste: {e}")),
+            },
+            Action::Notice(n) => self.notice = Some(n),
+        }
     }
 }

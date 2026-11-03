@@ -51,7 +51,10 @@ impl Editor {
         match self.keys.mode {
             Mode::Insert => vec![("Esc", "normal", false)],
             Mode::Normal | Mode::Select => vec![
+                ("space", "menu", false),
                 ("i", "insert", false),
+                ("v", "select", self.keys.mode == Mode::Select),
+                ("/", "search", false),
                 (":", "command", false),
                 ("?", "keys", false),
             ],

@@ -5,6 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use super::buffer::{Buffer, Sel};
 use super::keymap::{self, Cmd, Found};
 use super::motion;
+use super::ops::{self, Register};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -20,6 +21,14 @@ pub enum Action {
     None,
     /// Open the `:` command line.
     Command,
+    /// Open the search line.
+    Search,
+    /// Put this on the system clipboard.
+    Copy(String),
+    /// Paste the system clipboard after the selection, through `paste_text`.
+    Paste,
+    /// Something the buffer couldn't do, to show.
+    Notice(String),
 }
 
 /// The screen's size, for keys that move by it.
@@ -28,13 +37,31 @@ pub struct View {
     pub height: usize,
 }
 
+/// A command waiting for the char typed after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Await {
+    Find {
+        forward: bool,
+        till: bool,
+    },
+    Replace,
+    SurroundAdd,
+    SurroundDelete,
+    /// `mr`: the pair to replace, once typed.
+    SurroundReplace(Option<char>),
+}
+
 #[derive(Default)]
 pub struct Keys {
     pub mode: Mode,
     /// The keys of a binding typed so far.
     pending: Vec<String>,
+    awaiting: Option<Await>,
     /// The buffer's version when insert mode started.
-    inserted_at: u64,
+    pub(super) inserted_at: u64,
+    register: Register,
+    /// What `n` and `N` look for.
+    pub search: Option<String>,
 }
 
 impl Keys {
@@ -43,10 +70,23 @@ impl Keys {
         self.pending.join(" ")
     }
 
+    /// Whether a key is still to come: part of a binding, or a command's char.
+    pub fn waiting(&self) -> bool {
+        !self.pending.is_empty() || self.awaiting.is_some()
+    }
+
     pub fn press(&mut self, b: &mut Buffer, key: KeyEvent, view: View) -> Action {
         if self.mode == Mode::Insert {
             self.insert_key(b, key);
             return Action::None;
+        }
+        if let Some(wait) = self.awaiting.take() {
+            return match key.code {
+                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.finish(b, wait, c)
+                }
+                _ => Action::None,
+            };
         }
         let Some(name) = keymap::name(&key) else {
             return Action::None;
@@ -61,21 +101,79 @@ impl Keys {
             }
             Found::Run(cmd) => {
                 self.pending.clear();
-                self.run(b, cmd, view)
+                let action = self.run(b, cmd, view);
+                if !matches!(cmd, Cmd::Down | Cmd::Up | Cmd::HalfDown | Cmd::HalfUp) {
+                    b.column = None;
+                }
+                action
             }
         }
     }
 
+    fn select(&self) -> bool {
+        self.mode == Mode::Select
+    }
+
+    /// Takes a motion's selection, or in select mode moves only its head.
+    fn take(&self, b: &mut Buffer, (anchor, head): (usize, usize)) {
+        b.sel = if self.select() {
+            Sel::new(b.sel.anchor, head)
+        } else {
+            Sel::new(anchor, head)
+        };
+    }
+
+    /// Moves the cursor to `to`, the selection following it in select mode.
+    fn go(&self, b: &mut Buffer, to: usize) {
+        self.take(b, (to, to));
+    }
+
+    fn vertical(&self, b: &mut Buffer, by: isize) {
+        let (to, column) = motion::vertical(b, b.sel.head, by, b.column);
+        b.column = Some(column);
+        self.go(b, to);
+    }
+
+    /// Starts an edit: one undo step, after which select mode ends.
+    fn edit(&mut self, b: &mut Buffer) {
+        b.checkpoint();
+        if self.select() {
+            self.mode = Mode::Normal;
+        }
+    }
+
     fn run(&mut self, b: &mut Buffer, cmd: Cmd, view: View) -> Action {
-        let extend = self.mode == Mode::Select;
-        let half = (view.height / 2).max(1);
+        let half = (view.height / 2).max(1) as isize;
+        let head = b.sel.head;
         match cmd {
-            Cmd::Left => self.go(b, motion::left(b, b.sel.head), extend),
-            Cmd::Right => self.go(b, motion::right(b, b.sel.head), extend),
-            Cmd::Down => self.vertical(b, 1, extend),
-            Cmd::Up => self.vertical(b, -1, extend),
-            Cmd::HalfDown => self.vertical(b, half as isize, extend),
-            Cmd::HalfUp => self.vertical(b, -(half as isize), extend),
+            Cmd::Left => self.go(b, motion::left(b, head)),
+            Cmd::Right => self.go(b, motion::right(b, head)),
+            Cmd::Down => self.vertical(b, 1),
+            Cmd::Up => self.vertical(b, -1),
+            Cmd::HalfDown => self.vertical(b, half),
+            Cmd::HalfUp => self.vertical(b, -half),
+            Cmd::NextWord(big) => self.take(b, motion::next_word_start(b, head, big)),
+            Cmd::WordEnd(big) => self.take(b, motion::next_word_end(b, head, big)),
+            Cmd::PrevWord(big) => self.take(b, motion::prev_word_start(b, head, big)),
+            Cmd::Find { forward, till } => self.awaiting = Some(Await::Find { forward, till }),
+            Cmd::FileStart => self.go(b, 0),
+            Cmd::FileEnd => self.go(b, b.line_start(b.last_line())),
+            Cmd::LineStart => self.go(b, b.line_start(b.line_of(head))),
+            Cmd::LineEnd => self.go(b, motion::line_max(b, b.line_of(head))),
+            Cmd::LineText => self.go(b, motion::first_non_blank(b, b.line_of(head))),
+            Cmd::SelectLine => {
+                let (from, to) = motion::line_select(b, b.sel.from(), b.sel.to());
+                b.sel = Sel::new(from, to);
+            }
+            Cmd::ToggleSelect => {
+                self.mode = if self.select() {
+                    Mode::Normal
+                } else {
+                    Mode::Select
+                };
+            }
+            Cmd::Collapse => b.sel = Sel::point(head),
+            Cmd::SelectAll => b.sel = Sel::new(0, b.last_char()),
             Cmd::Insert => self.enter_insert(b, b.sel.from()),
             Cmd::Append => self.enter_insert(b, (b.sel.to() + 1).min(b.len())),
             Cmd::InsertLineStart => {
@@ -88,121 +186,139 @@ impl Keys {
             }
             Cmd::OpenBelow => self.open_line(b, true),
             Cmd::OpenAbove => self.open_line(b, false),
+            Cmd::Delete if b.len() > 0 => {
+                self.register = ops::yank(b);
+                self.edit(b);
+                ops::delete(b);
+            }
+            Cmd::Change => {
+                if b.len() > 0 {
+                    self.register = ops::yank(b);
+                }
+                b.checkpoint();
+                let at = if b.len() > 0 { ops::change(b) } else { 0 };
+                b.sel = Sel::point(at);
+                self.start_insert(b);
+            }
+            Cmd::Yank if b.len() > 0 => {
+                self.register = ops::yank(b);
+                if self.select() {
+                    self.mode = Mode::Normal;
+                }
+            }
+            Cmd::PasteAfter | Cmd::PasteBefore => {
+                let r = self.register.clone();
+                self.edit(b);
+                ops::paste(b, &r, cmd == Cmd::PasteAfter);
+                b.drop_empty_checkpoint();
+            }
+            Cmd::Replace => self.awaiting = Some(Await::Replace),
+            Cmd::Indent | Cmd::Outdent => {
+                self.edit(b);
+                ops::indent(b, cmd == Cmd::Indent);
+                b.drop_empty_checkpoint();
+            }
+            Cmd::Join => {
+                self.edit(b);
+                ops::join(b);
+                b.drop_empty_checkpoint();
+            }
+            Cmd::ToggleCase if b.len() > 0 => {
+                self.edit(b);
+                ops::toggle_case(b);
+            }
+            Cmd::SurroundAdd => self.awaiting = Some(Await::SurroundAdd),
+            Cmd::SurroundDelete => self.awaiting = Some(Await::SurroundDelete),
+            Cmd::SurroundReplace => self.awaiting = Some(Await::SurroundReplace(None)),
             Cmd::Undo => {
                 b.undo();
             }
             Cmd::Redo => {
                 b.redo();
             }
+            Cmd::Search => return Action::Search,
+            Cmd::SearchNext => return self.next_match(b, true),
+            Cmd::SearchPrev => return self.next_match(b, false),
+            Cmd::SearchSelection if b.len() > 0 => {
+                self.search = Some(b.slice(b.sel.from(), b.sel.to() + 1));
+            }
+            Cmd::ClipboardYank if b.len() > 0 => {
+                return Action::Copy(b.slice(b.sel.from(), b.sel.to() + 1));
+            }
+            Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
-        }
-        if cmd != Cmd::Down && cmd != Cmd::Up && cmd != Cmd::HalfDown && cmd != Cmd::HalfUp {
-            b.column = None;
+            Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}
+            Cmd::ClipboardYank => {}
         }
         Action::None
     }
 
-    /// Moves the cursor to `to`, the selection following it in select mode.
-    fn go(&mut self, b: &mut Buffer, to: usize, extend: bool) {
-        b.sel = if extend {
-            Sel::new(b.sel.anchor, to)
-        } else {
-            Sel::point(to)
-        };
-    }
-
-    fn vertical(&mut self, b: &mut Buffer, by: isize, extend: bool) {
-        let (to, column) = motion::vertical(b, b.sel.head, by, b.column);
-        b.column = Some(column);
-        self.go(b, to, extend);
-    }
-
-    fn enter_insert(&mut self, b: &mut Buffer, at: usize) {
-        b.checkpoint();
-        b.sel = Sel::point(at);
-        self.start_insert(b);
-    }
-
-    fn start_insert(&mut self, b: &Buffer) {
-        self.inserted_at = b.version;
-        self.mode = Mode::Insert;
-    }
-
-    /// Opens a line below or above the selection's, with its indent, to type into.
-    fn open_line(&mut self, b: &mut Buffer, below: bool) {
-        b.checkpoint();
-        let line = if below {
-            b.line_of(b.sel.to())
-        } else {
-            b.line_of(b.sel.from())
-        };
-        let indent = b.indent(line);
-        let at = if below {
-            let end = b.line_end(line);
-            b.insert(end, &format!("\n{indent}"));
-            end + 1 + indent.chars().count()
-        } else {
-            let start = b.line_start(line);
-            b.insert(start, &format!("{indent}\n"));
-            start + indent.chars().count()
-        };
-        b.sel = Sel::point(at);
-        self.start_insert(b);
-    }
-
-    fn insert_key(&mut self, b: &mut Buffer, key: KeyEvent) {
-        let at = b.sel.head;
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        match key.code {
-            KeyCode::Esc => {
-                b.drop_empty_checkpoint();
-                self.mode = Mode::Normal;
-                // Back onto the last char typed, as vim does.
-                let typed = b.version != self.inserted_at;
-                let back = typed && at > b.line_start(b.line_of(at));
-                b.sel = Sel::point(if back { at - 1 } else { at });
-                b.clamp();
-                return;
+    /// Runs a command that waited for `c`.
+    fn finish(&mut self, b: &mut Buffer, wait: Await, c: char) -> Action {
+        match wait {
+            Await::Find { forward, till } => {
+                if let Some(to) = motion::find_char(b, b.sel.head, c, forward, till) {
+                    self.take(b, (b.sel.head, to));
+                }
             }
-            KeyCode::Char('w') if ctrl => {
-                let from = motion::word_back_from(b, at);
-                b.remove(from, at);
-                b.sel = Sel::point(from);
+            Await::Replace if b.len() > 0 => {
+                self.edit(b);
+                ops::replace(b, c);
             }
-            KeyCode::Char(c) if !ctrl => {
-                b.insert(at, &c.to_string());
-                b.sel = Sel::point(at + 1);
+            Await::Replace => {}
+            Await::SurroundAdd if b.len() > 0 => {
+                self.edit(b);
+                ops::surround_add(b, c);
             }
-            KeyCode::Tab => {
-                let tab = motion::indent_unit(b);
-                b.insert(at, &tab);
-                b.sel = Sel::point(at + tab.chars().count());
+            Await::SurroundAdd => {}
+            Await::SurroundDelete => {
+                self.edit(b);
+                if !ops::surround_delete(b, c) {
+                    b.drop_empty_checkpoint();
+                    return Action::Notice(format!("no {c} around the selection"));
+                }
             }
-            KeyCode::Enter => {
-                let indent = b.indent(b.line_of(at));
-                // Not more indent than the cursor is into the line.
-                let into = at - b.line_start(b.line_of(at));
-                let indent: String = indent.chars().take(into).collect();
-                b.insert(at, &format!("\n{indent}"));
-                b.sel = Sel::point(at + 1 + indent.chars().count());
+            Await::SurroundReplace(None) => self.awaiting = Some(Await::SurroundReplace(Some(c))),
+            Await::SurroundReplace(Some(from)) => {
+                self.edit(b);
+                if !ops::surround_replace(b, from, c) {
+                    b.drop_empty_checkpoint();
+                    return Action::Notice(format!("no {from} around the selection"));
+                }
             }
-            KeyCode::Backspace if at > 0 => {
-                b.remove(at - 1, at);
-                b.sel = Sel::point(at - 1);
-            }
-            KeyCode::Delete if at < b.len() => b.remove(at, at + 1),
-            KeyCode::Left => b.sel = Sel::point(at.saturating_sub(1)),
-            KeyCode::Right => b.sel = Sel::point((at + 1).min(b.len())),
-            KeyCode::Up | KeyCode::Down => {
-                let by = if key.code == KeyCode::Up { -1 } else { 1 };
-                let (to, column) = motion::vertical(b, at, by, b.column);
-                b.column = Some(column);
-                b.sel = Sel::point(to);
-                return;
-            }
-            _ => {}
         }
-        b.column = None;
+        Action::None
+    }
+
+    /// Searches for `needle` from the cursor, and keeps it for `n` and `N`.
+    pub fn search_for(&mut self, b: &mut Buffer, needle: &str) -> Action {
+        self.search = Some(needle.to_string());
+        self.next_match(b, true)
+    }
+
+    fn next_match(&mut self, b: &mut Buffer, forward: bool) -> Action {
+        let Some(needle) = self.search.clone() else {
+            return Action::None;
+        };
+        let at = if forward { b.sel.to() } else { b.sel.from() };
+        match motion::search(b, at, &needle, forward) {
+            Some((from, to)) => {
+                self.take(b, (from, to - 1));
+                Action::None
+            }
+            None => Action::Notice(format!("no match for {needle}")),
+        }
+    }
+
+    /// Pastes `text`, from the system clipboard, after the selection.
+    pub fn paste_text(&mut self, b: &mut Buffer, text: &str) {
+        let r = Register {
+            text: text.to_string(),
+            lines: text.ends_with('\n'),
+        };
+        self.edit(b);
+        ops::paste(b, &r, true);
+        b.drop_empty_checkpoint();
     }
 }
