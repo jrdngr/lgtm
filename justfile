@@ -28,26 +28,24 @@ test:
     cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
     pnpm test
 
-# Build the macOS app and the `lgtm` command at the same time. The command builds in its own
-# target directory, since cargo lets one build at a time use a directory.
+# Build the macOS app and the `lgtm` command in one cargo build, so they share every
+# dependency, then bundle the app. `tauri build` would compile the app on its own: the frontend
+# goes into the binary, and custom-protocol is the feature it adds for release builds.
 build:
-    #!/usr/bin/env bash
-    set -euo pipefail
     pnpm install --frozen-lockfile
-    just build-tui &
-    tui=$!
-    pnpm tauri build --bundles app
-    wait $tui
+    pnpm build
+    cd src-tauri && cargo build --release --locked -p lgtm-app -p lgtm --features tauri/custom-protocol
+    pnpm tauri bundle --bundles app
 
 [private]
 build-tui:
-    cd src-tauri && CARGO_TARGET_DIR=target/tui cargo build --release --locked -p lgtm
+    cd src-tauri && cargo build --release --locked -p lgtm
 
 # Put the `lgtm` command from `just build` where cargo puts installed commands
 [private]
 install-tui:
     mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
-    install -m 755 src-tauri/target/tui/release/lgtm "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
+    install -m 755 src-tauri/target/release/lgtm "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
 
 # Build the app and the `lgtm` command, put the app in /Applications, replacing any copy
 # there, and install the command
