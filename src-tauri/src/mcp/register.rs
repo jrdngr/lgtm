@@ -30,17 +30,23 @@ pub struct McpStatus {
     pub command: String,
 }
 
-/// The `lgtm` command: beside this binary, as in a dev build, else on the PATH.
+/// The `lgtm` command: the installed one on the PATH, else the one beside this binary, as in
+/// a dev build.
 fn cli() -> Option<String> {
     let beside = std::env::current_exe()
         .ok()
         .and_then(|e| Some(e.parent()?.join("lgtm")));
     let path = std::env::var_os("PATH").unwrap_or_default();
-    beside
-        .into_iter()
-        .chain(std::env::split_paths(&path).map(|d| d.join("lgtm")))
+    std::env::split_paths(&path)
+        .map(|d| d.join("lgtm"))
+        .chain(beside)
         .find(|p| p.is_file())
         .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Whether `command` is a cargo build's binary rather than an installed one.
+fn dev_build(command: &str) -> bool {
+    command.contains("/target/debug/") || command.contains("/target/release/")
 }
 
 fn exe() -> anyhow::Result<String> {
@@ -180,9 +186,10 @@ pub fn status() -> anyhow::Result<McpStatus> {
     })
 }
 
-/// Whether `.claude.json` registers an `lgtm` that's gone, or the app's own binary, as builds
-/// from before the `lgtm` command did: its old name inside the bundle, or `lgtm-app`.
-fn stale_registration(config: &str) -> bool {
+/// Whether `.claude.json` registers an `lgtm` that's gone, the app's own binary, as builds
+/// from before the `lgtm` command did (its old name inside the bundle, or `lgtm-app`), or a
+/// cargo build's `lgtm` when `installed`, the `lgtm` command found, isn't one.
+fn stale_registration(config: &str, installed: &str) -> bool {
     let Ok(v) = serde_json::from_str::<Value>(config) else {
         return false;
     };
@@ -192,6 +199,7 @@ fn stale_registration(config: &str) -> bool {
             c.ends_with(".app/Contents/MacOS/lgtm")
                 || c.ends_with("/lgtm-app")
                 || (c.ends_with("/lgtm") && !std::path::Path::new(c).exists())
+                || (dev_build(c) && !dev_build(installed))
         })
 }
 
@@ -200,7 +208,7 @@ pub async fn migrate() -> anyhow::Result<()> {
     let config = claude_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .unwrap_or_default();
-    if stale_registration(&config) && cli().is_some() {
+    if cli().is_some_and(|exe| stale_registration(&config, &exe)) {
         register().await?;
     }
     Ok(())
@@ -255,18 +263,26 @@ mod tests {
     }
 
     #[test]
-    fn finds_registrations_of_the_app_binary_or_a_command_thats_gone() {
+    fn finds_registrations_of_the_app_binary_a_command_thats_gone_or_a_dev_build() {
         let config = |cmd: &str| format!(r#"{{"mcpServers":{{"lgtm":{{"command":"{cmd}"}}}}}}"#);
-        assert!(stale_registration(&config(
-            "/Applications/lgtm.app/Contents/MacOS/lgtm"
-        )));
-        assert!(stale_registration(&config("/x/target/debug/lgtm-app")));
-        assert!(stale_registration(&config("/gone/.cargo/bin/lgtm")));
         let dir = tempfile::tempdir().unwrap();
         let installed = dir.path().join("lgtm");
         std::fs::write(&installed, "").unwrap();
-        assert!(!stale_registration(&config(&installed.to_string_lossy())));
-        assert!(!stale_registration("{}"));
+        let installed = installed.to_string_lossy();
+        let stale = |cmd: &str| stale_registration(&config(cmd), &installed);
+        assert!(stale("/Applications/lgtm.app/Contents/MacOS/lgtm"));
+        assert!(stale("/x/target/debug/lgtm-app"));
+        assert!(stale("/gone/.cargo/bin/lgtm"));
+        assert!(!stale(&installed));
+        assert!(!stale_registration("{}", &installed));
+        // A dev build's registration moves to the installed command, but not to another
+        // dev build.
+        let built = dir.path().join("target/debug/lgtm");
+        std::fs::create_dir_all(built.parent().unwrap()).unwrap();
+        std::fs::write(&built, "").unwrap();
+        let built = built.to_string_lossy();
+        assert!(stale(&built));
+        assert!(!stale_registration(&config(&built), &built));
     }
 
     #[test]
