@@ -413,7 +413,8 @@ impl Review {
     }
 
     /// A click on a file in the list goes to it, a click on a file's header folds or unfolds
-    /// it, a click elsewhere in the diff moves the cursor there, and the wheel scrolls.
+    /// it, a click elsewhere in the diff moves the cursor there, a drag selects lines, and the
+    /// wheel scrolls.
     pub fn mouse(&mut self, ev: MouseEvent) {
         let at = Position::new(ev.column, ev.row);
         self.pinned = true;
@@ -442,10 +443,29 @@ impl Review {
                 };
                 match line {
                     Some(&Line::File(f)) => self.toggle_file(f),
-                    Some(_) => self.cursor = i,
+                    Some(&l) => {
+                        self.cursor = i;
+                        self.anchor = Some(l);
+                    }
                     None => {}
                 }
                 self.set_in_list(false);
+            }
+            // Dragging selects lines, scrolling at the diff's edges.
+            MouseEventKind::Drag(MouseButton::Left) if self.anchor.is_some() => {
+                let area = self.diff_area;
+                if ev.row < area.y + 1 {
+                    self.scroll(-1);
+                } else if ev.row >= area.bottom().saturating_sub(1) {
+                    self.scroll(1);
+                }
+                let row = ev.row.clamp(area.y, area.bottom().saturating_sub(1));
+                let i = self.top + (row - area.y) as usize;
+                self.cursor = i.min(self.lines.len().saturating_sub(1));
+            }
+            // A click without a drag selects nothing.
+            MouseEventKind::Up(MouseButton::Left) if self.anchor == self.current() => {
+                self.anchor = None;
             }
             _ => {}
         }
