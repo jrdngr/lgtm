@@ -180,24 +180,27 @@ pub fn status() -> anyhow::Result<McpStatus> {
     })
 }
 
-/// Whether `.claude.json` registers the app's own binary, as builds from before the `lgtm`
-/// command did: its old name inside the bundle, or `lgtm-app`.
-fn registers_the_app(config: &str) -> bool {
+/// Whether `.claude.json` registers an `lgtm` that's gone, or the app's own binary, as builds
+/// from before the `lgtm` command did: its old name inside the bundle, or `lgtm-app`.
+fn stale_registration(config: &str) -> bool {
     let Ok(v) = serde_json::from_str::<Value>(config) else {
         return false;
     };
     v["mcpServers"]["lgtm"]["command"]
         .as_str()
-        .is_some_and(|c| c.ends_with(".app/Contents/MacOS/lgtm") || c.ends_with("/lgtm-app"))
+        .is_some_and(|c| {
+            c.ends_with(".app/Contents/MacOS/lgtm")
+                || c.ends_with("/lgtm-app")
+                || (c.ends_with("/lgtm") && !std::path::Path::new(c).exists())
+        })
 }
 
-/// Moves a registration of the app's own binary over to the `lgtm` command, once it's
-/// installed.
+/// Moves a stale registration over to the `lgtm` command, once it's installed.
 pub async fn migrate() -> anyhow::Result<()> {
     let config = claude_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .unwrap_or_default();
-    if registers_the_app(&config) && cli().is_some() {
+    if stale_registration(&config) && cli().is_some() {
         register().await?;
     }
     Ok(())
@@ -252,14 +255,18 @@ mod tests {
     }
 
     #[test]
-    fn finds_registrations_of_the_app_binary() {
+    fn finds_registrations_of_the_app_binary_or_a_command_thats_gone() {
         let config = |cmd: &str| format!(r#"{{"mcpServers":{{"lgtm":{{"command":"{cmd}"}}}}}}"#);
-        assert!(registers_the_app(&config(
+        assert!(stale_registration(&config(
             "/Applications/lgtm.app/Contents/MacOS/lgtm"
         )));
-        assert!(registers_the_app(&config("/x/target/debug/lgtm-app")));
-        assert!(!registers_the_app(&config("/Users/j/.cargo/bin/lgtm")));
-        assert!(!registers_the_app("{}"));
+        assert!(stale_registration(&config("/x/target/debug/lgtm-app")));
+        assert!(stale_registration(&config("/gone/.cargo/bin/lgtm")));
+        let dir = tempfile::tempdir().unwrap();
+        let installed = dir.path().join("lgtm");
+        std::fs::write(&installed, "").unwrap();
+        assert!(!stale_registration(&config(&installed.to_string_lossy())));
+        assert!(!stale_registration("{}"));
     }
 
     #[test]

@@ -41,11 +41,14 @@ build:
 build-tui:
     cd src-tauri && cargo build --release --locked -p lgtm
 
-# Put the `lgtm` command from `just build` where cargo puts installed commands
+# Put the `lgtm` command from `just build` in ~/.local/bin, and remove the copy older installs
+# left in ~/.cargo/bin, which could come first on the PATH
 [private]
 install-tui:
-    mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
-    install -m 755 src-tauri/target/release/lgtm "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
+    mkdir -p ~/.local/bin
+    install -m 755 src-tauri/target/release/lgtm ~/.local/bin/lgtm
+    -cargo uninstall --quiet lgtm 2>/dev/null
+    rm -f "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
 
 # Build the app and the `lgtm` command, put the app in /Applications, replacing any copy
 # there, and install the command
