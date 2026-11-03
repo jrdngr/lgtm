@@ -27,16 +27,6 @@ impl Term {
         }
     }
 
-    /// Gives the terminal back for a program to run in it, then takes it again.
-    pub fn suspended<T>(&mut self, run: impl FnOnce() -> T) -> T {
-        self.release();
-        let out = run();
-        self.terminal = ratatui::init();
-        let _ = execute!(stdout(), EnableMouseCapture);
-        self.enhanced = enhance();
-        out
-    }
-
     fn release(&self) {
         let _ = execute!(stdout(), DisableMouseCapture);
         if self.enhanced {

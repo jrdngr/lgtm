@@ -35,6 +35,8 @@ pub enum Action {
     Fold(Fold),
     /// Open a list to pick from.
     Pick(Pick),
+    /// Go to the review.
+    Review,
 }
 
 /// The screen around the buffer: its size, for keys that move by it, and the closed folds,
@@ -280,6 +282,7 @@ impl Keys {
             }
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
+            Cmd::Review => return Action::Review,
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}

@@ -1,7 +1,6 @@
 //! The terminal UI: a picker over the jj log, the review of what was picked, and the editor.
 
 mod edit;
-mod editor;
 mod files;
 mod github;
 mod highlight;
@@ -36,7 +35,7 @@ use paint::Canvas;
 use review::Review;
 use settings::Settings;
 use term::Term;
-use theme::{ACCENT, BG, FG, PANEL};
+use theme::{ACCENT, BG, CYAN, FG, PANEL};
 
 /// The store of the repo the workspace at `root` belongs to, shared with the desktop app.
 pub fn store(root: &Path) -> Option<Store> {
@@ -70,13 +69,6 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         eprintln!("lgtm: not in a jj repo");
         return 1;
     };
-    let config = match crate::config::load() {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("lgtm: {e:#}");
-            return 1;
-        }
-    };
     let (tx, rx) = mpsc::channel();
     let server = match crate::agent::socket_path(&root).map(|p| serve::start(&p, tx.clone())) {
         Some(Ok(s)) => Some(s),
@@ -99,12 +91,10 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
     let watcher = loader.watch(&root, snapshots.clone()).ok();
     let mut app = App {
         root,
-        editor: config.editor,
         loader,
         _watcher: watcher,
         _server: server,
         snapshots,
-        edit: None,
         version: store.as_ref().and_then(|s| s.data_version().ok()),
         store,
         polled: Instant::now(),
@@ -150,16 +140,12 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
 
 struct App {
     root: PathBuf,
-    /// The command template that opens the editor.
-    editor: String,
     loader: Loader,
     _watcher: Option<notify::RecommendedWatcher>,
     /// Where agents ask this app about the review, over MCP.
     _server: Option<serve::Server>,
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
-    /// The file and line to open the editor at, once the frame is drawn.
-    edit: Option<(String, u32)>,
     home: home::Home,
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
@@ -212,28 +198,35 @@ impl App {
         }
     }
 
-    /// Opens the editor at `path`, a path in the workspace, and `line`.
-    fn open_editor(&mut self, term: &mut Term, path: &str, line: u32) {
-        let failed = match editor::open(&self.editor, &self.root.join(path), line) {
-            editor::Open::Detached(argv) => editor::spawn(&argv).err(),
-            editor::Open::Here(argv) => term
-                .suspended(|| {
-                    std::process::Command::new(&argv[0])
-                        .args(&argv[1..])
-                        .status()
-                })
-                .err(),
-        };
-        if let (Some(e), Some(r)) = (failed, self.review.as_mut()) {
-            r.notice = Some(format!("couldn't open the editor: {e}"));
+    /// Goes to the editor from the review, at `at` or on the buffer it had.
+    fn show_editor(&mut self, at: Option<(String, u32)>) {
+        if let Some((path, line)) = at
+            && let Err(e) = self.buffers.open(&path, line)
+        {
+            if let Some(r) = self.review.as_mut() {
+                r.notice = Some(format!("couldn't open {path}: {e}"));
+            }
+            return;
         }
+        self.screen = Screen::Editor;
+        self.editor_back = Some(Screen::Review);
+    }
+
+    /// Goes to the review from the editor, on `path`'s `line`, opening the working copy's
+    /// review when none is open.
+    fn show_review(&mut self, path: &str, line: u32, text: &str) {
+        match self.review.is_some() {
+            true => self.reload(),
+            false => self.open(Target::Revset("@".into())),
+        }
+        if let Some(r) = self.review.as_mut() {
+            r.go_to_line(path, line, text);
+        }
+        self.screen = Screen::Review;
     }
 
     fn run(&mut self, term: &mut Term, rx: &Receiver<Msg>) -> anyhow::Result<()> {
         loop {
-            if let Some((path, line)) = self.edit.take() {
-                self.open_editor(term, &path, line);
-            }
             term.terminal.draw(|f| {
                 let area = f.area();
                 self.draw(&mut Canvas::new(f.buffer_mut(), area));
@@ -263,6 +256,10 @@ impl App {
             if self.polled.elapsed() >= POLL {
                 self.polled = Instant::now();
                 self.poll_store();
+                self.buffers.check_disk();
+            }
+            for name in self.buffers.take_base_requests() {
+                self.loader.base(name);
             }
         }
     }
@@ -323,7 +320,11 @@ impl App {
                     self.buffers.set_files(paths);
                 }
             }
-            Msg::Changed => self.reload(),
+            Msg::Base { name, text } => self.buffers.set_base(&name, text),
+            Msg::Changed => {
+                self.buffers.bases_stale();
+                self.reload();
+            }
             Msg::Agent { req, reply } => {
                 let answer = match self.review.as_mut() {
                     Some(r) => r.answer(req, self.store.as_mut()),
@@ -377,6 +378,10 @@ impl App {
             }
             return match self.buffers.key(key) {
                 edit::Outcome::None => false,
+                edit::Outcome::Review(path, line, text) => {
+                    self.show_review(&path, line, &text);
+                    false
+                }
                 edit::Outcome::Back => match self.editor_back {
                     Some(screen) => {
                         self.screen = screen;
@@ -409,7 +414,14 @@ impl App {
                     return self.direct;
                 }
                 review::Outcome::Quit => return true,
-                review::Outcome::Edit(path, line) => self.edit = Some((path, line)),
+                review::Outcome::Editor(None) if self.buffers.open.is_empty() => {
+                    r.notice = Some("nothing open in the editor".into());
+                }
+                review::Outcome::Editor(at) => self.show_editor(at),
+                review::Outcome::Pick(kind) => {
+                    self.show_editor(None);
+                    self.buffers.pick(kind);
+                }
                 review::Outcome::Pull => {
                     let pr = r.pr().map(|(_, n)| n.to_string()).or(self.pr.clone());
                     self.loader.pull(r.id, pr, r.bookmarks());
@@ -455,8 +467,15 @@ impl App {
             self.draw_editor(c, x, body);
             return;
         }
+        let unsaved = self
+            .buffers
+            .unsaved()
+            .into_iter()
+            .map(str::to_string)
+            .collect();
         let (hints, keys) = match self.review.as_mut() {
             Some(r) => {
+                r.unsaved = unsaved;
                 r.title(c, x, top);
                 r.draw(c, body);
                 if let Some((text, offers)) = r.prompt() {
@@ -464,7 +483,12 @@ impl App {
                     keybar::menu(c, body, &r.command_menu());
                     return;
                 }
-                (r.hints(self.shift), review::KEYS)
+                keybar::draw_badged(c, bottom, Some(("REV", CYAN)), &r.hints(self.shift));
+                keybar::menu(c, body, &r.space_menu());
+                if self.help {
+                    keybar::help(c, body, review::KEYS);
+                }
+                return;
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));

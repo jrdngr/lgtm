@@ -42,6 +42,11 @@ pub enum Msg {
     Log(anyhow::Result<Vec<LogRow>>),
     /// The working copy's files.
     Files(anyhow::Result<Vec<String>>),
+    /// A file at `@-`, empty when it isn't there, for the editor's gutter.
+    Base {
+        name: String,
+        text: String,
+    },
     /// The versions of the change `rev`, newest first.
     Versions {
         rev: String,
@@ -117,6 +122,18 @@ impl Loader {
         });
     }
 
+    /// Reads the file `name` at `@-`.
+    pub fn base(&self, name: String) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            // Without a readable base the gutter stays empty.
+            if let Ok(bytes) = jj.file_if_any(Some("@-"), &name).await {
+                let text = String::from_utf8_lossy(&bytes.unwrap_or_default()).into_owned();
+                let _ = tx.send(Msg::Base { name, text });
+            }
+        });
+    }
+
     /// Lists the working copy's files.
     pub fn files(&self) {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
@@ -150,7 +167,11 @@ impl Loader {
             let cached = ConfigTexts::default();
             let result = async {
                 let (range, revset) = match target {
-                    Target::Revset(revset) => (jj.resolve(&revset).await?, revset),
+                    Target::Revset(revset) => {
+                        // Files the editor saved since the last snapshot show too.
+                        let _ = jj.background_snapshot().await;
+                        (jj.resolve(&revset).await?, revset)
+                    }
                     Target::Between { from, to, .. } => (
                         Range {
                             from: Some(from),

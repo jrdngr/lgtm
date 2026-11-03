@@ -12,6 +12,7 @@ use ratatui::crossterm::event::KeyEvent;
 
 use crate::edit::buffer::{Buffer, Sel};
 use crate::edit::fold::Folds;
+use crate::edit::gutter::Mark;
 use crate::edit::keymap::Pick;
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
@@ -21,6 +22,8 @@ pub enum Outcome {
     None,
     /// Leave the editor.
     Back,
+    /// Go to the review, on this file's line from 1, which holds this text.
+    Review(String, u32, String),
 }
 
 /// A buffer with where it's scrolled to and its colors.
@@ -32,6 +35,15 @@ pub struct Open {
     /// Highlight segments per line, and the buffer version they're for.
     colors: Option<(u64, Vec<Vec<Segment>>)>,
     folds: Folds,
+    /// The file at `@-`, for the diff gutter: `None` until it's read. A file not there is
+    /// empty.
+    base: Option<String>,
+    /// Whether the base was asked for.
+    base_asked: bool,
+    /// The gutter's marks, and the buffer version they're for.
+    marks: Option<(u64, Vec<Option<Mark>>)>,
+    /// Whether the file changed on disk under unsaved edits.
+    pub conflict: bool,
 }
 
 impl Open {
@@ -42,6 +54,10 @@ impl Open {
             left: 0,
             colors: None,
             folds: Folds::default(),
+            base: None,
+            base_asked: false,
+            marks: None,
+            conflict: false,
         }
     }
 }
@@ -82,6 +98,44 @@ impl Editor {
             height: 20,
             finder: None,
             sidebar: FileTree::default(),
+        }
+    }
+
+    /// The buffers whose base the gutter still needs, marked as asked for.
+    pub fn take_base_requests(&mut self) -> Vec<String> {
+        self.open
+            .iter_mut()
+            .filter_map(|o| {
+                (!std::mem::replace(&mut o.base_asked, true)).then(|| o.buf.name.clone())
+            })
+            .collect()
+    }
+
+    /// Asks for every buffer's base again, after jj may have moved `@-`.
+    pub fn bases_stale(&mut self) {
+        self.open.iter_mut().for_each(|o| o.base_asked = false);
+    }
+
+    pub fn set_base(&mut self, name: &str, text: String) {
+        if let Some(o) = self.open.iter_mut().find(|o| o.buf.name == name) {
+            if o.base.as_deref() != Some(text.as_str()) {
+                o.marks = None;
+            }
+            o.base = Some(text);
+        }
+    }
+
+    /// Takes what other programs wrote to open files: a buffer with no unsaved edits reads
+    /// it, and one with edits is marked as in conflict.
+    pub fn check_disk(&mut self) {
+        for o in &mut self.open {
+            if let Some(text) = o.buf.disk_text() {
+                if o.buf.dirty() {
+                    o.conflict = true;
+                } else {
+                    o.buf.take_disk(&text);
+                }
+            }
         }
     }
 
@@ -135,7 +189,12 @@ impl Editor {
         };
         match f.key(key) {
             finder::Outcome::None => {}
-            finder::Outcome::Close => self.finder = None,
+            finder::Outcome::Close => {
+                self.finder = None;
+                if self.open.is_empty() {
+                    return Outcome::Back;
+                }
+            }
             finder::Outcome::Open(path, line) => {
                 self.finder = None;
                 if let Err(e) = self.open(&path, line) {
@@ -185,6 +244,12 @@ impl Editor {
             hidden: &hidden,
         };
         let action = self.keys.press(&mut open.buf, key, view);
+        if action == Action::Review {
+            let b = &open.buf;
+            let line = b.line_of(b.sel.head);
+            let text = b.slice(b.line_start(line), b.line_end(line));
+            return Outcome::Review(b.name.clone(), line as u32 + 1, text);
+        }
         self.act(action);
         if let Some(open) = self.open.get_mut(self.cur) {
             // Whatever moved the cursor into a closed fold opens it.
@@ -216,6 +281,7 @@ impl Editor {
             },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
+            Action::Review => {}
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
                     let line = open.buf.line_of(open.buf.sel.head);
@@ -223,5 +289,44 @@ impl Editor {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn editor_on(text: &str) -> (tempfile::TempDir, Editor) {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), text).unwrap();
+        let mut e = Editor::new(dir.path());
+        e.open("a.txt", 1).unwrap();
+        (dir, e)
+    }
+
+    #[test]
+    fn a_clean_buffer_takes_what_was_written_to_its_file() {
+        let (dir, mut e) = editor_on("one\n");
+        std::fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+        e.check_disk();
+        assert_eq!(e.open[0].buf.text.to_string(), "one\ntwo\n");
+        assert!(!e.open[0].buf.dirty());
+        assert!(!e.open[0].conflict);
+    }
+
+    #[test]
+    fn a_buffer_with_edits_keeps_them_and_is_in_conflict_until_reload() {
+        let (dir, mut e) = editor_on("one\n");
+        e.open[0].buf.insert(0, "x");
+        std::fs::write(dir.path().join("a.txt"), "one\ntwo\n").unwrap();
+        e.check_disk();
+        assert_eq!(e.open[0].buf.text.to_string(), "xone\n");
+        assert!(e.open[0].conflict);
+        e.run_command("reload");
+        assert_eq!(e.open[0].buf.text.to_string(), "one\ntwo\n");
+        assert!(!e.open[0].conflict);
+        // Undo brings the edits back.
+        e.open[0].buf.undo();
+        assert_eq!(e.open[0].buf.text.to_string(), "xone\n");
     }
 }

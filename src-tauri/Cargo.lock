@@ -2538,9 +2538,9 @@ dependencies = [
  "ropey",
  "serde",
  "serde_json",
+ "similar",
  "tempfile",
  "tokio",
- "toml 1.1.8+spec-1.1.0",
  "tree-sitter",
 ]
 

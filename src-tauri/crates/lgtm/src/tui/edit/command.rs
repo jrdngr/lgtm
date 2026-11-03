@@ -10,6 +10,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("q", "leave the editor"),
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
+    ("reload", "read the file again, over edits"),
     ("N", "go to line N"),
 ];
 
@@ -78,6 +79,14 @@ impl Editor {
             }
             "q" => return self.leave(false),
             "q!" => return self.leave(true),
+            "reload" => {
+                if let Some(o) = self.open.get_mut(self.cur) {
+                    match o.buf.reload() {
+                        Ok(()) => o.conflict = false,
+                        Err(e) => self.notice = Some(format!("couldn't read {}: {e}", o.buf.name)),
+                    }
+                }
+            }
             "" => {}
             n if n.parse::<usize>().is_ok() => {
                 if let Some(o) = self.open.get_mut(self.cur) {
@@ -95,7 +104,10 @@ impl Editor {
             return false;
         };
         match o.buf.save() {
-            Ok(()) => true,
+            Ok(()) => {
+                o.conflict = false;
+                true
+            }
             Err(e) => {
                 self.notice = Some(format!("couldn't save {}: {e}", o.buf.name));
                 false

@@ -3,6 +3,7 @@
 
 pub mod buffer;
 pub mod fold;
+pub mod gutter;
 mod insert;
 pub mod keymap;
 pub mod keys;

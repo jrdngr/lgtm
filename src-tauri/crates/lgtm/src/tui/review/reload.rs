@@ -27,6 +27,22 @@ enum At {
 }
 
 impl Spot {
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// The row at `line` in `path`'s new side, or the nearest holding `text`.
+    pub fn line(path: &str, line: u32, text: &str) -> Self {
+        Self {
+            path: path.to_string(),
+            at: At::Row {
+                old: None,
+                new: Some(line),
+                text: text.to_string(),
+            },
+        }
+    }
+
     pub fn of(files: &[FileDiff], line: Line) -> Self {
         let file = &files[line.file()];
         let at = match line.code() {

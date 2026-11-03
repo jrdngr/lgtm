@@ -67,6 +67,8 @@ pub enum Cmd {
     ClipboardYank,
     ClipboardPaste,
     Pick(Pick),
+    /// Go to the review, on the cursor's line.
+    Review,
     Command,
     Escape,
 }
@@ -208,6 +210,7 @@ pub const BINDS: &[Bind] = &[
     b("space f", Pick(Pick::Files), Both, "files"),
     b("space b", Pick(Pick::Buffers), Both, "buffers"),
     b("space /", Pick(Pick::Grep), Both, "search"),
+    b("space r", Review, Both, "review"),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),

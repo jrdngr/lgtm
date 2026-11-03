@@ -157,8 +157,11 @@ impl Review {
                 theme::fg(color)
             };
             let x = area.x + 3 + 2 * depth as u16;
-            c.put(x, y, &name, style.bg(bg));
+            let x = c.put(x, y, &name, style.bg(bg));
             if let tree::Entry::File { file, .. } = entry {
+                if self.unsaved.contains(&self.files[*file].path) {
+                    c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
+                }
                 let open = self.open_comments(*file);
                 if open > 0 {
                     c.put_right(y, 1, &format!(" {open}"), theme::fg(ACCENT).bg(bg));
@@ -203,7 +206,8 @@ impl Review {
             match line {
                 Line::File(f) => {
                     let folded = self.folded.contains(&self.files[f].path);
-                    file_header(c, y, &self.files[f], folded, cursor)
+                    let unsaved = self.unsaved.contains(&self.files[f].path);
+                    file_header(c, y, &self.files[f], folded, unsaved, cursor)
                 }
                 Line::Hunk(..) => hunk_divider(c, y, cursor),
                 Line::Code {
@@ -234,7 +238,8 @@ impl Review {
         };
         if let Some(f) = self.sticky {
             let folded = self.folded.contains(&self.files[f].path);
-            file_header(c, area.y, &self.files[f], folded, false);
+            let unsaved = self.unsaved.contains(&self.files[f].path);
+            file_header(c, area.y, &self.files[f], folded, unsaved, false);
         }
     }
 }
@@ -317,7 +322,7 @@ impl Review {
 }
 
 /// A file's header, with `▸` when it's folded.
-fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, folded: bool, cursor: bool) {
+fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, folded: bool, unsaved: bool, cursor: bool) {
     let bg = if cursor { SEL } else { PANEL };
     let x0 = c.area.x;
     c.fill(x0, y, c.area.width, bg);
@@ -330,6 +335,9 @@ fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, folded: bool, cursor: bool)
         x = c.put(x, y, " → ", theme::fg(MUTED).bg(bg));
     }
     x = c.put(x, y, &f.path, theme::bold(FG).bg(bg));
+    if unsaved {
+        x = c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
+    }
     let count = |k| {
         f.hunks
             .iter()

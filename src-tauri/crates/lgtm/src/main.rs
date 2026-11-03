@@ -2,7 +2,6 @@
 //! and hooks.
 
 mod agent;
-mod config;
 mod edit;
 mod mcp;
 mod route;

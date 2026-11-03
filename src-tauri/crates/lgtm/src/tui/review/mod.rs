@@ -8,6 +8,7 @@ mod edit;
 mod list;
 mod marking;
 pub mod marks;
+mod mode;
 mod range;
 mod reload;
 pub mod rows;
@@ -29,14 +30,18 @@ use super::highlight::Sides;
 use super::keybar::Hint;
 use super::load::Target;
 use super::settings::Settings;
+use crate::edit::keymap::Pick;
 use rows::Line;
 
 pub enum Outcome {
     None,
     Back,
     Quit,
-    /// Open the editor on this file, a path in the workspace, at this line.
-    Edit(String, u32),
+    /// Go to the editor, on this file, a path in the workspace, at this line, else on the
+    /// file it last had.
+    Editor(Option<(String, u32)>),
+    /// Go to the editor and pick from a list.
+    Pick(Pick),
     /// Pull the PR's threads from GitHub.
     Pull,
 }
@@ -97,6 +102,12 @@ pub struct Review {
     show_resolved: bool,
     /// A failure to show until the next key.
     pub notice: Option<String>,
+    /// Whether `space` was pressed, for its menu.
+    space: bool,
+    /// Files with edits the editor hasn't saved.
+    pub unsaved: HashSet<String>,
+    /// Where to put the cursor once the diff loads.
+    goto: Option<reload::Spot>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -115,7 +126,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("c", "comment for the agent, on the selected lines"),
     ("C", "next comment"),
     ("d", "delete comment"),
-    ("e", "edit"),
+    ("space", "files, buffers, search, editor"),
     ("t", "side by side"),
     ("p", "pull PR comments"),
     ("H", "hide PR comments"),
@@ -179,6 +190,9 @@ impl Review {
             hide_pr: false,
             show_resolved: false,
             notice: None,
+            space: false,
+            unsaved: HashSet::new(),
+            goto: None,
         }
     }
 
@@ -206,6 +220,9 @@ impl Review {
         self.error = None;
         self.lines = self.layout();
         self.cursor = at.map_or(0, |at| at.find(&self.files, &self.lines));
+        if let Some(spot) = self.goto.take() {
+            self.go_to(spot);
+        }
     }
 
     /// The PR whose threads show, as `(owner/name, number)`.
@@ -392,6 +409,19 @@ impl Review {
             self.input_key(key, store.as_deref());
             return Outcome::None;
         }
+        if std::mem::take(&mut self.space) {
+            return match key.code {
+                KeyCode::Char('f') => Outcome::Pick(Pick::Files),
+                KeyCode::Char('b') => Outcome::Pick(Pick::Buffers),
+                KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
+                KeyCode::Char('r') => Outcome::Editor(self.edit_target()),
+                _ => Outcome::None,
+            };
+        }
+        if key.code == KeyCode::Char(' ') && !self.in_list {
+            self.space = true;
+            return Outcome::None;
+        }
         if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c')) {
             self.anchor = None;
         }
@@ -442,11 +472,6 @@ impl Review {
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
             KeyCode::Char('C') => self.next_comment(),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
-            KeyCode::Char('e') => {
-                if let Some((path, line)) = self.edit_target() {
-                    return Outcome::Edit(path, line);
-                }
-            }
             KeyCode::Char('p') => return Outcome::Pull,
             KeyCode::Char('H') => self.toggle_pr(),
             KeyCode::Char('t') => {
@@ -552,12 +577,12 @@ impl Review {
             (("r", "review hunk", false), ("f", "flag hunk", false))
         };
         let mut hints = vec![
+            ("space", "menu", false),
             ("[ ]", "hunk", false),
             ("{ }", "file", false),
             review,
             flag,
             ("c", "comment", false),
-            ("e", "edit", false),
             ("t", "split", self.split),
             ("h", "hide reviewed", self.group_reviewed),
         ];
@@ -574,7 +599,7 @@ mod tests {
     use super::*;
     use lgtm_core::diff::{FileStatus, Hunk, Row, RowKind};
 
-    fn file(path: &str, hunks: usize) -> FileDiff {
+    pub(super) fn file(path: &str, hunks: usize) -> FileDiff {
         let row = |kind| Row {
             kind,
             old_line: Some(1),
@@ -607,7 +632,7 @@ mod tests {
         r.key(KeyEvent::new(code, KeyModifiers::NONE), None);
     }
 
-    fn review() -> Review {
+    pub(super) fn review() -> Review {
         let mut r = Review::new(1, Target::Revset("@".into()));
         r.loaded(Ok((vec![], vec![file("a.rs", 2), file("b.rs", 1)])));
         r

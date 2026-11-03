@@ -1,6 +1,7 @@
 //! An open file: its text, its selection, what's on disk, and its undo history.
 
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use ropey::Rope;
 
@@ -54,6 +55,14 @@ pub struct Buffer {
     redo: Vec<State>,
     /// The column `j` and `k` keep to across shorter lines.
     pub column: Option<usize>,
+    /// The file's time and size when last read or written, to notice other writes.
+    stamp: Option<(SystemTime, u64)>,
+}
+
+/// When the file at `path` last changed, and its size.
+fn stamp(path: &Path) -> Option<(SystemTime, u64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
 }
 
 impl Buffer {
@@ -79,6 +88,7 @@ impl Buffer {
             undo: vec![],
             redo: vec![],
             column: None,
+            stamp: stamp(path),
         }
     }
 
@@ -95,6 +105,42 @@ impl Buffer {
         self.text.write_to(&mut file)?;
         std::io::Write::flush(&mut file)?;
         self.saved = self.text.clone();
+        self.stamp = stamp(&self.path);
+        Ok(())
+    }
+
+    /// The file's text when something else wrote it since it was last read or written.
+    pub fn disk_text(&mut self) -> Option<String> {
+        let now = stamp(&self.path);
+        if now == self.stamp {
+            return None;
+        }
+        self.stamp = now;
+        let text = std::fs::read_to_string(&self.path).ok()?;
+        if self.saved == text.as_str() {
+            return None;
+        }
+        if self.text == text.as_str() {
+            self.saved = self.text.clone();
+            return None;
+        }
+        Some(text)
+    }
+
+    /// Takes `text` from disk as the buffer's. Undo brings back what was there.
+    pub fn take_disk(&mut self, text: &str) {
+        self.checkpoint();
+        self.text = Rope::from_str(text);
+        self.saved = self.text.clone();
+        self.version += 1;
+        self.clamp();
+    }
+
+    /// Reads the file again, over any edits.
+    pub fn reload(&mut self) -> std::io::Result<()> {
+        let text = std::fs::read_to_string(&self.path)?;
+        self.stamp = stamp(&self.path);
+        self.take_disk(&text);
         Ok(())
     }
 

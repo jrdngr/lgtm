@@ -7,6 +7,7 @@ use ratatui::style::{Color, Style};
 
 use super::{Editor, Open};
 use crate::edit::buffer::Buffer;
+use crate::edit::gutter::{self, Mark};
 use crate::edit::keymap;
 use crate::edit::keys::Mode;
 use crate::tui::keybar::Hint;
@@ -38,6 +39,10 @@ impl Editor {
                 let col = b.sel.head - b.line_start(line);
                 let at = format!("{}:{}", line + 1, col + 1);
                 c.put_right(y, 1, &at, theme::fg(MUTED).bg(PANEL));
+                if self.open[self.cur].conflict {
+                    let pad = at.chars().count() as u16 + 4;
+                    c.put_right(y, pad, "changed on disk", theme::fg(AMBER).bg(PANEL));
+                }
             }
         }
     }
@@ -52,7 +57,8 @@ impl Editor {
     }
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
-        match self.keys.mode {
+        let conflict = self.open.get(self.cur).is_some_and(|o| o.conflict);
+        let mut hints = match self.keys.mode {
             Mode::Insert => vec![("Esc", "normal", false)],
             Mode::Normal | Mode::Select => vec![
                 ("space", "menu", false),
@@ -63,7 +69,11 @@ impl Editor {
                 (":", "command", false),
                 ("?", "keys", false),
             ],
+        };
+        if conflict {
+            hints.splice(1..1, [(":reload", "reload", false), (":w", "save", false)]);
         }
+        hints
     }
 
     /// What the keys typed so far could go on to, for the menu over the key bar.
@@ -113,6 +123,7 @@ impl Editor {
             return;
         };
         open.recolor();
+        open.remark();
         open.folds.update(&open.buf);
         let last = open.buf.last_line();
         let visible = open.folds.visible(last);
@@ -130,6 +141,11 @@ impl Editor {
             .map(|(_, c)| c.as_slice())
             .unwrap_or(&[]);
         let hidden = open.folds.hidden();
+        let marks = open
+            .marks
+            .as_ref()
+            .map(|(_, m)| m.as_slice())
+            .unwrap_or(&[]);
         let cursor_line = b.line_of(b.sel.head);
         for (row, &line) in visible
             .iter()
@@ -141,6 +157,14 @@ impl Editor {
             let num = if line == cursor_line { FG } else { FAINT };
             let n = format!("{:>w$}", line + 1, w = num_w as usize);
             c.put(body.x + 1, y, &n, theme::fg(num).bg(BG));
+            if let Some(Some(mark)) = marks.get(line) {
+                let (s, color) = match mark {
+                    Mark::Added => ("▍", GREEN),
+                    Mark::Modified => ("▍", AMBER),
+                    Mark::Deleted => ("▔", RED),
+                };
+                c.put(body.x, y, s, theme::fg(color).bg(BG));
+            }
             let segs = colors.get(line).map(Vec::as_slice).unwrap_or(&[]);
             let end = draw_line(c, b, mode, line, segs, code_x, y, left, width);
             if let Some(&(_, fold_end)) = hidden.iter().find(|&&(s, _)| s == line) {
@@ -151,6 +175,22 @@ impl Editor {
 }
 
 impl Open {
+    /// Works out the gutter's marks again when the text or its base changed.
+    fn remark(&mut self) {
+        let Some(base) = &self.base else {
+            return;
+        };
+        if self
+            .marks
+            .as_ref()
+            .is_some_and(|(v, _)| *v == self.buf.version)
+        {
+            return;
+        }
+        let marks = gutter::marks(base, &self.buf.text.to_string());
+        self.marks = Some((self.buf.version, marks));
+    }
+
     /// Highlights the text again when it changed since last time.
     fn recolor(&mut self) {
         if self

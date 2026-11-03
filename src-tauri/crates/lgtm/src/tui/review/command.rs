@@ -254,7 +254,7 @@ impl Review {
             }
             "edit" => {
                 if let Some((path, line)) = self.edit_target() {
-                    return Outcome::Edit(path, line);
+                    return Outcome::Editor(Some((path, line)));
                 }
             }
             _ => return Outcome::Quit,
