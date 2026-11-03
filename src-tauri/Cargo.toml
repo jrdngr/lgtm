@@ -1,5 +1,8 @@
+[workspace]
+members = [".", "crates/lgtm-core", "crates/lgtm"]
+
 [package]
-name = "lgtm"
+name = "lgtm-app"
 version = "0.1.0"
 description = "Desktop code review for agentic development"
 edition = "2024"
@@ -11,9 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-cc = "1"
 
 [dependencies]
+lgtm-core = { path = "crates/lgtm-core" }
 tauri = { version = "2", features = ["specta"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -73,6 +76,7 @@ objc2 = "0.6"
 drag = "2"
 
 [dev-dependencies]
+lgtm-core = { path = "crates/lgtm-core", features = ["test-support"] }
 tempfile = "3"
 rustix = { version = "1", features = ["fs", "process"] }
 

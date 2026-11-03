@@ -75,7 +75,7 @@ fn file_writer(dir: &Path) -> anyhow::Result<Capped<RollingFileAppender>> {
 /// Not for `lgtm mcp` and `lgtm hook`, whose stdout talks to Claude Code.
 pub fn init() {
     let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("lgtm_lib=info,ui=info,warn"));
+        .unwrap_or_else(|_| EnvFilter::new("lgtm_lib=info,lgtm_core=info,ui=info,warn"));
     let dir = std::env::var_os("LGTM_LOG_DIR").filter(|d| !d.is_empty());
     let (file, failed) = match dir.as_deref().map(|d| file_writer(Path::new(d))) {
         Some(Ok(w)) => (Some(w), None),

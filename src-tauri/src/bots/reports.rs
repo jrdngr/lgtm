@@ -6,22 +6,6 @@ use anyhow::{Context, bail, ensure};
 use super::BotRun;
 use crate::ctx::RepoCtx;
 
-impl BotRun {
-    /// The id the user sees and tells agents: its name, or `R<id>`.
-    pub fn label(&self) -> String {
-        self.name.clone().unwrap_or_else(|| format!("R{}", self.id))
-    }
-
-    /// Whether finding `id` is "dismissed" or "open".
-    pub fn finding_state(&self, id: &str) -> &'static str {
-        if self.dismissed.iter().any(|d| d == id) {
-            "dismissed"
-        } else {
-            "open"
-        }
-    }
-}
-
 /// Whether `name` has the shape of a default id, like `R12`.
 fn looks_default(name: &str) -> bool {
     name.strip_prefix(['R', 'r'])

@@ -15,7 +15,6 @@ use serde::Serialize;
 use specta::Type;
 
 use crate::ctx::RepoCtx;
-use crate::jj::git::remote_bookmark;
 use crate::store::PrRecord;
 
 pub use discussion::DiscussionDto;
@@ -24,46 +23,9 @@ pub use preview::PrPreviewDto;
 pub use refetch::HeadDto;
 pub use send::Fixed;
 
-impl PrRecord {
-    /// What the workspace reviews: the PR's own commits, which match GitHub's diff.
-    /// A stack PR's stop at the open PR below it, even when both target the same base.
-    pub fn revset(&self) -> String {
-        let base = remote_bookmark(&self.base_ref, &self.base_remote);
-        let own = format!("{base}..{}", self.head_revset());
-        match &self.below {
-            Some(b) => format!("{own} ~ ::{}", head_revset(b)),
-            None => own,
-        }
-    }
-
-    /// The PR's head. A stack PR's is its bookmark: the local one, else where it was fetched.
-    /// A checked-out PR's is where it was fetched to, since its branch name, like a fork's
-    /// `main`, can name another branch here.
-    pub fn head_revset(&self) -> String {
-        match (self.stack, &self.head_remote) {
-            (true, _) => head_revset(&self.head_ref),
-            (false, Some(remote)) => remote_bookmark(&self.head_ref, remote),
-            (false, None) => format!(
-                "bookmarks(exact:{})",
-                quoted(&fallback_bookmark(self.number))
-            ),
-        }
-    }
-}
-
-fn quoted(name: &str) -> String {
-    format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
-}
-
-fn head_revset(head: &str) -> String {
-    let head = quoted(head);
-    format!("coalesce(bookmarks(exact:{head}), remote_bookmarks(exact:{head}))")
-}
-
-/// The bookmark a PR's head is fetched into when its branch can't be fetched.
-pub fn fallback_bookmark(number: u32) -> String {
-    format!("lgtm/pr-{number}")
-}
+pub use crate::store::fallback_bookmark;
+#[cfg(test)]
+use crate::store::head_bookmark_revset as head_revset;
 
 pub fn workspace_name(number: u32) -> String {
     format!("pr-{number}")

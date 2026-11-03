@@ -35,7 +35,7 @@ pub use guided::AgentEdit;
 pub use marks::{Mark, MarkColor};
 pub use notes::NoteRow;
 pub use projects::ProjectRow;
-pub use prs::PrRecord;
+pub use prs::{PrRecord, fallback_bookmark, head_bookmark_revset};
 pub use report::{BotRun, Part, Persona};
 pub use sessions::Session;
 pub use symbol_info::InfoKey;

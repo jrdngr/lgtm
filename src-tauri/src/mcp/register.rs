@@ -1,6 +1,6 @@
 //! Registering `lgtm mcp` with Claude Code at user scope, so every `claude` in an lgtm
 //! terminal gets the tools, and `lgtm hook` in its user settings, so the app sees how each
-//! terminal's agent stands.
+//! terminal's agent stands. The `lgtm` command hands both to this app inside its terminals.
 
 use std::path::PathBuf;
 
@@ -14,7 +14,7 @@ use super::hook;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub enum McpSetup {
-    /// Registered to run this app.
+    /// Registered to run the `lgtm` command this app found.
     Registered,
     /// Registered to run another lgtm binary that exists, like a dev build.
     Elsewhere,
@@ -30,8 +30,21 @@ pub struct McpStatus {
     pub command: String,
 }
 
+/// The `lgtm` command: beside this binary, as in a dev build, else on the PATH.
+fn cli() -> Option<String> {
+    let beside = std::env::current_exe()
+        .ok()
+        .and_then(|e| Some(e.parent()?.join("lgtm")));
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    beside
+        .into_iter()
+        .chain(std::env::split_paths(&path).map(|d| d.join("lgtm")))
+        .find(|p| p.is_file())
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
 fn exe() -> anyhow::Result<String> {
-    Ok(std::env::current_exe()?.to_string_lossy().into_owned())
+    cli().context("the lgtm command isn't installed: run `just install`")
 }
 
 /// Claude Code's user config, which holds user-scope MCP servers.
@@ -55,9 +68,9 @@ fn hook_command(exe: &str) -> String {
     format!("'{}' hook", exe.replace('\'', "'\\''"))
 }
 
-/// Whether a hook command runs some lgtm binary's `hook`.
+/// Whether a hook command runs some lgtm binary's `hook`, the `lgtm` command's or the app's.
 fn is_lgtm_hook(command: &str) -> bool {
-    command.ends_with("/lgtm' hook")
+    command.ends_with("/lgtm' hook") || command.ends_with("/lgtm-app' hook")
 }
 
 /// Whether settings JSON has this binary's hook on every event lgtm listens to.
@@ -147,7 +160,7 @@ fn setup_in(config: &str, exe: &str) -> McpSetup {
 }
 
 pub fn status() -> anyhow::Result<McpStatus> {
-    let exe = exe()?;
+    let exe = cli().unwrap_or_else(|| "lgtm".into());
     let claude = crate::tools::claude::status()
         .resolved
         .unwrap_or_else(|| "claude".into());
@@ -167,7 +180,30 @@ pub fn status() -> anyhow::Result<McpStatus> {
     })
 }
 
-/// Registers this app as the `lgtm` MCP server and its hooks, replacing any earlier
+/// Whether `.claude.json` registers the app's own binary, as builds from before the `lgtm`
+/// command did: its old name inside the bundle, or `lgtm-app`.
+fn registers_the_app(config: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<Value>(config) else {
+        return false;
+    };
+    v["mcpServers"]["lgtm"]["command"]
+        .as_str()
+        .is_some_and(|c| c.ends_with(".app/Contents/MacOS/lgtm") || c.ends_with("/lgtm-app"))
+}
+
+/// Moves a registration of the app's own binary over to the `lgtm` command, once it's
+/// installed.
+pub async fn migrate() -> anyhow::Result<()> {
+    let config = claude_json()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .unwrap_or_default();
+    if registers_the_app(&config) && cli().is_some() {
+        register().await?;
+    }
+    Ok(())
+}
+
+/// Registers the `lgtm` command as the `lgtm` MCP server and its hooks, replacing any earlier
 /// registration.
 pub async fn register() -> anyhow::Result<()> {
     let exe = exe()?;
@@ -216,10 +252,21 @@ mod tests {
     }
 
     #[test]
+    fn finds_registrations_of_the_app_binary() {
+        let config = |cmd: &str| format!(r#"{{"mcpServers":{{"lgtm":{{"command":"{cmd}"}}}}}}"#);
+        assert!(registers_the_app(&config(
+            "/Applications/lgtm.app/Contents/MacOS/lgtm"
+        )));
+        assert!(registers_the_app(&config("/x/target/debug/lgtm-app")));
+        assert!(!registers_the_app(&config("/Users/j/.cargo/bin/lgtm")));
+        assert!(!registers_the_app("{}"));
+    }
+
+    #[test]
     fn adds_hooks_replacing_other_lgtm_builds_and_keeping_the_users() {
         let mine = r#"{"type":"command","command":"say hi"}"#;
         let config = format!(
-            r#"{{"model":"opus","hooks":{{"Stop":[{{"hooks":[{mine},{{"type":"command","command":"'/old/lgtm' hook"}}]}}],
+            r#"{{"model":"opus","hooks":{{"Stop":[{{"hooks":[{mine},{{"type":"command","command":"'/old/lgtm-app' hook"}}]}}],
             "Notification":[{{"hooks":[{{"type":"command","command":"'/old/lgtm' hook"}}]}}]}}}}"#
         );
         assert!(!hooks_in(&config, "/a/lgtm"));

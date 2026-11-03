@@ -33,7 +33,11 @@ pub(crate) async fn pty_spawn(
     let socket = crate::paths::data_dir(window.app_handle())
         .map(|d| crate::mcp::socket_path(&d).to_string_lossy().into_owned())
         .unwrap_or_default();
+    let app_bin = std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let env = [
+        ("LGTM_APP_BIN", app_bin.as_str()),
         ("LGTM_ROOT", root.as_ref()),
         ("LGTM_WORKSPACE", ws.name.as_deref().unwrap_or("")),
         ("LGTM_SOCKET", socket.as_str()),

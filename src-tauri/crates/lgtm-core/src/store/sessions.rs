@@ -58,7 +58,7 @@ impl Store {
     }
 
     /// The revset of the latest review in `workspace`.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "test-support"))]
     pub fn last_revset(&self, workspace: &str) -> rusqlite::Result<Option<String>> {
         self.db
             .query_row(

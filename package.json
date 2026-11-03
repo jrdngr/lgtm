@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "check": "tsc && biome check --error-on-warnings",
-    "test": "vitest run && cd src-tauri && cargo test",
+    "test": "vitest run && cd src-tauri && cargo test --workspace",
     "tauri": "tauri"
   },
   "dependencies": {

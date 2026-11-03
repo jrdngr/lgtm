@@ -1770,7 +1770,7 @@ export type MarkSlot_Serialize = {
 };
 
 export type McpSetup = 
-/**  Registered to run this app. */
+/**  Registered to run the `lgtm` command this app found. */
 "registered" | 
 /**  Registered to run another lgtm binary that exists, like a dev build. */
 "elsewhere" | 

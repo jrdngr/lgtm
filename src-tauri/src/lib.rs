@@ -1,19 +1,14 @@
-pub mod anchor;
 mod bots;
 mod canvas;
 mod commands;
 mod config;
 mod ctx;
-pub mod diff;
 mod dragged;
 mod drawings;
 mod events;
 mod files;
 mod frame;
-mod github;
-mod gitmeta;
 mod html;
-mod jj;
 mod layout;
 mod logging;
 mod lsp;
@@ -36,9 +31,7 @@ mod review;
 mod revisions;
 mod search;
 mod settings;
-mod store;
 mod symbol_info;
-mod syntax;
 mod tools;
 mod turns;
 mod watch;
@@ -46,6 +39,8 @@ mod workspace;
 mod workspaces;
 mod zoom;
 
+pub use lgtm_core::{anchor, diff};
+use lgtm_core::{github, jj, store, syntax};
 use std::path::Path;
 
 use tauri::{Manager, WindowEvent};
@@ -367,6 +362,11 @@ pub fn run() {
                 Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
                 Err(e) => tracing::error!("no data directory for the MCP socket: {e}"),
             }
+            tauri::async_runtime::spawn(async {
+                if let Err(e) = mcp::register::migrate().await {
+                    tracing::warn!("couldn't move the MCP registration to the lgtm command: {e:#}");
+                }
+            });
             app.manage(notes::GlobalStore(std::sync::Mutex::new(global_store(app))));
             let cwd = std::env::current_dir()?;
             repo::open_from_args(app.handle(), &args, &cwd, true);

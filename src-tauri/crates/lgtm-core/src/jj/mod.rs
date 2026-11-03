@@ -26,8 +26,8 @@ mod log;
 mod near;
 mod push;
 mod rewrite;
-#[cfg(test)]
-pub(crate) mod test_support;
+#[cfg(any(test, feature = "test-support"))]
+pub mod test_support;
 pub mod workspace;
 pub use at::WorkingCopyDto;
 pub use background::Snapshot;

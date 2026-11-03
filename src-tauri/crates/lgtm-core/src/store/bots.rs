@@ -105,7 +105,23 @@ impl Store {
     }
 }
 
-#[cfg(test)]
+impl BotRun {
+    /// The id the user sees and tells agents: its name, or `R<id>`.
+    pub fn label(&self) -> String {
+        self.name.clone().unwrap_or_else(|| format!("R{}", self.id))
+    }
+
+    /// Whether finding `id` is "dismissed" or "open".
+    pub fn finding_state(&self, id: &str) -> &'static str {
+        if self.dismissed.iter().any(|d| d == id) {
+            "dismissed"
+        } else {
+            "open"
+        }
+    }
+}
+
+#[cfg(any(test, feature = "test-support"))]
 impl Store {
     /// Stores a run as raw JSON, as an older build might have.
     pub fn add_bot_run_raw_for_test(&self, workspace: &str, data: &str) -> rusqlite::Result<()> {

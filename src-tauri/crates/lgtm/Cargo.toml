@@ -1,0 +1,12 @@
+[package]
+name = "lgtm"
+version = "0.1.0"
+description = "Terminal code review for jj"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+lgtm-core = { path = "../lgtm-core" }
+rmcp = "3.5.1"
+tokio = { version = "1", features = ["rt", "io-std", "macros"] }

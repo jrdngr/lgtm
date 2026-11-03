@@ -895,6 +895,15 @@ dependencies = [
 
 [[package]]
 name = "dirs"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+dependencies = [
+ "dirs-sys",
+]
+
+[[package]]
+name = "dirs"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d57d423b3c82e89b9a24ca3091fee61f456a26edbd28d26c65906f4bc1dcd8f"
@@ -2283,16 +2292,26 @@ checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 name = "lgtm"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "lgtm-core",
+ "rmcp",
+ "tokio",
+]
+
+[[package]]
+name = "lgtm-app"
+version = "0.1.0"
+dependencies = [
  "aho-corasick",
  "anyhow",
  "base64 0.22.1",
  "blake3",
- "cc",
  "drag",
  "futures",
  "getrandom 0.4.3",
  "globset",
  "ignore",
+ "lgtm-core",
  "notify",
  "objc2",
  "percent-encoding",
@@ -2320,6 +2339,46 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "trash",
+ "tree-sitter",
+ "tree-sitter-bash",
+ "tree-sitter-containerfile",
+ "tree-sitter-css",
+ "tree-sitter-go",
+ "tree-sitter-hcl",
+ "tree-sitter-highlight",
+ "tree-sitter-html",
+ "tree-sitter-javascript",
+ "tree-sitter-json",
+ "tree-sitter-language",
+ "tree-sitter-make",
+ "tree-sitter-md",
+ "tree-sitter-python",
+ "tree-sitter-rust",
+ "tree-sitter-scss",
+ "tree-sitter-sequel",
+ "tree-sitter-swift",
+ "tree-sitter-toml-ng",
+ "tree-sitter-typescript",
+ "tree-sitter-yaml",
+]
+
+[[package]]
+name = "lgtm-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "cc",
+ "dirs 6.0.0",
+ "rusqlite",
+ "rustix",
+ "serde",
+ "serde_json",
+ "similar",
+ "specta",
+ "tempfile",
+ "tokio",
+ "tracing",
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-containerfile",
@@ -4225,7 +4284,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "cookie",
- "dirs",
+ "dirs 7.0.0",
  "dunce",
  "embed_plist",
  "getrandom 0.3.4",
@@ -4276,7 +4335,7 @@ checksum = "59563ca5b331fd97f27ee9672ec8d36d33bb3c9e2c9f6710a1a5687256052e45"
 dependencies = [
  "anyhow",
  "cargo_toml",
- "dirs",
+ "dirs 7.0.0",
  "glob",
  "heck 0.5.0",
  "json-patch",
@@ -4962,7 +5021,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2b9c52859a94554803ccd4a24b98f74148ebc73b90676d783f3490b1bff9d72"
 dependencies = [
  "crossbeam-channel",
- "dirs",
+ "dirs 7.0.0",
  "libappindicator",
  "muda",
  "objc2",
@@ -6175,7 +6234,7 @@ dependencies = [
  "block2",
  "cookie",
  "crossbeam-channel",
- "dirs",
+ "dirs 7.0.0",
  "dom_query",
  "dpi",
  "dunce",
