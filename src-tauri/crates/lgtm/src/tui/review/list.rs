@@ -31,9 +31,47 @@ pub fn combined(states: impl IntoIterator<Item = State>) -> State {
     }
 }
 
+/// What's picked in the file list when it isn't the cursor's file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Pick {
+    Dir(String),
+    Reviewed,
+}
+
 impl Review {
+    /// Whether the file is reviewed, by the user or an agent.
+    pub(super) fn reviewed(&self, file: usize) -> bool {
+        matches!(self.file_state(file), State::Reviewed | State::Agent)
+    }
+
+    /// Whether `{` and `}` pass over the file: it's reviewed and set apart.
+    pub(super) fn skipped(&self, file: usize) -> bool {
+        self.group_reviewed && self.reviewed(file)
+    }
+
+    /// The list's lines: every file, or with reviewed files set apart, the files left and
+    /// then the reviewed ones under a heading.
     pub(super) fn entries(&self) -> Vec<Entry> {
-        tree::tree(self.files.iter().map(|f| f.path.as_str()))
+        let files = self
+            .files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (i, f.path.as_str()));
+        if !self.group_reviewed {
+            return tree::tree(files, 0);
+        }
+        let (done, left): (Vec<_>, Vec<_>) = files.partition(|&(i, _)| self.reviewed(i));
+        let mut out = tree::tree(left, 0);
+        if !done.is_empty() {
+            out.push(Entry::Reviewed {
+                count: done.len(),
+                open: self.reviewed_open,
+            });
+            if self.reviewed_open {
+                out.extend(tree::tree(done, 1));
+            }
+        }
+        out
     }
 
     /// The review files inside the folder `dir`, or the file at `path`.
@@ -51,16 +89,20 @@ impl Review {
         combined(self.files_at(dir).into_iter().map(|f| self.file_state(f)))
     }
 
-    /// The list entry that's picked: the folder picked in the list, else the cursor's file.
+    /// The list entry that's picked: the folder or heading picked in the list, else the
+    /// cursor's file, or the reviewed heading when that file is under it, closed.
     pub(super) fn list_at(&self, entries: &[Entry]) -> usize {
         let file = self.current().map_or(0, Line::file);
-        entries
-            .iter()
-            .position(|e| match (e, &self.list_dir) {
-                (Entry::Dir { path, .. }, Some(dir)) => path == dir,
+        let at = |pick: Option<&Pick>| {
+            entries.iter().position(|e| match (e, pick) {
+                (Entry::Dir { path, .. }, Some(Pick::Dir(dir))) => path == dir,
+                (Entry::Reviewed { .. }, Some(Pick::Reviewed)) => true,
                 (Entry::File { file: f, .. }, None) => *f == file,
                 _ => false,
             })
+        };
+        at(self.list_pick.as_ref())
+            .or_else(|| at(Some(&Pick::Reviewed)))
             .unwrap_or(0)
     }
 
@@ -76,22 +118,42 @@ impl Review {
     }
 
     pub(super) fn pick_entry(&mut self, entry: &Entry) {
-        let (file, dir) = match entry {
+        let (file, pick) = match entry {
             Entry::File { file, .. } => (Some(*file), None),
-            Entry::Dir { path, .. } => (self.files_at(path).first().copied(), Some(path.clone())),
+            Entry::Dir { path, .. } => (
+                self.files_at(path).first().copied(),
+                Some(Pick::Dir(path.clone())),
+            ),
+            Entry::Reviewed { .. } => (None, Some(Pick::Reviewed)),
         };
-        self.list_dir = dir;
+        self.list_pick = pick;
         if let Some(f) = file {
             self.cursor = rows::find(&self.lines, (f, None, None));
         }
     }
 
-    /// The files R and F act on from the list: the picked folder's, or the cursor's file.
+    /// The files R and F act on from the list: the picked folder's, the reviewed ones under
+    /// their heading, or the cursor's file.
     pub(super) fn list_files(&self) -> Vec<usize> {
-        match &self.list_dir {
-            Some(dir) => self.files_at(dir),
+        match &self.list_pick {
+            Some(Pick::Dir(dir)) => self.files_at(dir),
+            Some(Pick::Reviewed) => (0..self.files.len())
+                .filter(|&f| self.reviewed(f))
+                .collect(),
             None => self.current().map(Line::file).into_iter().collect(),
         }
+    }
+
+    /// Opens or closes the reviewed files' heading.
+    pub(super) fn toggle_reviewed_open(&mut self) {
+        self.reviewed_open = !self.reviewed_open;
+        self.list_pick = Some(Pick::Reviewed);
+    }
+
+    /// Sets reviewed files apart in the list, or puts them back.
+    pub(super) fn toggle_group(&mut self) {
+        self.group_reviewed = !self.group_reviewed;
+        self.list_pick = None;
     }
 
     /// R checks the list's pick and F flags it, or undoes that when it's all done already.

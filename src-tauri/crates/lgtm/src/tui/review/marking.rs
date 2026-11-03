@@ -1,5 +1,5 @@
-//! Marking from the keyboard: r and f on the cursor's hunk, R and F on its file, n to the next
-//! hunk that isn't reviewed.
+//! Marking from the keyboard: r and f on the cursor's hunk, R and F on its file, and moving on
+//! to the next hunk that isn't reviewed.
 
 use lgtm_core::anchor::MatchConfig;
 use lgtm_core::review::file::ReviewFile;
@@ -81,12 +81,8 @@ impl Review {
 
     /// Handles a marking key. Returns whether `key` was one.
     pub(super) fn mark_key(&mut self, key: char, store: Option<&mut Store>) -> bool {
-        if !"rfRFn".contains(key) {
+        if !"rfRF".contains(key) {
             return false;
-        }
-        if key == 'n' {
-            self.next_unreviewed();
-            return true;
         }
         let hunk = self.current().and_then(|l| self.hunk_at(l));
         let (Some(line), Some(marks), Some(store)) = (self.current(), self.marks.as_mut(), store)

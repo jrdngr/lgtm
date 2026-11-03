@@ -16,6 +16,9 @@ app: fresh dev
 # Fetch, start a new change on main@origin, and install the `lgtm` command
 tui: fresh build-tui install-tui
 
+# Fetch, start a new change on main@origin, and install the app and the `lgtm` command
+go: fresh install
+
 [private]
 fresh:
     jj git fetch
@@ -41,8 +44,7 @@ build:
 build-tui:
     cd src-tauri && cargo build --release --locked -p lgtm
 
-# Put the `lgtm` command from `just build` in ~/.local/bin, and remove the copy older installs
-# left in ~/.cargo/bin, which could come first on the PATH
+# Put the `lgtm` command from `just build` in ~/.local/bin
 [private]
 install-tui:
     mkdir -p ~/.local/bin

@@ -18,6 +18,8 @@ pub enum Entry {
         name: String,
         depth: usize,
     },
+    /// The heading over reviewed files, set apart, with how many there are.
+    Reviewed { count: usize, open: bool },
 }
 
 #[derive(Default)]
@@ -26,10 +28,10 @@ struct Node {
     files: Vec<(String, usize)>,
 }
 
-/// The tree of `paths`, each a review file in order.
-pub fn tree<'a>(paths: impl IntoIterator<Item = &'a str>) -> Vec<Entry> {
+/// The tree of review files, each by index with its path, `depth` deep.
+pub fn tree<'a>(files: impl IntoIterator<Item = (usize, &'a str)>, depth: usize) -> Vec<Entry> {
     let mut root = Node::default();
-    for (i, path) in paths.into_iter().enumerate() {
+    for (i, path) in files {
         let mut parts: Vec<&str> = path.split('/').collect();
         let name = parts.pop().unwrap_or_default();
         let mut node = &mut root;
@@ -39,7 +41,7 @@ pub fn tree<'a>(paths: impl IntoIterator<Item = &'a str>) -> Vec<Entry> {
         node.files.push((name.to_string(), i));
     }
     let mut out = Vec::new();
-    emit(&root, "", 0, &mut out);
+    emit(&root, "", depth, &mut out);
     out
 }
 
@@ -93,12 +95,13 @@ mod tests {
 
     #[test]
     fn entries_go_in_path_order_and_single_directory_chains_join() {
-        let got = tree([
+        let paths = [
             "src/tui/review/a.rs",
             "README.md",
             "src/tui/review/b.rs",
             "src/main.rs",
-        ]);
+        ];
+        let got = tree(paths.into_iter().enumerate(), 0);
         let dir = |name: &str, path: &str, depth| Entry::Dir {
             name: name.into(),
             path: path.into(),

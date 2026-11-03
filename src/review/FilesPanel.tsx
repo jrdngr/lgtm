@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useSavedSet } from "../core/savedState";
+import { loadState, saveState, useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
@@ -13,12 +13,39 @@ import { type LineStat, lineStat, sumStats } from "./lineStat";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
 import { ProgressCard } from "./ProgressCard";
-import { filterLabel, matchesFilter, type Progress, progressParts, progressTitle } from "./state";
-import { buildTree, dirPaths, guideAt, indent, type TreeNode, toggled } from "./tree";
+import {
+  filterLabel,
+  matchesFilter,
+  type Progress,
+  progressParts,
+  progressTitle,
+  sumProgress,
+} from "./state";
+import { buildTree, dirPaths, guideAt, indent, type TreeDir, type TreeNode, toggled } from "./tree";
 import { useSendFromMenu } from "./useSendText";
 import "./FilesPanel.css";
 
 const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
+
+const fileCount = (d: TreeDir): number =>
+  d.children.reduce((n, c) => n + (c.kind === "dir" ? fileCount(c) : 1), 0);
+
+const HIDE_REVIEWED = "changes-hide-reviewed";
+/** The closed set's key for the reviewed files' heading, which no folder path can be. */
+const REVIEWED_OPEN = "/reviewed";
+
+/** Whether reviewed files go in their own collapsed list, remembered across windows. */
+function useHideReviewed() {
+  const [on, setOn] = useState(() =>
+    loadState(HIDE_REVIEWED, false, (v): v is boolean => typeof v === "boolean"),
+  );
+  const toggle = () =>
+    setOn((prev) => {
+      saveState(HIDE_REVIEWED, !prev);
+      return !prev;
+    });
+  return [on, toggle] as const;
+}
 
 interface TreeProps {
   depth: number;
@@ -76,7 +103,7 @@ function Node({
           <span className="chevron" />
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
-          <Diffstat stat={stats[node.file]} />
+          {check !== "checked" && <Diffstat stat={stats[node.file]} />}
           {setup.enabled ? (
             <>
               <MarkCounts progress={p} setup={setup} notDone />
@@ -111,7 +138,7 @@ function Node({
         <span className="dir-count reveal">
           {p.done}/{p.changed}
         </span>
-        {isDone(p) && <Ring done={1} />}
+        {isDone(p) && <Ring done={1} by="user" />}
       </button>
       {!isClosed && (
         <Children
@@ -155,14 +182,19 @@ export function FilesPanel() {
   const setup = useMarkSetup();
   const { sender } = useSendFromMenu(workspace);
   const [closed, setClosed] = useSavedSet(`changes-closed:${workspace ?? ""}`);
-  const tree = useMemo(
-    () =>
-      review &&
-      buildTree(review.files, review.progress, (f) =>
-        matchesFilter(review.progress[f], review.filter),
-      ),
-    [review],
-  );
+  const [hideReviewed, toggleHideReviewed] = useHideReviewed();
+  const trees = useMemo(() => {
+    if (!review) return undefined;
+    const shown = (f: number) => matchesFilter(review.progress[f], review.filter);
+    const reviewed = (f: number) => review.checks[f] === "checked" || isDone(review.progress[f]);
+    if (!hideReviewed) return { tree: buildTree(review.files, review.progress, shown) };
+    return {
+      tree: buildTree(review.files, review.progress, (f) => shown(f) && !reviewed(f)),
+      done: buildTree(review.files, review.progress, (f) => shown(f) && reviewed(f)),
+    };
+  }, [review, hideReviewed]);
+  const tree = trees?.tree;
+  const done = trees?.done;
   const stats = useMemo(() => review?.files.map((f) => lineStat(f.dto)) ?? [], [review?.files]);
   if (!review || !tree) {
     return (
@@ -172,7 +204,19 @@ export function FilesPanel() {
       </div>
     );
   }
-  const p = tree.progress;
+  const p = sumProgress([tree.progress, ...(done ? [done.progress] : [])]);
+  const reviewedOpen = closed.has(REVIEWED_OPEN);
+  const treeProps = {
+    review,
+    stats,
+    setup,
+    closed,
+    onToggle: (path: string) => setClosed(toggled(closed, path)),
+    menu: (n: TreeNode) =>
+      n.kind === "file"
+        ? fileMenu(workspace, review, setup, n.file, sender)
+        : dirMenu(workspace, review, n, closed, setClosed),
+  };
   const filter = filterLabel(review.filter, setup);
   const anyClosed = closed.size > 0;
   const total = sumStats(
@@ -192,6 +236,12 @@ export function FilesPanel() {
           </>
         }
       >
+        <IconButton
+          icon="check"
+          label="Hide reviewed files"
+          aria-pressed={hideReviewed}
+          onClick={toggleHideReviewed}
+        />
         {tree.children.length > 0 && (
           <IconButton
             icon={anyClosed ? "expand" : "collapse"}
@@ -200,24 +250,27 @@ export function FilesPanel() {
           />
         )}
       </SectionHeader>
-      {tree.children.length === 0 ? (
+      {tree.children.length === 0 && !done?.children.length ? (
         <Empty>{review.files.length === 0 ? "No changes" : `No ${filter} files`}</Empty>
       ) : (
         <div className="side-split-body file-tree">
-          <Children
-            nodes={tree.children}
-            depth={0}
-            review={review}
-            stats={stats}
-            setup={setup}
-            closed={closed}
-            onToggle={(path) => setClosed(toggled(closed, path))}
-            menu={(n) =>
-              n.kind === "file"
-                ? fileMenu(workspace, review, setup, n.file, sender)
-                : dirMenu(workspace, review, n, closed, setClosed)
-            }
-          />
+          <Children nodes={tree.children} depth={0} {...treeProps} />
+          {done && done.children.length > 0 && (
+            <ul>
+              <li>
+                <button
+                  type="button"
+                  className="dir"
+                  onClick={() => setClosed(toggled(closed, REVIEWED_OPEN))}
+                >
+                  <span className="chevron">{reviewedOpen ? "▾" : "▸"}</span>
+                  <span className="name">Reviewed</span>
+                  <span className="dir-count">{fileCount(done)}</span>
+                </button>
+                {reviewedOpen && <Children nodes={done.children} depth={1} {...treeProps} />}
+              </li>
+            </ul>
+          )}
         </div>
       )}
     </div>

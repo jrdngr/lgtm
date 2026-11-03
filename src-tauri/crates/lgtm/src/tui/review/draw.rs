@@ -130,10 +130,14 @@ impl Review {
             c.fill(area.x, y, area.width, bg);
             let (state, name, depth, color) = match entry {
                 tree::Entry::Dir { name, path, depth } => {
-                    (self.dir_state(path), format!("{name}/"), depth, MUTED)
+                    (self.dir_state(path), format!("{name}/"), *depth, MUTED)
                 }
                 tree::Entry::File { file, name, depth } => {
-                    (self.file_state(*file), name.clone(), depth, FG)
+                    (self.file_state(*file), name.clone(), *depth, FG)
+                }
+                tree::Entry::Reviewed { count, open } => {
+                    let fold = if *open { "▾" } else { "▸" };
+                    (State::None, format!("{fold} Reviewed {count}"), 0, MUTED)
                 }
             };
             let (mark, mark_color) = icon(state);
@@ -143,7 +147,7 @@ impl Review {
             } else {
                 theme::fg(color)
             };
-            let x = area.x + 3 + 2 * *depth as u16;
+            let x = area.x + 3 + 2 * depth as u16;
             c.put(x, y, &name, style.bg(bg));
         }
     }

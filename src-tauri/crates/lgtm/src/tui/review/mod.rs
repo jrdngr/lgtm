@@ -57,8 +57,11 @@ pub struct Review {
     pinned: bool,
     /// Whether keys move through the file list rather than the diff.
     in_list: bool,
-    /// The folder picked in the file list, when one is rather than a file.
-    list_dir: Option<String>,
+    /// What's picked in the file list, when it isn't the cursor's file.
+    list_pick: Option<list::Pick>,
+    /// Whether reviewed files are set apart at the bottom of the list, and `{` `}` skip them.
+    group_reviewed: bool,
+    reviewed_open: bool,
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
@@ -92,7 +95,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "file list"),
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file or folder"),
-    ("n", "next not reviewed"),
+    ("h", "hide reviewed files"),
     ("c", "comment for the agent"),
     ("d", "delete comment"),
     ("e", "edit"),
@@ -123,7 +126,9 @@ impl Review {
             top: 0,
             pinned: false,
             in_list: false,
-            list_dir: None,
+            list_pick: None,
+            group_reviewed: false,
+            reviewed_open: false,
             list_top: 0,
             height: 0,
             list_area: Rect::default(),
@@ -228,6 +233,15 @@ impl Review {
         if let Some(i) = found {
             self.cursor = i;
         }
+    }
+
+    /// Moves to the next or previous file's header, past files set apart as reviewed.
+    fn jump_file(&mut self, forward: bool) {
+        let skipped: HashSet<usize> = (0..self.files.len()).filter(|&f| self.skipped(f)).collect();
+        self.jump(
+            forward,
+            |l| matches!(l, Line::File(f) if !skipped.contains(f)),
+        );
     }
 
     fn by(&mut self, n: isize) {
@@ -335,6 +349,9 @@ impl Review {
             KeyCode::Char('q') => return Outcome::Back,
             KeyCode::Char(':') => self.start_command(),
             KeyCode::Tab => self.set_in_list(!self.in_list),
+            KeyCode::Enter if self.list_pick == Some(list::Pick::Reviewed) => {
+                self.toggle_reviewed_open()
+            }
             KeyCode::Esc | KeyCode::Enter if self.in_list => self.set_in_list(false),
             KeyCode::Char('j') | KeyCode::Down if self.in_list => self.list_step(1),
             KeyCode::Char('k') | KeyCode::Up if self.in_list => self.list_step(-1),
@@ -349,8 +366,9 @@ impl Review {
             KeyCode::Char('G') | KeyCode::End => self.by(isize::MAX / 2),
             KeyCode::Char(']') => self.jump_hunk(true),
             KeyCode::Char('[') => self.jump_hunk(false),
-            KeyCode::Char('}') => self.jump(true, |l| matches!(l, Line::File(_))),
-            KeyCode::Char('{') => self.jump(false, |l| matches!(l, Line::File(_))),
+            KeyCode::Char('}') => self.jump_file(true),
+            KeyCode::Char('{') => self.jump_file(false),
+            KeyCode::Char('h') => self.toggle_group(),
             KeyCode::Enter => self.toggle_fold(),
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
@@ -380,8 +398,11 @@ impl Review {
             MouseEventKind::ScrollUp => self.scroll(-3),
             MouseEventKind::Down(MouseButton::Left) if self.list_area.contains(at) => {
                 if let Some(entry) = self.list_entry_at(ev.row) {
-                    self.in_list = matches!(entry, tree::Entry::Dir { .. });
+                    self.in_list = !matches!(entry, tree::Entry::File { .. });
                     self.pick_entry(&entry);
+                    if matches!(entry, tree::Entry::Reviewed { .. }) {
+                        self.toggle_reviewed_open();
+                    }
                 }
             }
             MouseEventKind::Down(MouseButton::Left) if self.diff_area.contains(at) => {
@@ -400,7 +421,7 @@ impl Review {
     fn set_in_list(&mut self, on: bool) {
         self.in_list = on;
         if !on {
-            self.list_dir = None;
+            self.list_pick = None;
         }
     }
 
@@ -436,10 +457,10 @@ impl Review {
             ("{ }", "file", false),
             review,
             flag,
-            ("n", "next", false),
             ("c", "comment", false),
             ("e", "edit", false),
             ("t", "split", self.split),
+            ("h", "hide reviewed", self.group_reviewed),
         ];
         if self.pr.is_some() {
             hints.push(("H", "hide PR", self.hide_pr));
