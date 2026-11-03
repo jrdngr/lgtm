@@ -14,8 +14,15 @@ dev:
 app: fresh dev
 
 # Fetch, start a new change on main@origin, and install the `lgtm` command
-tui: fresh
-    cargo install --locked --path src-tauri/crates/lgtm
+tui: fresh install-tui
+
+# Build the `lgtm` command in the app's target directory, reusing what the app build already
+# compiled, and put it where `cargo install` would
+[private]
+install-tui:
+    cd src-tauri && cargo build --release --locked -p lgtm
+    mkdir -p "${CARGO_HOME:-$HOME/.cargo}/bin"
+    install -m 755 src-tauri/target/release/lgtm "${CARGO_HOME:-$HOME/.cargo}/bin/lgtm"
 
 [private]
 fresh:
@@ -36,10 +43,9 @@ build:
 
 # Build the app and put it in /Applications, replacing any copy there, and install the
 # `lgtm` command
-install: build
+install: build && install-tui
     rm -rf /Applications/lgtm.app
     ditto src-tauri/target/release/bundle/macos/lgtm.app /Applications/lgtm.app
-    cargo install --locked --path src-tauri/crates/lgtm
 
 # Run the app bundle from `just build`, optionally on a repo. Launching the
 # binary inside the .app gives it the bundle's Dock icon.
