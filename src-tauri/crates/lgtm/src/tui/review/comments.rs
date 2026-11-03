@@ -15,6 +15,8 @@ pub struct Input {
     file: usize,
     hunk: usize,
     row: usize,
+    /// The first row of a comment on a range, as (hunk, row).
+    start: Option<(usize, usize)>,
     number: i64,
     pub text: String,
 }
@@ -118,27 +120,21 @@ impl Review {
         self.input.as_ref().map_or(0, |i| i.number)
     }
 
-    /// Starts a comment under the cursor's row.
+    /// Starts a comment under the cursor's row, or the selection's last row for a comment on
+    /// the selected rows.
     pub(super) fn start_comment(&mut self, store: Option<&Store>) {
-        let (
-            Some(Line::Code {
-                file,
-                hunk,
-                old,
-                new,
-            }),
-            Some(store),
-        ) = (self.current(), store)
-        else {
+        let (Some((file, first, (hunk, row))), Some(store)) = (self.selected_rows(), store) else {
             return;
         };
-        let Some(row) = new.or(old) else { return };
+        let start = (first != (hunk, row)).then_some(first);
+        self.anchor = None;
         match store.next_agent_comment_number() {
             Ok(number) => {
                 self.input = Some(Input {
                     file,
                     hunk,
                     row,
+                    start,
                     number,
                     text: String::new(),
                 });
@@ -211,6 +207,14 @@ impl Review {
             ),
             _ => (Side::New, file.path.clone(), row.new_line),
         };
+        let start = input.start.map(|(h, r)| {
+            let row = &file.hunks[h].rows[r];
+            let line = match row.kind {
+                RowKind::Removed => row.old_line,
+                _ => row.new_line,
+            };
+            (line.unwrap_or(1), row.text.clone())
+        });
         AgentComment {
             id: 0,
             number: 0,
@@ -218,6 +222,7 @@ impl Review {
             side,
             line: line.unwrap_or(1),
             line_text: row.text.clone(),
+            start,
             body: body.to_string(),
             review: self.revset.clone(),
             created_at: std::time::SystemTime::now()
@@ -250,6 +255,7 @@ mod tests {
             side,
             line,
             line_text: text.into(),
+            start: None,
             body: String::new(),
             review: String::new(),
             created_at: 0,

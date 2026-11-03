@@ -8,6 +8,7 @@ mod edit;
 mod list;
 mod marking;
 pub mod marks;
+mod range;
 mod reload;
 pub mod rows;
 mod threads;
@@ -55,6 +56,10 @@ pub struct Review {
     top: usize,
     /// Whether the mouse put the cursor where it is, so the view stays put around it.
     pinned: bool,
+    /// The file whose header is pinned over the diff's top line, when that line isn't one.
+    sticky: Option<usize>,
+    /// Where a selection of lines started, while there is one.
+    anchor: Option<Line>,
     /// Whether keys move through the file list rather than the diff.
     in_list: bool,
     /// What's picked in the file list, when it isn't the cursor's file.
@@ -62,6 +67,8 @@ pub struct Review {
     /// Whether reviewed files are set apart at the bottom of the list, and `{` `}` skip them.
     group_reviewed: bool,
     reviewed_open: bool,
+    /// Folders closed in the file list, by path.
+    closed_dirs: HashSet<String>,
     list_top: usize,
     /// Screen rows the diff had when last drawn.
     height: usize,
@@ -93,10 +100,12 @@ pub const KEYS: &[(&str, &str)] = &[
     ("{ }", "file"),
     ("Enter", "fold file"),
     ("Tab", "file list"),
+    ("Enter", "open, close folder (file list)"),
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file or folder"),
     ("h", "hide reviewed files"),
-    ("c", "comment for the agent"),
+    ("J K", "select lines"),
+    ("c", "comment for the agent, on the selected lines"),
     ("d", "delete comment"),
     ("e", "edit"),
     ("t", "side by side"),
@@ -125,10 +134,13 @@ impl Review {
             cursor: 0,
             top: 0,
             pinned: false,
+            sticky: None,
+            anchor: None,
             in_list: false,
             list_pick: None,
             group_reviewed: false,
             reviewed_open: false,
+            closed_dirs: HashSet::new(),
             list_top: 0,
             height: 0,
             list_area: Rect::default(),
@@ -338,6 +350,9 @@ impl Review {
             self.input_key(key, store.as_deref());
             return Outcome::None;
         }
+        if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c')) {
+            self.anchor = None;
+        }
         if let KeyCode::Char(c) = key.code
             && !ctrl
             && !self.in_list
@@ -349,13 +364,18 @@ impl Review {
             KeyCode::Char('q') => return Outcome::Back,
             KeyCode::Char(':') => self.start_command(),
             KeyCode::Tab => self.set_in_list(!self.in_list),
-            KeyCode::Enter if self.list_pick == Some(list::Pick::Reviewed) => {
-                self.toggle_reviewed_open()
+            KeyCode::Enter if self.in_list && self.list_pick.is_some() => {
+                match self.list_pick.clone() {
+                    Some(list::Pick::Dir(dir)) => self.toggle_dir(&dir),
+                    _ => self.toggle_reviewed_open(),
+                }
             }
             KeyCode::Esc | KeyCode::Enter if self.in_list => self.set_in_list(false),
             KeyCode::Char('j') | KeyCode::Down if self.in_list => self.list_step(1),
             KeyCode::Char('k') | KeyCode::Up if self.in_list => self.list_step(-1),
             KeyCode::Char(c @ ('R' | 'F')) if self.in_list => self.list_mark(c, store),
+            KeyCode::Char('J') if !self.in_list => self.extend(1),
+            KeyCode::Char('K') if !self.in_list => self.extend(-1),
             KeyCode::Char('j') | KeyCode::Down => self.by(1),
             KeyCode::Char('k') | KeyCode::Up => self.by(-1),
             KeyCode::Char('d') if ctrl => self.by(half),
@@ -393,6 +413,9 @@ impl Review {
     pub fn mouse(&mut self, ev: MouseEvent) {
         let at = Position::new(ev.column, ev.row);
         self.pinned = true;
+        if matches!(ev.kind, MouseEventKind::Down(_)) {
+            self.anchor = None;
+        }
         match ev.kind {
             MouseEventKind::ScrollDown => self.scroll(3),
             MouseEventKind::ScrollUp => self.scroll(-3),
@@ -400,14 +423,20 @@ impl Review {
                 if let Some(entry) = self.list_entry_at(ev.row) {
                     self.in_list = !matches!(entry, tree::Entry::File { .. });
                     self.pick_entry(&entry);
-                    if matches!(entry, tree::Entry::Reviewed { .. }) {
-                        self.toggle_reviewed_open();
+                    match &entry {
+                        tree::Entry::Reviewed { .. } => self.toggle_reviewed_open(),
+                        tree::Entry::Dir { path, .. } => self.toggle_dir(path),
+                        tree::Entry::File { .. } => {}
                     }
                 }
             }
             MouseEventKind::Down(MouseButton::Left) if self.diff_area.contains(at) => {
                 let i = self.top + (ev.row - self.diff_area.y) as usize;
-                match self.lines.get(i) {
+                let line = match self.sticky {
+                    Some(f) if ev.row == self.diff_area.y => Some(&Line::File(f)),
+                    _ => self.lines.get(i),
+                };
+                match line {
                     Some(&Line::File(f)) => self.toggle_file(f),
                     Some(_) => self.cursor = i,
                     None => {}

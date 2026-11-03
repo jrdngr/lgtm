@@ -1,11 +1,12 @@
 //! Answers agents' requests over MCP about the open review.
 
 use lgtm_core::anchor::Side;
-use lgtm_core::store::{MarkColor, Store};
+use lgtm_core::diff::{Row, RowKind};
+use lgtm_core::store::{AgentComment, MarkColor, Store};
 use serde_json::json;
 
-use super::Review;
 use super::marks::State;
+use super::{Review, comments};
 use crate::agent::{self, AgentMark, CheckFiles, MarkLines, Request, Response};
 
 fn state_name(s: State) -> &'static str {
@@ -93,14 +94,19 @@ impl Review {
                         Side::Old => row.old_line,
                     }
                 });
-                json!({
+                let mut comment = json!({
                     "number": format!("C{}", c.number),
                     "path": c.path,
                     "side": if c.side == Side::Old { "old" } else { "new" },
                     "line": line,
                     "code": c.line_text,
                     "body": c.body,
-                })
+                });
+                if let Some(range) = self.range_of(c, *at) {
+                    comment["startLine"] = json!(range.0);
+                    comment["code"] = json!(range.1);
+                }
+                comment
             })
             .collect();
         comments.extend(self.threads.iter().map(|t| {
@@ -125,6 +131,57 @@ impl Review {
             })
         }));
         pretty(json!(comments))
+    }
+
+    /// For a comment on a range whose rows are both found: its first line, and the code of
+    /// its rows as a unified diff.
+    fn range_of(
+        &self,
+        c: &AgentComment,
+        end: Option<(usize, usize, usize)>,
+    ) -> Option<(Option<u32>, String)> {
+        let (line, text) = c.start.clone()?;
+        let start = AgentComment {
+            line,
+            line_text: text,
+            ..c.clone()
+        };
+        let (f, h0, r0) = comments::place(&self.files, &start)?;
+        let (f1, h1, r1) = end?;
+        if f != f1 || (h0, r0) > (h1, r1) {
+            return None;
+        }
+        let rows: Vec<&Row> = self.files[f]
+            .hunks
+            .iter()
+            .enumerate()
+            .flat_map(|(h, hunk)| {
+                hunk.rows
+                    .iter()
+                    .enumerate()
+                    .map(move |(r, row)| (h, r, row))
+            })
+            .filter(|&(h, r, _)| (h0, r0) <= (h, r) && (h, r) <= (h1, r1))
+            .map(|(_, _, row)| row)
+            .collect();
+        let first = rows.first()?;
+        let first_line = match first.kind {
+            RowKind::Removed => first.old_line,
+            _ => first.new_line,
+        };
+        let code = rows
+            .iter()
+            .map(|r| {
+                let sign = match r.kind {
+                    RowKind::Added => '+',
+                    RowKind::Removed => '-',
+                    RowKind::Context => ' ',
+                };
+                format!("{sign}{}", r.text)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        Some((first_line, code))
     }
 
     fn same_review(&self, revset: &str) -> Result<(), String> {

@@ -21,7 +21,20 @@ pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
             done INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS agent_comments_path ON agent_comments (path);",
-    )
+    )?;
+    for (name, def) in [("start_line", "INTEGER"), ("start_text", "TEXT")] {
+        let has: bool = db.query_row(
+            "SELECT COUNT(*) > 0 FROM pragma_table_info('agent_comments') WHERE name = ?",
+            [name],
+            |r| r.get(0),
+        )?;
+        if !has {
+            db.execute_batch(&format!(
+                "ALTER TABLE agent_comments ADD COLUMN {name} {def};"
+            ))?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -35,6 +48,9 @@ pub struct AgentComment {
     pub line: u32,
     /// The line's code then, which finds it again after edits.
     pub line_text: String,
+    /// For a comment on a range of lines, its first line on `side` and that line's code;
+    /// `line` is its last.
+    pub start: Option<(u32, String)>,
     pub body: String,
     /// The review it was made in, e.g. its revset.
     pub review: String,
@@ -43,7 +59,7 @@ pub struct AgentComment {
     pub done: bool,
 }
 
-const COLUMNS: &str = "id, number, path, side, line, line_text, body, review, created_at, done";
+const COLUMNS: &str = "id, number, path, side, line, line_text, body, review, created_at, done, start_line, start_text";
 
 fn row_to_comment(r: &Row) -> rusqlite::Result<AgentComment> {
     Ok(AgentComment {
@@ -57,6 +73,9 @@ fn row_to_comment(r: &Row) -> rusqlite::Result<AgentComment> {
         review: r.get(7)?,
         created_at: r.get(8)?,
         done: r.get(9)?,
+        start: r
+            .get::<_, Option<u32>>(10)?
+            .zip(r.get::<_, Option<String>>(11)?),
     })
 }
 
@@ -66,8 +85,9 @@ impl Store {
         let number = self.next_agent_comment_number()?;
         self.db.execute(
             "INSERT INTO agent_comments
-             (number, path, side, line, line_text, body, review, created_at, done)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             (number, path, side, line, line_text, body, review, created_at, done,
+              start_line, start_text)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             params![
                 number,
                 c.path,
@@ -77,7 +97,9 @@ impl Store {
                 c.body,
                 c.review,
                 c.created_at,
-                c.done
+                c.done,
+                c.start.as_ref().map(|s| s.0),
+                c.start.as_ref().map(|s| s.1.as_str()),
             ],
         )?;
         Ok(AgentComment {
@@ -131,6 +153,7 @@ mod tests {
             side: Side::New,
             line: 3,
             line_text: "let x = 1;".into(),
+            start: None,
             body: "why 1?".into(),
             review: "@".into(),
             created_at: 1,
@@ -142,7 +165,11 @@ mod tests {
     fn comments_are_numbered_in_order_and_marked_done_by_number() {
         let store = Store::in_memory();
         let first = store.add_agent_comment(&comment("a.rs")).unwrap();
-        let second = store.add_agent_comment(&comment("b.rs")).unwrap();
+        let ranged = AgentComment {
+            start: Some((1, "fn a() {".into())),
+            ..comment("b.rs")
+        };
+        let second = store.add_agent_comment(&ranged).unwrap();
         assert_eq!((first.number, second.number), (1, 2));
         assert!(store.set_agent_comment_done(2, true).unwrap());
         assert!(!store.set_agent_comment_done(9, true).unwrap());
@@ -151,6 +178,7 @@ mod tests {
             found.iter().map(|c| (c.number, c.done)).collect::<Vec<_>>(),
             [(1, false), (2, true)]
         );
+        assert_eq!(found[1].start, Some((1, "fn a() {".into())));
         // A deleted comment's number isn't reused while a later one exists.
         store.delete_agent_comment(1).unwrap();
         assert_eq!(store.add_agent_comment(&comment("a.rs")).unwrap().number, 3);

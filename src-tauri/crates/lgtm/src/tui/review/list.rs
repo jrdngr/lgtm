@@ -52,6 +52,20 @@ impl Review {
     /// The list's lines: every file, or with reviewed files set apart, the files left and
     /// then the reviewed ones under a heading.
     pub(super) fn entries(&self) -> Vec<Entry> {
+        let path = |e: &Entry| match e {
+            Entry::Dir { path, .. } => Some(path.clone()),
+            Entry::File { file, .. } => Some(self.files[*file].path.clone()),
+            Entry::Reviewed { .. } => None,
+        };
+        let mut out = self.all_entries();
+        out.retain(|e| {
+            path(e).is_none_or(|p| !self.closed_dirs.iter().any(|d| tree::inside(&p, d)))
+        });
+        out
+    }
+
+    /// Every entry, closed folders' too.
+    fn all_entries(&self) -> Vec<Entry> {
         let files = self
             .files
             .iter()
@@ -101,8 +115,16 @@ impl Review {
                 _ => false,
             })
         };
+        // A file in a closed folder shows as the folder.
+        let path = self.files.get(file).map_or("", |f| f.path.as_str());
+        let folder = || {
+            entries
+                .iter()
+                .rposition(|e| matches!(e, Entry::Dir { path: d, .. } if tree::inside(path, d)))
+        };
         at(self.list_pick.as_ref())
             .or_else(|| at(Some(&Pick::Reviewed)))
+            .or_else(folder)
             .unwrap_or(0)
     }
 
@@ -142,6 +164,14 @@ impl Review {
                 .collect(),
             None => self.current().map(Line::file).into_iter().collect(),
         }
+    }
+
+    /// Opens or closes a folder in the list.
+    pub(super) fn toggle_dir(&mut self, dir: &str) {
+        if !self.closed_dirs.remove(dir) {
+            self.closed_dirs.insert(dir.to_string());
+        }
+        self.list_pick = Some(Pick::Dir(dir.to_string()));
     }
 
     /// Opens or closes the reviewed files' heading.

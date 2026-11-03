@@ -130,7 +130,17 @@ impl Review {
             c.fill(area.x, y, area.width, bg);
             let (state, name, depth, color) = match entry {
                 tree::Entry::Dir { name, path, depth } => {
-                    (self.dir_state(path), format!("{name}/"), *depth, MUTED)
+                    let fold = if self.closed_dirs.contains(path) {
+                        "▸"
+                    } else {
+                        "▾"
+                    };
+                    (
+                        self.dir_state(path),
+                        format!("{fold} {name}/"),
+                        *depth,
+                        MUTED,
+                    )
                 }
                 tree::Entry::File { file, name, depth } => {
                     (self.file_state(*file), name.clone(), *depth, FG)
@@ -163,8 +173,9 @@ impl Review {
         self.diff_area = area;
         let height = area.height as usize;
         self.height = height;
-        let margin = if self.pinned && (self.top..self.top + height).contains(&self.cursor) {
-            0
+        // At least one line, for the file header pinned at the top.
+        let margin = if self.pinned && (self.top + 1..self.top + height).contains(&self.cursor) {
+            1
         } else {
             (height / 4).min(3)
         };
@@ -173,9 +184,10 @@ impl Review {
         } else if self.cursor + margin >= self.top + height {
             self.top = (self.cursor + margin + 1).saturating_sub(height);
         }
+        let selection = self.selection();
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;
-            let cursor = n == self.cursor;
+            let cursor = n == self.cursor || selection.as_ref().is_some_and(|s| s.contains(&n));
             let gutter = line
                 .hunk()
                 .and_then(|h| bar(self.hunk_state(line.file(), h)));
@@ -205,6 +217,15 @@ impl Review {
             if let Some(color) = gutter {
                 c.put(area.x, y, "▌", theme::fg(color));
             }
+        }
+        // The file the top line is in keeps its header at the top.
+        self.sticky = match self.lines.get(self.top) {
+            Some(Line::File(_)) | None => None,
+            Some(line) => Some(line.file()),
+        };
+        if let Some(f) = self.sticky {
+            let folded = self.folded.contains(&self.files[f].path);
+            file_header(c, area.y, &self.files[f], folded, false);
         }
     }
 }
