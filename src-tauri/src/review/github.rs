@@ -6,24 +6,12 @@ use std::collections::HashMap;
 
 use anyhow::{Context, bail};
 
-use super::{RepoCtx, Review, RowRef, StateDto, now_ms, pulled_stage};
-use crate::anchor::{FileIndex, Side, nearest_lines, norm_for, remap_lines};
-use crate::diff::RowKind;
-use crate::store::{Comment, Conversation, GhLink, ThreadState};
+use lgtm_core::github::pulled::{self, PulledThread};
+use lgtm_core::review::place::hashes;
 
-/// A thread pulled from GitHub, to become a comment block.
-pub struct PulledThread {
-    pub link: GhLink,
-    pub path: String,
-    pub side: Side,
-    pub start: Option<u32>,
-    /// `None` once outdated.
-    pub line: Option<u32>,
-    /// GitHub's diff hunk, the snippet when the code can't be found.
-    pub hunk: String,
-    /// The viewer had the last word.
-    pub answered: bool,
-}
+use super::{RepoCtx, Review, StateDto, now_ms};
+use crate::anchor::{Side, remap_lines};
+use crate::diff::RowKind;
 
 /// Where a comment goes on the PR head's diff.
 #[derive(Debug, PartialEq, Eq)]
@@ -39,69 +27,7 @@ fn line_map(from: &[i64], to: &[i64]) -> HashMap<u32, u32> {
     remap_lines(from, to)
 }
 
-fn hashes(text: &str, path: &str) -> Vec<i64> {
-    FileIndex::new(text, norm_for(path)).hashes
-}
-
 impl Review {
-    /// The changed rows of `path` with `side` lines in `start..=end`, or the nearest changed
-    /// row when there are none.
-    pub(super) fn rows_on_side(
-        &self,
-        path: &str,
-        side: Side,
-        start: u32,
-        end: u32,
-    ) -> Option<Vec<RowRef>> {
-        let fi = self.files.iter().position(|f| f.path == path)?;
-        let rows = &self.files[fi].rows;
-        let line = |i: usize| match side {
-            Side::Old => rows[i].old_line,
-            Side::New => rows[i].new_line,
-        };
-        let changed = |i: &usize| rows[*i].kind != RowKind::Context;
-        let inside: Vec<usize> = (0..rows.len())
-            .filter(|&i| line(i).is_some_and(|l| start <= l && l <= end))
-            .collect();
-        let mut picked: Vec<usize> = match (inside.first(), inside.last()) {
-            (Some(&lo), Some(&hi)) => (lo..=hi).filter(changed).collect(),
-            _ => vec![],
-        };
-        if picked.is_empty() {
-            picked.extend(
-                (0..rows.len())
-                    .filter(changed)
-                    .min_by_key(|&i| line(i).map_or(u32::MAX, |l| l.abs_diff(start))),
-            );
-        }
-        (!picked.is_empty()).then(|| {
-            picked
-                .into_iter()
-                .map(|r| RowRef::new(fi, r as u32))
-                .collect()
-        })
-    }
-
-    /// The review's nearest new-side lines for `head` lines of `path`, when `head` is known
-    /// and the review shows another commit.
-    fn head_to_review(&self, path: &str, head: Option<&str>) -> Option<HashMap<u32, u32>> {
-        let f = self.files.iter().find(|f| f.path == path)?;
-        let ours = f.new.index.as_ref()?;
-        Some(nearest_lines(&hashes(head?, path), &ours.hashes))
-    }
-
-    /// Rows a thread covers, or `None` when it's outdated or its file isn't in the review.
-    fn thread_rows(&self, t: &PulledThread, head_text: Option<&str>) -> Option<Vec<RowRef>> {
-        let line = t.line?;
-        let start = t.start.unwrap_or(line).min(line);
-        // A line `@` edited or deleted goes where its replacement is.
-        let (start, line) = match (t.side, self.head_to_review(&t.path, head_text)) {
-            (Side::New, Some(map)) => (*map.get(&start)?, *map.get(&line)?),
-            _ => (start, line),
-        };
-        self.rows_on_side(&t.path, t.side, start, line)
-    }
-
     /// Where the comment's first and last changed rows are on the PR head. `head_text` is its
     /// file at the head.
     fn spot(&self, comment: u32, head_text: Option<&str>) -> anyhow::Result<Spot> {
@@ -163,63 +89,14 @@ impl RepoCtx {
         label: &str,
     ) -> anyhow::Result<StateDto> {
         self.comment_edit(id, |review, store| {
-            // Each known thread's comment.
-            let mut known: HashMap<String, Comment> = HashMap::new();
-            if let Some(first) = threads.first() {
-                for c in store.pr_threads(&first.link.repo, first.link.pr)? {
-                    if let Some(g) = &c.github {
-                        known.insert(g.thread.clone(), c);
-                    }
-                }
-            }
-            let now = now_ms();
-            for t in threads {
-                let rows = review.thread_rows(&t, head_texts.get(&t.path).map(String::as_str));
-                if let Some(c) = known.get(&t.link.thread) {
-                    let (Some(old), Some(link)) = (&c.thread, &c.github) else {
-                        continue;
-                    };
-                    let mut state = old.clone();
-                    state.stage = pulled_stage(Some((old, link)), &t.link, t.answered);
-                    // A reply posted from elsewhere, like a terminal agent, isn't left to send.
-                    let sent = t.link.posts.last().is_some_and(|p| {
-                        t.answered && !c.body.trim().is_empty() && p.body.trim() == c.body.trim()
-                    });
-                    if sent {
-                        store.set_comment_body(c.id, "", now)?;
-                    }
-                    store.set_thread(c.id, &Some(state))?;
-                    store.set_github(c.id, &Some(t.link))?;
-                    // A thread pulled while its code wasn't in the review gets placed now.
-                    if let (true, false, Some(rows)) = (c.pins.is_empty(), t.path.is_empty(), &rows)
-                    {
-                        let (path, pins) = review.pins(store, rows)?;
-                        store.set_comment_pins(c.id, &path, &pins, &review.snippet(rows))?;
-                    }
-                    continue;
-                }
-                let (path, pins) = match &rows {
-                    Some(rows) => review.pins(store, rows)?,
-                    None => (t.path.clone(), vec![]),
-                };
-                let snippet = rows.map_or(t.hunk.clone(), |r| review.snippet(&r));
-                let stage = pulled_stage(None, &t.link, t.answered);
-                let thread = ThreadState::new(&t.link.repo, t.link.pr, stage);
-                store.add_comment(&Comment {
-                    id: 0,
-                    path,
-                    pins,
-                    body: String::new(),
-                    snippet,
-                    review: label.to_string(),
-                    created_at: now,
-                    updated_at: now,
-                    conversation: Conversation::default(),
-                    github: Some(t.link),
-                    thread: Some(thread),
-                })?;
-            }
-            Ok(())
+            pulled::add_threads(
+                store,
+                &review.placer(),
+                threads,
+                head_texts,
+                label,
+                now_ms(),
+            )
         })
     }
 

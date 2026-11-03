@@ -54,12 +54,12 @@ use crate::workspace::Workspace;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
-pub use github::PulledThread;
+pub use lgtm_core::github::pulled::PulledThread;
 use load::{Listed, Loaded};
 use matching::MatchedCheck;
 pub use quotes::quoted_reply;
 pub use rowmap::RowMove;
-pub use threads::{ThreadDto, pulled_stage};
+pub use threads::ThreadDto;
 pub use views::{ChangeDto, View};
 
 /// The open reviews and what they share, kept on the [`RepoCtx`].

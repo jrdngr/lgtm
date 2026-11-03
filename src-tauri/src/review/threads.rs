@@ -54,27 +54,6 @@ pub fn after_edit(stage: Stage, draft: bool, body: &str) -> Stage {
     }
 }
 
-/// A pulled thread's stage. `old` is the thread as last pulled. `answered` means the viewer
-/// had the last word. A thread someone posted to since comes back to decide, and one the viewer
-/// replied to since, from anywhere, is done.
-pub fn pulled_stage(old: Option<(&ThreadState, &GhLink)>, new: &GhLink, answered: bool) -> Stage {
-    let Some((state, link)) = old else {
-        return if new.resolved || answered {
-            Stage::Done
-        } else {
-            Stage::Decide
-        };
-    };
-    let posted = new.posts.len() > link.posts.len();
-    if posted && !answered && !new.resolved {
-        Stage::Decide
-    } else if (posted && answered) || (new.resolved && !link.resolved) {
-        Stage::Done
-    } else {
-        state.stage
-    }
-}
-
 /// Inline threads in file and line order, then comments on the PR by time.
 fn order(t: &ThreadDto) -> (bool, String, u32, String) {
     let first = t.github.as_ref().and_then(|g| g.posts.first());
@@ -170,26 +149,6 @@ impl RepoCtx {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::GhPost;
-
-    fn link(posts: usize, resolved: bool) -> GhLink {
-        let post = GhPost {
-            author: "bob".into(),
-            body: "why?".into(),
-            created_at: String::new(),
-            pending: false,
-        };
-        GhLink {
-            repo: "o/n".into(),
-            pr: 1,
-            thread: "T".into(),
-            url: String::new(),
-            resolved,
-            outdated: false,
-            posts: vec![post; posts],
-            line: None,
-        }
-    }
 
     #[test]
     fn editing_a_reply_moves_its_stage() {
@@ -199,37 +158,5 @@ mod tests {
         assert_eq!(after_edit(Stage::Decide, false, "because"), Stage::Reply);
         // Clearing a reply leaves a fixed thread ready to go without one.
         assert_eq!(after_edit(Stage::Ready, false, ""), Stage::Ready);
-    }
-
-    #[test]
-    fn pulling_keeps_or_reopens_a_threads_stage() {
-        let ready = ThreadState::new("o/n", 1, Stage::Ready);
-        let done = ThreadState::new("o/n", 1, Stage::Done);
-        assert_eq!(pulled_stage(None, &link(1, false), false), Stage::Decide);
-        assert_eq!(pulled_stage(None, &link(1, true), false), Stage::Done);
-        assert_eq!(pulled_stage(None, &link(2, false), true), Stage::Done);
-        let old = link(1, false);
-        assert_eq!(
-            pulled_stage(Some((&ready, &old)), &link(1, false), false),
-            Stage::Ready
-        );
-        assert_eq!(
-            pulled_stage(Some((&done, &old)), &link(2, false), false),
-            Stage::Decide
-        );
-        assert_eq!(
-            pulled_stage(Some((&done, &old)), &link(2, false), true),
-            Stage::Done
-        );
-        assert_eq!(
-            pulled_stage(Some((&ready, &old)), &link(1, true), false),
-            Stage::Done
-        );
-        // Replied to outside lgtm, like from a terminal agent.
-        let reply = ThreadState::new("o/n", 1, Stage::Reply);
-        assert_eq!(
-            pulled_stage(Some((&reply, &old)), &link(2, false), true),
-            Stage::Done
-        );
     }
 }

@@ -39,6 +39,7 @@ impl Review {
             self.notice = Some(format!("{e:#}"));
         }
         self.load_comments(store);
+        self.load_threads(store);
     }
 
     fn hunks(&self) -> impl Iterator<Item = (usize, usize)> + '_ {

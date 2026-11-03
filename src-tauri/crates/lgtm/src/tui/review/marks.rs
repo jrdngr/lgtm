@@ -8,6 +8,7 @@ use lgtm_core::review::RowRef;
 use lgtm_core::review::edits::Marking;
 use lgtm_core::review::file::ReviewFile;
 use lgtm_core::review::matching::{self, MatchedCheck};
+use lgtm_core::review::place::Placer;
 use lgtm_core::store::{Mark, MarkColor, Store};
 
 /// How far along a hunk or file is.
@@ -173,6 +174,20 @@ impl Marks {
 
     pub fn path(&self, file: usize) -> &str {
         &self.files[file].path
+    }
+
+    pub fn placer(&self) -> Placer<'_> {
+        Placer {
+            files: &self.files,
+            cfg: self.cfg,
+        }
+    }
+
+    /// The hunk a row of the file is in, and its index among the hunk's rows.
+    pub fn hunk_row(&self, file: usize, row: u32) -> Option<(usize, usize)> {
+        let starts = self.starts.get(file)?;
+        let hunk = starts.iter().rposition(|&s| s <= row)?;
+        Some((hunk, (row - starts[hunk]) as usize))
     }
 
     pub fn file_count(&self) -> usize {

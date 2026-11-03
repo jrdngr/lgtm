@@ -1,6 +1,7 @@
 //! The review UI: a picker over the jj log, and the review of what was picked.
 
 mod editor;
+mod github;
 mod highlight;
 mod keybar;
 mod load;
@@ -13,6 +14,7 @@ mod theme;
 mod versions;
 mod watch;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -40,7 +42,7 @@ pub fn store(root: &Path) -> Option<Store> {
 }
 
 /// Runs the UI in the jj workspace around the current directory, opening `revset` when given.
-pub fn run(revset: Option<String>) -> i32 {
+pub fn run(revset: Option<String>, pr: Option<String>) -> i32 {
     let Some(root) = std::env::current_dir()
         .ok()
         .and_then(|d| crate::agent::workspace(&d))
@@ -81,6 +83,8 @@ pub fn run(revset: Option<String>) -> i32 {
         picker: Picker::default(),
         review: None,
         direct: revset.is_some(),
+        pr,
+        prs: HashMap::new(),
         help: false,
         loads: 0,
     };
@@ -114,6 +118,10 @@ struct App {
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
     direct: bool,
+    /// The PR given on the command line, whose threads `p` pulls.
+    pr: Option<String>,
+    /// The PR pulled for each review, by its name.
+    prs: HashMap<String, (String, u32)>,
     help: bool,
     loads: u64,
     /// The repo's store, shared with the desktop app. `None` when it couldn't be opened.
@@ -132,7 +140,11 @@ impl App {
     fn open(&mut self, target: Target) {
         self.loads += 1;
         self.loader.review(self.loads, target.clone());
-        self.review = Some(Review::new(self.loads, target));
+        let mut review = Review::new(self.loads, target);
+        if let Some(pr) = self.prs.get(&review.revset) {
+            review.set_pr(pr.clone());
+        }
+        self.review = Some(review);
     }
 
     /// Loads what's on screen again after a jj operation.
@@ -252,6 +264,17 @@ impl App {
                     r.highlighted(file, sides);
                 }
             }
+            Msg::Pulled { id, result } => {
+                if let (Some(r), Some(store)) = (
+                    self.review.as_mut().filter(|r| r.id == id),
+                    self.store.as_ref(),
+                ) {
+                    r.pulled(store, result);
+                    if let Some(pr) = r.pr() {
+                        self.prs.insert(r.revset.clone(), pr.clone());
+                    }
+                }
+            }
             Msg::Built { id, files, cfg } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.built(files, cfg, self.store.as_ref());
@@ -282,6 +305,10 @@ impl App {
                     return self.direct;
                 }
                 review::Outcome::Edit(path, line) => self.edit = Some((path, line)),
+                review::Outcome::Pull => {
+                    let pr = r.pr().map(|(_, n)| n.to_string()).or(self.pr.clone());
+                    self.loader.pull(r.id, pr, r.bookmarks());
+                }
                 review::Outcome::None => {}
             }
             return false;

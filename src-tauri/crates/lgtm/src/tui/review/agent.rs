@@ -79,10 +79,10 @@ impl Review {
     }
 
     fn get_comments(&self) -> Response {
-        if self.comments.is_empty() {
+        if self.comments.is_empty() && self.threads.is_empty() {
             return Ok("No open comments.".into());
         }
-        let comments: Vec<_> = self
+        let mut comments: Vec<_> = self
             .comments
             .iter()
             .map(|(c, at)| {
@@ -103,6 +103,27 @@ impl Review {
                 })
             })
             .collect();
+        comments.extend(self.threads.iter().map(|t| {
+            let line = t.at.and_then(|(h, r)| {
+                let row = &self.files[t.file].hunks[h].rows[r];
+                row.new_line.or(row.old_line)
+            });
+            let posts: Vec<_> = t
+                .comment
+                .github
+                .iter()
+                .flat_map(|g| &g.posts)
+                .map(|p| json!({"author": p.author, "body": p.body}))
+                .collect();
+            json!({
+                "number": format!("#{}", t.comment.id),
+                "path": t.comment.path,
+                "line": if t.outdated() { None } else { line },
+                "outdated": t.outdated(),
+                "url": t.comment.github.as_ref().map(|g| g.url.clone()),
+                "posts": posts,
+            })
+        }));
         pretty(json!(comments))
     }
 

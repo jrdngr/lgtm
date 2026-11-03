@@ -32,6 +32,7 @@ pub const ADD: Color = tint((46, 160, 67), 15);
 pub const DEL: Color = tint((248, 81, 73), 15);
 pub const SEL: Color = tint((79, 140, 201), 28);
 /// Behind a comment for the agent.
+pub const THREAD: Color = tint((57, 197, 207), 10);
 pub const NOTE: Color = tint((79, 140, 201), 12);
 pub const BLANK: Color = tint((60, 60, 60), 35);
 

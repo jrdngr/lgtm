@@ -34,6 +34,8 @@ pub enum NoteKey {
     Comment(i64),
     /// The comment being written.
     Input,
+    /// A PR thread, by its id in the store.
+    Thread(i64),
 }
 
 /// Notes by where they go, each with how many lines it takes.

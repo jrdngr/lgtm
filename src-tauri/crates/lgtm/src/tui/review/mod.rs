@@ -8,6 +8,7 @@ mod marking;
 pub mod marks;
 mod reload;
 pub mod rows;
+mod threads;
 
 use std::collections::{HashMap, HashSet};
 
@@ -25,6 +26,8 @@ pub enum Outcome {
     Back,
     /// Open the editor on this file, a path in the workspace, at this line.
     Edit(String, u32),
+    /// Pull the PR's threads from GitHub.
+    Pull,
 }
 
 pub struct Review {
@@ -54,6 +57,10 @@ pub struct Review {
     /// Open comments for the agent, each with where it is.
     comments: Vec<comments::Placed>,
     input: Option<comments::Input>,
+    /// The PR whose threads show, as `(owner/name, number)`.
+    pr: Option<(String, u32)>,
+    threads: Vec<threads::Thread>,
+    hide_pr: bool,
     /// A failure to show until the next key.
     pub notice: Option<String>,
 }
@@ -73,6 +80,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("d", "delete comment"),
     ("e", "edit"),
     ("t", "side by side"),
+    ("p", "pull PR comments"),
+    ("H", "hide PR comments"),
     ("q", "back"),
 ];
 
@@ -98,6 +107,9 @@ impl Review {
             built_once: false,
             comments: vec![],
             input: None,
+            pr: None,
+            threads: vec![],
+            hide_pr: false,
             notice: None,
         }
     }
@@ -128,6 +140,25 @@ impl Review {
         self.error = None;
         self.lines = self.layout();
         self.cursor = at.map_or(0, |at| at.find(&self.files, &self.lines));
+    }
+
+    /// The PR whose threads show, as `(owner/name, number)`.
+    pub fn pr(&self) -> Option<&(String, u32)> {
+        self.pr.as_ref()
+    }
+
+    pub fn set_pr(&mut self, pr: (String, u32)) {
+        self.pr = Some(pr);
+    }
+
+    /// The review's bookmarks, newest commit first.
+    pub fn bookmarks(&self) -> Vec<String> {
+        self.changes
+            .iter()
+            .rev()
+            .flat_map(|c| &c.bookmarks)
+            .map(|b| b.trim_end_matches('*').to_string())
+            .collect()
     }
 
     /// Whether the review shows the working copy, whose edits it follows.
@@ -238,6 +269,8 @@ impl Review {
                     return Outcome::Edit(path, line);
                 }
             }
+            KeyCode::Char('p') => return Outcome::Pull,
+            KeyCode::Char('H') => self.toggle_pr(),
             KeyCode::Char('t') => {
                 self.split = !self.split;
                 self.relayout();
@@ -257,7 +290,7 @@ impl Review {
         } else {
             (("r", "review hunk", false), ("f", "flag hunk", false))
         };
-        vec![
+        let mut hints = vec![
             ("[ ]", "hunk", false),
             ("{ }", "file", false),
             review,
@@ -266,9 +299,12 @@ impl Review {
             ("c", "comment", false),
             ("e", "edit", false),
             ("t", "split", self.split),
-            ("?", "keys", false),
-            ("q", "back", false),
-        ]
+        ];
+        if self.pr.is_some() {
+            hints.push(("H", "hide PR", self.hide_pr));
+        }
+        hints.extend([("?", "keys", false), ("q", "back", false)]);
+        hints
     }
 }
 

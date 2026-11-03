@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use lgtm_core::review::matching::{self, check_covers, replaced_lines};
-pub use lgtm_core::review::matching::{MatchedCheck, Remaps, SideRows, pools};
+pub use lgtm_core::review::matching::{MatchedCheck, Remaps};
 
 use super::build::Keyed;
 use super::{Review, RowRef};
@@ -40,10 +40,6 @@ impl Review {
     /// Every path a mark or check in this review could be stored under.
     pub(super) fn paths(&self) -> Vec<&str> {
         matching::paths(&self.files)
-    }
-
-    pub(super) fn removed_paths(&self) -> Vec<&str> {
-        matching::removed_paths(&self.files)
     }
 
     fn match_marks(&self, store: &Store, marks: &[Mark]) -> HashMap<RowRef, Mark> {

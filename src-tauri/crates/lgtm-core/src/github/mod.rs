@@ -5,6 +5,7 @@ pub mod gh;
 pub mod heads;
 pub mod pr;
 pub mod publish;
+pub mod pulled;
 pub mod remote;
 pub mod threads;
 

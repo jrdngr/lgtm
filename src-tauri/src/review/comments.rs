@@ -1,24 +1,19 @@
 //! Comments on a review: placing them on rows, and adding, editing, and deleting them.
 
-use std::collections::HashSet;
 use std::sync::Mutex;
 
 use anyhow::Context;
 use serde::Serialize;
 use specta::Type;
 
-use super::matching::{Remaps, SideRows, pools};
+use lgtm_core::review::place::Placer;
+
+use super::matching::Remaps;
 use super::threads::after_edit;
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
-use crate::anchor::{self, MarkRef};
 use crate::store::{Comment, Conversation, GhLink, Message, Pin, Store, ThreadState};
 
-/// The first and last rows a comment covers, by index among its file's rows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
-pub struct RowSpan {
-    pub start: u32,
-    pub end: u32,
-}
+pub use lgtm_core::review::place::RowSpan;
 
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
@@ -98,8 +93,7 @@ impl Review {
         })
     }
 
-    /// The file and rows that pins on `path` match, or `None` when none of the review's files
-    /// is that file. The rows are absent when the code can't be found any more.
+    /// The file and rows that pins on `path` match. See [`Placer::placement`].
     pub(super) fn placement(
         &self,
         store: &Store,
@@ -107,82 +101,9 @@ impl Review {
         path: &str,
         pins: &[Pin],
     ) -> Option<(u32, Option<RowSpan>)> {
-        let found: Vec<RowRef> = pins
-            .iter()
-            .filter_map(|p| self.locate(store, remaps, path, p))
-            .collect();
-        let end = found.last().copied();
-        let rows = end.map(|end| {
-            let same: Vec<u32> = found
-                .iter()
-                .filter(|r| r.file == end.file)
-                .map(|r| r.row)
-                .collect();
-            let (lo, hi) = (*same.iter().min().unwrap(), *same.iter().max().unwrap());
-            (end.file, RowSpan { start: lo, end: hi })
-        });
-        let file = match rows {
-            Some((f, _)) => f,
-            None => self
-                .files
-                .iter()
-                .position(|f| f.path == path || f.old_path.as_deref() == Some(path))?
-                as u32,
-        };
-        Some((file, rows.map(|(_, span)| span)))
+        self.placer().placement(store, remaps, path, pins)
     }
 
-    /// The changed row a pin matches best, trying the files whose path pools hold its path:
-    /// its own, or else `path`, its comment's. A pin whose line was edited lands on a line that
-    /// replaced it and shares some of its context.
-    fn locate(&self, store: &Store, remaps: &mut Remaps, path: &str, pin: &Pin) -> Option<RowRef> {
-        let path = pin.path.as_deref().unwrap_or(path);
-        let anchor = pin.anchor(path);
-        let sides = self.pin_sides(path, pin);
-        for rows in &sides {
-            let mark = MarkRef {
-                id: 0,
-                anchor: &anchor,
-                created_at: 0,
-                remap: remaps.row(store, &pin.commit, path, pin.line, rows),
-            };
-            if let Some((&row, _)) = anchor::match_marks(&[mark], &rows.candidates, self.cfg)
-                .iter()
-                .next()
-            {
-                return Some(RowRef::new(rows.file_idx, row as u32));
-            }
-        }
-        // The line was edited: take the line that replaced it whose context fits best, if any
-        // of its context is still there.
-        sides.iter().find_map(|rows| {
-            let edited = remaps.edited(store, &pin.commit, path, pin.line, rows);
-            let (score, best) = edited
-                .iter()
-                .rev()
-                .map(|c| (anchor::score(&anchor, c), c))
-                .max_by_key(|(s, _)| *s)?;
-            (score > 0).then(|| RowRef::new(rows.file_idx, best.id as u32))
-        })
-    }
-
-    /// The changed rows of each file side a pin on `path` may be on.
-    fn pin_sides(&self, path: &str, pin: &Pin) -> Vec<SideRows<'_>> {
-        let removed = self.removed_paths();
-        self.files
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| {
-                pools(f, pin.side, &removed)
-                    .iter()
-                    .any(|p| p.contains(&path))
-            })
-            .filter_map(|(i, f)| SideRows::new(i, f, pin.side))
-            .collect()
-    }
-
-    /// The changed row nearest where the last pin's line is now, for a GitHub thread whose code
-    /// can't be found: it stays on a line near the one GitHub shows it on.
     fn near_last_pin(
         &self,
         store: &Store,
@@ -190,56 +111,22 @@ impl Review {
         path: &str,
         pins: &[Pin],
     ) -> Option<RowRef> {
-        let pin = pins.last()?;
-        let path = pin.path.as_deref().unwrap_or(path);
-        self.pin_sides(path, pin).iter().find_map(|rows| {
-            let row = remaps.nearest(store, &pin.commit, path, pin.line, rows)?;
-            Some(RowRef::new(rows.file_idx, row as u32))
-        })
+        self.placer().near_last_pin(store, remaps, path, pins)
     }
 
-    /// Pins for the first and last of `rows` that can be anchored, all in the last one's file.
     pub(super) fn pins(
         &self,
         store: &Store,
         rows: &[RowRef],
     ) -> anyhow::Result<(String, Vec<Pin>)> {
-        self.try_pins(store, rows)?
-            .context("these rows can't hold a comment")
+        self.placer().pins(store, rows)
     }
 
-    /// Like [`Self::pins`], but `None` when none of `rows` can be anchored, as removed rows
-    /// of an interdiff can't.
-    pub(super) fn try_pins(
-        &self,
-        store: &Store,
-        rows: &[RowRef],
-    ) -> anyhow::Result<Option<(String, Vec<Pin>)>> {
-        let wanted: HashSet<RowRef> = rows.iter().copied().collect();
-        let file_idx = rows.last().context("nothing to comment on")?.file;
-        let file = self.files.get(file_idx as usize).context("no such file")?;
-        let mut pins = Vec::new();
-        for k in &file.keyed {
-            if !wanted.contains(&RowRef {
-                file: file_idx,
-                row: k.row,
-            }) {
-                continue;
-            }
-            let Some(commit) = file.side(k.side).anchor_commit(store)? else {
-                continue;
-            };
-            let path = file.side(k.side).path.clone();
-            pins.push(Pin::new(&k.anchor, commit, k.line, Some(path)));
+    pub(super) fn placer(&self) -> Placer<'_> {
+        Placer {
+            files: &self.files,
+            cfg: self.cfg,
         }
-        if pins.len() > 2 {
-            pins.drain(1..pins.len() - 1);
-        }
-        let Some(last) = pins.last() else {
-            return Ok(None);
-        };
-        let path = last.path.clone().unwrap_or_default();
-        Ok(Some((path, pins)))
     }
 }
 

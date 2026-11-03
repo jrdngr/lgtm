@@ -92,6 +92,7 @@ impl Review {
                 }
             }
         }
+        self.thread_notes(&mut notes);
         if let Some(i) = &self.input {
             notes
                 .at_row

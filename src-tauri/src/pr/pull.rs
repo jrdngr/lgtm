@@ -5,63 +5,12 @@ use std::collections::HashMap;
 
 use crate::anchor::Side;
 use crate::ctx::RepoCtx;
+use crate::github;
 use crate::github::threads::{Comment, Review};
-use crate::github::{self, threads::Thread};
 use crate::review::{PulledThread, StateDto};
 use crate::store::{GhLink, GhPost};
 
-pub(super) fn pulled(t: Thread, repo: &str, pr: u32, viewer: &str) -> PulledThread {
-    let url = t
-        .comments
-        .nodes
-        .first()
-        .map(|c| c.url.clone())
-        .unwrap_or_default();
-    let hunk = t
-        .comments
-        .nodes
-        .first()
-        .map(|c| c.diff_hunk.clone())
-        .unwrap_or_default();
-    let posts = t
-        .comments
-        .nodes
-        .into_iter()
-        .map(|c| GhPost {
-            author: github::login(&c.author),
-            body: c.body,
-            created_at: c.created_at,
-            pending: c.state == "PENDING",
-        })
-        .collect::<Vec<GhPost>>();
-    let answered = posts.last().is_some_and(|p| p.author == viewer);
-    let line = if t.is_outdated { None } else { t.line };
-    PulledThread {
-        link: GhLink {
-            repo: repo.to_string(),
-            pr,
-            thread: t.id,
-            url,
-            resolved: t.is_resolved,
-            outdated: t.is_outdated,
-            posts,
-            line,
-        },
-        path: t.path,
-        side: if t.diff_side == "LEFT" {
-            Side::Old
-        } else {
-            Side::New
-        },
-        // A range from a removed line to an added one keeps just its end.
-        start: t
-            .start_line
-            .filter(|_| t.start_diff_side.as_deref() == Some(&t.diff_side)),
-        line,
-        hunk,
-        answered,
-    }
-}
+pub(super) use lgtm_core::github::pulled::pulled;
 
 /// Conversation comments and review summaries from others, each a thread on the PR. One the
 /// viewer posted to the conversation after counts as answered.

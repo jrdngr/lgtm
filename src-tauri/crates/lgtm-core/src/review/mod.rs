@@ -4,6 +4,8 @@
 pub mod edits;
 pub mod file;
 pub mod matching;
+pub mod place;
+pub mod snippet;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

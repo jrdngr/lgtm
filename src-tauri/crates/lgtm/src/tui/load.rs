@@ -62,6 +62,11 @@ pub enum Msg {
         req: crate::agent::Request,
         reply: std::sync::mpsc::Sender<crate::agent::Response>,
     },
+    /// The review's PR threads, pulled from GitHub.
+    Pulled {
+        id: u64,
+        result: anyhow::Result<super::github::Pulled>,
+    },
     /// Every file's review state, in diff order, for matching marks.
     Built {
         id: u64,
@@ -107,6 +112,15 @@ impl Loader {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let _ = tx.send(Msg::Log(jj.log_rows(None).await));
+        });
+    }
+
+    /// Pulls the threads of the PR `pr`, or else of the open PR from one of `bookmarks`.
+    pub fn pull(&self, id: u64, pr: Option<String>, bookmarks: Vec<String>) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let result = super::github::pull(&jj, pr.as_deref(), &bookmarks).await;
+            let _ = tx.send(Msg::Pulled { id, result });
         });
     }
 

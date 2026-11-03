@@ -13,7 +13,7 @@ use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
     self, ACCENT, ADD, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, NOTE,
-    PANEL, RED, SEL, UNIQUE,
+    PANEL, RED, SEL, THREAD, UNIQUE,
 };
 
 /// Width of a line number column.
@@ -48,8 +48,16 @@ impl Review {
     pub fn title(&self, c: &mut Canvas, x: u16, y: u16) {
         if let Some(notice) = &self.notice {
             c.put_right(y, 1, notice, theme::fg(RED).bg(PANEL));
-        } else if let Some(pct) = self.percent() {
-            c.put_right(y, 1, &format!("{pct}%"), theme::fg(GREEN).bg(PANEL));
+        } else {
+            let pct = self.percent().map(|p| format!("{p}%")).unwrap_or_default();
+            c.put_right(y, 1, &pct, theme::fg(GREEN).bg(PANEL));
+            if let Some((_, n)) = &self.pr {
+                let right = match pct.len() {
+                    0 => 1,
+                    n => n as u16 + 4,
+                };
+                c.put_right(y, right, &format!("#{n}"), theme::fg(CYAN).bg(PANEL));
+            }
         }
         let id = |c: &mut Canvas, x: u16, ch: &lgtm_core::jj::Change| {
             let id: String = ch.change_id.chars().take(8).collect();
@@ -203,6 +211,27 @@ impl Review {
                     x0 + 2 + id.len() as u16
                 };
                 c.put(x, y, text, theme::fg(FG).bg(bg));
+            }
+            NoteKey::Thread(id) => {
+                let Some(t) = self.thread(id) else { return };
+                let bg = if cursor { SEL } else { THREAD };
+                c.fill(x0, y, w, bg);
+                c.put(x0, y, "▎", theme::fg(CYAN).bg(bg));
+                let tag = format!("#{id} ");
+                let lines = t.lines();
+                let Some(line) = lines.get(part) else { return };
+                let mut x = if part == 0 {
+                    c.put(x0 + 2, y, &tag, theme::bold(CYAN).bg(bg))
+                } else {
+                    x0 + 2 + tag.len() as u16
+                };
+                if part == 0 && t.outdated() {
+                    x = c.put(x, y, "outdated  ", theme::fg(AMBER).bg(bg));
+                }
+                if let Some(who) = line.who {
+                    x = c.put(x, y, &format!("{who}  "), theme::fg(FG).bg(bg));
+                }
+                c.put(x, y, line.text, theme::fg(FG).bg(bg));
             }
             NoteKey::Input => {
                 let border = theme::fg(ACCENT).bg(BG);
