@@ -122,6 +122,12 @@ impl Review {
         self.threads.iter().find(|t| t.comment.id == id)
     }
 
+    /// A thread's label, P1, P2, …, numbered in the order they were stored.
+    pub(super) fn thread_label(&self, id: i64) -> String {
+        let n = self.threads.iter().filter(|t| t.comment.id < id).count() + 1;
+        format!("P{n}")
+    }
+
     /// Adds the shown threads to `notes`.
     pub(super) fn thread_notes(&self, notes: &mut Notes) {
         if self.hide_pr {

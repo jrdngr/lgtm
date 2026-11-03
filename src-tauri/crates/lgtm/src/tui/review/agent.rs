@@ -122,7 +122,7 @@ impl Review {
                 .map(|p| json!({"author": p.author, "body": p.body}))
                 .collect();
             json!({
-                "number": format!("#{}", t.comment.id),
+                "number": self.thread_label(t.comment.id),
                 "path": t.comment.path,
                 "line": if t.outdated() { None } else { line },
                 "outdated": t.outdated(),

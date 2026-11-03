@@ -267,7 +267,7 @@ impl Review {
                 let bg = if cursor { SEL } else { THREAD };
                 c.fill(x0, y, w, bg);
                 c.put(x0, y, "▎", theme::fg(CYAN).bg(bg));
-                let tag = format!("#{id} ");
+                let tag = format!("{} ", self.thread_label(id));
                 let lines = t.lines();
                 let Some(line) = lines.get(part) else { return };
                 let mut x = if part == 0 {

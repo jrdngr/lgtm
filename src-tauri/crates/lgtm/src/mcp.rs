@@ -47,7 +47,7 @@ impl Tui {
     #[tool(
         description = "The human's open comments for you, by number (C1, C2, ...): the file, \
         the line it's on now, that line's code, and what they wrote. Then the open threads of \
-        the review's PR on GitHub (#12, ...), once the human pulled them, with their posts."
+        the review's PR on GitHub (P1, P2, ...), once the human pulled them, with their posts."
     )]
     async fn get_comments(&self) -> Response {
         self.ask(Request::GetComments).await
