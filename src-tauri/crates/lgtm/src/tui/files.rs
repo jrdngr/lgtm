@@ -58,6 +58,11 @@ pub struct FileTree {
     matched: usize,
     sel: usize,
     top: usize,
+    /// The cursor's row when last drawn: the view follows the cursor only when it moved, so
+    /// the wheel can scroll away from it.
+    drawn_sel: Option<usize>,
+    /// Where the rows were last drawn, for clicks.
+    area: Rect,
 }
 
 #[derive(Default)]
@@ -127,10 +132,20 @@ impl FileTree {
             for p in &self.paths {
                 add(&mut root, p, vec![]);
             }
+        } else if self.query.contains('/') {
+            // A path: every file in the folders it names, or the files it names.
+            self.matched = 0;
+            for p in &self.paths {
+                if let Some(hits) = path_match(self.query.trim(), p) {
+                    if best.is_none() {
+                        best = Some((0, p.clone()));
+                    }
+                    self.matched += 1;
+                    add(&mut root, p, hits);
+                }
+            }
         } else {
-            // Names alone, unless the search names folders too.
-            let whole = self.query.contains('/');
-            let ranked = fuzzy::rank(&self.query, self.paths.iter(), |p| match_text(p, whole));
+            let ranked = fuzzy::rank(&self.query, self.paths.iter(), |p| name_of(p));
             self.matched = 0;
             // Matches much weaker than the best are noise in a tree.
             let floor = ranked.first().map_or(0, |(_, m)| m.score * 2 / 3);
@@ -138,22 +153,11 @@ impl FileTree {
                 if m.score < floor {
                     break;
                 }
-                let name_start = p.rfind('/').map_or(0, |i| i + 1);
-                let skip = if whole {
-                    p[..name_start].chars().count()
-                } else {
-                    0
-                };
-                let hits = m
-                    .positions
-                    .iter()
-                    .filter_map(|&i| i.checked_sub(skip))
-                    .collect();
                 if best.is_none() {
                     best = Some((m.score, p.clone()));
                 }
                 self.matched += 1;
-                add(&mut root, p, hits);
+                add(&mut root, p, m.positions);
             }
         }
         let searching = !self.query.trim().is_empty();
@@ -234,6 +238,48 @@ impl FileTree {
         Outcome::None
     }
 
+    /// Forgets where the rows were drawn, when they're not on screen.
+    pub fn hide(&mut self) {
+        self.area = Rect::default();
+    }
+
+    /// Scrolls the rows by `n` without moving the cursor.
+    pub fn scroll(&mut self, n: isize) {
+        let max = self.rows.len().saturating_sub(self.area.height as usize);
+        self.top = (self.top as isize + n).clamp(0, max as isize) as usize;
+    }
+
+    /// Whether the rows were last drawn over the cell at `x`, `y`.
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        self.area.contains(ratatui::layout::Position::new(x, y))
+    }
+
+    /// A click on the screen row `y`: opens a file, or opens or closes a folder.
+    pub fn click(&mut self, y: u16) -> Outcome {
+        let Some(n) = y.checked_sub(self.area.y) else {
+            return Outcome::None;
+        };
+        let i = self.top + n as usize;
+        if i >= self.rows.len() {
+            return Outcome::None;
+        }
+        self.sel = i;
+        // The click's row stays where it was clicked.
+        self.drawn_sel = Some(i);
+        match self.rows[i].clone() {
+            Row::File { path, .. } => Outcome::Open(path),
+            Row::Dir { path, open, .. } => {
+                if self.query.trim().is_empty() {
+                    let top = self.top;
+                    self.set_open(&path, !open);
+                    self.top = top;
+                    self.drawn_sel = Some(self.sel);
+                }
+                Outcome::None
+            }
+        }
+    }
+
     /// Moves the cursor to the folder that holds `row`.
     fn go_to_parent(&mut self, row: &Row) {
         let depth = match row {
@@ -279,10 +325,14 @@ impl FileTree {
         marked: &dyn Fn(&str) -> bool,
     ) {
         let height = area.height as usize;
-        if self.sel < self.top {
-            self.top = self.sel;
-        } else if height > 0 && self.sel >= self.top + height {
-            self.top = self.sel + 1 - height;
+        self.area = area;
+        if self.drawn_sel != Some(self.sel) {
+            self.drawn_sel = Some(self.sel);
+            if self.sel < self.top {
+                self.top = self.sel;
+            } else if height > 0 && self.sel >= self.top + height {
+                self.top = self.sel + 1 - height;
+            }
         }
         self.top = self.top.min(self.rows.len().saturating_sub(height));
         let mut sub = Canvas::new(&mut *c.buf, area);
@@ -326,13 +376,54 @@ fn draw_row(c: &mut Canvas, x0: u16, y: u16, row: &Row, bg: Color, marked: &dyn 
     }
 }
 
-/// What a search matches a path by: all of it, or its name.
-fn match_text(path: &str, whole: bool) -> &str {
-    if whole {
-        path
-    } else {
-        path.rsplit('/').next().unwrap_or(path)
+fn name_of(path: &str) -> &str {
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+/// Whether `path` is in the folders `query` names, `/` between them, each part found in a
+/// folder's name and the folders one inside the next. The last part can find a file's name
+/// instead, and a `/` at the start ties the first part to the top folder. Returns which chars
+/// of the file's name matched.
+fn path_match(query: &str, path: &str) -> Option<Vec<usize>> {
+    let anchored = query.starts_with('/');
+    let parts: Vec<&str> = query
+        .trim_start_matches('/')
+        .trim_end_matches('/')
+        .split('/')
+        .collect();
+    let exact = query.chars().any(char::is_uppercase);
+    let fold = |s: &str| {
+        if exact {
+            s.to_string()
+        } else {
+            s.to_lowercase()
+        }
+    };
+    let comps: Vec<&str> = path.split('/').collect();
+    let last_comp = comps.len() - 1;
+    let starts = if anchored { 0..1 } else { 0..comps.len() };
+    for start in starts {
+        let fits = parts.iter().enumerate().all(|(i, part)| {
+            let at = start + i;
+            let last_part = i == parts.len() - 1;
+            at <= last_comp
+                && (at < last_comp || last_part)
+                && fold(comps[at]).contains(&fold(part))
+        });
+        if !fits {
+            continue;
+        }
+        let end = start + parts.len() - 1;
+        if end < last_comp {
+            return Some(vec![]);
+        }
+        // The last part found the file's name.
+        let part = fold(parts[parts.len() - 1]);
+        let name = fold(comps[last_comp]);
+        let at = name.find(&part).map_or(0, |b| name[..b].chars().count());
+        return Some((at..at + part.chars().count()).collect());
     }
+    None
 }
 
 fn add(root: &mut Node, path: &str, hits: Vec<usize>) {
@@ -497,6 +588,35 @@ mod tests {
         // A slash matches folders too.
         t.set_query("c/send".into());
         assert_eq!(t.selected(), Some("c/sendItems.ts"));
+    }
+
+    #[test]
+    fn a_search_with_slashes_shows_the_folder_it_names() {
+        let mut t = tree(&[
+            "services/auth/docs/services/a.md",
+            "services/auth/docs/services/b.md",
+            "services/auth/docs/other.md",
+            "services/billing/docs/services/c.md",
+        ]);
+        t.set_query("auth/docs/services".into());
+        assert_eq!(t.count().as_deref(), Some("2 / 4"));
+        assert_eq!(t.selected(), Some("services/auth/docs/services/a.md"));
+        t.set_query("auth/docs/oth".into());
+        assert_eq!(t.count().as_deref(), Some("1 / 4"));
+        t.set_query("/auth".into());
+        assert_eq!(t.count().as_deref(), Some("0 / 4"));
+        t.set_query("docs/".into());
+        assert_eq!(t.count().as_deref(), Some("4 / 4"));
+    }
+
+    #[test]
+    fn a_click_opens_a_folder_or_a_file() {
+        let mut t = tree(PATHS);
+        t.area = Rect::new(0, 5, 30, 10);
+        assert!(matches!(t.click(5), Outcome::None));
+        assert_eq!(shown(&t)[..2], ["-src/", "  main.tsx"]);
+        assert!(matches!(t.click(6), Outcome::Open(p) if p == "src/main.tsx"));
+        assert!(matches!(t.click(40), Outcome::None));
     }
 
     #[test]

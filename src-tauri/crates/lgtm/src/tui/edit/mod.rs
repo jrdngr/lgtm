@@ -195,6 +195,27 @@ impl Editor {
         }
     }
 
+    /// A click in the sidebar opens a file or a folder, and the wheel scrolls it.
+    pub fn mouse(&mut self, ev: ratatui::crossterm::event::MouseEvent) {
+        use ratatui::crossterm::event::{MouseButton, MouseEventKind};
+        if self.finder.is_some() || !self.sidebar.contains(ev.column, ev.row) {
+            return;
+        }
+        match ev.kind {
+            MouseEventKind::ScrollDown => self.sidebar.scroll(3),
+            MouseEventKind::ScrollUp => self.sidebar.scroll(-3),
+            MouseEventKind::Down(MouseButton::Left) => {
+                if let crate::tui::files::Outcome::Open(path) = self.sidebar.click(ev.row) {
+                    self.in_sidebar = false;
+                    if let Err(e) = self.open(&path, 0) {
+                        self.notice = Some(format!("couldn't open {path}: {e}"));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Moves in the sidebar's tree, opens and closes its folders, and opens its files.
     fn sidebar_key(&mut self, key: KeyEvent) {
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};

@@ -35,7 +35,7 @@ use paint::Canvas;
 use review::Review;
 use settings::Settings;
 use term::Term;
-use theme::{ACCENT, BG, CYAN, FG, PANEL};
+use theme::{ACCENT, BG, CYAN, FG, PANEL, RED};
 
 /// The store of the repo the workspace at `root` belongs to, shared with the desktop app.
 pub fn store(root: &Path) -> Option<Store> {
@@ -250,12 +250,16 @@ impl App {
                             return Ok(());
                         }
                     }
-                    Event::Mouse(ev) => {
-                        let reviewing = self.screen == Screen::Review && !self.help;
-                        if let (Some(r), true) = (self.review.as_mut(), reviewing) {
-                            r.mouse(ev);
+                    Event::Mouse(_) if self.help => {}
+                    Event::Mouse(ev) => match self.screen {
+                        Screen::Editor => self.buffers.mouse(ev),
+                        Screen::Review => {
+                            if let Some(r) = self.review.as_mut() {
+                                r.mouse(ev);
+                            }
                         }
-                    }
+                        Screen::Home => {}
+                    },
                     _ => {}
                 }
             }
@@ -501,7 +505,15 @@ impl App {
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));
+                if let Some(n) = &self.home.notice {
+                    c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));
+                }
                 self.home.draw(c, body);
+                if let Some(text) = self.home.prompt() {
+                    keybar::prompt(c, bottom, &text, &[]);
+                    keybar::menu(c, body, &self.home.command_menu());
+                    return;
+                }
                 (self.home.hints(), home::KEYS)
             }
         };

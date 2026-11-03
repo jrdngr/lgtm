@@ -29,7 +29,14 @@ pub struct Home {
     pub picker: Picker,
     pub files: FileTree,
     focus: Focus,
+    /// The `:` line being typed.
+    cmd: Option<String>,
+    /// A failure to show until the next key.
+    pub notice: Option<String>,
 }
+
+/// The `:` commands, for the menu over the command line.
+const COMMANDS: &[(&str, &str)] = &[("q", "quit")];
 
 impl Default for Home {
     fn default() -> Self {
@@ -37,6 +44,8 @@ impl Default for Home {
             picker: Picker::default(),
             files: FileTree::default(),
             focus: Focus::Revisions,
+            cmd: None,
+            notice: None,
         }
     }
 }
@@ -51,16 +60,77 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Enter", "open"),
     ("s", "snapshots"),
     ("a", "every snapshot"),
+    (":", "command"),
     ("q", "quit"),
 ];
 
 impl Home {
     /// Whether keys are going into the search box.
     pub fn typing(&self) -> bool {
-        self.focus == Focus::Files
+        self.focus == Focus::Files || self.cmd.is_some()
+    }
+
+    /// The `:` line, as it shows.
+    pub fn prompt(&self) -> Option<String> {
+        self.cmd.as_ref().map(|c| format!(":{c}"))
+    }
+
+    /// The commands that match what's typed.
+    pub fn command_menu(&self) -> Vec<(String, &'static str)> {
+        let Some(typed) = &self.cmd else {
+            return vec![];
+        };
+        COMMANDS
+            .iter()
+            .filter(|(name, _)| name.starts_with(typed.as_str()))
+            .map(|(name, label)| (format!(":{name}"), *label))
+            .collect()
+    }
+
+    fn command_key(&mut self, key: KeyEvent) -> Outcome {
+        let Some(typed) = self.cmd.as_mut() else {
+            return Outcome::None;
+        };
+        match key.code {
+            KeyCode::Esc => self.cmd = None,
+            KeyCode::Backspace if typed.is_empty() => self.cmd = None,
+            KeyCode::Backspace => {
+                typed.pop();
+            }
+            KeyCode::Tab => {
+                let matches: Vec<&str> = COMMANDS
+                    .iter()
+                    .map(|(n, _)| *n)
+                    .filter(|n| n.starts_with(typed.as_str()))
+                    .collect();
+                if let [one] = matches[..] {
+                    *typed = one.to_string();
+                }
+            }
+            KeyCode::Enter => {
+                let line = self.cmd.take().unwrap_or_default();
+                match line.trim() {
+                    "q" | "q!" | "quit" => return Outcome::Quit,
+                    "" => {}
+                    other => self.notice = Some(format!("no command {other}")),
+                }
+            }
+            KeyCode::Char(c) => typed.push(c),
+            _ => {}
+        }
+        Outcome::None
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
+        self.notice = None;
+        if self.cmd.is_some() {
+            return self.command_key(key);
+        }
+        let empty_search = self.focus == Focus::Revisions || self.files.query.is_empty();
+        if key.code == KeyCode::Char(':') && empty_search {
+            self.cmd = Some(String::new());
+            return Outcome::None;
+        }
         if key.code == KeyCode::Tab {
             self.focus = match self.focus {
                 Focus::Revisions => Focus::Files,
@@ -100,7 +170,7 @@ impl Home {
                 } else {
                     hints.push(("Esc", "clear", false));
                 }
-                hints.push(("C-c", "quit", false));
+                hints.push((":q", "quit", false));
                 hints
             }
         }
@@ -141,5 +211,37 @@ impl Home {
         }
         let tree = Rect::new(right.x, right.y + 3, right.width, right.height - 3);
         self.files.draw(&mut sub, tree, focused, &|_| false);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::crossterm::event::KeyModifiers;
+
+    fn press(h: &mut Home, keys: &str) -> Vec<Outcome> {
+        crate::edit::spec::keys(keys)
+            .into_iter()
+            .map(|k| h.key(KeyEvent::new(k.code, KeyModifiers::NONE)))
+            .collect()
+    }
+
+    #[test]
+    fn colon_q_quits_from_either_side_and_an_unknown_command_says_so() {
+        let mut h = Home::default();
+        assert!(matches!(
+            press(&mut h, ":q<ret>").last(),
+            Some(Outcome::Quit)
+        ));
+        press(&mut h, "<tab>");
+        assert!(matches!(
+            press(&mut h, ":q<ret>").last(),
+            Some(Outcome::Quit)
+        ));
+        press(&mut h, ":zz<ret>");
+        assert_eq!(h.notice.as_deref(), Some("no command zz"));
+        // With a search typed, `:` is part of it.
+        press(&mut h, "a:");
+        assert_eq!(h.files.query, "a:");
     }
 }
