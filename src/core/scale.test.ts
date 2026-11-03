@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { onScaleSettled } from "./scale";
+import { onScaleSettled, screenChanged } from "./scale";
 
 /** The media query listeners, which a ratio change fires. */
 let fire: (() => void)[] = [];
@@ -64,5 +64,12 @@ describe("scale changes", () => {
     window.dispatchEvent(new Event("resize"));
     await vi.advanceTimersByTimeAsync(100);
     expect(seen).not.toHaveBeenCalled();
+  });
+
+  it("report a move to another screen that WebKit didn't pass on as a ratio change", async () => {
+    const seen = watch();
+    screenChanged();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(seen).toHaveBeenCalledTimes(1);
   });
 });

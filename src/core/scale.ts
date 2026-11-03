@@ -48,6 +48,13 @@ function stop() {
   clearTimeout(settling);
 }
 
+/** Reports that the window moved to a screen with another backing scale. WebKit doesn't always
+ * pass that on as a ratio change while the page is zoomed, which leaves xterm drawing glyphs
+ * for one ratio into cells sized for the other. */
+export function screenChanged() {
+  if (listeners.size > 0) changed();
+}
+
 /** Calls `f` once the window's scale has changed and settled. */
 export function onScaleSettled(f: () => void): () => void {
   if (listeners.size === 0) start();
