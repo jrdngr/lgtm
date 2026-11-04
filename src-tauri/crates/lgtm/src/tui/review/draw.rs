@@ -373,7 +373,12 @@ fn file_header(
     c.fill(x0, y, c.area.width, bg);
     let mut x = c.put(x0 + CHECK_X.start, y, "[", theme::fg(MUTED).bg(bg));
     x = match check {
-        Some(agent) => c.put(x, y, "✓", theme::fg(if agent { CYAN } else { GREEN }).bg(bg)),
+        Some(agent) => c.put(
+            x,
+            y,
+            "✓",
+            theme::fg(if agent { CYAN } else { GREEN }).bg(bg),
+        ),
         None => c.put(x, y, " ", theme::fg(MUTED).bg(bg)),
     };
     x = c.put(x, y, "] ", theme::fg(MUTED).bg(bg));
