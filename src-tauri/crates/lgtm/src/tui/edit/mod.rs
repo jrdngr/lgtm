@@ -1,6 +1,6 @@
 //! The editor screen: open buffers, the one in view, the `:` command line, and the keys.
 
-mod clipboard;
+pub mod clipboard;
 mod command;
 mod draw;
 mod finder;

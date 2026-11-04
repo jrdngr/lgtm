@@ -82,9 +82,20 @@ pub struct Keys {
     pub search: Option<String>,
     /// Selections `Alt-o` grew from, for `Alt-i` to go back through.
     grown: Vec<Sel>,
+    /// Whether commands that change the text do nothing.
+    read_only: bool,
 }
 
 impl Keys {
+    /// Keys in select mode that only move and select, for text that can't change.
+    pub fn read_only_select() -> Self {
+        Self {
+            mode: Mode::Select,
+            read_only: true,
+            ..Self::default()
+        }
+    }
+
     /// The keys typed toward a binding, like `g` or `space`.
     pub fn pending(&self) -> String {
         self.pending.join(" ")
@@ -163,6 +174,9 @@ impl Keys {
     }
 
     fn run(&mut self, b: &mut Buffer, cmd: Cmd, view: View) -> Action {
+        if self.read_only && cmd.edits() {
+            return Action::None;
+        }
         let half = (view.height / 2).max(1) as isize;
         let head = b.sel.head;
         match cmd {

@@ -79,6 +79,36 @@ pub enum Cmd {
     Escape,
 }
 
+impl Cmd {
+    /// Whether it changes the text.
+    pub fn edits(self) -> bool {
+        matches!(
+            self,
+            Insert
+                | Append
+                | InsertLineStart
+                | AppendLineEnd
+                | OpenBelow
+                | OpenAbove
+                | Delete
+                | Change
+                | PasteAfter
+                | PasteBefore
+                | Replace
+                | Indent
+                | Outdent
+                | Join
+                | ToggleCase
+                | SurroundAdd
+                | SurroundDelete
+                | SurroundReplace
+                | Undo
+                | Redo
+                | ClipboardPaste
+        )
+    }
+}
+
 /// The lists `space` opens to pick from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pick {

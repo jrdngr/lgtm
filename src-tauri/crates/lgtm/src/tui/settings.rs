@@ -11,6 +11,7 @@ pub struct Settings {
     pub split: bool,
     pub hide_pr: bool,
     pub show_resolved: bool,
+    pub wrap: bool,
 }
 
 impl Default for Settings {
@@ -20,6 +21,7 @@ impl Default for Settings {
             split: false,
             hide_pr: false,
             show_resolved: false,
+            wrap: false,
         }
     }
 }

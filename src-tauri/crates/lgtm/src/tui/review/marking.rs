@@ -9,6 +9,7 @@ use lgtm_core::store::{MarkColor, Store};
 
 use super::Review;
 use super::marks::{Marks, State};
+use super::undo::Step;
 
 impl Review {
     /// Takes every file's review state and matches marks onto it. The first time it folds
@@ -37,7 +38,7 @@ impl Review {
     }
 
     /// The reviewed files' paths, by the marks as last matched.
-    fn reviewed_paths(&self) -> HashSet<String> {
+    pub(super) fn reviewed_paths(&self) -> HashSet<String> {
         let Some(marks) = &self.marks else {
             return HashSet::new();
         };
@@ -114,9 +115,12 @@ impl Review {
             'R' => marks.toggle_checks(store, &[file]),
             _ => marks.toggle(store, file, None, MarkColor::Red),
         };
-        if let Err(e) = result {
-            self.notice = Some(format!("{e:#}"));
-            return true;
+        match result {
+            Ok(edit) => self.history.did(Step::Marks(edit)),
+            Err(e) => {
+                self.notice = Some(format!("{e:#}"));
+                return true;
+            }
         }
         // A file folds once it's all reviewed, and the cursor moves on.
         if matches!(key, 'r' | 'R') {

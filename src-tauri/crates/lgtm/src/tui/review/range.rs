@@ -35,6 +35,7 @@ impl Review {
                     hunk,
                     old,
                     new,
+                    ..
                 } => Some((file, hunk, new.or(old)?)),
                 _ => None,
             })

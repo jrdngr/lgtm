@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 use lgtm_core::store::{MarkColor, Store};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use super::undo::Step;
 use super::{Outcome, Review};
 
 /// Commands, with whether each takes a path, and what they do.
@@ -235,7 +236,10 @@ impl Review {
                     _ => marks.mark_files(store, &files, MarkColor::Red),
                 };
                 match result {
-                    Ok(()) => self.refold(&files),
+                    Ok(edit) => {
+                        self.history.did(Step::Marks(edit));
+                        self.refold(&files);
+                    }
                     Err(e) => self.notice = Some(format!("{e:#}")),
                 }
             }
@@ -268,7 +272,10 @@ impl Review {
             return;
         };
         match marks.clear(store, files) {
-            Ok(()) => self.refold(files),
+            Ok(edit) => {
+                self.history.did(Step::Marks(edit));
+                self.refold(files);
+            }
             Err(e) => self.notice = Some(format!("{e:#}")),
         }
     }

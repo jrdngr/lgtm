@@ -83,6 +83,29 @@ impl Store {
     /// Stores `c` under the next number. Returns it with its id and number.
     pub fn add_agent_comment(&self, c: &AgentComment) -> rusqlite::Result<AgentComment> {
         let number = self.next_agent_comment_number()?;
+        self.insert_agent_comment(c, number)
+    }
+
+    /// Puts a deleted comment back under its own number, or the next one when that's taken.
+    pub fn restore_agent_comment(&self, c: &AgentComment) -> rusqlite::Result<AgentComment> {
+        let taken: bool = self.db.query_row(
+            "SELECT EXISTS (SELECT 1 FROM agent_comments WHERE number = ?)",
+            [c.number],
+            |r| r.get(0),
+        )?;
+        let number = if taken {
+            self.next_agent_comment_number()?
+        } else {
+            c.number
+        };
+        self.insert_agent_comment(c, number)
+    }
+
+    fn insert_agent_comment(
+        &self,
+        c: &AgentComment,
+        number: i64,
+    ) -> rusqlite::Result<AgentComment> {
         self.db.execute(
             "INSERT INTO agent_comments
              (number, path, side, line, line_text, body, review, created_at, done,
@@ -196,5 +219,18 @@ mod tests {
         // A deleted comment's number isn't reused while a later one exists.
         store.delete_agent_comment(1).unwrap();
         assert_eq!(store.add_agent_comment(&comment("a.rs")).unwrap().number, 3);
+    }
+
+    #[test]
+    fn a_restored_comment_keeps_its_number_unless_another_took_it() {
+        let store = Store::in_memory();
+        let first = store.add_agent_comment(&comment("a.rs")).unwrap();
+        let second = store.add_agent_comment(&comment("a.rs")).unwrap();
+        store.delete_agent_comment(1).unwrap();
+        let back = store.restore_agent_comment(&first).unwrap();
+        assert_eq!((back.number, back.body.as_str()), (1, "why 1?"));
+        store.delete_agent_comment(2).unwrap();
+        store.add_agent_comment(&comment("b.rs")).unwrap();
+        assert_eq!(store.restore_agent_comment(&second).unwrap().number, 3);
     }
 }

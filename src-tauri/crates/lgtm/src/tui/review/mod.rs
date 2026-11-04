@@ -12,8 +12,10 @@ mod mode;
 mod range;
 mod reload;
 pub mod rows;
+mod select;
 mod threads;
 mod tree;
+mod undo;
 mod wrap;
 
 use std::collections::{HashMap, HashSet};
@@ -31,6 +33,7 @@ use super::keybar::Hint;
 use super::load::Target;
 use super::settings::Settings;
 use crate::edit::keymap::Pick;
+use draw::{CODE_X, NUM};
 use rows::Line;
 
 pub enum Outcome {
@@ -59,6 +62,10 @@ pub struct Review {
     /// Folded files, by path, so they stay folded across reloads.
     folded: HashSet<String>,
     split: bool,
+    /// Whether code rows wrap, rather than scroll sideways.
+    wrap: bool,
+    /// Columns of code scrolled off to the left.
+    left: usize,
     lines: Vec<Line>,
     cursor: usize,
     top: usize,
@@ -72,7 +79,7 @@ pub struct Review {
     in_list: bool,
     /// What's picked in the file list, when it isn't the cursor's file.
     list_pick: Option<list::Pick>,
-    /// Whether reviewed files are set apart at the bottom of the list, and `{` `}` skip them.
+    /// Whether reviewed files are set apart at the bottom of the list.
     group_reviewed: bool,
     reviewed_open: bool,
     /// Folders closed in the file list, by path.
@@ -108,28 +115,35 @@ pub struct Review {
     pub unsaved: HashSet<String>,
     /// Where to put the cursor once the diff loads.
     goto: Option<reload::Spot>,
+    /// Text being selected with `v`.
+    selecting: Option<select::Selecting>,
+    history: undo::History,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
     ("j k", "line"),
     ("Ctrl-d Ctrl-u", "half page"),
     ("g G", "top, bottom"),
-    ("[ ]", "hunk"),
-    ("{ }", "file"),
+    ("n m", "next, previous hunk"),
+    ("N M", "next, previous file"),
+    ("h l", "scroll left, right"),
     ("Enter", "fold file, edit comment"),
     ("Tab", "file list"),
     ("Enter", "open, close folder (file list)"),
     ("r f", "review, flag hunk"),
     ("R F", "review, flag file or folder"),
-    ("h", "hide reviewed files"),
+    ("u U", "undo, redo marks and comments"),
+    ("z", "hide reviewed files"),
     ("J K", "select lines"),
+    ("v", "select text"),
+    ("y", "copy the selection"),
     ("c", "comment for the agent, on the selected lines"),
     ("C", "next comment"),
     ("d", "delete comment"),
-    ("space", "files, buffers, search, editor"),
+    ("space", "files, buffers, search, wrap, editor"),
     ("t", "side by side"),
     ("p", "pull PR comments"),
-    ("H", "hide PR comments"),
+    ("P", "hide PR comments"),
     (":", "command (:? lists them)"),
     ("q", "back"),
 ];
@@ -142,6 +156,7 @@ impl Review {
             split: self.split,
             hide_pr: self.hide_pr,
             show_resolved: self.show_resolved,
+            wrap: self.wrap,
         }
     }
 
@@ -150,6 +165,7 @@ impl Review {
         self.split = s.split;
         self.hide_pr = s.hide_pr;
         self.show_resolved = s.show_resolved;
+        self.wrap = s.wrap;
     }
 
     pub fn new(id: u64, target: Target) -> Self {
@@ -163,6 +179,8 @@ impl Review {
             error: None,
             folded: HashSet::new(),
             split: false,
+            wrap: false,
+            left: 0,
             lines: vec![],
             cursor: 0,
             top: 0,
@@ -193,6 +211,8 @@ impl Review {
             space: false,
             unsaved: HashSet::new(),
             goto: None,
+            selecting: None,
+            history: undo::History::default(),
         }
     }
 
@@ -219,6 +239,7 @@ impl Review {
         self.files = files;
         self.error = None;
         self.lines = self.layout();
+        self.selecting = None;
         self.cursor = at.map_or(0, |at| at.find(&self.files, &self.lines));
         if let Some(spot) = self.goto.take() {
             self.go_to(spot);
@@ -259,7 +280,8 @@ impl Review {
         let folded: HashSet<usize> = (0..self.files.len())
             .filter(|&f| self.folded.contains(&self.files[f].path))
             .collect();
-        let mut lines = rows::lines_with(&self.files, &folded, self.split, &self.notes());
+        let wrap = self.wrap.then(|| self.code_width());
+        let mut lines = rows::lines_with(&self.files, &folded, self.split, &self.notes(), wrap);
         // Reviewed files set apart show only while their heading is open.
         if self.group_reviewed && !self.reviewed_open {
             lines.retain(|l| !self.reviewed(l.file()));
@@ -270,7 +292,11 @@ impl Review {
     fn relayout(&mut self) {
         let spot = self.lines.get(self.cursor).map(|l| l.spot());
         self.lines = self.layout();
-        self.cursor = spot.map_or(0, |s| rows::find(&self.lines, s));
+        self.keep_selection();
+        self.cursor = match &self.selecting {
+            Some(s) => s.buf.line_of(s.buf.sel.head),
+            None => spot.map_or(0, |s| rows::find(&self.lines, s)),
+        };
     }
 
     fn current(&self) -> Option<Line> {
@@ -313,13 +339,49 @@ impl Review {
         }
     }
 
-    /// Moves to the next or previous file's header, past files set apart as reviewed.
+    /// Moves to the next or previous file's header.
     fn jump_file(&mut self, forward: bool) {
-        let skipped: HashSet<usize> = (0..self.files.len()).filter(|&f| self.skipped(f)).collect();
-        self.jump(
-            forward,
-            |l| matches!(l, Line::File(f) if !skipped.contains(f)),
-        );
+        self.jump(forward, |l| matches!(l, Line::File(_)));
+    }
+
+    /// Columns of code a line shows: one side's in split view.
+    fn code_width(&self) -> usize {
+        if self.split {
+            (self.width.saturating_sub(3) / 2).saturating_sub(NUM as usize + 1)
+        } else {
+            self.width.saturating_sub(CODE_X as usize)
+        }
+        .max(4)
+    }
+
+    /// Scrolls code `n` columns sideways, no further than the widest row needs.
+    fn scroll_side(&mut self, n: isize) {
+        if self.wrap {
+            return;
+        }
+        let widest = self
+            .lines
+            .iter()
+            .filter_map(|l| match *l {
+                Line::Code {
+                    file,
+                    hunk,
+                    old,
+                    new,
+                    ..
+                } => Some((file, hunk, [old, new])),
+                _ => None,
+            })
+            .flat_map(|(f, h, rows)| {
+                let hunk = &self.files[f].hunks[h];
+                rows.into_iter()
+                    .flatten()
+                    .map(move |r| hunk.rows[r].text.chars().map(wrap::cols).sum::<usize>())
+            })
+            .max()
+            .unwrap_or(0);
+        let most = widest.saturating_sub(self.code_width()) as isize;
+        self.left = (self.left as isize + n).clamp(0, most.max(0)) as usize;
     }
 
     fn by(&mut self, n: isize) {
@@ -346,6 +408,7 @@ impl Review {
                     hunk,
                     old,
                     new,
+                    ..
                 } => {
                     let rows = &self.files[file].hunks[hunk].rows;
                     let changed = [old, new]
@@ -365,9 +428,14 @@ impl Review {
         out
     }
 
-    /// Moves the cursor to the next or previous hunk's start.
+    /// Moves the cursor to the next or previous hunk's start, or folded file's header.
     fn jump_hunk(&mut self, forward: bool) {
-        let starts = self.hunk_starts();
+        let mut starts = self.hunk_starts();
+        starts.extend((0..self.lines.len()).filter(|&i| match self.lines[i] {
+            Line::File(f) => self.folded.contains(&self.files[f].path),
+            _ => false,
+        }));
+        starts.sort_unstable();
         let found = if forward {
             starts.into_iter().find(|&i| i > self.cursor)
         } else {
@@ -384,6 +452,7 @@ impl Review {
             self.folded.insert(path);
         }
         self.lines = self.layout();
+        self.selecting = None;
         self.cursor = rows::find(&self.lines, (file, None, None));
     }
 
@@ -409,12 +478,22 @@ impl Review {
             self.input_key(key, store.as_deref());
             return Outcome::None;
         }
+        if self.selecting.is_some() {
+            self.select_key(key);
+            return Outcome::None;
+        }
         if std::mem::take(&mut self.space) {
             return match key.code {
                 KeyCode::Char('f') => Outcome::Pick(Pick::Files),
                 KeyCode::Char('b') => Outcome::Pick(Pick::Buffers),
                 KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
                 KeyCode::Char('r') => Outcome::Editor(self.edit_target()),
+                KeyCode::Char('w') => {
+                    self.wrap = !self.wrap;
+                    self.left = 0;
+                    self.relayout();
+                    Outcome::None
+                }
                 _ => Outcome::None,
             };
         }
@@ -456,11 +535,16 @@ impl Review {
             KeyCode::PageUp => self.by(-(self.height.max(1) as isize)),
             KeyCode::Char('g') | KeyCode::Home => self.cursor = 0,
             KeyCode::Char('G') | KeyCode::End => self.by(isize::MAX / 2),
-            KeyCode::Char(']') => self.jump_hunk(true),
-            KeyCode::Char('[') => self.jump_hunk(false),
-            KeyCode::Char('}') => self.jump_file(true),
-            KeyCode::Char('{') => self.jump_file(false),
-            KeyCode::Char('h') => self.toggle_group(),
+            KeyCode::Char('n') => self.jump_hunk(true),
+            KeyCode::Char('m') => self.jump_hunk(false),
+            KeyCode::Char('N') => self.jump_file(true),
+            KeyCode::Char('M') => self.jump_file(false),
+            KeyCode::Char('h') | KeyCode::Left => self.scroll_side(-4),
+            KeyCode::Char('l') | KeyCode::Right => self.scroll_side(4),
+            KeyCode::Char('u') => self.undo(store),
+            KeyCode::Char('U') => self.redo(store),
+            KeyCode::Char('v') if !self.in_list => self.start_select(),
+            KeyCode::Char('z') => self.toggle_group(),
             KeyCode::Enter => match self.current() {
                 Some(Line::File(f)) => self.toggle_file(f),
                 Some(Line::Note {
@@ -473,7 +557,7 @@ impl Review {
             KeyCode::Char('C') => self.next_comment(),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
             KeyCode::Char('p') => return Outcome::Pull,
-            KeyCode::Char('H') => self.toggle_pr(),
+            KeyCode::Char('P') => self.toggle_pr(),
             KeyCode::Char('t') => {
                 self.split = !self.split;
                 self.relayout();
@@ -491,6 +575,7 @@ impl Review {
         self.pinned = true;
         if matches!(ev.kind, MouseEventKind::Down(_)) {
             self.anchor = None;
+            self.selecting = None;
         }
         match ev.kind {
             MouseEventKind::ScrollDown => self.scroll(3),
@@ -570,6 +655,9 @@ impl Review {
         if self.typing() {
             return vec![("Enter", "save", false), ("Esc", "cancel", false)];
         }
+        if self.selecting.is_some() {
+            return vec![("y", "copy", false), ("Esc", "cancel", false)];
+        }
         let (review, flag) = if shift {
             (("R", "review file", false), ("F", "flag file", false))
         } else {
@@ -577,16 +665,18 @@ impl Review {
         };
         let mut hints = vec![
             ("space", "menu", false),
-            ("[ ]", "hunk", false),
-            ("{ }", "file", false),
+            ("n m", "hunk", false),
+            ("N M", "file", false),
             review,
             flag,
             ("c", "comment", false),
             ("t", "split", self.split),
-            ("h", "hide reviewed", self.group_reviewed),
+            ("u U", "undo", false),
+            ("v", "select", false),
+            ("z", "hide reviewed", self.group_reviewed),
         ];
         if self.pr.is_some() {
-            hints.push(("H", "hide PR", self.hide_pr));
+            hints.push(("P", "hide PR", self.hide_pr));
         }
         hints.extend([("?", "keys", false), ("q", "back", false)]);
         hints
@@ -627,7 +717,7 @@ mod tests {
         }
     }
 
-    fn press(r: &mut Review, code: KeyCode) {
+    pub(super) fn press(r: &mut Review, code: KeyCode) {
         r.key(KeyEvent::new(code, KeyModifiers::NONE), None);
     }
 
@@ -643,6 +733,7 @@ mod tests {
             hunk,
             old: Some(0),
             new: None,
+            part: 0,
         })
     }
 
@@ -662,47 +753,68 @@ mod tests {
     }
 
     #[test]
-    fn brackets_move_between_first_changed_lines_and_braces_between_files() {
+    fn n_m_move_between_first_changed_lines_and_shifted_between_files() {
         let mut r = review();
-        press(&mut r, KeyCode::Char(']'));
+        press(&mut r, KeyCode::Char('n'));
         assert_eq!(r.current(), on_change(0, 0));
-        press(&mut r, KeyCode::Char(']'));
+        press(&mut r, KeyCode::Char('n'));
         assert_eq!(r.current(), on_change(0, 1));
-        press(&mut r, KeyCode::Char('}'));
+        press(&mut r, KeyCode::Char('N'));
         assert_eq!(r.current(), Some(Line::File(1)));
-        press(&mut r, KeyCode::Char('['));
+        press(&mut r, KeyCode::Char('m'));
         assert_eq!(r.current(), on_change(0, 1));
-        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Char('M'));
         assert_eq!(r.current(), Some(Line::File(0)));
     }
 
     #[test]
     fn enter_on_a_file_header_folds_the_file_and_unfolds_it_again() {
         let mut r = review();
-        press(&mut r, KeyCode::Char(']'));
+        press(&mut r, KeyCode::Char('n'));
         // Enter on code does nothing.
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), on_change(0, 0));
-        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Char('M'));
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), Some(Line::File(0)));
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::File(1)));
-        // Brackets skip the folded file.
-        press(&mut r, KeyCode::Char('{'));
-        press(&mut r, KeyCode::Char(']'));
-        assert_eq!(r.current(), on_change(1, 0));
-        press(&mut r, KeyCode::Char('{'));
-        press(&mut r, KeyCode::Char('{'));
+        press(&mut r, KeyCode::Char('M'));
+        press(&mut r, KeyCode::Char('M'));
         press(&mut r, KeyCode::Enter);
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::Hunk(0, 0)));
     }
 
     #[test]
+    fn hunk_keys_stop_on_a_folded_files_header() {
+        let mut r = review();
+        r.set_folded(0, true);
+        press(&mut r, KeyCode::Char('n'));
+        assert_eq!(r.current(), on_change(1, 0));
+        press(&mut r, KeyCode::Char('m'));
+        assert_eq!(r.current(), Some(Line::File(0)));
+    }
+
+    #[test]
+    fn h_l_scroll_sideways_no_further_than_the_widest_row_needs() {
+        let mut r = review();
+        // Ten columns wider than the 66 an 80-column unified view shows.
+        r.width = 80;
+        r.files[0].hunks[0].rows[0].text = "x".repeat(76);
+        press(&mut r, KeyCode::Char('l'));
+        press(&mut r, KeyCode::Char('l'));
+        assert_eq!(r.left, 8);
+        press(&mut r, KeyCode::Char('l'));
+        assert_eq!(r.left, 10);
+        press(&mut r, KeyCode::Char('h'));
+        assert_eq!(r.left, 6);
+    }
+
+    #[test]
     fn the_file_list_moves_a_file_at_a_time() {
         let mut r = review();
-        press(&mut r, KeyCode::Char(']'));
+        press(&mut r, KeyCode::Char('n'));
         press(&mut r, KeyCode::Tab);
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::File(1)));

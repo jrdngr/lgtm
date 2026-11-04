@@ -7,6 +7,7 @@ use super::Review;
 use super::marks::State;
 use super::rows::{self, Line};
 use super::tree::{self, Entry};
+use super::undo::Step;
 
 /// A folder's state from its files': flagged when any is, reviewed when all are, else partly
 /// reviewed when any of them is started.
@@ -42,11 +43,6 @@ impl Review {
     /// Whether the file is reviewed, by the user or an agent.
     pub(super) fn reviewed(&self, file: usize) -> bool {
         matches!(self.file_state(file), State::Reviewed | State::Agent)
-    }
-
-    /// Whether `{` and `}` pass over the file: it's reviewed and set apart.
-    pub(super) fn skipped(&self, file: usize) -> bool {
-        self.group_reviewed && self.reviewed(file)
     }
 
     /// The list's lines: every file, or with reviewed files set apart, the files left and
@@ -199,7 +195,10 @@ impl Review {
             _ => marks.toggle_files(store, &files, MarkColor::Red),
         };
         match result {
-            Ok(()) => self.refold(&files),
+            Ok(edit) => {
+                self.history.did(Step::Marks(edit));
+                self.refold(&files);
+            }
             Err(e) => self.notice = Some(format!("{e:#}")),
         }
     }

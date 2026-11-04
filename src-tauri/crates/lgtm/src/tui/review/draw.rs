@@ -2,11 +2,14 @@
 
 use lgtm_core::diff::{Row, RowKind};
 use lgtm_core::jj::FileDiff;
+use std::ops::Range;
+
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 use super::marks::State;
 use super::rows::{Line, NoteKey};
+use super::wrap::{self, code_parts};
 use super::{Review, tree};
 use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
@@ -17,7 +20,9 @@ use crate::tui::theme::{
 };
 
 /// Width of a line number column.
-const NUM: u16 = 4;
+pub const NUM: u16 = 4;
+/// Where code starts in unified view, past the gutter, line numbers and sign.
+pub const CODE_X: u16 = 14;
 
 /// The gutter color of a hunk in `state`.
 fn bar(state: State) -> Option<Color> {
@@ -197,9 +202,12 @@ impl Review {
             self.top = (self.cursor + margin + 1).saturating_sub(height);
         }
         let selection = self.selection();
+        let selecting = self.selecting.is_some();
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;
-            let cursor = n == self.cursor || selection.as_ref().is_some_and(|s| s.contains(&n));
+            let cursor = !selecting
+                && (n == self.cursor || selection.as_ref().is_some_and(|s| s.contains(&n)));
+            let chars = self.selected_chars(n);
             let gutter = line
                 .hunk()
                 .and_then(|h| bar(self.hunk_state(line.file(), h)));
@@ -215,14 +223,21 @@ impl Review {
                     hunk,
                     old,
                     new,
+                    part,
                 } => {
                     let rows = &self.files[file].hunks[hunk].rows;
                     let sides = self.sides[file].as_ref();
                     let row = |i: Option<usize>| i.map(|i| &rows[i]);
+                    let show = Show {
+                        part,
+                        wrap: self.wrap.then(|| self.code_width()),
+                        left: self.left,
+                        chars,
+                    };
                     if self.split {
-                        split_row(c, y, sides, row(old), row(new), cursor);
+                        split_row(c, y, sides, (row(old), row(new)), cursor, &show);
                     } else if let Some(r) = row(old) {
-                        unified_row(c, y, sides, r, cursor);
+                        unified_row(c, y, sides, r, cursor, &show);
                     }
                 }
                 Line::Note { key, part, .. } => self.draw_note(c, y, key, part, cursor),
@@ -305,7 +320,13 @@ impl Review {
                     }
                     _ if part <= lines.len() => {
                         c.put(x0, y, "│", border);
-                        let text = lines[part - 1].trim_end_matches(' ');
+                        // The last line ends in the cursor's room, which the cursor takes.
+                        let line = lines[part - 1].as_str();
+                        let text = if part == lines.len() {
+                            line.strip_suffix(' ').unwrap_or(line)
+                        } else {
+                            line
+                        };
                         let x = c.put(x0 + 2, y, text, theme::fg(FG).bg(BG));
                         if part == lines.len() {
                             c.put(x, y, "▏", theme::bold(FG).bg(BG));
@@ -383,43 +404,104 @@ fn num(n: Option<u32>) -> String {
     )
 }
 
-/// The row's text in syntax colors, from the side it belongs to.
-fn code(c: &mut Canvas, x: u16, y: u16, sides: Option<&Sides>, r: &Row, bg: Color) {
+/// The chars of a row selected with `v`, and the cursor's char when it's on the row.
+type Chars = Option<(Range<usize>, Option<usize>)>;
+
+/// Which part of a row's code a screen line shows.
+#[derive(Clone)]
+struct Show {
+    /// The screen line of the row, and the columns rows wrap to, when they do.
+    part: usize,
+    wrap: Option<usize>,
+    /// Columns scrolled off to the left.
+    left: usize,
+    /// Selected chars, counted from the part's first.
+    chars: Chars,
+}
+
+/// The row's text in syntax colors, from the side it belongs to: the part `show` picks, with
+/// its selected chars.
+fn code(c: &mut Canvas, x: u16, y: u16, sides: Option<&Sides>, r: &Row, bg: Color, show: &Show) {
     let segs = sides.and_then(|s| match r.kind {
         RowKind::Removed => s.old.get(r.old_line? as usize - 1),
         _ => s.new.get(r.new_line? as usize - 1),
     });
-    let mut x = x;
-    for (text, color) in highlight::runs(&r.text, segs.map_or(&[], Vec::as_slice)) {
-        x = c.put(x, y, &text, theme::fg(color).bg(bg));
+    let colors: Vec<Color> = highlight::runs(&r.text, segs.map_or(&[], Vec::as_slice))
+        .into_iter()
+        .flat_map(|(text, color)| text.chars().map(move |_| color).collect::<Vec<_>>())
+        .collect();
+    let chars: Vec<char> = r.text.chars().collect();
+    let span = match show.wrap {
+        Some(w) => code_parts(&r.text, w)
+            .get(show.part)
+            .cloned()
+            .unwrap_or(chars.len()..chars.len()),
+        None => 0..chars.len(),
+    };
+    // Columns before the span, and the first one on screen.
+    let start: usize = chars[..span.start].iter().map(|&c| wrap::cols(c)).sum();
+    let first = start + if show.wrap.is_some() { 0 } else { show.left };
+    let (range, head) = show.chars.clone().unwrap_or_default();
+    let mut col = start;
+    for k in 0..=span.len() {
+        let i = span.start + k;
+        // Past the span's last char, only the cursor shows.
+        let ch = match chars.get(i) {
+            Some(&ch) if i < span.end => ch,
+            _ if head == Some(k) => ' ',
+            _ => break,
+        };
+        let fg = colors.get(col).copied().unwrap_or(FG);
+        let style = if head == Some(k) {
+            theme::fg(BG).bg(FG)
+        } else if range.contains(&k) {
+            theme::fg(fg).bg(SEL)
+        } else {
+            theme::fg(fg).bg(bg)
+        };
+        let glyph = if ch == '\t' {
+            " ".to_string()
+        } else {
+            ch.to_string()
+        };
+        for n in col..col + wrap::cols(ch) {
+            if let Some(dx) = n.checked_sub(first).and_then(|d| u16::try_from(d).ok()) {
+                c.put(x.saturating_add(dx), y, &glyph, style);
+            }
+        }
+        col += wrap::cols(ch);
     }
 }
 
-fn unified_row(c: &mut Canvas, y: u16, sides: Option<&Sides>, r: &Row, cursor: bool) {
+fn unified_row(c: &mut Canvas, y: u16, sides: Option<&Sides>, r: &Row, cursor: bool, show: &Show) {
     let bg = if cursor { SEL } else { row_bg(r) };
     let x0 = c.area.x;
     c.fill(x0 + 1, y, c.area.width.saturating_sub(1), bg);
-    let x = c.put(x0 + 2, y, &num(r.old_line), theme::fg(FAINT).bg(bg));
-    let x = c.put(x + 1, y, &num(r.new_line), theme::fg(FAINT).bg(bg));
-    let (sign, color) = match r.kind {
-        RowKind::Added => ("+", GREEN),
-        RowKind::Removed => ("-", RED),
-        RowKind::Context => (" ", FAINT),
-    };
-    c.put(x + 1, y, sign, theme::fg(color).bg(bg));
-    code(c, x + 3, y, sides, r, bg);
+    if show.part == 0 {
+        let x = c.put(x0 + 2, y, &num(r.old_line), theme::fg(FAINT).bg(bg));
+        let x = c.put(x + 1, y, &num(r.new_line), theme::fg(FAINT).bg(bg));
+        let (sign, color) = match r.kind {
+            RowKind::Added => ("+", GREEN),
+            RowKind::Removed => ("-", RED),
+            RowKind::Context => (" ", FAINT),
+        };
+        c.put(x + 1, y, sign, theme::fg(color).bg(bg));
+    }
+    code(c, x0 + CODE_X, y, sides, r, bg, show);
 }
 
 fn split_row(
     c: &mut Canvas,
     y: u16,
     sides: Option<&Sides>,
-    old: Option<&Row>,
-    new: Option<&Row>,
+    (old, new): (Option<&Row>, Option<&Row>),
     cursor: bool,
+    show: &Show,
 ) {
     let x0 = c.area.x;
     let half = c.area.width.saturating_sub(3) / 2;
+    // The selection is on the new side, or the old where there's no new row.
+    let selected = if new.is_some() { 1 } else { 0 };
     for (i, r) in [old, new].into_iter().enumerate() {
         let sx = x0 + 2 + i as u16 * (half + 1);
         let bg = match r {
@@ -430,9 +512,19 @@ fn split_row(
         let mut side = Canvas::new(&mut *c.buf, Rect::new(sx, y, half, 1));
         side.fill(sx, y, half, bg);
         if let Some(r) = r {
-            let n = if i == 0 { r.old_line } else { r.new_line };
-            side.put(sx, y, &num(n), theme::fg(FAINT).bg(bg));
-            code(&mut side, sx + NUM + 1, y, sides, r, bg);
+            if show.part == 0 {
+                let n = if i == 0 { r.old_line } else { r.new_line };
+                side.put(sx, y, &num(n), theme::fg(FAINT).bg(bg));
+            }
+            let show = Show {
+                chars: if i == selected {
+                    show.chars.clone()
+                } else {
+                    None
+                },
+                ..show.clone()
+            };
+            code(&mut side, sx + NUM + 1, y, sides, r, bg, &show);
         }
         if i == 0 {
             c.put(sx + half, y, "│", theme::fg(HAIR).bg(BG));

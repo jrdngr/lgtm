@@ -9,6 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::Review;
 use super::rows::{Line, NoteKey, Notes};
+use super::undo::Step;
 use super::wrap::wrap;
 
 /// A comment being written under a row.
@@ -214,8 +215,10 @@ impl Review {
         else {
             return;
         };
-        if let Err(e) = store.delete_agent_comment(number) {
-            self.notice = Some(format!("{e:#}"));
+        let deleted = self.comment(number).cloned();
+        match store.delete_agent_comment(number) {
+            Ok(()) => self.history.extend(deleted.map(Step::Deleted)),
+            Err(e) => self.notice = Some(format!("{e:#}")),
         }
         self.load_comments(store);
     }
@@ -235,14 +238,22 @@ impl Review {
                 let body = input.text.trim();
                 if let (false, Some(store)) = (body.is_empty(), store) {
                     let saved = if input.editing {
-                        store.set_agent_comment_body(input.number, body)
+                        let before = self.comment(input.number).map(|c| c.body.clone());
+                        store.set_agent_comment_body(input.number, body).map(|()| {
+                            before.map(|before| Step::Edited {
+                                number: input.number,
+                                before,
+                                after: body.to_string(),
+                            })
+                        })
                     } else {
                         store
                             .add_agent_comment(&self.comment_at(&input, body))
-                            .map(drop)
+                            .map(|c| Some(Step::Added(c)))
                     };
-                    if let Err(e) = saved {
-                        self.notice = Some(format!("{e:#}"));
+                    match saved {
+                        Ok(step) => self.history.extend(step),
+                        Err(e) => self.notice = Some(format!("{e:#}")),
                     }
                     self.load_comments(store);
                 } else {

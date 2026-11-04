@@ -1,0 +1,242 @@
+//! `v` selects text in the diff with the editor's motions, and `y` copies it. The diff's
+//! lines become a read-only buffer, a line per screen line, so the buffer's lines are the
+//! review's: code rows hold their text, or a wrapped row each part of it, and every other line
+//! is empty.
+
+use std::path::Path;
+
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+use super::Review;
+use super::rows::Line;
+use super::wrap::{code_parts, cols};
+use crate::edit::buffer::{Buffer, Sel};
+use crate::edit::keys::{Action, Keys, Mode, View};
+use crate::edit::motion;
+use crate::tui::edit::clipboard;
+
+pub struct Selecting {
+    pub buf: Buffer,
+    keys: Keys,
+}
+
+impl Review {
+    /// The text of each screen line: a code row's, the new side's in split view, or the part
+    /// of it the line shows when rows wrap.
+    fn line_texts(&self) -> String {
+        let width = self.code_width();
+        let texts: Vec<String> = self
+            .lines
+            .iter()
+            .map(|&line| match line {
+                Line::Code {
+                    file,
+                    hunk,
+                    old,
+                    new,
+                    part,
+                } => {
+                    let rows = &self.files[file].hunks[hunk].rows;
+                    let at = if self.split { new.or(old) } else { old };
+                    let text = at.map_or("", |i| rows[i].text.as_str());
+                    if !self.wrap {
+                        return text.to_string();
+                    }
+                    let span = code_parts(text, width).get(part).cloned().unwrap_or(0..0);
+                    text.chars().skip(span.start).take(span.len()).collect()
+                }
+                _ => String::new(),
+            })
+            .collect();
+        texts.join("\n")
+    }
+
+    /// The selected text. Lines a wrapped row continues on join without a newline.
+    fn selected_text(&self, b: &Buffer) -> String {
+        let (from, to) = (b.sel.from(), b.sel.to() + 1);
+        let mut out = String::new();
+        for (i, ch) in b.text.chars().enumerate().skip(from).take(to - from) {
+            let next = b.line_of(i) + 1;
+            let wraps = matches!(self.lines.get(next), Some(Line::Code { part, .. }) if *part > 0);
+            if !(ch == '\n' && wraps) {
+                out.push(ch);
+            }
+        }
+        out
+    }
+
+    /// Starts selecting at the cursor line's first non-blank char.
+    pub(super) fn start_select(&mut self) {
+        let name = self
+            .current()
+            .map_or("", |l| self.files[l.file()].path.as_str());
+        let mut buf = Buffer::with_text(Path::new(name), name, &self.line_texts());
+        let at = motion::first_non_blank(&buf, self.cursor.min(buf.last_line()));
+        buf.sel = Sel::point(at);
+        self.selecting = Some(Selecting {
+            buf,
+            keys: Keys::read_only_select(),
+        });
+        self.follow_head();
+    }
+
+    /// Keeps the selection while the lines read the same, else ends it.
+    pub(super) fn keep_selection(&mut self) {
+        if self
+            .selecting
+            .as_ref()
+            .is_some_and(|s| s.buf.text != self.line_texts().as_str())
+        {
+            self.selecting = None;
+        }
+    }
+
+    /// Moves the cursor to the selection's head, scrolling sideways to show it.
+    fn follow_head(&mut self) {
+        let Some(b) = self.selecting.as_ref().map(|s| &s.buf) else {
+            return;
+        };
+        let line = b.line_of(b.sel.head);
+        let start = b.line_start(line);
+        let col: usize = b
+            .text
+            .chars_at(start)
+            .take(b.sel.head - start)
+            .map(cols)
+            .sum();
+        self.cursor = line;
+        if self.wrap {
+            return;
+        }
+        let width = self.code_width();
+        if col < self.left {
+            self.left = col;
+        } else if col >= self.left + width {
+            self.left = col + 1 - width;
+        }
+    }
+
+    /// Handles a key while selecting: motions move the selection, `y` copies it, and `v` or
+    /// Esc stop.
+    pub(super) fn select_key(&mut self, key: KeyEvent) {
+        let Some(s) = self.selecting.as_mut() else {
+            return;
+        };
+        let plain = !key.modifiers.contains(KeyModifiers::CONTROL);
+        let view = View {
+            height: self.height,
+            hidden: &[],
+        };
+        let action = if key.code == KeyCode::Char('y') && plain && !s.keys.waiting() {
+            Action::Copy(String::new())
+        } else {
+            s.keys.press(&mut s.buf, key, view)
+        };
+        let selecting = s.keys.mode == Mode::Select;
+        self.follow_head();
+        match action {
+            Action::Copy(_) => {
+                let b = &self.selecting.as_ref().expect("checked above").buf;
+                if let Err(e) = clipboard::copy(&self.selected_text(b)) {
+                    self.notice = Some(format!("copy: {e}"));
+                }
+                self.selecting = None;
+            }
+            Action::Notice(n) => self.notice = Some(n),
+            _ if !selecting => self.selecting = None,
+            _ => {}
+        }
+    }
+
+    /// The selected chars on screen line `n`, as a range of its chars, and the cursor's char
+    /// when it's on the line.
+    pub(super) fn selected_chars(
+        &self,
+        n: usize,
+    ) -> Option<(std::ops::Range<usize>, Option<usize>)> {
+        let b = &self.selecting.as_ref()?.buf;
+        if n > b.last_line() {
+            return None;
+        }
+        let start = b.line_start(n);
+        let len = b.line_end(n) - start;
+        let (from, to) = (b.sel.from(), b.sel.to() + 1);
+        let range = from.clamp(start, start + len) - start..to.clamp(start, start + len) - start;
+        let head = (b.line_of(b.sel.head) == n).then(|| b.sel.head - start);
+        (!range.is_empty() || head.is_some()).then_some((range, head))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lgtm_core::diff::{Hunk, Row, RowKind};
+
+    use super::super::draw::CODE_X;
+    use super::super::tests::{file, press};
+    use super::*;
+    use crate::tui::load::Target;
+
+    fn review() -> Review {
+        let row = |kind, text: &str| Row {
+            kind,
+            old_line: Some(1),
+            new_line: Some(1),
+            text: text.into(),
+        };
+        let mut f = file("a.rs", 0);
+        f.hunks.push(Hunk {
+            old_start: 1,
+            old_lines: 1,
+            new_start: 1,
+            new_lines: 1,
+            section: String::new(),
+            rows: vec![
+                row(RowKind::Removed, "  old a0"),
+                row(RowKind::Added, "  new a0"),
+            ],
+        });
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![f])));
+        r
+    }
+
+    #[test]
+    fn v_selects_with_the_editors_motions_and_esc_stops() {
+        let mut r = review();
+        press(&mut r, KeyCode::Char('n'));
+        assert_eq!(r.cursor, 1);
+        press(&mut r, KeyCode::Char('v'));
+        press(&mut r, KeyCode::Char('j'));
+        press(&mut r, KeyCode::Char('g'));
+        press(&mut r, KeyCode::Char('l'));
+        let b = &r.selecting.as_ref().unwrap().buf;
+        assert_eq!(b.slice(b.sel.from(), b.sel.to() + 1), "old a0\n  new a0");
+        assert_eq!(r.cursor, 2);
+        assert_eq!(r.selected_chars(1), Some((2..8, None)));
+        assert_eq!(r.selected_chars(2), Some((0..8, Some(7))));
+        // Keys that would change the text do nothing.
+        press(&mut r, KeyCode::Char('d'));
+        assert_eq!(r.lines.len(), 3);
+        assert!(r.selecting.is_some());
+        press(&mut r, KeyCode::Esc);
+        assert!(r.selecting.is_none());
+    }
+
+    #[test]
+    fn space_w_wraps_rows_and_a_copy_joins_a_wrapped_row_back_up() {
+        let mut r = review();
+        r.width = CODE_X as usize + 5;
+        press(&mut r, KeyCode::Char(' '));
+        press(&mut r, KeyCode::Char('w'));
+        // "  old a0" wraps after its spaces: "  ", "old ", "a0".
+        assert_eq!(r.lines.len(), 1 + 3 + 3);
+        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('v'));
+        press(&mut r, KeyCode::Char('j'));
+        press(&mut r, KeyCode::Char('j'));
+        press(&mut r, KeyCode::Char('g'));
+        press(&mut r, KeyCode::Char('l'));
+        let b = &r.selecting.as_ref().unwrap().buf;
+        assert_eq!(r.selected_text(b), "old a0");
+    }
+}

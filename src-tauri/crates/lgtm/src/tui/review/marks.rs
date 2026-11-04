@@ -9,7 +9,7 @@ use lgtm_core::review::edits::Marking;
 use lgtm_core::review::file::ReviewFile;
 use lgtm_core::review::matching::{self, MatchedCheck};
 use lgtm_core::review::place::Placer;
-use lgtm_core::store::{Mark, MarkColor, Store};
+use lgtm_core::store::{Edit, Mark, MarkColor, Store};
 
 /// How far along a hunk or file is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -278,7 +278,7 @@ impl Marks {
         file: usize,
         hunk: Option<usize>,
         color: MarkColor,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let rows = self.rows(file, hunk, true);
         self.toggle_rows(store, rows, color)
     }
@@ -289,7 +289,7 @@ impl Marks {
         store: &mut Store,
         files: &[usize],
         color: MarkColor,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let rows = files
             .iter()
             .flat_map(|&f| self.rows(f, None, true))
@@ -302,7 +302,7 @@ impl Marks {
         store: &mut Store,
         rows: Vec<RowRef>,
         color: MarkColor,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let all = !rows.is_empty()
             && rows
                 .iter()
@@ -315,12 +315,18 @@ impl Marks {
         store: &mut Store,
         rows: &[RowRef],
         color: Option<MarkColor>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let edit = self
             .marking(now_ms())
             .mark_edit(store, rows, color, false)?;
-        store.apply(&edit)?;
-        self.rematch(store)
+        self.apply(store, &edit)
+    }
+
+    /// Applies the user's `edit`. Returns it as stored, for undo.
+    fn apply(&mut self, store: &mut Store, edit: &Edit) -> anyhow::Result<Edit> {
+        let done = store.apply(edit)?;
+        self.rematch(store)?;
+        Ok(done)
     }
 
     /// Marks every row of the files `color`.
@@ -329,7 +335,7 @@ impl Marks {
         store: &mut Store,
         files: &[usize],
         color: MarkColor,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let rows: Vec<RowRef> = files
             .iter()
             .flat_map(|&f| self.rows(f, None, true))
@@ -338,7 +344,7 @@ impl Marks {
     }
 
     /// Checks the files, or unchecks them when the user's check is current on each.
-    pub fn toggle_checks(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<()> {
+    pub fn toggle_checks(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<Edit> {
         let all = files.iter().all(|&f| self.checked(f) == Some(false));
         self.set_checks(store, files, !all)
     }
@@ -348,15 +354,14 @@ impl Marks {
         store: &mut Store,
         files: &[usize],
         checked: bool,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Edit> {
         let files: Vec<u32> = files.iter().map(|&f| f as u32).collect();
         let edit = self.marking(now_ms()).check_edit(&files, checked, false);
-        store.apply(&edit)?;
-        self.rematch(store)
+        self.apply(store, &edit)
     }
 
     /// Clears every mark and check on the files, the agent's too.
-    pub fn clear(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<()> {
+    pub fn clear(&mut self, store: &mut Store, files: &[usize]) -> anyhow::Result<Edit> {
         let rows: Vec<RowRef> = files
             .iter()
             .flat_map(|&f| self.rows(f, None, true))
@@ -365,8 +370,7 @@ impl Marks {
         let mut edit = marking.mark_edit(store, &rows, None, false)?;
         let ids: Vec<u32> = files.iter().map(|&f| f as u32).collect();
         edit.checks_removed = marking.check_edit(&ids, false, false).checks_removed;
-        store.apply(&edit)?;
-        self.rematch(store)
+        self.apply(store, &edit)
     }
 }
 
@@ -484,6 +488,25 @@ mod tests {
         m.toggle_checks(&mut store, &[0]).unwrap();
         assert_eq!(m.state(0, Some(0)), State::None);
         assert_eq!(m.percent(), Some(0));
+    }
+
+    #[test]
+    fn a_marks_step_undoes_and_redoes_a_check_over_a_flag() {
+        use super::super::undo::Step;
+        let mut store = Store::in_memory();
+        let mut m = marks();
+        m.toggle(&mut store, 0, Some(1), MarkColor::Red).unwrap();
+        let checked = m.toggle(&mut store, 0, Some(1), MarkColor::Green).unwrap();
+        assert_eq!(m.state(0, Some(1)), State::Reviewed);
+        let step = Step::Marks(checked).run(&mut store, true).unwrap();
+        m.rematch(&store).unwrap();
+        assert_eq!(m.state(0, Some(1)), State::Flagged);
+        let step = step.run(&mut store, false).unwrap();
+        m.rematch(&store).unwrap();
+        assert_eq!(m.state(0, Some(1)), State::Reviewed);
+        step.run(&mut store, true).unwrap();
+        m.rematch(&store).unwrap();
+        assert_eq!(m.state(0, Some(1)), State::Flagged);
     }
 
     #[test]

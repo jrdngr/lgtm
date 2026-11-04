@@ -97,6 +97,7 @@ impl Spot {
                     hunk,
                     old,
                     new,
+                    ..
                 } if file == f => [old, new]
                     .into_iter()
                     .flatten()

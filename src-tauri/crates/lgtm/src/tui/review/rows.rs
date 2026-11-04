@@ -6,6 +6,8 @@ use std::collections::{HashMap, HashSet};
 use lgtm_core::diff::{Row, RowKind};
 use lgtm_core::jj::FileDiff;
 
+use super::wrap::code_parts;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Line {
     File(usize),
@@ -16,6 +18,8 @@ pub enum Line {
         hunk: usize,
         old: Option<usize>,
         new: Option<usize>,
+        /// Which screen line of the row this is, when it wraps.
+        part: usize,
     },
     /// A line of a note under a row, or at the top of a file when its code is gone.
     Note {
@@ -77,6 +81,7 @@ impl Line {
                 hunk,
                 old: Some(row),
                 new: None,
+                part: 0,
             },
             Line::Note { file, at: None, .. } => Line::File(file),
             line => line,
@@ -93,6 +98,7 @@ impl Line {
                 hunk,
                 old,
                 new,
+                ..
             } => (file, Some(hunk), new.or(old)),
             Line::Note { file, at, .. } => (file, at.map(|(h, _)| h), at.map(|(_, r)| r)),
         }
@@ -101,15 +107,17 @@ impl Line {
 
 #[cfg(test)]
 pub fn lines(files: &[FileDiff], folded: &HashSet<usize>, split: bool) -> Vec<Line> {
-    lines_with(files, folded, split, &Notes::default())
+    lines_with(files, folded, split, &Notes::default(), None)
 }
 
 /// The lines of `files`, with `notes` under their rows. A folded file shows only its header.
+/// With `wrap`, code rows wrap to that many columns.
 pub fn lines_with(
     files: &[FileDiff],
     folded: &HashSet<usize>,
     split: bool,
     notes: &Notes,
+    wrap: Option<usize>,
 ) -> Vec<Line> {
     let mut out = Vec::new();
     let note_lines = |out: &mut Vec<Line>, file, at, list: Option<&Vec<(NoteKey, usize)>>| {
@@ -132,11 +140,9 @@ pub fn lines_with(
             if file.hunks.len() > 1 {
                 out.push(Line::Hunk(f, h));
             }
-            let code = |(old, new)| Line::Code {
-                file: f,
-                hunk: h,
-                old,
-                new,
+            let height = |i: Option<usize>| match (i, wrap) {
+                (Some(i), Some(w)) => code_parts(&hunk.rows[i].text, w).len(),
+                _ => 1,
             };
             let pairs = if split {
                 pairs(&hunk.rows)
@@ -144,7 +150,14 @@ pub fn lines_with(
                 (0..hunk.rows.len()).map(|i| (Some(i), None)).collect()
             };
             for (old, new) in pairs {
-                out.push(code((old, new)));
+                let parts = height(old).max(height(new));
+                out.extend((0..parts).map(|part| Line::Code {
+                    file: f,
+                    hunk: h,
+                    old,
+                    new,
+                    part,
+                }));
                 let mut rows: Vec<usize> = [old, new].into_iter().flatten().collect();
                 rows.dedup();
                 for row in rows {
@@ -192,6 +205,7 @@ pub fn find(lines: &[Line], spot: (usize, Option<usize>, Option<usize>)) -> usiz
             hunk: h,
             old,
             new,
+            ..
         } => f == file && Some(h) == hunk && row.is_some() && (old == row || new == row),
         _ => false,
     };
@@ -273,6 +287,7 @@ mod tests {
             hunk,
             old: Some(0),
             new: None,
+            part: 0,
         };
         assert_eq!(
             lines(&files, &HashSet::new(), false),
@@ -284,7 +299,8 @@ mod tests {
                     file: 0,
                     hunk: 0,
                     old: Some(1),
-                    new: None
+                    new: None,
+                    part: 0,
                 },
                 Line::Hunk(0, 1),
                 code(0, 1),
@@ -325,7 +341,8 @@ mod tests {
                 file: 0,
                 hunk: 0,
                 old: None,
-                new: Some(3)
+                new: Some(3),
+                part: 0,
             }
         );
         // A row inside a folded file falls back to the file's header.
