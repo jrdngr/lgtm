@@ -8,7 +8,10 @@ use std::time::SystemTime;
 
 use super::extract::{self, Raw};
 use super::roots::{Manifests, is_manifest};
-use crate::review::graph::scan::{MAX_BYTES, MAX_FILES};
+
+/// Past these a scan stops, so a huge repo can't stall it.
+pub const MAX_FILES: usize = 20_000;
+pub const MAX_BYTES: u64 = 512 * 1024;
 
 pub struct WorkingCopy {
     /// Every file, other than skipped ones.
@@ -18,14 +21,14 @@ pub struct WorkingCopy {
     pub manifests: Manifests,
 }
 
-type Stamp = (SystemTime, u64);
+pub type Stamp = (SystemTime, u64);
 
-type Cache = Mutex<HashMap<PathBuf, (Stamp, Arc<Vec<Raw>>)>>;
+pub type Cache = Mutex<HashMap<PathBuf, (Stamp, Arc<Vec<Raw>>)>>;
 
-static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
+pub static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
 
 /// Past this many entries the cache starts over.
-const MAX_CACHED: usize = 100_000;
+pub const MAX_CACHED: usize = 100_000;
 
 /// Scans `root`, leaving out `skip` (repo-relative paths) and anything ignored. Manifests are
 /// read even when skipped.
@@ -66,7 +69,7 @@ pub fn scan(root: &Path, skip: &HashSet<String>) -> WorkingCopy {
         }
         wc.paths.insert(rel);
     }
-    let raws = crate::par::map(&sources, |(abs, rel, stamp)| imports(abs, rel, *stamp));
+    let raws = lgtm_core::par::map(&sources, |(abs, rel, stamp)| imports(abs, rel, *stamp));
     for ((_, rel, _), raw) in sources.into_iter().zip(raws) {
         if let Some(raw) = raw {
             wc.imports.insert(rel, raw);
@@ -75,14 +78,14 @@ pub fn scan(root: &Path, skip: &HashSet<String>) -> WorkingCopy {
     wc
 }
 
-fn stamp(meta: &std::fs::Metadata) -> Stamp {
+pub fn stamp(meta: &std::fs::Metadata) -> Stamp {
     (
         meta.modified().unwrap_or(SystemTime::UNIX_EPOCH),
         meta.len(),
     )
 }
 
-fn imports(abs: &Path, rel: &str, stamp: Stamp) -> Option<Arc<Vec<Raw>>> {
+pub fn imports(abs: &Path, rel: &str, stamp: Stamp) -> Option<Arc<Vec<Raw>>> {
     if let Some((s, raw)) = CACHE.lock().unwrap().get(abs)
         && *s == stamp
     {

@@ -5,9 +5,9 @@ use std::fmt::Write;
 use super::{ArchDto, EdgeStatus};
 
 /// Import sites listed per edge in the architecture diff before the rest are counted.
-const MAX_SITES: usize = 5;
+pub const MAX_SITES: usize = 5;
 
-fn status_word(s: EdgeStatus) -> &'static str {
+pub fn status_word(s: EdgeStatus) -> &'static str {
     match s {
         EdgeStatus::Added => "added",
         EdgeStatus::Removed => "removed",
@@ -17,7 +17,7 @@ fn status_word(s: EdgeStatus) -> &'static str {
 
 /// The architecture diff, compactly, for Assess. Edges between two
 /// unchanged components that the change keeps are only counted.
-pub(super) fn arch_text(arch: &ArchDto) -> String {
+pub fn arch_text(arch: &ArchDto) -> String {
     let c = arch.counts;
     let mut out = format!(
         "Components are folders under source roots, with ids as given. An edge means `from` \

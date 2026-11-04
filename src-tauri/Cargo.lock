@@ -2567,6 +2567,7 @@ dependencies = [
  "getrandom 0.4.3",
  "globset",
  "ignore",
+ "lgtm-arch",
  "lgtm-canvas",
  "lgtm-core",
  "notify",
@@ -2617,6 +2618,25 @@ dependencies = [
  "tree-sitter-toml-ng",
  "tree-sitter-typescript",
  "tree-sitter-yaml",
+]
+
+[[package]]
+name = "lgtm-arch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "futures",
+ "ignore",
+ "lgtm-canvas",
+ "lgtm-core",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "tokio",
+ "toml 1.1.8+spec-1.1.0",
+ "tree-sitter",
 ]
 
 [[package]]

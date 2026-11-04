@@ -7,8 +7,8 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ctx::now_ms;
-use crate::review::arch::system::SystemDto;
+use crate::now_ms;
+use crate::system::SystemDto;
 
 /// How a design changes a node of the code's system.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -157,7 +157,7 @@ pub struct DesignReply {
 
 /// Keeps what hangs together: components in known containers, code links to the code's
 /// containers and components, and relations and differences on known nodes.
-pub(super) fn validate(
+pub fn validate(
     d: DesignReply,
     map: &SystemDto,
     spec_commit: String,
@@ -263,7 +263,7 @@ mod tests {
         .unwrap();
         let map = SystemDto {
             repo: "shop".into(),
-            containers: vec![crate::review::arch::system::SysContainerDto {
+            containers: vec![crate::system::SysContainerDto {
                 id: "api".into(),
                 name: "api".into(),
                 files: 3,

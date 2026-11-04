@@ -11,7 +11,7 @@ use super::{
 };
 
 #[derive(Deserialize)]
-pub(super) struct Reply {
+pub struct Reply {
     score: i64,
     risk: RiskLevel,
     reason: String,
@@ -21,7 +21,7 @@ pub(super) struct Reply {
 }
 
 #[derive(Deserialize)]
-struct LayerReply {
+pub struct LayerReply {
     title: String,
     summary: String,
     components: Vec<String>,
@@ -29,7 +29,7 @@ struct LayerReply {
 }
 
 #[derive(Deserialize)]
-struct RangeReply {
+pub struct RangeReply {
     path: String,
     start: i64,
     end: i64,
@@ -37,13 +37,13 @@ struct RangeReply {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-enum AgentSource {
+pub enum AgentSource {
     Agent,
     Security,
 }
 
 #[derive(Deserialize)]
-struct LookReply {
+pub struct LookReply {
     source: AgentSource,
     severity: LookSeverity,
     title: String,
@@ -56,7 +56,7 @@ struct LookReply {
 }
 
 /// What a reply may refer to.
-pub(super) struct Known<'a> {
+pub struct Known<'a> {
     pub components: HashSet<&'a str>,
     /// The review's file paths, by index.
     pub files: &'a [String],
@@ -90,13 +90,13 @@ impl Known<'_> {
     }
 }
 
-fn non_empty(s: Option<String>) -> Option<String> {
+pub fn non_empty(s: Option<String>) -> Option<String> {
     s.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
 /// The reply as stored, with what it names checked against `known`. Layers and boundaries
 /// left with nothing in them are dropped.
-pub(super) fn validate(reply: Reply, known: &Known, created_at: f64) -> Assessed {
+pub fn validate(reply: Reply, known: &Known, created_at: f64) -> Assessed {
     let boundaries = reply
         .boundaries
         .into_iter()

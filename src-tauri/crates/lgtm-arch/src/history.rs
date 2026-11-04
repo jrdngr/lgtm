@@ -10,7 +10,7 @@ use super::HistoryDto;
 pub type Key = [u8; 32];
 
 /// Past this many commits the cache starts over.
-const MAX_COMMITS: usize = 1024;
+pub const MAX_COMMITS: usize = 1024;
 
 /// Each commit's entry, `None` for one that didn't change the architecture.
 #[derive(Default)]

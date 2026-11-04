@@ -5,7 +5,7 @@ use super::compute::{Stored, compute};
 use super::group::Grouping;
 use super::model::{Changed, Import, Model, Snapshot, Use};
 use super::*;
-use crate::diff::FileStatus;
+use lgtm_core::diff::FileStatus;
 
 fn snap(files: &[(&str, &[(&str, u32)])]) -> Snapshot {
     files

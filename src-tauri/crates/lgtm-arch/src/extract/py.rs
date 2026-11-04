@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use super::{Raw, Spec, line, text, walk};
 
-pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
+pub fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
     walk(root, |node| {
         match node.kind() {
             "import_statement" => {
@@ -59,14 +59,14 @@ pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
 }
 
 /// An `a as b` clause's module.
-fn module_of(node: Node) -> Node {
+pub fn module_of(node: Node) -> Node {
     match node.kind() {
         "aliased_import" => node.child_by_field_name("name").unwrap_or(node),
         _ => node,
     }
 }
 
-fn dotted(node: Node, source: &str) -> Vec<String> {
+pub fn dotted(node: Node, source: &str) -> Vec<String> {
     text(node, source)
         .split('.')
         .map(|s| s.trim().to_string())

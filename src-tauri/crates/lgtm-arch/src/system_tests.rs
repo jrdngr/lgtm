@@ -1,6 +1,6 @@
 use super::*;
-use crate::review::arch::model::Import;
-use crate::review::arch::roots::Root;
+use crate::model::Import;
+use crate::roots::Root;
 
 #[test]
 fn structure_counts_files_import_sites_and_entry_files_per_component() {

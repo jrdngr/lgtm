@@ -11,7 +11,7 @@ use std::sync::{Arc, LazyLock, Mutex};
 
 use tree_sitter::Node;
 
-use crate::syntax;
+use lgtm_core::syntax;
 
 /// What an import names, in its language's terms.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -49,11 +49,11 @@ pub fn is_source(path: &str) -> bool {
 }
 
 /// Past this many entries the cache starts over.
-const MAX_CACHED: usize = 100_000;
+pub const MAX_CACHED: usize = 100_000;
 
-type Cache = Mutex<HashMap<[u8; 32], Arc<Vec<Raw>>>>;
+pub type Cache = Mutex<HashMap<[u8; 32], Arc<Vec<Raw>>>>;
 
-static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
+pub static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
 
 /// The imports `text` names, cached by its path's extension and content.
 pub fn imports(path: &str, text: &str) -> Arc<Vec<Raw>> {
@@ -75,7 +75,7 @@ pub fn imports(path: &str, text: &str) -> Arc<Vec<Raw>> {
     raw
 }
 
-fn parse(path: &str, text: &str) -> Vec<Raw> {
+pub fn parse(path: &str, text: &str) -> Vec<Raw> {
     if !is_source(path) {
         return vec![];
     }
@@ -96,7 +96,7 @@ fn parse(path: &str, text: &str) -> Vec<Raw> {
 
 /// Every node under `root`, depth first, without recursion. `enter` says whether to visit a
 /// node's children.
-fn walk<'t>(root: Node<'t>, mut enter: impl FnMut(Node<'t>) -> bool) {
+pub fn walk<'t>(root: Node<'t>, mut enter: impl FnMut(Node<'t>) -> bool) {
     let mut cursor = root.walk();
     loop {
         let node = cursor.node();
@@ -111,16 +111,16 @@ fn walk<'t>(root: Node<'t>, mut enter: impl FnMut(Node<'t>) -> bool) {
     }
 }
 
-fn text<'a>(node: Node, source: &'a str) -> &'a str {
+pub fn text<'a>(node: Node, source: &'a str) -> &'a str {
     &source[node.byte_range()]
 }
 
-fn line(node: Node) -> u32 {
+pub fn line(node: Node) -> u32 {
     node.start_position().row as u32 + 1
 }
 
 /// A string literal's contents, without quotes.
-fn unquote(s: &str) -> &str {
+pub fn unquote(s: &str) -> &str {
     let s = s.trim();
     let q = |c: char| matches!(c, '"' | '\'' | '`');
     s.strip_prefix(q)

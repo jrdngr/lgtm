@@ -1,0 +1,226 @@
+//! Gathering a model: the changed files' imports at both ends of a range, the working copy's
+//! for the rest, and the symbol graph's uses.
+
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::hash::Hash;
+use std::path::Path;
+use std::sync::{Arc, LazyLock, Mutex};
+
+use super::extract::{self, Raw};
+use super::model::{Changed, Import, Model, Snapshot};
+use super::resolve::Resolver;
+use super::roots::{self, Manifests, Root};
+use super::scan;
+use lgtm_core::diff::FileStatus;
+use lgtm_core::jj::{DiffPath, Jj, Range};
+
+/// Past this many entries the cache starts over.
+pub const MAX_CACHED: usize = 50_000;
+
+/// A file's imports, found by its commit and path without reading it, or by its path and
+/// a hash of its contents once read, so an unchanged file in a new commit isn't parsed again.
+#[derive(PartialEq, Eq, Hash)]
+pub enum Key {
+    At(String, String),
+    Contents(String, [u8; 32]),
+}
+
+pub type Cache = Mutex<HashMap<Key, Arc<Vec<Raw>>>>;
+
+pub static CACHE: LazyLock<Cache> = LazyLock::new(Mutex::default);
+
+pub struct Built {
+    pub model: Model,
+    pub roots: Vec<Root>,
+}
+
+pub fn changed_of_paths(diffs: &[DiffPath]) -> Vec<Changed> {
+    diffs
+        .iter()
+        .map(|d| Changed {
+            path: d.path.clone(),
+            old_path: d.old_path.clone(),
+            status: d.status,
+            file: None,
+            ranges: vec![],
+        })
+        .collect()
+}
+
+/// Runs of consecutive lines.
+pub fn spans(lines: impl Iterator<Item = u32>) -> Vec<(u32, u32)> {
+    let mut out: Vec<(u32, u32)> = Vec::new();
+    for l in lines {
+        match out.last_mut() {
+            Some((_, end)) if *end + 1 == l => *end = l,
+            _ => out.push((l, l)),
+        }
+    }
+    out
+}
+
+/// The model of `range`, whose changes are `changed`. `extra` files are unchanged in the
+/// range but differ in the working copy, so they're read at `range.to`.
+pub async fn build(
+    jj: &Jj,
+    root: &Path,
+    repo: &str,
+    range: &Range,
+    changed: Vec<Changed>,
+    extra: Vec<String>,
+) -> anyhow::Result<Built> {
+    let mut skip: HashSet<String> = extra.iter().cloned().collect();
+    for c in &changed {
+        skip.insert(c.path.clone());
+        skip.extend(c.old_path.clone());
+    }
+    let wc = {
+        let root = root.to_path_buf();
+        tokio::task::spawn_blocking(move || scan::scan(&root, &skip))
+    };
+    // (side is new, commit, path, may be absent)
+    let mut reads: Vec<(bool, Option<String>, String, bool)> = Vec::new();
+    for c in &changed {
+        let old = c.old_path.clone().unwrap_or_else(|| c.path.clone());
+        if c.status != FileStatus::Added {
+            reads.push((false, range.from.clone(), old, false));
+        }
+        if c.status != FileStatus::Removed {
+            reads.push((true, Some(range.to.clone()), c.path.clone(), false));
+        }
+    }
+    for p in &extra {
+        reads.push((false, Some(range.to.clone()), p.clone(), true));
+        reads.push((true, Some(range.to.clone()), p.clone(), true));
+    }
+    let repo = repo.to_string();
+    let read = read_imports(jj, &reads);
+    let (wc, raws) = tokio::join!(wc, read);
+    let (wc, raws) = (wc?, raws?);
+    Ok(tokio::task::spawn_blocking(move || {
+        let mut base = (wc.paths.clone(), wc.imports.clone());
+        let mut head = (wc.paths, wc.imports);
+        for ((new, _, path, _), raw) in reads.into_iter().zip(raws) {
+            let side = if new { &mut head } else { &mut base };
+            let Some(raw) = raw else { continue };
+            side.0.insert(path.clone());
+            if let Some(raw) = raw {
+                side.1.insert(path, raw);
+            }
+        }
+        for c in &changed {
+            // Non-source files aren't read, but still exist for resolving and roots.
+            match c.status {
+                FileStatus::Added => head.0.insert(c.path.clone()),
+                FileStatus::Removed => base.0.insert(c.path.clone()),
+                _ => {
+                    base.0
+                        .insert(c.old_path.clone().unwrap_or_else(|| c.path.clone()));
+                    head.0.insert(c.path.clone())
+                }
+            };
+            if c.status == FileStatus::Copied
+                && let Some(old) = &c.old_path
+            {
+                head.0.insert(old.clone());
+            }
+        }
+        let all: BTreeSet<String> = base.0.union(&head.0).cloned().collect();
+        Built {
+            roots: roots::detect(&all, &wc.manifests, &repo),
+            model: Model {
+                base: snapshot(&base.0, &base.1, &wc.manifests),
+                head: snapshot(&head.0, &head.1, &wc.manifests),
+                changed,
+                ..Model::default()
+            },
+        }
+    })
+    .await?)
+}
+
+/// Each read's file imports: `None` for an optional file that isn't there, and `Some(None)`
+/// for one that isn't source or is too large. One `jj file show` per commit.
+pub async fn read_imports(
+    jj: &Jj,
+    reads: &[(bool, Option<String>, String, bool)],
+) -> anyhow::Result<Vec<Option<Option<Arc<Vec<Raw>>>>>> {
+    let mut found = vec![None; reads.len()];
+    let mut by_commit: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (i, (_, commit, path, _)) in reads.iter().enumerate() {
+        if !extract::is_source(path) {
+            found[i] = Some(None);
+            continue;
+        }
+        let Some(commit) = commit else {
+            found[i] = Some(Some(Arc::default()));
+            continue;
+        };
+        let at = Key::At(commit.clone(), path.clone());
+        if let Some(hit) = CACHE.lock().unwrap().get(&at) {
+            found[i] = Some(Some(hit.clone()));
+            continue;
+        }
+        by_commit.entry(commit).or_default().push(i);
+    }
+    let batches =
+        futures::future::try_join_all(by_commit.into_iter().map(|(commit, at)| async move {
+            let paths: Vec<String> = at.iter().map(|&i| reads[i].2.clone()).collect();
+            let files = jj.files_at(commit, &paths).await?;
+            Ok::<_, anyhow::Error>((commit, at, files))
+        }))
+        .await?;
+    for (commit, at, files) in batches {
+        for i in at {
+            let (_, _, path, optional) = &reads[i];
+            let Some(bytes) = files.get(path) else {
+                // A file the review changes elsewhere may not exist at this commit.
+                anyhow::ensure!(*optional, "{path} isn't in commit {commit}");
+                continue;
+            };
+            if bytes.len() as u64 > scan::MAX_BYTES {
+                found[i] = Some(None);
+                continue;
+            }
+            let contents = Key::Contents(path.clone(), *blake3::hash(bytes).as_bytes());
+            let hit = CACHE.lock().unwrap().get(&contents).cloned();
+            let raw =
+                hit.unwrap_or_else(|| extract::imports(path, &String::from_utf8_lossy(bytes)));
+            let mut cache = CACHE.lock().unwrap();
+            if cache.len() >= MAX_CACHED {
+                cache.clear();
+            }
+            cache.insert(contents, raw.clone());
+            cache.insert(Key::At(commit.to_string(), path.clone()), raw.clone());
+            found[i] = Some(Some(raw));
+        }
+    }
+    Ok(found)
+}
+
+pub fn snapshot(
+    paths: &BTreeSet<String>,
+    raws: &HashMap<String, Arc<Vec<Raw>>>,
+    manifests: &Manifests,
+) -> Snapshot {
+    let r = Resolver::new(paths, manifests);
+    paths
+        .iter()
+        .filter(|p| extract::is_source(p))
+        .map(|p| {
+            let mut imports: Vec<Import> = raws
+                .get(p)
+                .into_iter()
+                .flat_map(|raw| raw.iter())
+                .flat_map(|raw| {
+                    r.resolve(p, raw)
+                        .into_iter()
+                        .map(|to| Import { to, line: raw.line })
+                })
+                .collect();
+            imports.sort_by(|a, b| (&a.to, a.line).cmp(&(&b.to, b.line)));
+            imports.dedup();
+            (p.clone(), imports)
+        })
+        .collect()
+}

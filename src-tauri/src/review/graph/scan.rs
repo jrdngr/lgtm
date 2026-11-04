@@ -10,8 +10,7 @@ use aho_corasick::AhoCorasick;
 use crate::syntax::{self, CodeSymbol, Ref};
 
 /// Past these the scan stops, so a huge repo can't stall the graph.
-pub(in crate::review) const MAX_FILES: usize = 20_000;
-pub(in crate::review) const MAX_BYTES: u64 = 512 * 1024;
+pub(in crate::review) use lgtm_arch::scan::{MAX_BYTES, MAX_FILES};
 
 pub(super) struct Scanned {
     pub path: String,

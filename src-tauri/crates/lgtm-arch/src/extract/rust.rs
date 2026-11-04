@@ -4,9 +4,9 @@ use tree_sitter::Node;
 
 use super::{Raw, Spec, line, text, walk};
 
-const ANCHORS: &[&str] = &["crate", "super", "self"];
+pub const ANCHORS: &[&str] = &["crate", "super", "self"];
 
-pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
+pub fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
     walk(root, |node| match node.kind() {
         "use_declaration" => {
             if let Some(arg) = node.child_by_field_name("argument") {
@@ -28,7 +28,7 @@ pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
     });
 }
 
-fn push(segs: Vec<String>, line: u32, out: &mut Vec<Raw>) {
+pub fn push(segs: Vec<String>, line: u32, out: &mut Vec<Raw>) {
     if segs.first().is_some_and(|s| ANCHORS.contains(&s.as_str())) {
         out.push(Raw {
             spec: Spec::Rust(segs),
@@ -37,7 +37,7 @@ fn push(segs: Vec<String>, line: u32, out: &mut Vec<Raw>) {
     }
 }
 
-fn segments(path: &str) -> Vec<String> {
+pub fn segments(path: &str) -> Vec<String> {
     path.split("::")
         .map(|s| s.split_whitespace().collect::<String>())
         .filter(|s| !s.is_empty())
@@ -45,7 +45,7 @@ fn segments(path: &str) -> Vec<String> {
 }
 
 /// The full paths in a use tree, each with its line.
-fn expand(node: Node, source: &str, prefix: &[String], out: &mut Vec<(Vec<String>, u32)>) {
+pub fn expand(node: Node, source: &str, prefix: &[String], out: &mut Vec<(Vec<String>, u32)>) {
     let with = |segs: Vec<String>| [prefix, &segs].concat();
     match node.kind() {
         "use_as_clause" => {

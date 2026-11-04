@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use super::group::Grouping;
 use super::{CompStatus, ComponentDto, EdgeDto, EdgeStatus, FileRefDto, ImportDto, RangeDto};
-use crate::diff::FileStatus;
+use lgtm_core::diff::FileStatus;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Import {
@@ -92,7 +92,7 @@ impl Diff {
     }
 }
 
-fn is_changed(s: CompStatus) -> bool {
+pub fn is_changed(s: CompStatus) -> bool {
     matches!(
         s,
         CompStatus::Added | CompStatus::Removed | CompStatus::Changed

@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use super::{Raw, Spec, line, text, unquote, walk};
 
-pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
+pub fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
     walk(root, |node| {
         let spec = match node.kind() {
             "import_statement" | "export_statement" => node.child_by_field_name("source"),

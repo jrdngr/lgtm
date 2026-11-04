@@ -1,5 +1,5 @@
 use super::*;
-use crate::review::arch::system::{SysComponentDto, SysContainerDto};
+use crate::system::{SysComponentDto, SysContainerDto};
 
 fn map() -> SystemDto {
     SystemDto {
@@ -148,7 +148,7 @@ fn validate_drops_unknown_components_tiers_relation_ends_and_grouped_containers_
 fn map_text_keeps_the_heaviest_edges() {
     let mut m = map();
     m.edges = (0..MAX_EDGES as u32 + 2)
-        .map(|i| crate::review::arch::system::SysEdgeDto {
+        .map(|i| crate::system::SysEdgeDto {
             from: format!("a{i}"),
             to: "b".into(),
             imports: i,

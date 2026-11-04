@@ -6,7 +6,7 @@ use super::group::Grouping;
 use super::model::{Diff, Model};
 use super::{CompStatus, EdgeDto, EdgeStatus, LookDto, LookSeverity, LookSource};
 
-fn item(key: String, severity: LookSeverity, title: String) -> LookDto {
+pub fn item(key: String, severity: LookSeverity, title: String) -> LookDto {
     LookDto {
         key,
         source: LookSource::Rule,
@@ -71,7 +71,7 @@ pub fn rules(d: &Diff, m: &Model, g: &Grouping) -> Vec<LookDto> {
     out
 }
 
-fn edge_item(
+pub fn edge_item(
     key: String,
     severity: LookSeverity,
     title: String,
@@ -91,7 +91,12 @@ fn edge_item(
 
 /// Changed symbols that code in other components uses. Symbols link by name, so a use only
 /// counts when its component imports the symbol's.
-fn used_symbols(d: &Diff, m: &Model, g: &Grouping, name: &dyn Fn(&str) -> String) -> Vec<LookDto> {
+pub fn used_symbols(
+    d: &Diff,
+    m: &Model,
+    g: &Grouping,
+    name: &dyn Fn(&str) -> String,
+) -> Vec<LookDto> {
     // (path, symbol, line) -> components using it
     let mut users: BTreeMap<(&str, &str, u32), BTreeSet<String>> = BTreeMap::new();
     for u in m

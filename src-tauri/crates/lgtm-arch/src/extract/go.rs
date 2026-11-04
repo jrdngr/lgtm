@@ -4,7 +4,7 @@ use tree_sitter::Node;
 
 use super::{Raw, Spec, line, text, unquote, walk};
 
-pub(super) fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
+pub fn imports(root: Node, source: &str, out: &mut Vec<Raw>) {
     walk(root, |node| {
         if node.kind() != "import_spec" {
             // Imports sit at the top level, so function bodies needn't be walked.

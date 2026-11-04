@@ -7,7 +7,7 @@ use anyhow::{Context, bail};
 use serde::Serialize;
 use specta::Type;
 
-use crate::jj::Jj;
+use lgtm_core::jj::Jj;
 
 /// The commit a design's revision resolves to now.
 #[derive(Clone, Debug, PartialEq, Serialize, Type)]
@@ -21,7 +21,7 @@ pub struct ResolvedDto {
 }
 
 /// Resolves `revision`, any revset of one commit or a bookmark name a revset can't parse.
-pub(super) async fn resolve(jj: &Jj, revision: &str) -> anyhow::Result<ResolvedDto> {
+pub async fn resolve(jj: &Jj, revision: &str) -> anyhow::Result<ResolvedDto> {
     let changes = match jj.changes(revision).await {
         Ok(c) => c,
         Err(_) => jj
@@ -48,12 +48,12 @@ pub(super) async fn resolve(jj: &Jj, revision: &str) -> anyhow::Result<ResolvedD
 
 /// What to store for a revision: a bookmark's name as given, else the change id, which
 /// survives rewrites where `@` or a commit id would not.
-pub(super) fn stored(r: &ResolvedDto) -> String {
+pub fn stored(r: &ResolvedDto) -> String {
     r.bookmark.clone().unwrap_or_else(|| r.change_id.clone())
 }
 
 /// One hash over `files` from their per-file `hashes`; a file missing from `hashes` counts too.
-pub(super) fn files_hash(files: &[String], hashes: &HashMap<String, String>) -> String {
+pub fn files_hash(files: &[String], hashes: &HashMap<String, String>) -> String {
     let mut sorted: Vec<&String> = files.iter().collect();
     sorted.sort();
     let mut h = blake3::Hasher::new();

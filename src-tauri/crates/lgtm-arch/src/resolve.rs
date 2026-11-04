@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::extract::{Raw, Spec};
 use super::roots::{Manifests, dir_of, join, under};
 
-const JS_EXTS: &[&str] = &["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"];
+pub const JS_EXTS: &[&str] = &["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"];
 
 /// One side's files and what's needed to resolve imports among them.
 pub struct Resolver<'a> {
@@ -231,12 +231,12 @@ impl<'a> Resolver<'a> {
     }
 }
 
-fn split(p: &str) -> (&str, &str) {
+pub fn split(p: &str) -> (&str, &str) {
     p.rsplit_once('/').unwrap_or(("", p))
 }
 
 /// Resolves `.` and `..` segments. `None` when it leaves the repo.
-fn normalize(p: &str) -> Option<String> {
+pub fn normalize(p: &str) -> Option<String> {
     let mut out: Vec<&str> = Vec::new();
     for seg in p.split('/') {
         match seg {

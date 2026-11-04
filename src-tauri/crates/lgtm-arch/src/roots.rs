@@ -103,7 +103,7 @@ pub fn detect(paths: &BTreeSet<String>, manifests: &Manifests, repo: &str) -> Ve
     roots
 }
 
-fn add(roots: &mut Vec<Root>, path: String, name: String) {
+pub fn add(roots: &mut Vec<Root>, path: String, name: String) {
     if !roots.iter().any(|r| r.path == path) {
         roots.push(Root { path, name });
     }
