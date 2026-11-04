@@ -1,6 +1,6 @@
 //! Syntax colors for diff rows, from highlighting each side's whole file.
 
-use lgtm_core::syntax::{self, HIGHLIGHT_NAMES, Segment};
+use lgtm_core::syntax::{self, HIGHLIGHT_NAMES, Items, Segment};
 use ratatui::style::Color;
 
 use super::theme::{self, FG};
@@ -11,14 +11,20 @@ use super::theme::{self, FG};
 pub struct Sides {
     pub old: Vec<Vec<Segment>>,
     pub new: Vec<Vec<Segment>>,
+    /// Where each line's syntax item steps to, on each side.
+    pub old_items: Items,
+    pub new_items: Items,
 }
 
 impl Sides {
     pub fn of(path: &str, old: Option<&str>, new: Option<&str>) -> Self {
         let side = |s: Option<&str>| s.map_or_else(Vec::new, |s| syntax::highlight_file(path, s));
+        let items = |s: Option<&str>| s.map_or_else(Items::default, |s| syntax::items(path, s));
         Self {
             old: side(old),
             new: side(new),
+            old_items: items(old),
+            new_items: items(new),
         }
     }
 }

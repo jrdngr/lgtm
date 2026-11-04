@@ -1,9 +1,11 @@
 //! Tree-sitter: languages, highlighting, and symbol ranges.
 
+mod items;
 mod langs;
 mod queries;
 mod refs;
 
+pub use items::{Items, items};
 pub use refs::Ref;
 
 use std::collections::HashMap;

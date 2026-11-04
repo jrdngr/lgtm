@@ -130,9 +130,9 @@ impl Review {
         };
         let file = line.file();
         let result = match key {
-            'R' | 'f' if hunk.is_none() => return true,
+            'R' | 'F' if hunk.is_none() => return true,
             'R' => marks.toggle(store, file, hunk, MarkColor::Green),
-            'f' => marks.toggle(store, file, hunk, MarkColor::Red),
+            'F' => marks.toggle(store, file, hunk, MarkColor::Red),
             'r' => marks.toggle_checks(store, &[file]),
             _ => marks.toggle(store, file, None, MarkColor::Red),
         };

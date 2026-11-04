@@ -60,7 +60,6 @@ mod tests {
     #[test]
     fn space_r_goes_to_the_editor_on_the_cursors_line_and_space_f_picks_a_file() {
         let mut r = review();
-        key(&mut r, 'N');
         assert!(matches!(key(&mut r, ' '), Outcome::None));
         assert_eq!(r.space_menu().len(), 6);
         let out = key(&mut r, 'r');
