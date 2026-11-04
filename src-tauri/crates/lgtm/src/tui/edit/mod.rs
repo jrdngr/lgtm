@@ -373,6 +373,9 @@ impl Editor {
             hidden: &hidden,
         };
         let action = self.keys.press(&mut open.buf, key, view);
+        if action == Action::Quit {
+            return self.leave(false);
+        }
         if action == Action::Review {
             let b = &open.buf;
             let line = b.line_of(b.sel.head);
@@ -410,7 +413,7 @@ impl Editor {
             },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
-            Action::Review => {}
+            Action::Review | Action::Quit => {}
             Action::Sidebar => {
                 self.files = true;
                 self.in_sidebar = true;
@@ -458,6 +461,17 @@ mod tests {
         assert_eq!(line(&e), Some(start + 3));
         e.mouse(wheel(MouseEventKind::ScrollUp));
         assert_eq!(line(&e), Some(start));
+    }
+
+    #[test]
+    fn q_leaves_the_editor_like_colon_q_but_not_with_unsaved_edits() {
+        use ratatui::crossterm::event::{KeyCode, KeyEvent};
+        let q = KeyEvent::from(KeyCode::Char('q'));
+        let (_dir, mut e) = editor_on("one\n");
+        assert!(matches!(e.key(q), Outcome::Back));
+        e.open[0].buf.insert(0, "x");
+        assert!(matches!(e.key(q), Outcome::None));
+        assert!(e.notice.as_deref().is_some_and(|n| n.contains("a.txt")));
     }
 
     #[test]
