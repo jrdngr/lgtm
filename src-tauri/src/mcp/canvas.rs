@@ -6,11 +6,9 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::{Deserialize, Serialize};
-use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed, json};
 use crate::canvas::{CanvasKind, CanvasOp, FocusPart, Swatch, ViewCanvas};
-use crate::events::{DesignChanged, DrawingChanged};
 
 #[derive(Deserialize, JsonSchema)]
 pub struct NewDrawing {
@@ -75,11 +73,8 @@ impl Lgtm {
 
     #[tool(description = "Make an empty drawing in lgtm and return its id.")]
     async fn create_drawing(&self, Parameters(p): Parameters<NewDrawing>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let d = ctx.create_drawing(&p.name).map_err(failed)?;
-        DrawingChanged { id: d.id.clone() }
-            .emit_to(self.app(), &label)
-            .ok();
         Ok(format!("Made drawing `{}` with id `{}`.", d.name, d.id))
     }
 
@@ -132,26 +127,17 @@ impl Lgtm {
         move or restyle the user's; they show as one agent pass the user can undo."
     )]
     async fn edit_canvas(&self, Parameters(p): Parameters<CanvasEdit>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let n = p.ops.len();
         match p.kind {
             CanvasKind::Drawing => {
                 ctx.edit_drawing_canvas(&p.id, p.ops).map_err(failed)?;
-                DrawingChanged { id: p.id.clone() }
-                    .emit_to(self.app(), &label)
-                    .ok();
                 Ok(format!("Applied {n} changes to drawing `{}`.", p.id))
             }
             CanvasKind::Design => {
                 let view = p.view.unwrap_or_default();
-                ctx.edit_design_canvas(&p.id, &view, p.ops)
+                ctx.edit_design_canvas(self.workspace(), &p.id, &view, p.ops)
                     .map_err(failed)?;
-                DesignChanged {
-                    id: p.id.clone(),
-                    workspace: self.workspace().map(String::from),
-                }
-                .emit_to(self.app(), &label)
-                .ok();
                 Ok(format!(
                     "Applied {n} changes to `{view}` of design `{}`.",
                     p.id

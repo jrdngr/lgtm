@@ -15,6 +15,7 @@ use specta::Type;
 
 use crate::ctx::{RepoCtx, now_ms};
 use crate::diff::RowKind;
+use crate::events::TurnsChanged;
 use crate::jj::{FileDiff, Jj, JjAction, Range};
 use crate::store::Turn;
 use crate::workspace::Workspace;
@@ -164,7 +165,7 @@ fn squashed_at(parts: &[Squashed], i: usize) -> i64 {
 impl RepoCtx {
     /// Records what a hook saw at `point` of `session`'s turn in workspace `workspace`, its
     /// agent running in terminal panel `terminal`. `tool` names the tool call around a tool.
-    /// Returns whether the workspace's turns changed.
+    /// Tells the window when the workspace's turns changed.
     pub async fn turn_checkpoint(
         &self,
         workspace: Option<&str>,
@@ -173,15 +174,40 @@ impl RepoCtx {
         tool: Option<&str>,
         point: Checkpoint,
         prompt: Option<&str>,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<()> {
         let ws = self.workspace(workspace).await?;
-        let (change, commit) = at(&ws).await?;
+        if self
+            .record_point(&ws, terminal, session, tool, point, prompt)
+            .await?
+        {
+            self.turns_changed(&ws);
+        }
+        Ok(())
+    }
+
+    fn turns_changed(&self, ws: &Workspace) {
+        self.notify(TurnsChanged {
+            workspace: ws.name.clone(),
+        });
+    }
+
+    /// Returns whether the workspace's turns changed.
+    async fn record_point(
+        &self,
+        ws: &Workspace,
+        terminal: Option<&str>,
+        session: &str,
+        tool: Option<&str>,
+        point: Checkpoint,
+        prompt: Option<&str>,
+    ) -> anyhow::Result<bool> {
+        let (change, commit) = at(ws).await?;
         let running = self.store.lock().unwrap().running_turn(session)?;
         let key = tool.unwrap_or(session).to_string();
         match point {
             Checkpoint::Start => {
                 if let Some(turn) = running {
-                    self.end_turn(&ws, turn, &change, &commit).await?;
+                    self.end_turn(ws, turn, &change, &commit).await?;
                 }
                 let store = self.store.lock().unwrap();
                 store.prune_turns(now_ms() - KEEP_MS)?;
@@ -225,7 +251,7 @@ impl RepoCtx {
             }
             Checkpoint::End => match running {
                 Some(turn) => self
-                    .end_turn(&ws, turn, &change, &commit)
+                    .end_turn(ws, turn, &change, &commit)
                     .await
                     .map(|_| true),
                 None => Ok(false),
@@ -295,7 +321,7 @@ impl RepoCtx {
 
     /// Records the user's save of `path` as an edit, `before` being `@`'s commit before it.
     /// A save right after another edit, with no turn or checkpoint between, joins it.
-    /// Returns whether the workspace's turns changed.
+    /// Returns whether the workspace's turns changed, and tells the window so.
     pub async fn record_save(
         &self,
         ws: &Workspace,
@@ -322,6 +348,20 @@ impl RepoCtx {
     /// Records the files under `roots` that changed since `before` as the user's edit: one of
     /// its own named `label`, else joining the last edit of saves when nothing came between.
     async fn record_edit(
+        &self,
+        ws: &Workspace,
+        roots: &[String],
+        before: &str,
+        label: Option<&str>,
+    ) -> anyhow::Result<bool> {
+        let changed = self.record_edit_in(ws, roots, before, label).await?;
+        if changed {
+            self.turns_changed(ws);
+        }
+        Ok(changed)
+    }
+
+    async fn record_edit_in(
         &self,
         ws: &Workspace,
         roots: &[String],
@@ -444,6 +484,8 @@ impl RepoCtx {
         let (change, commit) = at(&ws).await?;
         let store = self.store.lock().unwrap();
         store.start_turn(ws.key(), None, None, &change, &commit, now_ms())?;
+        drop(store);
+        self.turns_changed(&ws);
         Ok(())
     }
 

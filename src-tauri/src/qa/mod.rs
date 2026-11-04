@@ -68,6 +68,35 @@ impl Session {
             .filter(|q| q.state == state)
             .count()
     }
+
+    /// The session as list_qa lists it.
+    pub fn listing(&self) -> serde_json::Value {
+        serde_json::json!({
+            "session": self.id,
+            "title": self.title,
+            "open": self.count(QState::Open),
+            "decided": self.count(QState::Decided),
+        })
+    }
+
+    /// The decisions so far, in ask order, and how many questions are still open.
+    pub fn answers(&self) -> serde_json::Value {
+        let decided: Vec<_> = self
+            .queue
+            .questions
+            .iter()
+            .filter(|q| q.state != QState::Open)
+            .map(|q| {
+                serde_json::json!({
+                    "id": q.id,
+                    "subject": q.text.subject,
+                    "answer": text::decision_text(q),
+                    "auto": q.answer.as_ref().is_some_and(|a| a.is_auto()),
+                })
+            })
+            .collect();
+        serde_json::json!({ "decided": decided, "stillOpen": self.queue.open_count() })
+    }
 }
 
 /// A title from the prompt's first line, until the agent names it.

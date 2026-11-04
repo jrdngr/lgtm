@@ -26,7 +26,9 @@ impl RepoCtx {
                 .map(|p| review.file_index(p))
                 .collect::<anyhow::Result<Vec<u32>>>()?
         };
-        Ok((at.id, self.agent_set_checked(at.id, &files, checked)?))
+        let state = self.agent_set_checked(at.id, &files, checked)?;
+        self.state_changed(at.id, &state);
+        Ok((at.id, state))
     }
 
     /// Marks the changed rows of `path` on new-side `lines` and old-side `removed` lines
@@ -59,7 +61,9 @@ impl RepoCtx {
         if rows.is_empty() {
             bail!("`{path}` has no changed rows on those lines");
         }
-        Ok((at.id, self.agent_mark(at.id, &rows, color)?))
+        let state = self.agent_mark(at.id, &rows, color)?;
+        self.state_changed(at.id, &state);
+        Ok((at.id, state))
     }
 }
 

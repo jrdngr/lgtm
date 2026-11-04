@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event;
 
-use crate::events::{AgentHookState, TerminalAgent, TurnsChanged};
+use crate::events::{AgentHookState, TerminalAgent};
 use crate::repo::Repos;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
@@ -77,7 +77,7 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
             if let (Some(point), Some(session)) = (report.checkpoint, &report.session) {
                 let workspace = report.workspace.as_deref();
                 let (tool, prompt) = (report.tool_use.as_deref(), report.prompt.as_deref());
-                match ctx
+                if let Err(e) = ctx
                     .turn_checkpoint(
                         workspace,
                         Some(&report.terminal),
@@ -88,12 +88,7 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                     )
                     .await
                 {
-                    Ok(true) => {
-                        let workspace = report.workspace.clone();
-                        TurnsChanged { workspace }.emit_to(&app, &label).ok();
-                    }
-                    Ok(false) => {}
-                    Err(e) => tracing::warn!(?point, "agent turn snapshot: {e:#}"),
+                    tracing::warn!(?point, "agent turn snapshot: {e:#}");
                 }
             }
             if report.prompt.is_some() || report.checkpoint.is_some() {

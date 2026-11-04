@@ -17,6 +17,7 @@ pub use rev::ResolvedDto;
 
 use crate::canvas::{Canvas, CanvasOp};
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::DesignChanged;
 use crate::jj::Jj;
 use crate::store::Store;
 
@@ -253,7 +254,17 @@ impl RepoCtx {
         if !missing.is_empty() {
             bail!("not at `{}`: {}", input.revision, missing.join(", "));
         }
-        self.save_design(workspace, None, input).await
+        let d = self.save_design(workspace, None, input).await?;
+        self.design_changed(workspace, &d.id);
+        Ok(d)
+    }
+
+    /// Has `workspace`'s window show design `id`, which an agent changed.
+    fn design_changed(&self, workspace: Option<&str>, id: &str) {
+        self.notify(DesignChanged {
+            id: id.to_string(),
+            workspace: workspace.map(String::from),
+        });
     }
 
     pub fn delete_design(&self, id: &str) -> anyhow::Result<()> {
@@ -309,6 +320,7 @@ impl RepoCtx {
     /// Applies an agent's `ops` to a view of design `id`'s canvas as one undoable pass.
     pub fn edit_design_canvas(
         &self,
+        workspace: Option<&str>,
         id: &str,
         view: &str,
         ops: Vec<CanvasOp>,
@@ -322,6 +334,8 @@ impl RepoCtx {
         before.agent = None;
         d.canvas_undo = Some(before);
         save(&store, &d)?;
+        drop(store);
+        self.design_changed(workspace, id);
         Ok(d)
     }
 
@@ -358,6 +372,7 @@ impl RepoCtx {
         m.files_hash = Some(rev::files_hash(&files, &hashes));
         d.map = Some(m);
         save(&self.store.lock().unwrap(), &d)?;
+        self.design_changed(workspace, id);
         Ok(d)
     }
 }

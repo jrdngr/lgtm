@@ -2,11 +2,9 @@
 
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router};
-use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed};
-use crate::events::SymbolInfoChanged;
-use crate::symbol_info::{self, InfoReply};
+use crate::symbol_info::InfoReply;
 
 #[tool_router(router = symbol_info_router, vis = "pub(super)")]
 impl Lgtm {
@@ -17,11 +15,10 @@ impl Lgtm {
         prompt asks for it."
     )]
     async fn set_symbol_info(&self, Parameters(p): Parameters<InfoReply>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let ws = ctx.workspace(self.workspace()).await.map_err(failed)?;
         let name = p.name.clone();
-        symbol_info::set(&ctx.store.lock().unwrap(), ws.key(), &ws.root, p).map_err(failed)?;
-        SymbolInfoChanged.emit_to(self.app(), &label).ok();
+        ctx.set_symbol_info(&ws, p).map_err(failed)?;
         Ok(format!("Stored Symbol Information on `{name}`."))
     }
 }

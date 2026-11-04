@@ -53,6 +53,7 @@ impl RepoCtx {
             );
             f(store)
         })?;
+        self.state_changed(id, &state);
         Ok((id, state))
     }
 

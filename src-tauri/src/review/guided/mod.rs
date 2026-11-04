@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::GuidedChanged;
 use crate::jj::Range;
 use crate::review::arch::assess::Commits;
 use crate::store::Store;
@@ -287,6 +288,11 @@ impl RepoCtx {
         save(&store, &ws, revset, &g)?;
         let ids: Vec<&str> = g.chunks.iter().map(|c| c.id.as_str()).collect();
         store.keep_guided_verdicts(&ws, revset, &ids)?;
+        drop(store);
+        self.notify(GuidedChanged {
+            workspace: Some(ws),
+            review,
+        });
         Ok(counts)
     }
 

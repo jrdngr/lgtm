@@ -6,10 +6,8 @@ use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
-use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed, json};
-use crate::events::NotesChanged;
 use crate::notes::{GlobalStore, NoteBook, NoteLevel};
 
 #[derive(Deserialize, JsonSchema)]
@@ -61,6 +59,7 @@ impl Lgtm {
             global: &global.0,
             repo: &ctx.store,
             workspace: self.workspace().unwrap_or_default().to_string(),
+            notify: Some(&ctx),
         };
         f(&book).map_err(failed)
     }
@@ -106,11 +105,6 @@ impl Lgtm {
                 self.notes(|b| b.create(level, folder, name, &p.body))?
             }
         };
-        NotesChanged {
-            id: Some(n.id.clone()),
-        }
-        .emit(self.app())
-        .ok();
         Ok(format!("Wrote note `{}` with id `{}`.", n.name, n.id))
     }
 }

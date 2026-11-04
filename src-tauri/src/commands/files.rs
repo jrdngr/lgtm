@@ -1,10 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use tauri::{Manager, WebviewWindow};
-use tauri_specta::Event;
+use tauri::WebviewWindow;
 
 use super::{CmdResult, err};
-use crate::events::TurnsChanged;
 use crate::files::{self, FileEntry};
 use crate::frame::Frame;
 use crate::prompts;
@@ -85,11 +83,7 @@ pub(crate) async fn save_file(
     let (Ok(before), false) = (before, Path::new(&path).is_absolute()) else {
         return ws.snapshot().await.map_err(err);
     };
-    if repo.record_save(&ws, &path, &before).await.map_err(err)? {
-        TurnsChanged { workspace }
-            .emit_to(window.app_handle(), window.label())
-            .ok();
-    }
+    repo.record_save(&ws, &path, &before).await.map_err(err)?;
     Ok(())
 }
 
@@ -143,7 +137,6 @@ fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 /// their edit named `label` when `before`, `@`'s commit before it, is known.
 async fn record_change(
     window: &Frame,
-    workspace: Option<String>,
     ws: &Workspace,
     roots: &[String],
     before: anyhow::Result<String>,
@@ -153,15 +146,9 @@ async fn record_change(
         return ws.snapshot().await.map_err(err);
     };
     let repo = super::repo(window)?;
-    if repo
-        .record_files_change(ws, roots, &before, &label)
+    repo.record_files_change(ws, roots, &before, &label)
         .await
-        .map_err(err)?
-    {
-        TurnsChanged { workspace }
-            .emit_to(window.app_handle(), window.label())
-            .ok();
-    }
+        .map_err(err)?;
     Ok(())
 }
 
@@ -188,7 +175,7 @@ pub(crate) async fn create_path(
     let before = turns::working_commit(&ws).await;
     files::create(&confined(&ws, &path)?, &path, dir).map_err(err)?;
     let label = format!("New {path}");
-    record_change(&window, workspace, &ws, &[path], before, label).await
+    record_change(&window, &ws, &[path], before, label).await
 }
 
 /// A file dropped into the workspace: where it goes and its contents as base64.
@@ -226,7 +213,7 @@ pub(crate) async fn add_files(
         [one] => format!("Add {one}"),
         many => format!("Add {} files", many.len()),
     };
-    record_change(&window, workspace, &ws, &added, before, label).await?;
+    record_change(&window, &ws, &added, before, label).await?;
     Ok(taken)
 }
 
@@ -298,7 +285,7 @@ pub(crate) async fn rename_path(
     let before = turns::working_commit(&ws).await;
     files::rename(&confined(&ws, &from)?, &confined(&ws, &to)?, &to).map_err(err)?;
     let label = move_label(&from, &to);
-    record_change(&window, workspace, &ws, &[from, to], before, label).await
+    record_change(&window, &ws, &[from, to], before, label).await
 }
 
 /// Copies a file or folder into folder `dir` (`""` for the root), named as a copy when its
@@ -322,15 +309,7 @@ pub(crate) async fn copy_path(
     let rel = to.strip_prefix(&ws.root).map_err(|e| e.to_string())?;
     let rel = rel.to_string_lossy().into_owned();
     let label = format!("Copy {from} → {rel}");
-    record_change(
-        &window,
-        workspace,
-        &ws,
-        std::slice::from_ref(&rel),
-        before,
-        label,
-    )
-    .await?;
+    record_change(&window, &ws, std::slice::from_ref(&rel), before, label).await?;
     Ok(rel)
 }
 
@@ -350,7 +329,7 @@ pub(crate) async fn trash_path(
     let before = turns::working_commit(&ws).await;
     trash::delete(&abs).map_err(|e| format!("can't move {path} to the Trash: {e}"))?;
     let label = format!("Trash {path}");
-    record_change(&window, workspace, &ws, &[path], before, label).await
+    record_change(&window, &ws, &[path], before, label).await
 }
 
 /// Shows a path in Finder. `""` is the workspace's root.

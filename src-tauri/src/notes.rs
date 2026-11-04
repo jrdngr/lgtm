@@ -7,7 +7,8 @@ use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::ctx::now_ms;
+use crate::ctx::{RepoCtx, now_ms};
+use crate::events::NotesChanged;
 use crate::store::{NoteRow, Store};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -56,6 +57,8 @@ pub struct NoteBook<'a> {
     pub repo: &'a Mutex<Store>,
     /// The workspace's name, empty for the main one.
     pub workspace: String,
+    /// Where changes to notes are told, to every window since global notes show in each.
+    pub notify: Option<&'a RepoCtx>,
 }
 
 /// `folder` without empty segments or surrounding space. Rejects `.` and `..`.
@@ -167,6 +170,15 @@ impl NoteBook<'_> {
         Ok(out)
     }
 
+    /// Tells the windows a note changed: `id`, or with `None` the notes as a whole.
+    fn changed(&self, id: Option<&str>) {
+        if let Some(ctx) = self.notify {
+            ctx.notify_all(NotesChanged {
+                id: id.map(str::to_string),
+            });
+        }
+    }
+
     pub fn get(&self, id: &str) -> anyhow::Result<NoteDto> {
         let (level, n) = self.find(id)?;
         Ok(dto(level, n))
@@ -194,6 +206,7 @@ impl NoteBook<'_> {
             updated_at: now,
         };
         self.put(level, &n)?;
+        self.changed(Some(&n.id));
         Ok(dto(level, n))
     }
 
@@ -202,6 +215,7 @@ impl NoteBook<'_> {
         n.body = body.to_string();
         n.updated_at = now_ms();
         self.put(level, &n)?;
+        self.changed(Some(id));
         Ok(dto(level, n))
     }
 
@@ -209,6 +223,7 @@ impl NoteBook<'_> {
         let (level, mut n) = self.find(id)?;
         n.name = clean_name(name, "note")?;
         self.put(level, &n)?;
+        self.changed(Some(id));
         Ok(dto(level, n))
     }
 
@@ -221,12 +236,14 @@ impl NoteBook<'_> {
             self.place(from).0.lock().unwrap().delete_note(id)?;
         }
         self.put(level, &n)?;
+        self.changed(Some(id));
         Ok(dto(level, n))
     }
 
     pub fn delete(&self, id: &str) -> anyhow::Result<()> {
         let (level, _) = self.find(id)?;
         self.place(level).0.lock().unwrap().delete_note(id)?;
+        self.changed(Some(id));
         Ok(())
     }
 
@@ -241,6 +258,7 @@ impl NoteBook<'_> {
         };
         let (store, ws) = self.place(level);
         store.lock().unwrap().add_note_folder(ws, &path)?;
+        self.changed(None);
         Ok(path)
     }
 
@@ -251,12 +269,16 @@ impl NoteBook<'_> {
             Some((parent, _)) => format!("{parent}/{name}"),
             None => name,
         };
-        self.refolder(level, path, |folder| Some(rebase(folder, path, &to)))
+        self.refolder(level, path, |folder| Some(rebase(folder, path, &to)))?;
+        self.changed(None);
+        Ok(())
     }
 
     /// Deletes folder `path` of `level` with every note and folder in it.
     pub fn delete_folder(&self, level: NoteLevel, path: &str) -> anyhow::Result<()> {
-        self.refolder(level, path, |_| None)
+        self.refolder(level, path, |_| None)?;
+        self.changed(None);
+        Ok(())
     }
 
     /// Moves each note and folder within `path` to the folder `to` gives, or deletes it.
@@ -309,6 +331,7 @@ mod tests {
             global: &s.0,
             repo: &s.1,
             workspace: ws.into(),
+            notify: None,
         }
     }
 

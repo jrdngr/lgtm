@@ -5,10 +5,8 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::{Deserialize, Serialize};
-use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed};
-use crate::events::{ArchChanged, SystemChanged};
 
 #[derive(Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -203,19 +201,13 @@ impl Lgtm {
         the review has moved off the from and to commits the prompt named."
     )]
     async fn set_assessment(&self, Parameters(p): Parameters<Assessment>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let review = ctx.current_review(self.workspace()).map_err(failed)?;
         let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
         let a = ctx
             .save_assessment(review, &p.revset, (&p.from, &p.to), reply)
             .await
             .map_err(failed)?;
-        ArchChanged {
-            workspace: self.workspace().map(str::to_string),
-            review,
-        }
-        .emit_to(self.app(), &label)
-        .ok();
         Ok(format!("Stored it: {}/5.", a.score))
     }
 
@@ -226,17 +218,12 @@ impl Lgtm {
         dropped."
     )]
     async fn set_system(&self, Parameters(p): Parameters<System>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
         let d = ctx
             .save_description(self.workspace(), reply)
             .await
             .map_err(failed)?;
-        SystemChanged {
-            workspace: self.workspace().map(str::to_string),
-        }
-        .emit_to(self.app(), &label)
-        .ok();
         Ok(format!(
             "Stored it: {} containers described, {} components.",
             d.containers.len(),
@@ -251,17 +238,12 @@ impl Lgtm {
         Steps on unknown nodes are dropped, and so are unknown files and symbols."
     )]
     async fn set_tour(&self, Parameters(p): Parameters<Tour>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
         let (node, steps) = ctx
             .save_tour(self.workspace(), reply)
             .await
             .map_err(failed)?;
-        SystemChanged {
-            workspace: self.workspace().map(str::to_string),
-        }
-        .emit_to(self.app(), &label)
-        .ok();
         Ok(format!("Stored the tour of `{node}`: {steps} steps."))
     }
 }

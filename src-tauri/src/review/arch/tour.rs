@@ -200,6 +200,8 @@ impl RepoCtx {
         let mut all = stored(&store)?;
         all.insert(node.clone(), tour);
         store.save_arch_state(KEY, &serde_json::to_string(&all)?)?;
+        drop(store);
+        self.system_changed(workspace);
         Ok((node, steps))
     }
 }

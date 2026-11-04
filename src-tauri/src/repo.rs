@@ -144,6 +144,10 @@ pub fn start(app: &AppHandle, root: &Path, window: &str) -> Result<String, Strin
         .map_err(|e| format!("open mark store: {e:#}"))?;
     let ctx = RepoCtx::new(root.to_path_buf(), Jj::new(root), store);
     *ctx.emit.lock().unwrap() = Some(emitter(app, &label));
+    *ctx.ui.lock().unwrap() = Some(crate::ui::Ui {
+        app: app.clone(),
+        label: label.clone(),
+    });
     ctx.hook(&ctx.main);
     // The main workspace's watcher also reports operations made in the other workspaces.
     ctx.watch(&ctx.main);

@@ -10,6 +10,7 @@ use specta::Type;
 
 use super::system::SystemDto;
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::SystemChanged;
 use crate::store::Store;
 
 const KEY: &str = "system";
@@ -292,7 +293,16 @@ impl RepoCtx {
         let store = self.store.lock().unwrap();
         let desc = validate(d, &map, commit, described(&store)?);
         store.save_arch_state(KEY, &serde_json::to_string(&desc)?)?;
+        drop(store);
+        self.system_changed(workspace);
         Ok(desc)
+    }
+
+    /// Has `workspace`'s window show the system map, which an agent described or toured.
+    pub(super) fn system_changed(&self, workspace: Option<&str>) {
+        self.notify(SystemChanged {
+            workspace: workspace.map(str::to_string),
+        });
     }
 }
 

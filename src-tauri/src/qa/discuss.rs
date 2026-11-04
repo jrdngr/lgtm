@@ -109,7 +109,9 @@ impl RepoCtx {
                     auto: None,
                 },
             )
-        })
+        })?;
+        self.show_qa(ws, id);
+        Ok(())
     }
 }
 

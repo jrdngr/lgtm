@@ -1,6 +1,6 @@
 //! Q&A tool parameters, with the JSON schemas agents see.
 
-use crate::qa::queue::{Choice, NewQuestion, Rewrite};
+use crate::qa::queue::{Choice, Drop, NewQuestion, Rewrite, Update};
 use rmcp::schemars::{self, JsonSchema};
 use serde::Deserialize;
 #[derive(Deserialize, JsonSchema)]
@@ -154,6 +154,23 @@ pub struct QaUpdate {
     /// New decisions the answer raises.
     #[serde(default)]
     pub add: Vec<QaQuestion>,
+}
+
+impl From<QaUpdate> for Update {
+    fn from(p: QaUpdate) -> Self {
+        Update {
+            drop: p
+                .drop
+                .into_iter()
+                .map(|d| Drop {
+                    id: d.id,
+                    why: d.why,
+                })
+                .collect(),
+            rewrite: p.rewrite.into_iter().map(Into::into).collect(),
+            add: p.add.into_iter().map(Into::into).collect(),
+        }
+    }
 }
 
 #[derive(Deserialize, JsonSchema)]

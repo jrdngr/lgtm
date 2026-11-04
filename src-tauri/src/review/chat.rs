@@ -8,7 +8,8 @@ use super::{RepoCtx, StateDto, now_ms};
 use crate::store::{Author, Message};
 
 impl RepoCtx {
-    /// Adds a message to a comment's chat. Blank text adds nothing.
+    /// Adds a message to a comment's chat. Blank text adds nothing. The review shows it as it
+    /// would an agent's change, wherever the review is open.
     pub fn add_chat_message(
         &self,
         id: u32,
@@ -16,7 +17,7 @@ impl RepoCtx {
         author: Author,
         text: &str,
     ) -> anyhow::Result<StateDto> {
-        self.comment_edit(id, |_, store| {
+        let state = self.comment_edit(id, |_, store| {
             let mut c = store
                 .comment(comment as i64)?
                 .context("the comment is gone")?;
@@ -29,7 +30,9 @@ impl RepoCtx {
                 text: text.to_string(),
             });
             Ok(store.set_conversation(c.id, &c.conversation)?)
-        })
+        })?;
+        self.state_changed(id, &state);
+        Ok(state)
     }
 
     /// Sets a thread's suggested reply, for a terminal agent. It replaces any earlier one.

@@ -1,9 +1,5 @@
-use tauri::Manager;
-use tauri_specta::Event;
-
 use super::{CmdResult, err, repo};
 use crate::frame::Frame;
-use crate::review::ReviewStateChanged;
 use crate::review::{RowRef, StateDto};
 use crate::store::{Author, Stage};
 
@@ -81,12 +77,10 @@ pub(crate) fn add_chat_message(
     author: Author,
     text: String,
 ) -> CmdResult<()> {
-    let state = repo(&window)?
+    repo(&window)?
         .add_chat_message(review, comment, author, &text)
         .map_err(err)?;
-    ReviewStateChanged { review, state }
-        .emit_to(window.app_handle(), window.label())
-        .map_err(|e| e.to_string())
+    Ok(())
 }
 
 /// Drops a thread's suggested reply.

@@ -25,6 +25,8 @@ pub struct RepoCtx {
     pub(crate) opened: Mutex<HashSet<String>>,
     /// Set once the window exists. Workspaces start being watched from then on.
     pub emit: Mutex<Option<Emit>>,
+    /// Set once the window exists, for features to tell it what changed.
+    pub(crate) ui: Mutex<Option<crate::ui::Ui>>,
     /// Where new workspaces go.
     pub workspace_base: Option<PathBuf>,
     pub store: Mutex<Store>,
@@ -43,6 +45,7 @@ impl RepoCtx {
             workspaces: Mutex::default(),
             opened: Mutex::default(),
             emit: Mutex::default(),
+            ui: Mutex::default(),
             workspace_base: ws_base(),
             store: Mutex::new(store),
             reviews: Reviews::default(),

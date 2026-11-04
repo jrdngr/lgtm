@@ -5,6 +5,7 @@ use serde::Serialize;
 use specta::Type;
 
 use crate::ctx::RepoCtx;
+use crate::events::LogRevsetChanged;
 use crate::jj::LogRow;
 
 #[derive(Serialize, Type)]
@@ -54,7 +55,8 @@ impl RepoCtx {
         Ok(self.workspace(workspace).await?.jj.operation())
     }
 
-    /// Sets the workspace's log revset once jj takes it. Blank goes back to jj's default.
+    /// Sets the workspace's log revset once jj takes it, and shows it. Blank goes back to
+    /// jj's default.
     pub async fn set_log_revset(
         &self,
         workspace: Option<&str>,
@@ -68,11 +70,14 @@ impl RepoCtx {
                 .log_rows(Some(r))
                 .await?;
         }
-        Ok(self
-            .store
+        self.store
             .lock()
             .unwrap()
-            .set_log_revset(workspace.unwrap_or(""), revset)?)
+            .set_log_revset(workspace.unwrap_or(""), revset)?;
+        self.notify(LogRevsetChanged {
+            workspace: workspace.map(String::from),
+        });
+        Ok(())
     }
 }
 

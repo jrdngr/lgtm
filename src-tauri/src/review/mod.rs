@@ -173,6 +173,17 @@ pub struct ReviewStateChanged {
     pub state: StateDto,
 }
 
+impl RepoCtx {
+    /// Sends review `review`'s new `state` to the window after an agent or a synced terminal
+    /// changed it.
+    pub(crate) fn state_changed(&self, review: u32, state: &StateDto) {
+        self.notify(ReviewStateChanged {
+            review,
+            state: state.clone(),
+        });
+    }
+}
+
 /// Everything marking and commenting can change.
 #[derive(Clone, Default, Serialize, Type)]
 #[serde(rename_all = "camelCase")]

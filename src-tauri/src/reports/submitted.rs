@@ -7,6 +7,7 @@ use anyhow::Context;
 use super::output::{Action, Finding, Location, Minimal, Output, Question, Review};
 use super::{Part, Persona, ReportRun};
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::ReportRunChanged;
 
 /// An agent's own suggested fixes, naming findings by their 1-based place in what it published.
 pub struct Summary {
@@ -72,6 +73,25 @@ impl RepoCtx {
     /// locations. Without, it's a new report against the workspace's current review. Either
     /// must be of `revset`, the revset the agent reviewed, and of the head it resolves to now. Returns the report and whether it's new.
     pub async fn publish_findings(
+        &self,
+        workspace: Option<&str>,
+        revset: &str,
+        report: Option<&str>,
+        reviewer: &str,
+        review: serde_json::Value,
+        summary: Option<Summary>,
+    ) -> anyhow::Result<(ReportRun, bool)> {
+        let out = self
+            .publish(workspace, revset, report, reviewer, review, summary)
+            .await?;
+        self.notify(ReportRunChanged {
+            run: out.0.id,
+            workspace: workspace.map(str::to_string),
+        });
+        Ok(out)
+    }
+
+    async fn publish(
         &self,
         workspace: Option<&str>,
         revset: &str,

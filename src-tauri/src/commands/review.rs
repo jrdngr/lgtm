@@ -1,8 +1,4 @@
-use tauri::Manager;
-use tauri_specta::Event as _;
-
 use super::{CmdResult, err, repo};
-use crate::events::LogRevsetChanged;
 use crate::frame::Frame;
 use crate::jj::{BookmarkSpot, JjAction, WorkingCopyDto};
 use crate::review::{ContextLine, RefreshDto, ReviewDto, RowRef, StateDto, View};
@@ -81,10 +77,7 @@ pub(crate) async fn set_log_revset(
     let ctx = repo(&window)?;
     ctx.set_log_revset(workspace.as_deref(), &revset)
         .await
-        .map_err(err)?;
-    LogRevsetChanged { workspace }
-        .emit_to(window.app_handle(), window.label())
-        .map_err(|e| e.to_string())
+        .map_err(err)
 }
 
 /// The local bookmark `trunk()` resolves to, as a revset symbol, for the revisions panel's

@@ -34,6 +34,7 @@ mod settings;
 mod symbol_info;
 mod tools;
 mod turns;
+mod ui;
 mod watch;
 mod windows;
 mod workspace;

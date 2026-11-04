@@ -9,9 +9,12 @@ use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
+use crate::ctx::RepoCtx;
+use crate::events::SymbolInfoChanged;
 use crate::search::{self, Definition};
 use crate::store::{InfoKey, Store};
 use crate::syntax::SymbolKind;
+use crate::workspace::Workspace;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -192,8 +195,17 @@ fn prompt(path: &str, line: u32, name: &str) -> String {
     )
 }
 
+impl RepoCtx {
+    /// Stores the agent's notes on `reply.name` in `ws` and has the window show them.
+    pub fn set_symbol_info(&self, ws: &Workspace, reply: InfoReply) -> anyhow::Result<()> {
+        set(&self.store.lock().unwrap(), ws.key(), &ws.root, reply)?;
+        self.notify(SymbolInfoChanged);
+        Ok(())
+    }
+}
+
 /// Stores the agent's notes on `reply.name`, keeping the code hash from when it was asked.
-pub fn set(store: &Store, workspace: &str, root: &Path, reply: InfoReply) -> anyhow::Result<()> {
+fn set(store: &Store, workspace: &str, root: &Path, reply: InfoReply) -> anyhow::Result<()> {
     let defs = defs_at(root, &reply.path, &reply.name);
     let Some(i) = pick(&defs, reply.line) else {
         if let Ok(d) = locate(root, &reply.name, None, None) {

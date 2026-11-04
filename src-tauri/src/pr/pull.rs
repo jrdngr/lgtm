@@ -7,7 +7,7 @@ use crate::anchor::Side;
 use crate::ctx::RepoCtx;
 use crate::github;
 use crate::github::threads::{Comment, Review};
-use crate::review::{PulledThread, StateDto};
+use crate::review::{PulledThread, StateDto, ThreadDto};
 use crate::store::{GhLink, GhPost};
 
 pub(super) use lgtm_core::github::pulled::pulled;
@@ -67,6 +67,18 @@ pub(super) fn pr_level(
 }
 
 impl RepoCtx {
+    /// Pulls the PR's threads into the review open in `workspace` for a terminal agent, has
+    /// the window show them, and lists them.
+    pub async fn agent_sync_threads(
+        &self,
+        workspace: Option<&str>,
+    ) -> anyhow::Result<Vec<ThreadDto>> {
+        let review = self.current_review(workspace)?;
+        let state = self.pull_pr_comments(review).await?;
+        self.state_changed(review, &state);
+        self.agent_threads(workspace)
+    }
+
     /// Pulls the review threads of the PR the review's workspace is for into the review.
     pub async fn pull_pr_comments(&self, id: u32) -> anyhow::Result<StateDto> {
         let ws = self.review_workspace(id)?;

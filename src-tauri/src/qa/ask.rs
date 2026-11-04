@@ -2,6 +2,7 @@
 
 use super::queue::{NewQuestion, Rewrite, Update};
 use crate::ctx::RepoCtx;
+use crate::events::QaChanged;
 use crate::workspace::Workspace;
 
 /// Where an agent's questions go.
@@ -42,12 +43,24 @@ impl RepoCtx {
             }
             Ok(s.queue.add_round(questions))
         })?;
+        self.show_qa(ws, &id);
         Ok((id, ids))
+    }
+
+    /// Has the Q&A tab show session `id`, which an agent changed.
+    pub(super) fn show_qa(&self, ws: &Workspace, id: &str) {
+        self.notify(QaChanged {
+            workspace: ws.name.clone(),
+            id: id.to_string(),
+            show: true,
+        });
     }
 
     /// Rewrites a queued question.
     pub fn reask_qa(&self, ws: &Workspace, id: &str, r: Rewrite) -> anyhow::Result<()> {
-        self.edit_qa(ws, id, |s| s.queue.reask(r))
+        self.edit_qa(ws, id, |s| s.queue.reask(r))?;
+        self.show_qa(ws, id);
+        Ok(())
     }
 
     /// Applies the answer to question `after` to the questions that depend on it.
@@ -62,6 +75,8 @@ impl RepoCtx {
             anyhow::ensure!(s.queue.get(after).is_some(), "no question {after}");
             s.queue.apply(after, update);
             Ok(())
-        })
+        })?;
+        self.show_qa(ws, id);
+        Ok(())
     }
 }

@@ -4,10 +4,8 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::schemars::{self, JsonSchema};
 use rmcp::{tool, tool_router};
 use serde::{Deserialize, Serialize};
-use tauri_specta::Event as _;
 
 use super::server::{Lgtm, Out, failed, json};
-use crate::events::DesignChanged;
 use crate::review::arch::design::DesignInput;
 
 #[derive(Deserialize, Serialize, JsonSchema)]
@@ -166,19 +164,13 @@ impl Lgtm {
         unknown code ids, and relations and differences on unknown nodes are dropped."
     )]
     async fn set_design(&self, Parameters(p): Parameters<Design>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let id = p.id.clone();
         let reply = serde_json::to_value(&p).map_err(|e| e.to_string())?;
         let d = ctx
             .save_design_map(self.workspace(), &id, reply)
             .await
             .map_err(failed)?;
-        DesignChanged {
-            id: id.clone(),
-            workspace: self.workspace().map(String::from),
-        }
-        .emit_to(self.app(), &label)
-        .ok();
         let m = d.map.as_ref();
         Ok(format!(
             "Stored design `{id}`: {} containers, {} components.",
@@ -194,7 +186,7 @@ impl Lgtm {
         edit_canvas."
     )]
     async fn create_design(&self, Parameters(p): Parameters<NewDesign>) -> Out {
-        let (label, ctx) = self.repo().map_err(failed)?;
+        let (_, ctx) = self.repo().map_err(failed)?;
         let input = DesignInput {
             name: p.name,
             revision: p.revision.unwrap_or_else(|| "@".into()),
@@ -205,12 +197,6 @@ impl Lgtm {
             .create_design(self.workspace(), input)
             .await
             .map_err(failed)?;
-        DesignChanged {
-            id: d.id.clone(),
-            workspace: self.workspace().map(String::from),
-        }
-        .emit_to(self.app(), &label)
-        .ok();
         if d.files.is_empty() {
             return Ok(format!(
                 "Made empty design `{}` with id `{}`. Draw on it with edit_canvas (kind `design`, \

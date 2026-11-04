@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::reply::{Known, Reply, validate};
 use super::{AssessmentDto, LayerDto, LookDto, prompt, state};
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::ArchChanged;
 use crate::jj::Range;
 use crate::store::Store;
 
@@ -144,6 +145,11 @@ impl RepoCtx {
         let store = self.store.lock().unwrap();
         save_assessed(&store, ws.key(), revset, &assessed)?;
         state::uncheck_assessed(&store, ws.key(), revset)?;
+        drop(store);
+        self.notify(ArchChanged {
+            workspace: ws.name.clone(),
+            review,
+        });
         Ok(assessed.assessment)
     }
 }

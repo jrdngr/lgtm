@@ -7,6 +7,7 @@ use specta::Type;
 
 use crate::canvas::{Canvas, CanvasOp};
 use crate::ctx::{RepoCtx, now_ms};
+use crate::events::DrawingChanged;
 use crate::store::Store;
 
 /// A drawing's one view.
@@ -101,7 +102,14 @@ impl RepoCtx {
             canvas_undo: None,
         };
         save(&store, &d)?;
+        drop(store);
+        self.drawing_changed(&d.id);
         Ok(d)
+    }
+
+    /// Has the window load the repo's drawings again.
+    fn drawing_changed(&self, id: &str) {
+        self.notify(DrawingChanged { id: id.to_string() });
     }
 
     pub fn rename_drawing(&self, id: &str, name: &str) -> anyhow::Result<DrawingDto> {
@@ -134,6 +142,8 @@ impl RepoCtx {
         let mut d = load(&store, id)?;
         d.agent_edit(ops)?;
         save(&store, &d)?;
+        drop(store);
+        self.drawing_changed(id);
         Ok(d)
     }
 

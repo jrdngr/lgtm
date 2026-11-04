@@ -1,17 +1,13 @@
 use tauri::Manager;
-use tauri_specta::Event as _;
 
 use super::{CmdResult, err, repo};
-use crate::events::NotesChanged;
 use crate::frame::Frame;
 use crate::notes::{GlobalStore, NoteBook, NoteDto, NoteLevel, NotesDto};
 
-/// Runs `f` on the notes `workspace` sees. With `changed`, tells every window, since global
-/// notes show in each.
+/// Runs `f` on the notes `workspace` sees.
 fn book<T>(
     window: &Frame,
     workspace: Option<String>,
-    changed: Option<&str>,
     f: impl FnOnce(&NoteBook) -> anyhow::Result<T>,
 ) -> CmdResult<T> {
     let ctx = repo(window)?;
@@ -20,29 +16,22 @@ fn book<T>(
         global: &global.0,
         repo: &ctx.store,
         workspace: workspace.unwrap_or_default(),
+        notify: Some(&ctx),
     };
-    let out = f(&book).map_err(err)?;
-    if let Some(id) = changed {
-        NotesChanged {
-            id: (!id.is_empty()).then(|| id.to_string()),
-        }
-        .emit(window.app_handle())
-        .ok();
-    }
-    Ok(out)
+    f(&book).map_err(err)
 }
 
 /// Every note and folder the workspace shows: global, the repo's and its own.
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn notes(window: Frame, workspace: Option<String>) -> CmdResult<NotesDto> {
-    book(&window, workspace, None, |b| b.list())
+    book(&window, workspace, |b| b.list())
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn note(window: Frame, workspace: Option<String>, id: String) -> CmdResult<NoteDto> {
-    book(&window, workspace, None, |b| b.get(&id))
+    book(&window, workspace, |b| b.get(&id))
 }
 
 #[tauri::command]
@@ -55,7 +44,7 @@ pub(crate) fn create_note(
     name: String,
     body: String,
 ) -> CmdResult<NoteDto> {
-    book(&window, workspace, Some(""), |b| {
+    book(&window, workspace, |b| {
         b.create(level, &folder, &name, &body)
     })
 }
@@ -68,7 +57,7 @@ pub(crate) fn save_note(
     id: String,
     body: String,
 ) -> CmdResult<NoteDto> {
-    book(&window, workspace, Some(&id), |b| b.save(&id, &body))
+    book(&window, workspace, |b| b.save(&id, &body))
 }
 
 #[tauri::command]
@@ -79,7 +68,7 @@ pub(crate) fn rename_note(
     id: String,
     name: String,
 ) -> CmdResult<NoteDto> {
-    book(&window, workspace, Some(&id), |b| b.rename(&id, &name))
+    book(&window, workspace, |b| b.rename(&id, &name))
 }
 
 /// Moves a note into a folder of any level.
@@ -92,15 +81,13 @@ pub(crate) fn move_note(
     level: NoteLevel,
     folder: String,
 ) -> CmdResult<NoteDto> {
-    book(&window, workspace, Some(&id), |b| {
-        b.move_to(&id, level, &folder)
-    })
+    book(&window, workspace, |b| b.move_to(&id, level, &folder))
 }
 
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn delete_note(window: Frame, workspace: Option<String>, id: String) -> CmdResult<()> {
-    book(&window, workspace, Some(&id), |b| b.delete(&id))
+    book(&window, workspace, |b| b.delete(&id))
 }
 
 /// Makes folder `name` in `parent`. Returns its path.
@@ -113,9 +100,7 @@ pub(crate) fn create_note_folder(
     parent: String,
     name: String,
 ) -> CmdResult<String> {
-    book(&window, workspace, Some(""), |b| {
-        b.add_folder(level, &parent, &name)
-    })
+    book(&window, workspace, |b| b.add_folder(level, &parent, &name))
 }
 
 #[tauri::command]
@@ -127,9 +112,7 @@ pub(crate) fn rename_note_folder(
     path: String,
     name: String,
 ) -> CmdResult<()> {
-    book(&window, workspace, Some(""), |b| {
-        b.rename_folder(level, &path, &name)
-    })
+    book(&window, workspace, |b| b.rename_folder(level, &path, &name))
 }
 
 /// Deletes a folder with every note and folder in it.
@@ -141,7 +124,5 @@ pub(crate) fn delete_note_folder(
     level: NoteLevel,
     path: String,
 ) -> CmdResult<()> {
-    book(&window, workspace, Some(""), |b| {
-        b.delete_folder(level, &path)
-    })
+    book(&window, workspace, |b| b.delete_folder(level, &path))
 }
