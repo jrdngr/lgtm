@@ -4,22 +4,8 @@
 use anyhow::{Context, bail};
 
 use super::{RepoCtx, RowRef, StateDto};
-use crate::anchor::Side;
 use crate::store::MarkColor;
-
-/// A line range as get_review writes them: `12` or `12-20`.
-fn parse_range(range: &str) -> anyhow::Result<(u32, u32)> {
-    let bad = || format!("`{range}` isn't a line or a range like `12-20`");
-    let (a, b) = range.split_once('-').unwrap_or((range, range));
-    let a: u32 = a.trim().parse().with_context(bad)?;
-    let b: u32 = b.trim().parse().with_context(bad)?;
-    anyhow::ensure!(a <= b, bad());
-    Ok((a, b))
-}
-
-fn within(ranges: &[(u32, u32)], line: u32) -> bool {
-    ranges.iter().any(|&(a, b)| (a..=b).contains(&line))
-}
+use lgtm_core::review::view::parse_range;
 
 impl RepoCtx {
     /// Checks or unchecks the files at `paths` in the review of `revset`, as an agent.
@@ -68,15 +54,7 @@ impl RepoCtx {
             let review = review.lock().unwrap();
             self.check_at(&review, &at)?;
             let file = review.file_index(path)?;
-            review.files[file as usize]
-                .keyed
-                .iter()
-                .filter(|k| match k.side {
-                    Side::New => within(&new, k.line),
-                    Side::Old => within(&old, k.line),
-                })
-                .map(|k| RowRef::new(file as usize, k.row))
-                .collect()
+            review.view().rows_on(file as usize, &new, &old)
         };
         if rows.is_empty() {
             bail!("`{path}` has no changed rows on those lines");
@@ -88,9 +66,8 @@ impl RepoCtx {
 impl super::Review {
     /// The index of the file at `path`, under its new name or its old one.
     fn file_index(&self, path: &str) -> anyhow::Result<u32> {
-        self.files
-            .iter()
-            .position(|f| f.path == path || f.old_path.as_deref() == Some(path))
+        self.view()
+            .file_index(path)
             .map(|i| i as u32)
             .with_context(|| format!("`{path}` isn't in the review"))
     }

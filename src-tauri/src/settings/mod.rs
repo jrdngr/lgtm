@@ -9,7 +9,7 @@
 //! reviewMarks = false
 //! ```
 
-pub mod marks;
+pub use lgtm_core::review::slots as marks;
 
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;

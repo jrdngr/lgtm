@@ -1,11 +1,14 @@
 //! A review's files as marks and checks see them, matching stored marks and checks onto their
 //! rows, and the edits marking and checking make. Shared by the desktop and terminal apps.
 
+pub mod agent;
 pub mod edits;
 pub mod file;
 pub mod matching;
 pub mod place;
+pub mod slots;
 pub mod snippet;
+pub mod view;
 
 use serde::{Deserialize, Serialize};
 use specta::Type;

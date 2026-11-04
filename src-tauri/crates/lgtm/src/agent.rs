@@ -9,41 +9,7 @@ use std::time::Duration;
 use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-pub struct CheckFiles {
-    /// The review's revset, as get_review gives it. lgtm refuses the call once its review
-    /// shows another.
-    pub revset: String,
-    /// The files' paths, as get_review gives them.
-    pub paths: Vec<String>,
-    /// False unchecks them.
-    pub checked: bool,
-}
-
-/// An agent's mark: reviewed rows count as done, flagged ones don't.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum AgentMark {
-    Reviewed,
-    Flagged,
-}
-
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct MarkLines {
-    /// The review's revset, as get_review gives it. lgtm refuses the call once its review
-    /// shows another.
-    pub revset: String,
-    pub path: String,
-    /// New-side line numbers or ranges, like `12` or `12-20`.
-    #[serde(default)]
-    pub lines: Vec<String>,
-    /// Old-side line numbers or ranges of removed lines.
-    #[serde(default)]
-    pub removed_lines: Vec<String>,
-    /// The mark to set. Leave it out to clear your marks on those lines.
-    pub mark: Option<AgentMark>,
-}
+pub use lgtm_core::review::agent::{CheckFiles, MarkLines};
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 pub struct ResolveComment {
@@ -95,58 +61,9 @@ pub fn ask(socket: &Path, req: &Request) -> Response {
         .map_err(|e| format!("lgtm's answer didn't parse: {e}"))?
 }
 
-/// Line numbers from `12` and `12-20` style specs.
-pub fn parse_lines(specs: &[String]) -> Result<Vec<u32>, String> {
-    let mut out = Vec::new();
-    for spec in specs {
-        let bad = || format!("`{spec}` isn't a line or a range like 12-20");
-        let (a, b) = match spec.split_once('-') {
-            Some((a, b)) => (a.trim(), b.trim()),
-            None => (spec.trim(), spec.trim()),
-        };
-        let (a, b): (u32, u32) = (a.parse().map_err(|_| bad())?, b.parse().map_err(|_| bad())?);
-        if a == 0 || b < a {
-            return Err(bad());
-        }
-        out.extend(a..=b);
-    }
-    Ok(out)
-}
-
-/// `lines`, sorted, as ranges like `3`, `5-9`.
-pub fn ranges(mut lines: Vec<u32>) -> Vec<String> {
-    lines.sort_unstable();
-    lines.dedup();
-    let mut out: Vec<String> = Vec::new();
-    let mut start = None;
-    for (i, &l) in lines.iter().enumerate() {
-        let s = *start.get_or_insert(l);
-        if lines.get(i + 1) != Some(&(l + 1)) {
-            out.push(if s == l {
-                s.to_string()
-            } else {
-                format!("{s}-{l}")
-            });
-            start = None;
-        }
-    }
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn line_specs_and_ranges_round_trip() {
-        let specs = ["3".to_string(), "5-7".into(), "9".into()];
-        let lines = parse_lines(&specs).unwrap();
-        assert_eq!(lines, [3, 5, 6, 7, 9]);
-        assert_eq!(ranges(lines), ["3", "5-7", "9"]);
-        assert!(parse_lines(&["7-5".into()]).is_err());
-        assert!(parse_lines(&["0".into()]).is_err());
-        assert!(parse_lines(&["x".into()]).is_err());
-    }
 
     #[test]
     fn requests_name_their_tool() {

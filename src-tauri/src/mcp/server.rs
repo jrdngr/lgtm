@@ -14,6 +14,8 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager};
 use tauri_specta::Event as _;
 
+use lgtm_core::review::agent;
+
 use super::{Hello, inputs, reports};
 use crate::ctx::RepoCtx;
 use crate::events::{AgentRevset, AgentShow, ReportRunChanged};
@@ -21,7 +23,7 @@ use crate::repo::Repos;
 use crate::reports::Summary;
 use crate::review::ReviewStateChanged;
 use crate::review::StateDto;
-use crate::store::{MarkColor, Stage, Take, TakeVerdict};
+use crate::store::{Stage, Take, TakeVerdict};
 
 const INSTRUCTIONS: &str = "lgtm is the code review app this terminal runs in. The human \
 reviews a change there and marks rows with colors they label, like reviewed or flagged. These tools act on the review open in \
@@ -148,11 +150,8 @@ impl Lgtm {
         json(&review)
     }
 
-    #[tool(
-        description = "Check or uncheck files in the open review as reviewed, as yourself: \
-        the human sees your checks apart from theirs. Their own checks stay as they are."
-    )]
-    async fn check_files(&self, Parameters(p): Parameters<inputs::CheckFiles>) -> Out {
+    #[tool(description = agent::CHECK_FILES)]
+    async fn check_files(&self, Parameters(p): Parameters<agent::CheckFiles>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
         let (review, state) = ctx
             .agent_check_files(self.workspace(), &p.revset, &p.paths, p.checked)
@@ -162,18 +161,10 @@ impl Lgtm {
         Ok(if p.checked { "Checked." } else { "Unchecked." }.into())
     }
 
-    #[tool(
-        description = "Mark changed lines of a file in the open review with your own marks: \
-        reviewed (counts as done) or flagged (doesn't). The human sees your marks apart from \
-        theirs, and lines they marked keep their marks. Leave mark out to clear yours. Marks \
-        show only while the human uses marks (get_review's marks)."
-    )]
-    async fn mark_lines(&self, Parameters(p): Parameters<inputs::MarkLines>) -> Out {
+    #[tool(description = agent::MARK_LINES)]
+    async fn mark_lines(&self, Parameters(p): Parameters<agent::MarkLines>) -> Out {
         let (label, ctx) = self.repo().map_err(failed)?;
-        let color = p.mark.map(|m| match m {
-            inputs::AgentMark::Reviewed => MarkColor::AgentReviewed,
-            inputs::AgentMark::Flagged => MarkColor::AgentFlagged,
-        });
+        let color = p.mark.map(agent::AgentMark::color);
         let (review, state) = ctx
             .agent_mark_lines(
                 self.workspace(),

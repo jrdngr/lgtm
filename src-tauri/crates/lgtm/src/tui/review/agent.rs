@@ -2,23 +2,14 @@
 
 use lgtm_core::anchor::Side;
 use lgtm_core::diff::{Row, RowKind};
-use lgtm_core::store::{AgentComment, MarkColor, Store};
+use lgtm_core::store::{AgentComment, Store};
 use serde_json::json;
 
-use super::marks::State;
 use super::{Review, comments};
-use crate::agent::{self, AgentMark, CheckFiles, MarkLines, Request, Response};
+use lgtm_core::review::slots;
+use lgtm_core::review::view::{About, parse_range};
 
-fn state_name(s: State) -> &'static str {
-    match s {
-        State::None => "not reviewed",
-        State::Partial => "partly reviewed",
-        State::Reviewed => "reviewed",
-        State::Agent => "reviewed by agent",
-        State::Flagged => "flagged",
-        State::AgentFlagged => "flagged by agent",
-    }
-}
+use crate::agent::{CheckFiles, MarkLines, Request, Response};
 
 fn pretty(v: serde_json::Value) -> Response {
     serde_json::to_string_pretty(&v).map_err(|e| e.to_string())
@@ -54,35 +45,20 @@ impl Review {
 
     fn get_review(&self) -> Response {
         let marks = self.marks.as_ref().ok_or("the review is still loading")?;
-        let files: Vec<_> = (0..marks.file_count())
-            .map(|i| {
-                let p = marks.progress(i);
-                let mut file = json!({
-                    "path": marks.path(i),
-                    "state": state_name(marks.state(i, None)),
-                    "done": p.done,
-                    "total": p.total,
-                });
-                if !p.left.is_empty() {
-                    file["linesLeft"] = json!(agent::ranges(p.left));
-                }
-                if !p.removed_left.is_empty() {
-                    file["removedLinesLeft"] = json!(agent::ranges(p.removed_left));
-                }
-                file
-            })
-            .collect();
-        let commits: Vec<_> = self
+        let about = About {
+            marks: true,
+            revset: &self.revset,
+            from: None,
+            to: self.changes.last().map_or("", |c| c.commit_id.as_str()),
+        };
+        let summary = marks.view().summary(about, &slots::defaults());
+        let mut review = serde_json::to_value(summary).map_err(|e| e.to_string())?;
+        review["commits"] = self
             .changes
             .iter()
             .map(|c| json!({"changeId": c.change_id, "description": c.description}))
             .collect();
-        pretty(json!({
-            "revset": self.revset,
-            "commits": commits,
-            "percentDone": marks.percent(),
-            "files": files,
-        }))
+        pretty(review)
     }
 
     fn get_comments(&self) -> Response {
@@ -215,6 +191,7 @@ impl Review {
             .iter()
             .map(|p| {
                 marks
+                    .view()
                     .file_index(p)
                     .map(|i| i as u32)
                     .ok_or_else(|| format!("`{p}` isn't in the review"))
@@ -232,14 +209,18 @@ impl Review {
         let store = store.ok_or("lgtm couldn't open its store")?;
         let marks = self.marks.as_mut().ok_or("the review is still loading")?;
         let file = marks
+            .view()
             .file_index(&m.path)
             .ok_or_else(|| format!("`{}` isn't in the review", m.path))?;
-        let lines = agent::parse_lines(&m.lines)?;
-        let removed = agent::parse_lines(&m.removed_lines)?;
-        let color = m.mark.map(|k| match k {
-            AgentMark::Reviewed => MarkColor::AgentReviewed,
-            AgentMark::Flagged => MarkColor::AgentFlagged,
-        });
+        let ranges = |specs: &[String]| {
+            specs
+                .iter()
+                .map(|s| parse_range(s).map_err(|e| format!("{e:#}")))
+                .collect::<Result<Vec<_>, _>>()
+        };
+        let lines = ranges(&m.lines)?;
+        let removed = ranges(&m.removed_lines)?;
+        let color = m.mark.map(|k| k.color());
         let n = marks
             .agent_mark(store, file, &lines, &removed, color)
             .map_err(|e| format!("{e:#}"))?;
@@ -253,5 +234,36 @@ impl Review {
         };
         let lines = if n == 1 { "line" } else { "lines" };
         Ok(format!("{verb} {n} changed {lines}."))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lgtm_core::review::agent::AgentMark;
+
+    use super::*;
+    use crate::tui::load::Target;
+
+    #[test]
+    fn get_review_lists_lines_left_and_mark_lines_takes_ranges() {
+        let mut store = Store::in_memory();
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        r.marks = Some(super::super::marks::tests::marks());
+        let left = |r: &mut Review| {
+            let text = r.answer(Request::GetReview, None).unwrap();
+            let v: serde_json::Value = serde_json::from_str(&text).unwrap();
+            v["files"][0]["left"].clone()
+        };
+        assert_eq!(left(&mut r), json!(["2", "10"]));
+        let mark = MarkLines {
+            revset: "@".into(),
+            path: "a.rs".into(),
+            lines: vec!["9-10".into()],
+            removed_lines: vec![],
+            mark: Some(AgentMark::Reviewed),
+        };
+        let said = r.answer(Request::MarkLines(mark), Some(&mut store));
+        assert_eq!(said.as_deref(), Ok("Marked 1 changed line."));
+        assert_eq!(left(&mut r), json!(["2"]));
     }
 }

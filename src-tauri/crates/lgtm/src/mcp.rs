@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use lgtm_core::review::agent as review_agent;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
@@ -38,11 +39,7 @@ impl Tui {
 
 #[tool_router]
 impl Tui {
-    #[tool(
-        description = "The open review as the human has reviewed it so far: its revset and \
-        commits, how much is done, and per file its state, how many changed rows count as \
-        done, and the line ranges still left."
-    )]
+    #[tool(description = review_agent::GET_REVIEW)]
     async fn get_review(&self) -> Response {
         self.ask(Request::GetReview).await
     }
@@ -70,19 +67,12 @@ impl Tui {
         self.ask(Request::UnresolveComment(p)).await
     }
 
-    #[tool(
-        description = "Check or uncheck files in the open review as reviewed, as yourself: \
-        the human sees your checks apart from theirs. Their own checks stay as they are."
-    )]
+    #[tool(description = review_agent::CHECK_FILES)]
     async fn check_files(&self, Parameters(p): Parameters<CheckFiles>) -> Response {
         self.ask(Request::CheckFiles(p)).await
     }
 
-    #[tool(
-        description = "Mark changed lines of a file in the open review with your own marks: \
-        reviewed (counts as done) or flagged (doesn't). The human sees your marks apart from \
-        theirs, and lines they marked keep their marks. Leave mark out to clear yours."
-    )]
+    #[tool(description = review_agent::MARK_LINES)]
     async fn mark_lines(&self, Parameters(p): Parameters<MarkLines>) -> Response {
         self.ask(Request::MarkLines(p)).await
     }
