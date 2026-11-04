@@ -342,6 +342,7 @@ impl Review {
             }
             NoteKey::Input => {
                 let lines = self.input_lines();
+                let (at_line, at_col) = self.input_cursor();
                 let border = theme::fg(ACCENT).bg(BG);
                 c.fill(x0, y, w, BG);
                 let inner = w.saturating_sub(2) as usize;
@@ -353,16 +354,12 @@ impl Review {
                     }
                     _ if part <= lines.len() => {
                         c.put(x0, y, "│", border);
-                        // The last line ends in the cursor's room, which the cursor takes.
                         let line = lines[part - 1].as_str();
-                        let text = if part == lines.len() {
-                            line.strip_suffix(' ').unwrap_or(line)
-                        } else {
-                            line
-                        };
-                        let x = c.put(x0 + 2, y, text, theme::fg(FG).bg(BG));
-                        if part == lines.len() {
-                            c.put(x, y, "▏", theme::bold(FG).bg(BG));
+                        c.put(x0 + 2, y, line, theme::fg(FG).bg(BG));
+                        if part - 1 == at_line {
+                            let under = line.chars().nth(at_col).unwrap_or(' ');
+                            let x = x0 + 2 + at_col as u16;
+                            c.put(x, y, &under.to_string(), theme::fg(BG).bg(FG));
                         }
                         c.put(x0 + w - 1, y, "│", border);
                     }

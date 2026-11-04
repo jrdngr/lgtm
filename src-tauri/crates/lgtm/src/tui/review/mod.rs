@@ -5,6 +5,7 @@ mod command;
 mod comments;
 mod draw;
 mod edit;
+mod field;
 mod list;
 mod marking;
 pub mod marks;
@@ -664,6 +665,14 @@ impl Review {
                 match line {
                     Some(&Line::File(f)) if on_check => self.click_check(f, store),
                     Some(&Line::File(f)) => self.toggle_file(f),
+                    Some(&Line::Note {
+                        key: rows::NoteKey::Input,
+                        part,
+                        ..
+                    }) if part > 0 => {
+                        let col = ev.column.saturating_sub(self.diff_area.x + 4);
+                        self.click_input(part - 1, col as usize);
+                    }
                     Some(&l) => {
                         self.cursor = i;
                         self.anchor = Some(l);
@@ -722,7 +731,11 @@ impl Review {
             ];
         }
         if self.typing() {
-            return vec![("Enter", "save", false), ("Esc", "cancel", false)];
+            return vec![
+                ("Enter", "save", false),
+                ("S-Enter", "new line", false),
+                ("Esc", "cancel", false),
+            ];
         }
         if self.selecting.is_some() {
             return vec![

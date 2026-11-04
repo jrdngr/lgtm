@@ -8,6 +8,7 @@ use lgtm_core::store::{AgentComment, Store};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::Review;
+use super::field::{Field, Typed};
 use super::rows::{Line, NoteKey, Notes};
 use super::undo::Step;
 use super::wrap::wrap;
@@ -22,7 +23,7 @@ pub struct Input {
     /// Whether this edits comment `number` rather than writing a new one.
     editing: bool,
     number: i64,
-    pub text: String,
+    pub field: Field,
 }
 
 /// A comment, and the file, hunk and row it's on now. `None` when its code is gone.
@@ -123,10 +124,37 @@ impl Review {
         wrap(&c.body, self.width.saturating_sub(5 + id))
     }
 
-    /// The comment being written, wrapped inside its box, with room for the cursor.
+    /// How wide the comment being written wraps, inside its box with room for the cursor.
+    fn input_width(&self) -> usize {
+        self.width.saturating_sub(9).max(4)
+    }
+
+    /// The comment being written, wrapped inside its box.
     pub(super) fn input_lines(&self) -> Vec<String> {
-        let text = self.input.as_ref().map_or("", |i| i.text.as_str());
-        wrap(&format!("{text} "), self.width.saturating_sub(9))
+        let Some(i) = &self.input else {
+            return vec![String::new()];
+        };
+        let chars: Vec<char> = i.field.text.chars().collect();
+        i.field
+            .lines(self.input_width())
+            .into_iter()
+            .map(|r| chars[r].iter().collect())
+            .collect()
+    }
+
+    /// The cursor's line and column in [`Self::input_lines`].
+    pub(super) fn input_cursor(&self) -> (usize, usize) {
+        self.input
+            .as_ref()
+            .map_or((0, 0), |i| i.field.spot(self.input_width()))
+    }
+
+    /// Puts the cursor in the comment being written at its line `line` and column `col`.
+    pub(super) fn click_input(&mut self, line: usize, col: usize) {
+        let width = self.input_width();
+        if let Some(i) = self.input.as_mut() {
+            i.field.place(width, line, col);
+        }
     }
 
     /// How many open comments a file has: the agent's, and its PR threads while they show.
@@ -173,7 +201,7 @@ impl Review {
                     start,
                     editing: false,
                     number,
-                    text: String::new(),
+                    field: Field::default(),
                 });
                 self.relayout();
             }
@@ -197,7 +225,7 @@ impl Review {
             start: None,
             editing: true,
             number,
-            text: c.body.clone(),
+            field: Field::new(&c.body),
         });
         self.relayout();
     }
@@ -225,6 +253,7 @@ impl Review {
 
     /// Handles a key while writing a comment.
     pub(super) fn input_key(&mut self, key: KeyEvent, store: Option<&Store>) {
+        let width = self.input_width();
         let Some(input) = self.input.as_mut() else {
             return;
         };
@@ -233,9 +262,13 @@ impl Review {
                 self.input = None;
                 self.relayout();
             }
-            KeyCode::Enter => {
+            KeyCode::Enter
+                if !key
+                    .modifiers
+                    .intersects(KeyModifiers::SHIFT | KeyModifiers::ALT) =>
+            {
                 let input = self.input.take().expect("checked above");
-                let body = input.text.trim();
+                let body = input.field.text.trim();
                 if let (false, Some(store)) = (body.is_empty(), store) {
                     let saved = if input.editing {
                         let before = self.comment(input.number).map(|c| c.body.clone());
@@ -260,15 +293,11 @@ impl Review {
                     self.relayout();
                 }
             }
-            KeyCode::Backspace => {
-                input.text.pop();
-                self.relayout();
+            _ => {
+                if input.field.key(key, width) == Typed::Changed {
+                    self.relayout();
+                }
             }
-            KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                input.text.push(c);
-                self.relayout();
-            }
-            _ => {}
         }
     }
 
