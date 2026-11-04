@@ -567,12 +567,12 @@ impl App {
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));
-                if let Some((doing, since)) = self.busy {
+                self.home.busy = self.busy.map(|(doing, since)| {
                     let frame =
                         SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
-                    let text = format!("{frame} {doing}…");
-                    c.put_right(top, 1, &text, theme::fg(CYAN).bg(PANEL));
-                } else if let Some(n) = &self.home.notice {
+                    format!("{frame} {doing}…")
+                });
+                if let Some(n) = &self.home.notice {
                     c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));
                 }
                 self.home.draw(c, body);

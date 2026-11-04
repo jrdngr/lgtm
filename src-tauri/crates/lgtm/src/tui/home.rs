@@ -10,7 +10,7 @@ use super::load::Target;
 use super::motions::{self, Menu};
 use super::paint::Canvas;
 use super::picker::{self, Picker};
-use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED};
+use super::theme::{self, ACCENT, BG, CYAN, FG, HAIR, MUTED};
 use super::width;
 use lgtm_core::jj::{JjAction, PushPlan};
 
@@ -42,6 +42,9 @@ pub struct Home {
     cmd: Option<String>,
     /// A failure to show until the next key.
     pub notice: Option<String>,
+    /// What a running jj action on the revisions is doing, with its spinner frame, shown in
+    /// the Revisions header.
+    pub busy: Option<String>,
     /// The jj menu, while it's open.
     menu: Option<Menu>,
     /// The revisions side's width, once `<` or `>` set it.
@@ -64,6 +67,7 @@ impl Default for Home {
             focus: Focus::Revisions,
             cmd: None,
             notice: None,
+            busy: None,
             menu: None,
             revisions_width: None,
             drawn_width: 0,
@@ -337,6 +341,9 @@ impl Home {
                 .draw(&mut sub, left, self.focus == Focus::Revisions);
             let style = theme::title(self.focus == Focus::Revisions);
             sub.put(left.x + 1, left.y, "Revisions", style.bg(BG));
+            if let Some(busy) = &self.busy {
+                sub.put_right(left.y, 1, busy, theme::fg(CYAN).bg(BG));
+            }
         }
         for y in body.y..body.bottom() {
             c.put(body.x + left_w, y, "│", theme::fg(HAIR).bg(BG));
