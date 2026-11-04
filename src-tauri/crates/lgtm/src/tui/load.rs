@@ -84,6 +84,8 @@ pub enum Msg {
     Acted(anyhow::Result<u32>),
     /// The bookmarks nearest a commit, for Set bookmark.
     Bookmarks(anyhow::Result<Vec<String>>),
+    /// What a push would do.
+    PushPlan(anyhow::Result<lgtm_core::jj::PushPlan>),
 }
 
 /// How many files are read and highlighted at once.
@@ -131,6 +133,14 @@ impl Loader {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let _ = tx.send(Msg::Acted(jj.act(&action).await));
+        });
+    }
+
+    /// Finds what a push would do.
+    pub fn push_plan(&self) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let _ = tx.send(Msg::PushPlan(jj.push_plan().await));
         });
     }
 

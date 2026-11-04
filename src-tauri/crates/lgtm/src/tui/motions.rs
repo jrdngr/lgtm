@@ -1,7 +1,8 @@
 //! The jj menu on the revisions side, as the app's ⌘J: Space, then a motion's keys. Some ask
-//! for a name or a description first, and Set bookmark picks one of the nearest bookmarks.
+//! for a name or a description first, Set bookmark picks one of the nearest bookmarks, and a
+//! push that would create bookmarks on the remote asks first.
 
-use lgtm_core::jj::JjAction;
+use lgtm_core::jj::{JjAction, PushPlan};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +60,10 @@ enum State {
     Loading,
     /// Picking one of them by its number.
     Pick(Vec<String>),
+    /// Waiting for what a push would do.
+    Planning,
+    /// Asking whether to push new bookmarks.
+    Confirm(PushPlan),
 }
 
 pub struct Menu {
@@ -74,6 +79,8 @@ pub enum Step {
     Run(JjAction),
     /// Load the bookmarks nearest the cursor's commit.
     Bookmarks(String),
+    /// Find which bookmarks a push would create on the remote.
+    PushPlan,
 }
 
 /// A description's first line, which Describe edits.
@@ -143,6 +150,10 @@ impl Menu {
                 self.state = State::Loading;
                 Step::Bookmarks(self.target.cursor.clone())
             }
+            Kind::Push => {
+                self.state = State::Planning;
+                Step::PushPlan
+            }
             _ => Step::Run(self.action(kind, "")),
         }
     }
@@ -183,7 +194,15 @@ impl Menu {
                 }
                 _ => Step::Stay,
             },
-            State::Loading => Step::Stay,
+            State::Loading | State::Planning => Step::Stay,
+            State::Confirm(plan) => match key.code {
+                KeyCode::Char('y') => Step::Run(JjAction::Push {
+                    remote: Some(plan.remote.clone()),
+                    range: Some(plan.range.clone()),
+                    new_bookmarks: plan.new_bookmarks.clone(),
+                }),
+                _ => Step::Close,
+            },
             State::Pick(names) => {
                 let picked = match key.code {
                     KeyCode::Char(c) => c
@@ -214,9 +233,27 @@ impl Menu {
         }
     }
 
-    /// The bottom line while typing.
+    /// Takes what a push would do: pushes when it makes no new bookmarks, else asks.
+    pub fn push_plan(&mut self, plan: PushPlan) -> Step {
+        if plan.new_bookmarks.is_empty() {
+            return Step::Run(self.action(Kind::Push, ""));
+        }
+        self.state = State::Confirm(plan);
+        Step::Stay
+    }
+
+    /// The bottom line while typing or asking.
     pub fn prompt(&self) -> Option<String> {
         match &self.state {
+            State::Confirm(plan) => {
+                let noun = if plan.new_bookmarks.len() == 1 {
+                    "bookmark"
+                } else {
+                    "bookmarks"
+                };
+                let names = plan.new_bookmarks.join(", ");
+                Some(format!("Push new {noun} {names} to {}? y/n", plan.remote))
+            }
             State::Ask(Kind::Describe, text) => Some(format!("Describe: {text}")),
             State::Ask(_, text) => Some(format!("Bookmark name: {text}")),
             _ => None,
@@ -246,12 +283,13 @@ impl Menu {
                 out
             }
             State::Loading => vec![(String::new(), "Loading bookmarks")],
+            State::Planning => vec![(String::new(), "Checking the push")],
             State::Pick(names) => names
                 .iter()
                 .enumerate()
                 .map(|(i, n)| (format!("{} {n}", i + 1), "Set bookmark"))
                 .collect(),
-            State::Ask(..) => vec![],
+            State::Ask(..) | State::Confirm(_) => vec![],
         }
     }
 }
@@ -305,6 +343,44 @@ mod tests {
                 message: "old name\n\nbody".into()
             })
         );
+    }
+
+    #[test]
+    fn a_push_making_new_bookmarks_names_them_once_confirmed() {
+        let plan = |names: &[&str]| PushPlan {
+            remote: "origin".into(),
+            range: "r".into(),
+            new_bookmarks: names.iter().map(|n| n.to_string()).collect(),
+        };
+        let mut m = menu();
+        assert_eq!(keys(&mut m, "gp"), Step::PushPlan);
+        assert_eq!(
+            m.push_plan(plan(&[])),
+            Step::Run(JjAction::Push {
+                remote: None,
+                range: None,
+                new_bookmarks: vec![]
+            })
+        );
+        let mut m = menu();
+        keys(&mut m, "gp");
+        assert_eq!(m.push_plan(plan(&["feat"])), Step::Stay);
+        assert_eq!(
+            m.prompt().as_deref(),
+            Some("Push new bookmark feat to origin? y/n")
+        );
+        assert_eq!(
+            keys(&mut m, "y"),
+            Step::Run(JjAction::Push {
+                remote: Some("origin".into()),
+                range: Some("r".into()),
+                new_bookmarks: vec!["feat".into()]
+            })
+        );
+        let mut m = menu();
+        keys(&mut m, "gp");
+        m.push_plan(plan(&["feat"]));
+        assert_eq!(keys(&mut m, "n"), Step::Close);
     }
 
     #[test]

@@ -11,7 +11,7 @@ use super::motions::{self, Menu};
 use super::paint::Canvas;
 use super::picker::{self, Picker};
 use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED};
-use lgtm_core::jj::JjAction;
+use lgtm_core::jj::{JjAction, PushPlan};
 
 pub enum Outcome {
     None,
@@ -22,6 +22,8 @@ pub enum Outcome {
     Jj(JjAction),
     /// Load the bookmarks nearest this commit, for the jj menu.
     Bookmarks(String),
+    /// Find what a push would do, for the jj menu.
+    PushPlan,
     Quit,
 }
 
@@ -150,6 +152,25 @@ impl Home {
                 Outcome::Jj(action)
             }
             motions::Step::Bookmarks(rev) => Outcome::Bookmarks(rev),
+            motions::Step::PushPlan => Outcome::PushPlan,
+        }
+    }
+
+    /// Takes what a push would do, for the jj menu.
+    pub fn push_plan(&mut self, plan: anyhow::Result<PushPlan>) -> Outcome {
+        let Some(menu) = self.menu.as_mut() else {
+            return Outcome::None;
+        };
+        match plan {
+            Ok(plan) => {
+                let step = menu.push_plan(plan);
+                self.menu_step(step)
+            }
+            Err(e) => {
+                self.notice = Some(format!("{e:#}"));
+                self.menu = None;
+                Outcome::None
+            }
         }
     }
 

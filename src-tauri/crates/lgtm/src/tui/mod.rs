@@ -344,6 +344,11 @@ impl App {
                     self.loader.act(action);
                 }
             }
+            Msg::PushPlan(plan) => {
+                if let home::Outcome::Jj(action) = self.home.push_plan(plan) {
+                    self.loader.act(action);
+                }
+            }
             Msg::Changed => {
                 self.buffers.bases_stale();
                 self.reload();
@@ -469,6 +474,7 @@ impl App {
             },
             home::Outcome::Jj(action) => self.loader.act(action),
             home::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
+            home::Outcome::PushPlan => self.loader.push_plan(),
             home::Outcome::Quit => return true,
             home::Outcome::None => {}
         }
