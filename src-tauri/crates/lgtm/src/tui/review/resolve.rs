@@ -89,6 +89,10 @@ mod tests {
         assert!(r.comment(1).unwrap().done);
         assert_eq!(r.comment_at_cursor(), Some(1));
         assert_eq!(r.open_comments(0), 0);
+        assert_eq!(r.resolved_comments(0), 0);
+        r.show_resolved = true;
+        assert_eq!(r.resolved_comments(0), 1);
+        r.show_resolved = false;
         press(&mut r, KeyCode::Char('k'));
         assert_eq!(on(&r), None);
         r.key(key('u'), Some(&mut store));

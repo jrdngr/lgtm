@@ -29,7 +29,8 @@ pub struct Input {
 /// A comment, and the file, hunk and row it's on now. `None` when its code is gone.
 pub type Placed = (AgentComment, Option<(usize, usize, usize)>);
 
-/// Where `c` is in `files`: the row on its side with its code, nearest its line.
+/// Where `c` is in `files`: the row on its side with its code, nearest its line. A resolved
+/// comment whose code is gone goes on the row nearest its line instead.
 pub fn place(files: &[FileDiff], c: &AgentComment) -> Option<(usize, usize, usize)> {
     let (f, file) = files
         .iter()
@@ -40,14 +41,22 @@ pub fn place(files: &[FileDiff], c: &AgentComment) -> Option<(usize, usize, usiz
         Side::Old if r.kind != RowKind::Added => r.old_line,
         _ => None,
     };
-    file.hunks
-        .iter()
-        .enumerate()
-        .flat_map(|(h, hunk)| hunk.rows.iter().enumerate().map(move |(i, r)| (h, i, r)))
-        .filter(|(_, _, r)| r.text == c.line_text)
-        .filter_map(|(h, i, r)| Some((h, i, line(r)?.abs_diff(c.line))))
-        .min_by_key(|&(_, _, d)| d)
-        .map(|(h, i, _)| (f, h, i))
+    let rows = || {
+        file.hunks
+            .iter()
+            .enumerate()
+            .flat_map(|(h, hunk)| hunk.rows.iter().enumerate().map(move |(i, r)| (h, i, r)))
+    };
+    let nearest = |rows: &mut dyn Iterator<Item = (usize, usize, &Row)>| {
+        rows.filter_map(|(h, i, r)| Some((h, i, line(r)?.abs_diff(c.line))))
+            .min_by_key(|&(_, _, d)| d)
+            .map(|(h, i, _)| (f, h, i))
+    };
+    let same = nearest(&mut rows().filter(|(_, _, r)| r.text == c.line_text));
+    if same.is_some() || !c.done {
+        return same;
+    }
+    nearest(&mut rows())
 }
 
 impl Review {
@@ -171,6 +180,18 @@ impl Review {
             self.threads.iter().filter(|t| t.file == file).count()
         };
         comments + threads
+    }
+
+    /// How many of a file's comments are resolved, while resolved ones show; else none.
+    pub(super) fn resolved_comments(&self, file: usize) -> usize {
+        if !self.show_resolved {
+            return 0;
+        }
+        let path = &self.files[file].path;
+        self.comments
+            .iter()
+            .filter(|(c, _)| &c.path == path && c.done)
+            .count()
     }
 
     pub(super) fn comment(&self, number: i64) -> Option<&AgentComment> {
@@ -404,5 +425,11 @@ mod tests {
             Some((0, 0, 2))
         );
         assert_eq!(place(&files, &comment(Side::New, 2, "gone();")), None);
+        // Resolved, it goes on the nearest row of its side instead.
+        let resolved = AgentComment {
+            done: true,
+            ..comment(Side::New, 4, "gone();")
+        };
+        assert_eq!(place(&files, &resolved), Some((0, 0, 3)));
     }
 }

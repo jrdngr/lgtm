@@ -177,13 +177,17 @@ impl Review {
                 if self.unsaved.contains(&self.files[*file].path) {
                     c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
                 }
-                // The counts on the right, open comments left of them, over the name's end if
-                // need be.
+                // The counts on the right, open comments left of them and resolved ones left
+                // of those, over the name's end if need be.
                 let (added, removed) = counts(&self.files[*file]);
                 let open = self.open_comments(*file);
+                let resolved = self.resolved_comments(*file);
                 let mut parts = vec![(format!("+{added}"), GREEN), (format!("−{removed}"), RED)];
                 if open > 0 {
                     parts.insert(0, (format!("{open}"), ACCENT));
+                }
+                if resolved > 0 {
+                    parts.insert(0, (format!("✓{resolved}"), FG));
                 }
                 let width: usize = parts.iter().map(|(t, _)| t.chars().count() + 1).sum();
                 let mut x = area.right().saturating_sub(width as u16).max(area.x);
