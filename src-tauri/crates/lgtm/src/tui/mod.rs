@@ -38,6 +38,9 @@ use settings::Settings;
 use term::Term;
 use theme::{ACCENT, BG, CYAN, FG, PANEL, RED};
 
+/// The frames of the spinner a running jj action shows.
+const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 /// The store of the repo the workspace at `root` belongs to, shared with the desktop app.
 pub fn store(root: &Path) -> Option<Store> {
     paths::data_dir()
@@ -109,6 +112,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         version: store.as_ref().and_then(|s| s.data_version().ok()),
         store,
         polled: Instant::now(),
+        busy: None,
         shift: false,
         home: home::Home::default(),
         review: None,
@@ -176,6 +180,8 @@ struct App {
     /// The store's data version when last read, to notice the app's writes.
     version: Option<i64>,
     polled: Instant,
+    /// The jj action running, and since when.
+    busy: Option<(&'static str, Instant)>,
     /// Whether Shift is held, where the terminal reports it.
     shift: bool,
     /// The review's toggles, as last left.
@@ -336,18 +342,22 @@ impl App {
                 }
             }
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
-            Msg::Acted(result) => match result {
-                Ok(_) => self.loader.log(),
-                Err(e) => self.home.notice = Some(format!("{e:#}")),
-            },
+            Msg::Acted(result) => {
+                self.busy = None;
+                match result {
+                    Ok(_) => self.loader.log(),
+                    Err(e) => self.home.notice = Some(format!("{e:#}")),
+                }
+            }
             Msg::Bookmarks(found) => {
                 if let home::Outcome::Jj(action) = self.home.bookmarks(found) {
-                    self.loader.act(action);
+                    self.act(action);
                 }
             }
             Msg::PushPlan(plan) => {
+                self.busy = None;
                 if let home::Outcome::Jj(action) = self.home.push_plan(plan) {
-                    self.loader.act(action);
+                    self.act(action);
                 }
             }
             Msg::Changed => {
@@ -482,9 +492,12 @@ impl App {
                 }
                 Err(e) => self.buffers.notice = Some(format!("couldn't open {path}: {e}")),
             },
-            home::Outcome::Jj(action) => self.loader.act(action),
+            home::Outcome::Jj(action) => self.act(action),
             home::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
-            home::Outcome::PushPlan => self.loader.push_plan(),
+            home::Outcome::PushPlan => {
+                self.busy = Some(("checking the push", Instant::now()));
+                self.loader.push_plan();
+            }
             home::Outcome::Quit => return true,
             home::Outcome::None => {}
         }
@@ -533,7 +546,12 @@ impl App {
             }
             None => {
                 c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));
-                if let Some(n) = &self.home.notice {
+                if let Some((doing, since)) = self.busy {
+                    let frame =
+                        SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
+                    let text = format!("{frame} {doing}…");
+                    c.put_right(top, 1, &text, theme::fg(CYAN).bg(PANEL));
+                } else if let Some(n) = &self.home.notice {
                     c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));
                 }
                 self.home.draw(c, body);
@@ -556,6 +574,12 @@ impl App {
 }
 
 impl App {
+    /// Runs a jj action, showing it as running until it's done.
+    fn act(&mut self, action: lgtm_core::jj::JjAction) {
+        self.busy = Some((motions::doing(&action), Instant::now()));
+        self.loader.act(action);
+    }
+
     fn draw_editor(&mut self, c: &mut Canvas, x: u16, body: Rect) {
         let (top, bottom) = (c.area.y, c.area.bottom() - 1);
         let e = &mut self.buffers;

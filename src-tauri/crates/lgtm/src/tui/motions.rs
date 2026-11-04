@@ -297,6 +297,25 @@ impl Menu {
     }
 }
 
+/// What the app shows while `action` runs.
+pub fn doing(action: &JjAction) -> &'static str {
+    match action {
+        JjAction::Edit { .. } => "editing",
+        JjAction::Undo { .. } => "undoing",
+        JjAction::Redo { .. } => "redoing",
+        JjAction::NewAfter { .. } | JjAction::NewBefore { .. } => "making a change",
+        JjAction::Discard { .. } => "discarding",
+        JjAction::Squash { .. } => "squashing",
+        JjAction::RebaseOnTrunk { .. } => "rebasing",
+        JjAction::BookmarkAdvance
+        | JjAction::BookmarkCreate { .. }
+        | JjAction::BookmarkSet { .. } => "moving bookmarks",
+        JjAction::Describe { .. } => "describing",
+        JjAction::Fetch => "fetching",
+        JjAction::Push { .. } => "pushing",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
