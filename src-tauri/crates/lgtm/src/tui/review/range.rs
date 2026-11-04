@@ -23,6 +23,24 @@ impl Review {
         Some(at.min(self.cursor)..=at.max(self.cursor))
     }
 
+    /// The lines shown as picked: the selection, else the rows of the comment being written
+    /// or the cursor's comment.
+    pub(super) fn picked_lines(&self) -> Option<RangeInclusive<usize>> {
+        if let Some(s) = self.selection() {
+            return Some(s);
+        }
+        let (file, start, end) = self.commented_rows()?;
+        let at = |(h, r): HunkRow| {
+            move |l: &Line| {
+                matches!(*l, Line::Code { file: f, hunk, old, new, .. }
+                    if f == file && hunk == h && (old == Some(r) || new == Some(r)))
+            }
+        };
+        let first = self.lines.iter().position(at(start))?;
+        let last = self.lines.iter().rposition(at(end))?;
+        Some(first..=last)
+    }
+
     /// The first and last code rows of the selection, as (hunk, row), in its last row's file,
     /// with that file. Without a selection, the cursor's row.
     pub(super) fn selected_rows(&self) -> Option<(usize, HunkRow, HunkRow)> {

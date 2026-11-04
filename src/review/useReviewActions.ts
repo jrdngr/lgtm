@@ -143,7 +143,7 @@ export function useReviewActions(d: Deps) {
     finishAction();
   }
 
-  /** Opens a comment for the agent on the selection. */
+  /** Opens a comment for the agent on the selection, which stays selected. */
   function startComment() {
     const draft = agentDraftFor(files, lines, sel.start, sel.end);
     if (!draft) {
@@ -151,8 +151,8 @@ export function useReviewActions(d: Deps) {
       return;
     }
     setError(undefined);
+    // The selection stays, showing the rows the comment is on.
     d.agent.start(draft);
-    finishAction();
   }
 
   function pick(action: MenuAction) {

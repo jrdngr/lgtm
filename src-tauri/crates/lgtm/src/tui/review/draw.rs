@@ -241,7 +241,7 @@ impl Review {
             self.top = (self.cursor + margin + 1).saturating_sub(height);
         }
         self.drawn_cursor = self.cursor;
-        let selection = self.selection();
+        let selection = self.picked_lines();
         let selecting = self.selecting.is_some();
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;

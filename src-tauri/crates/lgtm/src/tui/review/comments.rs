@@ -26,6 +26,9 @@ pub struct Input {
     pub field: Field,
 }
 
+/// A comment's file and its first and last (hunk, row).
+pub type CommentedRows = (usize, (usize, usize), (usize, usize));
+
 /// A comment, and the file, hunk and row it's on now. `None` when its code is gone.
 pub type Placed = (AgentComment, Option<(usize, usize, usize)>);
 
@@ -193,6 +196,30 @@ impl Review {
             .iter()
             .map(|(c, _)| c)
             .find(|c| c.number == number)
+    }
+
+    /// The rows the comment being written is on, else those of the comment the cursor is on,
+    /// as their file and first and last (hunk, row).
+    pub(super) fn commented_rows(&self) -> Option<CommentedRows> {
+        if let Some(i) = &self.input {
+            return Some((i.file, i.start.unwrap_or((i.hunk, i.row)), (i.hunk, i.row)));
+        }
+        let Some(Line::Note {
+            key: NoteKey::Comment(number),
+            ..
+        }) = self.current()
+        else {
+            return None;
+        };
+        let (c, (file, hunk, row)) = self
+            .comments
+            .iter()
+            .find_map(|(c, at)| Some((c, (*at)?)).filter(|(c, _)| c.number == number))?;
+        let start = core::start_of(c)
+            .and_then(|s| core::place(rows(&self.files[file]), &s))
+            .filter(|&s| s <= (hunk, row))
+            .unwrap_or((hunk, row));
+        Some((file, start, (hunk, row)))
     }
 
     pub(super) fn input_number(&self) -> i64 {
@@ -368,6 +395,65 @@ mod tests {
             created_at: 0,
             done: false,
         }
+    }
+
+    fn diff() -> FileDiff {
+        FileDiff {
+            path: "a.rs".into(),
+            old_path: None,
+            status: FileStatus::Modified,
+            binary: false,
+            conflict: false,
+            old_exec: false,
+            new_exec: false,
+            blobs: None,
+            hunks: vec![Hunk {
+                old_start: 1,
+                old_lines: 3,
+                new_start: 1,
+                new_lines: 3,
+                section: String::new(),
+                rows: vec![
+                    row(RowKind::Context, Some(1), Some(1), "}"),
+                    row(RowKind::Removed, Some(2), None, "x();"),
+                    row(RowKind::Added, None, Some(2), "x();"),
+                    row(RowKind::Context, Some(3), Some(3), "}"),
+                ],
+            }],
+        }
+    }
+
+    #[test]
+    fn the_rows_of_a_comment_being_written_or_under_the_cursor_show_picked() {
+        let store = Store::in_memory();
+        let mut r = Review::new(1, crate::tui::load::Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![diff()])));
+        let line_of = |r: &Review, row: usize| {
+            r.lines
+                .iter()
+                .position(|l| matches!(*l, Line::Code { old, new, .. } if new.or(old) == Some(row)))
+                .unwrap()
+        };
+        r.cursor = line_of(&r, 0);
+        r.extend(2);
+        let picked = r.picked_lines();
+        r.start_comment(Some(&store));
+        // The selection goes, but its rows stay picked while the comment is written.
+        assert!(r.selection().is_none());
+        assert_eq!(r.picked_lines(), picked);
+        r.input = None;
+        assert_eq!(r.picked_lines(), None);
+
+        let mut c = comment(Side::New, 2, "x();");
+        c.start = Some((1, "}".into()));
+        store.add_agent_comment(&c).unwrap();
+        r.load_comments(&store);
+        r.cursor = r
+            .lines
+            .iter()
+            .position(|l| matches!(l, Line::Note { .. }))
+            .unwrap();
+        assert_eq!(r.picked_lines(), Some(line_of(&r, 0)..=line_of(&r, 2)));
     }
 
     #[test]
