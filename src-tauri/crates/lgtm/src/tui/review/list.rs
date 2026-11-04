@@ -46,7 +46,7 @@ impl Review {
     }
 
     /// The list's lines: every file, or with reviewed files set apart, the files left and
-    /// then the reviewed ones under a heading.
+    /// then the reviewed ones without open comments under a heading.
     pub(super) fn entries(&self) -> Vec<Entry> {
         let path = |e: &Entry| match e {
             Entry::Dir { path, .. } => Some(path.clone()),
@@ -82,7 +82,9 @@ impl Review {
         if !self.group_reviewed {
             return tree::tree(files, 0);
         }
-        let (done, left): (Vec<_>, Vec<_>) = files.partition(|&(i, _)| self.reviewed(i));
+        // A reviewed file with open comments stays with the files left.
+        let (done, left): (Vec<_>, Vec<_>) =
+            files.partition(|&(i, _)| self.reviewed(i) && self.open_comments(i) == 0);
         let mut out = tree::tree(left, 0);
         if !done.is_empty() {
             out.push(Entry::Reviewed {
@@ -242,5 +244,37 @@ mod tests {
         assert_eq!(combined([Reviewed, Agent]), Agent);
         assert_eq!(combined([Reviewed, None]), Partial);
         assert_eq!(combined([None, None]), None);
+    }
+
+    #[test]
+    fn a_reviewed_file_with_open_comments_stays_shown_but_folded_until_they_are_resolved() {
+        use lgtm_core::anchor::Side;
+        use lgtm_core::store::{AgentComment, Store};
+        let mut store = Store::in_memory();
+        let mut r = Review::new(1, crate::tui::load::Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![super::super::tests::file("a.rs", 2)])));
+        r.marks = Some(super::super::marks::tests::marks());
+        r.group_reviewed = true;
+        let comment = AgentComment {
+            id: 0,
+            number: 0,
+            path: "a.rs".into(),
+            side: Side::New,
+            line: 1,
+            line_text: String::new(),
+            start: Option::None,
+            body: "why?".into(),
+            review: "@".into(),
+            created_at: 0,
+            done: false,
+        };
+        store.add_agent_comment(&comment).unwrap();
+        r.load_comments(&store);
+        r.click_check(0, Some(&mut store));
+        assert!(r.reviewed(0) && r.folded.contains("a.rs"));
+        assert_eq!(r.list_order(), vec![0]);
+        store.set_agent_comment_done(1, true).unwrap();
+        r.load_comments(&store);
+        assert!(r.list_order().is_empty());
     }
 }

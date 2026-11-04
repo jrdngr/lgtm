@@ -253,12 +253,7 @@ impl Review {
                 .hunk()
                 .and_then(|h| bar(self.hunk_state(line.file(), h)));
             match line {
-                Line::File(f) => {
-                    let folded = self.folded.contains(&self.files[f].path);
-                    let unsaved = self.unsaved.contains(&self.files[f].path);
-                    let check = self.file_check(f);
-                    file_header(c, y, &self.files[f], check, folded, unsaved, cursor)
-                }
+                Line::File(f) => self.file_header(c, y, f, cursor),
                 Line::Gap(_) => {
                     c.put(area.x, y, &"─".repeat(area.width.into()), theme::fg(FAINT));
                 }
@@ -297,10 +292,49 @@ impl Review {
             Some(line) => Some(line.file()),
         };
         if let Some(f) = self.sticky {
-            let folded = self.folded.contains(&self.files[f].path);
-            let unsaved = self.unsaved.contains(&self.files[f].path);
-            let check = self.file_check(f);
-            file_header(c, area.y, &self.files[f], check, folded, unsaved, false);
+            self.file_header(c, area.y, f, false);
+        }
+    }
+
+    /// A file's header: its checkbox, cyan when an agent checked it, then `▸` when it's
+    /// folded, its path, and after its row counts its open comments and resolved ones.
+    fn file_header(&self, c: &mut Canvas, y: u16, file: usize, cursor: bool) {
+        let f = &self.files[file];
+        let bg = if cursor { SEL } else { PANEL };
+        let x0 = c.area.x;
+        c.fill(x0, y, c.area.width, bg);
+        let mut x = c.put(x0 + CHECK_X.start, y, "[", theme::fg(MUTED).bg(bg));
+        x = match self.file_check(file) {
+            Some(agent) => c.put(
+                x,
+                y,
+                "✓",
+                theme::fg(if agent { CYAN } else { GREEN }).bg(bg),
+            ),
+            None => c.put(x, y, " ", theme::fg(MUTED).bg(bg)),
+        };
+        x = c.put(x, y, "] ", theme::fg(MUTED).bg(bg));
+        if self.folded.contains(&f.path) {
+            x = c.put(x, y, "▸ ", theme::fg(MUTED).bg(bg));
+        }
+        if let Some(old) = &f.old_path {
+            x = c.put(x, y, old, theme::fg(MUTED).bg(bg));
+            x = c.put(x, y, " → ", theme::fg(MUTED).bg(bg));
+        }
+        x = c.put(x, y, &f.path, theme::bold(FG).bg(bg));
+        if self.unsaved.contains(&f.path) {
+            x = c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
+        }
+        let (added, removed) = counts(f);
+        x = c.put(x + 2, y, &format!("+{added}"), theme::fg(GREEN).bg(bg));
+        x = c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(bg));
+        let open = self.open_comments(file);
+        if open > 0 {
+            x = c.put(x + 2, y, &open.to_string(), theme::fg(ACCENT).bg(bg));
+        }
+        let resolved = self.resolved_comments(file);
+        if resolved > 0 {
+            c.put(x + 1, y, &format!("✓{resolved}"), theme::fg(FG).bg(bg));
         }
     }
 }
@@ -387,47 +421,6 @@ impl Review {
 
 /// Where a file header's checkbox is, from the diff's left edge.
 pub const CHECK_X: std::ops::Range<u16> = 1..4;
-
-/// A file's header: its checkbox (`check` is `Some(true)` when an agent's), then `▸` when it's
-/// folded.
-fn file_header(
-    c: &mut Canvas,
-    y: u16,
-    f: &FileDiff,
-    check: Option<bool>,
-    folded: bool,
-    unsaved: bool,
-    cursor: bool,
-) {
-    let bg = if cursor { SEL } else { PANEL };
-    let x0 = c.area.x;
-    c.fill(x0, y, c.area.width, bg);
-    let mut x = c.put(x0 + CHECK_X.start, y, "[", theme::fg(MUTED).bg(bg));
-    x = match check {
-        Some(agent) => c.put(
-            x,
-            y,
-            "✓",
-            theme::fg(if agent { CYAN } else { GREEN }).bg(bg),
-        ),
-        None => c.put(x, y, " ", theme::fg(MUTED).bg(bg)),
-    };
-    x = c.put(x, y, "] ", theme::fg(MUTED).bg(bg));
-    if folded {
-        x = c.put(x, y, "▸ ", theme::fg(MUTED).bg(bg));
-    }
-    if let Some(old) = &f.old_path {
-        x = c.put(x, y, old, theme::fg(MUTED).bg(bg));
-        x = c.put(x, y, " → ", theme::fg(MUTED).bg(bg));
-    }
-    x = c.put(x, y, &f.path, theme::bold(FG).bg(bg));
-    if unsaved {
-        x = c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
-    }
-    let (added, removed) = counts(f);
-    x = c.put(x + 2, y, &format!("+{added}"), theme::fg(GREEN).bg(bg));
-    c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(bg));
-}
 
 /// The file's added and removed rows.
 fn counts(f: &FileDiff) -> (usize, usize) {
