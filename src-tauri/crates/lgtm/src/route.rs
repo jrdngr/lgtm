@@ -1,6 +1,6 @@
 //! Claude Code registers `lgtm mcp` and `lgtm hook` once. Inside a desktop app terminal they
 //! hand over to the app's binary, which talks to the app. Anywhere else in a jj workspace
-//! `mcp` serves the terminal app's tools, and `hook` does nothing.
+//! `mcp` serves the terminal app's tools, and `hook` records the agent's turns.
 
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
@@ -45,7 +45,7 @@ pub fn mcp() -> i32 {
 pub fn hook() -> i32 {
     match app_terminal() {
         Some(app) => hand_over(&app, &["hook".into()]),
-        None => 0,
+        None => crate::turn_hook::run(),
     }
 }
 

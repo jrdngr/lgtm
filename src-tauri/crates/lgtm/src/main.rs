@@ -7,6 +7,7 @@ mod mcp;
 mod route;
 mod snap;
 mod tui;
+mod turn_hook;
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();

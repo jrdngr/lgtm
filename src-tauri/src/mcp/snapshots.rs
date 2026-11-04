@@ -3,20 +3,14 @@
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{tool, tool_router};
 
-use super::inputs;
 use super::server::{Lgtm, Out, failed};
 use crate::turns::Checkpoint;
+use lgtm_core::turns::StartSnapshot;
 
 #[tool_router(router = snapshots_router, vis = "pub(super)")]
 impl Lgtm {
-    #[tool(
-        description = "Start a new lgtm snapshot named `label`. lgtm records the files you \
-        change for each prompt as one snapshot under the working copy in the human's revisions \
-        log, which they can review, undo or move to its own commit on its own. Your edits after \
-        this call go into the new snapshot, until you call it again or your turn ends. When the \
-        human asks for work in separate snapshots, call it before each part, naming the part."
-    )]
-    async fn start_snapshot(&self, Parameters(p): Parameters<inputs::Snapshot>) -> Out {
+    #[tool(description = lgtm_core::turns::START_SNAPSHOT)]
+    async fn start_snapshot(&self, Parameters(p): Parameters<StartSnapshot>) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
         let session = self
             .agent_session(&ctx)

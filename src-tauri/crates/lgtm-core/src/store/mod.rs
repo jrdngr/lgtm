@@ -20,7 +20,6 @@ pub mod report;
 mod report_runs;
 mod sessions;
 mod setup;
-mod snap_labels;
 mod symbol_info;
 mod threads;
 mod turns;
@@ -287,7 +286,6 @@ impl Store {
         turns::create_table(&db)?;
         fixes::create_table(&db)?;
         agent_comments::create_table(&db)?;
-        snap_labels::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
     }

@@ -317,10 +317,15 @@ impl App {
             Msg::Versions { rev, result } => {
                 let labeled = result.and_then(|list| {
                     let ids: Vec<String> = list.iter().map(|v| v.commit_id.clone()).collect();
-                    let mut labels = match self.store.as_ref() {
-                        Some(store) => store.snapshot_labels(&ids)?,
-                        None => Default::default(),
-                    };
+                    let mut labels: std::collections::HashMap<String, String> =
+                        match self.store.as_ref() {
+                            Some(store) => store
+                                .turns_starting_at(&ids)?
+                                .into_iter()
+                                .map(|(c, t)| (c, lgtm_core::turns::turn_name(&t)))
+                                .collect(),
+                            None => Default::default(),
+                        };
                     Ok(list
                         .into_iter()
                         .map(|v| {

@@ -10,7 +10,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::events::AgentHookState;
-use crate::turns::Checkpoint;
+use lgtm_core::turns::{Checkpoint, checkpoint};
 
 /// The hook events lgtm listens to.
 pub const EVENTS: [&str; 9] = [
@@ -67,9 +67,6 @@ pub(super) struct HookReport {
     pub title: Option<String>,
 }
 
-/// Claude Code's tools that can change files.
-const WRITERS: [&str; 5] = ["Edit", "Write", "MultiEdit", "NotebookEdit", "Bash"];
-
 /// How long the hook waits for the app to snapshot the working copy.
 const SNAPSHOT_WAIT: Duration = Duration::from_secs(15);
 
@@ -96,19 +93,6 @@ fn state(input: &serde_json::Value) -> Option<AgentHookState> {
         "SessionEnd" => Gone,
         _ => return None,
     })
-}
-
-/// Where in a turn the event is, for the app to snapshot the working copy: a prompt, either
-/// side of a tool that can change files, or the agent stopping.
-fn checkpoint(input: &serde_json::Value) -> Option<Checkpoint> {
-    let writes = || WRITERS.contains(&input["tool_name"].as_str().unwrap_or(""));
-    match input["hook_event_name"].as_str()? {
-        "UserPromptSubmit" => Some(Checkpoint::Start),
-        "PreToolUse" if writes() => Some(Checkpoint::Before),
-        "PostToolUse" if writes() => Some(Checkpoint::After),
-        "Stop" | "StopFailure" => Some(Checkpoint::End),
-        _ => None,
-    }
 }
 
 /// Whether the event is the user ending the session, by exiting or clearing it.

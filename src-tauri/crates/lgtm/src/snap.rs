@@ -1,7 +1,12 @@
-//! `lgtm snap <label>`: starts a step named `label`. It snapshots the working copy and labels
-//! the snapshot, so the review picker lists it under its change and opens the edits after it.
+//! `lgtm snap <label>` starts a step named `label`. It ends the agent's running turn in the
+//! workspace and starts one named for the step, or takes a checkpoint named `label` when no
+//! agent is working. Both apps list it with the workspace's turns.
+
+use std::path::Path;
+use std::sync::Mutex;
 
 use lgtm_core::jj::Jj;
+use lgtm_core::turns;
 
 pub fn run(label: &[String]) -> i32 {
     let label = label.join(" ");
@@ -17,36 +22,8 @@ pub fn run(label: &[String]) -> i32 {
         eprintln!("lgtm: not in a jj repo");
         return 1;
     };
-    let Some(store) = crate::tui::store(&root) else {
-        eprintln!("lgtm: couldn't open the repo's store");
-        return 1;
-    };
-    let commit = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(anyhow::Error::from)
-        .and_then(|rt| {
-            rt.block_on(async {
-                let jj = Jj::new(&root);
-                jj.snapshot().await?;
-                let ids = jj.commit_ids("@").await?;
-                ids.into_iter()
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("no working-copy commit"))
-            })
-        });
-    let commit = match commit {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("lgtm: {e:#}");
-            return 1;
-        }
-    };
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_millis() as i64);
-    match store.label_snapshot(&commit, label, now) {
-        Ok(()) => {
+    match block_on(start(&root, label)) {
+        Ok(commit) => {
             println!("{} {label}", &commit[..commit.len().min(8)]);
             0
         }
@@ -55,4 +32,23 @@ pub fn run(label: &[String]) -> i32 {
             1
         }
     }
+}
+
+/// Starts step `label` in the workspace at `root`. Returns the commit it starts from.
+pub async fn start(root: &Path, label: &str) -> anyhow::Result<String> {
+    let store =
+        crate::tui::store(root).ok_or_else(|| anyhow::anyhow!("couldn't open the repo's store"))?;
+    let store = Mutex::new(store);
+    let jj = Jj::new(root);
+    let key = turns::workspace_key(&jj, root).await?;
+    let (change, commit) = turns::at(&jj).await?;
+    turns::start_step(&store, &jj, &key, (&change, &commit), label).await?;
+    Ok(commit)
+}
+
+pub fn block_on<T>(f: impl std::future::Future<Output = anyhow::Result<T>>) -> anyhow::Result<T> {
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?
+        .block_on(f)
 }

@@ -1,5 +1,7 @@
 //! Agent turns, the user's saved edits, and checkpoints: snapshots of a workspace's working copy that diffs start from.
 
+use std::collections::HashMap;
+
 use rusqlite::{OptionalExtension, params};
 
 use super::Store;
@@ -22,6 +24,13 @@ CREATE TABLE IF NOT EXISTS agent_turns (
     terminal TEXT
 );
 CREATE INDEX IF NOT EXISTS agent_turns_workspace ON agent_turns (workspace, change_id);
+CREATE INDEX IF NOT EXISTS agent_turns_start ON agent_turns (start);
+CREATE TABLE IF NOT EXISTS turn_befores (
+    key TEXT PRIMARY KEY,
+    commit_id TEXT NOT NULL,
+    at INTEGER NOT NULL
+);
+DROP TABLE IF EXISTS snap_labels;
 ";
 
 pub(super) fn create_table(db: &rusqlite::Connection) -> rusqlite::Result<()> {
@@ -270,11 +279,52 @@ impl Store {
         Ok(())
     }
 
-    /// Drops turns started before `before`.
+    /// Drops turns started before `before`, and snapshots before tools that never finished.
     pub fn prune_turns(&self, before: i64) -> rusqlite::Result<()> {
         self.db
             .execute("DELETE FROM agent_turns WHERE started_at < ?", [before])?;
+        self.db
+            .execute("DELETE FROM turn_befores WHERE at < ?", [before])?;
         Ok(())
+    }
+
+    /// Notes `commit` as the working copy before tool call `key` runs.
+    pub fn set_turn_before(&self, key: &str, commit: &str, at: i64) -> rusqlite::Result<()> {
+        self.db.execute(
+            "INSERT OR REPLACE INTO turn_befores (key, commit_id, at) VALUES (?, ?, ?)",
+            params![key, commit, at],
+        )?;
+        Ok(())
+    }
+
+    /// The working copy before tool call `key` ran, forgetting it.
+    pub fn take_turn_before(&self, key: &str) -> rusqlite::Result<Option<String>> {
+        let commit = self
+            .db
+            .query_row(
+                "SELECT commit_id FROM turn_befores WHERE key = ?",
+                [key],
+                |r| r.get(0),
+            )
+            .optional()?;
+        self.db
+            .execute("DELETE FROM turn_befores WHERE key = ?", [key])?;
+        Ok(commit)
+    }
+
+    /// The turns that start at any of `commits`, in any workspace, by commit. The latest one
+    /// when several do.
+    pub fn turns_starting_at(&self, commits: &[String]) -> rusqlite::Result<HashMap<String, Turn>> {
+        let mut stmt = self.db.prepare_cached(&format!(
+            "SELECT {COLUMNS} FROM agent_turns WHERE start = ? ORDER BY id DESC LIMIT 1"
+        ))?;
+        let mut out = HashMap::new();
+        for c in commits {
+            if let Some(t) = stmt.query_row([c], row).optional()? {
+                out.insert(c.clone(), t);
+            }
+        }
+        Ok(out)
     }
 }
 

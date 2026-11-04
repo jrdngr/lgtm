@@ -4,6 +4,7 @@
 use std::path::PathBuf;
 
 use lgtm_core::review::agent as review_agent;
+use lgtm_core::turns::{self, StartSnapshot};
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
@@ -15,10 +16,7 @@ const INSTRUCTIONS: &str = "lgtm is the terminal code review app open in this wo
 The human reviews a change there and marks hunks reviewed or flagged.";
 
 const MORE_INSTRUCTIONS: &str = "You can check files and mark lines with marks of your \
-own, which the human sees apart from theirs. Lines are on the new side of the diff. Before \
-each step of your work, run `lgtm snap \"<what the step will do>\"` in the workspace. The \
-step's edits, until the next snap, show under that name so the human can review the step on \
-its own.";
+own, which the human sees apart from theirs. Lines are on the new side of the diff.";
 
 #[derive(Clone)]
 pub struct Tui {
@@ -66,6 +64,22 @@ impl Tui {
     #[tool(description = review_agent::CHECK_FILES)]
     async fn check_files(&self, Parameters(p): Parameters<CheckFiles>) -> Response {
         self.ask(Request::CheckFiles(p)).await
+    }
+
+    #[tool(description = turns::START_SNAPSHOT)]
+    async fn start_snapshot(&self, Parameters(p): Parameters<StartSnapshot>) -> Response {
+        let label = p.label.lines().next().unwrap_or("").trim().to_string();
+        if label.is_empty() {
+            return Err("name the snapshot".into());
+        }
+        let root = std::env::current_dir()
+            .ok()
+            .and_then(|d| agent::workspace(&d))
+            .ok_or("not in a jj workspace")?;
+        crate::snap::start(&root, &label)
+            .await
+            .map_err(|e| format!("{e:#}"))?;
+        Ok(format!("Edits from here go into the snapshot \"{label}\"."))
     }
 
     #[tool(description = review_agent::MARK_LINES)]

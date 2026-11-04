@@ -138,7 +138,7 @@ export function ReviewBar(props: Props) {
             )}
             {props.turns.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.kind === "checkpoint" ? `Checkpoint ${turnTime(t)}` : turnName(t)}
+                {t.kind === "checkpoint" && !t.prompt ? `Checkpoint ${turnTime(t)}` : turnName(t)}
               </option>
             ))}
           </select>

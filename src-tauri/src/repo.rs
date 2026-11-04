@@ -183,6 +183,7 @@ fn poll_store(ctx: &Arc<RepoCtx>) {
             let version = ctx.store.lock().unwrap().data_version().ok();
             if seen.is_some() && version != seen {
                 ctx.reread_store();
+                ctx.reread_turns();
             }
             seen = version;
         }
