@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawned: number[] = [];
 const killed: number[] = [];
+const written: string[] = [];
 vi.mock("@tauri-apps/api/core", () => ({ Channel: class {} }));
 vi.mock("../ipc", () => ({
   commands: {
@@ -11,6 +12,7 @@ vi.mock("../ipc", () => ({
       return Promise.resolve({ status: "ok", data: spawned.length - 1 });
     },
     ptyKill: (id: number) => killed.push(id),
+    ptyWrite: (_: number, data: string) => written.push(data),
   },
 }));
 /** The last session's agent hook listener. */
@@ -30,6 +32,7 @@ vi.mock("./xterm", () => ({
       onData: sub,
       onTitleChange,
       onResize,
+      parser: { registerOscHandler },
       dispose() {},
     },
     refit() {},
@@ -42,6 +45,13 @@ const sub = () => ({ dispose() {} });
 let setTitle = (_: string) => {};
 const onTitleChange = (l: (t: string) => void) => {
   setTitle = l;
+  return sub();
+};
+
+/** The last session's OSC 7501 handler. */
+let osc = (_: string) => true;
+const registerOscHandler = (_: number, h: (body: string) => boolean) => {
+  osc = h;
   return sub();
 };
 
@@ -113,6 +123,23 @@ describe("terminal sessions", () => {
     await settle();
     setTitle("\u2802 working");
     expect(claude.hasAgent()).toBe(true);
+  });
+
+  it("follow a program's status reports and answer the terminal query", async () => {
+    const s = openSession("t20", box(), null, false);
+    await settle();
+    osc("?");
+    expect(written).toContain("\x1b]7501;?\x1b\\");
+    osc("state=blocked:kind=permission:app=claude-code");
+    expect(s.hasAgent()).toBe(true);
+    expect(s.agentBusy()).toBe(true);
+    // The title no longer decides once a program reports.
+    setTitle("plain");
+    expect(s.hasAgent()).toBe(true);
+    osc("state=idle");
+    expect(s.agentBusy()).toBe(false);
+    osc("state=clear");
+    expect(s.hasAgent()).toBe(false);
   });
 
   it("count as busy once prompted, until the prompt has had time to land", async () => {

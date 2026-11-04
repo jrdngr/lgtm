@@ -5,6 +5,7 @@ import { commands, type PtyEvent } from "../ipc";
 import { type ActivityState, pulse, report } from "../workspaces/activity";
 import { onAgentHook } from "./agentHooks";
 import { fileLinks } from "./fileLinks";
+import { programStatus } from "./programStatus";
 import { isAgentTitle, isBusyTitle, titleLabel } from "./title";
 import { urlLinks } from "./urlLinks";
 import { createTerminal } from "./xterm";
@@ -148,7 +149,8 @@ function startSession(
   const activity = `term:${id}`;
   /** How its agent stands, as last reported. */
   let agent: ActivityState = "gone";
-  /** Whether Claude Code's hooks report for it, which then wins over the title. */
+  /** Whether Claude Code's hooks or a program status report (OSC 7501) speak for it, which
+   * then wins over the title. */
   let hooked = false;
   /** Whether it was started to run Claude Code. Only then does the title count without hooks,
    * since any program can set the title. */
@@ -212,12 +214,21 @@ function startSession(
     }
   });
 
+  function send(data: string) {
+    if (pty === undefined) early += data;
+    else commands.ptyWrite(pty, data);
+  }
+
   const subs = [
     fileLinks(term, workspace),
     urlLinks(term),
-    term.onData((data) => {
-      if (pty === undefined) early += data;
-      else commands.ptyWrite(pty, data);
+    term.onData(send),
+    programStatus(term, send, (state) => {
+      hooked = true;
+      promptedUntil = 0;
+      lastData = Date.now();
+      set(state);
+      pulse(activity);
     }),
     term.onTitleChange((t) => {
       title = t;
