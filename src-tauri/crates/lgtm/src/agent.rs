@@ -59,6 +59,7 @@ pub enum Request {
     CheckFiles(CheckFiles),
     MarkLines(MarkLines),
     ResolveComment(ResolveComment),
+    UnresolveComment(ResolveComment),
 }
 
 pub type Response = Result<String, String>;

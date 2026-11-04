@@ -61,7 +61,6 @@ impl Review {
             Ok(found) => {
                 self.comments = found
                     .into_iter()
-                    .filter(|c| self.show_resolved || !c.done)
                     .map(|c| {
                         let at = place(&self.files, &c);
                         (c, at)
@@ -91,7 +90,7 @@ impl Review {
         for (c, at) in self
             .comments
             .iter()
-            .filter(|(c, _)| Some(c.number) != editing)
+            .filter(|(c, _)| self.shown(c) && Some(c.number) != editing)
         {
             let note = (NoteKey::Comment(c.number), self.comment_lines(c).len());
             match *at {
@@ -136,7 +135,7 @@ impl Review {
         let comments = self
             .comments
             .iter()
-            .filter(|(c, _)| &c.path == path)
+            .filter(|(c, _)| &c.path == path && !c.done)
             .count();
         let threads = if self.hide_pr {
             0
@@ -216,6 +215,7 @@ impl Review {
             return;
         };
         let deleted = self.comment(number).cloned();
+        self.lingering = None;
         match store.delete_agent_comment(number) {
             Ok(()) => self.history.extend(deleted.map(Step::Deleted)),
             Err(e) => self.notice = Some(format!("{e:#}")),

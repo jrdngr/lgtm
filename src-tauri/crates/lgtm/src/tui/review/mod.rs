@@ -11,6 +11,7 @@ pub mod marks;
 mod mode;
 mod range;
 mod reload;
+mod resolve;
 pub mod rows;
 mod select;
 mod threads;
@@ -118,6 +119,8 @@ pub struct Review {
     /// Text being selected with `v`.
     selecting: Option<select::Selecting>,
     history: undo::History,
+    /// A comment resolved while resolved ones are hidden, shown until the cursor leaves it.
+    lingering: Option<i64>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -138,7 +141,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("v", "select text"),
     ("y", "copy the selection"),
     ("c", "comment for the agent, on the selected lines"),
-    ("C", "next comment"),
+    ("] [", "next, previous comment"),
+    ("C", "resolve, reopen comment"),
     ("d", "delete comment"),
     ("space", "files, buffers, search, wrap, editor"),
     ("t", "side by side"),
@@ -213,6 +217,7 @@ impl Review {
             goto: None,
             selecting: None,
             history: undo::History::default(),
+            lingering: None,
         }
     }
 
@@ -319,8 +324,8 @@ impl Review {
         }
     }
 
-    /// Moves to the first line of the next open comment or PR thread, wrapping around.
-    fn next_comment(&mut self) {
+    /// Moves to the first line of the next or previous comment or PR thread, wrapping around.
+    fn next_comment(&mut self, forward: bool) {
         let starts: Vec<usize> = (0..self.lines.len())
             .filter(|&i| {
                 matches!(
@@ -333,7 +338,15 @@ impl Review {
                 )
             })
             .collect();
-        let next = starts.iter().find(|&&i| i > self.cursor).or(starts.first());
+        let next = if forward {
+            starts.iter().find(|&&i| i > self.cursor).or(starts.first())
+        } else {
+            starts
+                .iter()
+                .rev()
+                .find(|&&i| i < self.cursor)
+                .or(starts.last())
+        };
         if let Some(&i) = next {
             self.cursor = i;
         }
@@ -466,7 +479,13 @@ impl Review {
         self.relayout();
     }
 
-    pub fn key(&mut self, key: KeyEvent, mut store: Option<&mut Store>) -> Outcome {
+    pub fn key(&mut self, key: KeyEvent, store: Option<&mut Store>) -> Outcome {
+        let out = self.handle_key(key, store);
+        self.let_go();
+        out
+    }
+
+    fn handle_key(&mut self, key: KeyEvent, mut store: Option<&mut Store>) -> Outcome {
         let half = (self.height / 2).max(1) as isize;
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         self.notice = None;
@@ -554,7 +573,9 @@ impl Review {
                 _ => {}
             },
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
-            KeyCode::Char('C') => self.next_comment(),
+            KeyCode::Char(']') => self.next_comment(true),
+            KeyCode::Char('[') => self.next_comment(false),
+            KeyCode::Char('C') => self.toggle_resolved(store.as_deref()),
             KeyCode::Char('d') if !ctrl => self.delete_comment(store.as_deref()),
             KeyCode::Char('p') => return Outcome::Pull,
             KeyCode::Char('P') => self.toggle_pr(),
@@ -625,6 +646,7 @@ impl Review {
             }
             _ => {}
         }
+        self.let_go();
     }
 
     fn set_in_list(&mut self, on: bool) {
@@ -663,6 +685,20 @@ impl Review {
         } else {
             (("r", "review hunk", false), ("f", "flag hunk", false))
         };
+        if let Some(c) = self.comment_at_cursor().and_then(|n| self.comment(n)) {
+            let resolve = if c.done { "reopen" } else { "resolve" };
+            let mut hints = vec![("Enter", "edit", false)];
+            hints.truncate(usize::from(!c.done));
+            hints.extend([
+                ("d", "delete", false),
+                ("C", resolve, false),
+                ("u U", "undo", false),
+                ("] [", "comment", false),
+                ("?", "keys", false),
+                ("q", "back", false),
+            ]);
+            return hints;
+        }
         let mut hints = vec![
             ("space", "menu", false),
             ("n m", "hunk", false),

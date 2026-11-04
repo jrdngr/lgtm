@@ -30,20 +30,26 @@ impl Review {
         match req {
             Request::GetReview => self.get_review(),
             Request::GetComments => self.get_comments(),
-            Request::ResolveComment(r) => {
-                let store = store.ok_or("lgtm couldn't open its store")?;
-                let found = store
-                    .set_agent_comment_done(r.number, true)
-                    .map_err(|e| e.to_string())?;
-                if !found {
-                    return Err(format!("there's no comment C{}", r.number));
-                }
-                self.load_comments(store);
-                Ok(format!("C{} is done.", r.number))
-            }
+            Request::ResolveComment(r) => self.set_done(r.number, true, store),
+            Request::UnresolveComment(r) => self.set_done(r.number, false, store),
             Request::CheckFiles(c) => self.check_files(c, store),
             Request::MarkLines(m) => self.mark_lines(m, store),
         }
+    }
+
+    fn set_done(&mut self, number: i64, done: bool, store: Option<&mut Store>) -> Response {
+        let store = store.ok_or("lgtm couldn't open its store")?;
+        let found = store
+            .set_agent_comment_done(number, done)
+            .map_err(|e| e.to_string())?;
+        if !found {
+            return Err(format!("there's no comment C{number}"));
+        }
+        self.load_comments(store);
+        Ok(format!(
+            "C{number} is {}.",
+            if done { "done" } else { "open again" }
+        ))
     }
 
     fn get_review(&self) -> Response {
@@ -80,13 +86,14 @@ impl Review {
     }
 
     fn get_comments(&self) -> Response {
-        if self.comments.iter().all(|(c, _)| c.done) && self.threads.is_empty() {
-            return Ok("No open comments.".into());
+        if self.comments.is_empty() && self.threads.is_empty() {
+            return Ok("No comments.".into());
         }
-        let mut comments: Vec<_> = self
-            .comments
-            .iter()
-            .filter(|(c, _)| !c.done)
+        // Open comments first, then resolved ones.
+        let mut ordered: Vec<_> = self.comments.iter().collect();
+        ordered.sort_by_key(|(c, _)| c.done);
+        let mut comments: Vec<_> = ordered
+            .into_iter()
             .map(|(c, at)| {
                 let line = at.and_then(|(f, h, r)| {
                     let row = &self.files[f].hunks[h].rows[r];
@@ -103,6 +110,9 @@ impl Review {
                     "code": c.line_text,
                     "body": c.body,
                 });
+                if c.done {
+                    comment["resolved"] = json!(true);
+                }
                 if let Some(range) = self.range_of(c, *at) {
                     comment["startLine"] = json!(range.0);
                     comment["code"] = json!(range.1);

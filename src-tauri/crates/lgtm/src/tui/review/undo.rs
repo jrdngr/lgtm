@@ -15,6 +15,11 @@ pub enum Step {
         before: String,
         after: String,
     },
+    /// A comment resolved, or opened again.
+    Resolved {
+        number: i64,
+        done: bool,
+    },
 }
 
 #[derive(Default)]
@@ -56,6 +61,10 @@ impl Step {
             Step::Marks(edit) => Step::Marks(store.apply(&edit)?),
             Step::Added(c) => Step::Added(set_comment(store, c, !back)?),
             Step::Deleted(c) => Step::Deleted(set_comment(store, c, back)?),
+            Step::Resolved { number, done } => {
+                store.set_agent_comment_done(number, done != back)?;
+                Step::Resolved { number, done }
+            }
             Step::Edited {
                 number,
                 before,
