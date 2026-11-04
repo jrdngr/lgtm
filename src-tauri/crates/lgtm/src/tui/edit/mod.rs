@@ -198,10 +198,24 @@ impl Editor {
         }
     }
 
-    /// A click in the sidebar opens a file or a folder, and the wheel scrolls it.
+    /// A click in the sidebar opens a file or a folder, and the wheel scrolls it. Over the
+    /// text the wheel moves the cursor, three lines a notch.
     pub fn mouse(&mut self, ev: ratatui::crossterm::event::MouseEvent) {
-        use ratatui::crossterm::event::{MouseButton, MouseEventKind};
-        if self.finder.is_some() || !self.sidebar.contains(ev.column, ev.row) {
+        use ratatui::crossterm::event::{
+            KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
+        };
+        if self.finder.is_some() {
+            return;
+        }
+        if !self.sidebar.contains(ev.column, ev.row) {
+            let code = match ev.kind {
+                MouseEventKind::ScrollDown => KeyCode::Down,
+                MouseEventKind::ScrollUp => KeyCode::Up,
+                _ => return,
+            };
+            for _ in 0..3 {
+                self.key(KeyEvent::new(code, KeyModifiers::NONE));
+            }
             return;
         }
         match ev.kind {
@@ -415,6 +429,24 @@ mod tests {
         let mut e = Editor::new(dir.path());
         e.open("a.txt", 1).unwrap();
         (dir, e)
+    }
+
+    #[test]
+    fn the_wheel_over_the_text_moves_the_cursor_three_lines_a_notch() {
+        use ratatui::crossterm::event::{KeyModifiers, MouseEvent, MouseEventKind};
+        let (_dir, mut e) = editor_on(&"x\n".repeat(10));
+        let line = |e: &Editor| e.current().map(|b| b.line_of(b.sel.head));
+        let start = line(&e).unwrap();
+        let wheel = |kind| MouseEvent {
+            kind,
+            column: 50,
+            row: 5,
+            modifiers: KeyModifiers::NONE,
+        };
+        e.mouse(wheel(MouseEventKind::ScrollDown));
+        assert_eq!(line(&e), Some(start + 3));
+        e.mouse(wheel(MouseEventKind::ScrollUp));
+        assert_eq!(line(&e), Some(start));
     }
 
     #[test]

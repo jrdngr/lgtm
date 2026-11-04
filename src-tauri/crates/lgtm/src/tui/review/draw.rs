@@ -406,6 +406,7 @@ fn file_header(
     let (added, removed) = counts(f);
     x = c.put(x + 2, y, &format!("+{added}"), theme::fg(GREEN).bg(bg));
     c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(bg));
+    c.underline(x0, y, c.area.width, MUTED);
 }
 
 /// The file's added and removed rows.

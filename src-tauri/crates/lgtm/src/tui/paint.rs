@@ -2,7 +2,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 
 pub struct Canvas<'a> {
     pub buf: &'a mut Buffer,
@@ -39,6 +39,20 @@ impl<'a> Canvas<'a> {
         let end = x.saturating_add(w).min(self.right());
         for i in x..end {
             self.buf[(i, y)].set_symbol(" ").set_bg(bg);
+        }
+    }
+
+    /// Underlines `w` cells from (`x`, `y`) in `color`, keeping their text and colors.
+    pub fn underline(&mut self, x: u16, y: u16, w: u16, color: Color) {
+        if !self.inside(x, y) {
+            return;
+        }
+        let end = x.saturating_add(w).min(self.right());
+        let style = Style::default()
+            .add_modifier(Modifier::UNDERLINED)
+            .underline_color(color);
+        for i in x..end {
+            self.buf[(i, y)].set_style(style);
         }
     }
 

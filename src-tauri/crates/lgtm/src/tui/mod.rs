@@ -266,7 +266,10 @@ impl App {
                                 r.mouse(ev, self.store.as_mut());
                             }
                         }
-                        Screen::Home => {}
+                        Screen::Home => {
+                            let outcome = self.home.mouse(ev);
+                            self.home_outcome(outcome);
+                        }
                     },
                     _ => {}
                 }
@@ -462,9 +465,6 @@ impl App {
                     return self.direct;
                 }
                 review::Outcome::Quit => return true,
-                review::Outcome::Editor(None) if self.buffers.open.is_empty() => {
-                    r.notice = Some("nothing open in the editor".into());
-                }
                 review::Outcome::Editor(at) => self.show_editor(at),
                 review::Outcome::Pick(kind) => {
                     self.show_editor(None);
@@ -478,7 +478,13 @@ impl App {
             }
             return false;
         }
-        match self.home.key(key) {
+        let outcome = self.home.key(key);
+        self.home_outcome(outcome)
+    }
+
+    /// Acts on what a key or click on the home screen asked for. Returns whether to quit.
+    fn home_outcome(&mut self, outcome: home::Outcome) -> bool {
+        match outcome {
             home::Outcome::Open(target) => self.open(target),
             home::Outcome::Versions(revs) => {
                 for rev in revs {

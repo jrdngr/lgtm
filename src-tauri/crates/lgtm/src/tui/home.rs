@@ -1,7 +1,7 @@
 //! The screen `lgtm` opens on: the jj log on the left to pick a review from, and the repo's
 //! files on the right to open in the editor. Tab moves between them.
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use super::files::{self, FileTree};
@@ -195,6 +195,25 @@ impl Home {
                 Outcome::None
             }
         }
+    }
+
+    /// A click in the file tree opens a file or a folder, and the wheel scrolls it.
+    pub fn mouse(&mut self, ev: MouseEvent) -> Outcome {
+        if !self.files.contains(ev.column, ev.row) {
+            return Outcome::None;
+        }
+        match ev.kind {
+            MouseEventKind::ScrollDown => self.files.scroll(3),
+            MouseEventKind::ScrollUp => self.files.scroll(-3),
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.focus = Focus::Files;
+                if let files::Outcome::Open(path) = self.files.click(ev.row) {
+                    return Outcome::Edit(path);
+                }
+            }
+            _ => {}
+        }
+        Outcome::None
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
