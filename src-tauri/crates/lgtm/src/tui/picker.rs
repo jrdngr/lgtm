@@ -7,6 +7,7 @@ use ratatui::layout::Rect;
 
 use super::keybar::Hint;
 use super::load::Target;
+use super::motions;
 use super::paint::Canvas;
 use super::theme::{
     self, ACCENT, AMBER, BG, FAINT, FG, FUCHSIA, GREEN, MUTED, PANEL, RED, SEL, UNIQUE,
@@ -248,6 +249,41 @@ impl Picker {
         self.on = at.and_then(|j| Some((self.on.take()?.0, j)));
     }
 
+    /// Starts a range where the cursor is, if there's none yet, and moves its other end.
+    fn extend(&mut self, down: bool) {
+        let unanchored = self.anchor.is_none();
+        match self.on_versions() {
+            Some((v, _)) => {
+                if !v.anchored() {
+                    v.toggle_anchor();
+                }
+                self.anchor = None;
+            }
+            None if unanchored => {
+                self.clear_ranges();
+                self.anchor = Some(self.sel);
+            }
+            None => {}
+        }
+        self.step(down);
+    }
+
+    /// What the jj menu acts on: the cursor's commit, the picked range, and the cursor
+    /// commit's description. `None` before the log loads.
+    pub fn motion_target(&self) -> Option<motions::Target> {
+        Some(motions::Target {
+            cursor: self.id(self.sel)?,
+            picked: self.revset()?,
+            description: self
+                .rows
+                .get(self.sel)?
+                .commit
+                .as_ref()?
+                .description
+                .clone(),
+        })
+    }
+
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         match key.code {
             KeyCode::Char('s') => return self.toggle_snapshots(),
@@ -260,17 +296,7 @@ impl Picker {
             KeyCode::Char('G') | KeyCode::End => {
                 self.go(Item::Row(self.commits().last().copied().unwrap_or(0)))
             }
-            KeyCode::Char(' ') => match self.on_versions() {
-                Some((v, _)) => {
-                    v.toggle_anchor();
-                    self.anchor = None;
-                }
-                None => {
-                    let had = self.anchor.is_some();
-                    self.clear_ranges();
-                    self.anchor = (!had).then_some(self.sel);
-                }
-            },
+            KeyCode::Char(c @ ('J' | 'K')) => self.extend(c == 'J'),
             KeyCode::Esc if self.anchored() => self.clear_ranges(),
             KeyCode::Esc => {
                 if self.snapshots.is_some() {
@@ -293,7 +319,11 @@ impl Picker {
     }
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
-        let mut hints = vec![("Enter", "open", false), ("Space", "range", false)];
+        let mut hints = vec![
+            ("Enter", "open", false),
+            ("J K", "range", false),
+            ("Space", "jj", false),
+        ];
         if self.anchored() {
             hints.push(("Esc", "clear", false));
         }
@@ -528,8 +558,7 @@ mod tests {
         press(&mut p, KeyCode::Char('j'));
         // The line of graph alone is skipped.
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "bbb-commit");
-        press(&mut p, KeyCode::Char(' '));
-        press(&mut p, KeyCode::Char('j'));
+        press(&mut p, KeyCode::Char('J'));
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");

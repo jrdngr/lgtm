@@ -80,6 +80,10 @@ pub enum Msg {
         files: Vec<ReviewFile>,
         cfg: MatchConfig,
     },
+    /// A jj menu motion ran.
+    Acted(anyhow::Result<u32>),
+    /// The bookmarks nearest a commit, for Set bookmark.
+    Bookmarks(anyhow::Result<Vec<String>>),
 }
 
 /// How many files are read and highlighted at once.
@@ -119,6 +123,25 @@ impl Loader {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let _ = tx.send(Msg::Log(jj.log_rows(None).await));
+        });
+    }
+
+    /// Runs a jj menu motion.
+    pub fn act(&self, action: lgtm_core::jj::JjAction) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let _ = tx.send(Msg::Acted(jj.act(&action).await));
+        });
+    }
+
+    /// Lists the bookmarks nearest `rev`.
+    pub fn bookmarks(&self, rev: String) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let found = jj.nearest_bookmarks(&rev).await;
+            let _ = tx.send(Msg::Bookmarks(
+                found.map(|spots| spots.into_iter().map(|s| s.name).collect()),
+            ));
         });
     }
 

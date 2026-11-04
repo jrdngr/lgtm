@@ -1,0 +1,327 @@
+//! The jj menu on the revisions side, as the app's ⌘J: Space, then a motion's keys. Some ask
+//! for a name or a description first, and Set bookmark picks one of the nearest bookmarks.
+
+use lgtm_core::jj::JjAction;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    NewAfter,
+    NewBefore,
+    Describe,
+    Squash,
+    BookmarkAdvance,
+    BookmarkCreate,
+    BookmarkSet,
+    Undo,
+    Redo,
+    Fetch,
+    Push,
+    Rebase,
+}
+
+/// The motions, by their keys, in the app's groups.
+const MOTIONS: &[&[(&str, &str, Kind)]] = &[
+    &[
+        ("na", "New after", Kind::NewAfter),
+        ("nb", "New before", Kind::NewBefore),
+    ],
+    &[("d", "Describe", Kind::Describe)],
+    &[("s", "Squash into parent", Kind::Squash)],
+    &[
+        ("ba", "Advance bookmark", Kind::BookmarkAdvance),
+        ("bc", "Create bookmark", Kind::BookmarkCreate),
+        ("bs", "Set bookmark", Kind::BookmarkSet),
+    ],
+    &[("u", "Undo", Kind::Undo), ("U", "Redo", Kind::Redo)],
+    &[
+        ("gf", "Fetch", Kind::Fetch),
+        ("gp", "Push", Kind::Push),
+        ("gr", "Rebase onto trunk", Kind::Rebase),
+    ],
+];
+
+/// What the motions act on: the cursor's commit and the picked range, as revsets, and the
+/// cursor commit's description.
+#[derive(Clone, Debug, Default)]
+pub struct Target {
+    pub cursor: String,
+    pub picked: String,
+    pub description: String,
+}
+
+enum State {
+    /// The keys typed so far.
+    Keys(String),
+    /// Typing a new bookmark's name, or the cursor commit's description.
+    Ask(Kind, String),
+    /// Waiting for the nearest bookmarks.
+    Loading,
+    /// Picking one of them by its number.
+    Pick(Vec<String>),
+}
+
+pub struct Menu {
+    target: Target,
+    state: State,
+}
+
+/// What a key in the menu asks for.
+#[derive(Debug, PartialEq)]
+pub enum Step {
+    Stay,
+    Close,
+    Run(JjAction),
+    /// Load the bookmarks nearest the cursor's commit.
+    Bookmarks(String),
+}
+
+/// A description's first line, which Describe edits.
+fn title(description: &str) -> &str {
+    description.lines().next().unwrap_or("")
+}
+
+impl Menu {
+    pub fn new(target: Target) -> Self {
+        Self {
+            target,
+            state: State::Keys(String::new()),
+        }
+    }
+
+    fn action(&self, kind: Kind, text: &str) -> JjAction {
+        let t = &self.target;
+        let rev = t.cursor.clone();
+        match kind {
+            Kind::NewAfter => JjAction::NewAfter { rev },
+            Kind::NewBefore => JjAction::NewBefore { rev },
+            Kind::Describe => {
+                // The typed line replaces the first; the body stays.
+                let body = t.description.find('\n').map_or("", |i| &t.description[i..]);
+                JjAction::Describe {
+                    rev,
+                    message: format!("{text}{body}"),
+                }
+            }
+            Kind::Squash => JjAction::Squash {
+                revs: t.picked.clone(),
+            },
+            Kind::BookmarkAdvance => JjAction::BookmarkAdvance,
+            Kind::BookmarkCreate | Kind::BookmarkSet => {
+                let name = text.to_string();
+                if kind == Kind::BookmarkCreate {
+                    JjAction::BookmarkCreate { name, rev }
+                } else {
+                    JjAction::BookmarkSet { name, rev }
+                }
+            }
+            Kind::Undo => JjAction::Undo { steps: 1 },
+            Kind::Redo => JjAction::Redo { steps: 1 },
+            Kind::Fetch => JjAction::Fetch,
+            Kind::Push => JjAction::Push {
+                remote: None,
+                range: None,
+                new_bookmarks: vec![],
+            },
+            Kind::Rebase => JjAction::RebaseOnTrunk { rev },
+        }
+    }
+
+    /// Starts the motion: runs it, or first asks for what it needs.
+    fn start(&mut self, kind: Kind) -> Step {
+        match kind {
+            Kind::Describe => {
+                let text = title(&self.target.description).to_string();
+                self.state = State::Ask(kind, text);
+                Step::Stay
+            }
+            Kind::BookmarkCreate => {
+                self.state = State::Ask(kind, String::new());
+                Step::Stay
+            }
+            Kind::BookmarkSet => {
+                self.state = State::Loading;
+                Step::Bookmarks(self.target.cursor.clone())
+            }
+            _ => Step::Run(self.action(kind, "")),
+        }
+    }
+
+    pub fn key(&mut self, key: KeyEvent) -> Step {
+        if key.code == KeyCode::Esc {
+            return Step::Close;
+        }
+        match &mut self.state {
+            State::Keys(typed) => {
+                let KeyCode::Char(c) = key.code else {
+                    return Step::Close;
+                };
+                typed.push(c);
+                let all = MOTIONS.iter().flat_map(|g| g.iter());
+                if let Some(&(_, _, kind)) = all.clone().find(|(k, ..)| k == typed) {
+                    return self.start(kind);
+                }
+                if all.clone().any(|(k, ..)| k.starts_with(typed.as_str())) {
+                    Step::Stay
+                } else {
+                    Step::Close
+                }
+            }
+            State::Ask(kind, text) => match key.code {
+                KeyCode::Enter if text.trim().is_empty() && *kind != Kind::Describe => Step::Stay,
+                KeyCode::Enter => {
+                    let (kind, text) = (*kind, text.trim().to_string());
+                    Step::Run(self.action(kind, &text))
+                }
+                KeyCode::Backspace => {
+                    text.pop();
+                    Step::Stay
+                }
+                KeyCode::Char(c) => {
+                    text.push(c);
+                    Step::Stay
+                }
+                _ => Step::Stay,
+            },
+            State::Loading => Step::Stay,
+            State::Pick(names) => {
+                let picked = match key.code {
+                    KeyCode::Char(c) => c
+                        .to_digit(10)
+                        .and_then(|n| names.get((n as usize).checked_sub(1)?)),
+                    _ => None,
+                };
+                match picked {
+                    Some(name) => {
+                        let name = name.clone();
+                        Step::Run(self.action(Kind::BookmarkSet, &name))
+                    }
+                    None => Step::Stay,
+                }
+            }
+        }
+    }
+
+    /// Takes the bookmarks nearest the cursor: sets the only one, or asks which.
+    pub fn bookmarks(&mut self, names: Vec<String>) -> Step {
+        match names.as_slice() {
+            [] => Step::Close,
+            [one] => Step::Run(self.action(Kind::BookmarkSet, one)),
+            _ => {
+                self.state = State::Pick(names.into_iter().take(9).collect());
+                Step::Stay
+            }
+        }
+    }
+
+    /// The bottom line while typing.
+    pub fn prompt(&self) -> Option<String> {
+        match &self.state {
+            State::Ask(Kind::Describe, text) => Some(format!("Describe: {text}")),
+            State::Ask(_, text) => Some(format!("Bookmark name: {text}")),
+            _ => None,
+        }
+    }
+
+    /// The menu's lines: the motions the typed keys could still finish, a blank line between
+    /// groups, or the bookmarks to pick from.
+    pub fn items(&self) -> Vec<(String, &'static str)> {
+        match &self.state {
+            State::Keys(typed) => {
+                let mut out = Vec::new();
+                for group in MOTIONS {
+                    let shown: Vec<_> = group
+                        .iter()
+                        .filter(|(k, ..)| k.starts_with(typed.as_str()))
+                        .map(|&(k, label, _)| (k.to_string(), label))
+                        .collect();
+                    if shown.is_empty() {
+                        continue;
+                    }
+                    if !out.is_empty() {
+                        out.push((String::new(), ""));
+                    }
+                    out.extend(shown);
+                }
+                out
+            }
+            State::Loading => vec![(String::new(), "Loading bookmarks")],
+            State::Pick(names) => names
+                .iter()
+                .enumerate()
+                .map(|(i, n)| (format!("{} {n}", i + 1), "Set bookmark"))
+                .collect(),
+            State::Ask(..) => vec![],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn menu() -> Menu {
+        Menu::new(Target {
+            cursor: "abc".into(),
+            picked: "abc::def".into(),
+            description: "old title\n\nbody".into(),
+        })
+    }
+
+    fn keys(m: &mut Menu, keys: &str) -> Step {
+        let mut last = Step::Stay;
+        for k in crate::edit::spec::keys(keys) {
+            last = m.key(k);
+        }
+        last
+    }
+
+    #[test]
+    fn keys_run_motions_on_the_cursor_or_the_picked_range() {
+        assert_eq!(
+            keys(&mut menu(), "na"),
+            Step::Run(JjAction::NewAfter { rev: "abc".into() })
+        );
+        assert_eq!(
+            keys(&mut menu(), "s"),
+            Step::Run(JjAction::Squash {
+                revs: "abc::def".into()
+            })
+        );
+        assert_eq!(keys(&mut menu(), "n"), Step::Stay);
+        assert_eq!(keys(&mut menu(), "x"), Step::Close);
+    }
+
+    #[test]
+    fn describe_edits_the_first_line_and_keeps_the_body() {
+        let mut m = menu();
+        keys(&mut m, "d");
+        assert_eq!(m.prompt().as_deref(), Some("Describe: old title"));
+        let step = keys(&mut m, "<bs><bs><bs><bs><bs>name<ret>");
+        assert_eq!(
+            step,
+            Step::Run(JjAction::Describe {
+                rev: "abc".into(),
+                message: "old name\n\nbody".into()
+            })
+        );
+    }
+
+    #[test]
+    fn set_bookmark_sets_the_only_nearest_one_or_picks_by_number() {
+        let mut m = menu();
+        assert_eq!(keys(&mut m, "bs"), Step::Bookmarks("abc".into()));
+        let set = |name: &str| {
+            Step::Run(JjAction::BookmarkSet {
+                name: name.into(),
+                rev: "abc".into(),
+            })
+        };
+        assert_eq!(m.bookmarks(vec!["main".into()]), set("main"));
+        let mut m = menu();
+        keys(&mut m, "bs");
+        assert_eq!(m.bookmarks(vec!["a".into(), "b".into()]), Step::Stay);
+        assert_eq!(keys(&mut m, "3"), Step::Stay);
+        assert_eq!(keys(&mut m, "2"), set("b"));
+    }
+}

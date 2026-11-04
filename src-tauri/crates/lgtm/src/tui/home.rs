@@ -7,15 +7,21 @@ use ratatui::layout::Rect;
 use super::files::{self, FileTree};
 use super::keybar::Hint;
 use super::load::Target;
+use super::motions::{self, Menu};
 use super::paint::Canvas;
 use super::picker::{self, Picker};
 use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED};
+use lgtm_core::jj::JjAction;
 
 pub enum Outcome {
     None,
     Open(Target),
     Versions(Vec<String>),
     Edit(String),
+    /// Run a jj menu motion.
+    Jj(JjAction),
+    /// Load the bookmarks nearest this commit, for the jj menu.
+    Bookmarks(String),
     Quit,
 }
 
@@ -33,6 +39,8 @@ pub struct Home {
     cmd: Option<String>,
     /// A failure to show until the next key.
     pub notice: Option<String>,
+    /// The jj menu, while it's open.
+    menu: Option<Menu>,
 }
 
 /// The `:` commands, for the menu over the command line.
@@ -46,6 +54,7 @@ impl Default for Home {
             focus: Focus::Revisions,
             cmd: None,
             notice: None,
+            menu: None,
         }
     }
 }
@@ -55,8 +64,9 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "files"),
     ("j k", "move"),
     ("g G", "first, last"),
-    ("Space", "range"),
+    ("J K", "range"),
     ("Esc", "clear range"),
+    ("Space", "jj menu"),
     ("Enter", "open"),
     ("s", "snapshots"),
     ("a", "every snapshot"),
@@ -67,16 +77,22 @@ pub const KEYS: &[(&str, &str)] = &[
 impl Home {
     /// Whether keys are going into the search box.
     pub fn typing(&self) -> bool {
-        self.focus == Focus::Files || self.cmd.is_some()
+        self.focus == Focus::Files || self.cmd.is_some() || self.menu.is_some()
     }
 
-    /// The `:` line, as it shows.
+    /// The `:` line, or what the jj menu asks for, as it shows.
     pub fn prompt(&self) -> Option<String> {
+        if let Some(p) = self.menu.as_ref().and_then(Menu::prompt) {
+            return Some(p);
+        }
         self.cmd.as_ref().map(|c| format!(":{c}"))
     }
 
-    /// The commands that match what's typed.
+    /// The commands that match what's typed, or the jj menu's motions.
     pub fn command_menu(&self) -> Vec<(String, &'static str)> {
+        if let Some(menu) = &self.menu {
+            return menu.items();
+        }
         let Some(typed) = &self.cmd else {
             return vec![];
         };
@@ -121,10 +137,57 @@ impl Home {
         Outcome::None
     }
 
+    /// Takes a jj menu step.
+    fn menu_step(&mut self, step: motions::Step) -> Outcome {
+        match step {
+            motions::Step::Stay => Outcome::None,
+            motions::Step::Close => {
+                self.menu = None;
+                Outcome::None
+            }
+            motions::Step::Run(action) => {
+                self.menu = None;
+                Outcome::Jj(action)
+            }
+            motions::Step::Bookmarks(rev) => Outcome::Bookmarks(rev),
+        }
+    }
+
+    /// Takes the bookmarks nearest the cursor for the jj menu.
+    pub fn bookmarks(&mut self, found: anyhow::Result<Vec<String>>) -> Outcome {
+        let Some(menu) = self.menu.as_mut() else {
+            return Outcome::None;
+        };
+        match found {
+            Ok(names) if names.is_empty() => {
+                self.notice = Some("no bookmarks near the commit".into());
+                self.menu = None;
+                Outcome::None
+            }
+            Ok(names) => {
+                let step = menu.bookmarks(names);
+                self.menu_step(step)
+            }
+            Err(e) => {
+                self.notice = Some(format!("{e:#}"));
+                self.menu = None;
+                Outcome::None
+            }
+        }
+    }
+
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
+        if let Some(menu) = self.menu.as_mut() {
+            let step = menu.key(key);
+            return self.menu_step(step);
+        }
         if self.cmd.is_some() {
             return self.command_key(key);
+        }
+        if key.code == KeyCode::Char(' ') && self.focus == Focus::Revisions {
+            self.menu = self.picker.motion_target().map(Menu::new);
+            return Outcome::None;
         }
         let empty_search = self.focus == Focus::Revisions || self.files.query.is_empty();
         if key.code == KeyCode::Char(':') && empty_search {

@@ -7,6 +7,7 @@ mod highlight;
 mod home;
 mod keybar;
 mod load;
+mod motions;
 mod paint;
 mod picker;
 mod review;
@@ -334,6 +335,15 @@ impl App {
                 }
             }
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
+            Msg::Acted(result) => match result {
+                Ok(_) => self.loader.log(),
+                Err(e) => self.home.notice = Some(format!("{e:#}")),
+            },
+            Msg::Bookmarks(found) => {
+                if let home::Outcome::Jj(action) = self.home.bookmarks(found) {
+                    self.loader.act(action);
+                }
+            }
             Msg::Changed => {
                 self.buffers.bases_stale();
                 self.reload();
@@ -457,6 +467,8 @@ impl App {
                 }
                 Err(e) => self.buffers.notice = Some(format!("couldn't open {path}: {e}")),
             },
+            home::Outcome::Jj(action) => self.loader.act(action),
+            home::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
             home::Outcome::Quit => return true,
             home::Outcome::None => {}
         }
@@ -518,6 +530,9 @@ impl App {
             }
         };
         keybar::draw(c, bottom, &hints);
+        if self.review.is_none() {
+            keybar::menu(c, body, &self.home.command_menu());
+        }
         if self.help {
             keybar::help(c, body, keys);
         }

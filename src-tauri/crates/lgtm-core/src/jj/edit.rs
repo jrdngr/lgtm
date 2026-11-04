@@ -6,7 +6,7 @@ use specta::Type;
 use super::Jj;
 
 /// A change to the repo, on a revision given by change id.
-#[derive(Clone, Debug, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Type)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum JjAction {
     Edit {
