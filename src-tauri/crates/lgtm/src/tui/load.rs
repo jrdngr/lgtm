@@ -6,11 +6,10 @@ use std::sync::mpsc::Sender;
 
 use lgtm_core::anchor::MatchConfig;
 use lgtm_core::config::{Config, ConfigTexts};
-use lgtm_core::diff::FileStatus;
 use lgtm_core::jj::{Change, FileDiff, Jj, LogRow, Range, Version};
+use lgtm_core::review::contents;
 use lgtm_core::review::file::{ReviewFile, Sides as Commits, Text};
 use tokio::runtime::Runtime;
-use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use super::highlight::Sides;
@@ -87,9 +86,6 @@ pub enum Msg {
     /// What a push would do.
     PushPlan(anyhow::Result<lgtm_core::jj::PushPlan>),
 }
-
-/// How many files are read and highlighted at once.
-const READERS: usize = 8;
 
 pub struct Loader {
     rt: Runtime,
@@ -237,14 +233,15 @@ impl Loader {
                 old: range.from.clone(),
                 new: range.to.clone(),
             });
-            let gate = Arc::new(Semaphore::new(READERS));
+            let diffs: Vec<&FileDiff> = files.iter().collect();
+            let texts = contents::read(&jj, &commits, &diffs)
+                .await
+                .unwrap_or_else(|_| vec![(None, None); files.len()]);
             let mut tasks = JoinSet::new();
-            for (file, diff) in files.into_iter().enumerate() {
-                let (jj, tx, gate) = (jj.clone(), tx.clone(), gate.clone());
+            for (file, (diff, (old, new))) in files.into_iter().zip(texts).enumerate() {
+                let tx = tx.clone();
                 let (config, commits) = (config.clone(), commits.clone());
                 tasks.spawn(async move {
-                    let _permit = gate.acquire().await.ok();
-                    let (old, new) = texts(&jj, &commits, &diff).await;
                     let built = tokio::task::spawn_blocking(move || {
                         let highlight = !diff.binary && !diff.hunks.is_empty();
                         let sides = highlight
@@ -294,30 +291,4 @@ impl Loader {
             }
         });
     }
-}
-
-/// A file's old and new text, `None` for a side it doesn't have.
-async fn texts(jj: &Jj, commits: &Commits, diff: &FileDiff) -> (Option<String>, Option<String>) {
-    if diff.binary {
-        return (None, None);
-    }
-    let old_path = diff.old_path.as_deref().unwrap_or(&diff.path);
-    let old = match diff.status {
-        FileStatus::Added => None,
-        _ => jj
-            .file_if_any(commits.old.as_deref(), old_path)
-            .await
-            .ok()
-            .flatten(),
-    };
-    let new = match diff.status {
-        FileStatus::Removed => None,
-        _ => jj
-            .file_if_any(Some(&commits.new), &diff.path)
-            .await
-            .ok()
-            .flatten(),
-    };
-    let text = |b: Option<Vec<u8>>| b.map(|b| String::from_utf8_lossy(&b).into_owned());
-    (text(old), text(new))
 }
