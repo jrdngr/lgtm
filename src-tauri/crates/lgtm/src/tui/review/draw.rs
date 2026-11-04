@@ -21,8 +21,8 @@ use crate::tui::theme::{
 
 /// Width of a line number column.
 pub const NUM: u16 = 4;
-/// Where code starts in unified view, past the gutter, line numbers and sign.
-pub const CODE_X: u16 = 14;
+/// Where code starts in unified view, past the gutter and line numbers.
+pub const CODE_X: u16 = 13;
 
 /// The gutter color of a hunk in `state`.
 fn bar(state: State) -> Option<Color> {
@@ -531,13 +531,7 @@ fn unified_row(c: &mut Canvas, y: u16, sides: Option<&Sides>, r: &Row, cursor: b
     c.fill(x0 + 1, y, c.area.width.saturating_sub(1), bg);
     if show.part == 0 {
         let x = c.put(x0 + 2, y, &num(r.old_line), theme::fg(FAINT).bg(bg));
-        let x = c.put(x + 1, y, &num(r.new_line), theme::fg(FAINT).bg(bg));
-        let (sign, color) = match r.kind {
-            RowKind::Added => ("+", GREEN),
-            RowKind::Removed => ("-", RED),
-            RowKind::Context => (" ", FAINT),
-        };
-        c.put(x + 1, y, sign, theme::fg(color).bg(bg));
+        c.put(x + 1, y, &num(r.new_line), theme::fg(FAINT).bg(bg));
     }
     code(c, x0 + CODE_X, y, sides, r, bg, show);
 }

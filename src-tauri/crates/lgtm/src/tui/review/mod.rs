@@ -948,9 +948,9 @@ mod tests {
     #[test]
     fn h_l_scroll_sideways_no_further_than_the_widest_row_needs() {
         let mut r = review();
-        // Ten columns wider than the 66 an 80-column unified view shows.
+        // Ten columns wider than the 67 an 80-column unified view shows.
         r.width = 80;
-        r.files[0].hunks[0].rows[0].text = "x".repeat(76);
+        r.files[0].hunks[0].rows[0].text = "x".repeat(77);
         press(&mut r, KeyCode::Char('l'));
         press(&mut r, KeyCode::Char('l'));
         assert_eq!(r.left, 8);
