@@ -546,7 +546,7 @@ impl App {
                 keybar::draw_badged(c, bottom, Some(("REV", CYAN)), &r.hints(self.shift));
                 keybar::menu(c, body, &r.space_menu());
                 if self.help {
-                    keybar::help(c, body, review::KEYS);
+                    keybar::help(c, body, &r.help_keys());
                 }
                 return;
             }

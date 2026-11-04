@@ -6,11 +6,14 @@
 use std::path::Path;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::layout::Position;
 
 use super::Review;
+use super::draw::{CODE_X, NUM};
 use super::rows::Line;
 use super::wrap::{code_parts, cols};
 use crate::edit::buffer::{Buffer, Sel};
+use crate::edit::keymap::{self, Cmd};
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
 use crate::tui::edit::clipboard;
@@ -20,7 +23,46 @@ pub struct Selecting {
     pub(super) keys: Keys,
 }
 
+/// The keys while selecting: the review's own, then the editor's that move or select.
+pub fn select_keys() -> Vec<(&'static str, &'static str)> {
+    let own = [
+        ("Home End", "line start, end"),
+        ("click", "move the cursor"),
+        ("y", "copy the selection"),
+        ("v Esc", "stop selecting"),
+    ];
+    let editor = keymap::BINDS.iter().filter(|b| {
+        !b.cmd.edits()
+            && !matches!(b.keys, "left" | "right" | "up" | "down")
+            && !matches!(
+                b.cmd,
+                Cmd::Pick(_)
+                    | Cmd::Review
+                    | Cmd::Sidebar
+                    | Cmd::ToggleSidebar
+                    | Cmd::Split { .. }
+                    | Cmd::Command
+                    | Cmd::Fold(_)
+                    | Cmd::ToggleSelect
+                    | Cmd::Escape
+                    | Cmd::Yank
+            )
+    });
+    own.into_iter()
+        .chain(editor.map(|b| (b.keys, b.label)))
+        .collect()
+}
+
 impl Review {
+    /// The keys `?` lists: the selecting ones while selecting.
+    pub fn help_keys(&self) -> Vec<(&'static str, &'static str)> {
+        if self.selecting.is_some() {
+            select_keys()
+        } else {
+            super::KEYS.to_vec()
+        }
+    }
+
     /// The text of each screen line: a code row's, the new side's in split view, or the part
     /// of it the line shows when rows wrap.
     fn line_texts(&self) -> String {
@@ -116,11 +158,67 @@ impl Review {
         }
     }
 
-    /// Handles a key while selecting: motions move the selection, `y` copies it, `/` searches
-    /// from it, and `v` or Esc stop.
+    /// Puts the selection's cursor, selecting nothing, on the char under a click at `at` while
+    /// selecting. Returns whether the click was on code then.
+    pub(super) fn click_select(&mut self, at: Position) -> bool {
+        let i = self.top + (at.y - self.diff_area.y) as usize;
+        let Some(&Line::Code { new, .. }) = self.lines.get(i) else {
+            return false;
+        };
+        let x0 = self.diff_area.x;
+        let start = if !self.split {
+            x0 + CODE_X
+        } else {
+            let half = self.diff_area.width.saturating_sub(3) / 2;
+            let side = u16::from(new.is_some());
+            x0 + 2 + side * (half + 1) + NUM + 1
+        };
+        let left = if self.wrap { 0 } else { self.left };
+        let want = left + at.x.saturating_sub(start) as usize;
+        let Some(s) = self.selecting.as_mut() else {
+            return false;
+        };
+        let b = &mut s.buf;
+        let (from, end) = (b.line_start(i), b.line_end(i));
+        let mut col = 0;
+        let mut pos = from;
+        for ch in b.text.chars_at(from).take(end - from) {
+            col += cols(ch);
+            if col > want {
+                break;
+            }
+            pos += 1;
+        }
+        b.sel = Sel::point(pos.min(end.saturating_sub(1).max(from)));
+        self.follow_head();
+        true
+    }
+
+    /// Moves the selection's cursor to its line's start or end, selecting nothing.
+    fn line_edge(&mut self, end: bool) {
+        let Some(s) = self.selecting.as_mut() else {
+            return;
+        };
+        let b = &mut s.buf;
+        let line = b.line_of(b.sel.head);
+        let (from, to) = (b.line_start(line), b.line_end(line));
+        b.sel = Sel::point(if end {
+            to.saturating_sub(1).max(from)
+        } else {
+            from
+        });
+        self.follow_head();
+    }
+
+    /// Handles a key while selecting: motions move the selection, Home and End go to the
+    /// line's ends, `y` copies it, `/` searches from it, and `v` or Esc stop.
     pub(super) fn select_key(&mut self, key: KeyEvent) {
         let plain = !key.modifiers.contains(KeyModifiers::CONTROL);
         let waiting = self.selecting.as_ref().is_some_and(|s| s.keys.waiting());
+        if !waiting && matches!(key.code, KeyCode::Home | KeyCode::End) {
+            self.line_edge(key.code == KeyCode::End);
+            return;
+        }
         if plain
             && !waiting
             && let KeyCode::Char(c @ ('n' | 'N')) = key.code
@@ -180,7 +278,8 @@ impl Review {
 mod tests {
     use lgtm_core::diff::{Hunk, Row, RowKind};
 
-    use super::super::draw::CODE_X;
+    use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+
     use super::super::tests::{file, press};
     use super::*;
     use crate::tui::load::Target;
@@ -228,6 +327,37 @@ mod tests {
         assert!(r.selecting.is_some());
         press(&mut r, KeyCode::Esc);
         assert!(r.selecting.is_none());
+    }
+
+    #[test]
+    fn home_end_and_clicks_move_the_cursor_without_selecting_and_semicolon_collapses() {
+        let mut r = review();
+        r.diff_area = ratatui::layout::Rect::new(0, 0, 80, 10);
+        r.cursor = 1;
+        press(&mut r, KeyCode::Char('v'));
+        press(&mut r, KeyCode::End);
+        let point = |r: &Review| {
+            let b = &r.selecting.as_ref().unwrap().buf;
+            (b.sel.anchor == b.sel.head).then_some(b.sel.head - b.line_start(b.line_of(b.sel.head)))
+        };
+        assert_eq!(point(&r), Some(7));
+        press(&mut r, KeyCode::Home);
+        assert_eq!(point(&r), Some(0));
+        press(&mut r, KeyCode::Char('w'));
+        assert_eq!(point(&r), None);
+        press(&mut r, KeyCode::Char(';'));
+        assert!(point(&r).is_some());
+        // A click on the second row's "new" lands there, still selecting.
+        let click = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: CODE_X + 3,
+            row: 2,
+            modifiers: KeyModifiers::NONE,
+        };
+        r.mouse(click, None);
+        assert_eq!(r.cursor, 2);
+        assert_eq!(point(&r), Some(3));
+        assert_eq!(r.help_keys()[0].0, "Home End");
     }
 
     #[test]

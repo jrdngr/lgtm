@@ -136,24 +136,27 @@ pub const KEYS: &[(&str, &str)] = &[
     ("j k", "line"),
     ("Ctrl-d Ctrl-u", "half page"),
     ("g G", "top, bottom"),
-    ("n m", "next, previous file"),
-    ("N M", "next, previous hunk"),
+    ("n N", "next, previous file"),
+    ("m M", "next, previous syntax item"),
     ("h l", "scroll left, right"),
     ("Enter", "fold file, edit comment"),
     ("Tab", "file list"),
     ("Enter", "open, close folder (file list)"),
-    ("r f", "review, flag hunk"),
-    ("R F", "review, flag file or folder"),
+    ("r f", "review, flag file or folder"),
+    ("R F", "review, flag hunk"),
     ("u U", "undo, redo marks and comments"),
     ("z", "hide reviewed files"),
     ("J K", "select lines"),
     ("v", "select text"),
-    ("y", "copy the selection"),
+    ("/", "search"),
     ("c", "comment for the agent, on the selected lines"),
     ("] [", "next, previous comment"),
     ("C", "resolve, reopen comment"),
     ("d", "delete comment"),
-    ("space", "files, buffers, search, wrap, editor"),
+    (
+        "space",
+        "files, open files, file list, search, wrap, editor",
+    ),
     ("t", "side by side"),
     ("p", "pull PR comments"),
     ("P", "hide PR comments"),
@@ -598,12 +601,20 @@ impl Review {
     }
 
     /// A click on a file in the list goes to it, a click on a file header's checkbox checks
-    /// the file, a click elsewhere on the header folds or unfolds it, a click elsewhere in the diff moves the cursor there, a drag selects lines, and the
-    /// wheel scrolls.
+    /// the file, a click elsewhere on the header folds or unfolds it, a click elsewhere in the
+    /// diff moves the cursor there, or while selecting text, on code, moves the selection's
+    /// cursor there. A drag selects lines, and the wheel scrolls.
     pub fn mouse(&mut self, ev: MouseEvent, store: Option<&mut Store>) {
         let at = Position::new(ev.column, ev.row);
         self.pinned = true;
         self.snap = None;
+        if ev.kind == MouseEventKind::Down(MouseButton::Left)
+            && self.diff_area.contains(at)
+            && self.click_select(at)
+        {
+            self.let_go();
+            return;
+        }
         if matches!(ev.kind, MouseEventKind::Down(_)) {
             self.anchor = None;
             self.selecting = None;
