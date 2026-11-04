@@ -258,7 +258,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::AgentShow,
             events::AgentRevset,
             events::LogRevsetChanged,
-            events::ReviewStateChanged,
+            review::ReviewStateChanged,
             events::QaChanged,
             events::ArchChanged,
             events::GuidedChanged,

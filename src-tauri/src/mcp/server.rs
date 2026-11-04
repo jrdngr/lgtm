@@ -16,9 +16,10 @@ use tauri_specta::Event as _;
 
 use super::{Hello, inputs, reports};
 use crate::ctx::RepoCtx;
-use crate::events::{AgentRevset, AgentShow, ReportRunChanged, ReviewStateChanged};
+use crate::events::{AgentRevset, AgentShow, ReportRunChanged};
 use crate::repo::Repos;
 use crate::reports::Summary;
+use crate::review::ReviewStateChanged;
 use crate::review::StateDto;
 use crate::store::{MarkColor, Stage, Take, TakeVerdict};
 

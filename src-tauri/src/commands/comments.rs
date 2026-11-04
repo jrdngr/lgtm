@@ -2,8 +2,8 @@ use tauri::Manager;
 use tauri_specta::Event;
 
 use super::{CmdResult, err, repo};
-use crate::events::ReviewStateChanged;
 use crate::frame::Frame;
+use crate::review::ReviewStateChanged;
 use crate::review::{RowRef, StateDto};
 use crate::store::{Author, Stage};
 

@@ -109,13 +109,6 @@ pub struct LogRevsetChanged {
     pub workspace: Option<String>,
 }
 
-/// An agent changed review `review`'s comments or threads.
-#[derive(Clone, Serialize, Type, Event)]
-pub struct ReviewStateChanged {
-    pub review: u32,
-    pub state: crate::review::StateDto,
-}
-
 /// A terminal agent assessed review `review`'s architecture.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct ArchChanged {

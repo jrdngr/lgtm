@@ -166,6 +166,13 @@ pub enum CheckState {
     ChangedSinceReviewed,
 }
 
+/// An agent changed review `review`'s comments or threads.
+#[derive(Clone, Serialize, Type, tauri_specta::Event)]
+pub struct ReviewStateChanged {
+    pub review: u32,
+    pub state: StateDto,
+}
+
 /// Everything marking and commenting can change.
 #[derive(Clone, Default, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
