@@ -208,8 +208,23 @@ impl Home {
         }
     }
 
-    /// A click in the file tree opens a file or a folder, and the wheel scrolls it.
+    /// A click in the file tree opens a file or a folder, and the wheel scrolls it. A click
+    /// in the log picks a commit or snapshot, a double click opens it, and the wheel moves
+    /// through them.
     pub fn mouse(&mut self, ev: MouseEvent) -> Outcome {
+        if self.menu.is_none() && self.picker.contains(ev.column, ev.row) {
+            match ev.kind {
+                MouseEventKind::ScrollDown => self.picker.scroll(true),
+                MouseEventKind::ScrollUp => self.picker.scroll(false),
+                MouseEventKind::Down(MouseButton::Left) => {
+                    self.focus = Focus::Revisions;
+                    let outcome = self.picker.click(ev.row);
+                    return self.picked(outcome);
+                }
+                _ => {}
+            }
+            return Outcome::None;
+        }
         if !self.files.contains(ev.column, ev.row) {
             return Outcome::None;
         }
@@ -261,12 +276,19 @@ impl Home {
                 files::Outcome::Open(path) => Outcome::Edit(path),
                 files::Outcome::None => Outcome::None,
             },
-            Focus::Revisions => match self.picker.key(key) {
-                picker::Outcome::Open(t) => Outcome::Open(t),
-                picker::Outcome::Versions(v) => Outcome::Versions(v),
-                picker::Outcome::Quit => Outcome::Quit,
-                picker::Outcome::None => Outcome::None,
-            },
+            Focus::Revisions => {
+                let outcome = self.picker.key(key);
+                self.picked(outcome)
+            }
+        }
+    }
+
+    fn picked(&self, outcome: picker::Outcome) -> Outcome {
+        match outcome {
+            picker::Outcome::Open(t) => Outcome::Open(t),
+            picker::Outcome::Versions(v) => Outcome::Versions(v),
+            picker::Outcome::Quit => Outcome::Quit,
+            picker::Outcome::None => Outcome::None,
         }
     }
 

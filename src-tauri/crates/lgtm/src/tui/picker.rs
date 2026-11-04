@@ -44,7 +44,14 @@ pub struct Picker {
     snapshots: Option<Vec<Versions>>,
     /// The snapshot the cursor is on, by its change and place among the shown ones.
     on: Option<(String, usize)>,
+    /// Where the log was last drawn, for the mouse.
+    area: Rect,
+    /// The last click's line and when, to tell a double click.
+    clicked: Option<(Item, std::time::Instant)>,
 }
+
+/// Two clicks on a line within this make a double click.
+const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
 
 impl Picker {
     pub fn loaded(&mut self, result: anyhow::Result<Vec<LogRow>>) {
@@ -318,6 +325,40 @@ impl Picker {
         Outcome::None
     }
 
+    /// Whether `(x, y)` is in the log as last drawn.
+    pub fn contains(&self, x: u16, y: u16) -> bool {
+        self.area.contains(ratatui::layout::Position { x, y })
+    }
+
+    /// A click puts the cursor on the line at row `y`, and a second click on it opens it as
+    /// Enter does.
+    pub fn click(&mut self, y: u16) -> Outcome {
+        let (items, _) = self.items();
+        let at = self.top + y.saturating_sub(self.area.y + 1) as usize;
+        let Some(&item) = items.get(at) else {
+            return Outcome::None;
+        };
+        if matches!(item, Item::Row(i) if self.rows[i].commit.is_none()) {
+            return Outcome::None;
+        }
+        let now = std::time::Instant::now();
+        let double = self
+            .clicked
+            .is_some_and(|(was, when)| was == item && now - when < DOUBLE_CLICK);
+        self.clicked = (!double).then_some((item, now));
+        self.clear_ranges();
+        self.go(item);
+        if double {
+            return self.key(KeyEvent::from(KeyCode::Enter));
+        }
+        Outcome::None
+    }
+
+    /// The wheel moves the cursor.
+    pub fn scroll(&mut self, down: bool) {
+        self.step(down);
+    }
+
     pub fn hints(&self) -> Vec<Hint<'static>> {
         let mut hints = vec![
             ("Enter", "open", false),
@@ -369,6 +410,7 @@ impl Picker {
 
     /// Draws the log into `body`, the cursor's row lit when `focused`.
     pub fn draw(&mut self, c: &mut Canvas, body: Rect, focused: bool) {
+        self.area = body;
         let x0 = body.x;
         if let Some(e) = &self.error {
             c.put_lines(x0 + 1, body.y + 1, e, theme::fg(RED));
@@ -562,6 +604,20 @@ mod tests {
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+    }
+
+    #[test]
+    fn a_click_picks_a_line_and_a_second_click_opens_it() {
+        let mut p = Picker::default();
+        p.loaded(Ok(vec![commit("aaa", false), commit("bbb", false)]));
+        // The log's first line is under its title row.
+        p.area = Rect::new(0, 5, 40, 10);
+        assert!(matches!(p.click(7), Outcome::None));
+        assert!(matches!(p.click(6), Outcome::None));
+        assert_eq!(opened(p.click(6)), "aaa");
+        // Below the last line does nothing.
+        assert!(matches!(p.click(9), Outcome::None));
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "aaa");
     }
 
     fn version(id: &str, label: Option<&str>) -> (lgtm_core::jj::Version, Option<String>) {
