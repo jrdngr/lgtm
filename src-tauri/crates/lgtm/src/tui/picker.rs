@@ -50,6 +50,27 @@ pub struct Picker {
     clicked: Option<(Item, std::time::Instant)>,
 }
 
+/// The rows with a line of graph after each commit whose second line joins or forks
+/// branches, since the picker draws a commit on one line.
+fn with_joins(rows: Vec<LogRow>) -> Vec<LogRow> {
+    let mut out = Vec::with_capacity(rows.len());
+    for row in rows {
+        let join = row
+            .graph
+            .get(1)
+            .filter(|g| g.chars().any(|c| !matches!(c, '│' | ' ')))
+            .cloned();
+        out.push(row);
+        if let Some(graph) = join {
+            out.push(LogRow {
+                graph: vec![graph],
+                commit: None,
+            });
+        }
+    }
+    out
+}
+
 /// Two clicks on a line within this make a double click.
 const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
 
@@ -64,7 +85,7 @@ impl Picker {
                     id_at(&self.rows, Some(self.sel)),
                     id_at(&self.rows, self.anchor),
                 );
-                self.rows = rows;
+                self.rows = with_joins(rows);
                 self.error = None;
                 let find = |id: Option<String>| {
                     let id = id?;
@@ -472,8 +493,8 @@ impl Picker {
             let color = match ch {
                 '@' => GREEN,
                 '×' => RED,
-                '◆' | '~' => MUTED,
-                _ => FAINT,
+                '◆' => FG,
+                _ => MUTED,
             };
             x = c.put(x, y, &ch.to_string(), theme::fg(color).bg(bg));
         }
@@ -513,7 +534,7 @@ fn draw_version(c: &mut Canvas, x0: u16, y: u16, v: &versions::Shown, bg: ratatu
     if let Some(mark) = v.mark {
         c.put(x0 + 1, y, mark, theme::fg(ACCENT).bg(bg));
     }
-    c.put(x0 + 3, y, "│", theme::fg(FAINT).bg(bg));
+    c.put(x0 + 3, y, "│", theme::fg(MUTED).bg(bg));
     let (dot, color) = match v.label {
         Some(_) => ("◇", AMBER),
         None => ("·", FAINT),
@@ -603,6 +624,21 @@ mod tests {
         press(&mut p, KeyCode::Char('J'));
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+    }
+
+    #[test]
+    fn a_commit_whose_second_line_joins_branches_gets_that_line_of_graph() {
+        let mut fork = commit("bbb", false);
+        fork.graph = vec!["│ ○  ".into(), "├─╯  ".into()];
+        let mut plain = commit("ccc", false);
+        plain.graph = vec!["○  ".into(), "│  ".into()];
+        let mut p = Picker::default();
+        p.loaded(Ok(vec![fork, plain]));
+        let graphs: Vec<_> = p.rows.iter().map(|r| r.graph[0].trim_end()).collect();
+        assert_eq!(graphs, ["│ ○", "├─╯", "○"]);
+        // The cursor steps over it.
+        press(&mut p, KeyCode::Char('j'));
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
     }
 
