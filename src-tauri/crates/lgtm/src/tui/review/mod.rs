@@ -617,10 +617,10 @@ impl Review {
         Outcome::None
     }
 
-    /// A click on a file in the list goes to it, a click on a file's header folds or unfolds
-    /// it, a click elsewhere in the diff moves the cursor there, a drag selects lines, and the
+    /// A click on a file in the list goes to it, a click on a file header's checkbox checks
+    /// the file, a click elsewhere on the header folds or unfolds it, a click elsewhere in the diff moves the cursor there, a drag selects lines, and the
     /// wheel scrolls.
-    pub fn mouse(&mut self, ev: MouseEvent) {
+    pub fn mouse(&mut self, ev: MouseEvent, store: Option<&mut Store>) {
         let at = Position::new(ev.column, ev.row);
         self.pinned = true;
         self.snap = None;
@@ -648,7 +648,9 @@ impl Review {
                     Some(f) if ev.row == self.diff_area.y => Some(&Line::File(f)),
                     _ => self.lines.get(i),
                 };
+                let on_check = draw::CHECK_X.contains(&(ev.column - self.diff_area.x));
                 match line {
+                    Some(&Line::File(f)) if on_check => self.click_check(f, store),
                     Some(&Line::File(f)) => self.toggle_file(f),
                     Some(&l) => {
                         self.cursor = i;
@@ -801,6 +803,31 @@ mod tests {
             new: None,
             part: 0,
         })
+    }
+
+    #[test]
+    fn a_click_on_a_headers_checkbox_checks_the_file_and_one_on_its_path_only_folds() {
+        let mut store = Store::in_memory();
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![file("a.rs", 2)])));
+        r.marks = Some(super::marks::tests::marks());
+        r.diff_area = Rect::new(30, 1, 80, 20);
+        let mut click = |r: &mut Review, column| {
+            let ev = MouseEvent {
+                kind: MouseEventKind::Down(MouseButton::Left),
+                column,
+                row: 1,
+                modifiers: KeyModifiers::NONE,
+            };
+            r.mouse(ev, Some(&mut store));
+        };
+        let folded = |r: &Review| r.folded.contains("a.rs");
+        click(&mut r, 32);
+        assert_eq!((r.file_check(0), folded(&r)), (Some(false), true));
+        click(&mut r, 40);
+        assert_eq!((r.file_check(0), folded(&r)), (Some(false), false));
+        click(&mut r, 31);
+        assert_eq!((r.file_check(0), folded(&r)), (None, false));
     }
 
     #[test]

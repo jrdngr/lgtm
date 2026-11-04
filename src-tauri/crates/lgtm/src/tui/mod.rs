@@ -256,7 +256,7 @@ impl App {
                         Screen::Editor => self.buffers.mouse(ev),
                         Screen::Review => {
                             if let Some(r) = self.review.as_mut() {
-                                r.mouse(ev);
+                                r.mouse(ev, self.store.as_mut());
                             }
                         }
                         Screen::Home => {}

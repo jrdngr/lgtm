@@ -112,7 +112,7 @@ impl Marks {
     }
 
     /// The file's current check: `Some(true)` when an agent's.
-    fn checked(&self, file: usize) -> Option<bool> {
+    pub(super) fn checked(&self, file: usize) -> Option<bool> {
         let c = self.checks.get(file)?.as_ref().filter(|c| c.current)?;
         Some(c.check.agent)
     }
@@ -381,7 +381,7 @@ fn now_ms() -> i64 {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use lgtm_core::diff::{FileStatus, Hunk, Row, RowKind};
     use lgtm_core::jj::FileDiff;
@@ -397,7 +397,7 @@ mod tests {
     }
 
     /// `a.rs` with two hunks: one adding a line, one replacing a line.
-    fn marks() -> Marks {
+    pub(in super::super) fn marks() -> Marks {
         let diff = FileDiff {
             path: "a.rs".into(),
             old_path: None,

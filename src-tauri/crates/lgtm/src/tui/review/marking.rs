@@ -71,6 +71,27 @@ impl Review {
             .map_or(State::None, |m| m.state(file, None))
     }
 
+    /// The file's check: `Some(true)` when an agent's.
+    pub(super) fn file_check(&self, file: usize) -> Option<bool> {
+        self.marks.as_ref()?.checked(file)
+    }
+
+    /// Checks or unchecks the file from its header's checkbox. It folds once reviewed.
+    pub(super) fn click_check(&mut self, file: usize, store: Option<&mut Store>) {
+        let (Some(marks), Some(store)) = (self.marks.as_mut(), store) else {
+            return;
+        };
+        match marks.toggle_checks(store, &[file]) {
+            Ok(edit) => self.history.did(Step::Marks(edit)),
+            Err(e) => {
+                self.notice = Some(format!("{e:#}"));
+                return;
+            }
+        }
+        self.set_folded(file, self.file_state(file) == State::Reviewed);
+        self.cursor = super::rows::find(&self.lines, (file, None, None));
+    }
+
     pub fn percent(&self) -> Option<u32> {
         self.marks.as_ref()?.percent()
     }

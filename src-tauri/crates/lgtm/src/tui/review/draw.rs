@@ -225,7 +225,8 @@ impl Review {
                 Line::File(f) => {
                     let folded = self.folded.contains(&self.files[f].path);
                     let unsaved = self.unsaved.contains(&self.files[f].path);
-                    file_header(c, y, &self.files[f], folded, unsaved, cursor)
+                    let check = self.file_check(f);
+                    file_header(c, y, &self.files[f], check, folded, unsaved, cursor)
                 }
                 Line::Hunk(..) => hunk_divider(c, y, cursor),
                 Line::Code {
@@ -264,7 +265,8 @@ impl Review {
         if let Some(f) = self.sticky {
             let folded = self.folded.contains(&self.files[f].path);
             let unsaved = self.unsaved.contains(&self.files[f].path);
-            file_header(c, area.y, &self.files[f], folded, unsaved, false);
+            let check = self.file_check(f);
+            file_header(c, area.y, &self.files[f], check, folded, unsaved, false);
         }
     }
 }
@@ -352,12 +354,29 @@ impl Review {
     }
 }
 
-/// A file's header, with `▸` when it's folded.
-fn file_header(c: &mut Canvas, y: u16, f: &FileDiff, folded: bool, unsaved: bool, cursor: bool) {
+/// Where a file header's checkbox is, from the diff's left edge.
+pub const CHECK_X: std::ops::Range<u16> = 1..4;
+
+/// A file's header: its checkbox (`check` is `Some(true)` when an agent's), then `▸` when it's
+/// folded.
+fn file_header(
+    c: &mut Canvas,
+    y: u16,
+    f: &FileDiff,
+    check: Option<bool>,
+    folded: bool,
+    unsaved: bool,
+    cursor: bool,
+) {
     let bg = if cursor { SEL } else { PANEL };
     let x0 = c.area.x;
     c.fill(x0, y, c.area.width, bg);
-    let mut x = x0 + 1;
+    let mut x = c.put(x0 + CHECK_X.start, y, "[", theme::fg(MUTED).bg(bg));
+    x = match check {
+        Some(agent) => c.put(x, y, "✓", theme::fg(if agent { CYAN } else { GREEN }).bg(bg)),
+        None => c.put(x, y, " ", theme::fg(MUTED).bg(bg)),
+    };
+    x = c.put(x, y, "] ", theme::fg(MUTED).bg(bg));
     if folded {
         x = c.put(x, y, "▸ ", theme::fg(MUTED).bg(bg));
     }
