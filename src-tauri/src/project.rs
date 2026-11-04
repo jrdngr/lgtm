@@ -157,7 +157,7 @@ fn show(app: &AppHandle, window: &str, label: &str) -> Result<(), String> {
     let w = app
         .get_webview_window(window)
         .ok_or_else(|| format!("no window {window}"))?;
-    repo::close_start(app);
+    crate::windows::close_start(app);
     w.unminimize().ok();
     w.set_focus().map_err(|e| e.to_string())?;
     ShowRepo {
@@ -233,7 +233,7 @@ pub fn open_project(app: &AppHandle, id: &str, label: Option<String>) -> Result<
             active,
         },
     );
-    repo::window(app, &window, &row.name)
+    crate::windows::window(app, &window, &row.name)
 }
 
 /// Opens the projects that were open at the last quit, else the last used project.
@@ -265,7 +265,7 @@ pub fn reopen(app: &AppHandle) -> Result<(), String> {
 /// when the app is quitting.
 pub fn closed(app: &AppHandle, window: &str, quitting: bool) {
     for label in app.state::<Repos>().in_window(window) {
-        repo::stop(app, &label);
+        stop(app, &label);
     }
     let Some(shown) = app.state::<Projects>().open.lock().unwrap().remove(window) else {
         return;
@@ -317,7 +317,7 @@ pub fn sleep(app: &AppHandle, window: &str, label: &str) -> Result<(), String> {
     let id = id_of(app, window)?;
     let root = root_in(&load(app, &id)?, label)?;
     if app.state::<Repos>().window_of(label).as_deref() == Some(window) {
-        repo::stop(app, label);
+        stop(app, label);
     }
     update(app, &id, |p| {
         if !p.asleep.contains(&root) {
@@ -347,7 +347,7 @@ pub fn remove(app: &AppHandle, window: &str, label: &str) -> Result<(), String> 
     let id = id_of(app, window)?;
     let root = root_in(&load(app, &id)?, label)?;
     if app.state::<Repos>().window_of(label).as_deref() == Some(window) {
-        repo::stop(app, label);
+        stop(app, label);
     }
     update(app, &id, |p| {
         p.repos.retain(|r| r != &root);
@@ -393,4 +393,32 @@ pub fn delete(app: &AppHandle, id: &str) -> Result<(), String> {
         return Err("the project is open".into());
     }
     global(app).delete_project(id).map_err(|e| e.to_string())
+}
+
+/// Ends the repo's terminals and HTML tabs, and forgets its state.
+pub fn stop(app: &AppHandle, label: &str) {
+    app.state::<crate::pty::Ptys>().kill_window(label);
+    app.state::<crate::html::HtmlRoots>().close_window(label);
+    app.state::<Repos>().remove(label);
+}
+
+/// Opens the repo holding `path`: focuses the window showing it, or else opens the project
+/// that has it, or a new project of its own.
+pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
+    open_repo(app, &repo::root_of(path)?)
+}
+
+/// Opens the repo named on a command line. With none, a `launch` reopens the projects open at
+/// the last quit, and otherwise, or when that fails, the start window opens.
+pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool) {
+    let Some(arg) = args.iter().find(|a| !a.starts_with('-')) else {
+        if !launch || reopen(app).is_err() {
+            crate::windows::open_start(app).ok();
+        }
+        return;
+    };
+    if let Err(e) = open(app, &cwd.join(arg)) {
+        tracing::error!("{e}");
+        crate::windows::open_start(app).ok();
+    }
 }

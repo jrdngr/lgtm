@@ -35,6 +35,7 @@ mod symbol_info;
 mod tools;
 mod turns;
 mod watch;
+mod windows;
 mod workspace;
 mod workspaces;
 mod zoom;
@@ -336,7 +337,7 @@ pub fn run() {
     tauri::Builder::default()
         // Must be registered first. Later launches hand their arguments to this process.
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            repo::open_from_args(
+            crate::project::open_from_args(
                 app,
                 argv.get(1..).unwrap_or_default(),
                 Path::new(&cwd),
@@ -369,7 +370,7 @@ pub fn run() {
             });
             app.manage(notes::GlobalStore(std::sync::Mutex::new(global_store(app))));
             let cwd = std::env::current_dir()?;
-            repo::open_from_args(app.handle(), &args, &cwd, true);
+            crate::project::open_from_args(app.handle(), &args, &cwd, true);
             Ok(())
         })
         .on_window_event(|window, event| match event {

@@ -7,7 +7,7 @@ use crate::frame::Frame;
 use crate::jj::init;
 use crate::menu::WordWrapItem;
 use crate::paths::{data_dir, find_root};
-use crate::repo::{self, RepoInfo};
+use crate::repo::RepoInfo;
 use crate::{layout, recent};
 
 #[tauri::command]
@@ -19,7 +19,7 @@ pub(crate) fn current_repo(window: Frame) -> Option<RepoInfo> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn open_repo(app: AppHandle, path: String) -> CmdResult<()> {
-    repo::open(&app, Path::new(&path))
+    crate::project::open(&app, Path::new(&path))
 }
 
 /// Shows the window's saved Word Wrap setting as View > Word Wrap's check.

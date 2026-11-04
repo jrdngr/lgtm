@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use specta::Type;
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager};
 
 use tauri_specta::Event as _;
 
@@ -33,7 +33,7 @@ impl Repos {
     }
 
     /// Forgets the repo and stops its language servers.
-    fn remove(&self, label: &str) {
+    pub fn remove(&self, label: &str) {
         let Some((ctx, _)) = self.open.lock().unwrap().remove(label) else {
             return;
         };
@@ -91,8 +91,6 @@ pub(crate) fn name(root: &Path) -> String {
         |n| n.to_string_lossy().into(),
     )
 }
-
-pub const START_LABEL: &str = "start";
 
 /// Sends a workspace's watch events to the repo's window.
 fn emitter(app: &AppHandle, label: &str) -> Emit {
@@ -166,98 +164,4 @@ pub fn start(app: &AppHandle, root: &Path, window: &str) -> Result<String, Strin
         tracing::warn!("save recent repos: {e}");
     }
     Ok(label)
-}
-
-/// Ends the repo's terminals and HTML tabs, and forgets its state.
-pub fn stop(app: &AppHandle, label: &str) {
-    app.state::<crate::pty::Ptys>().kill_window(label);
-    app.state::<crate::html::HtmlRoots>().close_window(label);
-    app.state::<Repos>().remove(label);
-}
-
-/// Opens the repo holding `path`: focuses the window showing it, or else opens the project
-/// that has it, or a new project of its own.
-pub fn open(app: &AppHandle, path: &Path) -> Result<(), String> {
-    crate::project::open_repo(app, &root_of(path)?)
-}
-
-/// Builds a window showing the app at `label`.
-pub fn window(app: &AppHandle, label: &str, title: &str) -> Result<(), String> {
-    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title(title)
-        // The app is dark only, so its title bar is too, whatever macOS's appearance.
-        .theme(Some(tauri::Theme::Dark))
-        .inner_size(1400.0, 900.0)
-        // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
-        .disable_drag_drop_handler()
-        .on_navigation(stays_in_app);
-    crate::zoom::on_load(crate::placement::place(app, label, builder))
-        .build()
-        .map_err(|e| e.to_string())?;
-    close_start(app);
-    Ok(())
-}
-
-pub fn close_start(app: &AppHandle) {
-    if let Some(start) = app.get_webview_window(START_LABEL) {
-        start.close().ok();
-    }
-}
-
-/// Whether the webview or a frame in it may go to `url`: only the app's own pages and HTML
-/// tabs' files, so a dropped file or a link never replaces the app and an HTML tab's page
-/// never leaves for the web.
-fn stays_in_app(url: &tauri::Url) -> bool {
-    match url.scheme() {
-        "tauri" | crate::html::SCHEME => true,
-        "http" | "https" => matches!(
-            url.host_str(),
-            Some("localhost" | "tauri.localhost" | "127.0.0.1")
-        ),
-        _ => false,
-    }
-}
-
-pub fn open_start(app: &AppHandle) -> tauri::Result<()> {
-    if let Some(window) = app.get_webview_window(START_LABEL) {
-        return window.set_focus();
-    }
-    let builder = WebviewWindowBuilder::new(app, START_LABEL, WebviewUrl::App("index.html".into()))
-        .title("lgtm")
-        .theme(Some(tauri::Theme::Dark))
-        .inner_size(480.0, 420.0)
-        .on_navigation(stays_in_app);
-    crate::zoom::on_load(crate::placement::place(app, START_LABEL, builder))
-        .build()
-        .map(drop)
-}
-
-/// Opens the repo named on a command line. With none, a `launch` reopens the projects open at
-/// the last quit, and otherwise, or when that fails, the start window opens.
-pub fn open_from_args(app: &AppHandle, args: &[String], cwd: &Path, launch: bool) {
-    let Some(arg) = args.iter().find(|a| !a.starts_with('-')) else {
-        if !launch || crate::project::reopen(app).is_err() {
-            open_start(app).ok();
-        }
-        return;
-    };
-    if let Err(e) = open(app, &cwd.join(arg)) {
-        tracing::error!("{e}");
-        open_start(app).ok();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_webview_stays_on_the_apps_own_pages() {
-        let ok = |u: &str| stays_in_app(&tauri::Url::parse(u).unwrap());
-        assert!(ok("tauri://localhost/index.html"));
-        assert!(ok("http://localhost:1420/"));
-        assert!(ok("lgtmhtml://localhost/r0/docs/map.html"));
-        assert!(!ok("file:///Users/j/diagram.png"));
-        assert!(!ok("https://github.com/o/r"));
-    }
 }

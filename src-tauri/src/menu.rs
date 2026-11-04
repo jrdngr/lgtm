@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_specta::Event as _;
 
 use crate::events::{AddRepo, OpenSettings, OpenShortcuts, WordWrap};
-use crate::{repo, zoom};
+use crate::zoom;
 
 const NEW_WINDOW: &str = "new-window";
 const OPEN_PROJECT: &str = "open-project";
@@ -109,8 +109,8 @@ fn remove_predefined<R: Runtime>(sub: &Submenu<R>, text: &str) -> tauri::Result<
 
 pub fn handle(app: &AppHandle, event: MenuEvent) {
     let result = match event.id().as_ref() {
-        NEW_WINDOW => repo::open_start(app),
-        OPEN_PROJECT => repo::open_start(app),
+        NEW_WINDOW => crate::windows::open_start(app),
+        OPEN_PROJECT => crate::windows::open_start(app),
         ADD_REPO => add_repo(app),
         CLOSE_WINDOW => close_window(app),
         WORD_WRAP => word_wrap(app),
@@ -141,7 +141,7 @@ fn word_wrap(app: &AppHandle) -> tauri::Result<()> {
 fn focused(app: &AppHandle) -> Option<tauri::WebviewWindow> {
     app.webview_windows()
         .into_values()
-        .find(|w| w.label() != repo::START_LABEL && w.is_focused().unwrap_or(false))
+        .find(|w| w.label() != crate::windows::START_LABEL && w.is_focused().unwrap_or(false))
 }
 
 /// Asks the focused window to close, which a repo window confirms first.
@@ -183,6 +183,6 @@ fn open_shortcuts(app: &AppHandle) -> tauri::Result<()> {
 fn add_repo(app: &AppHandle) -> tauri::Result<()> {
     match focused(app) {
         Some(window) => Ok(AddRepo {}.emit_to(app, window.label())?),
-        None => repo::open_start(app),
+        None => crate::windows::open_start(app),
     }
 }
