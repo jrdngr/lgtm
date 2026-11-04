@@ -167,9 +167,19 @@ impl Review {
                 if self.unsaved.contains(&self.files[*file].path) {
                     c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
                 }
+                // The counts on the right, open comments left of them, over the name's end if
+                // need be.
+                let (added, removed) = counts(&self.files[*file]);
                 let open = self.open_comments(*file);
+                let mut parts = vec![(format!("+{added}"), GREEN), (format!("−{removed}"), RED)];
                 if open > 0 {
-                    c.put_right(y, 1, &format!(" {open}"), theme::fg(ACCENT).bg(bg));
+                    parts.insert(0, (format!("{open}"), ACCENT));
+                }
+                let width: usize = parts.iter().map(|(t, _)| t.chars().count() + 1).sum();
+                let mut x = area.right().saturating_sub(width as u16).max(area.x);
+                c.fill(x.saturating_sub(1), y, width as u16 + 1, bg);
+                for (text, color) in &parts {
+                    x = c.put(x, y, text, theme::fg(*color).bg(bg)) + 1;
                 }
             }
         }
@@ -393,6 +403,13 @@ fn file_header(
     if unsaved {
         x = c.put(x + 1, y, "●", theme::fg(FG).bg(bg));
     }
+    let (added, removed) = counts(f);
+    x = c.put(x + 2, y, &format!("+{added}"), theme::fg(GREEN).bg(bg));
+    c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(bg));
+}
+
+/// The file's added and removed rows.
+fn counts(f: &FileDiff) -> (usize, usize) {
     let count = |k| {
         f.hunks
             .iter()
@@ -400,18 +417,7 @@ fn file_header(
             .filter(|r| r.kind == k)
             .count()
     };
-    x = c.put(
-        x + 2,
-        y,
-        &format!("+{}", count(RowKind::Added)),
-        theme::fg(GREEN).bg(bg),
-    );
-    c.put(
-        x + 1,
-        y,
-        &format!("−{}", count(RowKind::Removed)),
-        theme::fg(RED).bg(bg),
-    );
+    (count(RowKind::Added), count(RowKind::Removed))
 }
 
 /// The divider above a hunk, in a file with more than one.
@@ -563,5 +569,24 @@ fn split_row(
         if i == 0 {
             c.put(sx + half, y, "│", theme::fg(HAIR).bg(BG));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::buffer::Buffer;
+
+    use super::super::tests::file;
+    use super::*;
+
+    #[test]
+    fn the_list_shows_each_files_counts_on_the_right_over_a_long_name() {
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![file("a_long_file_name.rs", 2)])));
+        let area = Rect::new(0, 0, 20, 2);
+        let mut buf = Buffer::empty(area);
+        r.draw_list(&mut Canvas::new(&mut buf, area), area);
+        let row: String = (0..20).map(|x| buf[(x, 1)].symbol()).collect();
+        assert_eq!(row, "   a_long_fil +2 −2 ");
     }
 }
