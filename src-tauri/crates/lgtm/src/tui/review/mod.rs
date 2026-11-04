@@ -583,7 +583,7 @@ impl Review {
             KeyCode::Esc | KeyCode::Enter if self.in_list => self.set_in_list(false),
             KeyCode::Char('j') | KeyCode::Down if self.in_list => self.list_step(1),
             KeyCode::Char('k') | KeyCode::Up if self.in_list => self.list_step(-1),
-            KeyCode::Char(c @ ('R' | 'F')) if self.in_list => self.list_mark(c, store),
+            KeyCode::Char(c @ ('r' | 'F')) if self.in_list => self.list_mark(c, store),
             KeyCode::Char('J') if !self.in_list => self.extend(1),
             KeyCode::Char('K') if !self.in_list => self.extend(-1),
             KeyCode::Char('j') | KeyCode::Down => self.by(1),
@@ -733,9 +733,9 @@ impl Review {
             ];
         }
         let (review, flag) = if shift {
-            (("R", "review file", false), ("F", "flag file", false))
+            (("R", "review hunk", false), ("F", "flag file", false))
         } else {
-            (("r", "review hunk", false), ("f", "flag hunk", false))
+            (("r", "review file", false), ("f", "flag hunk", false))
         };
         if let Some(c) = self.comment_at_cursor().and_then(|n| self.comment(n)) {
             let resolve = if c.done { "reopen" } else { "resolve" };

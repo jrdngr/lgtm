@@ -130,10 +130,10 @@ impl Review {
         };
         let file = line.file();
         let result = match key {
-            'r' | 'f' if hunk.is_none() => return true,
-            'r' => marks.toggle(store, file, hunk, MarkColor::Green),
+            'R' | 'f' if hunk.is_none() => return true,
+            'R' => marks.toggle(store, file, hunk, MarkColor::Green),
             'f' => marks.toggle(store, file, hunk, MarkColor::Red),
-            'R' => marks.toggle_checks(store, &[file]),
+            'r' => marks.toggle_checks(store, &[file]),
             _ => marks.toggle(store, file, None, MarkColor::Red),
         };
         match result {
@@ -146,7 +146,7 @@ impl Review {
         // A file folds once it's all reviewed, and the cursor moves on.
         if matches!(key, 'r' | 'R') {
             let reviewed = self.file_state(file) == State::Reviewed;
-            if reviewed || key == 'R' {
+            if reviewed || key == 'r' {
                 self.set_folded(file, reviewed);
             }
             if reviewed {

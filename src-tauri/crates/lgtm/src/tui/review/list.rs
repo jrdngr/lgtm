@@ -197,14 +197,14 @@ impl Review {
         self.relayout();
     }
 
-    /// R checks the list's pick and F flags it, or undoes that when it's all done already.
+    /// r checks the list's pick and F flags it, or undoes that when it's all done already.
     pub(super) fn list_mark(&mut self, key: char, store: Option<&mut Store>) {
         let files = self.list_files();
         let (Some(marks), Some(store)) = (self.marks.as_mut(), store) else {
             return;
         };
         let result = match key {
-            'R' => marks.toggle_checks(store, &files),
+            'r' => marks.toggle_checks(store, &files),
             _ => marks.toggle_files(store, &files, MarkColor::Red),
         };
         match result {
