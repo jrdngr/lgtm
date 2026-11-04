@@ -423,6 +423,9 @@ impl Review {
     fn by(&mut self, n: isize) {
         let last = self.lines.len().saturating_sub(1) as isize;
         self.cursor = (self.cursor as isize + n).clamp(0, last.max(0)) as usize;
+        if matches!(self.lines.get(self.cursor), Some(Line::Gap(_))) {
+            self.cursor = (self.cursor as isize + n.signum()).clamp(0, last) as usize;
+        }
     }
 
     /// The hunk `line` is in. A file with one hunk has no divider, so its header stands for it.
@@ -453,7 +456,7 @@ impl Review {
                         .any(|r| rows[r].kind != RowKind::Context);
                     changed.then_some((file, hunk))
                 }
-                Line::File(_) | Line::Hunk(..) | Line::Note { .. } => None,
+                Line::Gap(_) | Line::File(_) | Line::Hunk(..) | Line::Note { .. } => None,
             };
             if let Some(key) = start
                 && seen.insert(key)
@@ -643,6 +646,7 @@ impl Review {
                 match line {
                     Some(&Line::File(f)) if on_check => self.click_check(f, store),
                     Some(&Line::File(f)) => self.toggle_file(f),
+                    Some(Line::Gap(_)) => {}
                     Some(&Line::Note {
                         key: rows::NoteKey::Input,
                         part,
@@ -895,8 +899,12 @@ mod tests {
         press(&mut r, KeyCode::Char('N'));
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), Some(Line::File(0)));
+        // The rule between the headers is stepped over both ways.
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::File(1)));
+        press(&mut r, KeyCode::Up);
+        assert_eq!(r.current(), Some(Line::File(0)));
+        press(&mut r, KeyCode::Down);
         press(&mut r, KeyCode::Char('N'));
         press(&mut r, KeyCode::Enter);
         press(&mut r, KeyCode::Down);

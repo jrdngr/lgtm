@@ -46,7 +46,7 @@ impl Spot {
     pub fn of(files: &[FileDiff], line: Line) -> Self {
         let file = &files[line.file()];
         let at = match line.code() {
-            Line::File(_) => At::File,
+            Line::Gap(_) | Line::File(_) => At::File,
             Line::Hunk(_, h) => At::Hunk {
                 new_start: file.hunks[h].new_start,
             },

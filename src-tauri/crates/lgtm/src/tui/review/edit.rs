@@ -15,7 +15,7 @@ impl Review {
             return None;
         }
         let at = match line {
-            Line::File(_) => file.hunks.first().map_or(1, |h| h.new_start),
+            Line::Gap(_) | Line::File(_) => file.hunks.first().map_or(1, |h| h.new_start),
             Line::Hunk(_, h) => file.hunks[h].new_start,
             Line::Code { hunk, old, new, .. } => {
                 let hunk = &file.hunks[hunk];

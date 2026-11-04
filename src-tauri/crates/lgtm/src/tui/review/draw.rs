@@ -214,6 +214,10 @@ impl Review {
             self.width = area.width as usize;
             self.relayout();
         }
+        // A rule above a header isn't a place for the cursor: it goes to the header.
+        if matches!(self.lines.get(self.cursor), Some(Line::Gap(_))) {
+            self.cursor += 1;
+        }
         // At least one line, for the file header pinned at the top.
         let margin = if self.pinned && (self.top + 1..self.top + height).contains(&self.cursor) {
             1
@@ -253,6 +257,9 @@ impl Review {
                     let check = self.file_check(f);
                     file_header(c, y, &self.files[f], check, folded, unsaved, cursor)
                 }
+                Line::Gap(_) => {
+                    c.put(area.x, y, &"─".repeat(area.width.into()), theme::fg(FAINT));
+                }
                 Line::Hunk(..) => hunk_divider(c, y, cursor),
                 Line::Code {
                     file,
@@ -284,7 +291,7 @@ impl Review {
         }
         // The file the top line is in keeps its header at the top.
         self.sticky = match self.lines.get(self.top) {
-            Some(Line::File(_)) | None => None,
+            Some(Line::Gap(_) | Line::File(_)) | None => None,
             Some(line) => Some(line.file()),
         };
         if let Some(f) = self.sticky {
@@ -418,7 +425,6 @@ fn file_header(
     let (added, removed) = counts(f);
     x = c.put(x + 2, y, &format!("+{added}"), theme::fg(GREEN).bg(bg));
     c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(bg));
-    c.underline(x0, y, c.area.width, MUTED);
 }
 
 /// The file's added and removed rows.

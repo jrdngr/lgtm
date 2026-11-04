@@ -1,4 +1,4 @@
-//! The review's screen lines: each file's header, then its hunks' rows, unified or paired side
+//! The review's screen lines: each file's header under a rule, then its hunks' rows, unified or paired side
 //! by side, with a divider line above each hunk where a file has more than one.
 
 use std::collections::{HashMap, HashSet};
@@ -10,6 +10,8 @@ use super::wrap::code_parts;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Line {
+    /// The rule above a file's header, for every file but the first.
+    Gap(usize),
     File(usize),
     Hunk(usize, usize),
     /// Rows of a hunk by index: one row in unified view, or the old and new side's rows.
@@ -54,7 +56,8 @@ pub struct Notes {
 impl Line {
     pub fn file(self) -> usize {
         match self {
-            Line::File(f)
+            Line::Gap(f)
+            | Line::File(f)
             | Line::Hunk(f, _)
             | Line::Code { file: f, .. }
             | Line::Note { file: f, .. } => f,
@@ -63,13 +66,13 @@ impl Line {
 
     pub fn hunk(self) -> Option<usize> {
         match self {
-            Line::File(_) => None,
+            Line::Gap(_) | Line::File(_) => None,
             Line::Hunk(_, h) | Line::Code { hunk: h, .. } => Some(h),
             Line::Note { at, .. } => at.map(|(h, _)| h),
         }
     }
 
-    /// The code line a note line belongs to: its row, or its file's header.
+    /// The code line a note or rule line belongs to: its row, or its file's header.
     pub fn code(self) -> Line {
         match self {
             Line::Note {
@@ -83,7 +86,7 @@ impl Line {
                 new: None,
                 part: 0,
             },
-            Line::Note { file, at: None, .. } => Line::File(file),
+            Line::Note { file, at: None, .. } | Line::Gap(file) => Line::File(file),
             line => line,
         }
     }
@@ -91,7 +94,7 @@ impl Line {
     /// Where the line is in the diff, the same in both views: file, hunk, and a row of it.
     pub fn spot(self) -> (usize, Option<usize>, Option<usize>) {
         match self {
-            Line::File(f) => (f, None, None),
+            Line::Gap(f) | Line::File(f) => (f, None, None),
             Line::Hunk(f, h) => (f, Some(h), None),
             Line::Code {
                 file,
@@ -134,6 +137,9 @@ pub fn lines_with(
     };
     for &f in order {
         let file = &files[f];
+        if !out.is_empty() {
+            out.push(Line::Gap(f));
+        }
         out.push(Line::File(f));
         if folded.contains(&f) {
             continue;
@@ -222,7 +228,11 @@ pub fn find(lines: &[Line], spot: (usize, Option<usize>, Option<usize>)) -> usiz
         })
         .or_else(|| lines.iter().position(|l| *l == Line::File(file)))
         // A file that isn't shown gives way to the next one, or the last.
-        .or_else(|| lines.iter().position(|l| l.file() > file))
+        .or_else(|| {
+            lines
+                .iter()
+                .position(|l| l.file() > file && !matches!(l, Line::Gap(_)))
+        })
         .unwrap_or(lines.len().saturating_sub(1))
 }
 
@@ -283,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn a_folded_file_keeps_only_its_header_and_one_hunk_has_no_divider() {
+    fn a_folded_file_keeps_only_its_header_one_hunk_has_no_divider_and_later_files_a_rule() {
         let files = [file(vec![vec![C, A], vec![R]]), file(vec![vec![R]])];
         let code = |file, hunk| Line::Code {
             file,
@@ -307,13 +317,14 @@ mod tests {
                 },
                 Line::Hunk(0, 1),
                 code(0, 1),
+                Line::Gap(1),
                 Line::File(1),
                 code(1, 0),
             ]
         );
         assert_eq!(
             lines(&files, &HashSet::from([0]), false),
-            vec![Line::File(0), Line::File(1), code(1, 0)]
+            vec![Line::File(0), Line::Gap(1), Line::File(1), code(1, 0)]
         );
     }
 
