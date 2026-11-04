@@ -40,6 +40,11 @@ pub fn fg(c: Color) -> Style {
     Style::default().fg(c)
 }
 
+/// A pane's title: the accent when keys go to the pane.
+pub fn title(focused: bool) -> Style {
+    if focused { bold(ACCENT) } else { fg(MUTED) }
+}
+
 pub fn bold(c: Color) -> Style {
     fg(c).add_modifier(Modifier::BOLD)
 }

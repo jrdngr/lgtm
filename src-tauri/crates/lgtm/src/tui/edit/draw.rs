@@ -106,7 +106,13 @@ impl Editor {
         let open = &self.open;
         let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
         let tree = Rect::new(body.x, body.y + 1, SIDEBAR - 1, body.height - 1);
-        self.sidebar.draw(c, tree, true, &marked);
+        self.sidebar.draw(c, tree, self.in_sidebar, &marked);
+        c.put(
+            body.x + 1,
+            body.y,
+            "Files",
+            theme::title(self.in_sidebar).bg(BG),
+        );
         for y in body.y..body.bottom() {
             c.put(body.x + SIDEBAR, y, "│", theme::fg(HAIR).bg(BG));
         }

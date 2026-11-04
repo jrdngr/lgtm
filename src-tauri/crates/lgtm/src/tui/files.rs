@@ -9,7 +9,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 use super::paint::Canvas;
-use super::theme::{self, ACCENT, BG, FG, MUTED, SEL};
+use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED, SEL};
 
 /// The most files a search shows.
 const MAX_SHOWN: usize = 200;
@@ -338,7 +338,11 @@ impl FileTree {
         let mut sub = Canvas::new(&mut *c.buf, area);
         for (n, row) in self.rows.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;
-            let bg = if focused && n == self.sel { SEL } else { BG };
+            let bg = match (n == self.sel, focused) {
+                (true, true) => SEL,
+                (true, false) => HAIR,
+                _ => BG,
+            };
             sub.fill(area.x, y, area.width, bg);
             draw_row(&mut sub, area.x + 1, y, row, bg, marked);
         }

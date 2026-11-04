@@ -292,20 +292,21 @@ impl Home {
             let mut sub = Canvas::new(&mut *c.buf, left);
             self.picker
                 .draw(&mut sub, left, self.focus == Focus::Revisions);
-            sub.put(left.x + 1, left.y, "Revisions", theme::bold(FG).bg(BG));
+            let style = theme::title(self.focus == Focus::Revisions);
+            sub.put(left.x + 1, left.y, "Revisions", style.bg(BG));
         }
         for y in body.y..body.bottom() {
             c.put(body.x + left_w, y, "│", theme::fg(HAIR).bg(BG));
         }
         let mut sub = Canvas::new(&mut *c.buf, right);
         let x0 = right.x + 1;
-        sub.put(x0, right.y, "Files", theme::bold(FG).bg(BG));
+        let focused = self.focus == Focus::Files;
+        sub.put(x0, right.y, "Files", theme::title(focused).bg(BG));
         if right.height < 4 {
             return;
         }
         let x = sub.put(x0, right.y + 1, "› ", theme::bold(ACCENT).bg(BG));
         let x = sub.put(x, right.y + 1, &self.files.query, theme::fg(FG).bg(BG));
-        let focused = self.focus == Focus::Files;
         if focused {
             sub.put(x, right.y + 1, " ", theme::fg(FG).bg(ACCENT));
         }

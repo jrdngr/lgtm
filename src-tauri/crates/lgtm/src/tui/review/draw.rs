@@ -127,10 +127,20 @@ impl Review {
             self.list_top = at + 1 - height;
         }
         let mut c = Canvas::new(&mut *c.buf, area);
+        c.put(
+            area.x + 1,
+            area.y,
+            "Files",
+            theme::title(self.in_list).bg(BG),
+        );
         for (n, entry) in entries.iter().enumerate().skip(self.list_top).take(height) {
             let y = area.y + 1 + (n - self.list_top) as u16;
             let picked = n == at;
-            let bg = if picked { SEL } else { BG };
+            let bg = match (picked, self.in_list) {
+                (true, true) => SEL,
+                (true, false) => HAIR,
+                _ => BG,
+            };
             c.fill(area.x, y, area.width, bg);
             let (state, name, depth, color) = match entry {
                 tree::Entry::Dir { name, path, depth } => {
@@ -226,6 +236,7 @@ impl Review {
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {
             let y = area.y + (n - self.top) as u16;
             let cursor = !selecting
+                && !self.in_list
                 && (n == self.cursor || selection.as_ref().is_some_and(|s| s.contains(&n)));
             let chars = self.selected_chars(n);
             let gutter = line
