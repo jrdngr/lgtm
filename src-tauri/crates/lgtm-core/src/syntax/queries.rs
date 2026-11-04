@@ -211,12 +211,17 @@ pub(super) const MAKE_SYMBOLS: &str = r#"
 (define_directive name: (word) @name) @symbol
 "#;
 
+pub(super) const JUST_HIGHLIGHTS: &str = include_str!("../../grammars/just/highlights.scm");
+
+pub(super) const JUST_SYMBOLS: &str = r#"
+(recipe name: (identifier) @name) @symbol
+"#;
+
 pub(super) const GORP_HIGHLIGHTS: &str = include_str!("../../grammars/gorp/queries/highlights.scm");
 
 pub(super) const GORP_SYMBOLS: &str = r#"
 (module name: (identifier) @name) @symbol
 (type_definition name: (type_identifier) @name) @symbol
-(enum_definition name: (type_identifier) @name) @symbol
 (component name: (type_identifier) @name) @symbol
 (method name: (identifier) @name) @symbol
 "#;

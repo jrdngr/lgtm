@@ -619,6 +619,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "codebook-tree-sitter-just"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ff9151900e03e431f2d8339fbb80eae85df292974a772336847114436b410c1"
+dependencies = [
+ "cc",
+ "tree-sitter-language",
+]
+
+[[package]]
 name = "combine"
 version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2615,6 +2625,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "cc",
+ "codebook-tree-sitter-just",
  "dirs 6.0.0",
  "globset",
  "ignore",

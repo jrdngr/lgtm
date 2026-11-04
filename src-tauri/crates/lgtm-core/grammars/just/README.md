@@ -1,0 +1,1 @@
+`highlights.scm` from the `codebook-tree-sitter-just` crate 0.1.3 (MIT, github.com/blopker/codebook-tree-sitter-just), which ships it but doesn't export it. Copy it again when bumping the crate, and drop `@spell` from the comment pattern.

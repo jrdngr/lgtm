@@ -315,6 +315,17 @@ pub(super) static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|
                 .leading(&["comment"]),
         ),
         (
+            "just",
+            Lang::new(
+                codebook_tree_sitter_just::LANGUAGE.into(),
+                "just",
+                JUST_HIGHLIGHTS,
+                "",
+            )
+            .outline(JUST_SYMBOLS)
+            .leading(&["comment"]),
+        ),
+        (
             "dockerfile",
             Lang::new(
                 tree_sitter_containerfile::LANGUAGE.into(),
@@ -332,6 +343,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
     match name {
         "Makefile" | "makefile" | "GNUmakefile" => return Some("make"),
         "Dockerfile" | "Containerfile" => return Some("dockerfile"),
+        "justfile" | "Justfile" | "JUSTFILE" | ".justfile" => return Some("just"),
         _ if name.starts_with("Dockerfile.") || name.starts_with("Containerfile.") => {
             return Some("dockerfile");
         }
@@ -360,6 +372,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "hcl" | "tf" | "tfvars" | "terraform" => "hcl",
         "dockerfile" | "containerfile" => "dockerfile",
         "gorp" => "gorp",
+        "just" => "just",
         _ => return None,
     })
 }

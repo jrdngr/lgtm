@@ -13,7 +13,7 @@ fn symbols(path: &str, src: &str) -> Vec<(String, u32, u32)> {
 
 #[test]
 fn every_language_builds() {
-    assert_eq!(LazyLock::force(&LANGS).len(), 20);
+    assert_eq!(LazyLock::force(&LANGS).len(), 21);
 }
 
 #[test]
@@ -271,4 +271,25 @@ fn gorp_highlights_by_capture_precedence_and_outlines_components() {
         [("TodoList".into(), 1, 8), ("add".into(), 3, 7)]
     );
     assert!(!highlight_file("report.gorp.lock", "type A = B")[0].is_empty());
+}
+
+#[test]
+fn justfiles_highlight_recipes_and_outline_them() {
+    let src = "# Run the tests\ntest:\n    cargo test\n\nbuild target=\"x\": test\n    echo {{ target }}\n";
+    let lines = highlight_file("justfile", src);
+    let class_at = |line: usize, col: u32| {
+        let mut end = 0;
+        let seg = lines[line].iter().find(|s| {
+            end += s.1;
+            end > col
+        });
+        seg.and_then(|s| s.0).map(|c| HIGHLIGHT_NAMES[c as usize])
+    };
+    assert_eq!(class_at(0, 0), Some("comment"));
+    assert_eq!(class_at(1, 0), Some("function"));
+    assert_eq!(class_at(4, 0), Some("function"));
+    assert_eq!(class_at(4, 13), Some("string"));
+    let names: Vec<String> = symbols("Justfile", src).into_iter().map(|s| s.0).collect();
+    assert_eq!(names, ["test", "build"]);
+    assert!(!highlight_file("ci.just", "x:\n  y\n")[0].is_empty());
 }

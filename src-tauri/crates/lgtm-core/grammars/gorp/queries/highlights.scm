@@ -25,7 +25,9 @@
   "="
   "|>"
   "->"
-  "=>"
+  "\\"
+  "|"
+  ";"
 ] @operator
 (wildcard) @operator
 
@@ -36,7 +38,6 @@
 [
   "component"
   "type"
-  "enum"
   "import"
   "forbid"
   "module"
@@ -76,7 +77,6 @@
 
 ; Types
 (type_definition name: (type_identifier) @type)
-(enum_definition name: (type_identifier) @type)
 (component name: (type_identifier) @type)
 (named_type (type_identifier) @type)
 (type_path (type_identifier) @type)
@@ -89,7 +89,7 @@
 
 ; Builtin names
 ((identifier) @variable.builtin
-  (#any-of? @variable.builtin "it" "state"))
+  (#any-of? @variable.builtin "state"))
 
 ; Modules
 (import module: (identifier) @module)
@@ -112,8 +112,8 @@
 
 ; Parameters and bindings
 (parameter name: (identifier) @variable.parameter)
-(lambda parameters: (identifier) @variable.parameter)
 (lambda_parameters (identifier) @variable.parameter)
+(refined_type binder: (identifier) @variable.parameter)
 (let_statement name: (identifier) @variable)
 
 ; Strings
