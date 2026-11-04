@@ -34,7 +34,9 @@ pub struct CmdLine {
     pub text: String,
     /// What Tab offers for the word being typed, and which one it's on when cycling.
     pub offers: Vec<String>,
-    cycle: Option<usize>,
+    pub(super) cycle: Option<usize>,
+    /// Whether it's the `/` search line.
+    pub search: bool,
 }
 
 /// What's left to answer before a command runs.
@@ -106,13 +108,14 @@ impl Review {
             return Some(("Clear every mark in the review? y/n".into(), &[]));
         }
         let cmd = self.cmd.as_ref()?;
-        Some((format!(":{}", cmd.text), &cmd.offers))
+        let lead = if cmd.search { '/' } else { ':' };
+        Some((format!("{lead}{}", cmd.text), &cmd.offers))
     }
 
     /// The commands whose names start with what's typed, each with a word on what it takes
     /// and what it does: all of them for `?`. None once a path is being typed.
     pub fn command_menu(&self) -> Vec<(String, &'static str)> {
-        let Some(cmd) = &self.cmd else {
+        let Some(cmd) = self.cmd.as_ref().filter(|c| !c.search) else {
             return vec![];
         };
         let typed = cmd.text.as_str();
@@ -163,10 +166,15 @@ impl Review {
         }
         match key.code {
             KeyCode::Esc => self.cmd = None,
+            KeyCode::Enter if line.search => {
+                let text = self.cmd.take().map(|c| c.text).unwrap_or_default();
+                self.search(&text);
+            }
             KeyCode::Enter => {
                 let text = self.cmd.take().map(|c| c.text).unwrap_or_default();
                 return self.run(&text, store);
             }
+            KeyCode::Tab if line.search => {}
             KeyCode::Tab => {
                 let options = if line.text.contains(' ') {
                     self.paths()

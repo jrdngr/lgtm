@@ -13,6 +13,7 @@ mod range;
 mod reload;
 mod resolve;
 pub mod rows;
+mod search;
 mod select;
 mod threads;
 mod tree;
@@ -602,6 +603,7 @@ impl Review {
             KeyCode::Char('u') => self.undo(store),
             KeyCode::Char('U') => self.redo(store),
             KeyCode::Char('v') if !self.in_list => self.start_select(),
+            KeyCode::Char('/') if !self.in_list => self.start_search(""),
             KeyCode::Char('z') => self.toggle_group(),
             KeyCode::Enter => match self.current() {
                 Some(Line::File(f)) => self.toggle_file(f),
@@ -709,6 +711,9 @@ impl Review {
 
     /// The key bar. With Shift held, r and f become R and F.
     pub fn hints(&self, shift: bool) -> Vec<Hint<'static>> {
+        if self.cmd.as_ref().is_some_and(|c| c.search) {
+            return vec![("Enter", "search", false), ("Esc", "cancel", false)];
+        }
         if self.cmd.is_some() {
             return vec![
                 ("Tab", "complete", false),
@@ -720,7 +725,12 @@ impl Review {
             return vec![("Enter", "save", false), ("Esc", "cancel", false)];
         }
         if self.selecting.is_some() {
-            return vec![("y", "copy", false), ("Esc", "cancel", false)];
+            return vec![
+                ("y", "copy", false),
+                ("/", "search", false),
+                ("n N", "match", false),
+                ("Esc", "cancel", false),
+            ];
         }
         let (review, flag) = if shift {
             (("R", "review file", false), ("F", "flag file", false))

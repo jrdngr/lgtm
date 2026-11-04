@@ -17,7 +17,7 @@ use crate::tui::edit::clipboard;
 
 pub struct Selecting {
     pub buf: Buffer,
-    keys: Keys,
+    pub(super) keys: Keys,
 }
 
 impl Review {
@@ -52,7 +52,7 @@ impl Review {
     }
 
     /// The selected text. Lines a wrapped row continues on join without a newline.
-    fn selected_text(&self, b: &Buffer) -> String {
+    pub(super) fn selected_text(&self, b: &Buffer) -> String {
         let (from, to) = (b.sel.from(), b.sel.to() + 1);
         let mut out = String::new();
         for (i, ch) in b.text.chars().enumerate().skip(from).take(to - from) {
@@ -92,7 +92,7 @@ impl Review {
     }
 
     /// Moves the cursor to the selection's head, scrolling sideways to show it.
-    fn follow_head(&mut self) {
+    pub(super) fn follow_head(&mut self) {
         let Some(b) = self.selecting.as_ref().map(|s| &s.buf) else {
             return;
         };
@@ -116,13 +116,21 @@ impl Review {
         }
     }
 
-    /// Handles a key while selecting: motions move the selection, `y` copies it, and `v` or
-    /// Esc stop.
+    /// Handles a key while selecting: motions move the selection, `y` copies it, `/` searches
+    /// from it, and `v` or Esc stop.
     pub(super) fn select_key(&mut self, key: KeyEvent) {
+        let plain = !key.modifiers.contains(KeyModifiers::CONTROL);
+        let waiting = self.selecting.as_ref().is_some_and(|s| s.keys.waiting());
+        if plain
+            && !waiting
+            && let KeyCode::Char(c @ ('n' | 'N')) = key.code
+        {
+            self.next_match(c == 'n');
+            return;
+        }
         let Some(s) = self.selecting.as_mut() else {
             return;
         };
-        let plain = !key.modifiers.contains(KeyModifiers::CONTROL);
         let view = View {
             height: self.height,
             hidden: &[],
@@ -143,6 +151,7 @@ impl Review {
                 self.selecting = None;
             }
             Action::Notice(n) => self.notice = Some(n),
+            Action::Search => self.start_search(&self.selection_needle()),
             _ if !selecting => self.selecting = None,
             _ => {}
         }
