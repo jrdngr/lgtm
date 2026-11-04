@@ -196,14 +196,21 @@ impl Review {
         } else {
             (height / 4).min(3)
         };
-        if let Some(top) = self.snap.take() {
+        // The view keeps a margin only on the side the cursor is moving toward, so a line put
+        // at the top by a jump stays there as the cursor moves down from it.
+        let up = self.cursor < self.drawn_cursor;
+        let down = self.cursor > self.drawn_cursor;
+        if let Some(top) = self.snap {
             let last = self.lines.len().saturating_sub(height);
             self.top = top.min(last);
-        } else if self.cursor < self.top + margin {
+        } else if self.cursor < self.top || (up && self.cursor < self.top + margin) {
             self.top = self.cursor.saturating_sub(margin);
-        } else if self.cursor + margin >= self.top + height {
+        } else if self.cursor >= self.top + height
+            || (down && self.cursor + margin >= self.top + height)
+        {
             self.top = (self.cursor + margin + 1).saturating_sub(height);
         }
+        self.drawn_cursor = self.cursor;
         let selection = self.selection();
         let selecting = self.selecting.is_some();
         for (n, &line) in self.lines.iter().enumerate().skip(self.top).take(height) {

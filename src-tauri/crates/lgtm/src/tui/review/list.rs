@@ -60,6 +60,18 @@ impl Review {
         out
     }
 
+    /// The files in the order the list shows them, closed folders' too, leaving out
+    /// reviewed files set apart under a closed heading.
+    pub(super) fn list_order(&self) -> Vec<usize> {
+        self.all_entries()
+            .into_iter()
+            .filter_map(|e| match e {
+                Entry::File { file, .. } => Some(file),
+                _ => None,
+            })
+            .collect()
+    }
+
     /// Every entry, closed folders' too.
     fn all_entries(&self) -> Vec<Entry> {
         let files = self

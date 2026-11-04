@@ -121,16 +121,18 @@ pub struct Review {
     history: undo::History,
     /// A comment resolved while resolved ones are hidden, shown until the cursor leaves it.
     lingering: Option<i64>,
-    /// The line to put at the top of the screen when next drawn, after a jump.
+    /// The line held at the top of the screen after a jump, until the next key.
     snap: Option<usize>,
+    /// Where the cursor was when last drawn, for which way it's moving.
+    drawn_cursor: usize,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
     ("j k", "line"),
     ("Ctrl-d Ctrl-u", "half page"),
     ("g G", "top, bottom"),
-    ("n m", "next, previous hunk"),
-    ("N M", "next, previous file"),
+    ("n m", "next, previous file"),
+    ("N M", "next, previous hunk"),
     ("h l", "scroll left, right"),
     ("Enter", "fold file, edit comment"),
     ("Tab", "file list"),
@@ -221,6 +223,7 @@ impl Review {
             history: undo::History::default(),
             lingering: None,
             snap: None,
+            drawn_cursor: 0,
         }
     }
 
@@ -289,12 +292,17 @@ impl Review {
             .filter(|&f| self.folded.contains(&self.files[f].path))
             .collect();
         let wrap = self.wrap.then(|| self.code_width());
-        let mut lines = rows::lines_with(&self.files, &folded, self.split, &self.notes(), wrap);
-        // Reviewed files set apart show only while their heading is open.
-        if self.group_reviewed && !self.reviewed_open {
-            lines.retain(|l| !self.reviewed(l.file()));
-        }
-        lines
+        // Files in the list's order; reviewed ones set apart show only while their heading is
+        // open.
+        let order = self.list_order();
+        rows::lines_with(
+            &self.files,
+            &order,
+            &folded,
+            self.split,
+            &self.notes(),
+            wrap,
+        )
     }
 
     fn relayout(&mut self) {
@@ -575,10 +583,10 @@ impl Review {
             KeyCode::PageUp => self.by(-(self.height.max(1) as isize)),
             KeyCode::Char('g') | KeyCode::Home => self.cursor = 0,
             KeyCode::Char('G') | KeyCode::End => self.by(isize::MAX / 2),
-            KeyCode::Char('n') => self.jump_hunk(true),
-            KeyCode::Char('m') => self.jump_hunk(false),
-            KeyCode::Char('N') => self.jump_file(true),
-            KeyCode::Char('M') => self.jump_file(false),
+            KeyCode::Char('n') => self.jump_file(true),
+            KeyCode::Char('m') => self.jump_file(false),
+            KeyCode::Char('N') => self.jump_hunk(true),
+            KeyCode::Char('M') => self.jump_hunk(false),
             KeyCode::Char('h') | KeyCode::Left => self.scroll_side(-4),
             KeyCode::Char('l') | KeyCode::Right => self.scroll_side(4),
             KeyCode::Char('u') => self.undo(store),
@@ -615,6 +623,7 @@ impl Review {
     pub fn mouse(&mut self, ev: MouseEvent) {
         let at = Position::new(ev.column, ev.row);
         self.pinned = true;
+        self.snap = None;
         if matches!(ev.kind, MouseEventKind::Down(_)) {
             self.anchor = None;
             self.selecting = None;
@@ -722,8 +731,8 @@ impl Review {
         }
         let mut hints = vec![
             ("space", "menu", false),
-            ("n m", "hunk", false),
-            ("N M", "file", false),
+            ("n m", "file", false),
+            ("N M", "hunk", false),
             review,
             flag,
             ("c", "comment", false),
@@ -810,34 +819,34 @@ mod tests {
     }
 
     #[test]
-    fn n_m_move_between_first_changed_lines_and_shifted_between_files() {
+    fn shifted_n_m_move_between_first_changed_lines_and_n_m_between_files() {
         let mut r = review();
-        press(&mut r, KeyCode::Char('n'));
-        assert_eq!(r.current(), on_change(0, 0));
-        press(&mut r, KeyCode::Char('n'));
-        assert_eq!(r.current(), on_change(0, 1));
         press(&mut r, KeyCode::Char('N'));
-        assert_eq!(r.current(), Some(Line::File(1)));
-        press(&mut r, KeyCode::Char('m'));
+        assert_eq!(r.current(), on_change(0, 0));
+        press(&mut r, KeyCode::Char('N'));
         assert_eq!(r.current(), on_change(0, 1));
+        press(&mut r, KeyCode::Char('n'));
+        assert_eq!(r.current(), Some(Line::File(1)));
         press(&mut r, KeyCode::Char('M'));
+        assert_eq!(r.current(), on_change(0, 1));
+        press(&mut r, KeyCode::Char('m'));
         assert_eq!(r.current(), Some(Line::File(0)));
     }
 
     #[test]
     fn enter_on_a_file_header_folds_the_file_and_unfolds_it_again() {
         let mut r = review();
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
         // Enter on code does nothing.
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), on_change(0, 0));
-        press(&mut r, KeyCode::Char('M'));
+        press(&mut r, KeyCode::Char('m'));
         press(&mut r, KeyCode::Enter);
         assert_eq!(r.current(), Some(Line::File(0)));
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::File(1)));
-        press(&mut r, KeyCode::Char('M'));
-        press(&mut r, KeyCode::Char('M'));
+        press(&mut r, KeyCode::Char('m'));
+        press(&mut r, KeyCode::Char('m'));
         press(&mut r, KeyCode::Enter);
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::Hunk(0, 0)));
@@ -847,23 +856,38 @@ mod tests {
     fn hunk_keys_stop_on_a_folded_files_header() {
         let mut r = review();
         r.set_folded(0, true);
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
         assert_eq!(r.current(), on_change(1, 0));
-        press(&mut r, KeyCode::Char('m'));
+        press(&mut r, KeyCode::Char('M'));
         assert_eq!(r.current(), Some(Line::File(0)));
     }
 
     #[test]
     fn jumps_put_the_hunk_or_file_at_the_top_under_the_pinned_header() {
         let mut r = review();
-        press(&mut r, KeyCode::Char('n'));
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
+        press(&mut r, KeyCode::Char('N'));
         // a.rs: header, divider, 2 rows, divider, 2 rows. The second divider shows first.
         assert_eq!(r.snap, Some(3));
-        press(&mut r, KeyCode::Char('N'));
+        press(&mut r, KeyCode::Char('n'));
         assert_eq!(r.snap, Some(r.cursor));
         press(&mut r, KeyCode::Char('j'));
         assert_eq!(r.snap, None);
+    }
+
+    #[test]
+    fn the_diff_shows_files_in_the_file_lists_order() {
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        r.loaded(Ok((vec![], vec![file("z.rs", 1), file("a.rs", 1)])));
+        let headers: Vec<&str> = r
+            .lines
+            .iter()
+            .filter_map(|l| match l {
+                Line::File(f) => Some(r.files[*f].path.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(headers, ["a.rs", "z.rs"]);
     }
 
     #[test]
@@ -884,7 +908,7 @@ mod tests {
     #[test]
     fn the_file_list_moves_a_file_at_a_time() {
         let mut r = review();
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
         press(&mut r, KeyCode::Tab);
         press(&mut r, KeyCode::Down);
         assert_eq!(r.current(), Some(Line::File(1)));

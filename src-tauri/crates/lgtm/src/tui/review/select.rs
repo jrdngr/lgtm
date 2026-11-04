@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn v_selects_with_the_editors_motions_and_esc_stops() {
         let mut r = review();
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
         assert_eq!(r.cursor, 1);
         press(&mut r, KeyCode::Char('v'));
         press(&mut r, KeyCode::Char('j'));
@@ -230,7 +230,7 @@ mod tests {
         press(&mut r, KeyCode::Char('w'));
         // "  old a0" wraps after its spaces: "  ", "old ", "a0".
         assert_eq!(r.lines.len(), 1 + 3 + 3);
-        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('N'));
         press(&mut r, KeyCode::Char('v'));
         press(&mut r, KeyCode::Char('j'));
         press(&mut r, KeyCode::Char('j'));

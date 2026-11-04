@@ -107,13 +107,15 @@ impl Line {
 
 #[cfg(test)]
 pub fn lines(files: &[FileDiff], folded: &HashSet<usize>, split: bool) -> Vec<Line> {
-    lines_with(files, folded, split, &Notes::default(), None)
+    let order: Vec<usize> = (0..files.len()).collect();
+    lines_with(files, &order, folded, split, &Notes::default(), None)
 }
 
-/// The lines of `files`, with `notes` under their rows. A folded file shows only its header.
-/// With `wrap`, code rows wrap to that many columns.
+/// The lines of `files`, in `order`, with `notes` under their rows. A folded file shows only
+/// its header. With `wrap`, code rows wrap to that many columns.
 pub fn lines_with(
     files: &[FileDiff],
+    order: &[usize],
     folded: &HashSet<usize>,
     split: bool,
     notes: &Notes,
@@ -130,7 +132,8 @@ pub fn lines_with(
             }));
         }
     };
-    for (f, file) in files.iter().enumerate() {
+    for &f in order {
+        let file = &files[f];
         out.push(Line::File(f));
         if folded.contains(&f) {
             continue;
