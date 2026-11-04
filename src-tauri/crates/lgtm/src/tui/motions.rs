@@ -9,6 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent};
 enum Kind {
     NewAfter,
     NewBefore,
+    Edit,
     Describe,
     Squash,
     BookmarkAdvance,
@@ -26,6 +27,7 @@ const MOTIONS: &[&[(&str, &str, Kind)]] = &[
     &[
         ("na", "New after", Kind::NewAfter),
         ("nb", "New before", Kind::NewBefore),
+        ("e", "Edit", Kind::Edit),
     ],
     &[("d", "Describe", Kind::Describe)],
     &[("s", "Squash into parent", Kind::Squash)],
@@ -102,6 +104,7 @@ impl Menu {
         match kind {
             Kind::NewAfter => JjAction::NewAfter { rev },
             Kind::NewBefore => JjAction::NewBefore { rev },
+            Kind::Edit => JjAction::Edit { rev },
             Kind::Describe => {
                 // The typed line replaces the first; the body stays.
                 let body = t.description.find('\n').map_or("", |i| &t.description[i..]);
@@ -325,6 +328,10 @@ mod tests {
             Step::Run(JjAction::Squash {
                 revs: "abc::def".into()
             })
+        );
+        assert_eq!(
+            keys(&mut menu(), "e"),
+            Step::Run(JjAction::Edit { rev: "abc".into() })
         );
         assert_eq!(keys(&mut menu(), "n"), Step::Stay);
         assert_eq!(keys(&mut menu(), "x"), Step::Close);

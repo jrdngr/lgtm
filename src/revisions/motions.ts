@@ -43,6 +43,12 @@ export function motions(trunk: string | null): Motion[][] {
         action: (t) => ({ kind: "newBefore", rev: t.cursor }),
         follow: true,
       },
+      {
+        keys: "e",
+        label: "Edit",
+        action: (t) => ({ kind: "edit", rev: t.cursor }),
+        follow: true,
+      },
     ],
     [
       {
