@@ -10,7 +10,7 @@ use ratatui::style::Color;
 use super::marks::State;
 use super::rows::{Line, NoteKey};
 use super::wrap::{self, code_parts};
-use super::{Review, tree};
+use super::{LIST_MIN, Review, tree};
 use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
@@ -18,6 +18,7 @@ use crate::tui::theme::{
     self, ACCENT, ADD, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, NOTE,
     PANEL, RED, SEL, THREAD, UNIQUE,
 };
+use crate::tui::width;
 
 /// Width of a line number column.
 pub const NUM: u16 = 4;
@@ -100,7 +101,8 @@ impl Review {
             return;
         }
         let list = if self.show_list && body.width >= 100 {
-            (body.width / 5).clamp(24, 40)
+            let default = (body.width / 5).clamp(24, 40);
+            width::fit(self.list_width, default, LIST_MIN, body.width - 40)
         } else {
             0
         };

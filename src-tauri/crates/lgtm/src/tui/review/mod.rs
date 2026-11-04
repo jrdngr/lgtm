@@ -36,6 +36,7 @@ use super::highlight::Sides;
 use super::keybar::Hint;
 use super::load::Target;
 use super::settings::Settings;
+use super::width;
 use crate::edit::keymap::Pick;
 use draw::{CODE_X, NUM};
 use rows::Line;
@@ -70,6 +71,8 @@ pub struct Review {
     wrap: bool,
     /// Whether the file list shows, when there's room.
     show_list: bool,
+    /// The file list's width, once `<` or `>` set it.
+    list_width: Option<u16>,
     /// Columns of code scrolled off to the left.
     left: usize,
     lines: Vec<Line>,
@@ -141,6 +144,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("h l", "scroll left, right"),
     ("Enter", "fold file, edit comment"),
     ("Tab", "file list"),
+    ("< >", "file list width"),
     ("Enter", "open, close folder (file list)"),
     ("r f", "review, flag file or folder"),
     ("R F", "review, flag hunk"),
@@ -164,9 +168,12 @@ pub const KEYS: &[(&str, &str)] = &[
     ("q", "back"),
 ];
 
+/// The narrowest the file list gets.
+const LIST_MIN: u16 = 16;
+
 impl Review {
-    /// The toggles, to keep for the next review and run.
-    pub fn settings(&self) -> Settings {
+    /// The toggles, to keep for the next review and run, over the rest of `s`.
+    pub fn settings(&self, s: &Settings) -> Settings {
         Settings {
             hide_reviewed: self.group_reviewed,
             split: self.split,
@@ -174,6 +181,8 @@ impl Review {
             show_resolved: self.show_resolved,
             wrap: self.wrap,
             files: self.show_list,
+            review_files_width: self.list_width,
+            ..s.clone()
         }
     }
 
@@ -184,6 +193,7 @@ impl Review {
         self.show_resolved = s.show_resolved;
         self.wrap = s.wrap;
         self.show_list = s.files;
+        self.list_width = s.review_files_width;
     }
 
     pub fn new(id: u64, target: Target) -> Self {
@@ -199,6 +209,7 @@ impl Review {
             split: false,
             wrap: false,
             show_list: true,
+            list_width: None,
             left: 0,
             lines: vec![],
             cursor: 0,
@@ -530,6 +541,12 @@ impl Review {
                 _ => Outcome::None,
             };
         }
+        if let Some(step) = width::step(&key) {
+            if self.list_area.width > 0 {
+                self.list_width = Some(width::moved(self.list_area.width, step, LIST_MIN));
+            }
+            return Outcome::None;
+        }
         if key.code == KeyCode::Char(' ') && !self.in_list {
             self.space = true;
             return Outcome::None;
@@ -853,9 +870,9 @@ mod tests {
             r.key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE), None)
         };
         assert!(matches!(space(&mut r, 'b'), Outcome::None));
-        assert!(!r.settings().files);
+        assert!(!r.settings(&Settings::default()).files);
         space(&mut r, 'b');
-        assert!(r.settings().files);
+        assert!(r.settings(&Settings::default()).files);
         assert!(matches!(space(&mut r, 'o'), Outcome::Pick(Pick::OpenFiles)));
     }
 

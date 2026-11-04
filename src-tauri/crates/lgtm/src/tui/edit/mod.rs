@@ -20,6 +20,7 @@ use crate::edit::keymap::Pick;
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
 use crate::tui::files::FileTree;
+use crate::tui::width;
 
 pub enum Outcome {
     None,
@@ -91,6 +92,10 @@ pub struct Editor {
     in_sidebar: bool,
     /// Whether the sidebar shows, when there's room.
     pub files: bool,
+    /// The sidebar's width with its border, once `<` or `>` set it.
+    pub files_width: Option<u16>,
+    /// The sidebar's width as last drawn, 0 when hidden.
+    sidebar_width: u16,
 }
 
 impl Editor {
@@ -107,6 +112,8 @@ impl Editor {
             sidebar: FileTree::default(),
             in_sidebar: false,
             files: true,
+            files_width: None,
+            sidebar_width: 0,
         }
     }
 
@@ -237,6 +244,10 @@ impl Editor {
     fn sidebar_key(&mut self, key: KeyEvent) {
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        if let Some(step) = width::step(&key) {
+            self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+            return;
+        }
         let code = match key.code {
             KeyCode::Char('j') if !ctrl => KeyCode::Down,
             KeyCode::Char('k') if !ctrl => KeyCode::Up,

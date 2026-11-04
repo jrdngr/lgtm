@@ -11,6 +11,7 @@ use super::motions::{self, Menu};
 use super::paint::Canvas;
 use super::picker::{self, Picker};
 use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED};
+use super::width;
 use lgtm_core::jj::{JjAction, PushPlan};
 
 pub enum Outcome {
@@ -43,7 +44,14 @@ pub struct Home {
     pub notice: Option<String>,
     /// The jj menu, while it's open.
     menu: Option<Menu>,
+    /// The revisions side's width, once `<` or `>` set it.
+    pub revisions_width: Option<u16>,
+    /// The revisions side's width as last drawn.
+    drawn_width: u16,
 }
+
+/// The narrowest either side gets.
+const SIDE_MIN: u16 = 20;
 
 /// The `:` commands, for the menu over the command line.
 const COMMANDS: &[(&str, &str)] = &[("q", "quit")];
@@ -57,6 +65,8 @@ impl Default for Home {
             cmd: None,
             notice: None,
             menu: None,
+            revisions_width: None,
+            drawn_width: 0,
         }
     }
 }
@@ -64,6 +74,7 @@ impl Default for Home {
 /// The keys of the revisions side, for `?`.
 pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "files"),
+    ("< >", "move divider"),
     ("j k", "move"),
     ("g G", "first, last"),
     ("J K", "range"),
@@ -225,6 +236,10 @@ impl Home {
         if self.cmd.is_some() {
             return self.command_key(key);
         }
+        if let Some(step) = width::step(&key) {
+            self.revisions_width = Some(width::moved(self.drawn_width, step, SIDE_MIN));
+            return Outcome::None;
+        }
         if key.code == KeyCode::Char(' ') && self.focus == Focus::Revisions {
             self.menu = self.picker.motion_target().map(Menu::new);
             return Outcome::None;
@@ -280,7 +295,13 @@ impl Home {
     }
 
     pub fn draw(&mut self, c: &mut Canvas, body: Rect) {
-        let left_w = body.width / 2;
+        let left_w = width::fit(
+            self.revisions_width,
+            body.width / 2,
+            SIDE_MIN,
+            body.width.saturating_sub(SIDE_MIN + 1),
+        );
+        self.drawn_width = left_w;
         let left = Rect::new(body.x, body.y, left_w, body.height);
         let right = Rect::new(
             body.x + left_w + 1,

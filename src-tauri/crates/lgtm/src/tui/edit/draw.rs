@@ -13,11 +13,14 @@ use crate::edit::keys::Mode;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{self, ACCENT, AMBER, BG, FAINT, FG, GREEN, HAIR, MUTED, PANEL, RED, SEL};
+use crate::tui::width;
 
 /// Columns a tab takes.
 const TAB: usize = 4;
-/// Columns the sidebar takes, with its border.
+/// Columns the sidebar takes by default, with its border.
 const SIDEBAR: u16 = 30;
+/// The narrowest the sidebar gets.
+pub const SIDEBAR_MIN: u16 = 16;
 /// The narrowest screen that shows the sidebar.
 const MIN_SIDEBAR_WIDTH: u16 = 100;
 
@@ -98,14 +101,22 @@ impl Editor {
 
     /// Draws the sidebar, when there's room, and returns what's left for the text.
     fn draw_sidebar(&mut self, c: &mut Canvas, body: Rect) -> Rect {
-        let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > SIDEBAR * 2;
+        let side = width::fit(
+            self.files_width,
+            SIDEBAR,
+            SIDEBAR_MIN,
+            body.width.saturating_sub(40),
+        );
+        let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > side * 2;
         if !self.files || !room || self.sidebar.paths().is_empty() || body.height < 2 {
             self.sidebar.hide();
+            self.sidebar_width = 0;
             return body;
         }
+        self.sidebar_width = side;
         let open = &self.open;
         let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
-        let tree = Rect::new(body.x, body.y + 1, SIDEBAR - 1, body.height - 1);
+        let tree = Rect::new(body.x, body.y + 1, side - 1, body.height - 1);
         self.sidebar.draw(c, tree, self.in_sidebar, &marked);
         c.put(
             body.x + 1,
@@ -114,12 +125,12 @@ impl Editor {
             theme::title(self.in_sidebar).bg(BG),
         );
         for y in body.y..body.bottom() {
-            c.put(body.x + SIDEBAR, y, "│", theme::fg(HAIR).bg(BG));
+            c.put(body.x + side, y, "│", theme::fg(HAIR).bg(BG));
         }
         Rect::new(
-            body.x + SIDEBAR + 1,
+            body.x + side + 1,
             body.y,
-            body.width - SIDEBAR - 1,
+            body.width - side - 1,
             body.height,
         )
     }

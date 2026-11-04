@@ -17,6 +17,7 @@ mod term;
 mod theme;
 mod versions;
 mod watch;
+mod width;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -127,6 +128,8 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         settings: settings::load(),
     };
     app.buffers.files = app.settings.files;
+    app.buffers.files_width = app.settings.editor_files_width;
+    app.home.revisions_width = app.settings.home_revisions_width;
     app.loader.log();
     app.loader.files();
     match start {
@@ -419,8 +422,11 @@ impl App {
                 return false;
             }
             let outcome = self.buffers.key(key);
-            if self.buffers.files != self.settings.files {
+            if self.buffers.files != self.settings.files
+                || self.buffers.files_width != self.settings.editor_files_width
+            {
                 self.settings.files = self.buffers.files;
+                self.settings.editor_files_width = self.buffers.files_width;
                 settings::save(&self.settings);
                 if let Some(r) = self.review.as_mut() {
                     r.apply(&self.settings);
@@ -451,7 +457,7 @@ impl App {
         }
         if let Some(r) = self.review.as_mut() {
             let outcome = r.key(key, self.store.as_mut());
-            let settings = r.settings();
+            let settings = r.settings(&self.settings);
             if settings != self.settings {
                 settings::save(&settings);
                 self.buffers.files = settings.files;
@@ -479,6 +485,10 @@ impl App {
             return false;
         }
         let outcome = self.home.key(key);
+        if self.home.revisions_width != self.settings.home_revisions_width {
+            self.settings.home_revisions_width = self.home.revisions_width;
+            settings::save(&self.settings);
+        }
         self.home_outcome(outcome)
     }
 
