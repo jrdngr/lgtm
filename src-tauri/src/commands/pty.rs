@@ -31,7 +31,11 @@ pub(crate) async fn pty_spawn(
     };
     let root = ctx.root.to_string_lossy();
     let socket = crate::paths::data_dir(window.app_handle())
-        .map(|d| crate::mcp::socket_path(&d).to_string_lossy().into_owned())
+        .map(|d| {
+            crate::agents::socket_path(&d)
+                .to_string_lossy()
+                .into_owned()
+        })
         .unwrap_or_default();
     let app_bin = std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
@@ -83,5 +87,5 @@ pub(crate) fn pty_running(ptys: State<Ptys>, id: u32) -> Option<String> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) fn terminal_session_title(terminal: String) -> Option<String> {
-    crate::mcp::session_title::of_terminal(&terminal)
+    crate::agents::session_title::of_terminal(&terminal)
 }

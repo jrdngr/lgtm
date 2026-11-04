@@ -114,9 +114,9 @@ pub(crate) async fn check_tools() -> Vec<crate::tools::ToolProblem> {
 /// Whether agents in terminals can reach the app: `lgtm mcp` registered with Claude Code.
 #[tauri::command]
 #[specta::specta]
-pub(crate) async fn mcp_status() -> CmdResult<crate::mcp::register::McpStatus> {
+pub(crate) async fn mcp_status() -> CmdResult<crate::agents::register::McpStatus> {
     // Resolving the Claude command can ask the login shell.
-    tokio::task::spawn_blocking(crate::mcp::register::status)
+    tokio::task::spawn_blocking(crate::agents::register::status)
         .await
         .map_err(|e| e.to_string())?
         .map_err(err)
@@ -126,5 +126,5 @@ pub(crate) async fn mcp_status() -> CmdResult<crate::mcp::register::McpStatus> {
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn register_mcp() -> CmdResult<()> {
-    crate::mcp::register::register().await.map_err(err)
+    crate::agents::register::register().await.map_err(err)
 }

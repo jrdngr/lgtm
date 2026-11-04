@@ -78,7 +78,7 @@ pub(super) fn failed(e: anyhow::Error) -> String {
 }
 
 impl Lgtm {
-    pub(super) fn new(app: AppHandle, hello: Hello) -> Self {
+    pub fn new(app: AppHandle, hello: Hello) -> Self {
         Self {
             app,
             hello,

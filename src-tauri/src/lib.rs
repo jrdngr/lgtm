@@ -1,3 +1,4 @@
+mod agents;
 mod canvas;
 mod commands;
 mod ctx;
@@ -317,10 +318,10 @@ pub fn run() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     // Claude Code starts this, inside a terminal that already has the user's PATH.
     if args.first().is_some_and(|a| a == "mcp") {
-        std::process::exit(mcp::bridge_main());
+        std::process::exit(agents::bridge_main());
     }
     if args.first().is_some_and(|a| a == "hook") {
-        std::process::exit(mcp::hook::main());
+        std::process::exit(agents::hook::main());
     }
     logging::init();
     adopt_login_shell_path();
@@ -358,11 +359,11 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             quit::intercept(app.handle());
             match paths::data_dir(app) {
-                Ok(dir) => mcp::listen(app.handle().clone(), mcp::socket_path(&dir)),
+                Ok(dir) => agents::listen(app.handle().clone(), agents::socket_path(&dir)),
                 Err(e) => tracing::error!("no data directory for the MCP socket: {e}"),
             }
             tauri::async_runtime::spawn(async {
-                if let Err(e) = mcp::register::migrate().await {
+                if let Err(e) = agents::register::migrate().await {
                     tracing::warn!("couldn't move the MCP registration to the lgtm command: {e:#}");
                 }
             });

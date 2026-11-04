@@ -7,7 +7,7 @@ use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
 use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
 
-use super::Hello;
+use crate::mcp::Hello;
 
 pub fn main() -> i32 {
     let rt = tokio::runtime::Builder::new_current_thread()
