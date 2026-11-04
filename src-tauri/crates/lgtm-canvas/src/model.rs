@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 
-use rmcp::schemars::{self, JsonSchema};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 

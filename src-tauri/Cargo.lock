@@ -2567,6 +2567,7 @@ dependencies = [
  "getrandom 0.4.3",
  "globset",
  "ignore",
+ "lgtm-canvas",
  "lgtm-core",
  "notify",
  "objc2",
@@ -2616,6 +2617,17 @@ dependencies = [
  "tree-sitter-toml-ng",
  "tree-sitter-typescript",
  "tree-sitter-yaml",
+]
+
+[[package]]
+name = "lgtm-canvas"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "specta",
 ]
 
 [[package]]

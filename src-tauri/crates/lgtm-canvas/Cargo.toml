@@ -1,0 +1,15 @@
+[package]
+name = "lgtm-canvas"
+version = "0.1.0"
+description = "lgtm's canvases: drawings and the drawing over design maps, and the edits agents make to them"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+schemars = "1.2"
+serde = { version = "1", features = ["derive"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

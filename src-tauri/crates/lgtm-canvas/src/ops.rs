@@ -1,7 +1,7 @@
 //! An agent's changes to a canvas, applied as one pass the user can undo.
 
 use anyhow::{Context, bail};
-use rmcp::schemars::{self, JsonSchema};
+use schemars::JsonSchema;
 use serde::Deserialize;
 
 use super::model::*;

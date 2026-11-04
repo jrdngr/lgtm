@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/lgtm-core", "crates/lgtm"]
+members = [".", "crates/lgtm-core", "crates/lgtm-canvas", "crates/lgtm"]
 
 [package]
 name = "lgtm-app"
@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 lgtm-core = { path = "crates/lgtm-core" }
+lgtm-canvas = { path = "crates/lgtm-canvas" }
 tauri = { version = "2", features = ["specta"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
