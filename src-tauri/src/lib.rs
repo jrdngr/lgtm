@@ -14,7 +14,6 @@ mod lsp;
 mod mcp;
 mod menu;
 mod notes;
-mod par;
 mod paths;
 mod placement;
 mod pr;
@@ -42,7 +41,7 @@ mod workspaces;
 mod zoom;
 
 pub use lgtm_core::{anchor, config, diff};
-use lgtm_core::{github, jj, store, syntax};
+use lgtm_core::{github, jj, par, store, syntax};
 use std::path::Path;
 
 use tauri::{Manager, WindowEvent};

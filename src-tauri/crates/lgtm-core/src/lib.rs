@@ -8,6 +8,7 @@ pub mod fuzzy;
 pub mod github;
 pub mod gitmeta;
 pub mod jj;
+pub mod par;
 pub mod paths;
 pub mod review;
 pub mod store;
