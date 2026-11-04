@@ -159,6 +159,7 @@ impl Review {
         self.list_pick = pick;
         if let Some(f) = file {
             self.cursor = rows::find(&self.lines, (f, None, None));
+            self.snap = Some(self.cursor);
         }
     }
 

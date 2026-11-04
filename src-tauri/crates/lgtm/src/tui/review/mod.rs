@@ -900,6 +900,10 @@ mod tests {
         assert_eq!(r.snap, Some(r.cursor));
         press(&mut r, KeyCode::Char('j'));
         assert_eq!(r.snap, None);
+        // Picking a file in the list puts it at the top too.
+        r.list_step(-1);
+        assert_eq!(r.current(), Some(Line::File(0)));
+        assert_eq!(r.snap, Some(r.cursor));
     }
 
     #[test]
