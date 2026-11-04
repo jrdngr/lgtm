@@ -12,6 +12,8 @@ pub struct Settings {
     pub hide_pr: bool,
     pub show_resolved: bool,
     pub wrap: bool,
+    /// The file list in the review and the file tree in the editor.
+    pub files: bool,
 }
 
 impl Default for Settings {
@@ -22,6 +24,7 @@ impl Default for Settings {
             hide_pr: false,
             show_resolved: false,
             wrap: false,
+            files: true,
         }
     }
 }

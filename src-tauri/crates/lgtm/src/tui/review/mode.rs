@@ -12,7 +12,8 @@ impl Review {
         }
         [
             ("f", "files"),
-            ("b", "buffers"),
+            ("o", "open files"),
+            ("b", "file list"),
             ("/", "search"),
             ("w", "wrap"),
             ("r", "editor"),
@@ -61,7 +62,7 @@ mod tests {
         let mut r = review();
         key(&mut r, 'N');
         assert!(matches!(key(&mut r, ' '), Outcome::None));
-        assert_eq!(r.space_menu().len(), 5);
+        assert_eq!(r.space_menu().len(), 6);
         let out = key(&mut r, 'r');
         assert!(matches!(out, Outcome::Editor(Some((p, 1))) if p == "a.rs"));
         assert!(r.space_menu().is_empty());

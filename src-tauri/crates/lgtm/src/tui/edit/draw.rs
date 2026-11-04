@@ -99,7 +99,7 @@ impl Editor {
     /// Draws the sidebar, when there's room, and returns what's left for the text.
     fn draw_sidebar(&mut self, c: &mut Canvas, body: Rect) -> Rect {
         let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > SIDEBAR * 2;
-        if !room || self.sidebar.paths().is_empty() || body.height < 2 {
+        if !self.files || !room || self.sidebar.paths().is_empty() || body.height < 2 {
             self.sidebar.hide();
             return body;
         }

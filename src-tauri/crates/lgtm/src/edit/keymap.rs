@@ -71,6 +71,8 @@ pub enum Cmd {
     Review,
     /// Move to the file tree beside the text.
     Sidebar,
+    /// Show or hide the file tree beside the text.
+    ToggleSidebar,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -113,7 +115,7 @@ impl Cmd {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Pick {
     Files,
-    Buffers,
+    OpenFiles,
     /// Lines of the repo's files that hold some text.
     Grep,
 }
@@ -244,9 +246,10 @@ pub const BINDS: &[Bind] = &[
     b("z m", Fold(Fold::CloseLevel), Both, "close a level"),
     b("z r", Fold(Fold::OpenLevel), Both, "open a level"),
     b("space f", Pick(Pick::Files), Both, "files"),
-    b("space b", Pick(Pick::Buffers), Both, "buffers"),
+    b("space o", Pick(Pick::OpenFiles), Both, "open files"),
     b("space /", Pick(Pick::Grep), Both, "search"),
     b("space e", Sidebar, Both, "file tree"),
+    b("space b", ToggleSidebar, Both, "toggle file tree"),
     b("space r", Review, Both, "review"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),

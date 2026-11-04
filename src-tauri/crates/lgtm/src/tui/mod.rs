@@ -122,6 +122,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         loads: 0,
         settings: settings::load(),
     };
+    app.buffers.files = app.settings.files;
     app.loader.log();
     app.loader.files();
     match start {
@@ -404,7 +405,15 @@ impl App {
                 self.help = true;
                 return false;
             }
-            return match self.buffers.key(key) {
+            let outcome = self.buffers.key(key);
+            if self.buffers.files != self.settings.files {
+                self.settings.files = self.buffers.files;
+                settings::save(&self.settings);
+                if let Some(r) = self.review.as_mut() {
+                    r.apply(&self.settings);
+                }
+            }
+            return match outcome {
                 edit::Outcome::None => false,
                 edit::Outcome::Review(path, line, text) => {
                     self.show_review(&path, line, &text);
@@ -432,6 +441,7 @@ impl App {
             let settings = r.settings();
             if settings != self.settings {
                 settings::save(&settings);
+                self.buffers.files = settings.files;
                 self.settings = settings;
             }
             match outcome {

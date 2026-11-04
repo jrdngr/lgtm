@@ -65,6 +65,8 @@ pub struct Review {
     split: bool,
     /// Whether code rows wrap, rather than scroll sideways.
     wrap: bool,
+    /// Whether the file list shows, when there's room.
+    show_list: bool,
     /// Columns of code scrolled off to the left.
     left: usize,
     lines: Vec<Line>,
@@ -165,6 +167,7 @@ impl Review {
             hide_pr: self.hide_pr,
             show_resolved: self.show_resolved,
             wrap: self.wrap,
+            files: self.show_list,
         }
     }
 
@@ -174,6 +177,7 @@ impl Review {
         self.hide_pr = s.hide_pr;
         self.show_resolved = s.show_resolved;
         self.wrap = s.wrap;
+        self.show_list = s.files;
     }
 
     pub fn new(id: u64, target: Target) -> Self {
@@ -188,6 +192,7 @@ impl Review {
             folded: HashSet::new(),
             split: false,
             wrap: false,
+            show_list: true,
             left: 0,
             lines: vec![],
             cursor: 0,
@@ -533,7 +538,12 @@ impl Review {
         if std::mem::take(&mut self.space) {
             return match key.code {
                 KeyCode::Char('f') => Outcome::Pick(Pick::Files),
-                KeyCode::Char('b') => Outcome::Pick(Pick::Buffers),
+                KeyCode::Char('o') => Outcome::Pick(Pick::OpenFiles),
+                KeyCode::Char('b') => {
+                    self.show_list = !self.show_list;
+                    self.set_in_list(false);
+                    Outcome::None
+                }
                 KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
                 KeyCode::Char('r') => Outcome::Editor(self.edit_target()),
                 KeyCode::Char('w') => {
@@ -828,6 +838,20 @@ mod tests {
         assert_eq!((r.file_check(0), folded(&r)), (Some(false), false));
         click(&mut r, 31);
         assert_eq!((r.file_check(0), folded(&r)), (None, false));
+    }
+
+    #[test]
+    fn space_b_hides_and_shows_the_file_list_and_space_o_lists_open_files() {
+        let mut r = review();
+        let space = |r: &mut Review, c| {
+            press(r, KeyCode::Char(' '));
+            r.key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE), None)
+        };
+        assert!(matches!(space(&mut r, 'b'), Outcome::None));
+        assert!(!r.settings().files);
+        space(&mut r, 'b');
+        assert!(r.settings().files);
+        assert!(matches!(space(&mut r, 'o'), Outcome::Pick(Pick::OpenFiles)));
     }
 
     #[test]

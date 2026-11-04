@@ -89,6 +89,8 @@ pub struct Editor {
     sidebar: FileTree,
     /// Whether keys go to the sidebar.
     in_sidebar: bool,
+    /// Whether the sidebar shows, when there's room.
+    pub files: bool,
 }
 
 impl Editor {
@@ -104,6 +106,7 @@ impl Editor {
             finder: None,
             sidebar: FileTree::default(),
             in_sidebar: false,
+            files: true,
         }
     }
 
@@ -265,7 +268,7 @@ impl Editor {
     pub fn pick(&mut self, kind: Pick) {
         let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
         let paths: Vec<(String, bool)> = match kind {
-            Pick::Buffers => self
+            Pick::OpenFiles => self
                 .open
                 .iter()
                 .map(|o| (o.buf.name.clone(), o.buf.dirty()))
@@ -383,7 +386,14 @@ impl Editor {
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
             Action::Review => {}
-            Action::Sidebar => self.in_sidebar = true,
+            Action::Sidebar => {
+                self.files = true;
+                self.in_sidebar = true;
+            }
+            Action::ToggleSidebar => {
+                self.files = !self.files;
+                self.in_sidebar = false;
+            }
             Action::Split { right } => self.split(None, right),
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {

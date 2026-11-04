@@ -70,12 +70,12 @@ impl Finder {
         self.sel = 0;
         self.top = 0;
         self.items = match self.kind {
-            Pick::Files | Pick::Buffers if self.query.trim().is_empty() => self
+            Pick::Files | Pick::OpenFiles if self.query.trim().is_empty() => self
                 .all
                 .iter()
                 .map(|(p, dirty)| item(p, None, String::new(), vec![], *dirty))
                 .collect(),
-            Pick::Files | Pick::Buffers => fuzzy::rank(&self.query, self.all.iter(), |(p, _)| p)
+            Pick::Files | Pick::OpenFiles => fuzzy::rank(&self.query, self.all.iter(), |(p, _)| p)
                 .into_iter()
                 .map(|((p, dirty), m)| item(p, None, String::new(), m.positions, *dirty))
                 .collect(),
@@ -162,7 +162,7 @@ impl Finder {
             .max(60)
             .min(area.width.saturating_sub(2));
         let rows = match self.kind {
-            Pick::Buffers => self.items.len().max(1) as u16,
+            Pick::OpenFiles => self.items.len().max(1) as u16,
             _ => (area.height / 2).max(4),
         };
         let h = (rows + 4).min(area.height);

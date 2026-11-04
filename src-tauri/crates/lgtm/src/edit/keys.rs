@@ -39,6 +39,8 @@ pub enum Action {
     Review,
     /// Move to the file tree.
     Sidebar,
+    /// Show or hide the file tree.
+    ToggleSidebar,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -304,6 +306,7 @@ impl Keys {
             Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Review => return Action::Review,
             Cmd::Sidebar => return Action::Sidebar,
+            Cmd::ToggleSidebar => return Action::ToggleSidebar,
             Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,

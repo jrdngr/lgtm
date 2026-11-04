@@ -99,7 +99,7 @@ impl Review {
             c.put_lines(body.x + 1, body.y + 1, e, theme::fg(RED));
             return;
         }
-        let list = if body.width >= 100 {
+        let list = if self.show_list && body.width >= 100 {
             (body.width / 5).clamp(24, 40)
         } else {
             0
