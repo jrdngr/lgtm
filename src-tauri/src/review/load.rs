@@ -3,7 +3,7 @@
 use lgtm_core::review::contents;
 
 use crate::anchor::MatchConfig;
-use crate::config::Config;
+use crate::config::{Config, ConfigTexts};
 use crate::jj::{Change, FileDiff, Range};
 use crate::store::Session;
 use crate::workspace::Workspace;
@@ -48,8 +48,9 @@ impl RepoCtx {
         prev: Option<&Session>,
     ) -> anyhow::Result<Loaded> {
         let whole = listed.whole;
-        let config = Config::at_base(&ws.jj, &self.reviews.configs, whole.from.as_deref()).await?;
-        let stack = views::stack(&ws.jj, &self.reviews.evologs, listed.changes, prev).await?;
+        let config =
+            Config::at_base(&ws.jj, &self.state::<ConfigTexts>(), whole.from.as_deref()).await?;
+        let stack = views::stack(&ws.jj, &self.reviews().evologs, listed.changes, prev).await?;
         // A view of a change that left the revset falls back to the whole review.
         let view = match view {
             View::Change { change } | View::SinceLast { change }
@@ -116,7 +117,8 @@ impl RepoCtx {
             .map(|d| cache::key(&sides, interdiff, d, &config))
             .collect();
         let mut built: Vec<Option<(ReviewFile, FileDto)>> = {
-            let mut cache = self.reviews.cache.lock().unwrap();
+            let reviews = self.reviews();
+            let mut cache = reviews.cache.lock().unwrap();
             keys.iter().map(|k| cache.take(k, &sides)).collect()
         };
         let misses: Vec<(usize, FileDiff)> = diffs
@@ -138,7 +140,7 @@ impl RepoCtx {
             built[i] = Some(b);
         }
         let built: Vec<(ReviewFile, FileDto)> = built.into_iter().map(Option::unwrap).collect();
-        self.reviews
+        self.reviews()
             .cache
             .lock()
             .unwrap()

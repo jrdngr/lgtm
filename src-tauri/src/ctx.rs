@@ -1,13 +1,12 @@
-//! The repo's service context: its workspaces, store and open reviews, which every feature
-//! extends with its own `impl RepoCtx` block.
+//! The repo's service context: its workspaces and store, which every feature extends with its
+//! own `impl RepoCtx` block, keeping its own state in [`RepoCtx::state`].
 
+use std::any::{Any, TypeId};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use crate::canvas::CanvasFocus;
 use crate::jj::Jj;
-use crate::review::Reviews;
 use crate::store::Store;
 use crate::watch;
 use crate::workspace::Workspace;
@@ -30,11 +29,8 @@ pub struct RepoCtx {
     /// Where new workspaces go.
     pub workspace_base: Option<PathBuf>,
     pub store: Mutex<Store>,
-    pub(crate) reviews: Reviews,
-    /// The canvas each workspace shows, by workspace name ("" for the main one).
-    pub(crate) canvas_focus: Mutex<HashMap<String, CanvasFocus>>,
-    /// Agent turns' snapshots from before their tools ran.
-    pub(crate) befores: crate::turns::Befores,
+    /// Each feature's state, by its type.
+    states: Mutex<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
 }
 
 impl RepoCtx {
@@ -48,10 +44,18 @@ impl RepoCtx {
             ui: Mutex::default(),
             workspace_base: ws_base(),
             store: Mutex::new(store),
-            reviews: Reviews::default(),
-            canvas_focus: Mutex::default(),
-            befores: Default::default(),
+            states: Mutex::default(),
         }
+    }
+
+    /// A feature's state of type `T`, made the first time it's asked for.
+    pub(crate) fn state<T: Default + Send + Sync + 'static>(&self) -> Arc<T> {
+        let mut all = self.states.lock().unwrap();
+        let any = all
+            .entry(TypeId::of::<T>())
+            .or_insert_with(|| Arc::new(T::default()))
+            .clone();
+        any.downcast().expect("stored by its type")
     }
 }
 

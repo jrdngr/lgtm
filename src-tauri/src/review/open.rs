@@ -4,7 +4,7 @@ use super::*;
 
 impl RepoCtx {
     pub(super) fn review(&self, id: u32) -> anyhow::Result<Arc<Mutex<Review>>> {
-        self.reviews
+        self.reviews()
             .open
             .lock()
             .unwrap()
@@ -14,18 +14,22 @@ impl RepoCtx {
     }
 
     pub fn close(&self, id: u32) {
-        self.reviews.open.lock().unwrap().remove(&id);
-        self.reviews.current.lock().unwrap().retain(|_, r| *r != id);
+        self.reviews().open.lock().unwrap().remove(&id);
+        self.reviews()
+            .current
+            .lock()
+            .unwrap()
+            .retain(|_, r| *r != id);
     }
 
     /// Records the review a workspace's active review pane shows, for agents to act on.
     pub fn focus(&self, workspace: Option<&str>, id: u32) {
         let key = workspace.unwrap_or("").to_string();
-        self.reviews.current.lock().unwrap().insert(key, id);
+        self.reviews().current.lock().unwrap().insert(key, id);
     }
 
     pub fn current_review(&self, workspace: Option<&str>) -> anyhow::Result<u32> {
-        self.reviews
+        self.reviews()
             .current
             .lock()
             .unwrap()
@@ -80,7 +84,7 @@ impl RepoCtx {
                 .unwrap()
                 .start_session(&label, ws.key(), revset, now_ms())?,
         };
-        let id = self.reviews.next_id.fetch_add(1, Ordering::Relaxed);
+        let id = self.reviews().next_id.fetch_add(1, Ordering::Relaxed);
         let mut review = Review::new(ws, revset, label, loaded.cfg);
         review.view = loaded.dto.view.clone();
         review.baseline = prev
@@ -94,7 +98,7 @@ impl RepoCtx {
             let store = self.store.lock().unwrap();
             review.swap_in(&store, loaded, id)?.0
         };
-        self.reviews
+        self.reviews()
             .open
             .lock()
             .unwrap()

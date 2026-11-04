@@ -41,7 +41,8 @@ impl RepoCtx {
         brief: Option<String>,
         thread: Option<LinkThread>,
     ) {
-        let mut links = self.reviews.links.lock().unwrap();
+        let reviews = self.reviews();
+        let mut links = reviews.links.lock().unwrap();
         let told = match links.get_mut(terminal) {
             Some(Link::Linked { told, .. }) => told.take(),
             _ => None,
@@ -61,9 +62,9 @@ impl RepoCtx {
     /// Forgets what `terminal`'s agent was told, for a new session there, which starts with
     /// none of it.
     pub fn new_agent_session(&self, terminal: &str) {
-        self.reviews.briefed.lock().unwrap().remove(terminal);
+        self.reviews().briefed.lock().unwrap().remove(terminal);
         if let Some(Link::Linked { told, .. }) =
-            self.reviews.links.lock().unwrap().get_mut(terminal)
+            self.reviews().links.lock().unwrap().get_mut(terminal)
         {
             *told = None;
         }
@@ -73,7 +74,8 @@ impl RepoCtx {
     /// as it is now, then the user's thread, whole when the agent hasn't had it as it is now,
     /// else one line naming it.
     pub fn prompt_context(&self, terminal: &str) -> Option<String> {
-        let mut links = self.reviews.links.lock().unwrap();
+        let reviews = self.reviews();
+        let mut links = reviews.links.lock().unwrap();
         let (brief, thread, told) = match links.get_mut(terminal)? {
             Link::Unlinked => {
                 links.remove(terminal);
@@ -85,7 +87,8 @@ impl RepoCtx {
                 told,
             } => (brief.as_ref(), thread.as_ref(), told),
         };
-        let mut briefed = self.reviews.briefed.lock().unwrap();
+        let reviews = self.reviews();
+        let mut briefed = reviews.briefed.lock().unwrap();
         let brief = brief.filter(|b| briefed.get(terminal) != Some(*b));
         if let Some(b) = brief {
             briefed.insert(terminal.to_string(), b.clone());

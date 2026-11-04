@@ -1,6 +1,9 @@
 //! The canvas the user last looked at in each workspace, with what they selected, so an agent
 //! told "this" or "tag 3" knows where to look.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+
 use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -39,10 +42,15 @@ pub struct CanvasFocus {
     pub parts: Vec<FocusPart>,
 }
 
+/// The canvas each workspace shows, by workspace name ("" for the main one).
+#[derive(Default)]
+struct Focus(Mutex<HashMap<String, CanvasFocus>>);
+
 impl RepoCtx {
     /// Records the canvas workspace `workspace` shows, or with none, that it shows none.
     pub fn set_canvas_focus(&self, workspace: Option<&str>, focus: Option<CanvasFocus>) {
-        let mut all = self.canvas_focus.lock().unwrap();
+        let focused = self.state::<Focus>();
+        let mut all = focused.0.lock().unwrap();
         let key = workspace.unwrap_or_default().to_string();
         match focus {
             Some(f) => all.insert(key, f),
@@ -51,7 +59,8 @@ impl RepoCtx {
     }
 
     pub fn canvas_focus(&self, workspace: Option<&str>) -> Option<CanvasFocus> {
-        let all = self.canvas_focus.lock().unwrap();
+        let focused = self.state::<Focus>();
+        let all = focused.0.lock().unwrap();
         all.get(workspace.unwrap_or_default()).cloned()
     }
 }

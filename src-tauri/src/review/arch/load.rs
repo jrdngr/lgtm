@@ -4,10 +4,11 @@ use std::collections::{BTreeSet, HashSet};
 
 use super::compute::{self, Stored};
 use super::group::Grouping;
+use super::history::HistoryCache;
 use super::inputs::{self, Built};
 use super::model::{self, Model};
 use super::{ArchDto, ArchRange, HistoryDto, assess, history, state};
-use crate::config::Config;
+use crate::config::{Config, ConfigTexts};
 use crate::ctx::RepoCtx;
 use crate::jj::{FileDiff, Range};
 use crate::review::View;
@@ -107,7 +108,7 @@ impl RepoCtx {
         let mut out = Vec::new();
         for (c, parent) in changes {
             let key = history::key(&c.commit_id, parent.as_deref(), &seen_from, &reviewed);
-            if let Some(found) = self.reviews.history.get(&key) {
+            if let Some(found) = self.state::<HistoryCache>().get(&key) {
                 out.extend(found);
                 continue;
             }
@@ -139,7 +140,7 @@ impl RepoCtx {
                     edges_removed: d[3],
                 })
             };
-            self.reviews.history.put(key, entry.clone());
+            self.state::<HistoryCache>().put(key, entry.clone());
             out.extend(entry);
         }
         Ok(out)
@@ -162,7 +163,7 @@ impl RepoCtx {
                 sides,
                 false,
                 diffs,
-                Config::at_base(&ws.jj, &self.reviews.configs, base).await?,
+                Config::at_base(&ws.jj, &self.state::<ConfigTexts>(), base).await?,
             )
             .await?
             .0)

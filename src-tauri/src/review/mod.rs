@@ -62,7 +62,7 @@ pub use rowmap::RowMove;
 pub use threads::ThreadDto;
 pub use views::{ChangeDto, View};
 
-/// The open reviews and what they share, kept on the [`RepoCtx`].
+/// The open reviews and what they share, the review feature's state on the [`RepoCtx`].
 pub struct Reviews {
     open: Mutex<HashMap<u32, Arc<Mutex<Review>>>>,
     /// The review each workspace's last active review pane shows, by workspace key.
@@ -70,8 +70,6 @@ pub struct Reviews {
     next_id: AtomicU32,
     cache: Mutex<cache::FileCache>,
     evologs: views::Evologs,
-    configs: crate::config::ConfigTexts,
-    history: arch::history::HistoryCache,
     /// Terminals linked to a PR review, by terminal panel id.
     links: Mutex<HashMap<String, link::Link>>,
     /// The brief each terminal's agent session last got, by terminal panel id.
@@ -86,11 +84,15 @@ impl Default for Reviews {
             next_id: AtomicU32::new(1),
             cache: Mutex::default(),
             evologs: Default::default(),
-            configs: Default::default(),
-            history: Default::default(),
             links: Mutex::default(),
             briefed: Mutex::default(),
         }
+    }
+}
+
+impl RepoCtx {
+    fn reviews(&self) -> Arc<Reviews> {
+        self.state::<Reviews>()
     }
 }
 

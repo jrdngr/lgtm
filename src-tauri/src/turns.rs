@@ -71,7 +71,7 @@ pub struct TurnDto {
 
 /// Snapshots taken before tools run, by tool call, until the tools finish.
 #[derive(Default)]
-pub struct Befores(Mutex<HashMap<String, String>>);
+struct Befores(Mutex<HashMap<String, String>>);
 
 /// `@`'s commit, after a snapshot.
 pub async fn working_commit(ws: &Workspace) -> anyhow::Result<String> {
@@ -226,11 +226,15 @@ impl RepoCtx {
                 Ok(true)
             }
             Checkpoint::Before => {
-                self.befores.0.lock().unwrap().insert(key, commit);
+                self.state::<Befores>()
+                    .0
+                    .lock()
+                    .unwrap()
+                    .insert(key, commit);
                 Ok(false)
             }
             Checkpoint::After => {
-                let before = self.befores.0.lock().unwrap().remove(&key);
+                let before = self.state::<Befores>().0.lock().unwrap().remove(&key);
                 let (Some(turn), Some(before)) = (running, before) else {
                     return Ok(false);
                 };
