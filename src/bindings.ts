@@ -338,6 +338,12 @@ export const commands = {
 	/**  Starts a thread on `text`, quoted from comment `of` on the PR. */
 	addQuote: (review: number, of: number, text: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_quote", { review, of, text })),
 	deleteComment: (review: number, comment: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("delete_comment", { review, comment })),
+	/**  Writes a comment for the agent on rows `start..=end` of review file `file`. */
+	addAgentComment: (review: number, file: number, start: number, end: number, body: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("add_agent_comment", { review, file, start, end, body })),
+	editAgentComment: (review: number, number: number, body: string) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("edit_agent_comment", { review, number, body })),
+	/**  Resolves comment `number`, or opens it again. */
+	setAgentCommentDone: (review: number, number: number, done: boolean) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("set_agent_comment_done", { review, number, done })),
+	deleteAgentComment: (review: number, number: number) => typedError<StateDto_Serialize, string>(__TAURI_INVOKE("delete_agent_comment", { review, number })),
 	/**
 	 *  Adds a message from a synced terminal to a comment's chat. The review shows it as it
 	 *  would an agent's change, wherever the review is open.
@@ -582,6 +588,19 @@ export type ActorDto = {
 
 /**  File > Add Repository to this window's project. */
 export type AddRepo = Record<string, never>;
+
+export type AgentCommentDto = {
+	/**  Shown as `C<number>`. */
+	number: number,
+	path: string,
+	/**  The review file it's on. */
+	file: number,
+	/**  The rows it covers. Absent when its code is gone, and then it shows atop its file. */
+	rows: RowSpan | null,
+	body: string,
+	done: boolean,
+	createdAt: number | null,
+};
 
 /**  How a terminal's agent stands after a hook event. */
 export type AgentHookState = "working" | "input" | "done" | "failed" | "idle" | "gone";
@@ -2577,6 +2596,10 @@ export type StateDto_Deserialize = {
 	 *  the PR by time.
 	 */
 	threads: ThreadDto_Deserialize[],
+	/**  Comments for the agent (C1, C2, …), resolved ones too, in file and row order. */
+	agentComments: AgentCommentDto[],
+	/**  The number the next comment for the agent takes. */
+	nextAgentComment: number,
 };
 
 /**  Everything marking and commenting can change. */
@@ -2598,6 +2621,10 @@ export type StateDto_Serialize = {
 	 *  the PR by time.
 	 */
 	threads: ThreadDto_Serialize[],
+	/**  Comments for the agent (C1, C2, …), resolved ones too, in file and row order. */
+	agentComments: AgentCommentDto[],
+	/**  The number the next comment for the agent takes. */
+	nextAgentComment: number,
 };
 
 export type StepDto = {

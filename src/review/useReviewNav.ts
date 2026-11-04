@@ -43,12 +43,14 @@ export function useReviewNav(n: Nav) {
     if (target) jumpTo(target);
   }
 
-  function jumpToComment(id: number) {
-    const comment = n.comments.find((x) => x.id === id);
-    if (!comment) return;
+  /** Goes to comment block `id`, or when it isn't shown, to row `at` or its file. */
+  function jumpToComment(id: number, at?: { file: number; row?: number }) {
     const target = commentJumpTarget(lines, id);
-    if (target) jumpTo(target);
-    else jump(comment.file);
+    if (target) return jumpTo(target);
+    const file = at?.file ?? n.comments.find((x) => x.id === id)?.file;
+    if (file === undefined) return;
+    if (at?.row !== undefined) jumpToRow(file, at.row);
+    else jump(file);
   }
 
   function jumpToRow(file: number, row: number) {

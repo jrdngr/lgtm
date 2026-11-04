@@ -1,11 +1,11 @@
 //! Answers agents' requests over MCP about the open review.
 
 use lgtm_core::anchor::Side;
-use lgtm_core::diff::{Row, RowKind};
 use lgtm_core::store::{AgentComment, Store};
 use serde_json::json;
 
 use super::{Review, comments};
+use lgtm_core::review::comments as comment_core;
 use lgtm_core::review::slots;
 use lgtm_core::review::view::{About, parse_range};
 
@@ -78,22 +78,7 @@ impl Review {
                         Side::Old => row.old_line,
                     }
                 });
-                let mut comment = json!({
-                    "number": format!("C{}", c.number),
-                    "path": c.path,
-                    "side": if c.side == Side::Old { "old" } else { "new" },
-                    "line": line,
-                    "code": c.line_text,
-                    "body": c.body,
-                });
-                if c.done {
-                    comment["resolved"] = json!(true);
-                }
-                if let Some(range) = self.range_of(c, *at) {
-                    comment["startLine"] = json!(range.0);
-                    comment["code"] = json!(range.1);
-                }
-                comment
+                comment_core::listing(c, line, self.range_of(c, *at))
             })
             .collect();
         comments.extend(self.threads.iter().map(|t| {
@@ -127,48 +112,16 @@ impl Review {
         c: &AgentComment,
         end: Option<(usize, usize, usize)>,
     ) -> Option<(Option<u32>, String)> {
-        let (line, text) = c.start.clone()?;
-        let start = AgentComment {
-            line,
-            line_text: text,
-            ..c.clone()
-        };
-        let (f, h0, r0) = comments::place(&self.files, &start)?;
+        let (f, h0, r0) = comments::place(&self.files, &comment_core::start_of(c)?)?;
         let (f1, h1, r1) = end?;
         if f != f1 || (h0, r0) > (h1, r1) {
             return None;
         }
-        let rows: Vec<&Row> = self.files[f]
-            .hunks
-            .iter()
-            .enumerate()
-            .flat_map(|(h, hunk)| {
-                hunk.rows
-                    .iter()
-                    .enumerate()
-                    .map(move |(r, row)| (h, r, row))
-            })
-            .filter(|&(h, r, _)| (h0, r0) <= (h, r) && (h, r) <= (h1, r1))
-            .map(|(_, _, row)| row)
+        let rows: Vec<_> = comments::rows(&self.files[f])
+            .filter(|&(at, _)| (h0, r0) <= at && at <= (h1, r1))
+            .map(|(_, row)| row)
             .collect();
-        let first = rows.first()?;
-        let first_line = match first.kind {
-            RowKind::Removed => first.old_line,
-            _ => first.new_line,
-        };
-        let code = rows
-            .iter()
-            .map(|r| {
-                let sign = match r.kind {
-                    RowKind::Added => '+',
-                    RowKind::Removed => '-',
-                    RowKind::Context => ' ',
-                };
-                format!("{sign}{}", r.text)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        Some((first_line, code))
+        comment_core::range_code(&rows)
     }
 
     fn same_review(&self, revset: &str) -> Result<(), String> {

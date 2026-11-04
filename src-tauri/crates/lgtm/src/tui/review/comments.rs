@@ -1,9 +1,9 @@
 //! Comments for the agent: `c` writes one under the cursor's row, numbered C1, C2, …; the
 //! agent reads them over MCP and marks them done, which hides them. `d` deletes one.
 
-use lgtm_core::anchor::Side;
-use lgtm_core::diff::{Row, RowKind};
+use lgtm_core::diff::RowKind;
 use lgtm_core::jj::FileDiff;
+use lgtm_core::review::comments::{self as core, RowText};
 use lgtm_core::store::{AgentComment, Store};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
@@ -29,34 +29,29 @@ pub struct Input {
 /// A comment, and the file, hunk and row it's on now. `None` when its code is gone.
 pub type Placed = (AgentComment, Option<(usize, usize, usize)>);
 
-/// Where `c` is in `files`: the row on its side with its code, nearest its line. A resolved
-/// comment whose code is gone goes on the row nearest its line instead.
+/// Where `c` is in `files`: its file, then the hunk and row [`core::place`] finds.
 pub fn place(files: &[FileDiff], c: &AgentComment) -> Option<(usize, usize, usize)> {
     let (f, file) = files
         .iter()
         .enumerate()
         .find(|(_, d)| d.path == c.path || d.old_path.as_deref() == Some(&c.path))?;
-    let line = |r: &Row| match c.side {
-        Side::New if r.kind != RowKind::Removed => r.new_line,
-        Side::Old if r.kind != RowKind::Added => r.old_line,
-        _ => None,
-    };
-    let rows = || {
-        file.hunks
-            .iter()
-            .enumerate()
-            .flat_map(|(h, hunk)| hunk.rows.iter().enumerate().map(move |(i, r)| (h, i, r)))
-    };
-    let nearest = |rows: &mut dyn Iterator<Item = (usize, usize, &Row)>| {
-        rows.filter_map(|(h, i, r)| Some((h, i, line(r)?.abs_diff(c.line))))
-            .min_by_key(|&(_, _, d)| d)
-            .map(|(h, i, _)| (f, h, i))
-    };
-    let same = nearest(&mut rows().filter(|(_, _, r)| r.text == c.line_text));
-    if same.is_some() || !c.done {
-        return same;
-    }
-    nearest(&mut rows())
+    let (h, r) = core::place(rows(file), c)?;
+    Some((f, h, r))
+}
+
+/// A file's rows by hunk and row, as placing and listing comments see them.
+pub fn rows(file: &FileDiff) -> impl Iterator<Item = ((usize, usize), RowText<'_>)> + Clone {
+    file.hunks.iter().enumerate().flat_map(|(h, hunk)| {
+        hunk.rows.iter().enumerate().map(move |(i, r)| {
+            let text = RowText {
+                kind: r.kind,
+                old_line: r.old_line,
+                new_line: r.new_line,
+                text: &r.text,
+            };
+            ((h, i), text)
+        })
+    })
 }
 
 impl Review {
@@ -75,7 +70,7 @@ impl Review {
                         let at = place(&self.files, &c);
                         (c, at)
                     })
-                    .filter(|(c, at)| c.review == self.revset || self.on_change(*at))
+                    .filter(|(c, at)| core::shows_in(c, &self.revset, self.kind_at(*at)))
                     .collect();
             }
             Err(e) => self.notice = Some(format!("{e:#}")),
@@ -83,10 +78,9 @@ impl Review {
         self.relayout();
     }
 
-    /// Whether a comment is on a changed row. A comment made in another review shows here
-    /// only then: on context, or nowhere, it's about another change.
-    fn on_change(&self, at: Option<(usize, usize, usize)>) -> bool {
-        at.is_some_and(|(f, h, r)| self.files[f].hunks[h].rows[r].kind != RowKind::Context)
+    /// The kind of the row at `at`.
+    fn kind_at(&self, at: Option<(usize, usize, usize)>) -> Option<RowKind> {
+        at.map(|(f, h, r)| self.files[f].hunks[h].rows[r].kind)
     }
 
     pub fn typing(&self) -> bool {
@@ -325,45 +319,31 @@ impl Review {
     /// The comment `input` makes, with `body`.
     fn comment_at(&self, input: &Input, body: &str) -> AgentComment {
         let file = &self.files[input.file];
-        let row = &file.hunks[input.hunk].rows[input.row];
-        let (side, path, line) = match row.kind {
-            RowKind::Removed => (
-                Side::Old,
-                file.old_path.clone().unwrap_or_else(|| file.path.clone()),
-                row.old_line,
-            ),
-            _ => (Side::New, file.path.clone(), row.new_line),
-        };
-        let start = input.start.map(|(h, r)| {
+        let text = |h: usize, r: usize| {
             let row = &file.hunks[h].rows[r];
-            let line = match row.kind {
-                RowKind::Removed => row.old_line,
-                _ => row.new_line,
-            };
-            (line.unwrap_or(1), row.text.clone())
-        });
-        AgentComment {
-            id: 0,
-            number: 0,
-            path,
-            side,
-            line: line.unwrap_or(1),
-            line_text: row.text.clone(),
-            start,
-            body: body.to_string(),
-            review: self.revset.clone(),
-            created_at: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |d| d.as_millis() as i64),
-            done: false,
-        }
+            RowText {
+                kind: row.kind,
+                old_line: row.old_line,
+                new_line: row.new_line,
+                text: &row.text,
+            }
+        };
+        core::new_comment(
+            &file.path,
+            file.old_path.as_deref(),
+            input.start.map(|(h, r)| text(h, r)),
+            text(input.hunk, input.row),
+            body,
+            &self.revset,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lgtm_core::diff::{FileStatus, Hunk};
+    use lgtm_core::anchor::Side;
+    use lgtm_core::diff::{FileStatus, Hunk, Row};
 
     fn row(kind: RowKind, old: Option<u32>, new: Option<u32>, text: &str) -> Row {
         Row {

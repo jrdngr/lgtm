@@ -191,7 +191,16 @@ describe("fileProgress", () => {
     marksOn = true,
   ) =>
     indexState(
-      { marks, checks: [check], agentChecks: [], amber: [], comments: [], threads: [] },
+      {
+        marks,
+        checks: [check],
+        agentChecks: [],
+        amber: [],
+        comments: [],
+        threads: [],
+        agentComments: [],
+        nextAgentComment: 1,
+      },
       marksOn,
     );
   const done = (c: MarkColor) => c !== "red";

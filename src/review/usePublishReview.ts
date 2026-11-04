@@ -33,6 +33,7 @@ type Actions = Pick<
   CurrentReview,
   | "jump"
   | "jumpToComment"
+  | "jumpToAgentComment"
   | "jumpToRow"
   | "show"
   | "commentOn"
@@ -73,11 +74,13 @@ export function usePublishReview(
         filter,
         comments: review?.state.comments ?? [],
         threads: review?.state.threads ?? [],
+        agentComments: review?.state.agentComments ?? [],
         apply: (state) => latest.current.apply(state),
         refetchPr: () => latest.current.refetchPr(),
         pullPr: (quiet) => latest.current.pullPr(quiet),
         jump: (f) => latest.current.jump(f),
         jumpToComment: (id) => latest.current.jumpToComment(id),
+        jumpToAgentComment: (number) => latest.current.jumpToAgentComment(number),
         jumpToRow: (file, row) => latest.current.jumpToRow(file, row),
         show: (path, line) => latest.current.show(path, line),
         commentOn: (file, rows, body, snippet) =>

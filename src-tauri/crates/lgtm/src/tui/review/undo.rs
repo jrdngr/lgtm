@@ -1,26 +1,10 @@
 //! `u` undoes the review's last mark, check or comment change, and `U` redoes it.
 
-use lgtm_core::store::{AgentComment, Edit, Store};
+use lgtm_core::store::Store;
 
 use super::Review;
 
-/// A change `u` can undo.
-pub enum Step {
-    /// Marks and checks, as the store applied them.
-    Marks(Edit),
-    Added(AgentComment),
-    Deleted(AgentComment),
-    Edited {
-        number: i64,
-        before: String,
-        after: String,
-    },
-    /// A comment resolved, or opened again.
-    Resolved {
-        number: i64,
-        done: bool,
-    },
-}
+pub use lgtm_core::review::comments::Step;
 
 #[derive(Default)]
 pub struct History {
@@ -30,7 +14,7 @@ pub struct History {
 
 impl History {
     pub fn did(&mut self, step: Step) {
-        if matches!(&step, Step::Marks(e) if e.is_empty()) {
+        if step.is_empty() {
             return;
         }
         self.undo.push(step);
@@ -41,43 +25,6 @@ impl History {
         for step in steps {
             self.did(step);
         }
-    }
-}
-
-/// Puts comment `c` back, or deletes it. Returns it as stored.
-fn set_comment(store: &Store, c: AgentComment, there: bool) -> anyhow::Result<AgentComment> {
-    if there {
-        return Ok(store.restore_agent_comment(&c)?);
-    }
-    store.delete_agent_comment(c.number)?;
-    Ok(c)
-}
-
-impl Step {
-    /// Undoes the step, or redoes it. Returns it as it now stands, to go the other way.
-    pub(super) fn run(self, store: &mut Store, back: bool) -> anyhow::Result<Step> {
-        Ok(match self {
-            Step::Marks(edit) if back => Step::Marks(store.apply(&edit.inverse())?.inverse()),
-            Step::Marks(edit) => Step::Marks(store.apply(&edit)?),
-            Step::Added(c) => Step::Added(set_comment(store, c, !back)?),
-            Step::Deleted(c) => Step::Deleted(set_comment(store, c, back)?),
-            Step::Resolved { number, done } => {
-                store.set_agent_comment_done(number, done != back)?;
-                Step::Resolved { number, done }
-            }
-            Step::Edited {
-                number,
-                before,
-                after,
-            } => {
-                store.set_agent_comment_body(number, if back { &before } else { &after })?;
-                Step::Edited {
-                    number,
-                    before,
-                    after,
-                }
-            }
-        })
     }
 }
 
@@ -124,6 +71,7 @@ impl Review {
 #[cfg(test)]
 mod tests {
     use lgtm_core::anchor::Side;
+    use lgtm_core::store::AgentComment;
 
     use super::*;
 

@@ -162,10 +162,29 @@ pub fn start(app: &AppHandle, root: &Path, window: &str) -> Result<String, Strin
                 .unwrap_or_else(|e| tracing::error!("{e:#}"))
         }
     });
+    poll_store(&ctx);
     repos.insert(label.clone(), window, ctx);
     tracing::info!(repo = %root.display(), "opened repo");
     if let Err(e) = crate::recent::add(&crate::recent::path(&data_dir), root) {
         tracing::warn!("save recent repos: {e}");
     }
     Ok(label)
+}
+
+/// Rereads open reviews whenever another program, like the terminal app, writes to the
+/// repo's store. Stops once the repo closes.
+fn poll_store(ctx: &Arc<RepoCtx>) {
+    let weak = Arc::downgrade(ctx);
+    tauri::async_runtime::spawn(async move {
+        let mut seen = None;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            let Some(ctx) = weak.upgrade() else { return };
+            let version = ctx.store.lock().unwrap().data_version().ok();
+            if seen.is_some() && version != seen {
+                ctx.reread_store();
+            }
+            seen = version;
+        }
+    });
 }

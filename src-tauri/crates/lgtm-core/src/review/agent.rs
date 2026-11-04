@@ -11,6 +11,33 @@ pub const GET_REVIEW: &str = "The open review as the human has reviewed it so fa
     checked or changed since it was checked, how many changed rows count as done, the line \
     ranges still left, and, with marks in use, the line ranges of each mark (by mark label).";
 
+/// How `get_comments` reads, for an app to add what else it lists.
+#[macro_export]
+macro_rules! get_comments_doc {
+    () => {
+        "The human's comments for you, by number (C1, C2, ...): the file, the line it's on \
+        now, that line's code, and what they wrote. Resolved ones come last, marked resolved: \
+        leave them alone unless the human asks."
+    };
+}
+
+pub const RESOLVE_COMMENT: &str = "Mark a comment done once you've dealt with it. The human \
+    no longer sees it unless they show resolved comments.";
+
+pub const UNRESOLVE_COMMENT: &str = "Open a resolved comment again, when the human asks.";
+
+/// What the server's instructions say about comments.
+pub const COMMENTS_INSTRUCTIONS: &str = "The human leaves numbered comments for you (C1, C2, \
+    ...). Read them with get_comments, and once you've dealt with one, mark it done with \
+    resolve_comment. get_comments lists resolved comments too, marked resolved: leave those \
+    alone unless the human asks about them, and reopen one with unresolve_comment when they do.";
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct ResolveComment {
+    /// The comment's number: 3 for C3.
+    pub number: i64,
+}
+
 pub const CHECK_FILES: &str = "Check or uncheck files in the open review as reviewed, as \
     yourself: the human sees your checks apart from theirs. Their own checks stay as they are.";
 

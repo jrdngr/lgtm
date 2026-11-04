@@ -122,6 +122,17 @@ impl Lgtm {
         turn.and_then(|t| t.session)
             .or_else(|| self.hello.claude_session.clone())
     }
+
+    fn set_comment_done(&self, number: i64, done: bool) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let number = u32::try_from(number).map_err(|_| format!("there's no comment C{number}"))?;
+        ctx.agent_set_comment_done(self.workspace(), number, done)
+            .map_err(failed)?;
+        Ok(format!(
+            "C{number} is {}.",
+            if done { "done" } else { "open again" }
+        ))
+    }
 }
 
 #[tool_router]
@@ -139,6 +150,25 @@ impl Lgtm {
             .map_err(|e| e.to_string())?;
         review["log_revset"] = ctx.log_revset(self.workspace()).map_err(failed)?.into();
         json(&review)
+    }
+
+    #[tool(description = lgtm_core::get_comments_doc!())]
+    async fn get_comments(&self) -> Out {
+        let (_, ctx) = self.repo().map_err(failed)?;
+        json(
+            &ctx.agent_comments_listing(self.workspace())
+                .map_err(failed)?,
+        )
+    }
+
+    #[tool(description = agent::RESOLVE_COMMENT)]
+    async fn resolve_comment(&self, Parameters(p): Parameters<agent::ResolveComment>) -> Out {
+        self.set_comment_done(p.number, true)
+    }
+
+    #[tool(description = agent::UNRESOLVE_COMMENT)]
+    async fn unresolve_comment(&self, Parameters(p): Parameters<agent::ResolveComment>) -> Out {
+        self.set_comment_done(p.number, false)
     }
 
     #[tool(description = agent::CHECK_FILES)]
@@ -416,7 +446,7 @@ impl ServerHandler for Lgtm {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
-            .with_instructions(INSTRUCTIONS)
+            .with_instructions(format!("{INSTRUCTIONS} {}", agent::COMMENTS_INSTRUCTIONS))
     }
 }
 

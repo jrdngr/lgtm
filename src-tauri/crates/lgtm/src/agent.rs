@@ -6,16 +6,9 @@ use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use rmcp::schemars::{self, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-pub use lgtm_core::review::agent::{CheckFiles, MarkLines};
-
-#[derive(Debug, Deserialize, Serialize, JsonSchema)]
-pub struct ResolveComment {
-    /// The comment's number: 3 for C3.
-    pub number: i64,
-}
+pub use lgtm_core::review::agent::{CheckFiles, MarkLines, ResolveComment};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "tool", rename_all = "snake_case")]

@@ -17,6 +17,7 @@ import { useGithubOff } from "../tools/agents";
 import { contextMenu, copy } from "../ui/contextMenu";
 import { IconButton } from "../ui/icons";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
+import { AgentCommentList, ResolvedToggle } from "./AgentCommentList";
 import { LinkStrip } from "./LinkStrip";
 import { SendBox } from "./SendBox";
 import { ThreadGroups } from "./ThreadGroups";
@@ -88,6 +89,7 @@ export function PrComments({ pr, review }: Props) {
     <div style={{ display: "contents" }} onKeyDown={onKey}>
       <div style={{ display: "contents" }} onContextMenu={headerMenu}>
         <SectionHeader title="Comments">
+          <ResolvedToggle />
           {!off && <IconButton icon="sync" label="Sync" onClick={sync} />}
         </SectionHeader>
         {canTriage && (
@@ -101,6 +103,7 @@ export function PrComments({ pr, review }: Props) {
       <LinkStrip workspace={workspace} />
       {error && <div className="review-error">{error}</div>}
       <div className="comments-scroll">
+        {review && <AgentCommentList review={review} />}
         <PrSection pr={pr} review={review} discussion={discussion} threads={working(threads)} />
         {review ? (
           <ThreadGroups review={review} threads={threads} />

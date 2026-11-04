@@ -2,6 +2,7 @@
 //! rows, and the edits marking and checking make. Shared by the desktop and terminal apps.
 
 pub mod agent;
+pub mod comments;
 pub mod contents;
 pub mod edits;
 pub mod file;

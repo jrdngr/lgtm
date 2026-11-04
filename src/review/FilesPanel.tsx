@@ -2,9 +2,10 @@ import { useMemo, useState } from "react";
 import { loadState, saveState, useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
-import { IconButton } from "../ui/icons";
+import { Icon, IconButton } from "../ui/icons";
 import { Ring } from "../ui/Ring";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
+import { openCounts } from "./agentComments";
 import { dirMenu, fileMenu } from "./changesMenu";
 import { type CurrentReview, useCurrentReview } from "./current";
 import { Diffstat } from "./Diffstat";
@@ -52,6 +53,8 @@ interface TreeProps {
   review: CurrentReview;
   /** Lines added and removed, by file. */
   stats: LineStat[];
+  /** Open comments for the agent, by file. */
+  open: ReadonlyMap<number, number>;
   setup: MarkSetup;
   closed: ReadonlySet<string>;
   onToggle(path: string): void;
@@ -73,6 +76,7 @@ function Node({
   depth,
   review,
   stats,
+  open,
   setup,
   closed,
   onToggle,
@@ -103,6 +107,12 @@ function Node({
           <span className="chevron" />
           <span className={`status status-${dto.status}`}>{STATUS_LABEL[dto.status]}</span>
           <span className={`name${changed ? " amber" : ""}`}>{node.name}</span>
+          {!!open.get(node.file) && (
+            <span className="open-comments">
+              <Icon name="comments" size={13} />
+              {open.get(node.file)}
+            </span>
+          )}
           {check !== "checked" && <Diffstat stat={stats[node.file]} />}
           {setup.enabled ? (
             <>
@@ -146,6 +156,7 @@ function Node({
           depth={depth + 1}
           review={review}
           stats={stats}
+          open={open}
           setup={setup}
           closed={closed}
           onToggle={onToggle}
@@ -183,16 +194,19 @@ export function FilesPanel() {
   const { sender } = useSendFromMenu(workspace);
   const [closed, setClosed] = useSavedSet(`changes-closed:${workspace ?? ""}`);
   const [hideReviewed, toggleHideReviewed] = useHideReviewed();
+  const open = useMemo(() => openCounts(review?.agentComments ?? []), [review?.agentComments]);
   const trees = useMemo(() => {
     if (!review) return undefined;
     const shown = (f: number) => matchesFilter(review.progress[f], review.filter);
-    const reviewed = (f: number) => review.checks[f] === "checked" || isDone(review.progress[f]);
+    // A reviewed file with open comments stays with the files left.
+    const reviewed = (f: number) =>
+      (review.checks[f] === "checked" || isDone(review.progress[f])) && !open.get(f);
     if (!hideReviewed) return { tree: buildTree(review.files, review.progress, shown) };
     return {
       tree: buildTree(review.files, review.progress, (f) => shown(f) && !reviewed(f)),
       done: buildTree(review.files, review.progress, (f) => shown(f) && reviewed(f)),
     };
-  }, [review, hideReviewed]);
+  }, [review, hideReviewed, open]);
   const tree = trees?.tree;
   const done = trees?.done;
   const stats = useMemo(() => review?.files.map((f) => lineStat(f.dto)) ?? [], [review?.files]);
@@ -209,6 +223,7 @@ export function FilesPanel() {
   const treeProps = {
     review,
     stats,
+    open,
     setup,
     closed,
     onToggle: (path: string) => setClosed(toggled(closed, path)),

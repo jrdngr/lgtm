@@ -75,6 +75,8 @@ export function review(files: FileDto[]): ReviewDto {
       amber: [],
       comments: [],
       threads: [],
+      agentComments: [],
+      nextAgentComment: 1,
     },
     changes: [],
     removedChanges: [],

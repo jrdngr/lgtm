@@ -1,6 +1,9 @@
 //! A loaded review: its diff, file sides, anchors, and the marks and checks matched onto it.
 
 mod agent;
+#[cfg(test)]
+mod agent_comment_tests;
+mod agent_comments;
 mod agent_edits;
 #[cfg(test)]
 mod agent_tests;
@@ -49,12 +52,14 @@ use specta::Type;
 use crate::anchor::MatchConfig;
 use crate::ctx::{RepoCtx, now_ms};
 use crate::jj::Range;
-use crate::store::{Edit, Mark, MarkColor, Session, Store};
+use crate::store::{Mark, MarkColor, Session, Store};
 use crate::workspace::Workspace;
+use agent_comments::AgentCommentDto;
 use build::{FileDto, ReviewFile};
 use comments::CommentDto;
 pub use context::ContextLine;
 pub use lgtm_core::github::pulled::PulledThread;
+use lgtm_core::review::comments::Step;
 use load::{Listed, Loaded};
 use matching::MatchedCheck;
 pub use quotes::quoted_reply;
@@ -203,6 +208,10 @@ pub struct StateDto {
     /// In a PR workspace, every thread and draft on the PR, in file order, then comments on
     /// the PR by time.
     pub threads: Vec<ThreadDto>,
+    /// Comments for the agent (C1, C2, …), resolved ones too, in file and row order.
+    pub agent_comments: Vec<AgentCommentDto>,
+    /// The number the next comment for the agent takes.
+    pub next_agent_comment: u32,
 }
 
 pub struct Review {
@@ -220,6 +229,8 @@ pub struct Review {
     amber: Vec<RowRef>,
     comments: Vec<CommentDto>,
     threads: Vec<ThreadDto>,
+    agent_comments: Vec<AgentCommentDto>,
+    next_agent_comment: u32,
     /// Marks this review has matched, in this session or the previous one. One that stops
     /// matching was lost, and the rows that replaced its line turn amber.
     baseline: HashSet<i64>,
@@ -236,8 +247,8 @@ pub struct Review {
     /// change, so the next refresh loads them again.
     shown: Option<View>,
     prev: Option<Session>,
-    undo: Vec<Edit>,
-    redo: Vec<Edit>,
+    undo: Vec<Step>,
+    redo: Vec<Step>,
     /// Counts refreshes, so one that a later refresh overtook doesn't swap in.
     load_gen: u64,
 }
@@ -259,6 +270,8 @@ impl Review {
             amber: vec![],
             comments: vec![],
             threads: vec![],
+            agent_comments: vec![],
+            next_agent_comment: 1,
             baseline: HashSet::new(),
             session: 0,
             from: None,
@@ -344,6 +357,8 @@ impl Review {
             amber: self.amber.clone(),
             comments: self.comments.clone(),
             threads: self.threads.clone(),
+            agent_comments: self.agent_comments.clone(),
+            next_agent_comment: self.next_agent_comment,
         }
     }
 }

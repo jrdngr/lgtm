@@ -114,3 +114,12 @@
 .section-meta .diffstat {
   margin-right: 6px;
 }
+
+.file-tree .open-comments {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+}

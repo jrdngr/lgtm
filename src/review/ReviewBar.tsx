@@ -4,6 +4,7 @@ import { saveSettings } from "../settings/store";
 import { turnName, turnTime } from "../turns/turnsStore";
 import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
+import { showResolved } from "./agentComments";
 import { fixChoices } from "./fixes";
 import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
@@ -239,6 +240,7 @@ function ProgressBar({ progress: p, setup }: { progress: Progress; setup: MarkSe
  * mark. */
 function ReviewMenu(props: { disabled: boolean; marks: boolean; onReset(): void; onDone(): void }) {
   const { disabled, marks, onReset } = props;
+  const resolved = showResolved.use();
   const [confirming, setConfirming] = useState(false);
   const close = () => {
     setConfirming(false);
@@ -279,6 +281,11 @@ function ReviewMenu(props: { disabled: boolean; marks: boolean; onReset(): void;
           label: "Use review marks",
           checked: marks,
           onSelect: () => saveSettings({ reviewMarks: !marks }),
+        },
+        {
+          label: "Show resolved comments",
+          checked: resolved,
+          onSelect: () => showResolved.set(!resolved),
         },
         {
           label: "Reset review…",

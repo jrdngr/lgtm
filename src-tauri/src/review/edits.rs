@@ -3,6 +3,8 @@
 use lgtm_core::review::edits::Marking;
 
 use super::{RepoCtx, Review, RowRef, StateDto, now_ms};
+use lgtm_core::review::comments::Step;
+
 use crate::store::{Edit, MarkColor, Store};
 
 impl RepoCtx {
@@ -95,7 +97,7 @@ impl RepoCtx {
         let edit = make(&review, &store)?;
         if !edit.is_empty() {
             let applied = store.apply(&edit)?;
-            review.undo.push(applied);
+            review.undo.push(Step::Marks(applied));
             review.redo.clear();
             review.rematch_edit(&store, &edit)?;
             review.save_session(&store)?;
@@ -115,25 +117,24 @@ impl RepoCtx {
         let review = self.review(id)?;
         let mut review = review.lock().unwrap();
         let mut store = self.store.lock().unwrap();
-        let last = if undo {
-            review.undo.last()
+        let stack = if undo {
+            &mut review.undo
         } else {
-            review.redo.last()
+            &mut review.redo
         };
-        if let Some(edit) = last.cloned() {
-            // Popped only once applied, so a failed step stays on its stack.
+        if let Some(step) = stack.last().cloned() {
+            let marks = step.marks().cloned();
+            // Popped only once run, so a failed step stays on its stack.
+            let done = step.run(&mut store, undo)?;
+            stack.pop();
             if undo {
-                store.apply(&edit.inverse())?;
-                review.undo.pop();
+                review.redo.push(done);
             } else {
-                store.apply(&edit)?;
-                review.redo.pop();
+                review.undo.push(done);
             }
-            review.rematch_edit(&store, &edit)?;
-            if undo {
-                review.redo.push(edit);
-            } else {
-                review.undo.push(edit);
+            match marks {
+                Some(edit) => review.rematch_edit(&store, &edit)?,
+                None => review.rematch_agent_comments(&store)?,
             }
             review.save_session(&store)?;
         }

@@ -23,6 +23,8 @@ interface Ctx {
   openMenuAtCursor(): void;
   /** Opens a draft for the PR on GitHub on the selection. */
   startDraft(): void;
+  /** Opens a comment for the agent on the selection. */
+  startComment(): void;
   /** Opens the agent box of the comment at the cursor. */
   openArchitecture(): void;
   openInEditor(): void;
@@ -140,6 +142,9 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "C":
         if (!e.repeat) ctx.startDraft();
+        break;
+      case "c":
+        if (!e.repeat) ctx.startComment();
         break;
       case "g":
         ctx.openArchitecture();

@@ -94,9 +94,11 @@ function IdleReview({ workspace }: { workspace: WorkspaceName }) {
       filter: "all",
       comments: review.state.comments,
       threads: review.state.threads,
+      agentComments: review.state.agentComments,
       apply: (state, review) => setStateRef.current(state, review),
       jump: (file) => inPane((r) => r.jump(file)),
       jumpToComment: (id) => inPane((r) => r.jumpToComment(id)),
+      jumpToAgentComment: (number) => inPane((r) => r.jumpToAgentComment(number)),
       jumpToRow: (file, row) => inPane((r) => r.jumpToRow(file, row)),
       show: (path, line) => {
         if (files.some((f) => f.dto.path === path || f.dto.oldPath === path)) {

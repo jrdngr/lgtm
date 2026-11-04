@@ -1,4 +1,4 @@
-import type { CheckState, CommentDto, StateDto, ThreadDto } from "../bindings";
+import type { AgentCommentDto, CheckState, CommentDto, StateDto, ThreadDto } from "../bindings";
 import type { DoneFn } from "./marks";
 import type { FlatFile } from "./model";
 import type { Filter, RowStateFn } from "./rowState";
@@ -25,6 +25,8 @@ export interface CurrentReview {
   comments: CommentDto[];
   /** In a PR workspace, every thread and draft on the PR. */
   threads: ThreadDto[];
+  /** Comments for the agent, resolved ones too. */
+  agentComments: AgentCommentDto[];
   /** Shows a new state, after a side view changed comments or threads. With `review`, only
    * while that review is still the one shown. */
   apply(state: StateDto, review?: number): void;
@@ -32,6 +34,8 @@ export interface CurrentReview {
   jump(file: number): void;
   /** Scrolls the review pane to a comment, or its file when its code is gone. */
   jumpToComment(id: number): void;
+  /** Scrolls the review pane to comment C`number`, or its code when the comment is hidden. */
+  jumpToAgentComment(number: number): void;
   /** Shows `line` of `path` in the review pane, or in the editor when the review doesn't
    * change it. */
   show(path: string, line: number | null): void;

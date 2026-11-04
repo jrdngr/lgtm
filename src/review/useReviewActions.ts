@@ -1,11 +1,13 @@
 import type { MarkColor, ReviewDto, StateDto } from "../bindings";
 import { type CommandResult, commands } from "../ipc";
 import { copy as copyText } from "../ui/contextMenu";
+import { agentDraftFor } from "./agentComments";
 import { draftFor } from "./comments";
 import type { MenuAction } from "./MarkMenu";
 import { changedRows, type DisplayLine, type FlatFile, toggledMark } from "./model";
 import type { RowStateFn } from "./rowState";
 import { locatedText, selectedRowText, selectionText } from "./sendText";
+import type { AgentComments } from "./useAgentComments";
 import type { Comments } from "./useComments";
 import { clearTextSelection } from "./useRowMouse";
 import type { SelectionApi } from "./useSelection";
@@ -17,6 +19,7 @@ interface Deps {
   rowState: RowStateFn;
   s: SelectionApi;
   c: Comments;
+  agent: AgentComments;
   setError(message: string | undefined): void;
   /** Shows a new state after an edit. */
   edited(state: StateDto): void;
@@ -140,11 +143,24 @@ export function useReviewActions(d: Deps) {
     finishAction();
   }
 
+  /** Opens a comment for the agent on the selection. */
+  function startComment() {
+    const draft = agentDraftFor(files, lines, sel.start, sel.end);
+    if (!draft) {
+      setError("Select rows to comment on.");
+      return;
+    }
+    setError(undefined);
+    d.agent.start(draft);
+    finishAction();
+  }
+
   function pick(action: MenuAction) {
     d.closeMenu();
     if (action === "copy") copy();
     else if (action === "location") copyLocated();
     else if (action === "draft") startDraft();
+    else if (action === "comment") startComment();
     else if (action === "open") d.openInEditor();
     else if (action === "collapse") d.collapseHunk();
     else if (action === "agent") sendSelection();
@@ -160,6 +176,7 @@ export function useReviewActions(d: Deps) {
     resetMarks,
     copy,
     startDraft,
+    startComment,
     pick,
     sendSelection,
   };

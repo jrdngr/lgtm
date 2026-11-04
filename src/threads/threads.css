@@ -312,3 +312,7 @@
   stroke-width: 2.2;
   stroke-linecap: round;
 }
+
+.agent-comment-row .dot.open {
+  background: var(--accent);
+}

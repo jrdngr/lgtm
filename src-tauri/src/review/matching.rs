@@ -20,6 +20,7 @@ impl Review {
         self.checks = matching::match_checks(&self.files, &checks);
         self.baseline.extend(self.matched.values().map(|m| m.id));
         self.amber = self.find_amber(store, &marks);
+        self.rematch_agent_comments(store)?;
         self.rematch_comments(store)
     }
 

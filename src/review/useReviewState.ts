@@ -11,6 +11,8 @@ const NO_STATE: StateDto = {
   amber: [],
   comments: [],
   threads: [],
+  agentComments: [],
+  nextAgentComment: 1,
 };
 
 /** A review's files, and the state and progress of their rows. `setup` says whether marks are

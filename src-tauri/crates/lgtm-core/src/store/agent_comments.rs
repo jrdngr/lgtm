@@ -171,6 +171,15 @@ impl Store {
             .execute("DELETE FROM agent_comments WHERE number = ?", [number])?;
         Ok(())
     }
+
+    /// Comment `C<number>`, if there is one.
+    pub fn agent_comment(&self, number: i64) -> rusqlite::Result<Option<AgentComment>> {
+        let mut stmt = self.db.prepare(&format!(
+            "SELECT {COLUMNS} FROM agent_comments WHERE number = ?"
+        ))?;
+        let mut rows = stmt.query_map([number], row_to_comment)?;
+        rows.next().transpose()
+    }
 }
 
 #[cfg(test)]

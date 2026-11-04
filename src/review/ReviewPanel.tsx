@@ -12,11 +12,14 @@ import { useReviewFind } from "../find/useReviewFind";
 import { PrNote } from "../github/PrNote";
 import { usePrReview } from "../github/usePrReview";
 import { commands } from "../ipc";
+import { viewerLogin } from "../model/people";
 import { stageColor } from "../model/stages";
 import { searchItems } from "../search/menu";
 import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
+import { AgentCommentBlock } from "./AgentCommentBlock";
+import { agentId, agentSlots, isAgentId, mergeSlots, showResolved } from "./agentComments";
 import { CommentBlock } from "./CommentBlock";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
@@ -29,6 +32,7 @@ import { ReviewBar, ReviewNotes } from "./ReviewBar";
 import { startRevset, takeStartView, workspaceRevset } from "./revset";
 import type { Filter } from "./rowState";
 import { filterLabel, plural, sumProgress } from "./state";
+import { useAgentComments } from "./useAgentComments";
 import { useAgentRequests } from "./useAgentRequests";
 import { useCollapse } from "./useCollapse";
 import { useComments } from "./useComments";
@@ -114,7 +118,24 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     onDone: focusRoot,
     canDraft: !!pr.pr,
   });
-  const slots = useMemo(() => commentSlots(c.comments, c.draft), [c.comments, c.draft]);
+  const agent = useAgentComments({
+    review,
+    files,
+    moves: loaded?.moves,
+    onState: setState,
+    onError: setError,
+    send: sendText,
+    onDone: focusRoot,
+  });
+  const resolved = showResolved.use();
+  const slots = useMemo(
+    () =>
+      mergeSlots(
+        commentSlots(c.comments, c.draft),
+        agentSlots(agent.comments, agent.draft, resolved),
+      ),
+    [c.comments, c.draft, agent.comments, agent.draft, resolved],
+  );
   const { collapsedFiles, collapsedHunks, revealed } = fold;
   const wc = useWorkingCopy(workspace)?.commitId;
   const atWorkingCopy = !!review && wc === review.to;
@@ -163,6 +184,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     rowState,
     s,
     c,
+    agent,
     setError,
     edited: setState,
     followChecks(checked) {
@@ -275,6 +297,10 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     {
       jump,
       jumpToComment,
+      jumpToAgentComment(number) {
+        const x = agent.comments.find((y) => y.number === number);
+        if (x) jumpToComment(agentId(number), { file: x.file, row: x.rows?.end });
+      },
       jumpToRow,
       show: showLine,
       commentOn,
@@ -341,6 +367,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     applyMark: a.applyMark,
     openMenuAtCursor,
     startDraft: a.startDraft,
+    startComment: a.startComment,
     openArchitecture: () => openArchitecture(containerApi),
     openInEditor,
     stepHunk,
@@ -448,17 +475,21 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
             if (!x) return undefined;
             return x.thread ? stageColor(x.thread.stage) : undefined;
           }}
-          renderComment={(id) => (
-            <>
-              <PrCommentsHead comments={c.onPr} id={id} />
-              <CommentBlock
-                id={id}
-                comment={navComments.find((x) => x.id === id)}
-                c={c}
-                folds={commentFolds}
-              />
-            </>
-          )}
+          renderComment={(id) =>
+            isAgentId(id) ? (
+              <AgentCommentBlock id={id} a={agent} viewer={viewerLogin(c.comments)} />
+            ) : (
+              <>
+                <PrCommentsHead comments={c.onPr} id={id} />
+                <CommentBlock
+                  id={id}
+                  comment={navComments.find((x) => x.id === id)}
+                  c={c}
+                  folds={commentFolds}
+                />
+              </>
+            )
+          }
           {...handlers}
         />
       )}

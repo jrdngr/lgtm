@@ -113,3 +113,54 @@ pub(crate) fn set_agent_link(
 pub(crate) fn take_suggestion(window: Frame, review: u32, comment: u32) -> CmdResult<StateDto> {
     repo(&window)?.take_suggestion(review, comment).map_err(err)
 }
+
+/// Writes a comment for the agent on rows `start..=end` of review file `file`.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn add_agent_comment(
+    window: Frame,
+    review: u32,
+    file: u32,
+    start: u32,
+    end: u32,
+    body: String,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .add_agent_comment(review, file, start, end, &body)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn edit_agent_comment(
+    window: Frame,
+    review: u32,
+    number: u32,
+    body: String,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .edit_agent_comment(review, number, &body)
+        .map_err(err)
+}
+
+/// Resolves comment `number`, or opens it again.
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn set_agent_comment_done(
+    window: Frame,
+    review: u32,
+    number: u32,
+    done: bool,
+) -> CmdResult<StateDto> {
+    repo(&window)?
+        .set_agent_comment_done(review, number, done)
+        .map_err(err)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub(crate) fn delete_agent_comment(window: Frame, review: u32, number: u32) -> CmdResult<StateDto> {
+    repo(&window)?
+        .delete_agent_comment(review, number)
+        .map_err(err)
+}
