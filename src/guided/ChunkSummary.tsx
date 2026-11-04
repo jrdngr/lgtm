@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { ChunkSummary as Summary } from "../bindings";
-import { Markdown } from "../bots/Markdown";
+import { Markdown } from "../reports/Markdown";
 
 /** A chunk's summary, one labeled section for each part the agent filled in. */
 export function ChunkSummary({ summary: s = {} }: { summary?: Summary }) {

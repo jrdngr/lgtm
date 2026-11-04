@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import { Markdown } from "../bots/Markdown";
 import { hue } from "../model/people";
+import { Markdown } from "../reports/Markdown";
 import { ago, fullDate } from "../ui/time";
 import "./github.css";
 

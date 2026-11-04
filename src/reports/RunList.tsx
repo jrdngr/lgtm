@@ -1,4 +1,4 @@
-import type { BotRun } from "../bindings";
+import type { ReportRun } from "../bindings";
 import { remembered } from "../core/remembered";
 import type { WorkspaceName } from "../core/workspace";
 import { commands } from "../ipc";
@@ -13,7 +13,7 @@ import { SevTag } from "./Severity";
 
 /** A report's suggested fixes and how many critical or high findings they leave out, or
  * without them, its findings and how many are high or worse. */
-function Outcome({ run }: { run: BotRun }) {
+function Outcome({ run }: { run: ReportRun }) {
   const r = report(run);
   if (r.minimal) {
     const fixes = r.minimal.fixes?.length ?? 0;
@@ -44,8 +44,8 @@ function Outcome({ run }: { run: BotRun }) {
 const othersOpen = remembered("lgtm:otherRuns", false, [true, false]);
 
 interface RowProps {
-  run: BotRun;
-  onOpen(run: BotRun): void;
+  run: ReportRun;
+  onOpen(run: ReportRun): void;
   onError(message: string | undefined): void;
 }
 
@@ -53,7 +53,7 @@ interface RowProps {
 function RunRow({ run, onOpen, onError }: RowProps) {
   async function remove() {
     if (!(await confirmAction("Delete this report and its findings?", "Delete"))) return;
-    const r = await commands.deleteBots(run.id);
+    const r = await commands.deleteReport(run.id);
     if (r.status === "error") return onError(r.error);
     forgetRun(run.id);
   }
@@ -67,11 +67,11 @@ function RunRow({ run, onOpen, onError }: RowProps) {
   ]);
   return (
     <li onContextMenu={menu}>
-      <button type="button" className="bots-run" onClick={() => onOpen(run)}>
-        <span className="bots-run-title">
+      <button type="button" className="reports-run" onClick={() => onOpen(run)}>
+        <span className="reports-run-title">
           <Outcome run={run} />
         </span>
-        <span className="bots-run-meta">
+        <span className="reports-run-meta">
           <b>{reportLabel(run)}</b> ·{" "}
           <code>
             {run.revset} {run.to.slice(0, 4)}
@@ -79,12 +79,12 @@ function RunRow({ run, onOpen, onError }: RowProps) {
           · {run.personas.map((p) => p.name).join(", ")}
         </span>
       </button>
-      <span className="bots-run-side">
-        <span className="bots-run-actions reveal">
+      <span className="reports-run-side">
+        <span className="reports-run-actions reveal">
           <Menu label="Run actions" items={[...reportIdItems(run, onError), del]} />
         </span>
         {run.createdAt !== null && (
-          <span className="bots-run-time" title={fullDate(run.createdAt)}>
+          <span className="reports-run-time" title={fullDate(run.createdAt)}>
             {ago(run.createdAt)}
           </span>
         )}
@@ -97,7 +97,7 @@ interface Props {
   workspace: WorkspaceName;
   /** The revset of the review being looked at. */
   revset: string | undefined;
-  onOpen(run: BotRun): void;
+  onOpen(run: ReportRun): void;
   onError(message: string | undefined): void;
 }
 
@@ -108,25 +108,27 @@ export function RunList({ workspace, revset, onOpen, onError }: Props) {
   const open = othersOpen.use();
   const current = runs.filter((r) => r.revset === revset);
   const others = runs.filter((r) => r.revset !== revset);
-  const row = (run: BotRun) => <RunRow key={run.id} run={run} onOpen={onOpen} onError={onError} />;
+  const row = (run: ReportRun) => (
+    <RunRow key={run.id} run={run} onOpen={onOpen} onError={onError} />
+  );
 
   return (
     <>
-      {current.length === 0 && <div className="bots-empty">No reports yet</div>}
-      <ul className="bots-runs">{current.map(row)}</ul>
+      {current.length === 0 && <div className="reports-empty">No reports yet</div>}
+      <ul className="reports-runs">{current.map(row)}</ul>
       {others.length > 0 && (
         <>
-          <div className="bots-section">
+          <div className="reports-section">
             <button
               type="button"
-              className="bots-label bots-fold"
+              className="reports-label reports-fold"
               aria-expanded={open}
               onClick={() => othersOpen.set(!open)}
             >
               {open ? "▾" : "▸"} Old Reports · {others.length}
             </button>
           </div>
-          {open && <ul className="bots-runs">{others.map(row)}</ul>}
+          {open && <ul className="reports-runs">{others.map(row)}</ul>}
         </>
       )}
     </>

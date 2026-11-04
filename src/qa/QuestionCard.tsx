@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Answer, QText } from "../bindings";
-import { Inline } from "../bots/Markdown";
+import { Inline } from "../reports/Markdown";
 import { Icon } from "../ui/icons";
 
 interface Props {

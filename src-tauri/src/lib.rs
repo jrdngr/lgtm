@@ -1,4 +1,3 @@
-mod bots;
 mod canvas;
 mod commands;
 mod ctx;
@@ -26,6 +25,7 @@ mod qa;
 mod quit;
 mod recent;
 mod repo;
+mod reports;
 mod review;
 mod revisions;
 mod search;
@@ -188,11 +188,11 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::comments::take_suggestion,
             commands::comments::dismiss_suggestion,
             commands::comments::set_agent_link,
-            commands::bots::delete_bots,
-            commands::bots::bot_runs,
-            commands::bots::bot_run,
-            commands::bots::rename_report,
-            commands::bots::dismiss_findings,
+            commands::reports::delete_report,
+            commands::reports::report_runs,
+            commands::reports::report_run,
+            commands::reports::rename_report,
+            commands::reports::dismiss_findings,
             commands::files::list_files,
             commands::files::read_file,
             commands::lsp::lsp_definition,
@@ -253,7 +253,7 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             events::WorkingCopyStale,
             events::JjBlocked,
             events::JjPaused,
-            events::BotRunChanged,
+            events::ReportRunChanged,
             events::AgentShow,
             events::AgentRevset,
             events::LogRevsetChanged,

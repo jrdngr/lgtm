@@ -82,7 +82,7 @@ pub struct JjPaused {
 
 /// An agent published findings to report `run`, so the workspace's dock opens it.
 #[derive(Clone, Serialize, Type, Event)]
-pub struct BotRunChanged {
+pub struct ReportRunChanged {
     pub run: u32,
     pub workspace: Option<String>,
 }

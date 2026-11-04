@@ -1,7 +1,6 @@
 //! Tauri commands, grouped by what they act on.
 
 pub mod arch;
-pub mod bots;
 pub mod comments;
 pub mod design;
 pub mod drawing;
@@ -16,6 +15,7 @@ pub mod project;
 pub mod pty;
 pub mod qa;
 pub mod repo;
+pub mod reports;
 pub mod review;
 pub mod search;
 pub mod settings;

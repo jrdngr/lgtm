@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { BotRun, Finding } from "../bindings";
+import type { Finding, ReportRun } from "../bindings";
 import { allFindings, locationText, type Report, raiser, refLabel, SEVERITIES } from "./findings";
 import { Inline } from "./Markdown";
 import { SevTag, Tally } from "./Severity";
@@ -8,7 +8,7 @@ import { SevTag, Tally } from "./Severity";
 type Cards = (list: [Finding, string][]) => ReactNode;
 
 interface Props {
-  run: BotRun;
+  run: ReportRun;
   r: Report;
   /** Shows only the findings this reviewer raised. */
   persona: string | undefined;
@@ -36,10 +36,10 @@ export function FindingsView(p: Props) {
   const minor = shown.filter((f) => MINOR.has(f.severity));
   return (
     <>
-      <div className="bots-filters">
+      <div className="reports-filters">
         <button
           type="button"
-          className="bots-chip"
+          className="reports-chip"
           aria-pressed={!persona}
           onClick={() => p.onPersona(undefined)}
         >
@@ -49,12 +49,12 @@ export function FindingsView(p: Props) {
           <button
             type="button"
             key={name}
-            className="bots-chip"
+            className="reports-chip"
             aria-pressed={persona === name}
             onClick={() => p.onPersona(persona === name ? undefined : name)}
           >
             {name}
-            <span className="bots-chip-text">{r.byPersona.get(name)?.length ?? 0}</span>
+            <span className="reports-chip-text">{r.byPersona.get(name)?.length ?? 0}</span>
           </button>
         ))}
         <span className="spacer" />

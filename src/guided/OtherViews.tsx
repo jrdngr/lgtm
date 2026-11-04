@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import type { ChunkRisk, CommentDto, GuidedDto } from "../bindings";
-import { Markdown } from "../bots/Markdown";
 import type { WorkspaceName } from "../core/workspace";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
+import { Markdown } from "../reports/Markdown";
 import type { CurrentReview } from "../review/current";
 import type { MarkSetup } from "../review/marks";
 import type { Comments } from "../review/useComments";

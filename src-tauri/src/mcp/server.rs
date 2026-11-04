@@ -15,10 +15,10 @@ use tauri::{AppHandle, Manager};
 use tauri_specta::Event as _;
 
 use super::{Hello, inputs, reports};
-use crate::bots::Summary;
 use crate::ctx::RepoCtx;
-use crate::events::{AgentRevset, AgentShow, BotRunChanged, ReviewStateChanged};
+use crate::events::{AgentRevset, AgentShow, ReportRunChanged, ReviewStateChanged};
 use crate::repo::Repos;
+use crate::reports::Summary;
 use crate::review::StateDto;
 use crate::store::{MarkColor, Stage, Take, TakeVerdict};
 
@@ -334,7 +334,7 @@ impl Lgtm {
     )]
     async fn list_reports(&self) -> Out {
         let (_, ctx) = self.repo().map_err(failed)?;
-        let runs = ctx.bot_runs(self.workspace()).map_err(failed)?;
+        let runs = ctx.report_runs(self.workspace()).map_err(failed)?;
         json(&runs.iter().map(reports::summary).collect::<Vec<_>>())
     }
 
@@ -348,7 +348,7 @@ impl Lgtm {
         let run = match p.report.as_deref() {
             Some(id) => ctx.find_report(self.workspace(), id).map_err(failed)?,
             None => ctx
-                .bot_runs(self.workspace())
+                .report_runs(self.workspace())
                 .map_err(failed)?
                 .into_iter()
                 .next()
@@ -395,7 +395,7 @@ impl Lgtm {
             )
             .await
             .map_err(failed)?;
-        BotRunChanged {
+        ReportRunChanged {
             run: run.id,
             workspace: self.workspace().map(str::to_string),
         }

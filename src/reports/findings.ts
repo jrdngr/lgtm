@@ -1,4 +1,4 @@
-import type { Action, BotRun, Finding, Location, Minimal, Severity } from "../bindings";
+import type { Action, Finding, Location, Minimal, ReportRun, Severity } from "../bindings";
 import type { FlatFile } from "../review/model";
 
 export const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -29,7 +29,7 @@ export interface Report {
   minimal?: Minimal;
 }
 
-export function report(run: BotRun): Report {
+export function report(run: ReportRun): Report {
   const byPersona = new Map<string, Finding[]>();
   const verdicts = new Map<string, string>();
   let minimal: Minimal | undefined;
@@ -54,7 +54,7 @@ export function verdictOf(r: Report): string | undefined {
 }
 
 /** A finding's id as the report shows it: `#3`, or with a lone reviewer, `#3` for `sec#3`. */
-export function refLabel(run: BotRun, id: string): string {
+export function refLabel(run: ReportRun, id: string): string {
   if (!id.includes("#")) return `#${id}`;
   return run.personas.length === 1 ? `#${id.split("#")[1]}` : id;
 }

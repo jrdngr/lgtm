@@ -13,9 +13,9 @@ export function SevTag({ severity, count }: { severity: Severity; count?: number
 
 /** How many findings there are of each severity, most severe first. */
 export function Tally({ findings }: { findings: Finding[] }) {
-  if (findings.length === 0) return <span className="bots-tally bots-none">No findings</span>;
+  if (findings.length === 0) return <span className="reports-tally reports-none">No findings</span>;
   return (
-    <span className="bots-tally">
+    <span className="reports-tally">
       {tally(findings).map(([s, n]) => (
         <SevTag key={s} severity={s} count={n} />
       ))}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BotRun, Finding, Part } from "../bindings";
+import type { Finding, Part, ReportRun } from "../bindings";
 import { file, review, rows } from "../review/fixture.test-utils";
 import { flatten } from "../review/model";
 import {
@@ -34,7 +34,7 @@ const fixes = (task: string): Part => ({
   output: { kind: "minimal", task, fixes: [], offTask: [] },
 });
 
-const run = (parts: Part[]): BotRun => ({
+const run = (parts: Part[]): ReportRun => ({
   id: 1,
   workspace: null,
   revset: "@",

@@ -1,11 +1,11 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { type BotRun, events } from "../bindings";
+import { events, type ReportRun } from "../bindings";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 import { commands } from "../ipc";
 
 /** Reports the window has seen, kept current by the backend's events. */
-const runs = new Map<number, BotRun>();
+const runs = new Map<number, ReportRun>();
 /** Reports the backend no longer has, so a pane can tell them from runs still loading. */
 const gone = new Set<number>();
 const listeners = new Set<() => void>();
@@ -18,7 +18,7 @@ function changed() {
   for (const l of listeners) l();
 }
 
-function put(run: BotRun) {
+function put(run: ReportRun) {
   runs.set(run.id, run);
   gone.delete(run.id);
   changed();
@@ -27,14 +27,14 @@ function put(run: BotRun) {
 export async function refreshRun(id: number) {
   const seq = (latest.get(id) ?? 0) + 1;
   latest.set(id, seq);
-  const r = await commands.botRun(id);
+  const r = await commands.reportRun(id);
   if (latest.get(id) !== seq) return;
   if (r.status === "ok") put(r.data);
   else forgetRun(id);
 }
 
 async function loadRuns(workspace: WorkspaceName) {
-  const r = await commands.botRuns(workspace);
+  const r = await commands.reportRuns(workspace);
   if (r.status !== "ok") return;
   for (const run of r.data) runs.set(run.id, run);
   changed();
@@ -51,7 +51,7 @@ let listening = false;
 function listen() {
   if (listening) return;
   listening = true;
-  events.botRunChanged(getCurrentWebviewWindow()).listen((e) => refreshRun(e.payload.run));
+  events.reportRunChanged(getCurrentWebviewWindow()).listen((e) => refreshRun(e.payload.run));
 }
 
 function subscribe(l: () => void) {
@@ -63,7 +63,7 @@ function subscribe(l: () => void) {
 const useVersion = () => useSyncExternalStore(subscribe, () => version);
 
 /** The workspace's reports, newest first. */
-export function useRuns(workspace: WorkspaceName): BotRun[] {
+export function useRuns(workspace: WorkspaceName): ReportRun[] {
   const v = useVersion();
   useEffect(() => {
     loadRuns(workspace);
@@ -79,7 +79,7 @@ export function useRuns(workspace: WorkspaceName): BotRun[] {
 }
 
 /** The report, `undefined` while it loads, or `null` once the backend doesn't have it. */
-export function useRun(id: number): BotRun | null | undefined {
+export function useRun(id: number): ReportRun | null | undefined {
   useVersion();
   useEffect(() => {
     if (!runs.has(id)) refreshRun(id);

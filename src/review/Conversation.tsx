@@ -1,5 +1,5 @@
 import type { Message } from "../bindings";
-import { Markdown } from "../bots/Markdown";
+import { Markdown } from "../reports/Markdown";
 
 /** A comment's conversation: what I and terminal agents said about it. */
 export function Conversation({ messages }: { messages: Message[] }) {

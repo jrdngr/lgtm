@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { CommentDto, Stage } from "../bindings";
-import { Markdown } from "../bots/Markdown";
 import { isMac, SAVE_KEY } from "../core/keys";
 import { GhThread, lastPost } from "../github/GhThread";
 import { Avatar } from "../github/Post";
 import { viewerLogin } from "../model/people";
 import { STAGES } from "../model/stages";
+import { Markdown } from "../reports/Markdown";
 import { useRoles } from "../terminal/registry";
 import { TakePill } from "../threads/ThreadBits";
 import { Busy } from "../ui/Busy";

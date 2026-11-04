@@ -1,8 +1,7 @@
 import { ArchSection } from "../arch/sidebar/ArchSection";
 import { archBadge } from "../arch/sidebar/logic";
 import { useArch } from "../arch/state";
-import type { BotRun } from "../bindings";
-import { BotsPanel } from "../bots/BotsPanel";
+import type { ReportRun } from "../bindings";
 import { useWorkspace, workspaceKey } from "../core/workspace";
 import { RepoTree } from "../editor/RepoTree";
 import { GuidedPanel } from "../guided/GuidedPanel";
@@ -10,6 +9,7 @@ import { needsYou } from "../model/stages";
 import { openQuestions } from "../qa/model";
 import { QaPanel } from "../qa/QaPanel";
 import { useQa } from "../qa/store";
+import { ReportsPanel } from "../reports/ReportsPanel";
 import { useCurrentReview } from "../review/current";
 import { FilesPanel } from "../review/FilesPanel";
 import { SearchPanel } from "../search/SearchPanel";
@@ -25,7 +25,7 @@ interface Props {
   state: SideState;
   onChange(next: SideState): void;
   bodyRef: React.RefObject<HTMLDivElement | null>;
-  onOpenReport(run: BotRun): void;
+  onOpenReport(run: ReportRun): void;
   onHide(): void;
 }
 
@@ -86,7 +86,7 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           group: "review",
           title: "Reports",
           icon: "users",
-          render: () => <BotsPanel onOpen={onOpenReport} />,
+          render: () => <ReportsPanel onOpen={onOpenReport} />,
         },
         {
           id: "qa",

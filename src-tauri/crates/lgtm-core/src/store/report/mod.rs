@@ -25,7 +25,7 @@ pub struct Part {
 /// A report on a revset, frozen at the commits it resolved to when it was first published.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct BotRun {
+pub struct ReportRun {
     pub id: u32,
     /// What the user renamed it to. Its id is `R<id>` until then.
     #[serde(default)]

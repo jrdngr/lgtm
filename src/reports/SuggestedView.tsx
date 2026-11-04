@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { BotRun, Finding } from "../bindings";
+import type { Finding, ReportRun } from "../bindings";
 import {
   allFindings,
   findingsById,
@@ -14,7 +14,7 @@ import { Refs } from "./Refs";
 import { SevTag, Tally } from "./Severity";
 
 interface Props {
-  run: BotRun;
+  run: ReportRun;
   r: Report;
   /** Indexes of the fixes left out of Send. */
   skipped: Set<number>;

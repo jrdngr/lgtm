@@ -3,7 +3,7 @@
 
 use anyhow::{Context, bail, ensure};
 
-use super::BotRun;
+use super::ReportRun;
 use crate::ctx::RepoCtx;
 
 /// Whether `name` has the shape of a default id, like `R12`.
@@ -14,36 +14,36 @@ fn looks_default(name: &str) -> bool {
 
 impl RepoCtx {
     /// The workspace's reports, newest first.
-    pub fn bot_runs(&self, workspace: Option<&str>) -> anyhow::Result<Vec<BotRun>> {
+    pub fn report_runs(&self, workspace: Option<&str>) -> anyhow::Result<Vec<ReportRun>> {
         Ok(self
             .store
             .lock()
             .unwrap()
-            .bot_runs(workspace.unwrap_or(""))?)
+            .report_runs(workspace.unwrap_or(""))?)
     }
 
-    pub fn bot_run(&self, id: u32) -> anyhow::Result<BotRun> {
+    pub fn report_run(&self, id: u32) -> anyhow::Result<ReportRun> {
         self.store
             .lock()
             .unwrap()
-            .bot_run(id)?
+            .report_run(id)?
             .context("the report is gone")
     }
 
-    pub fn delete_bots(&self, id: u32) -> anyhow::Result<()> {
-        Ok(self.store.lock().unwrap().delete_bot_run(id)?)
+    pub fn delete_report(&self, id: u32) -> anyhow::Result<()> {
+        Ok(self.store.lock().unwrap().delete_report_run(id)?)
     }
 
     /// Applies `f` to the stored report and saves it, unless `f` fails.
     pub(super) fn edit_run<T>(
         &self,
         id: u32,
-        f: impl FnOnce(&mut BotRun) -> anyhow::Result<T>,
+        f: impl FnOnce(&mut ReportRun) -> anyhow::Result<T>,
     ) -> anyhow::Result<T> {
         let store = self.store.lock().unwrap();
-        let mut run = store.bot_run(id)?.context("the report is gone")?;
+        let mut run = store.report_run(id)?.context("the report is gone")?;
         let out = f(&mut run)?;
-        store.save_bot_run(&run)?;
+        store.save_report_run(&run)?;
         Ok(out)
     }
 
@@ -53,7 +53,7 @@ impl RepoCtx {
         id: u32,
         findings: &[String],
         dismissed: bool,
-    ) -> anyhow::Result<BotRun> {
+    ) -> anyhow::Result<ReportRun> {
         self.edit_run(id, |run| {
             run.dismissed.retain(|f| !findings.contains(f));
             if dismissed {
@@ -64,9 +64,9 @@ impl RepoCtx {
     }
 
     /// The workspace's report whose id is `label`, ignoring case.
-    pub fn find_report(&self, workspace: Option<&str>, label: &str) -> anyhow::Result<BotRun> {
+    pub fn find_report(&self, workspace: Option<&str>, label: &str) -> anyhow::Result<ReportRun> {
         let label = label.trim();
-        self.bot_runs(workspace)?
+        self.report_runs(workspace)?
             .into_iter()
             .find(|r| r.label().eq_ignore_ascii_case(label))
             .with_context(|| format!("there's no report {label} in this workspace"))
@@ -75,7 +75,7 @@ impl RepoCtx {
     /// Renames report `id` to `name`, or back to `R<id>` when `name` is blank. Names are
     /// letters, digits, `-`, `_` and `.`, unique across the repository, and can't look like
     /// another report's default id.
-    pub fn rename_report(&self, id: u32, name: &str) -> anyhow::Result<BotRun> {
+    pub fn rename_report(&self, id: u32, name: &str) -> anyhow::Result<ReportRun> {
         let name = name.trim();
         let default = format!("R{id}");
         let name = (!name.is_empty() && !name.eq_ignore_ascii_case(&default)).then_some(name);
@@ -92,7 +92,7 @@ impl RepoCtx {
                 .store
                 .lock()
                 .unwrap()
-                .all_bot_runs()?
+                .all_report_runs()?
                 .iter()
                 .any(|r| r.id != id && r.label().eq_ignore_ascii_case(name));
             ensure!(!taken, "another report is already called {name}");
@@ -101,6 +101,6 @@ impl RepoCtx {
             run.name = name.map(str::to_string);
             Ok(())
         })?;
-        self.bot_run(id)
+        self.report_run(id)
     }
 }

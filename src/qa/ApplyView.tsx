@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Inline } from "../bots/Markdown";
 import { isMac } from "../core/keys";
 import type { WorkspaceName } from "../core/workspace";
+import { Inline } from "../reports/Markdown";
 import { PipeButton } from "../terminal/PipeButton";
 import { edit } from "./actions";
 import { answerLabel, applyText, isAuto, openQuestions, type Session } from "./model";

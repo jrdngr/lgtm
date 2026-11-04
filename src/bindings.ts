@@ -357,14 +357,14 @@ export const commands = {
 	/**  One line naming it, for later prompts. */
 	short: string,
 } | null) => typedError<null, string>(__TAURI_INVOKE("set_agent_link", { terminal, linked, brief, thread })),
-	deleteBots: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_bots", { run })),
+	deleteReport: (run: number) => typedError<null, string>(__TAURI_INVOKE("delete_report", { run })),
 	/**  The workspace's reports, newest first. */
-	botRuns: (workspace: string | null) => typedError<BotRun[], string>(__TAURI_INVOKE("bot_runs", { workspace })),
-	botRun: (run: number) => typedError<BotRun, string>(__TAURI_INVOKE("bot_run", { run })),
+	reportRuns: (workspace: string | null) => typedError<ReportRun[], string>(__TAURI_INVOKE("report_runs", { workspace })),
+	reportRun: (run: number) => typedError<ReportRun, string>(__TAURI_INVOKE("report_run", { run })),
 	/**  Renames a report, or with a blank `name`, gives it back its `R<n>` id. */
-	renameReport: (run: number, name: string) => typedError<BotRun, string>(__TAURI_INVOKE("rename_report", { run, name })),
+	renameReport: (run: number, name: string) => typedError<ReportRun, string>(__TAURI_INVOKE("rename_report", { run, name })),
 	/**  Dismisses findings of a report, or with `dismissed` false, brings them back. */
-	dismissFindings: (run: number, findings: string[], dismissed: boolean) => typedError<BotRun, string>(__TAURI_INVOKE("dismiss_findings", { run, findings, dismissed })),
+	dismissFindings: (run: number, findings: string[], dismissed: boolean) => typedError<ReportRun, string>(__TAURI_INVOKE("dismiss_findings", { run, findings, dismissed })),
 	/**  A directory of the workspace's working copy, `""` for its root. */
 	listFiles: (workspace: string | null, dir: string) => typedError<FileEntry[], string>(__TAURI_INVOKE("list_files", { workspace, dir })),
 	readFile: (workspace: string | null, path: string) => typedError<string, string>(__TAURI_INVOKE("read_file", { workspace, path })),
@@ -541,7 +541,6 @@ export const events = {
 	agentRevset: makeEvent<AgentRevset>("agent-revset"),
 	agentShow: makeEvent<AgentShow>("agent-show"),
 	archChanged: makeEvent<ArchChanged>("arch-changed"),
-	botRunChanged: makeEvent<BotRunChanged>("bot-run-changed"),
 	designChanged: makeEvent<DesignChanged>("design-changed"),
 	drawingChanged: makeEvent<DrawingChanged>("drawing-changed"),
 	guidedChanged: makeEvent<GuidedChanged>("guided-changed"),
@@ -553,6 +552,7 @@ export const events = {
 	openShortcuts: makeEvent<OpenShortcuts>("open-shortcuts"),
 	qaChanged: makeEvent<QaChanged>("qa-changed"),
 	repoChanged: makeEvent<RepoChanged>("repo-changed"),
+	reportRunChanged: makeEvent<ReportRunChanged>("report-run-changed"),
 	reviewOutdated: makeEvent<ReviewOutdated>("review-outdated"),
 	reviewStateChanged: makeEvent<ReviewStateChanged_Deserialize>("review-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged_Deserialize>("settings-changed"),
@@ -724,33 +724,6 @@ export type BookmarkSpot = {
 	change: string,
 	/**  Length of the shortest prefix of `change` that's unique in the repo. */
 	unique: number,
-};
-
-/**  A report on a revset, frozen at the commits it resolved to when it was first published. */
-export type BotRun = {
-	id: number,
-	/**  What the user renamed it to. Its id is `R<id>` until then. */
-	name?: string | null,
-	workspace: string | null,
-	revset: string,
-	from: string | null,
-	to: string,
-	/**
-	 *  `from` and `to` are the revset's whole range. False for reports stored before they
-	 *  were, which may have an open view's base.
-	 */
-	whole?: boolean,
-	personas: Persona[],
-	parts: Part[],
-	createdAt: number | null,
-	/**  Ids of findings the user dismissed. */
-	dismissed?: string[],
-};
-
-/**  An agent published findings to report `run`, so the workspace's dock opens it. */
-export type BotRunChanged = {
-	run: number,
-	workspace: string | null,
 };
 
 export type BoundaryDto = {
@@ -2234,6 +2207,33 @@ export type RepoChanged = {
 export type RepoInfo = {
 	root: string,
 	name: string,
+};
+
+/**  A report on a revset, frozen at the commits it resolved to when it was first published. */
+export type ReportRun = {
+	id: number,
+	/**  What the user renamed it to. Its id is `R<id>` until then. */
+	name?: string | null,
+	workspace: string | null,
+	revset: string,
+	from: string | null,
+	to: string,
+	/**
+	 *  `from` and `to` are the revset's whole range. False for reports stored before they
+	 *  were, which may have an open view's base.
+	 */
+	whole?: boolean,
+	personas: Persona[],
+	parts: Part[],
+	createdAt: number | null,
+	/**  Ids of findings the user dismissed. */
+	dismissed?: string[],
+};
+
+/**  An agent published findings to report `run`, so the workspace's dock opens it. */
+export type ReportRunChanged = {
+	run: number,
+	workspace: string | null,
 };
 
 /**  The commit a design's revision resolves to now. */

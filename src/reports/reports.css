@@ -1,17 +1,17 @@
 /* Reports panel */
 
-.bots {
+.reports {
   padding-bottom: 8px;
 }
 
-.bots-section {
+.reports-section {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 10px 10px 4px;
 }
 
-.bots-label {
+.reports-label {
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -19,50 +19,50 @@
   color: var(--muted);
 }
 
-.bots-fold {
+.reports-fold {
   padding: 0;
   border: none;
   background: none;
   cursor: pointer;
 }
 
-.bots label {
+.reports label {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
 
-.bots-error {
+.reports-error {
   padding: 4px 10px;
   color: var(--error);
   white-space: pre-wrap;
 }
 
-.bots-empty {
+.reports-empty {
   padding: 4px 10px;
   font-size: var(--fs-sm);
   color: var(--muted);
 }
 
-.bots-runs {
+.reports-runs {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 /* The outcome, and revset, commit and reviewers under it. */
-.bots-runs li {
+.reports-runs li {
   display: flex;
   align-items: center;
   padding-right: 6px;
 }
 
-.bots-runs li:hover {
+.reports-runs li:hover {
   background: var(--hover);
 }
 
-.bots-run {
+.reports-run {
   display: grid;
   align-items: center;
   gap: 2px 8px;
@@ -75,7 +75,7 @@
   text-align: left;
 }
 
-.bots-run-title {
+.reports-run-title {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -84,7 +84,7 @@
   white-space: nowrap;
 }
 
-.bots-run-meta {
+.reports-run-meta {
   overflow: hidden;
   font-size: var(--fs-xs);
   color: var(--muted);
@@ -92,27 +92,27 @@
   white-space: nowrap;
 }
 
-.bots-run-meta code {
+.reports-run-meta code {
   font: 10.5px var(--mono);
 }
 
-.bots-run-side {
+.reports-run-side {
   display: flex;
   align-items: center;
   gap: 2px;
 }
 
-.bots-run-actions {
+.reports-run-actions {
   display: flex;
   align-items: center;
 }
 
-.bots-run-actions .icon-button {
+.reports-run-actions .icon-button {
   width: 20px;
   height: 20px;
 }
 
-.bots-run-time {
+.reports-run-time {
   min-width: 18px;
   font-size: var(--fs-xs);
   color: var(--faint);
@@ -159,24 +159,24 @@
   background: var(--hover);
 }
 
-.bots-run-title .sev {
+.reports-run-title .sev {
   margin-left: 4px;
 }
 
-.bots-tally {
+.reports-tally {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.bots-none {
+.reports-none {
   font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 /* Report pane */
 
-.bots-report {
+.reports-report {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -184,7 +184,7 @@
   background: var(--bg);
 }
 
-.bots-report-bar {
+.reports-report-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -195,7 +195,7 @@
   font-size: var(--fs-sm);
 }
 
-.bots-report-id {
+.reports-report-id {
   flex: none;
   padding: 1px 6px;
   border: 1px solid var(--border);
@@ -205,29 +205,29 @@
   user-select: text;
 }
 
-.bots-report-title {
+.reports-report-title {
   font-weight: 600;
   white-space: nowrap;
 }
 
-.bots-revset {
+.reports-revset {
   font: var(--fs-sm) var(--mono);
   color: var(--rev-unique);
 }
 
-.bots-commit {
+.reports-commit {
   font: var(--fs-xs) var(--mono);
   color: var(--faint);
 }
 
-.bots-tabs {
+.reports-tabs {
   display: flex;
   gap: 14px;
   padding: 0 10px;
   border-bottom: 1px solid var(--hair);
 }
 
-.bots-tabs button {
+.reports-tabs button {
   padding: 6px 0;
   border: none;
   border-radius: 0;
@@ -236,16 +236,16 @@
   color: var(--muted);
 }
 
-.bots-tabs button:hover {
+.reports-tabs button:hover {
   color: var(--fg);
 }
 
-.bots-tabs button[aria-selected="true"] {
+.reports-tabs button[aria-selected="true"] {
   color: var(--fg);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.bots-notice {
+.reports-notice {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -253,11 +253,11 @@
   border-bottom: 1px solid var(--hair);
 }
 
-.bots-notice .icon-button {
+.reports-notice .icon-button {
   margin-left: auto;
 }
 
-.bots-report-body {
+.reports-report-body {
   flex: 1;
   overflow: auto;
   padding: 8px 12px 24px;
@@ -266,35 +266,35 @@
 }
 
 /* Room for the picked-findings bar floating over the bottom. */
-.bots-report-body.docked {
+.reports-report-body.docked {
   padding-bottom: 64px;
 }
 
-.bots-report-body h3 {
+.reports-report-body h3 {
   font-size: var(--fs);
   margin: 16px 0 4px;
 }
 
-.bots-report-body p {
+.reports-report-body p {
   margin: 4px 0;
 }
 
-.bots-report-body code {
+.reports-report-body code {
   font: var(--fs-sm) var(--mono);
 }
 
-.bots-report-body pre {
+.reports-report-body pre {
   overflow: auto;
   padding: 6px 8px;
   background: var(--panel);
   border-radius: 4px;
 }
 
-.bots-report-body li > p {
+.reports-report-body li > p {
   display: inline;
 }
 
-.bots-filters {
+.reports-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -302,7 +302,7 @@
   margin-bottom: 4px;
 }
 
-.bots-chip {
+.reports-chip {
   display: inline-flex;
   gap: 5px;
   max-width: 240px;
@@ -314,12 +314,12 @@
   white-space: nowrap;
 }
 
-.bots-chip[aria-pressed="true"] {
+.reports-chip[aria-pressed="true"] {
   border-color: transparent;
   background: var(--selection);
 }
 
-.bots-chip-text {
+.reports-chip-text {
   overflow: hidden;
   color: var(--muted);
   text-overflow: ellipsis;
@@ -423,7 +423,7 @@
 }
 
 /* The picked findings' actions, floating over the bottom so picking doesn't shift the list. */
-.bots-picked {
+.reports-picked {
   position: absolute;
   right: 10px;
   bottom: 10px;
@@ -439,7 +439,7 @@
   font-size: var(--fs-sm);
 }
 
-.bots-picked button:not(.icon-button) {
+.reports-picked button:not(.icon-button) {
   padding: 1px 10px;
   font-size: var(--fs-sm);
 }
@@ -454,7 +454,7 @@
   color: var(--muted);
 }
 
-.bots-tab-count {
+.reports-tab-count {
   margin-left: 5px;
   font: var(--fs-xs) var(--mono);
   color: var(--faint);
@@ -471,7 +471,7 @@
   gap: 14px;
 }
 
-.bots-report-body .suggested h3 {
+.reports-report-body .suggested h3 {
   display: flex;
   gap: 8px;
   margin: 0 0 6px;

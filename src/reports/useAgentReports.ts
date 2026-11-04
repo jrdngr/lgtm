@@ -9,7 +9,7 @@ import { type WorkspaceName, workspaceKey } from "../core/workspace";
 export function useAgentReports(workspace: WorkspaceName) {
   useEffect(() => {
     const key = workspaceKey(workspace);
-    const sub = events.botRunChanged(getCurrentWebviewWindow()).listen(({ payload: p }) => {
+    const sub = events.reportRunChanged(getCurrentWebviewWindow()).listen(({ payload: p }) => {
       if (workspaceKey(p.workspace) !== key) return;
       const api = dockOf(workspace);
       if (api) openReport(api, p.run);

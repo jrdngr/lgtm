@@ -5,8 +5,8 @@ use super::submitted::Summary;
 use super::*;
 use crate::store::Store;
 
-fn run(parts: Vec<Part>) -> BotRun {
-    BotRun {
+fn run(parts: Vec<Part>) -> ReportRun {
+    ReportRun {
         id: 0,
         name: None,
         workspace: None,
@@ -94,15 +94,15 @@ fn reports_round_trip_through_the_store_and_unreadable_ones_are_skipped() {
             findings: vec![finding("sec#1", Severity::Info)],
         }),
     }]);
-    r.id = store.add_bot_run(&r).unwrap();
-    assert_eq!(store.bot_run(r.id).unwrap(), Some(r.clone()));
+    r.id = store.add_report_run(&r).unwrap();
+    assert_eq!(store.report_run(r.id).unwrap(), Some(r.clone()));
     store
-        .add_bot_run_raw_for_test("", "{\"old\": true}")
+        .add_report_run_raw_for_test("", "{\"old\": true}")
         .unwrap();
-    assert_eq!(store.bot_runs("").unwrap(), [r.clone()]);
-    assert!(store.bot_runs("other").unwrap().is_empty());
-    store.delete_bot_run(r.id).unwrap();
-    assert_eq!(store.bot_run(r.id).unwrap(), None);
+    assert_eq!(store.report_runs("").unwrap(), [r.clone()]);
+    assert!(store.report_runs("other").unwrap().is_empty());
+    store.delete_report_run(r.id).unwrap();
+    assert_eq!(store.report_run(r.id).unwrap(), None);
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
     };
     let part = |step: &str, status: &str, output: &serde_json::Value| json!({ "step": step, "persona": "sec", "status": status, "output": output });
     store
-        .add_bot_run_raw_for_test(
+        .add_report_run_raw_for_test(
             "a",
             &old(json!([
                 part("reports", "done", &review),
@@ -131,7 +131,7 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
         )
         .unwrap();
     store
-        .add_bot_run_raw_for_test(
+        .add_report_run_raw_for_test(
             "b",
             &old(json!([
                 part("reports", "done", &review),
@@ -147,7 +147,7 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
         .unwrap();
 
     let kinds = |ws: &str| -> Vec<&'static str> {
-        store.bot_runs(ws).unwrap()[0]
+        store.report_runs(ws).unwrap()[0]
             .parts
             .iter()
             .map(|p| match p.output {
@@ -167,12 +167,17 @@ fn an_old_headless_run_keeps_its_reviewers_findings() {
 #[tokio::test]
 async fn a_failed_edit_leaves_the_report_as_it_was() {
     let (_dir, ctx) = crate::review::tests::repo();
-    let id = ctx.store.lock().unwrap().add_bot_run(&run(vec![])).unwrap();
-    let before = ctx.bot_run(id).unwrap();
+    let id = ctx
+        .store
+        .lock()
+        .unwrap()
+        .add_report_run(&run(vec![]))
+        .unwrap();
+    let before = ctx.report_run(id).unwrap();
     let out = ctx.edit_run::<()>(id, |run| {
         run.revset = "other".into();
         anyhow::bail!("refused")
     });
     assert!(out.is_err());
-    assert_eq!(ctx.bot_run(id).unwrap(), before);
+    assert_eq!(ctx.report_run(id).unwrap(), before);
 }

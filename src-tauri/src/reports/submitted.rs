@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use anyhow::Context;
 
 use super::output::{Action, Finding, Location, Minimal, Output, Question, Review};
-use super::{BotRun, Part, Persona};
+use super::{Part, Persona, ReportRun};
 use crate::ctx::{RepoCtx, now_ms};
 
 /// An agent's own suggested fixes, naming findings by their 1-based place in what it published.
@@ -79,7 +79,7 @@ impl RepoCtx {
         reviewer: &str,
         review: serde_json::Value,
         summary: Option<Summary>,
-    ) -> anyhow::Result<(BotRun, bool)> {
+    ) -> anyhow::Result<(ReportRun, bool)> {
         let filter = summary
             .map(|s| s.to_filter(reviewer, &review))
             .transpose()?;
@@ -114,7 +114,7 @@ impl RepoCtx {
             set_filter(run, filter);
             Ok(())
         })?;
-        Ok((self.bot_run(run.id)?, false))
+        Ok((self.report_run(run.id)?, false))
     }
 
     async fn new_report(
@@ -124,11 +124,11 @@ impl RepoCtx {
         reviewer: &str,
         output: Output,
         filter: Option<Minimal>,
-    ) -> anyhow::Result<BotRun> {
+    ) -> anyhow::Result<ReportRun> {
         let at = self.current_review_at(workspace, revset).await?;
         // Of the revset's commits as the review shows them, whichever view is open.
         self.ensure_at(&at)?;
-        let mut run = BotRun {
+        let mut run = ReportRun {
             id: 0,
             name: None,
             workspace: workspace.map(str::to_string),
@@ -145,14 +145,14 @@ impl RepoCtx {
             dismissed: vec![],
         };
         set_filter(&mut run, filter);
-        run.id = self.store.lock().unwrap().add_bot_run(&run)?;
+        run.id = self.store.lock().unwrap().add_report_run(&run)?;
         Ok(run)
     }
 }
 
 /// Makes the agent's suggested fixes the report's, or drops the old ones, which no longer
 /// match the findings.
-fn set_filter(run: &mut BotRun, filter: Option<Minimal>) {
+fn set_filter(run: &mut ReportRun, filter: Option<Minimal>) {
     run.parts.retain(|p| matches!(p.output, Output::Review(_)));
     if let Some(f) = filter {
         run.parts.push(Part {
@@ -185,7 +185,7 @@ fn findings(part: &Part) -> &[Finding] {
 
 /// Puts `output` in place of `reviewer`'s section of `run`, or adds it as a new section, and
 /// moves dismissals of the old section's findings to their matches in the new one.
-fn replace_section(run: &mut BotRun, reviewer: &str, output: Output) {
+fn replace_section(run: &mut ReportRun, reviewer: &str, output: Output) {
     let part = Part {
         persona: Some(reviewer.to_string()),
         output,

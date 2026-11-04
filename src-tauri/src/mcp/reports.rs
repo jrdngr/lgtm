@@ -2,11 +2,11 @@
 
 use serde_json::{Value, json};
 
-use crate::store::BotRun;
+use crate::store::ReportRun;
 use crate::store::report::output::{Finding, Output};
 
 /// Every reviewer's findings.
-fn findings(run: &BotRun) -> Vec<&Finding> {
+fn findings(run: &ReportRun) -> Vec<&Finding> {
     run.parts
         .iter()
         .filter_map(|p| match &p.output {
@@ -18,7 +18,7 @@ fn findings(run: &BotRun) -> Vec<&Finding> {
 }
 
 /// A line per report for `list_reports`.
-pub fn summary(run: &BotRun) -> Value {
+pub fn summary(run: &ReportRun) -> Value {
     let findings = findings(run);
     let open = findings
         .iter()
@@ -35,7 +35,7 @@ pub fn summary(run: &BotRun) -> Value {
 }
 
 /// The report with each finding's state, for `get_report`.
-pub fn report(run: &BotRun) -> Result<Value, String> {
+pub fn report(run: &ReportRun) -> Result<Value, String> {
     let verdicts: Vec<_> = run
         .parts
         .iter()

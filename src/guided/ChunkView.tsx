@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { ContextDocDto, PromptDto } from "../bindings";
-import { Markdown } from "../bots/Markdown";
 import { remembered } from "../core/remembered";
 import { openFile } from "../editor/open";
 import { commands, unwrap } from "../ipc";
+import { Markdown } from "../reports/Markdown";
 import { CommentBlock } from "../review/CommentBlock";
 import type { CurrentReview } from "../review/current";
 import { Diffstat } from "../review/Diffstat";

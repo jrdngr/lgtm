@@ -22,7 +22,7 @@ import { reportIdItems, reportLabel } from "./reportId";
 import { refreshRun, useRun } from "./runs";
 import { SettledFold } from "./SettledFold";
 import { SuggestedView } from "./SuggestedView";
-import "./bots.css";
+import "./reports.css";
 import { PipeButton } from "../terminal/PipeButton";
 
 type View = "suggested" | "findings";
@@ -198,7 +198,7 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
   const dock =
     view === "suggested"
       ? sending.length > 0 && (
-          <div className="bots-picked">
+          <div className="reports-picked">
             <b>
               {sending.length} of {fixes.length} fixes
             </b>
@@ -208,7 +208,7 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
         )
       : view === "findings" &&
         checked.size > 0 && (
-          <div className="bots-picked">
+          <div className="reports-picked">
             <b>{checked.size} picked</b>
             <span className="spacer" />
             <PipeButton onClick={sendChecked}>Findings</PipeButton>
@@ -216,13 +216,13 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
           </div>
         );
   return (
-    <div className="bots-report" ref={root}>
-      <div className="bots-report-bar">
-        <code className="bots-report-id">{reportId}</code>
-        <span className="bots-report-title">
-          Review of <code className="bots-revset">{run.revset}</code>
+    <div className="reports-report" ref={root}>
+      <div className="reports-report-bar">
+        <code className="reports-report-id">{reportId}</code>
+        <span className="reports-report-title">
+          Review of <code className="reports-revset">{run.revset}</code>
         </span>
-        <code className="bots-commit">{run.to.slice(0, 4)}</code>
+        <code className="reports-commit">{run.to.slice(0, 4)}</code>
         <span className="pill green">
           Published · {n} {n === 1 ? "finding" : "findings"}
         </span>
@@ -232,7 +232,7 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
         <span className="spacer" />
         <Menu label="Report actions" items={reportIdItems(run, setError)} />
       </div>
-      <div className="bots-tabs" role="tablist">
+      <div className="reports-tabs" role="tablist">
         {views.map((v) => (
           <button
             type="button"
@@ -243,20 +243,20 @@ export function ReportPanel({ params, api }: IDockviewPanelProps<{ run: number }
           >
             {VIEW_NAMES[v]}
             {v === "suggested" && r.minimal && (
-              <span className="bots-tab-count">{fixes.length}</span>
+              <span className="reports-tab-count">{fixes.length}</span>
             )}
-            {v === "findings" && <span className="bots-tab-count">{n}</span>}
+            {v === "findings" && <span className="reports-tab-count">{n}</span>}
           </button>
         ))}
       </div>
       {notice && (
-        <div className={notice.error ? "bots-error bots-notice" : "bots-notice"}>
+        <div className={notice.error ? "reports-error reports-notice" : "reports-notice"}>
           {notice.text}
           <IconButton icon="x" label="Dismiss" onClick={() => setNotice(undefined)} />
         </div>
       )}
-      {error && <div className="bots-error">{error}</div>}
-      <div className={`bots-report-body${dock ? " docked" : ""}`}>{body}</div>
+      {error && <div className="reports-error">{error}</div>}
+      <div className={`reports-report-body${dock ? " docked" : ""}`}>{body}</div>
       {dock}
       {picker}
     </div>

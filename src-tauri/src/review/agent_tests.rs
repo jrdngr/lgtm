@@ -101,7 +101,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     };
     let review_of =
         |fs: Vec<serde_json::Value>| serde_json::json!({ "verdict": "ok", "findings": fs });
-    let ids = |run: &crate::store::BotRun, i: usize| {
+    let ids = |run: &crate::store::ReportRun, i: usize| {
         let crate::store::report::Output::Review(r) = &run.parts[i].output else {
             panic!("no review");
         };
@@ -149,7 +149,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         "the bug stays dismissed, the gone nit's mark goes"
     );
 
-    let summary = crate::bots::Summary {
+    let summary = crate::reports::Summary {
         task: "tidy".into(),
         fixes: vec![("restyle".into(), vec![1])],
         off_task: vec![],
@@ -186,7 +186,7 @@ async fn published_findings_start_a_report_then_replace_their_section() {
     assert!(run.whole);
     let mut moved = run.clone();
     moved.from = Some("view-base".into());
-    ctx.store.lock().unwrap().save_bot_run(&moved).unwrap();
+    ctx.store.lock().unwrap().save_report_run(&moved).unwrap();
     let Err(err) = ctx
         .publish_findings(None, "@", Some(&label), "codex", review_of(vec![]), None)
         .await
@@ -194,15 +194,15 @@ async fn published_findings_start_a_report_then_replace_their_section() {
         panic!("findings went into a report of another base");
     };
     assert!(err.to_string().contains("publish a new report"), "{err}");
-    assert_eq!(ctx.bot_run(run.id).unwrap(), moved);
+    assert_eq!(ctx.report_run(run.id).unwrap(), moved);
 
     // One stored with an open view's base, before reports took the whole range, still takes
     // findings while its head is the revset's.
-    let legacy = crate::store::BotRun {
+    let legacy = crate::store::ReportRun {
         whole: false,
         ..moved
     };
-    ctx.store.lock().unwrap().save_bot_run(&legacy).unwrap();
+    ctx.store.lock().unwrap().save_report_run(&legacy).unwrap();
     ctx.publish_findings(None, "@", Some(&label), "codex", review_of(vec![]), None)
         .await
         .unwrap();
