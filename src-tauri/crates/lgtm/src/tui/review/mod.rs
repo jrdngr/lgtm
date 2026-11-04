@@ -121,6 +121,8 @@ pub struct Review {
     history: undo::History,
     /// A comment resolved while resolved ones are hidden, shown until the cursor leaves it.
     lingering: Option<i64>,
+    /// The line to put at the top of the screen when next drawn, after a jump.
+    snap: Option<usize>,
 }
 
 pub const KEYS: &[(&str, &str)] = &[
@@ -218,6 +220,7 @@ impl Review {
             selecting: None,
             history: undo::History::default(),
             lingering: None,
+            snap: None,
         }
     }
 
@@ -355,6 +358,7 @@ impl Review {
     /// Moves to the next or previous file's header.
     fn jump_file(&mut self, forward: bool) {
         self.jump(forward, |l| matches!(l, Line::File(_)));
+        self.snap = Some(self.cursor);
     }
 
     /// Columns of code a line shows: one side's in split view.
@@ -456,7 +460,23 @@ impl Review {
         };
         if let Some(i) = found {
             self.cursor = i;
+            self.snap = Some(self.hunk_top(i));
         }
+    }
+
+    /// The line to put at the top of the screen for the hunk on line `i`: the one above its
+    /// first, which the pinned file header covers, so the hunk shows from its start.
+    fn hunk_top(&self, i: usize) -> usize {
+        let line = self.lines[i];
+        let first = match line {
+            Line::Code { file, hunk, .. } => self.lines.iter().position(|l| {
+                l.file() == file
+                    && l.hunk() == Some(hunk)
+                    && matches!(l, Line::Hunk(..) | Line::Code { .. })
+            }),
+            _ => None,
+        };
+        first.map_or(i, |f| f.saturating_sub(1))
     }
 
     pub(super) fn toggle_file(&mut self, file: usize) {
@@ -490,6 +510,7 @@ impl Review {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         self.notice = None;
         self.pinned = false;
+        self.snap = None;
         if self.cmd.is_some() || self.confirm.is_some() {
             return self.command_key(key, store);
         }
@@ -830,6 +851,19 @@ mod tests {
         assert_eq!(r.current(), on_change(1, 0));
         press(&mut r, KeyCode::Char('m'));
         assert_eq!(r.current(), Some(Line::File(0)));
+    }
+
+    #[test]
+    fn jumps_put_the_hunk_or_file_at_the_top_under_the_pinned_header() {
+        let mut r = review();
+        press(&mut r, KeyCode::Char('n'));
+        press(&mut r, KeyCode::Char('n'));
+        // a.rs: header, divider, 2 rows, divider, 2 rows. The second divider shows first.
+        assert_eq!(r.snap, Some(3));
+        press(&mut r, KeyCode::Char('N'));
+        assert_eq!(r.snap, Some(r.cursor));
+        press(&mut r, KeyCode::Char('j'));
+        assert_eq!(r.snap, None);
     }
 
     #[test]

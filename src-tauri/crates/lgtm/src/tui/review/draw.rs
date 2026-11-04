@@ -196,7 +196,10 @@ impl Review {
         } else {
             (height / 4).min(3)
         };
-        if self.cursor < self.top + margin {
+        if let Some(top) = self.snap.take() {
+            let last = self.lines.len().saturating_sub(height);
+            self.top = top.min(last);
+        } else if self.cursor < self.top + margin {
             self.top = self.cursor.saturating_sub(margin);
         } else if self.cursor + margin >= self.top + height {
             self.top = (self.cursor + margin + 1).saturating_sub(height);
