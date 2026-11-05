@@ -19,6 +19,11 @@ pub enum Outcome {
     Open(Target),
     /// Load the versions of these changes.
     Versions(Vec<String>),
+    /// `jj edit` the commit, then open its review.
+    EditOpen {
+        rev: String,
+        target: Target,
+    },
 }
 
 /// A line of the picker: a row of the log, or the `j`th snapshot shown under the `k`th
@@ -188,6 +193,19 @@ impl Picker {
         })
     }
 
+    /// The commit Enter moves the working copy to before reviewing it: the cursor's, when it's
+    /// one commit, not a range or a snapshot, and jj may edit it and isn't already on it.
+    fn to_edit(&self) -> Option<String> {
+        if self.on.is_some() || self.anchored() {
+            return None;
+        }
+        let c = self.rows.get(self.sel)?.commit.as_ref()?;
+        if c.working_copy || c.immutable {
+            return None;
+        }
+        self.id(self.sel)
+    }
+
     /// The versions of the change the cursor's on a snapshot of.
     fn on_versions(&mut self) -> Option<(&mut Versions, usize)> {
         let (rev, j) = self.on.clone()?;
@@ -324,13 +342,18 @@ impl Picker {
                     return self.toggle_snapshots();
                 }
             }
-            KeyCode::Enter => {
+            KeyCode::Enter | KeyCode::Char('r') => {
+                let edit = (key.code == KeyCode::Enter)
+                    .then(|| self.to_edit())
+                    .flatten();
                 let target = match self.on_versions() {
                     Some((v, _)) => v.open(),
                     None => self.revset().map(Target::Revset),
                 };
-                if let Some(t) = target {
-                    return Outcome::Open(t);
+                match (target, edit) {
+                    (Some(target), Some(rev)) => return Outcome::EditOpen { rev, target },
+                    (Some(t), None) => return Outcome::Open(t),
+                    _ => {}
                 }
             }
             _ => {}
@@ -374,7 +397,8 @@ impl Picker {
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
         let mut hints = vec![
-            ("Enter", "open", false),
+            ("Enter", "edit", false),
+            ("r", "review", false),
             ("J K", "range", false),
             ("Space", "jj mode", false),
         ];
@@ -592,7 +616,11 @@ mod tests {
 
     fn opened(o: Outcome) -> String {
         match o {
-            Outcome::Open(Target::Revset(r)) => r,
+            Outcome::Open(Target::Revset(r))
+            | Outcome::EditOpen {
+                target: Target::Revset(r),
+                ..
+            } => r,
             _ => panic!("nothing opened"),
         }
     }
@@ -617,6 +645,32 @@ mod tests {
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+    }
+
+    #[test]
+    fn enter_edits_one_mutable_commit_off_the_working_copy_and_r_only_reviews() {
+        let mut at = commit("www", false);
+        let mut root = commit("zzz", false);
+        if let (Some(a), Some(z)) = (at.commit.as_mut(), root.commit.as_mut()) {
+            a.working_copy = true;
+            z.immutable = true;
+        }
+        let mut p = Picker::default();
+        p.loaded(Ok(vec![at, commit("aaa", false), root]));
+        let edits = |o: Outcome| match o {
+            Outcome::EditOpen { rev, .. } => Some(rev),
+            Outcome::Open(_) => None,
+            _ => panic!("nothing opened"),
+        };
+        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
+        press(&mut p, KeyCode::Char('j'));
+        assert_eq!(edits(press(&mut p, KeyCode::Enter)), Some("aaa".into()));
+        assert_eq!(edits(press(&mut p, KeyCode::Char('r'))), None);
+        press(&mut p, KeyCode::Char('J'));
+        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
+        press(&mut p, KeyCode::Esc);
+        press(&mut p, KeyCode::Char('j'));
+        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
     }
 
     #[test]

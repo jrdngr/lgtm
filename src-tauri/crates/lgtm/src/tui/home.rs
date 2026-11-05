@@ -17,6 +17,11 @@ use lgtm_core::jj::{JjAction, PushPlan};
 pub enum Outcome {
     None,
     Open(Target),
+    /// `jj edit` the commit, then open its review.
+    EditOpen {
+        rev: String,
+        target: Target,
+    },
     Versions(Vec<String>),
     Edit(String),
     /// Run a jj menu motion.
@@ -84,7 +89,8 @@ pub const KEYS: &[(&str, &str)] = &[
     ("J K", "range"),
     ("Esc", "clear range"),
     ("Space", "jj mode"),
-    ("Enter", "open"),
+    ("Enter", "edit the commit and review it"),
+    ("r", "review"),
     ("v", "snapshots"),
     ("a", "every snapshot"),
     (":", "command"),
@@ -291,7 +297,7 @@ impl Home {
                     self.picker.key(key);
                     self.set_jj_mode(true);
                 }
-                KeyCode::Enter => {
+                KeyCode::Enter | KeyCode::Char('r') => {
                     let outcome = self.picker.key(key);
                     self.set_jj_mode(false);
                     return self.picked(outcome);
@@ -360,6 +366,7 @@ impl Home {
     fn picked(&self, outcome: picker::Outcome) -> Outcome {
         match outcome {
             picker::Outcome::Open(t) => Outcome::Open(t),
+            picker::Outcome::EditOpen { rev, target } => Outcome::EditOpen { rev, target },
             picker::Outcome::Versions(v) => Outcome::Versions(v),
             picker::Outcome::None => Outcome::None,
         }
@@ -394,7 +401,8 @@ impl Home {
                 ("Space", "leave", false),
                 ("j k", "move", false),
                 ("J K", "range", false),
-                ("Enter", "open", false),
+                ("Enter", "edit", false),
+                ("r", "review", false),
                 ("Esc", esc, false),
             ];
         }

@@ -132,6 +132,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         store,
         polled: Instant::now(),
         busy: None,
+        after_edit: None,
         shift: false,
         home: home::Home::default(),
         review: None,
@@ -208,6 +209,8 @@ struct App {
     polled: Instant,
     /// The jj action running, and since when.
     busy: Option<(&'static str, Instant)>,
+    /// The review to open once the running `jj edit` is done.
+    after_edit: Option<Target>,
     /// Whether Shift is held, where the terminal reports it.
     shift: bool,
     /// The review's toggles, as last left.
@@ -375,8 +378,14 @@ impl App {
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
             Msg::Acted(result) => {
                 self.busy = None;
+                let then = self.after_edit.take();
                 match result {
-                    Ok(_) => self.loader.log(),
+                    Ok(_) => {
+                        self.loader.log();
+                        if let Some(target) = then {
+                            self.open(target);
+                        }
+                    }
                     Err(e) => self.home.notice = Some(format!("{e:#}")),
                 }
             }
@@ -521,6 +530,10 @@ impl App {
     fn home_outcome(&mut self, outcome: home::Outcome) -> bool {
         match outcome {
             home::Outcome::Open(target) => self.open(target),
+            home::Outcome::EditOpen { rev, target } => {
+                self.after_edit = Some(target);
+                self.act(lgtm_core::jj::JjAction::Edit { rev });
+            }
             home::Outcome::Versions(revs) => {
                 for rev in revs {
                     self.loader.versions(rev);
