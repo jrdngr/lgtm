@@ -132,6 +132,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         version: store.as_ref().and_then(|s| s.data_version().ok()),
         store,
         polled: Instant::now(),
+        refreshed: Instant::now(),
         busy: None,
         after_edit: None,
         shift: false,
@@ -209,6 +210,8 @@ struct App {
     /// The store's data version when last read, to notice the app's writes.
     version: Option<i64>,
     polled: Instant,
+    /// When the home screen last snapshotted the working copy.
+    refreshed: Instant,
     /// The jj action running, and since when.
     busy: Option<(&'static str, Instant)>,
     /// The review to open once the running `jj edit` is done.
@@ -221,6 +224,8 @@ struct App {
 
 /// How often to look for another app's writes to the store.
 const POLL: Duration = Duration::from_millis(250);
+/// How often the home screen snapshots the working copy, so edits by others show up.
+const REFRESH: Duration = Duration::from_secs(5);
 
 impl App {
     fn open(&mut self, target: Target) {
@@ -308,6 +313,11 @@ impl App {
             }
             while let Ok(msg) = rx.try_recv() {
                 self.message(msg);
+            }
+            if self.screen == Screen::Home && self.refreshed.elapsed() >= REFRESH {
+                self.refreshed = Instant::now();
+                // A snapshot that changed something lands as an operation, which reloads.
+                self.loader.decor();
             }
             if self.polled.elapsed() >= POLL {
                 self.polled = Instant::now();
