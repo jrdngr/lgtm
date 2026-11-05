@@ -427,7 +427,11 @@ impl FileTree {
                 _ => BG,
             };
             let (level, decor) = match row {
-                Row::Dir { path, .. } => (self.heat.dir(path), self.decor.dir(path)),
+                // An open folder shows its files' heat on their own rows.
+                Row::Dir { path, open, .. } => {
+                    let level = if *open { 0.0 } else { self.heat.dir(path) };
+                    (level, self.decor.dir(path))
+                }
                 Row::File { path, .. } => (self.heat.file(path), self.decor.file(path)),
             };
             let tint = decor.unwrap_or(Decor::Modified).color();

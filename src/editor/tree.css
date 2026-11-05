@@ -97,10 +97,6 @@
   animation: heat-fade 6s ease-in forwards;
 }
 
-.heat-glow.dir {
-  animation-name: heat-fade-dir;
-}
-
 .file-tree .heat-toggle[aria-pressed="true"] {
   color: var(--accent);
 }
@@ -108,15 +104,6 @@
 @keyframes heat-fade {
   from {
     opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes heat-fade-dir {
-  from {
-    opacity: 0.55;
   }
   to {
     opacity: 0;

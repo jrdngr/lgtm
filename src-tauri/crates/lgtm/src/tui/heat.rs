@@ -1,5 +1,5 @@
-//! Heat on the file trees: a file glows when it's written and fades over a few seconds, and
-//! the folders above it glow at half strength.
+//! Heat on the file trees: a file glows when it's written and fades over a few seconds. While
+//! it's out of sight, the closed folder that holds it glows instead.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -8,8 +8,6 @@ use ratatui::style::Color;
 
 /// How long a write glows.
 pub const FADE: Duration = Duration::from_secs(6);
-/// How strongly a folder glows next to the file written in it.
-const DIR: f32 = 0.55;
 /// How much of the tint a fresh write lays over the row.
 const STRENGTH: f32 = 0.38;
 
@@ -39,7 +37,7 @@ impl Heat {
     }
 
     pub fn dir(&self, path: &str) -> f32 {
-        level(self.dirs.get(path)) * DIR
+        level(self.dirs.get(path))
     }
 }
 
@@ -69,12 +67,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_write_lights_its_file_and_every_folder_above_it_at_half_strength() {
+    fn a_write_lights_its_file_and_every_folder_above_it() {
         let mut h = Heat::default();
         h.written(&["src/review/a.rs".into()]);
         assert!(h.file("src/review/a.rs") > 0.99);
-        assert!((h.dir("src") - DIR).abs() < 0.01);
-        assert!((h.dir("src/review") - DIR).abs() < 0.01);
+        assert!(h.dir("src") > 0.99);
+        assert!(h.dir("src/review") > 0.99);
         assert_eq!(h.file("src/review"), 0.0);
         assert_eq!(h.dir("src/rev"), 0.0);
     }

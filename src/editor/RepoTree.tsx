@@ -145,7 +145,10 @@ function Dir(props: DirProps) {
                     onClick={() => onToggle(e.path)}
                     onContextMenu={contextMenu(() => menu(e))}
                   >
-                    <HeatGlow at={heat.dirs.get(e.path)} decor={decor.byDir.get(e.path)} dir />
+                    <HeatGlow
+                      at={open.has(e.path) ? undefined : heat.dirs.get(e.path)}
+                      decor={decor.byDir.get(e.path)}
+                    />
                     <span className="chevron">{open.has(e.path) ? "▾" : "▸"}</span>
                     <Name name={e.name} decor={decor.byDir.get(e.path)} dir />
                   </button>

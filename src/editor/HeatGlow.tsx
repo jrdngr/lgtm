@@ -10,13 +10,13 @@ const TINT: Record<Decor, string> = {
   modified: "226 192 141",
 };
 
-/** A row's glow after a write at `at`, fading out over `HEAT_MS`. Folders glow at half
- * strength. Keyed by the write, so a new one starts the fade over. */
-export function HeatGlow({ at, decor, dir }: { at?: number; decor?: Decor; dir?: boolean }) {
+/** A row's glow after a write at `at`, fading out over `HEAT_MS`. Keyed by the write, so a
+ * new one starts the fade over. */
+export function HeatGlow({ at, decor }: { at?: number; decor?: Decor }) {
   if (at === undefined || Date.now() - at >= HEAT_MS) return null;
   const style = {
     "--heat": TINT[decor ?? "modified"],
     animationDelay: `${at - Date.now()}ms`,
   } as CSSProperties;
-  return <span key={at} className={`heat-glow${dir ? " dir" : ""}`} style={style} />;
+  return <span key={at} className="heat-glow" style={style} />;
 }
