@@ -293,3 +293,17 @@ fn justfiles_highlight_recipes_and_outline_them() {
     assert_eq!(names, ["test", "build"]);
     assert!(!highlight_file("ci.just", "x:\n  y\n")[0].is_empty());
 }
+
+#[test]
+fn shell_dotfiles_and_scripts_with_a_shebang_are_shell() {
+    let colored = |path: &str, src: &str| highlight_file(path, src).iter().any(|l| !l.is_empty());
+    assert!(colored("home/.zshrc", "export A=1\n"));
+    assert!(colored(".bash_profile", "export A=1\n"));
+    assert!(colored("bin/deploy", "#!/usr/bin/env bash\necho hi\n"));
+    assert!(colored(
+        "bin/run",
+        "#!/usr/bin/env -S python3 -u\nprint(1)\n"
+    ));
+    assert!(!colored("bin/blob", "echo hi\n"));
+    assert!(!colored("bin/x", "#!/usr/bin/env perl\nprint 1;\n"));
+}

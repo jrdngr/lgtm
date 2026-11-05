@@ -15,7 +15,7 @@ use specta::Type;
 use tree_sitter::{Node, Parser, QueryCursor, StreamingIterator, Tree};
 use tree_sitter_highlight::{HighlightEvent, Highlighter};
 
-use langs::{LANGS, Lang, injected, lang_key, lang_named};
+use langs::{LANGS, Lang, injected, lang_key, lang_named, lang_of};
 
 /// Capture names the UI styles, as `hl-<index>` classes. Order is part of the UI contract.
 pub const HIGHLIGHT_NAMES: &[&str] = &[
@@ -77,7 +77,7 @@ pub fn has_symbols(path: &str) -> bool {
 }
 
 pub fn parse(path: &str, source: &str) -> Option<Parsed> {
-    let lang = LANGS.get(lang_key(path)?)?;
+    let lang = LANGS.get(lang_of(path, source)?)?;
     let mut parser = Parser::new();
     parser.set_language(&lang.language).ok()?;
     let tree = parser.parse(source, None)?;
@@ -158,7 +158,10 @@ impl Parsed {
 pub fn highlight_file(path: &str, source: &str) -> Vec<Vec<Segment>> {
     // A rendered fence passes `code.<lang>`, where the language may be a grammar name.
     let named = || lang_named(path.rsplit_once('.')?.1);
-    let Some(lang) = lang_key(path).and_then(|k| LANGS.get(k)).or_else(named) else {
+    let Some(lang) = lang_of(path, source)
+        .and_then(|k| LANGS.get(k))
+        .or_else(named)
+    else {
         return vec![];
     };
     let mut by_line = highlight_lines(lang, source, |_| true);

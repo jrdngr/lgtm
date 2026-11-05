@@ -337,6 +337,29 @@ pub(super) static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|
     ])
 });
 
+/// The language of `path`, else of the program the `#!` line of `source` runs.
+pub(super) fn lang_of(path: &str, source: &str) -> Option<&'static str> {
+    lang_key(path).or_else(|| shebang(source))
+}
+
+/// The language of the program a `#!` line runs, like `#!/bin/bash` or
+/// `#!/usr/bin/env python3`.
+fn shebang(source: &str) -> Option<&'static str> {
+    let line = source.lines().next()?.strip_prefix("#!")?;
+    let mut words = line.split_whitespace();
+    let mut program = words.next()?.rsplit('/').next()?;
+    if program == "env" {
+        program = words.find(|w| !w.starts_with('-') && !w.contains('='))?;
+    }
+    let program = program.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
+    Some(match program {
+        "sh" | "bash" | "zsh" | "ksh" | "dash" => "sh",
+        "python" => "py",
+        "node" | "deno" | "bun" => "js",
+        _ => return None,
+    })
+}
+
 /// The language of `path`, by extension or, for files like `Makefile`, by name.
 pub(super) fn lang_key(path: &str) -> Option<&'static str> {
     let name = path.rsplit('/').next().unwrap_or(path);
@@ -344,6 +367,9 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "Makefile" | "makefile" | "GNUmakefile" => return Some("make"),
         "Dockerfile" | "Containerfile" => return Some("dockerfile"),
         "justfile" | "Justfile" | "JUSTFILE" | ".justfile" => return Some("just"),
+        ".bashrc" | ".bash_profile" | ".bash_login" | ".bash_logout" | ".bash_aliases"
+        | ".profile" | ".zshrc" | ".zshenv" | ".zprofile" | ".zlogin" | ".zlogout" | ".envrc"
+        | "PKGBUILD" => return Some("sh"),
         _ if name.starts_with("Dockerfile.") || name.starts_with("Containerfile.") => {
             return Some("dockerfile");
         }
@@ -362,7 +388,7 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "json" | "jsonc" => "json",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
-        "sh" | "bash" | "zsh" | "shell" => "sh",
+        "sh" | "bash" | "zsh" | "ksh" | "shell" => "sh",
         "md" | "markdown" => "md",
         "css" => "css",
         "scss" => "scss",
