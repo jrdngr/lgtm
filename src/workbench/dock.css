@@ -121,3 +121,8 @@
 .dock .dv-tabs-and-actions-container[data-tabs-fit="true"] .dv-tabs-overflow-dropdown-root {
   display: none;
 }
+
+/* An empty tab strip moves the window, not the pane. */
+.dock .dv-void-container.dv-draggable {
+  cursor: default;
+}

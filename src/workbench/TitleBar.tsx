@@ -15,8 +15,8 @@ interface TitleBar {
 
 export const TitleBarContext = createContext<TitleBar | null>(null);
 
-/** How far down the window the top row reaches. */
-const TOP_ROW = 32;
+/** How far down the window the side panels' headers reach. */
+const TOP_ROW = 31;
 
 /** Room for the traffic lights, then the left panel's toggle. Sits at the start of the
  * Workspaces header, or of the top-left pane's tabs while the left panel is hidden. */
@@ -68,22 +68,35 @@ export function useTitleBar() {
     };
     check();
     const resized = win.onResized(check);
+    // Taken before dockview's pointer drag sees it, which would move the pane instead.
+    const onPointer = (e: PointerEvent) => {
+      if (inTopRow(e)) e.stopPropagation();
+    };
     const onDown = (e: MouseEvent) => {
-      if (e.button !== 0 || e.clientY >= TOP_ROW) return;
-      const target = e.target as Element;
-      if (target.closest(INTERACTIVE)) return;
+      if (!inTopRow(e)) return;
       e.preventDefault();
       if (e.detail === 2) win.toggleMaximize();
       else win.startDragging();
     };
-    window.addEventListener("mousedown", onDown);
+    window.addEventListener("pointerdown", onPointer, true);
+    window.addEventListener("mousedown", onDown, true);
     return () => {
       resized.then((stop) => stop());
-      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("pointerdown", onPointer, true);
+      window.removeEventListener("mousedown", onDown, true);
     };
   }, []);
 
   return fullscreen;
+}
+
+/** An empty spot in the top row: the side panels' headers, or a top pane's tab strip. */
+function inTopRow(e: MouseEvent) {
+  const target = e.target as Element;
+  if (e.button !== 0 || target.closest(INTERACTIVE)) return false;
+  const strip = target.closest(".dv-tabs-and-actions-container");
+  if (strip) return strip.getBoundingClientRect().top < 1;
+  return e.clientY < TOP_ROW;
 }
 
 const INTERACTIVE =
