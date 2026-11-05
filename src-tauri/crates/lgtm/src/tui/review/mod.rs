@@ -165,7 +165,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("p", "pull PR comments"),
     ("P", "hide PR comments"),
     (":", "command (:? lists them)"),
-    (":home", "back to the home screen"),
+    (":h", "back to the home screen"),
 ];
 
 /// The narrowest the file list gets.

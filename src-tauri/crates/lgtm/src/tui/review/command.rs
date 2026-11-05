@@ -26,7 +26,7 @@ const COMMANDS: &[(&str, bool, &str)] = &[
     ("pull", false, "pull PR comments"),
     ("split", false, "side by side"),
     ("edit", false, "open the editor"),
-    ("home", false, "back to the home screen"),
+    ("h", false, "back to the home screen"),
     ("q", false, "quit"),
 ];
 
@@ -270,7 +270,7 @@ impl Review {
                     return Outcome::Editor(Some((path, line)));
                 }
             }
-            "home" => return Outcome::Back,
+            "h" => return Outcome::Back,
             _ => return Outcome::Quit,
         }
         Outcome::None
