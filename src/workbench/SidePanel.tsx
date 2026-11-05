@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode, useRef } from "react";
 import { contextMenu } from "../ui/contextMenu";
 import { Icon, type IconName } from "../ui/icons";
+import { useTip } from "../ui/Tip";
 
 export interface SideState {
   open: boolean;
@@ -101,17 +102,17 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide, split
       onSelect: onHide,
     },
   ]);
+  const tipSide = side === "left" ? "right" : "left";
   const splitButton = splittable && state.open && (
-    <button
-      type="button"
+    <TabButton
+      label="Split"
+      tipSide={tipSide}
       className={`side-split-toggle${split ? " selected" : ""}`}
       aria-pressed={!!split}
-      aria-label="Split"
-      title="Split"
       onClick={toggleSplit}
     >
       <Icon name="stack" />
-    </button>
+    </TabButton>
   );
 
   return (
@@ -127,6 +128,7 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide, split
             selected={state.open ? view.id : undefined}
             onPick={pick}
             onContextMenu={menu}
+            tipSide={tipSide}
             end={!split && splitButton}
           />
         )}
@@ -156,6 +158,7 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide, split
               selected={lower.id}
               onPick={pickLower}
               onContextMenu={menu}
+              tipSide={tipSide}
               end={splitButton}
             />
             <div className="side-body" tabIndex={-1}>
@@ -185,20 +188,20 @@ interface TabsProps {
   onContextMenu(e: React.MouseEvent): void;
   /** Sits at the bottom of the strip. */
   end?: ReactNode;
+  tipSide: "left" | "right";
 }
 
-function SideTabs({ views, selected, onPick, onContextMenu, end }: TabsProps) {
+function SideTabs({ views, selected, onPick, onContextMenu, end, tipSide }: TabsProps) {
   return (
     <div className="side-tabs" role="tablist" onContextMenu={onContextMenu}>
       {views.map((v, i) => (
         <Fragment key={v.id}>
           {i > 0 && v.group !== views[i - 1].group && <span className="side-divider" />}
-          <button
-            type="button"
+          <TabButton
+            label={v.title}
+            tipSide={tipSide}
             role="tab"
             aria-selected={v.id === selected}
-            aria-label={v.title}
-            title={v.title}
             className={
               [v.id === selected && "selected", v.alert && "alert"].filter(Boolean).join(" ") ||
               undefined
@@ -206,10 +209,25 @@ function SideTabs({ views, selected, onPick, onContextMenu, end }: TabsProps) {
             onClick={() => onPick(v.id)}
           >
             <Icon name={v.icon} />
-          </button>
+          </TabButton>
         </Fragment>
       ))}
       {end}
     </div>
+  );
+}
+
+type TabButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  label: string;
+  tipSide: "left" | "right";
+};
+
+function TabButton({ label, tipSide, children, ...rest }: TabButtonProps) {
+  const { handlers, tip } = useTip(label, tipSide);
+  return (
+    <button type="button" aria-label={label} {...rest} {...handlers}>
+      {children}
+      {tip}
+    </button>
   );
 }
