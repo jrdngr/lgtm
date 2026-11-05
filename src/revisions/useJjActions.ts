@@ -23,21 +23,25 @@ export function useJjActions(
   /** What the last fetch or push did, which nothing else in the log shows. */
   const [note, setNote] = useState<string>();
 
-  /** A push names the bookmarks it would create on the remote, once they're confirmed. Null
-   * when cancelled. */
+  /** A push takes its plan's remote and range, and names the bookmarks it would create on the
+   * remote, once they're confirmed. Null when cancelled. */
   async function withNewBookmarks(action: JjAction): Promise<JjAction | null> {
     if (action.kind !== "push") return action;
-    const plan = await unwrap(commands.pushPlan(workspace));
+    const plan = await unwrap(commands.pushPlan(workspace, action.range ?? null));
     const names = plan.newBookmarks;
-    if (!names.length) return action;
+    const planned: JjAction = {
+      kind: "push",
+      remote: plan.remote,
+      range: plan.range,
+      newBookmarks: names,
+    };
+    if (!names.length) return planned;
     const list = names.join(", ");
     const ok = await confirmAction(
       `Push new ${names.length === 1 ? "bookmark" : "bookmarks"} ${list} to ${plan.remote}?`,
       "Push",
     );
-    return ok
-      ? { kind: "push", remote: plan.remote, range: plan.range, newBookmarks: names }
-      : null;
+    return ok ? planned : null;
   }
 
   async function act(requested: JjAction, _label?: string, follow?: boolean) {

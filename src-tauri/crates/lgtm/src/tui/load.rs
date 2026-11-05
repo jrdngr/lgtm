@@ -132,11 +132,11 @@ impl Loader {
         });
     }
 
-    /// Finds what a push would do.
-    pub fn push_plan(&self) {
+    /// Finds what a push of `revs`' bookmarks would do.
+    pub fn push_plan(&self, revs: String) {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
-            let _ = tx.send(Msg::PushPlan(jj.push_plan().await));
+            let _ = tx.send(Msg::PushPlan(jj.push_plan(Some(&revs)).await));
         });
     }
 

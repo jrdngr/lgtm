@@ -23,8 +23,8 @@ pub enum Outcome {
     Jj(JjAction),
     /// Load the bookmarks nearest this commit, for the jj menu.
     Bookmarks(String),
-    /// Find what a push would do, for the jj menu.
-    PushPlan,
+    /// Find what a push of these commits' bookmarks would do, for the jj menu.
+    PushPlan(String),
     Quit,
 }
 
@@ -167,7 +167,7 @@ impl Home {
                 Outcome::Jj(action)
             }
             motions::Step::Bookmarks(rev) => Outcome::Bookmarks(rev),
-            motions::Step::PushPlan => Outcome::PushPlan,
+            motions::Step::PushPlan(revs) => Outcome::PushPlan(revs),
         }
     }
 

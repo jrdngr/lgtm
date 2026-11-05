@@ -81,8 +81,9 @@ pub enum Step {
     Run(JjAction),
     /// Load the bookmarks nearest the cursor's commit.
     Bookmarks(String),
-    /// Find which bookmarks a push would create on the remote.
-    PushPlan,
+    /// Find what a push of these commits' bookmarks would do, and which it would create on
+    /// the remote.
+    PushPlan(String),
 }
 
 /// A description's first line, which Describe edits.
@@ -160,7 +161,7 @@ impl Menu {
             }
             Kind::Push => {
                 self.state = State::Planning;
-                Step::PushPlan
+                Step::PushPlan(self.target.picked.clone())
             }
             _ => Step::Run(self.action(kind, "")),
         }
@@ -204,11 +205,7 @@ impl Menu {
             },
             State::Loading | State::Planning => Step::Stay,
             State::Confirm(plan) => match key.code {
-                KeyCode::Char('y') => Step::Run(JjAction::Push {
-                    remote: Some(plan.remote.clone()),
-                    range: Some(plan.range.clone()),
-                    new_bookmarks: plan.new_bookmarks.clone(),
-                }),
+                KeyCode::Char('y') => Step::Run(push(plan)),
                 _ => Step::Close,
             },
             State::Pick(names) => {
@@ -244,7 +241,7 @@ impl Menu {
     /// Takes what a push would do: pushes when it makes no new bookmarks, else asks.
     pub fn push_plan(&mut self, plan: PushPlan) -> Step {
         if plan.new_bookmarks.is_empty() {
-            return Step::Run(self.action(Kind::Push, ""));
+            return Step::Run(push(&plan));
         }
         self.state = State::Confirm(plan);
         Step::Stay
@@ -299,6 +296,15 @@ impl Menu {
                 .collect(),
             State::Ask(..) | State::Confirm(_) => vec![],
         }
+    }
+}
+
+/// The push `plan` describes.
+fn push(plan: &PushPlan) -> JjAction {
+    JjAction::Push {
+        remote: Some(plan.remote.clone()),
+        range: Some(plan.range.clone()),
+        new_bookmarks: plan.new_bookmarks.clone(),
     }
 }
 
@@ -384,12 +390,12 @@ mod tests {
             new_bookmarks: names.iter().map(|n| n.to_string()).collect(),
         };
         let mut m = menu();
-        assert_eq!(keys(&mut m, "gp"), Step::PushPlan);
+        assert_eq!(keys(&mut m, "gp"), Step::PushPlan("abc::def".into()));
         assert_eq!(
             m.push_plan(plan(&[])),
             Step::Run(JjAction::Push {
-                remote: None,
-                range: None,
+                remote: Some("origin".into()),
+                range: Some("r".into()),
                 new_bookmarks: vec![]
             })
         );

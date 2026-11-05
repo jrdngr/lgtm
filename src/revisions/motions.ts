@@ -87,7 +87,7 @@ export function motions(trunk: string | null): Motion[][] {
     [{ keys: "c", label: "Checkpoint", action: () => ({ kind: "checkpoint" }) }],
     [
       { keys: "gf", label: "Fetch", action: () => ({ kind: "fetch" }) },
-      { keys: "gp", label: "Push", action: () => ({ kind: "push" }) },
+      { keys: "gp", label: "Push", action: (t) => ({ kind: "push", range: t.picked }) },
       {
         keys: "gr",
         label: `Rebase onto ${trunk ? `${trunk}@origin` : "trunk"}`,

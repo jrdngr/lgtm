@@ -58,12 +58,12 @@ pub enum JjAction {
         rev: String,
     },
     Fetch,
-    /// `jj git push`. With `new_bookmarks`, those go too, by name, so they start tracking
-    /// `remote`, along with what plain push sends.
+    /// `jj git push`: of the bookmarks on `range`'s commits, or plain push's without one.
+    /// `new_bookmarks` go by name, so they start tracking `remote`.
     Push {
         #[serde(default)]
         remote: Option<String>,
-        /// The push plan's range, which `new_bookmarks` go with.
+        /// The push plan's range.
         #[serde(default)]
         range: Option<String>,
         #[serde(default, rename = "newBookmarks")]
@@ -124,9 +124,7 @@ impl JjAction {
                 new_bookmarks,
             } => {
                 let mut args = v(&["git", "push"]);
-                if let (Some(remote), Some(range), false) =
-                    (remote, range, new_bookmarks.is_empty())
-                {
+                if let (Some(remote), Some(range)) = (remote, range) {
                     args.extend(["--remote".into(), format!("exact:{remote}")]);
                     args.extend(["--config".into(), super::push::remote_binding(remote)]);
                     args.extend(["-r".into(), range.clone()]);

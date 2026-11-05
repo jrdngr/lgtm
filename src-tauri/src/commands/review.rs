@@ -142,15 +142,17 @@ pub(crate) async fn nearest_bookmarks(
     ws.jj.nearest_bookmarks(&rev).await.map_err(err)
 }
 
-/// What a push from the workspace would leave out without asking.
+/// What a push from the workspace of `revs`' bookmarks, or a plain push without them, would
+/// leave out without asking.
 #[tauri::command]
 #[specta::specta]
 pub(crate) async fn push_plan(
     window: Frame,
     workspace: Option<String>,
+    revs: Option<String>,
 ) -> CmdResult<crate::jj::PushPlan> {
     let ws = super::workspace(&window, workspace.as_deref()).await?;
-    ws.jj.push_plan().await.map_err(err)
+    ws.jj.push_plan(revs.as_deref()).await.map_err(err)
 }
 
 /// Reloads a review after the repo changed, or switches it to `view`.

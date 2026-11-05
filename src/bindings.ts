@@ -158,8 +158,11 @@ export const commands = {
 	jjAct: (workspace: string | null, action: JjAction) => typedError<number, string>(__TAURI_INVOKE("jj_act", { workspace, action })),
 	/**  The bookmarks closest to `rev` on either side, for moving one onto it. */
 	nearestBookmarks: (workspace: string | null, rev: string) => typedError<BookmarkSpot[], string>(__TAURI_INVOKE("nearest_bookmarks", { workspace, rev })),
-	/**  What a push from the workspace would leave out without asking. */
-	pushPlan: (workspace: string | null) => typedError<PushPlan, string>(__TAURI_INVOKE("push_plan", { workspace })),
+	/**
+	 *  What a push from the workspace of `revs`' bookmarks, or a plain push without them, would
+	 *  leave out without asking.
+	 */
+	pushPlan: (workspace: string | null, revs: string | null) => typedError<PushPlan, string>(__TAURI_INVOKE("push_plan", { workspace, revs })),
 	log: (level: LogLevel, module: string, message: string) => __TAURI_INVOKE<void>("log", { level, module, message }),
 	/**  The most detailed level the UI's lines are kept at, so it can skip the rest. */
 	logLevel: () => __TAURI_INVOKE<LogLevel>("log_level"),
@@ -1600,11 +1603,11 @@ export type JjAction = { kind: "edit"; rev: string } |
 /**  Moves bookmark `name` to `rev`, backwards or sideways too. */
 { kind: "bookmarkSet"; name: string; rev: string } | { kind: "fetch" } | 
 /**
- *  `jj git push`. With `new_bookmarks`, those go too, by name, so they start tracking
- *  `remote`, along with what plain push sends.
+ *  `jj git push`: of the bookmarks on `range`'s commits, or plain push's without one.
+ *  `new_bookmarks` go by name, so they start tracking `remote`.
  */
 { kind: "push"; remote?: string | null; 
-/**  The push plan's range, which `new_bookmarks` go with. */
+/**  The push plan's range. */
 range?: string | null; newBookmarks?: string[] };
 
 /**
@@ -2029,8 +2032,9 @@ export type PtyEvent = { kind: "data"; data: string } | { kind: "exit"; code: nu
 export type PushPlan = {
 	remote: string,
 	/**
-	 *  The revset plain push takes bookmarks from: the user's `revsets.git-push`, else jj's
-	 *  default. Its `remote` is bound with [`remote_binding`].
+	 *  The revset the push takes bookmarks from: the one asked for, else plain push's, the
+	 *  user's `revsets.git-push` or jj's default. Its `remote` is bound with
+	 *  [`remote_binding`].
 	 */
 	range: string,
 	/**  Local bookmarks in the push range that don't track `remote` yet. */

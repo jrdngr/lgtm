@@ -535,9 +535,9 @@ impl App {
             },
             home::Outcome::Jj(action) => self.act(action),
             home::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
-            home::Outcome::PushPlan => {
+            home::Outcome::PushPlan(revs) => {
                 self.busy = Some(("checking the push", Instant::now()));
-                self.loader.push_plan();
+                self.loader.push_plan(revs);
             }
             home::Outcome::Quit => return true,
             home::Outcome::None => {}
