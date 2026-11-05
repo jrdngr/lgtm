@@ -225,3 +225,33 @@ pub(super) const GORP_SYMBOLS: &str = r#"
 (component name: (type_identifier) @name) @symbol
 (method name: (identifier) @name) @symbol
 "#;
+
+/// Commit messages: the grammar's own query captures twice, which tree-sitter-highlight
+/// can't take, and names classes we don't color.
+pub(super) const COMMIT_HIGHLIGHTS: &str = r#"
+(comment) @comment
+(generated_comment) @comment
+(scissor) @comment
+(subject) @tag
+(subject (subject_prefix) @function)
+(prefix (type) @keyword)
+(prefix (scope) @variable.parameter)
+(prefix ["(" ")" ":"] @punctuation)
+(prefix "!" @punctuation)
+(branch) @string
+(change) @keyword
+(filepath) @string
+(arrow) @punctuation
+(trailer (token) @label)
+(breaking_change (token) @keyword)
+"#;
+
+/// Ini files and configs like `.gitconfig` and `.env`.
+pub(super) const INI_HIGHLIGHTS: &str = r#"
+(section_name (text) @type)
+(comment) @comment
+["[" "]"] @punctuation
+"=" @operator
+(setting (setting_name) @property)
+(setting (setting_value) @string)
+"#;

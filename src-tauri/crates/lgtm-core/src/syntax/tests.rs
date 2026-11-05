@@ -13,7 +13,7 @@ fn symbols(path: &str, src: &str) -> Vec<(String, u32, u32)> {
 
 #[test]
 fn every_language_builds() {
-    assert_eq!(LazyLock::force(&LANGS).len(), 21);
+    assert_eq!(LazyLock::force(&LANGS).len(), 23);
 }
 
 #[test]
@@ -306,4 +306,30 @@ fn shell_dotfiles_and_scripts_with_a_shebang_are_shell() {
     ));
     assert!(!colored("bin/blob", "echo hi\n"));
     assert!(!colored("bin/x", "#!/usr/bin/env perl\nprint 1;\n"));
+}
+
+#[test]
+fn commit_messages_and_ini_configs_are_highlighted() {
+    let class = |path: &str, src: &str, line: usize| {
+        highlight_file(path, src)[line]
+            .iter()
+            .filter_map(|(c, _)| c.map(|c| HIGHLIGHT_NAMES[c as usize]))
+            .collect::<Vec<_>>()
+    };
+    let jj = "Fix paging\n\nJJ: This commit contains the following changes:\nJJ:     M a.rs\n";
+    assert_eq!(class("/tmp/editor-1.jjdescription", jj, 0), ["tag"]);
+    assert_eq!(class("/tmp/editor-1.jjdescription", jj, 2), ["comment"]);
+    assert_eq!(class("/tmp/editor-1.jjdescription", jj, 3)[0], "comment");
+    let git = "Fix paging\n\n# Please enter the commit message\n";
+    assert_eq!(class(".git/COMMIT_EDITMSG", git, 2), ["comment"]);
+    let ini = "[user]\n\tname = Jordan\n";
+    assert!(class("home/.gitconfig", ini, 0).contains(&"type"));
+    assert_eq!(
+        class("repo/.git/config", ini, 1),
+        ["property", "operator", "string"]
+    );
+    assert_eq!(
+        class(".env", "A=1\n", 0),
+        ["property", "operator", "string"]
+    );
 }

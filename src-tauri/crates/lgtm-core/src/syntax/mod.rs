@@ -164,6 +164,21 @@ pub fn highlight_file(path: &str, source: &str) -> Vec<Vec<Segment>> {
     else {
         return vec![];
     };
+    // jj's notes in a description start `JJ:`: as `#` lines they're the comments git's are.
+    let jj;
+    let source = match path.ends_with(".jjdescription") {
+        true => {
+            jj = source
+                .split_inclusive('\n')
+                .map(|l| match l.strip_prefix("JJ:") {
+                    Some(rest) => format!("#  {rest}"),
+                    None => l.to_string(),
+                })
+                .collect::<String>();
+            jj.as_str()
+        }
+        false => source,
+    };
     let mut by_line = highlight_lines(lang, source, |_| true);
     let count = source.split('\n').count() as u32;
     (1..=count)

@@ -326,6 +326,19 @@ pub(super) static LANGS: LazyLock<HashMap<&'static str, Lang>> = LazyLock::new(|
             .leading(&["comment"]),
         ),
         (
+            "gitcommit",
+            Lang::new(
+                tree_sitter_gitcommit::LANGUAGE.into(),
+                "gitcommit",
+                COMMIT_HIGHLIGHTS,
+                "",
+            ),
+        ),
+        (
+            "ini",
+            Lang::new(tree_sitter_ini::LANGUAGE.into(), "ini", INI_HIGHLIGHTS, ""),
+        ),
+        (
             "dockerfile",
             Lang::new(
                 tree_sitter_containerfile::LANGUAGE.into(),
@@ -370,6 +383,16 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         ".bashrc" | ".bash_profile" | ".bash_login" | ".bash_logout" | ".bash_aliases"
         | ".profile" | ".zshrc" | ".zshenv" | ".zprofile" | ".zlogin" | ".zlogout" | ".envrc"
         | "PKGBUILD" => return Some("sh"),
+        "COMMIT_EDITMSG" | "MERGE_MSG" | "TAG_EDITMSG" | "SQUASH_MSG" | "EDIT_DESCRIPTION" => {
+            return Some("gitcommit");
+        }
+        ".gitconfig" | ".gitmodules" | ".editorconfig" | ".npmrc" | ".env" => {
+            return Some("ini");
+        }
+        _ if name.starts_with(".env.") => return Some("ini"),
+        "config" if path.ends_with(".git/config") || path.ends_with("/git/config") => {
+            return Some("ini");
+        }
         _ if name.starts_with("Dockerfile.") || name.starts_with("Containerfile.") => {
             return Some("dockerfile");
         }
@@ -399,6 +422,8 @@ pub(super) fn lang_key(path: &str) -> Option<&'static str> {
         "dockerfile" | "containerfile" => "dockerfile",
         "gorp" => "gorp",
         "just" => "just",
+        "jjdescription" | "gitcommit" => "gitcommit",
+        "ini" | "cfg" | "gitconfig" | "editorconfig" | "env" => "ini",
         _ => return None,
     })
 }
