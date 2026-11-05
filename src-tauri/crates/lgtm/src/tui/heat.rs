@@ -47,6 +47,14 @@ fn level(at: Option<&Instant>) -> f32 {
     })
 }
 
+/// Marks a Files title that ends at `x` with an amber dot while heat is on.
+pub fn mark(c: &mut crate::tui::paint::Canvas, x: u16, y: u16, on: bool) {
+    use crate::tui::theme::{self, AMBER, BG};
+    if on {
+        c.put(x + 1, y, "●", theme::fg(AMBER).bg(BG));
+    }
+}
+
 /// `bg` with `tint` laid over it as much as `level` glows.
 pub fn glow(bg: Color, tint: Color, level: f32) -> Color {
     mix(bg, tint, STRENGTH * level)

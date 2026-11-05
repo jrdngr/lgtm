@@ -477,7 +477,8 @@ impl Home {
         let mut sub = Canvas::new(&mut *c.buf, right);
         let x0 = right.x + 1;
         let focused = self.focus == Focus::Files;
-        sub.put(x0, right.y, "Files", theme::title(focused).bg(BG));
+        let end = sub.put(x0, right.y, "Files", theme::title(focused).bg(BG));
+        super::heat::mark(&mut sub, end, right.y, self.files.heat_on);
         if right.height < 4 {
             return;
         }

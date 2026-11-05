@@ -127,12 +127,13 @@ impl Editor {
         let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
         let tree = Rect::new(body.x, body.y + 1, side - 1, body.height - 1);
         self.sidebar.draw(c, tree, self.in_sidebar, &marked);
-        c.put(
+        let end = c.put(
             body.x + 1,
             body.y,
             "Files",
             theme::title(self.in_sidebar).bg(BG),
         );
+        crate::tui::heat::mark(c, end, body.y, self.sidebar.heat_on);
         for y in body.y..body.bottom() {
             c.put(body.x + side, y, "│", theme::fg(HAIR).bg(BG));
         }

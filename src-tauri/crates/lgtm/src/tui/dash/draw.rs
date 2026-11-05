@@ -65,7 +65,8 @@ impl Dash {
         }
         let files = Rect::new(body.x, body.y, files_w, body.height);
         let focused = self.focus == Focus::Files;
-        c.put(files.x + 1, files.y, "Files", theme::title(focused).bg(BG));
+        let end = c.put(files.x + 1, files.y, "Files", theme::title(focused).bg(BG));
+        crate::tui::heat::mark(c, end, files.y, tree.heat_on);
         let rows = Rect::new(files.x, files.y + 1, files.width, files.height - 1);
         tree.draw(c, rows, focused, &|_| false);
         self.draw_diff(c, Rect::new(mid_x, body.y, mid_w, body.height));
