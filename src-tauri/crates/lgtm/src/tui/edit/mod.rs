@@ -206,7 +206,8 @@ impl Editor {
     }
 
     /// A click in the sidebar opens a file or a folder, and the wheel scrolls it. Over the
-    /// text the wheel moves the cursor, three lines a notch.
+    /// text the wheel scrolls the view three lines a notch, and the cursor with it, as the
+    /// review does.
     pub fn mouse(&mut self, ev: ratatui::crossterm::event::MouseEvent) {
         use ratatui::crossterm::event::{
             KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
@@ -215,11 +216,12 @@ impl Editor {
             return;
         }
         if !self.sidebar.contains(ev.column, ev.row) {
-            let code = match ev.kind {
-                MouseEventKind::ScrollDown => KeyCode::Down,
-                MouseEventKind::ScrollUp => KeyCode::Up,
+            let (code, by) = match ev.kind {
+                MouseEventKind::ScrollDown => (KeyCode::Down, 3),
+                MouseEventKind::ScrollUp => (KeyCode::Up, -3),
                 _ => return,
             };
+            self.scroll_view(by);
             for _ in 0..3 {
                 self.key(KeyEvent::new(code, KeyModifiers::NONE));
             }
@@ -328,6 +330,21 @@ impl Editor {
             }
         }
         Outcome::None
+    }
+
+    /// Moves the view `by` lines that show, keeping the last line at the bottom at most.
+    fn scroll_view(&mut self, by: isize) {
+        let height = self.height;
+        let Some(open) = self.open.get_mut(self.cur) else {
+            return;
+        };
+        let visible = open.folds.visible(open.buf.last_line());
+        let at = visible.partition_point(|&l| l < open.top) as isize + by;
+        let most = visible.len().saturating_sub(height) as isize;
+        open.top = visible
+            .get(at.clamp(0, most.max(0)) as usize)
+            .copied()
+            .unwrap_or(0);
     }
 
     pub fn current(&self) -> Option<&Buffer> {
@@ -446,7 +463,7 @@ mod tests {
     }
 
     #[test]
-    fn the_wheel_over_the_text_moves_the_cursor_three_lines_a_notch() {
+    fn the_wheel_over_the_text_scrolls_the_view_and_the_cursor_with_it() {
         use ratatui::crossterm::event::{KeyModifiers, MouseEvent, MouseEventKind};
         let (_dir, mut e) = editor_on(&"x\n".repeat(10));
         let line = |e: &Editor| e.current().map(|b| b.line_of(b.sel.head));
@@ -457,10 +474,15 @@ mod tests {
             row: 5,
             modifiers: KeyModifiers::NONE,
         };
+        e.height = 4;
         e.mouse(wheel(MouseEventKind::ScrollDown));
-        assert_eq!(line(&e), Some(start + 3));
+        assert_eq!((line(&e), e.open[0].top), (Some(start + 3), 3));
+        e.mouse(wheel(MouseEventKind::ScrollDown));
+        e.mouse(wheel(MouseEventKind::ScrollDown));
+        // The view stops with the last line at the bottom.
+        assert_eq!(e.open[0].top, 6);
         e.mouse(wheel(MouseEventKind::ScrollUp));
-        assert_eq!(line(&e), Some(start));
+        assert_eq!(e.open[0].top, 3);
     }
 
     #[test]
