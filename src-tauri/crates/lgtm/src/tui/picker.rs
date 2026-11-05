@@ -54,27 +54,6 @@ pub struct Picker {
     clicked: Option<(Item, std::time::Instant)>,
 }
 
-/// The rows with a line of graph after each commit whose second line joins or forks
-/// branches, since the picker draws a commit on one line.
-fn with_joins(rows: Vec<LogRow>) -> Vec<LogRow> {
-    let mut out = Vec::with_capacity(rows.len());
-    for row in rows {
-        let join = row
-            .graph
-            .get(1)
-            .filter(|g| g.chars().any(|c| !matches!(c, '│' | ' ')))
-            .cloned();
-        out.push(row);
-        if let Some(graph) = join {
-            out.push(LogRow {
-                graph: vec![graph],
-                commit: None,
-            });
-        }
-    }
-    out
-}
-
 /// Two clicks on a line within this make a double click.
 const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
 
@@ -89,7 +68,7 @@ impl Picker {
                     id_at(&self.rows, Some(self.sel)),
                     id_at(&self.rows, self.anchor),
                 );
-                self.rows = with_joins(rows);
+                self.rows = rows;
                 self.error = None;
                 let find = |id: Option<String>| {
                     let id = id?;
@@ -366,12 +345,12 @@ impl Picker {
         self.area.contains(ratatui::layout::Position { x, y })
     }
 
-    /// A click puts the cursor on the line at row `y`, and a second click on it opens it as
+    /// A click puts the cursor on the item at row `y`, and a second click on it opens it as
     /// Enter does.
     pub fn click(&mut self, y: u16) -> Outcome {
-        let (items, _) = self.items();
+        let (lines, _) = self.lines();
         let at = self.top + y.saturating_sub(self.area.y + 1) as usize;
-        let Some(&item) = items.get(at) else {
+        let Some(&(item, _)) = lines.get(at) else {
             return Outcome::None;
         };
         if matches!(item, Item::Row(i) if self.rows[i].commit.is_none()) {
@@ -445,6 +424,25 @@ impl Picker {
         (items, on.unwrap_or(row))
     }
 
+    /// The picker's screen lines, each an item and which of its lines it is, and the first
+    /// line of the cursor's item. A commit takes two lines, like jj's: its change, then its
+    /// description.
+    fn lines(&self) -> (Vec<(Item, u8)>, usize) {
+        let (items, cursor) = self.items();
+        let mut lines = Vec::with_capacity(items.len() * 2);
+        let mut at = 0;
+        for (n, item) in items.into_iter().enumerate() {
+            if n == cursor {
+                at = lines.len();
+            }
+            lines.push((item, 0));
+            if matches!(item, Item::Row(i) if self.rows[i].commit.is_some()) {
+                lines.push((item, 1));
+            }
+        }
+        (lines, at)
+    }
+
     /// Draws the log into `body`, the cursor's row lit when `focused`.
     pub fn draw(&mut self, c: &mut Canvas, body: Rect, focused: bool) {
         self.area = body;
@@ -454,31 +452,39 @@ impl Picker {
             return;
         }
         let height = body.height.saturating_sub(1) as usize;
-        let (items, cursor) = self.items();
+        let (lines, cursor) = self.lines();
+        let cursor_item = lines.get(cursor).map(|&(item, _)| item);
+        let cursor_end = cursor
+            + lines
+                .iter()
+                .skip(cursor)
+                .take_while(|l| Some(l.0) == cursor_item)
+                .count();
         if cursor < self.top {
             self.top = cursor;
-        } else if height > 0 && cursor >= self.top + height {
-            self.top = cursor + 1 - height;
+        } else if height > 0 && cursor_end > self.top + height {
+            self.top = cursor_end.saturating_sub(height);
         }
         let list = self.snapshots.as_deref().unwrap_or_default();
         let shown: Vec<_> = list.iter().map(Versions::shown).collect();
         let now = now();
-        for (n, &item) in items.iter().skip(self.top).take(height).enumerate() {
+        for (n, &(item, line)) in lines.iter().skip(self.top).take(height).enumerate() {
             let y = body.y + 1 + n as u16;
-            let bg = match n + self.top == cursor {
+            let bg = match Some(item) == cursor_item {
                 true if focused => SEL,
                 true => PANEL,
                 false => BG,
             };
             c.fill(x0, y, body.width, bg);
             match item {
-                Item::Row(i) => self.draw_row(c, x0, y, i, bg, now),
+                Item::Row(i) if line == 0 => self.draw_row(c, x0, y, i, bg, now),
+                Item::Row(i) => self.draw_description(c, x0, y, i, bg),
                 Item::Version(k, j) => draw_version(c, x0, y, &shown[k][j], bg),
             }
         }
         let error = list.iter().find_map(|v| v.error.as_deref());
         if let Some(e) = error {
-            let y = body.y + 1 + items.len().saturating_sub(self.top).min(height) as u16;
+            let y = body.y + 1 + lines.len().saturating_sub(self.top).min(height) as u16;
             c.put_lines(x0 + 1, y, e, theme::fg(RED));
         }
     }
@@ -504,16 +510,7 @@ impl Picker {
             };
             c.put(x0 + 1, y, mark, theme::fg(ACCENT).bg(bg));
         }
-        let mut x = x0 + 3;
-        for ch in row.graph[0].trim_end().chars() {
-            let color = match ch {
-                '@' => GREEN,
-                '×' => RED,
-                '◆' => FG,
-                _ => MUTED,
-            };
-            x = c.put(x, y, &ch.to_string(), theme::fg(color).bg(bg));
-        }
+        let mut x = draw_graph(c, x0 + 3, y, &row.graph[0], bg);
         let Some(commit) = &row.commit else { return };
         x += 2;
         let id: String = commit.change_id.chars().take(8).collect();
@@ -525,24 +522,70 @@ impl Picker {
             x = c.put(x, y, b, theme::fg(FUCHSIA).bg(bg)) + 1;
         }
         let root = commit.commit_id.bytes().all(|b| b == b'0');
-        let summary = commit.description.lines().next().unwrap_or("");
-        let (text, color) = match summary {
-            _ if root => ("root()", FG),
-            "" => ("(no description set)", MUTED),
-            s => (s, FG),
-        };
-        let when = if root {
-            String::new()
-        } else {
-            ago(now - commit.time)
-        };
+        if root {
+            c.put(x, y, "root()", theme::fg(FG).bg(bg));
+            return;
+        }
+        let when = ago(now - commit.time);
         let room = x0 + w - (when.len() as u16 + 3);
-        if x + 1 < room {
+        if x < room && !commit.author.is_empty() {
             let mut sub = Canvas::new(&mut *c.buf, Rect::new(x, y, room - x, 1));
-            sub.put(x + 1, y, text, theme::fg(color).bg(bg));
+            sub.put(x, y, &commit.author, theme::fg(MUTED).bg(bg));
         }
         c.put_right(y, 1, &when, theme::fg(MUTED).bg(bg));
     }
+
+    /// A commit's second line: its graph, then its description's first line.
+    fn draw_description(
+        &self,
+        c: &mut Canvas,
+        x0: u16,
+        y: u16,
+        i: usize,
+        bg: ratatui::style::Color,
+    ) {
+        let row = &self.rows[i];
+        let (first, last) = self.range();
+        if self.anchor.is_some() && first <= i && i < last {
+            c.put(x0 + 1, y, "│", theme::fg(ACCENT).bg(bg));
+        }
+        let graph = row.graph.get(1).map_or("", String::as_str);
+        let x = draw_graph(c, x0 + 3, y, graph, bg);
+        let Some(commit) = &row.commit else { return };
+        if commit.commit_id.bytes().all(|b| b == b'0') {
+            return;
+        }
+        let summary = commit.description.lines().next().unwrap_or("");
+        let (text, color) = match summary {
+            "" => ("(no description set)", MUTED),
+            s => (s, FG),
+        };
+        let x = (x + 2).max(x0 + 3 + width_of(&row.graph[0]) + 2);
+        let right = x0 + c.area.width - 1;
+        if x < right {
+            let mut sub = Canvas::new(&mut *c.buf, Rect::new(x, y, right - x, 1));
+            sub.put(x, y, text, theme::fg(color).bg(bg));
+        }
+    }
+}
+
+/// Draws a line of jj's graph from `x`, nodes in their colors. Returns where it ends.
+fn draw_graph(c: &mut Canvas, mut x: u16, y: u16, graph: &str, bg: ratatui::style::Color) -> u16 {
+    for ch in graph.trim_end().chars() {
+        let color = match ch {
+            '@' => GREEN,
+            '×' => RED,
+            '◆' => FG,
+            _ => MUTED,
+        };
+        x = c.put(x, y, &ch.to_string(), theme::fg(color).bg(bg));
+    }
+    x
+}
+
+/// How many columns a line of graph takes, without its trailing spaces.
+fn width_of(graph: &str) -> u16 {
+    graph.trim_end().chars().count() as u16
 }
 
 /// A version under its change's row: its time, commit and label.
@@ -674,31 +717,33 @@ mod tests {
     }
 
     #[test]
-    fn a_commit_whose_second_line_joins_branches_gets_that_line_of_graph() {
+    fn a_commit_takes_two_lines_with_its_join_on_the_second() {
         let mut fork = commit("bbb", false);
         fork.graph = vec!["│ ○  ".into(), "├─╯  ".into()];
         let mut plain = commit("ccc", false);
         plain.graph = vec!["○  ".into(), "│  ".into()];
         let mut p = Picker::default();
         p.loaded(Ok(vec![fork, plain]));
-        let graphs: Vec<_> = p.rows.iter().map(|r| r.graph[0].trim_end()).collect();
-        assert_eq!(graphs, ["│ ○", "├─╯", "○"]);
-        // The cursor steps over it.
+        let (lines, cursor) = p.lines();
+        let shown: Vec<_> = lines.iter().map(|&(_, line)| line).collect();
+        assert_eq!(shown, [0, 1, 0, 1]);
+        assert_eq!(cursor, 0);
         press(&mut p, KeyCode::Char('j'));
+        assert_eq!(p.lines().1, 2);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
     }
 
     #[test]
-    fn a_click_picks_a_line_and_a_second_click_opens_it() {
+    fn a_click_on_either_line_of_a_commit_picks_it_and_a_second_click_opens_it() {
         let mut p = Picker::default();
         p.loaded(Ok(vec![commit("aaa", false), commit("bbb", false)]));
         // The log's first line is under its title row.
         p.area = Rect::new(0, 5, 40, 10);
+        assert!(matches!(p.click(8), Outcome::None));
         assert!(matches!(p.click(7), Outcome::None));
-        assert!(matches!(p.click(6), Outcome::None));
         assert_eq!(opened(p.click(6)), "aaa");
         // Below the last line does nothing.
-        assert!(matches!(p.click(9), Outcome::None));
+        assert!(matches!(p.click(10), Outcome::None));
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "aaa");
     }
 
