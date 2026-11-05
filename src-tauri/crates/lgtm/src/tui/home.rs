@@ -65,7 +65,7 @@ pub struct Home {
 const SIDE_MIN: u16 = 20;
 
 /// The `:` commands, for the menu over the command line.
-const COMMANDS: &[(&str, &str)] = &[("q", "quit")];
+const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("q", "quit")];
 
 impl Default for Home {
     fn default() -> Self {
@@ -152,7 +152,7 @@ impl Home {
                 let line = self.cmd.take().unwrap_or_default();
                 match line.trim() {
                     "q" | "q!" | "quit" => return Outcome::Quit,
-                    "" => {}
+                    "h" | "home" | "" => {}
                     other => self.notice = Some(format!("no command {other}")),
                 }
             }

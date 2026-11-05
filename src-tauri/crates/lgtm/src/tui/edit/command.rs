@@ -11,6 +11,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("e", "open a file"),
     ("w", "save, or save as a path"),
     ("wa", "save all"),
+    ("h", "home"),
     ("q", "leave the editor"),
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
@@ -117,6 +118,7 @@ impl Editor {
                     return self.leave(false);
                 }
             }
+            "h" | "home" => return Outcome::Home,
             "q" | "qa" => return self.leave(false),
             "q!" | "qa!" => return self.leave(true),
             "close" | "c" => return self.close(),

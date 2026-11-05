@@ -26,6 +26,8 @@ pub enum Outcome {
     None,
     /// Leave the editor.
     Back,
+    /// Go to the home screen, keeping the open files.
+    Home,
     /// Go to the review, on this file's line from 1, which holds this text.
     Review(String, u32, String),
 }
@@ -544,6 +546,21 @@ mod tests {
         e.open[0].buf.insert(0, "x");
         assert!(matches!(quit(&mut e), Outcome::None));
         assert!(e.notice.as_deref().is_some_and(|n| n.contains("a.txt")));
+    }
+
+    #[test]
+    fn colon_h_goes_home_even_with_unsaved_edits_which_stay_open() {
+        use ratatui::crossterm::event::{KeyCode, KeyEvent};
+        let (_dir, mut e) = editor_on("one\n");
+        e.open[0].buf.insert(0, "x");
+        for c in [':', 'h'] {
+            e.key(KeyEvent::from(KeyCode::Char(c)));
+        }
+        assert!(matches!(
+            e.key(KeyEvent::from(KeyCode::Enter)),
+            Outcome::Home
+        ));
+        assert_eq!(e.unsaved(), ["a.txt"]);
     }
 
     #[test]

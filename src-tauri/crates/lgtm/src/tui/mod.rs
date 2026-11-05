@@ -261,7 +261,9 @@ impl App {
         self.refresh_dash();
     }
 
-    fn leave_dash(&mut self) {
+    /// Goes to the home screen from any other, closing the review.
+    fn go_home(&mut self) {
+        self.review = None;
         self.screen = Screen::Home;
         self.snapshots.store(false, Ordering::Relaxed);
     }
@@ -549,6 +551,10 @@ impl App {
                     self.show_review(&path, line, &text);
                     false
                 }
+                edit::Outcome::Home => {
+                    self.go_home();
+                    false
+                }
                 edit::Outcome::Back => match self.editor_back {
                     Some(screen) => {
                         self.screen = screen;
@@ -568,7 +574,7 @@ impl App {
             return match outcome {
                 dash::Outcome::None => false,
                 dash::Outcome::Home => {
-                    self.leave_dash();
+                    self.go_home();
                     false
                 }
                 dash::Outcome::Quit => true,
