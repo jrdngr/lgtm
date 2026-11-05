@@ -33,6 +33,8 @@ pub struct LogCommit {
     pub conflict: bool,
     pub divergent: bool,
     pub empty: bool,
+    /// The workspaces whose working copy it is, when the repo has more than one.
+    pub workspaces: Vec<String>,
 }
 
 /// Each commit's fields, `\x1f`-separated, then a second line marked `\x1e` so jj draws the
@@ -45,7 +47,8 @@ const ROW_TEMPLATE: &str = r#""\x1f" ++ commit_id ++ "\x1f" ++ change_id ++ "\x1
   ++ coalesce(author.email().local(), author.name()) ++ "\x1f"
   ++ author.timestamp().format("%s") ++ "\x1f"
   ++ if(current_working_copy, "w") ++ if(immutable, "i") ++ if(conflict, "c")
-  ++ if(divergent, "d") ++ if(empty, "e")
+  ++ if(divergent, "d") ++ if(empty, "e") ++ "\x1f"
+  ++ working_copies.map(|w| w.name()).join(" ")
   ++ "\n\x1e\n""#;
 
 /// A line of graph alone, without the text jj puts after it, like `(elided revisions)`.
@@ -82,6 +85,10 @@ fn parse_rows(out: &str) -> Vec<LogRow> {
                     conflict: flags.contains('c'),
                     divergent: flags.contains('d'),
                     empty: flags.contains('e'),
+                    workspaces: f
+                        .get(8)
+                        .map(|w| w.split_whitespace().map(String::from).collect())
+                        .unwrap_or_default(),
                 }),
             });
         } else if let Some((graph, _)) = line.split_once('\x1e') {
@@ -158,7 +165,7 @@ mod tests {
 
     #[test]
     fn rows_pair_each_commit_with_its_graph_and_keep_graph_only_lines_without_their_text() {
-        let out = "@  \x1fc1\x1fkx\x1f2\x1f\"fix\\n\\nbody\"\x1fmain feat\x1fjo\x1f1700000000\x1fwe\n\
+        let out = "@  \x1fc1\x1fkx\x1f2\x1f\"fix\\n\\nbody\"\x1fmain feat\x1fjo\x1f1700000000\x1fwe\x1fdefault ws\n\
                    │  \x1e\n\
                    │ ○  \x1fc2\x1fpq\x1f1\x1f\"\"\x1f\x1fjo\x1f1\x1fc\n\
                    ├─╯  \x1e\n\
@@ -170,6 +177,7 @@ mod tests {
         let c = rows[0].commit.as_ref().unwrap();
         assert_eq!(c.description, "fix\n\nbody");
         assert_eq!(c.bookmarks, ["main", "feat"]);
+        assert_eq!(c.workspaces, ["default", "ws"]);
         assert!(c.working_copy && c.empty && !c.conflict);
         assert_eq!((c.unique, c.time), (2, 1_700_000_000.0));
         assert_eq!(rows[1].graph, ["│ ○  ", "├─╯  "]);

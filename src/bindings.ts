@@ -1679,6 +1679,8 @@ export type LogCommit = {
 	conflict: boolean,
 	divergent: boolean,
 	empty: boolean,
+	/**  The workspaces whose working copy it is, when the repo has more than one. */
+	workspaces: string[],
 };
 
 export type LogLevel = "error" | "warn" | "info" | "debug" | "trace";

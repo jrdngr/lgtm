@@ -1,17 +1,16 @@
 //! Picking what to review from the jj log: one commit, a range picked with Space, or
 //! snapshots, which `s` shows under every change.
 
-use lgtm_core::jj::LogRow;
+use lgtm_core::jj::{LogCommit, LogRow};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier, Style};
 
 use super::keybar::Hint;
 use super::load::Target;
 use super::motions;
 use super::paint::Canvas;
-use super::theme::{
-    self, ACCENT, AMBER, BG, FAINT, FG, FUCHSIA, GREEN, MUTED, PANEL, RED, SEL, UNIQUE,
-};
+use super::theme::{self, ACCENT, AMBER, BG, FAINT, FG, MUTED, PANEL, RED, SEL};
 use super::versions::{self, Versions};
 
 pub enum Outcome {
@@ -510,29 +509,44 @@ impl Picker {
             };
             c.put(x0 + 1, y, mark, theme::fg(ACCENT).bg(bg));
         }
-        let mut x = draw_graph(c, x0 + 3, y, &row.graph[0], bg);
-        let Some(commit) = &row.commit else { return };
+        let Some(commit) = &row.commit else {
+            draw_graph(c, x0 + 3, y, &row.graph[0], bg, None);
+            return;
+        };
+        let mut x = draw_graph(c, x0 + 3, y, &row.graph[0], bg, Some(commit));
+        let wc = commit.working_copy;
+        let style = |color: Color| jj_style(color, wc, bg);
         x += 2;
         let id: String = commit.change_id.chars().take(8).collect();
         let unique = (commit.unique as usize).min(id.len());
-        x = c.put(x, y, &id[..unique], theme::bold(UNIQUE).bg(bg));
-        x = c.put(x, y, &id[unique..], theme::fg(MUTED).bg(bg));
-        x += 2;
-        for b in &commit.bookmarks {
-            x = c.put(x, y, b, theme::fg(FUCHSIA).bg(bg)) + 1;
-        }
+        let change = bright(Color::Magenta, wc);
+        x = c.put(
+            x,
+            y,
+            &id[..unique],
+            style(change).add_modifier(Modifier::BOLD),
+        );
+        x = c.put(x, y, &id[unique..], style(Color::DarkGray));
         let root = commit.commit_id.bytes().all(|b| b == b'0');
         if root {
-            c.put(x, y, "root()", theme::fg(FG).bg(bg));
+            c.put(x + 1, y, "root()", style(Color::Green));
             return;
         }
         let when = ago(now - commit.time);
         let room = x0 + w - (when.len() as u16 + 3);
-        if x < room && !commit.author.is_empty() {
-            let mut sub = Canvas::new(&mut *c.buf, Rect::new(x, y, room - x, 1));
-            sub.put(x, y, &commit.author, theme::fg(MUTED).bg(bg));
+        let names = commit.bookmarks.iter().map(|b| (b.clone(), Color::Magenta));
+        let spaces = commit
+            .workspaces
+            .iter()
+            .map(|n| (format!("{n}@"), Color::Green));
+        for (name, color) in names.chain(spaces) {
+            if x + 1 >= room {
+                break;
+            }
+            let mut sub = Canvas::new(&mut *c.buf, Rect::new(x + 1, y, room - x - 1, 1));
+            x = sub.put(x + 1, y, &name, style(bright(color, wc)));
         }
-        c.put_right(y, 1, &when, theme::fg(MUTED).bg(bg));
+        c.put_right(y, 1, &when, style(bright(Color::Cyan, wc)));
     }
 
     /// A commit's second line: its graph, then its description's first line.
@@ -550,37 +564,76 @@ impl Picker {
             c.put(x0 + 1, y, "│", theme::fg(ACCENT).bg(bg));
         }
         let graph = row.graph.get(1).map_or("", String::as_str);
-        let x = draw_graph(c, x0 + 3, y, graph, bg);
+        let x = draw_graph(c, x0 + 3, y, graph, bg, None);
         let Some(commit) = &row.commit else { return };
         if commit.commit_id.bytes().all(|b| b == b'0') {
             return;
         }
+        let wc = commit.working_copy;
+        let style = |color: Color| jj_style(color, wc, bg);
+        let green = style(bright(Color::Green, wc));
         let summary = commit.description.lines().next().unwrap_or("");
-        let (text, color) = match summary {
-            "" => ("(no description set)", MUTED),
-            s => (s, FG),
+        let (text, look) = match summary {
+            "" if commit.empty => ("(no description set)", green),
+            "" => ("(no description set)", style(Color::Yellow)),
+            s => (s, style(Color::Reset)),
         };
         let x = (x + 2).max(x0 + 3 + width_of(&row.graph[0]) + 2);
         let right = x0 + c.area.width - 1;
         if x < right {
             let mut sub = Canvas::new(&mut *c.buf, Rect::new(x, y, right - x, 1));
-            sub.put(x, y, text, theme::fg(color).bg(bg));
+            let x = match commit.empty {
+                true => sub.put(x, y, "(empty)", green) + 1,
+                false => x,
+            };
+            sub.put(x, y, text, look);
         }
     }
 }
 
-/// Draws a line of jj's graph from `x`, nodes in their colors. Returns where it ends.
-fn draw_graph(c: &mut Canvas, mut x: u16, y: u16, graph: &str, bg: ratatui::style::Color) -> u16 {
+/// Draws a line of jj's graph from `x`, `commit`'s node in jj's colors. Returns where it
+/// ends.
+fn draw_graph(
+    c: &mut Canvas,
+    mut x: u16,
+    y: u16,
+    graph: &str,
+    bg: Color,
+    commit: Option<&LogCommit>,
+) -> u16 {
     for ch in graph.trim_end().chars() {
-        let color = match ch {
-            '@' => GREEN,
-            '×' => RED,
-            '◆' => FG,
-            _ => MUTED,
+        let node = match commit {
+            Some(_) if ch == '@' => Some(Color::Green),
+            Some(k) if ch == '×' || k.conflict && "○◆@".contains(ch) => Some(Color::Red),
+            Some(_) if ch == '◆' => Some(Color::LightCyan),
+            _ => None,
         };
-        x = c.put(x, y, &ch.to_string(), theme::fg(color).bg(bg));
+        let look = match node {
+            Some(color) => Style::new().fg(color).bg(bg).add_modifier(Modifier::BOLD),
+            None => Style::new().fg(Color::Reset).bg(bg),
+        };
+        x = c.put(x, y, &ch.to_string(), look);
     }
     x
+}
+
+/// jj's look for a field of a commit's lines: bold on the working copy.
+fn jj_style(color: Color, working_copy: bool, bg: Color) -> Style {
+    let style = Style::new().fg(color).bg(bg);
+    match working_copy {
+        true => style.add_modifier(Modifier::BOLD),
+        false => style,
+    }
+}
+
+/// The bright form of an ANSI color, which jj uses on the working copy.
+fn bright(color: Color, working_copy: bool) -> Color {
+    match (color, working_copy) {
+        (Color::Magenta, true) => Color::LightMagenta,
+        (Color::Green, true) => Color::LightGreen,
+        (Color::Cyan, true) => Color::LightCyan,
+        (color, _) => color,
+    }
 }
 
 /// How many columns a line of graph takes, without its trailing spaces.
@@ -649,6 +702,7 @@ mod tests {
                 conflict: false,
                 divergent,
                 empty: false,
+                workspaces: vec![],
             }),
         }
     }

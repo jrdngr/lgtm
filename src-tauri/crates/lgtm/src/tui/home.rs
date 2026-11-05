@@ -552,6 +552,7 @@ mod tests {
                     conflict: false,
                     divergent: false,
                     empty: false,
+                    workspaces: vec![],
                 }),
             })
             .collect();
