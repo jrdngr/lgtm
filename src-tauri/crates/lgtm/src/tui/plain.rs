@@ -26,6 +26,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             let _ = tx.send(Msg::Files(walk::list(&root)));
         });
     }
+    git_decor(&root, tx.clone());
     match file {
         Some((name, line)) => {
             if let Err(err) = e.open(&name, line) {
@@ -88,12 +89,16 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                 match msg {
                     Msg::Files(listing) => e.set_files(listing),
                     Msg::Base { name, text } => e.set_base(&name, text),
+                    Msg::Decor(decor) => e.set_decor(decor),
                     _ => {}
                 }
             }
             if polled.elapsed() >= POLL {
                 polled = Instant::now();
                 e.check_disk();
+            }
+            if std::mem::take(&mut e.saved) {
+                git_decor(&root, tx.clone());
             }
             for name in e.take_base_requests() {
                 if git {
@@ -110,6 +115,14 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             1
         }
     }
+}
+
+/// Finds what git says changed, for the sidebar.
+fn git_decor(root: &Path, tx: Sender<Msg>) {
+    let root = root.to_path_buf();
+    std::thread::spawn(move || {
+        let _ = tx.send(Msg::Decor(super::decor::git(&root)));
+    });
 }
 
 /// Reads the file `name` at git's `HEAD`, empty when it isn't there.

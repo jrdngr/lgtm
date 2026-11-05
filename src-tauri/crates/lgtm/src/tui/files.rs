@@ -9,6 +9,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
+use super::decor::Decorations;
 use super::paint::Canvas;
 use super::theme::{self, ACCENT, BG, FAINT, FG, HAIR, MUTED, SEL};
 use super::walk::{self, Listing};
@@ -65,6 +66,8 @@ pub struct FileTree {
     unread: BTreeSet<String>,
     /// Whether the files were listed.
     pub loaded: bool,
+    /// How the working copy changes files, coloring their names.
+    pub decor: Decorations,
     /// Folders opened, by path, while there's no search.
     open: BTreeSet<String>,
     pub query: String,
@@ -420,23 +423,35 @@ impl FileTree {
                 _ => BG,
             };
             sub.fill(area.x, y, area.width, bg);
-            draw_row(&mut sub, area.x + 1, y, row, bg, marked);
+            draw_row(&mut sub, area.x + 1, y, row, bg, marked, &self.decor);
         }
     }
 }
 
-fn draw_row(c: &mut Canvas, x0: u16, y: u16, row: &Row, bg: Color, marked: &dyn Fn(&str) -> bool) {
+fn draw_row(
+    c: &mut Canvas,
+    x0: u16,
+    y: u16,
+    row: &Row,
+    bg: Color,
+    marked: &dyn Fn(&str) -> bool,
+    decor: &Decorations,
+) {
     match row {
         Row::Dir {
             name,
+            path,
             depth,
             open,
             ignored,
-            ..
         } => {
             let arrow = if *open { "▾ " } else { "▸ " };
             let x = x0 + 2 * *depth as u16;
-            let color = if *ignored { FAINT } else { MUTED };
+            let color = match decor.dir(path) {
+                Some(d) => d.color(),
+                None if *ignored => FAINT,
+                None => MUTED,
+            };
             c.put(x, y, &format!("{arrow}{name}/"), theme::fg(color).bg(bg));
         }
         Row::File {
@@ -447,7 +462,11 @@ fn draw_row(c: &mut Canvas, x0: u16, y: u16, row: &Row, bg: Color, marked: &dyn 
             ignored,
         } => {
             let mut x = x0 + 2 * *depth as u16;
-            let color = if *ignored { MUTED } else { FG };
+            let color = match decor.file(path) {
+                Some(d) => d.color(),
+                None if *ignored => MUTED,
+                None => FG,
+            };
             for (i, ch) in name.chars().enumerate() {
                 let style = if hits.contains(&i) {
                     theme::bold(ACCENT).bg(bg)

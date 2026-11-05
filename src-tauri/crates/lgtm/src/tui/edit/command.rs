@@ -153,6 +153,7 @@ impl Editor {
                 o.conflict = false;
                 let name = o.buf.name.clone();
                 self.sidebar.add(&name);
+                self.saved = true;
                 true
             }
             Err(e) => {

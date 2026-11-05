@@ -41,6 +41,8 @@ pub enum Msg {
     Log(anyhow::Result<Vec<LogRow>>),
     /// The workspace's files.
     Files(super::walk::Listing),
+    /// How the working copy changes files.
+    Decor(super::decor::Decorations),
     /// A file at `@-`, empty when it isn't there, for the editor's gutter.
     Base {
         name: String,
@@ -160,6 +162,27 @@ impl Loader {
                 let text = String::from_utf8_lossy(&bytes.unwrap_or_default()).into_owned();
                 let _ = tx.send(Msg::Base { name, text });
             }
+        });
+    }
+
+    /// Snapshots the working copy, then finds how `@` changes files, for the file trees. A
+    /// snapshot that changed something lands as an operation, which reloads this again.
+    pub fn decor(&self) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            use super::decor::{Decor, Decorations};
+            let _ = jj.background_snapshot().await;
+            // Without a diff the trees keep their colors.
+            let Ok(range) = jj.resolve("@").await else {
+                return;
+            };
+            let Ok(paths) = jj.diff_paths(&range).await else {
+                return;
+            };
+            let found = paths
+                .into_iter()
+                .filter_map(|p| Some((p.path, Decor::of(p.status, p.conflict)?)));
+            let _ = tx.send(Msg::Decor(Decorations::new(found)));
         });
     }
 

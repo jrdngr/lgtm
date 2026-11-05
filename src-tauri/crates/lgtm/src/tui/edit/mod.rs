@@ -92,6 +92,8 @@ pub struct Editor {
     in_sidebar: bool,
     /// Whether the sidebar shows, when there's room.
     pub files: bool,
+    /// Whether a file was saved since this was last cleared.
+    pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
     pub files_width: Option<u16>,
     /// The sidebar's width as last drawn, 0 when hidden.
@@ -112,6 +114,7 @@ impl Editor {
             sidebar: FileTree::default(),
             in_sidebar: false,
             files: true,
+            saved: false,
             files_width: None,
             sidebar_width: 0,
         }
@@ -160,6 +163,11 @@ impl Editor {
                 }
             }
         }
+    }
+
+    /// Takes how the working copy changes files, for the sidebar.
+    pub fn set_decor(&mut self, decor: crate::tui::decor::Decorations) {
+        self.sidebar.decor = decor;
     }
 
     /// Takes the repo's files, for the sidebar and `space f`.

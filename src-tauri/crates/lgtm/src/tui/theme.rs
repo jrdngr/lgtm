@@ -2,7 +2,7 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
-const fn rgb(v: u32) -> Color {
+pub const fn rgb(v: u32) -> Color {
     Color::Rgb((v >> 16) as u8, (v >> 8) as u8, v as u8)
 }
 

@@ -44,6 +44,7 @@ pub struct DiffPath {
     /// Source path for renames and copies.
     pub old_path: Option<String>,
     pub status: FileStatus,
+    pub conflict: bool,
 }
 
 impl Jj {
@@ -95,6 +96,7 @@ impl Jj {
                     old_path: moved.then_some(m.source),
                     path: m.path,
                     status: m.status,
+                    conflict: m.conflict,
                 }
             })
             .collect())

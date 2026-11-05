@@ -1,5 +1,6 @@
 //! The terminal UI: a picker over the jj log, the review of what was picked, and the editor.
 
+mod decor;
 mod edit;
 mod files;
 mod github;
@@ -151,6 +152,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.home.revisions_width = app.settings.home_revisions_width;
     app.loader.log();
     app.loader.files(&app.root);
+    app.loader.decor();
     match start {
         Start::Home => {}
         Start::Revset(revset) => app.open(Target::Revset(revset)),
@@ -237,6 +239,7 @@ impl App {
     fn reload(&mut self) {
         self.loader.log();
         self.loader.files(&self.root);
+        self.loader.decor();
         if let Some(r) = self.review.as_mut() {
             self.loads += 1;
             r.id = self.loads;
@@ -314,6 +317,9 @@ impl App {
             for name in self.buffers.take_base_requests() {
                 self.loader.base(name);
             }
+            if std::mem::take(&mut self.buffers.saved) {
+                self.loader.decor();
+            }
         }
     }
 
@@ -376,6 +382,10 @@ impl App {
                 self.buffers.set_files(listing);
             }
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
+            Msg::Decor(decor) => {
+                self.home.files.decor = decor.clone();
+                self.buffers.set_decor(decor);
+            }
             Msg::Acted(result) => {
                 self.busy = None;
                 let then = self.after_edit.take();
