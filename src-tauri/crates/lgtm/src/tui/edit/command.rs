@@ -2,14 +2,20 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
+use std::path::Path;
+
 use super::{Editor, Outcome};
 
 /// The commands, and what they do, for the menu over the command line.
 pub const COMMANDS: &[(&str, &str)] = &[
-    ("w", "save"),
+    ("e", "open a file"),
+    ("w", "save, or save as a path"),
+    ("wa", "save all"),
     ("q", "leave the editor"),
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
+    ("wqa", "save all and leave"),
+    ("close", "close the file in view"),
     ("reload", "read the file again, over edits"),
     ("vsplit", "open in a pane to the right"),
     ("split", "open in a pane below"),
@@ -81,19 +87,39 @@ impl Editor {
                 self.split(arg, false);
                 return Outcome::None;
             }
+            "e" | "open" | "edit" => {
+                match arg {
+                    Some(path) => self.open_path(path),
+                    None => self.pick(crate::edit::keymap::Pick::Files),
+                }
+                return Outcome::None;
+            }
+            "w" if arg.is_some() => {
+                self.save_as(arg.unwrap_or_default());
+                return Outcome::None;
+            }
             _ => {}
         }
         match line {
             "w" => {
                 self.save();
             }
+            "wa" => {
+                self.save_all();
+            }
             "wq" | "x" => {
                 if self.save() {
                     return self.leave(false);
                 }
             }
-            "q" => return self.leave(false),
-            "q!" => return self.leave(true),
+            "wqa" | "xa" => {
+                if self.save_all() {
+                    return self.leave(false);
+                }
+            }
+            "q" | "qa" => return self.leave(false),
+            "q!" | "qa!" => return self.leave(true),
+            "close" | "c" => return self.close(),
             "reload" => {
                 if let Some(o) = self.open.get_mut(self.cur) {
                     match o.buf.reload() {
@@ -115,12 +141,18 @@ impl Editor {
 
     /// Saves the buffer in view. Returns whether it saved.
     fn save(&mut self) -> bool {
-        let Some(o) = self.open.get_mut(self.cur) else {
+        self.save_at(self.cur)
+    }
+
+    fn save_at(&mut self, i: usize) -> bool {
+        let Some(o) = self.open.get_mut(i) else {
             return false;
         };
         match o.buf.save() {
             Ok(()) => {
                 o.conflict = false;
+                let name = o.buf.name.clone();
+                self.sidebar.add(&name);
                 true
             }
             Err(e) => {
@@ -128,6 +160,72 @@ impl Editor {
                 false
             }
         }
+    }
+
+    /// Saves every buffer with unsaved edits. Returns whether all saved.
+    fn save_all(&mut self) -> bool {
+        let dirty: Vec<usize> = (0..self.open.len())
+            .filter(|&i| self.open[i].buf.dirty())
+            .collect();
+        let mut ok = true;
+        for i in dirty {
+            ok &= self.save_at(i);
+        }
+        ok
+    }
+
+    /// Opens `path`, from the current directory or whole.
+    fn open_path(&mut self, path: &str) {
+        let name = self.name_of(path);
+        if let Err(e) = self.open(&name, 0) {
+            self.notice = Some(format!("couldn't open {name}: {e}"));
+        }
+    }
+
+    /// Saves the buffer in view to `path`, from the current directory or whole, which it's
+    /// then the file of.
+    fn save_as(&mut self, path: &str) {
+        let name = self.name_of(path);
+        let full = self.root.join(&name);
+        let Some(o) = self.open.get_mut(self.cur) else {
+            return;
+        };
+        o.buf.path = full;
+        o.buf.name = name;
+        o.base = None;
+        o.base_asked = false;
+        o.marks = None;
+        o.colors = None;
+        self.save();
+    }
+
+    /// `path`'s name in the root: from it when it's inside, else the whole path.
+    fn name_of(&self, path: &str) -> String {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| self.root.clone());
+        crate::tui::workspace_name(&self.root, &cwd.join(path))
+    }
+
+    /// Closes the buffer in view unless it has unsaved edits. The last one closed opens the
+    /// file list.
+    fn close(&mut self) -> Outcome {
+        let Some(o) = self.open.get(self.cur) else {
+            return Outcome::None;
+        };
+        if o.buf.dirty() {
+            self.notice = Some(format!("unsaved: {}", o.buf.name));
+            return Outcome::None;
+        }
+        self.open.remove(self.cur);
+        self.cur = self
+            .cur
+            .saturating_sub(1)
+            .min(self.open.len().saturating_sub(1));
+        match self.current().map(|b| b.name.clone()) {
+            Some(name) if !Path::new(&name).is_absolute() => self.sidebar.reveal(&name),
+            Some(_) => {}
+            None => self.pick(crate::edit::keymap::Pick::Files),
+        }
+        Outcome::None
     }
 
     /// Leaves the editor unless a buffer has unsaved edits. `force` drops them.

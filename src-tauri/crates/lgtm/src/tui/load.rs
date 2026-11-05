@@ -39,8 +39,8 @@ impl Target {
 
 pub enum Msg {
     Log(anyhow::Result<Vec<LogRow>>),
-    /// The working copy's files.
-    Files(anyhow::Result<Vec<String>>),
+    /// The workspace's files.
+    Files(super::walk::Listing),
     /// A file at `@-`, empty when it isn't there, for the editor's gutter.
     Base {
         name: String,
@@ -163,11 +163,11 @@ impl Loader {
         });
     }
 
-    /// Lists the working copy's files.
-    pub fn files(&self) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
-        self.rt.spawn(async move {
-            let _ = tx.send(Msg::Files(jj.files("@").await));
+    /// Lists the files under `root`.
+    pub fn files(&self, root: &std::path::Path) {
+        let (root, tx) = (root.to_path_buf(), self.tx.clone());
+        self.rt.spawn_blocking(move || {
+            let _ = tx.send(Msg::Files(super::walk::list(&root)));
         });
     }
 

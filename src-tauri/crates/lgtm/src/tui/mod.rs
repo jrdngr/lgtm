@@ -10,12 +10,14 @@ mod load;
 mod motions;
 mod paint;
 mod picker;
+mod plain;
 mod review;
 mod serve;
 mod settings;
 mod term;
 mod theme;
 mod versions;
+mod walk;
 mod watch;
 mod width;
 
@@ -53,7 +55,8 @@ pub fn store(root: &Path) -> Option<Store> {
 pub enum Start {
     Home,
     Revset(String),
-    /// A file, as given relative to the current directory, at a line from 1.
+    /// A file, as given relative to the current directory, at a line from 1. A folder opens
+    /// the list of files.
     File(PathBuf, u32),
 }
 
@@ -67,21 +70,36 @@ enum Screen {
 
 pub use edit::SPLIT_FLAG;
 
-/// Runs the UI in the jj workspace around the file it opens, else around the current
-/// directory, opening `start`. A `split` is a second one beside another, which keeps the MCP
-/// socket.
+/// Runs the UI in the jj workspace around the file or folder it opens, else around the
+/// current directory, opening `start`. Outside jj only the editor runs. A `split` is a second
+/// one beside another, which keeps the MCP socket.
 pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     let cwd = std::env::current_dir().unwrap_or_default();
-    let near = match &start {
-        Start::File(path, _) => cwd.join(path).parent().map(Path::to_path_buf),
+    let target = match &start {
+        Start::File(path, line) => Some((normalize(&cwd.join(path)), *line)),
         _ => None,
     };
-    let Some(root) = near
-        .and_then(|d| crate::agent::workspace(&normalize(&d)))
-        .or_else(|| crate::agent::workspace(&cwd))
-    else {
-        eprintln!("lgtm: not in a jj repo");
-        return 1;
+    let folder = target.as_ref().filter(|(t, _)| t.is_dir()).map(|(t, _)| t);
+    let near = match &target {
+        Some((t, _)) if !t.is_dir() => t.parent().map(Path::to_path_buf),
+        Some((t, _)) => Some(t.clone()),
+        None => Some(cwd.clone()),
+    }
+    .unwrap_or_else(|| cwd.clone());
+    let file = target.as_ref().filter(|(t, _)| !t.is_dir());
+    let Some(root) = crate::agent::workspace(&near) else {
+        if matches!(start, Start::Revset(_)) {
+            eprintln!("lgtm: not in a jj repo");
+            return 1;
+        }
+        let root = near
+            .ancestors()
+            .find(|d| d.join(".git").exists())
+            .map(Path::to_path_buf)
+            .or(folder.cloned())
+            .unwrap_or(cwd);
+        let file = file.map(|(f, line)| (workspace_name(&root, f), *line));
+        return plain::run(root, file);
     };
     let (tx, rx) = mpsc::channel();
     let socket = crate::agent::socket_path(&root).filter(|_| !split);
@@ -131,15 +149,20 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.buffers.files_width = app.settings.editor_files_width;
     app.home.revisions_width = app.settings.home_revisions_width;
     app.loader.log();
-    app.loader.files();
+    app.loader.files(&app.root);
     match start {
         Start::Home => {}
         Start::Revset(revset) => app.open(Target::Revset(revset)),
-        Start::File(path, line) => {
-            let name = workspace_name(&app.root, &cwd.join(path));
-            if let Err(e) = app.buffers.open(&name, line) {
-                eprintln!("lgtm: couldn't open {name}: {e}");
-                return 1;
+        Start::File(..) => {
+            match file {
+                Some((path, line)) => {
+                    let name = workspace_name(&app.root, path);
+                    if let Err(e) = app.buffers.open(&name, *line) {
+                        eprintln!("lgtm: couldn't open {name}: {e}");
+                        return 1;
+                    }
+                }
+                None => app.buffers.pick(crate::edit::keymap::Pick::Files),
             }
             app.screen = Screen::Editor;
         }
@@ -210,7 +233,7 @@ impl App {
     /// Loads what's on screen again after a jj operation.
     fn reload(&mut self) {
         self.loader.log();
-        self.loader.files();
+        self.loader.files(&self.root);
         if let Some(r) = self.review.as_mut() {
             self.loads += 1;
             r.id = self.loads;
@@ -345,12 +368,9 @@ impl App {
                     self.snapshots.store(r.working_copy(), Ordering::Relaxed);
                 }
             }
-            Msg::Files(result) => {
-                // Without jj's list the tree keeps what it had.
-                if let Ok(paths) = result {
-                    self.home.files.set_paths(paths.clone());
-                    self.buffers.set_files(paths);
-                }
+            Msg::Files(listing) => {
+                self.home.files.set_listing(listing.clone());
+                self.buffers.set_files(listing);
             }
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
             Msg::Acted(result) => {
@@ -526,22 +546,16 @@ impl App {
     }
 
     fn draw(&mut self, c: &mut Canvas) {
-        let area = c.area;
-        if area.height < 3 {
+        if self.screen == Screen::Editor {
+            draw_editor(c, &mut self.buffers, self.help);
             return;
         }
-        for y in area.top()..area.bottom() {
-            c.fill(area.x, y, area.width, BG);
-        }
+        let Some((x, body)) = frame(c) else {
+            return;
+        };
+        let area = c.area;
         let top = area.y;
         let bottom = area.bottom() - 1;
-        let body = Rect::new(area.x, top + 1, area.width, area.height - 2);
-        c.fill(area.x, top, area.width, PANEL);
-        let x = c.put(area.x + 1, top, "lgtm", theme::bold(ACCENT).bg(PANEL)) + 2;
-        if self.screen == Screen::Editor {
-            self.draw_editor(c, x, body);
-            return;
-        }
         let unsaved = self
             .buffers
             .unsaved()
@@ -600,30 +614,49 @@ impl App {
         self.busy = Some((motions::doing(&action), Instant::now()));
         self.loader.act(action);
     }
+}
 
-    fn draw_editor(&mut self, c: &mut Canvas, x: u16, body: Rect) {
-        let (top, bottom) = (c.area.y, c.area.bottom() - 1);
-        let e = &mut self.buffers;
-        e.title(c, x, top);
-        e.draw(c, body);
-        if let Some(text) = e.prompt() {
-            keybar::prompt(c, bottom, &text, &[]);
-            keybar::menu(c, body, &e.command_menu());
-            return;
-        }
-        keybar::draw_badged(c, bottom, Some(e.badge()), &e.hints());
-        let pending = e.pending_menu();
-        if !pending.is_empty() {
-            keybar::menu(c, body, &pending);
-        }
-        if self.help {
-            let keys: Vec<(&str, &str)> = crate::edit::keymap::BINDS
-                .iter()
-                .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down"))
-                .map(|b| (b.keys, b.label))
-                .collect();
-            keybar::help(c, body, &keys);
-        }
+/// Paints the background and the top bar with `lgtm` on it. Returns where the title goes on
+/// and the body, when there's room.
+fn frame(c: &mut Canvas) -> Option<(u16, Rect)> {
+    let area = c.area;
+    if area.height < 3 {
+        return None;
+    }
+    for y in area.top()..area.bottom() {
+        c.fill(area.x, y, area.width, BG);
+    }
+    let top = area.y;
+    c.fill(area.x, top, area.width, PANEL);
+    let x = c.put(area.x + 1, top, "lgtm", theme::bold(ACCENT).bg(PANEL)) + 2;
+    Some((x, Rect::new(area.x, top + 1, area.width, area.height - 2)))
+}
+
+/// Draws the editor screen, with the keys over it when `help` is up.
+fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool) {
+    let Some((x, body)) = frame(c) else {
+        return;
+    };
+    let (top, bottom) = (c.area.y, c.area.bottom() - 1);
+    e.title(c, x, top);
+    e.draw(c, body);
+    if let Some(text) = e.prompt() {
+        keybar::prompt(c, bottom, &text, &[]);
+        keybar::menu(c, body, &e.command_menu());
+        return;
+    }
+    keybar::draw_badged(c, bottom, Some(e.badge()), &e.hints());
+    let pending = e.pending_menu();
+    if !pending.is_empty() {
+        keybar::menu(c, body, &pending);
+    }
+    if help {
+        let keys: Vec<(&str, &str)> = crate::edit::keymap::BINDS
+            .iter()
+            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down"))
+            .map(|b| (b.keys, b.label))
+            .collect();
+        keybar::help(c, body, &keys);
     }
 }
 

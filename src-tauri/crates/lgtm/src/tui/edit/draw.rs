@@ -8,7 +8,7 @@ use ratatui::style::{Color, Style};
 use super::{Editor, Open};
 use crate::edit::buffer::Buffer;
 use crate::edit::gutter::{self, Mark};
-use crate::edit::keymap;
+use crate::edit::keymap::{self, Pick};
 use crate::edit::keys::Mode;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
@@ -60,6 +60,14 @@ impl Editor {
     }
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
+        if let Some(f) = self.finder.as_ref() {
+            let mut hints = vec![("↑ ↓", "move", false), ("Enter", "open", false)];
+            if f.kind != Pick::OpenFiles {
+                hints.push(("C-i", "ignored", f.with_ignored()));
+            }
+            hints.push(("Esc", "close", false));
+            return hints;
+        }
         if self.in_sidebar {
             return vec![
                 ("↑ ↓", "move", false),
@@ -108,7 +116,7 @@ impl Editor {
             body.width.saturating_sub(40),
         );
         let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > side * 2;
-        if !self.files || !room || self.sidebar.paths().is_empty() || body.height < 2 {
+        if !self.files || !room || self.sidebar.is_empty() || body.height < 2 {
             self.sidebar.hide();
             self.sidebar_width = 0;
             return body;

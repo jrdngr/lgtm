@@ -1,7 +1,8 @@
 //! The repo's files as a tree with folders that open and close, narrowed by a fuzzy search.
-//! Home shows it beside the jj log, and the editor beside the text.
+//! Home shows it beside the jj log, and the editor beside the text. Files git ignores show
+//! dimmed, and an ignored folder is read when it's opened.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use lgtm_core::fuzzy;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -9,7 +10,8 @@ use ratatui::layout::Rect;
 use ratatui::style::Color;
 
 use super::paint::Canvas;
-use super::theme::{self, ACCENT, BG, FG, HAIR, MUTED, SEL};
+use super::theme::{self, ACCENT, BG, FAINT, FG, HAIR, MUTED, SEL};
+use super::walk::{self, Listing};
 
 /// The most files a search shows.
 const MAX_SHOWN: usize = 200;
@@ -24,6 +26,7 @@ pub enum Row {
         path: String,
         depth: usize,
         open: bool,
+        ignored: bool,
     },
     /// A file, and which chars of its name the search matched.
     File {
@@ -31,6 +34,7 @@ pub enum Row {
         path: String,
         depth: usize,
         hits: Vec<usize>,
+        ignored: bool,
     },
 }
 
@@ -49,7 +53,18 @@ pub enum Outcome {
 
 #[derive(Default)]
 pub struct FileTree {
+    /// Where the paths are from.
+    root: Option<std::path::PathBuf>,
+    /// Every file known, ignored or not.
     paths: Vec<String>,
+    /// Folders that hold no file known: ignored ones.
+    dirs: BTreeSet<String>,
+    /// Files and folders git ignores.
+    ignored: HashSet<String>,
+    /// Ignored folders not read yet.
+    unread: BTreeSet<String>,
+    /// Whether the files were listed.
+    pub loaded: bool,
     /// Folders opened, by path, while there's no search.
     open: BTreeSet<String>,
     pub query: String,
@@ -72,21 +87,79 @@ struct Node {
 }
 
 impl FileTree {
-    pub fn set_paths(&mut self, mut paths: Vec<String>) {
+    /// Takes a new listing. Ignored folders that were open are read again.
+    pub fn set_listing(&mut self, listing: Listing) {
+        self.loaded = true;
+        let mut paths = listing.files;
+        paths.extend(listing.ignored.iter().cloned());
         paths.sort();
-        if paths == self.paths {
+        let dirs: BTreeSet<String> = listing.ignored_dirs.iter().cloned().collect();
+        if paths == self.paths && dirs == self.dirs {
             return;
         }
         let at = self.selected().map(str::to_string);
+        self.root = Some(listing.root);
         self.paths = paths;
+        self.ignored = listing.ignored.into_iter().collect();
+        self.ignored.extend(dirs.iter().cloned());
+        self.unread = dirs.clone();
+        self.dirs = dirs;
+        let open: Vec<String> = self.open.iter().cloned().collect();
+        for dir in open {
+            self.read(&dir);
+        }
         self.rebuild();
         if let Some(path) = at {
             self.select(&path);
         }
     }
 
-    pub fn paths(&self) -> &[String] {
-        &self.paths
+    /// Reads the ignored folder `dir` when it wasn't read.
+    fn read(&mut self, dir: &str) {
+        let Some(root) = self.root.as_ref().filter(|_| self.unread.remove(dir)) else {
+            return;
+        };
+        let (files, dirs) = walk::read_dir(root, dir);
+        self.ignored.extend(files.iter().cloned());
+        self.ignored.extend(dirs.iter().cloned());
+        self.unread.extend(dirs.iter().cloned());
+        self.dirs.extend(dirs);
+        self.paths.extend(files);
+        self.paths.sort();
+    }
+
+    /// The files git doesn't ignore.
+    pub fn files(&self) -> impl Iterator<Item = &String> {
+        self.paths.iter().filter(|p| !self.ignored.contains(*p))
+    }
+
+    /// Whether there's anything to show.
+    pub fn is_empty(&self) -> bool {
+        self.paths.is_empty() && self.dirs.is_empty()
+    }
+
+    /// Whether git ignores `path`, or a folder it's in.
+    pub fn is_ignored(&self, path: &str) -> bool {
+        let mut at = path;
+        loop {
+            if self.ignored.contains(at) {
+                return true;
+            }
+            match at.rsplit_once('/') {
+                Some((dir, _)) => at = dir,
+                None => return false,
+            }
+        }
+    }
+
+    /// Adds the file `path` when it isn't listed, as one just saved.
+    pub fn add(&mut self, path: &str) {
+        if std::path::Path::new(path).is_absolute() || self.paths.iter().any(|p| p == path) {
+            return;
+        }
+        self.paths.push(path.to_string());
+        self.paths.sort();
+        self.rebuild();
     }
 
     pub fn selected(&self) -> Option<&str> {
@@ -110,6 +183,7 @@ impl FileTree {
             }
             dir.push_str(part);
             changed |= self.open.insert(dir.clone());
+            self.read(&dir);
         }
         if changed || self.rows.is_empty() {
             self.rebuild();
@@ -131,6 +205,9 @@ impl FileTree {
             self.matched = self.paths.len();
             for p in &self.paths {
                 add(&mut root, p, vec![]);
+            }
+            for d in &self.dirs {
+                add_dir(&mut root, d);
             }
         } else if self.query.contains('/') {
             // A path: every file in the folders it names, or the files it names.
@@ -162,13 +239,11 @@ impl FileTree {
         }
         let searching = !self.query.trim().is_empty();
         let mut rows = Vec::new();
-        emit(
-            &root,
-            "",
-            0,
-            &|p| searching || self.open.contains(p),
-            &mut rows,
-        );
+        let shape = Shape {
+            is_open: &|p| searching || self.open.contains(p),
+            is_ignored: &|p| self.is_ignored(p),
+        };
+        emit(&root, "", 0, &shape, &mut rows);
         self.rows = rows;
         self.sel = match best {
             Some((_, path)) => self.rows.iter().position(|r| r.path() == path).unwrap_or(0),
@@ -183,6 +258,7 @@ impl FileTree {
 
     fn set_open(&mut self, path: &str, open: bool) {
         if open {
+            self.read(path);
             self.open.insert(path.to_string());
         } else {
             self.open.remove(path);
@@ -352,24 +428,31 @@ impl FileTree {
 fn draw_row(c: &mut Canvas, x0: u16, y: u16, row: &Row, bg: Color, marked: &dyn Fn(&str) -> bool) {
     match row {
         Row::Dir {
-            name, depth, open, ..
+            name,
+            depth,
+            open,
+            ignored,
+            ..
         } => {
             let arrow = if *open { "▾ " } else { "▸ " };
             let x = x0 + 2 * *depth as u16;
-            c.put(x, y, &format!("{arrow}{name}/"), theme::fg(MUTED).bg(bg));
+            let color = if *ignored { FAINT } else { MUTED };
+            c.put(x, y, &format!("{arrow}{name}/"), theme::fg(color).bg(bg));
         }
         Row::File {
             name,
             path,
             depth,
             hits,
+            ignored,
         } => {
             let mut x = x0 + 2 * *depth as u16;
+            let color = if *ignored { MUTED } else { FG };
             for (i, ch) in name.chars().enumerate() {
                 let style = if hits.contains(&i) {
                     theme::bold(ACCENT).bg(bg)
                 } else {
-                    theme::fg(FG).bg(bg)
+                    theme::fg(color).bg(bg)
                 };
                 x = c.put(x, y, &ch.to_string(), style);
             }
@@ -440,14 +523,22 @@ fn add(root: &mut Node, path: &str, hits: Vec<usize>) {
     node.files.push((name.to_string(), hits));
 }
 
+/// Adds the folder `path`, which may hold nothing known.
+fn add_dir(root: &mut Node, path: &str) {
+    let mut node = root;
+    for dir in path.split('/') {
+        node = node.dirs.entry(dir.to_string()).or_default();
+    }
+}
+
+/// Which folders are open, and what git ignores.
+struct Shape<'a> {
+    is_open: &'a dyn Fn(&str) -> bool,
+    is_ignored: &'a dyn Fn(&str) -> bool,
+}
+
 /// Folders first, then files, each by name ignoring case.
-fn emit(
-    node: &Node,
-    parent: &str,
-    depth: usize,
-    is_open: &dyn Fn(&str) -> bool,
-    out: &mut Vec<Row>,
-) {
+fn emit(node: &Node, parent: &str, depth: usize, shape: &Shape, out: &mut Vec<Row>) {
     let join = |a: &str, b: &str| {
         if a.is_empty() {
             b.to_string()
@@ -460,30 +551,34 @@ fn emit(
     for (name, mut dir) in dirs {
         let mut label = name.clone();
         let mut path = join(parent, name);
-        // A folder holding only one folder shares its line.
-        while dir.files.is_empty() && dir.dirs.len() == 1 {
+        // A folder holding only one folder shares its line, unless it's ignored and may hold
+        // more than was read.
+        while dir.files.is_empty() && dir.dirs.len() == 1 && !(shape.is_ignored)(&path) {
             let (next, inner) = dir.dirs.iter().next().expect("one folder");
             label = format!("{label}/{next}");
             path = join(&path, next);
             dir = inner;
         }
-        let open = is_open(&path);
+        let open = (shape.is_open)(&path);
         out.push(Row::Dir {
             name: label,
+            ignored: (shape.is_ignored)(&path),
             path: path.clone(),
             depth,
             open,
         });
         if open {
-            emit(dir, &path, depth + 1, is_open, out);
+            emit(dir, &path, depth + 1, shape, out);
         }
     }
     let mut files: Vec<&(String, Vec<usize>)> = node.files.iter().collect();
     files.sort_by_key(|(name, _)| name.to_lowercase());
     for (name, hits) in files {
+        let path = join(parent, name);
         out.push(Row::File {
             name: name.clone(),
-            path: join(parent, name),
+            ignored: (shape.is_ignored)(&path),
+            path,
             depth,
             hits: hits.clone(),
         });
@@ -496,7 +591,10 @@ mod tests {
 
     fn tree(paths: &[&str]) -> FileTree {
         let mut t = FileTree::default();
-        t.set_paths(paths.iter().map(|p| p.to_string()).collect());
+        t.set_listing(Listing {
+            files: paths.iter().map(|p| p.to_string()).collect(),
+            ..Listing::default()
+        });
         t
     }
 
@@ -638,5 +736,50 @@ mod tests {
         press(&mut t, KeyCode::Down);
         assert_eq!(t.selected(), Some("src/main.tsx"));
         assert!(matches!(press(&mut t, KeyCode::Enter), Outcome::Open(p) if p == "src/main.tsx"));
+    }
+
+    #[test]
+    fn ignored_files_show_dimmed_and_an_ignored_folder_is_read_when_opened() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("target/debug")).unwrap();
+        std::fs::write(dir.path().join("target/out"), "").unwrap();
+        let mut t = FileTree::default();
+        t.set_listing(Listing {
+            root: dir.path().to_path_buf(),
+            files: vec!["a.rs".into()],
+            ignored: vec!["a.log".into()],
+            ignored_dirs: vec!["target".into()],
+        });
+        let dimmed = |t: &FileTree| -> Vec<(String, bool)> {
+            t.rows
+                .iter()
+                .map(|r| match r {
+                    Row::Dir { path, ignored, .. } | Row::File { path, ignored, .. } => {
+                        (path.clone(), *ignored)
+                    }
+                })
+                .collect()
+        };
+        assert_eq!(
+            dimmed(&t),
+            [
+                ("target".to_string(), true),
+                ("a.log".into(), true),
+                ("a.rs".into(), false)
+            ]
+        );
+        assert_eq!(t.files().collect::<Vec<_>>(), ["a.rs"]);
+        t.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(shown(&t)[..3], ["-target/", "  +debug/", "  out"]);
+        assert!(t.is_ignored("target/debug/new.rs"));
+        assert!(!t.is_ignored("src/new.rs"));
+        // A new listing reads the folders that were open again.
+        t.set_listing(Listing {
+            root: dir.path().to_path_buf(),
+            files: vec!["a.rs".into(), "b.rs".into()],
+            ignored: vec![],
+            ignored_dirs: vec!["target".into()],
+        });
+        assert_eq!(shown(&t)[..3], ["-target/", "  +debug/", "  out"]);
     }
 }

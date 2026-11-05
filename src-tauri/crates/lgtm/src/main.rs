@@ -27,7 +27,7 @@ fn main() {
         Some("snap") => snap::run(&args[1..]),
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line]\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
+                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm mcp | hook | gc"
             );
             0
         }

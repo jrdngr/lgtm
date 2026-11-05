@@ -117,13 +117,20 @@ impl Editor {
         }
     }
 
-    /// The buffers whose base the gutter still needs, marked as asked for.
+    /// The buffers whose base the gutter still needs, marked as asked for. Files outside
+    /// the root and files git ignores have none, and the files must be listed to know which
+    /// are ignored.
     pub fn take_base_requests(&mut self) -> Vec<String> {
+        if !self.sidebar.loaded {
+            return vec![];
+        }
+        let sidebar = &self.sidebar;
         self.open
             .iter_mut()
             .filter_map(|o| {
                 (!std::mem::replace(&mut o.base_asked, true)).then(|| o.buf.name.clone())
             })
+            .filter(|name| !Path::new(name).is_absolute() && !sidebar.is_ignored(name))
             .collect()
     }
 
@@ -156,8 +163,27 @@ impl Editor {
     }
 
     /// Takes the repo's files, for the sidebar and `space f`.
-    pub fn set_files(&mut self, paths: Vec<String>) {
-        self.sidebar.set_paths(paths);
+    pub fn set_files(&mut self, listing: crate::tui::walk::Listing) {
+        self.sidebar.set_listing(listing);
+        if self
+            .finder
+            .as_ref()
+            .is_some_and(|f| f.kind != Pick::OpenFiles)
+        {
+            let paths = self.listed();
+            if let Some(f) = self.finder.as_mut() {
+                f.set_paths(paths);
+            }
+        }
+    }
+
+    /// The files git doesn't ignore, each with whether it has unsaved edits.
+    fn listed(&self) -> Vec<(String, bool)> {
+        let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
+        self.sidebar
+            .files()
+            .map(|p| (p.clone(), dirty(p)))
+            .collect()
     }
 
     /// Opens the file `name`, a path in the workspace, at `line`, from 1, or goes to it when
@@ -176,7 +202,9 @@ impl Editor {
         if line > 0 || new {
             go_line(&mut self.open[at].buf, line as usize);
         }
-        self.sidebar.reveal(name);
+        if !Path::new(name).is_absolute() {
+            self.sidebar.reveal(name);
+        }
         Ok(())
     }
 
@@ -293,19 +321,13 @@ impl Editor {
 
     /// Opens a list of `kind` to pick from.
     pub fn pick(&mut self, kind: Pick) {
-        let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
         let paths: Vec<(String, bool)> = match kind {
             Pick::OpenFiles => self
                 .open
                 .iter()
                 .map(|o| (o.buf.name.clone(), o.buf.dirty()))
                 .collect(),
-            Pick::Files | Pick::Grep => self
-                .sidebar
-                .paths()
-                .iter()
-                .map(|p| (p.clone(), dirty(p)))
-                .collect(),
+            Pick::Files | Pick::Grep => self.listed(),
         };
         self.finder = Some(finder::Finder::new(kind, &self.root, paths));
     }
@@ -533,7 +555,7 @@ mod tests {
         let (dir, mut e) = editor_on("one\n");
         std::fs::create_dir(dir.path().join("b")).unwrap();
         std::fs::write(dir.path().join("b/c.txt"), "see\n").unwrap();
-        e.set_files(vec!["a.txt".into(), "b/c.txt".into()]);
+        e.set_files(crate::tui::walk::list(dir.path()));
         e.sidebar.reveal("a.txt");
         press(&mut e, "<space>ek");
         assert_eq!(e.sidebar.selected(), Some("b"));
@@ -548,5 +570,53 @@ mod tests {
         assert_eq!(e.open[1].buf.text.to_string(), "ee\n");
         press(&mut e, "<space>e<esc>");
         assert_eq!(e.sidebar.selected(), Some("b/c.txt"));
+    }
+
+    #[test]
+    fn e_opens_a_new_file_that_w_creates_and_close_leaves_the_list_of_files() {
+        let (dir, mut e) = editor_on("one\n");
+        e.set_files(crate::tui::walk::list(dir.path()));
+        let new = dir.path().join("b/new.txt");
+        e.run_command(&format!("e {}", new.display()));
+        assert_eq!(e.current().map(|b| b.name.as_str()), Some("b/new.txt"));
+        e.open[1].buf.insert(0, "hi\n");
+        assert!(matches!(e.run_command("close"), Outcome::None));
+        assert_eq!(e.open.len(), 2);
+        e.run_command("wa");
+        assert_eq!(std::fs::read_to_string(&new).unwrap(), "hi\n");
+        assert!(e.sidebar.files().any(|p| p == "b/new.txt"));
+        e.run_command("c");
+        e.run_command("c");
+        assert!(e.open.is_empty());
+        assert!(e.finder.is_some());
+    }
+
+    #[test]
+    fn w_with_a_path_saves_there_and_edits_that_file_after() {
+        let (dir, mut e) = editor_on("one\n");
+        e.open[0].buf.insert(0, "x");
+        let out = std::env::temp_dir().join(format!("lgtm-save-as-{}", std::process::id()));
+        e.run_command(&format!("w {}", out.display()));
+        assert_eq!(std::fs::read_to_string(&out).unwrap(), "xone\n");
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("a.txt")).unwrap(),
+            "one\n"
+        );
+        assert_eq!(e.open[0].buf.name, out.to_string_lossy());
+        std::fs::remove_file(out).unwrap();
+    }
+
+    #[test]
+    fn the_gutter_has_no_base_for_ignored_files_or_files_outside() {
+        let (dir, mut e) = editor_on("one\n");
+        std::fs::write(dir.path().join(".gitignore"), "*.log\n").unwrap();
+        std::fs::write(dir.path().join("b.log"), "").unwrap();
+        e.open("b.log", 1).unwrap();
+        e.open("/etc/hostname", 1).unwrap();
+        // Not until the files are listed.
+        assert!(e.take_base_requests().is_empty());
+        e.set_files(crate::tui::walk::list(dir.path()));
+        e.bases_stale();
+        assert_eq!(e.take_base_requests(), ["a.txt"]);
     }
 }

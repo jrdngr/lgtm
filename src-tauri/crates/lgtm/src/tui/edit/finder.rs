@@ -1,8 +1,9 @@
 //! The lists `space` opens over the editor: the repo's files, the open buffers, and the lines
-//! of the repo that hold some text. Typing narrows the list.
+//! of the repo that hold some text. Typing narrows the list. Files git ignores are left out
+//! until `C-i` takes them in.
 
-use std::collections::HashMap;
-use std::path::Path;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 use lgtm_core::fuzzy;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -36,9 +37,12 @@ pub enum Outcome {
 
 pub struct Finder {
     pub kind: Pick,
+    root: PathBuf,
     query: String,
     /// What there is to pick from, each with whether it has unsaved edits.
     all: Vec<(String, bool)>,
+    /// The files git doesn't ignore, while `all` holds every file.
+    listed: Option<Vec<(String, bool)>>,
     /// The text of each file a search reads, by path.
     texts: HashMap<String, String>,
     items: Vec<Item>,
@@ -55,8 +59,10 @@ impl Finder {
         };
         let mut f = Self {
             kind,
+            root: root.to_path_buf(),
             query: String::new(),
             all: paths,
+            listed: None,
             texts,
             items: vec![],
             sel: 0,
@@ -64,6 +70,63 @@ impl Finder {
         };
         f.narrow();
         f
+    }
+
+    /// Whether ignored files are in the list.
+    pub fn with_ignored(&self) -> bool {
+        self.listed.is_some()
+    }
+
+    /// Takes the files git doesn't ignore, listed since the list opened.
+    pub fn set_paths(&mut self, paths: Vec<(String, bool)>) {
+        match self.listed.as_mut() {
+            Some(listed) => *listed = paths,
+            None => self.all = paths,
+        }
+        self.read_texts();
+        self.narrow();
+    }
+
+    /// Takes in ignored files, or leaves them out again.
+    fn toggle_ignored(&mut self) {
+        if self.kind == Pick::OpenFiles {
+            return;
+        }
+        match self.listed.take() {
+            Some(listed) => self.all = listed,
+            None => {
+                let dirty: HashSet<&str> = self
+                    .all
+                    .iter()
+                    .filter(|(_, d)| *d)
+                    .map(|(p, _)| p.as_str())
+                    .collect();
+                let every = super::super::walk::everything(&self.root)
+                    .into_iter()
+                    .map(|p| {
+                        let d = dirty.contains(p.as_str());
+                        (p, d)
+                    })
+                    .collect();
+                self.listed = Some(std::mem::replace(&mut self.all, every));
+            }
+        }
+        self.read_texts();
+        self.narrow();
+    }
+
+    /// Reads the files a search needs and hasn't read.
+    fn read_texts(&mut self) {
+        if self.kind != Pick::Grep {
+            return;
+        }
+        let unread: Vec<(String, bool)> = self
+            .all
+            .iter()
+            .filter(|(p, _)| !self.texts.contains_key(p))
+            .cloned()
+            .collect();
+        self.texts.extend(read_all(&self.root, &unread));
     }
 
     fn narrow(&mut self) {
@@ -132,6 +195,8 @@ impl Finder {
         match key.code {
             KeyCode::Esc => return Outcome::Close,
             KeyCode::Char('c') if ctrl => return Outcome::Close,
+            KeyCode::Tab => self.toggle_ignored(),
+            KeyCode::Char('i') if ctrl => self.toggle_ignored(),
             KeyCode::Enter => {
                 return match self.items.get(self.sel) {
                     Some(it) => Outcome::Open(it.path.clone(), it.line.unwrap_or(0)),
@@ -339,5 +404,24 @@ mod tests {
         assert_eq!(f.items.len(), 1);
         let enter = f.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
         assert!(matches!(enter, Outcome::Open(p, 2) if p == "a.rs"));
+    }
+
+    #[test]
+    fn ctrl_i_takes_in_ignored_files_and_leaves_them_out_again() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("target")).unwrap();
+        std::fs::write(dir.path().join("a.rs"), "two\n").unwrap();
+        std::fs::write(dir.path().join("target/b.rs"), "two\n").unwrap();
+        let mut f = Finder::new(Pick::Grep, dir.path(), paths(&["a.rs"]));
+        typed(&mut f, "two");
+        assert_eq!(f.items.len(), 1);
+        let ctrl_i = KeyEvent::new(KeyCode::Char('i'), KeyModifiers::CONTROL);
+        f.key(ctrl_i);
+        assert!(f.with_ignored());
+        let mut found: Vec<&str> = f.items.iter().map(|it| it.path.as_str()).collect();
+        found.sort();
+        assert_eq!(found, ["a.rs", "target/b.rs"]);
+        f.key(ctrl_i);
+        assert_eq!(f.items.len(), 1);
     }
 }
