@@ -19,7 +19,6 @@ pub enum Outcome {
     Open(Target),
     /// Load the versions of these changes.
     Versions(Vec<String>),
-    Quit,
 }
 
 /// A line of the picker: a row of the log, or the `j`th snapshot shown under the `k`th
@@ -209,7 +208,7 @@ impl Picker {
             .for_each(Versions::clear_anchor);
     }
 
-    fn anchored(&self) -> bool {
+    pub fn anchored(&self) -> bool {
         self.anchor.is_some() || self.snapshots.iter().flatten().any(Versions::anchored)
     }
 
@@ -314,16 +313,10 @@ impl Picker {
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         match key.code {
-            KeyCode::Char('s') => return self.toggle_snapshots(),
+            KeyCode::Char('v') => return self.toggle_snapshots(),
             KeyCode::Char('a') => self.toggle_all(),
             KeyCode::Char('j') | KeyCode::Down => self.step(true),
             KeyCode::Char('k') | KeyCode::Up => self.step(false),
-            KeyCode::Char('g') | KeyCode::Home => {
-                self.go(Item::Row(self.commits().first().copied().unwrap_or(0)))
-            }
-            KeyCode::Char('G') | KeyCode::End => {
-                self.go(Item::Row(self.commits().last().copied().unwrap_or(0)))
-            }
             KeyCode::Char(c @ ('J' | 'K')) => self.extend(c == 'J'),
             KeyCode::Esc if self.anchored() => self.clear_ranges(),
             KeyCode::Esc => {
@@ -340,7 +333,6 @@ impl Picker {
                     return Outcome::Open(t);
                 }
             }
-            KeyCode::Char('q') => return Outcome::Quit,
             _ => {}
         }
         Outcome::None
@@ -384,7 +376,7 @@ impl Picker {
         let mut hints = vec![
             ("Enter", "open", false),
             ("J K", "range", false),
-            ("Space", "jj", false),
+            ("Space", "jj mode", false),
         ];
         if self.anchored() {
             hints.push(("Esc", "clear", false));
@@ -397,9 +389,9 @@ impl Picker {
                     hints.push(("Esc", "close", false));
                 }
             }
-            None => hints.push(("s", "snapshots", false)),
+            None => hints.push(("v", "snapshots", false)),
         }
-        hints.extend([("?", "keys", false), ("q", "quit", false)]);
+        hints.extend([("?", "keys", false), (":q", "quit", false)]);
         hints
     }
 
@@ -668,7 +660,7 @@ mod tests {
     fn s_shows_every_changes_snapshots_and_j_walks_through_them() {
         let mut p = Picker::default();
         p.loaded(Ok(vec![commit("aaa", false), commit("bbb", false)]));
-        match press(&mut p, KeyCode::Char('s')) {
+        match press(&mut p, KeyCode::Char('v')) {
             Outcome::Versions(revs) => assert_eq!(revs, ["aaa", "bbb"]),
             _ => panic!("no versions asked for"),
         }
@@ -690,7 +682,7 @@ mod tests {
             press(&mut p, KeyCode::Enter),
             Outcome::Open(Target::Between { from, to, .. }) if from == "b1" && to == "bbb"
         ));
-        press(&mut p, KeyCode::Char('s'));
+        press(&mut p, KeyCode::Char('v'));
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "bbb");
     }
 

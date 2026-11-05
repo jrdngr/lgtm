@@ -10,7 +10,7 @@ use super::load::Target;
 use super::motions::{self, Menu};
 use super::paint::Canvas;
 use super::picker::{self, Picker};
-use super::theme::{self, ACCENT, BG, CYAN, FG, HAIR, MUTED};
+use super::theme::{self, ACCENT, AMBER, BG, CYAN, FG, HAIR, MUTED};
 use super::width;
 use lgtm_core::jj::{JjAction, PushPlan};
 
@@ -45,7 +45,8 @@ pub struct Home {
     /// What a running jj action on the revisions is doing, with its spinner frame, shown in
     /// the Revisions header.
     pub busy: Option<String>,
-    /// The jj menu, while it's open.
+    /// jj mode's menu, while the mode is on: the motions' keys act on the cursor's commit,
+    /// and the log's moves still work.
     menu: Option<Menu>,
     /// The revisions side's width, once `<` or `>` set it.
     pub revisions_width: Option<u16>,
@@ -80,15 +81,13 @@ pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "files"),
     ("< >", "move divider"),
     ("j k", "move"),
-    ("g G", "first, last"),
     ("J K", "range"),
     ("Esc", "clear range"),
-    ("Space", "jj menu"),
+    ("Space", "jj mode"),
     ("Enter", "open"),
-    ("s", "snapshots"),
+    ("v", "snapshots"),
     ("a", "every snapshot"),
     (":", "command"),
-    ("q", "quit"),
 ];
 
 impl Home {
@@ -154,16 +153,17 @@ impl Home {
         Outcome::None
     }
 
-    /// Takes a jj menu step.
+    /// Takes a jj menu step. A finished or dropped motion leaves jj mode on, ready for the
+    /// next.
     fn menu_step(&mut self, step: motions::Step) -> Outcome {
         match step {
             motions::Step::Stay => Outcome::None,
             motions::Step::Close => {
-                self.menu = None;
+                self.set_jj_mode(true);
                 Outcome::None
             }
             motions::Step::Run(action) => {
-                self.menu = None;
+                self.set_jj_mode(true);
                 Outcome::Jj(action)
             }
             motions::Step::Bookmarks(rev) => Outcome::Bookmarks(rev),
@@ -183,7 +183,7 @@ impl Home {
             }
             Err(e) => {
                 self.notice = Some(format!("{e:#}"));
-                self.menu = None;
+                self.set_jj_mode(true);
                 Outcome::None
             }
         }
@@ -197,7 +197,7 @@ impl Home {
         match found {
             Ok(names) if names.is_empty() => {
                 self.notice = Some("no bookmarks near the commit".into());
-                self.menu = None;
+                self.set_jj_mode(true);
                 Outcome::None
             }
             Ok(names) => {
@@ -206,7 +206,7 @@ impl Home {
             }
             Err(e) => {
                 self.notice = Some(format!("{e:#}"));
-                self.menu = None;
+                self.set_jj_mode(true);
                 Outcome::None
             }
         }
@@ -216,21 +216,35 @@ impl Home {
     /// in the log picks a commit or snapshot, a double click opens it, and the wheel moves
     /// through them.
     pub fn mouse(&mut self, ev: MouseEvent) -> Outcome {
-        if self.menu.is_none() && self.picker.contains(ev.column, ev.row) {
-            match ev.kind {
-                MouseEventKind::ScrollDown => self.picker.scroll(true),
-                MouseEventKind::ScrollUp => self.picker.scroll(false),
+        let jj = self.jj_mode();
+        if jj && !self.menu.as_ref().is_some_and(Menu::idle) {
+            return Outcome::None;
+        }
+        if self.picker.contains(ev.column, ev.row) {
+            let outcome = match ev.kind {
+                MouseEventKind::ScrollDown => {
+                    self.picker.scroll(true);
+                    picker::Outcome::None
+                }
+                MouseEventKind::ScrollUp => {
+                    self.picker.scroll(false);
+                    picker::Outcome::None
+                }
                 MouseEventKind::Down(MouseButton::Left) => {
                     self.focus = Focus::Revisions;
-                    let outcome = self.picker.click(ev.row);
-                    return self.picked(outcome);
+                    self.picker.click(ev.row)
                 }
-                _ => {}
-            }
-            return Outcome::None;
+                _ => picker::Outcome::None,
+            };
+            let opens = !matches!(outcome, picker::Outcome::None);
+            self.set_jj_mode(jj && !opens);
+            return self.picked(outcome);
         }
         if !self.files.contains(ev.column, ev.row) {
             return Outcome::None;
+        }
+        if matches!(ev.kind, MouseEventKind::Down(_)) {
+            self.set_jj_mode(false);
         }
         match ev.kind {
             MouseEventKind::ScrollDown => self.files.scroll(3),
@@ -246,11 +260,67 @@ impl Home {
         Outcome::None
     }
 
+    /// Whether jj mode is on.
+    pub fn jj_mode(&self) -> bool {
+        self.menu.is_some()
+    }
+
+    /// Turns jj mode on with a fresh menu on the cursor's commit, or off without one.
+    fn set_jj_mode(&mut self, on: bool) {
+        self.menu = on
+            .then(|| self.picker.motion_target().map(Menu::new))
+            .flatten();
+    }
+
+    /// A key in jj mode. With no motion under way, Space, Esc and Tab leave the mode, and the
+    /// log's moves move; while a jj action runs, nothing else does anything.
+    fn jj_key(&mut self, key: KeyEvent) -> Outcome {
+        if self.menu.as_ref().is_some_and(Menu::idle) {
+            match key.code {
+                KeyCode::Char(' ') => self.set_jj_mode(false),
+                KeyCode::Esc if self.picker.anchored() => {
+                    self.picker.key(key);
+                }
+                KeyCode::Esc => self.set_jj_mode(false),
+                KeyCode::Tab => {
+                    self.set_jj_mode(false);
+                    self.focus = Focus::Files;
+                }
+                _ if self.busy.is_some() => {}
+                KeyCode::Char('j' | 'k' | 'J' | 'K') | KeyCode::Up | KeyCode::Down => {
+                    self.picker.key(key);
+                    self.set_jj_mode(true);
+                }
+                KeyCode::Enter => {
+                    let outcome = self.picker.key(key);
+                    self.set_jj_mode(false);
+                    return self.picked(outcome);
+                }
+                _ => {
+                    // The log may have changed under the menu since it opened.
+                    self.set_jj_mode(true);
+                    return self.menu_key(key);
+                }
+            }
+            return Outcome::None;
+        }
+        self.menu_key(key)
+    }
+
+    fn menu_key(&mut self, key: KeyEvent) -> Outcome {
+        match self.menu.as_mut() {
+            Some(menu) => {
+                let step = menu.key(key);
+                self.menu_step(step)
+            }
+            None => Outcome::None,
+        }
+    }
+
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
-        if let Some(menu) = self.menu.as_mut() {
-            let step = menu.key(key);
-            return self.menu_step(step);
+        if self.jj_mode() {
+            return self.jj_key(key);
         }
         if self.cmd.is_some() {
             return self.command_key(key);
@@ -260,7 +330,7 @@ impl Home {
             return Outcome::None;
         }
         if key.code == KeyCode::Char(' ') && self.focus == Focus::Revisions {
-            self.menu = self.picker.motion_target().map(Menu::new);
+            self.set_jj_mode(true);
             return Outcome::None;
         }
         let empty_search = self.focus == Focus::Revisions || self.files.query.is_empty();
@@ -291,12 +361,43 @@ impl Home {
         match outcome {
             picker::Outcome::Open(t) => Outcome::Open(t),
             picker::Outcome::Versions(v) => Outcome::Versions(v),
-            picker::Outcome::Quit => Outcome::Quit,
             picker::Outcome::None => Outcome::None,
         }
     }
 
+    /// Where the menu over the key bar goes: in jj mode over the files side, clear of the log.
+    pub fn menu_area(&self, body: Rect) -> Rect {
+        if !self.jj_mode() {
+            return body;
+        }
+        let x = body.x + self.drawn_width + 2;
+        Rect::new(x, body.y, body.right().saturating_sub(x), body.height)
+    }
+
+    /// jj mode's badge for the key bar, gray while a jj action runs.
+    pub fn badge(&self) -> Option<(&'static str, ratatui::style::Color)> {
+        self.jj_mode().then_some(("jj", self.jj_color()))
+    }
+
+    fn jj_color(&self) -> ratatui::style::Color {
+        if self.busy.is_some() { MUTED } else { AMBER }
+    }
+
     pub fn hints(&self) -> Vec<Hint<'static>> {
+        if self.jj_mode() {
+            let esc = if self.picker.anchored() {
+                "clear"
+            } else {
+                "leave"
+            };
+            return vec![
+                ("Space", "leave", false),
+                ("j k", "move", false),
+                ("J K", "range", false),
+                ("Enter", "open", false),
+                ("Esc", esc, false),
+            ];
+        }
         match self.focus {
             Focus::Revisions => {
                 let mut hints = vec![("Tab", "files", false)];
@@ -341,12 +442,18 @@ impl Home {
                 .draw(&mut sub, left, self.focus == Focus::Revisions);
             let style = theme::title(self.focus == Focus::Revisions);
             sub.put(left.x + 1, left.y, "Revisions", style.bg(BG));
+            if self.jj_mode() {
+                self.draw_jj_frame(&mut sub, left);
+            }
             if let Some(busy) = &self.busy {
                 sub.put_right(left.y, 1, busy, theme::fg(CYAN).bg(BG));
             }
         }
-        for y in body.y..body.bottom() {
-            c.put(body.x + left_w, y, "│", theme::fg(HAIR).bg(BG));
+        // jj mode's frame stands in for the divider.
+        if !self.jj_mode() {
+            for y in body.y..body.bottom() {
+                c.put(body.x + left_w, y, "│", theme::fg(HAIR).bg(BG));
+            }
         }
         let mut sub = Canvas::new(&mut *c.buf, right);
         let x0 = right.x + 1;
@@ -365,6 +472,26 @@ impl Home {
         }
         let tree = Rect::new(right.x, right.y + 3, right.width, right.height - 3);
         self.files.draw(&mut sub, tree, focused, &|_| false);
+    }
+}
+
+impl Home {
+    /// jj mode's frame around the revisions side, its title tagged jj.
+    fn draw_jj_frame(&self, c: &mut Canvas, r: Rect) {
+        if r.width < 4 || r.height < 2 {
+            return;
+        }
+        let line = theme::fg(self.jj_color()).bg(BG);
+        let (right, bottom) = (r.right() - 1, r.bottom() - 1);
+        let across = "─".repeat(usize::from(r.width - 2));
+        c.put(r.x, r.y, &format!("╭{across}╮"), line);
+        c.put(r.x, bottom, &format!("╰{across}╯"), line);
+        for y in r.y + 1..bottom {
+            c.put(r.x, y, "│", line);
+            c.put(right, y, "│", line);
+        }
+        let x = c.put(r.x + 2, r.y, " Revisions ", theme::bold(FG).bg(BG));
+        c.put(x, r.y, " jj ", theme::bold(BG).bg(self.jj_color()));
     }
 }
 
@@ -397,5 +524,91 @@ mod tests {
         // With a search typed, `:` is part of it.
         press(&mut h, "a:");
         assert_eq!(h.files.query, "a:");
+    }
+
+    fn with_log(changes: &[&str]) -> Home {
+        let rows = changes
+            .iter()
+            .map(|change| lgtm_core::jj::LogRow {
+                graph: vec!["○  ".into()],
+                commit: Some(lgtm_core::jj::LogCommit {
+                    commit_id: format!("{change}-commit"),
+                    change_id: (*change).into(),
+                    unique: 2,
+                    description: String::new(),
+                    bookmarks: vec![],
+                    author: String::new(),
+                    time: 0.0,
+                    working_copy: false,
+                    immutable: false,
+                    conflict: false,
+                    divergent: false,
+                    empty: false,
+                }),
+            })
+            .collect();
+        let mut h = Home::default();
+        h.picker.loaded(Ok(rows));
+        h
+    }
+
+    fn ran(outcomes: Vec<Outcome>) -> Vec<JjAction> {
+        outcomes
+            .into_iter()
+            .filter_map(|o| match o {
+                Outcome::Jj(a) => Some(a),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn jj_mode_runs_motions_on_each_commit_the_cursor_moves_to_and_stays_on() {
+        let mut h = with_log(&["aaa", "bbb"]);
+        press(&mut h, "<space>");
+        assert!(h.jj_mode());
+        let actions = ran(press(&mut h, "najna"));
+        assert_eq!(
+            actions,
+            vec![
+                JjAction::NewAfter { rev: "aaa".into() },
+                JjAction::NewAfter { rev: "bbb".into() },
+            ]
+        );
+        assert!(h.jj_mode());
+        press(&mut h, "<space>");
+        assert!(!h.jj_mode());
+    }
+
+    #[test]
+    fn jj_mode_ignores_motions_and_moves_while_an_action_runs() {
+        let mut h = with_log(&["aaa", "bbb"]);
+        press(&mut h, "<space>");
+        h.busy = Some("making a change".into());
+        assert!(ran(press(&mut h, "jna")).is_empty());
+        h.busy = None;
+        assert_eq!(
+            ran(press(&mut h, "na")),
+            vec![JjAction::NewAfter { rev: "aaa".into() }]
+        );
+    }
+
+    #[test]
+    fn tab_leaves_jj_mode_so_letters_search_the_files() {
+        let mut h = with_log(&["aaa"]);
+        press(&mut h, "<space><tab>");
+        assert!(!h.jj_mode());
+        assert!(ran(press(&mut h, "e")).is_empty());
+        assert_eq!(h.files.query, "e");
+    }
+
+    #[test]
+    fn esc_in_jj_mode_clears_a_range_before_leaving() {
+        let mut h = with_log(&["aaa", "bbb"]);
+        press(&mut h, "<space>J<esc>");
+        assert!(h.jj_mode());
+        assert!(!h.picker.anchored());
+        press(&mut h, "<esc>");
+        assert!(!h.jj_mode());
     }
 }

@@ -23,8 +23,6 @@ pub enum Action {
     None,
     /// Open the `:` command line.
     Command,
-    /// Leave the editor, as `:q` does.
-    Quit,
     /// Open the search line.
     Search,
     /// Put this on the system clipboard.
@@ -311,7 +309,6 @@ impl Keys {
             Cmd::ToggleSidebar => return Action::ToggleSidebar,
             Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
-            Cmd::Quit => return Action::Quit,
             Cmd::Escape => self.mode = Mode::Normal,
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}
             Cmd::ClipboardYank => {}

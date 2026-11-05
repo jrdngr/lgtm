@@ -10,10 +10,6 @@ use super::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
 /// it toggles is on.
 pub type Hint<'a> = (&'a str, &'a str, bool);
 
-pub fn draw(c: &mut Canvas, y: u16, hints: &[Hint]) {
-    draw_badged(c, y, None, hints);
-}
-
 /// The key bar after a badge naming the mode, like `NOR`, in its color.
 pub fn draw_badged(c: &mut Canvas, y: u16, badge: Option<(&str, Color)>, hints: &[Hint]) {
     c.fill(c.area.x, y, c.area.width, PANEL);

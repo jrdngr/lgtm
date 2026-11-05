@@ -287,7 +287,7 @@ impl Editor {
             KeyCode::Char('u') if ctrl => KeyCode::PageUp,
             KeyCode::Char('g') => KeyCode::Home,
             KeyCode::Char('G') => KeyCode::End,
-            KeyCode::Esc | KeyCode::Tab | KeyCode::Char('q' | ' ') => {
+            KeyCode::Esc | KeyCode::Tab | KeyCode::Char(' ') => {
                 self.leave_sidebar();
                 return;
             }
@@ -412,9 +412,6 @@ impl Editor {
             hidden: &hidden,
         };
         let action = self.keys.press(&mut open.buf, key, view);
-        if action == Action::Quit {
-            return self.leave(false);
-        }
         if action == Action::Review {
             let b = &open.buf;
             let line = b.line_of(b.sel.head);
@@ -452,7 +449,7 @@ impl Editor {
             },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
-            Action::Review | Action::Quit => {}
+            Action::Review => {}
             Action::Sidebar => {
                 self.files = true;
                 self.in_sidebar = true;
@@ -508,13 +505,18 @@ mod tests {
     }
 
     #[test]
-    fn q_leaves_the_editor_like_colon_q_but_not_with_unsaved_edits() {
+    fn colon_q_leaves_the_editor_but_not_with_unsaved_edits() {
         use ratatui::crossterm::event::{KeyCode, KeyEvent};
-        let q = KeyEvent::from(KeyCode::Char('q'));
+        let quit = |e: &mut Editor| {
+            for c in [':', 'q'] {
+                e.key(KeyEvent::from(KeyCode::Char(c)));
+            }
+            e.key(KeyEvent::from(KeyCode::Enter))
+        };
         let (_dir, mut e) = editor_on("one\n");
-        assert!(matches!(e.key(q), Outcome::Back));
+        assert!(matches!(quit(&mut e), Outcome::Back));
         e.open[0].buf.insert(0, "x");
-        assert!(matches!(e.key(q), Outcome::None));
+        assert!(matches!(quit(&mut e), Outcome::None));
         assert!(e.notice.as_deref().is_some_and(|n| n.contains("a.txt")));
     }
 

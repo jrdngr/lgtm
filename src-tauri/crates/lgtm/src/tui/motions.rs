@@ -98,6 +98,11 @@ impl Menu {
         }
     }
 
+    /// Whether no motion is under way: no keys typed, nothing asked or loading.
+    pub fn idle(&self) -> bool {
+        matches!(&self.state, State::Keys(typed) if typed.is_empty())
+    }
+
     fn action(&self, kind: Kind, text: &str) -> JjAction {
         let t = &self.target;
         let rev = t.cursor.clone();

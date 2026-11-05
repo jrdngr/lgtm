@@ -165,7 +165,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("p", "pull PR comments"),
     ("P", "hide PR comments"),
     (":", "command (:? lists them)"),
-    ("q", "back"),
+    (":home", "back to the home screen"),
 ];
 
 /// The narrowest the file list gets.
@@ -562,7 +562,6 @@ impl Review {
             return Outcome::None;
         }
         match key.code {
-            KeyCode::Char('q') => return Outcome::Back,
             KeyCode::Char(':') => self.start_command(),
             KeyCode::Tab => self.set_in_list(!self.in_list),
             KeyCode::Enter if self.in_list && self.list_pick.is_some() => {
@@ -759,7 +758,6 @@ impl Review {
                 ("u U", "undo", false),
                 ("] [", "comment", false),
                 ("?", "keys", false),
-                ("q", "back", false),
             ]);
             return hints;
         }
@@ -778,7 +776,7 @@ impl Review {
         if self.pr.is_some() {
             hints.push(("P", "hide PR", self.hide_pr));
         }
-        hints.extend([("?", "keys", false), ("q", "back", false)]);
+        hints.push(("?", "keys", false));
         hints
     }
 }

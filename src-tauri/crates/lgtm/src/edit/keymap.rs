@@ -78,8 +78,6 @@ pub enum Cmd {
         right: bool,
     },
     Command,
-    /// Leave the editor, as `:q` does.
-    Quit,
     Escape,
 }
 
@@ -258,7 +256,6 @@ pub const BINDS: &[Bind] = &[
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),
-    b("q", Quit, Both, "leave the editor"),
     b("esc", Escape, Select, "normal mode"),
 ];
 

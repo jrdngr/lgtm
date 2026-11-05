@@ -592,15 +592,20 @@ impl App {
                 self.home.draw(c, body);
                 if let Some(text) = self.home.prompt() {
                     keybar::prompt(c, bottom, &text, &[]);
-                    keybar::menu(c, body, &self.home.command_menu());
+                    keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
                     return;
                 }
                 (self.home.hints(), home::KEYS)
             }
         };
-        keybar::draw(c, bottom, &hints);
+        let badge = if self.review.is_none() {
+            self.home.badge()
+        } else {
+            None
+        };
+        keybar::draw_badged(c, bottom, badge, &hints);
         if self.review.is_none() {
-            keybar::menu(c, body, &self.home.command_menu());
+            keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
         }
         if self.help {
             keybar::help(c, body, keys);
