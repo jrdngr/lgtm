@@ -467,6 +467,12 @@ kbd {
   padding-top: 0;
 }
 
+/* The strip's edge starts under the toggle's line. */
+.side-right .side-tabs.headed {
+  border-left: none;
+  background: linear-gradient(var(--hair), var(--hair)) 0 31px / 1px 100% no-repeat;
+}
+
 .side-tabs-head {
   display: grid;
   flex: none;
