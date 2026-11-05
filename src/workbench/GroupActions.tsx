@@ -89,6 +89,38 @@ function useStripMenu(
   }, [inside, api, group, workspace]);
 }
 
+/** Drags the pane, as its empty tab strip would, which moves the window instead. */
+function Grip() {
+  const start = (e: React.PointerEvent) => {
+    const strip = e.currentTarget.closest(".dv-tabs-and-actions-container");
+    const handle = strip?.querySelector(".dv-void-container");
+    if (!handle || e.button !== 0) return;
+    e.stopPropagation();
+    handle.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        pointerId: e.pointerId,
+        pointerType: e.pointerType,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        button: 0,
+        buttons: 1,
+        bubbles: true,
+      }),
+    );
+  };
+  return (
+    <button type="button" className="grip" aria-label="Move pane" onPointerDown={start}>
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+        {[4, 8, 12].map((y) =>
+          [6, 10].map((x) => (
+            <circle key={`${x}-${y}`} cx={x} cy={y} r="1.2" fill="currentColor" />
+          )),
+        )}
+      </svg>
+    </button>
+  );
+}
+
 /** Two rects side by side, or stacked. */
 function SplitIcon({ stacked }: { stacked: boolean }) {
   return (
@@ -107,6 +139,7 @@ function SplitIcon({ stacked }: { stacked: boolean }) {
 export function SplitButtons({ containerApi, group }: IDockviewHeaderActionsProps) {
   return (
     <div className="split-buttons">
+      <Grip />
       <button
         type="button"
         title="Split right"

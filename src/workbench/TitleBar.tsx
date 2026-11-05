@@ -68,9 +68,13 @@ export function useTitleBar() {
     };
     check();
     const resized = win.onResized(check);
-    // Taken before dockview's pointer drag sees it, which would move the pane instead.
+    // Kept from dockview's pointer drag, which would move the pane: an empty tab strip moves
+    // the window, or nothing below the top row. A pane's grip hands dockview its own event.
     const onPointer = (e: PointerEvent) => {
-      if (inTopRow(e)) e.stopPropagation();
+      if (!e.isTrusted) return;
+      const target = e.target as Element;
+      if (inTopRow(e) || (!target.closest(INTERACTIVE) && target.closest(".dv-void-container")))
+        e.stopPropagation();
     };
     const onDown = (e: MouseEvent) => {
       if (!inTopRow(e)) return;

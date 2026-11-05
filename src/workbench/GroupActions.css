@@ -36,6 +36,10 @@
   border: none;
 }
 
+.split-buttons button.grip {
+  cursor: grab;
+}
+
 .split-buttons button:hover:not(:disabled) {
   color: var(--fg);
   background: var(--dv-icon-hover-background-color);
