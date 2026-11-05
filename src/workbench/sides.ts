@@ -10,7 +10,7 @@ export interface Sides {
 }
 
 const DEFAULT_SIDES: Sides = {
-  left: { open: true, width: 230, view: "workspaces" },
+  left: { open: true, width: 300, view: "workspaces" },
   right: { open: true, width: 260, view: "changes" },
 };
 

@@ -37,11 +37,21 @@ interface Props {
   onSleep(name: WorkspaceName): void;
   /** Hides the left panel. */
   onHide(): void;
+  /** Before the header's title. */
+  lead?: React.ReactNode;
 }
 
 /** The repo's workspaces, and the selected one's revisions under them. Click a workspace to
  * switch to it. */
-export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep, onHide }: Props) {
+export function WorkspacesSidebar({
+  list,
+  selected,
+  onSelect,
+  onDeleted,
+  onSleep,
+  onHide,
+  lead,
+}: Props) {
   const { workspaces, error, setError, reload } = list;
   const [naming, setNaming] = useState(false);
   const [openingPr, setOpeningPr] = useState(false);
@@ -265,7 +275,7 @@ export function WorkspacesSidebar({ list, selected, onSelect, onDeleted, onSleep
   return (
     <div className="workspaces">
       <div ref={split.top} className="ws-top" style={split.style} onContextMenu={menu}>
-        <SectionHeader title={project?.project.name ?? "Workspaces"}>
+        <SectionHeader lead={lead} title={project?.project.name ?? "Workspaces"}>
           <IconButton
             icon="sync"
             label="Refresh"

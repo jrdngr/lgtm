@@ -297,32 +297,27 @@ kbd {
   height: 100%;
 }
 
-.toolbar {
-  position: relative;
+/* The window's title bar is the panels' top row: room for the traffic lights, then the left
+   panel's toggle. */
+.title-lead {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-}
-
-.toolbar .repo {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 600;
+  gap: 6px;
   margin-right: 8px;
 }
 
-.toolbar .repo-sep {
-  margin: 0 5px;
-  color: var(--faint);
-  font-weight: normal;
+.title-lead .lights-room {
+  width: 66px;
 }
 
-.toolbar .repo-workspace {
-  color: var(--muted);
+.fullscreen .title-lead .lights-room {
+  display: none;
+}
+
+.dv-pre-actions-container .title-lead {
+  height: 100%;
+  padding-left: 10px;
 }
 
 .spacer {
@@ -465,6 +460,21 @@ kbd {
   width: 40px;
   padding-top: 10px;
   box-sizing: border-box;
+}
+
+/* The right panel's toggle, in the window's top row, its line level with the views' headers. */
+.side-tabs.headed {
+  padding-top: 0;
+}
+
+.side-tabs-head {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 100%;
+  min-height: 30px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--hair);
 }
 
 .side-left .side-tabs {

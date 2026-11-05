@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 
 interface Props {
+  /** Before the title. */
+  lead?: ReactNode;
   title: ReactNode;
   /** Quiet text after the title, such as a count. */
   meta?: ReactNode;
@@ -9,9 +11,10 @@ interface Props {
 }
 
 /** The header atop a list in a side panel: a title, a count, and its actions. */
-export function SectionHeader({ title, meta, children }: Props) {
+export function SectionHeader({ lead, title, meta, children }: Props) {
   return (
     <div className="section-header">
+      {lead}
       <span className="section-title">{title}</span>
       {meta !== undefined && <span className="section-meta">{meta}</span>}
       <span className="spacer" />

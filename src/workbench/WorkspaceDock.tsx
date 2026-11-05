@@ -41,6 +41,7 @@ import { NewTab, SplitButtons } from "./GroupActions";
 import { parseLayout, restoreLayout, type SavedLayout } from "./layout";
 import { useMaximized } from "./maximize";
 import { Tab } from "./Tab";
+import { TabsLead } from "./TitleBar";
 import { moveTogether } from "./tabPick";
 
 const components = {
@@ -219,7 +220,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
     registerDock(workspace, api, "bottom");
   }
 
-  const dock = (ready: (e: DockviewReadyEvent) => void, edge = false) => (
+  const dock = (ready: (e: DockviewReadyEvent) => void, main = false, edge = false) => (
     <div className="dock" hidden={hidden}>
       {edge && <div className="max-edge" />}
       <DockviewReact
@@ -227,6 +228,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
         defaultTabComponent={Tab}
         leftHeaderActionsComponent={NewTab}
         rightHeaderActionsComponent={SplitButtons}
+        prefixHeaderActionsComponent={main ? TabsLead : undefined}
         watermarkComponent={EmptyGroup}
         onReady={ready}
         theme={themeDark}
@@ -238,7 +240,7 @@ export function WorkspaceDock({ workspace, hidden, setup, bottomEl }: Props) {
 
   return (
     <WorkspaceContext.Provider value={workspace}>
-      {dock(readyMain, maximized)}
+      {dock(readyMain, true, maximized)}
       {bottomEl && createPortal(dock(readyBottom), bottomEl)}
       {hasPane !== undefined && <WorkspaceReview workspace={workspace} hasPane={hasPane} />}
     </WorkspaceContext.Provider>

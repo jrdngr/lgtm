@@ -21,7 +21,7 @@ import { commands, type RepoInfo, unwrap } from "../ipc";
 import { useFollowWorkingCopy } from "../review/followWorkingCopy";
 import { forgetWorkspaceRevset } from "../review/revset";
 import { useReviewTarget } from "../review/target";
-import { useAtOutside, useTrackWorkingCopy } from "../review/workingCopy";
+import { useTrackWorkingCopy } from "../review/workingCopy";
 import { focusLog, openMotions } from "../revisions/loadReview";
 import { watchDefinitionClicks } from "../search/definitionClick";
 import { HoverCard } from "../search/HoverCard";
@@ -44,7 +44,7 @@ import { WorkspacesSidebar } from "../workspaces/WorkspacesSidebar";
 import { AtBanner } from "./AtBanner";
 import { BottomPanel } from "./BottomPanel";
 import { reopenClosed } from "./closedTabs";
-import { JjBlockedBanner, JjBusyTag, useTrackJjBusy } from "./JjBusy";
+import { JjBlockedBanner, useTrackJjBusy } from "./JjBusy";
 import { toggleMaximize } from "./maximize";
 import { RightPanel } from "./RightPanel";
 import { reviewRevset } from "./revsetMenu";
@@ -59,6 +59,7 @@ import {
   saveSides,
   saveWorkspace,
 } from "./sides";
+import { TitleBarContext, TitleLead, useTitleBar } from "./TitleBar";
 import { flushLayout, WorkspaceDock } from "./WorkspaceDock";
 import { useWordWrapMenu } from "./wordWrap";
 
@@ -165,7 +166,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     onError: workspaces.setError,
   });
 
-  const atOutside = useAtOutside(selected);
+  const fullscreen = useTitleBar();
   // The selected workspace, remembered from last time or forgotten from a terminal, may be
   // gone. A list fetched before it was created can lack it too, so a fresh one confirms.
   // biome-ignore lint/correctness/useExhaustiveDependencies: check each list as it loads
@@ -340,87 +341,79 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
   };
 
   return (
-    <div className="workbench">
-      <header className={`toolbar${atOutside ? " warn" : ""}`}>
-        <SideToggle
-          side="left"
-          open={sides.left.open}
-          shortcut="⌘B"
-          onClick={() => toggle("left")}
-        />
-        <span className="repo" title={repo.root}>
-          {repo.name}
-          <span className="repo-sep">/</span>
-          <span className="repo-workspace">{selected ?? "main"}</span>
-        </span>
-        <JjBusyTag workspace={selected} />
-        <span className="spacer" />
-        <SideToggle
-          side="right"
-          open={sides.right.open}
-          shortcut="⌥⌘B"
-          onClick={() => toggle("right")}
-        />
-      </header>
-      <AtBanner workspace={selected} />
-      <JjBlockedBanner workspace={selected} />
-      <McpOffer />
-      <PromptHost />
-      <BackgroundPicker />
-      <HoverCard />
-      <QuickPickHost />
-      <DesignFormHost workspace={selected} />
-      <div className="workbench-body">
-        <SidePanel
-          side="left"
-          state={sides.left}
-          onChange={(left) => updateSide("left", () => left)}
-          bodyRef={leftBody}
-          views={[
-            {
-              id: "workspaces",
-              title: "Workspaces",
-              icon: "folder",
-              render: () => (
-                <WorkspacesSidebar
-                  list={workspaces}
-                  selected={selected}
-                  onSelect={select}
-                  onDeleted={forget}
-                  onSleep={sleep}
-                  onHide={() => toggle("left")}
-                />
-              ),
-            },
-          ]}
-        />
-        <div className="workbench-center">
-          <div className="docks">
-            {mounted.map((d) => (
-              <WorkspaceDock
-                key={workspaceKey(d.name)}
-                workspace={d.name}
-                hidden={d.name !== selected}
-                setup={d.setup}
-                bottomEl={bottomEl}
-              />
-            ))}
-          </div>
-          <BottomPanel docksRef={setBottomEl} workspace={selected} />
-        </div>
-        <WorkspaceContext.Provider value={selected}>
-          <RightPanel
-            state={sides.right}
-            onChange={(right) => updateSide("right", () => right)}
-            bodyRef={rightBody}
-            onOpenReport={(run) => {
-              if (!revealPanel(selected, `report-${run.id}`))
-                withApi((a) => openReport(a, run.id))();
-            }}
-            onHide={() => toggle("right")}
+    <TitleBarContext.Provider
+      value={{ leftOpen: sides.left.open, toggleLeft: () => toggle("left"), workspace: selected }}
+    >
+      <div className={`workbench${fullscreen ? " fullscreen" : ""}`}>
+        <AtBanner workspace={selected} />
+        <JjBlockedBanner workspace={selected} />
+        <McpOffer />
+        <PromptHost />
+        <BackgroundPicker />
+        <HoverCard />
+        <QuickPickHost />
+        <DesignFormHost workspace={selected} />
+        <div className="workbench-body">
+          <SidePanel
+            side="left"
+            state={sides.left}
+            onChange={(left) => updateSide("left", () => left)}
+            bodyRef={leftBody}
+            views={[
+              {
+                id: "workspaces",
+                title: "Workspaces",
+                icon: "folder",
+                render: () => (
+                  <WorkspacesSidebar
+                    lead={<TitleLead />}
+                    list={workspaces}
+                    selected={selected}
+                    onSelect={select}
+                    onDeleted={forget}
+                    onSleep={sleep}
+                    onHide={() => toggle("left")}
+                  />
+                ),
+              },
+            ]}
           />
-        </WorkspaceContext.Provider>
+          <div className="workbench-center">
+            <div className="docks">
+              {mounted.map((d) => (
+                <WorkspaceDock
+                  key={workspaceKey(d.name)}
+                  workspace={d.name}
+                  hidden={d.name !== selected}
+                  setup={d.setup}
+                  bottomEl={bottomEl}
+                />
+              ))}
+            </div>
+            <BottomPanel docksRef={setBottomEl} workspace={selected} />
+          </div>
+          <WorkspaceContext.Provider value={selected}>
+            <RightPanel
+              state={sides.right}
+              onChange={(right) => updateSide("right", () => right)}
+              bodyRef={rightBody}
+              onOpenReport={(run) => {
+                if (!revealPanel(selected, `report-${run.id}`))
+                  withApi((a) => openReport(a, run.id))();
+              }}
+              onHide={() => toggle("right")}
+              head={
+                <SideToggle
+                  side="right"
+                  open={sides.right.open}
+                  shortcut="⌥⌘B"
+                  onClick={() => toggle("right")}
+                />
+              }
+            />
+          </WorkspaceContext.Provider>
+        </div>
       </div>
-    </div>
+    </TitleBarContext.Provider>
   );
 }

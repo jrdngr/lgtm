@@ -27,6 +27,7 @@ interface Props {
   bodyRef: React.RefObject<HTMLDivElement | null>;
   onOpenReport(run: ReportRun): void;
   onHide(): void;
+  head: React.ReactNode;
 }
 
 /** The right side panel: the repo's files, search, and the review's changes and comments; the

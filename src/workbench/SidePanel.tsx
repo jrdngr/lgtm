@@ -40,6 +40,8 @@ interface Props {
   onHide?(): void;
   /** Offers a second view below the first, from a button at the bottom of the tabs. */
   splittable?: boolean;
+  /** Atop the tabs, in the window's top row. */
+  head?: ReactNode;
 }
 
 const MIN_WIDTH = 160;
@@ -51,7 +53,16 @@ const MIN_RATIO = 0.15;
  * groups, and resizes by dragging its inner edge. Each view draws its own header. Hidden, the
  * strip stays: a tab opens the panel on its view, and the open view's tab hides it. Split, a
  * second view with its own tabs sits below the first, and the line between them drags. */
-export function SidePanel({ side, views, state, onChange, bodyRef, onHide, splittable }: Props) {
+export function SidePanel({
+  side,
+  views,
+  state,
+  onChange,
+  bodyRef,
+  onHide,
+  splittable,
+  head,
+}: Props) {
   const drag = useRef<{ x: number; width: number }>(undefined);
   const aside = useRef<HTMLElement>(null);
   const splitDrag = useRef(false);
@@ -129,6 +140,7 @@ export function SidePanel({ side, views, state, onChange, bodyRef, onHide, split
             onPick={pick}
             onContextMenu={menu}
             tipSide={tipSide}
+            head={head}
             end={!split && splitButton}
           />
         )}
@@ -186,14 +198,21 @@ interface TabsProps {
   selected: string | undefined;
   onPick(id: string): void;
   onContextMenu(e: React.MouseEvent): void;
+  /** Sits at the top of the strip. */
+  head?: ReactNode;
   /** Sits at the bottom of the strip. */
   end?: ReactNode;
   tipSide: "left" | "right";
 }
 
-function SideTabs({ views, selected, onPick, onContextMenu, end, tipSide }: TabsProps) {
+function SideTabs({ views, selected, onPick, onContextMenu, head, end, tipSide }: TabsProps) {
   return (
-    <div className="side-tabs" role="tablist" onContextMenu={onContextMenu}>
+    <div
+      className={`side-tabs${head ? " headed" : ""}`}
+      role="tablist"
+      onContextMenu={onContextMenu}
+    >
+      {head && <div className="side-tabs-head">{head}</div>}
       {views.map((v, i) => (
         <Fragment key={v.id}>
           {i > 0 && v.group !== views[i - 1].group && <span className="side-divider" />}

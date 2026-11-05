@@ -14,6 +14,12 @@ pub fn window(app: &AppHandle, label: &str, title: &str) -> Result<(), String> {
         // Tauri's file-drop handler swallows HTML5 drags, which dockview uses to move panes.
         .disable_drag_drop_handler()
         .on_navigation(stays_in_app);
+    // No title bar: the panels' top row is it, with the traffic lights over its left end.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .title_bar_style(tauri::TitleBarStyle::Overlay)
+        .hidden_title(true)
+        .traffic_light_position(tauri::LogicalPosition::new(14.0, 13.0));
     crate::zoom::on_load(crate::placement::place(app, label, builder))
         .build()
         .map_err(|e| e.to_string())?;
