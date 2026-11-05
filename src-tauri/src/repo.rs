@@ -10,7 +10,8 @@ use tauri_specta::Event as _;
 
 use crate::ctx::{Emit, RepoCtx};
 use crate::events::{
-    JjBlocked, JjPaused, RepoChanged, ReviewOutdated, WorkingCopyMoved, WorkingCopyStale,
+    FilesWritten, JjBlocked, JjPaused, RepoChanged, ReviewOutdated, WorkingCopyMoved,
+    WorkingCopyStale,
 };
 use crate::jj::{Jj, Notice};
 use crate::paths::{data_dir, find_root, key, repo_dir};
@@ -110,6 +111,7 @@ fn emitter(app: &AppHandle, label: &str) -> Emit {
             watch::Event::Jj(Notice::Paused(paused)) => {
                 JjPaused { workspace, paused }.emit_to(&app, &label)
             }
+            watch::Event::Written(paths) => FilesWritten { workspace, paths }.emit_to(&app, &label),
             watch::Event::ReviewOutdated { review } => {
                 ReviewOutdated { review }.emit_to(&app, &label)
             }

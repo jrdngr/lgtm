@@ -1,9 +1,11 @@
 //! The terminal UI: a picker over the jj log, the review of what was picked, and the editor.
 
+mod dash;
 mod decor;
 mod edit;
 mod files;
 mod github;
+mod heat;
 mod highlight;
 mod home;
 mod keybar;
@@ -67,6 +69,8 @@ enum Screen {
     Home,
     Review,
     Editor,
+    /// DASH mode: what the agent is doing.
+    Dash,
 }
 
 pub use edit::SPLIT_FLAG;
@@ -137,6 +141,8 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         after_edit: None,
         shift: false,
         home: home::Home::default(),
+        dash: dash::Dash::default(),
+        workspace_key: None,
         review: None,
         direct: matches!(start, Start::Revset(_)),
         buffers,
@@ -151,6 +157,8 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.buffers.files = app.settings.files;
     app.buffers.files_width = app.settings.editor_files_width;
     app.home.revisions_width = app.settings.home_revisions_width;
+    app.home.files.heat_on = app.settings.heat;
+    app.buffers.set_heat_on(app.settings.heat);
     app.loader.log();
     app.loader.files(&app.root);
     app.loader.decor();
@@ -192,6 +200,9 @@ struct App {
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
     home: home::Home,
+    dash: dash::Dash,
+    /// The name the store files this workspace's turns under, once DASH mode asked.
+    workspace_key: Option<String>,
     review: Option<Review>,
     /// Whether the review was opened from the command line, so leaving it quits.
     direct: bool,
@@ -238,6 +249,32 @@ impl App {
         }
         self.review = Some(review);
         self.screen = Screen::Review;
+    }
+
+    /// Shows DASH mode, snapshotting edits so the turn's diff keeps up.
+    fn show_dash(&mut self) {
+        if self.workspace_key.is_none() {
+            self.workspace_key = self.loader.workspace_key(&self.root);
+        }
+        self.screen = Screen::Dash;
+        self.snapshots.store(true, Ordering::Relaxed);
+        self.refresh_dash();
+    }
+
+    fn leave_dash(&mut self) {
+        self.screen = Screen::Home;
+        self.snapshots.store(false, Ordering::Relaxed);
+    }
+
+    /// Reads the newest turn again, and its diff when its edits changed.
+    fn refresh_dash(&mut self) {
+        let (Some(store), Some(key)) = (self.store.as_ref(), self.workspace_key.as_deref()) else {
+            return;
+        };
+        let activity = store.agent_activity(key).ok().flatten();
+        if let Some(start) = self.dash.set_activity(activity) {
+            self.loader.turn_diff(start);
+        }
     }
 
     /// Loads what's on screen again after a jj operation.
@@ -307,6 +344,7 @@ impl App {
                             let outcome = self.home.mouse(ev);
                             self.home_outcome(outcome);
                         }
+                        Screen::Dash => self.dash_mouse(ev),
                     },
                     _ => {}
                 }
@@ -343,6 +381,12 @@ impl App {
             return;
         }
         self.version = version;
+        if self.screen == Screen::Dash {
+            self.refresh_dash();
+        }
+        let Some(store) = self.store.as_ref() else {
+            return;
+        };
         if let Some(r) = self.review.as_mut() {
             r.rematch(store);
         }
@@ -420,10 +464,20 @@ impl App {
                     self.act(action);
                 }
             }
+            Msg::Written(paths) => {
+                self.home.files.heat.written(&paths);
+                self.buffers.written(&paths);
+            }
             Msg::Changed => {
                 self.buffers.bases_stale();
                 self.reload();
+                if self.screen == Screen::Dash
+                    && let Some(start) = self.dash.start()
+                {
+                    self.loader.turn_diff(start.to_string());
+                }
             }
+            Msg::TurnDiff { start, result } => self.dash.diff_loaded(&start, result),
             Msg::Agent { req, reply } => {
                 let answer = match self.review.as_mut() {
                     Some(r) => r.answer(req, self.store.as_mut()),
@@ -478,9 +532,12 @@ impl App {
             let outcome = self.buffers.key(key);
             if self.buffers.files != self.settings.files
                 || self.buffers.files_width != self.settings.editor_files_width
+                || self.buffers.heat_on() != self.settings.heat
             {
                 self.settings.files = self.buffers.files;
                 self.settings.editor_files_width = self.buffers.files_width;
+                self.settings.heat = self.buffers.heat_on();
+                self.home.files.heat_on = self.settings.heat;
                 settings::save(&self.settings);
                 if let Some(r) = self.review.as_mut() {
                     r.apply(&self.settings);
@@ -499,6 +556,31 @@ impl App {
                     }
                     None => true,
                 },
+            };
+        }
+        if self.screen == Screen::Dash {
+            if key.code == KeyCode::Char('?') && !self.dash.typing() {
+                self.help = true;
+                return false;
+            }
+            let outcome = self.dash.key(key, &mut self.home.files);
+            self.save_heat();
+            return match outcome {
+                dash::Outcome::None => false,
+                dash::Outcome::Home => {
+                    self.leave_dash();
+                    false
+                }
+                dash::Outcome::Quit => true,
+                dash::Outcome::Edit(path) => {
+                    self.open_from_dash(path);
+                    false
+                }
+                dash::Outcome::Review(path, line, text) => {
+                    self.snapshots.store(false, Ordering::Relaxed);
+                    self.show_review(&path, line, &text);
+                    false
+                }
             };
         }
         let typing = match self.review.as_ref() {
@@ -543,7 +625,48 @@ impl App {
             self.settings.home_revisions_width = self.home.revisions_width;
             settings::save(&self.settings);
         }
+        self.save_heat();
         self.home_outcome(outcome)
+    }
+
+    /// The wheel scrolls the tree or the diff under it, and a click in the tree opens a file
+    /// or a folder.
+    fn dash_mouse(&mut self, ev: event::MouseEvent) {
+        use event::{MouseButton, MouseEventKind};
+        let tree = &mut self.home.files;
+        let over_tree = tree.contains(ev.column, ev.row);
+        match ev.kind {
+            MouseEventKind::ScrollDown if over_tree => tree.scroll(3),
+            MouseEventKind::ScrollUp if over_tree => tree.scroll(-3),
+            MouseEventKind::ScrollDown => self.dash.scroll(3),
+            MouseEventKind::ScrollUp => self.dash.scroll(-3),
+            MouseEventKind::Down(MouseButton::Left) if over_tree => {
+                if let files::Outcome::Open(path) = tree.click(ev.row) {
+                    self.open_from_dash(path);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Opens `path` in the editor from DASH mode.
+    fn open_from_dash(&mut self, path: String) {
+        match self.buffers.open(&path, 0) {
+            Ok(()) => {
+                self.screen = Screen::Editor;
+                self.editor_back = Some(Screen::Dash);
+            }
+            Err(e) => self.dash.notice = Some(format!("couldn't open {path}: {e}")),
+        }
+    }
+
+    /// Keeps the file trees' heat toggle, after a key on a screen that changes it.
+    fn save_heat(&mut self) {
+        if self.home.files.heat_on != self.settings.heat {
+            self.settings.heat = self.home.files.heat_on;
+            self.buffers.set_heat_on(self.settings.heat);
+            settings::save(&self.settings);
+        }
     }
 
     /// Acts on what a key or click on the home screen asked for. Returns whether to quit.
@@ -572,6 +695,7 @@ impl App {
                 self.busy = Some(("checking the push", Instant::now()));
                 self.loader.push_plan(revs);
             }
+            home::Outcome::Dash => self.show_dash(),
             home::Outcome::Quit => return true,
             home::Outcome::None => {}
         }
@@ -588,6 +712,24 @@ impl App {
         };
         let area = c.area;
         let top = area.y;
+        if self.screen == Screen::Dash {
+            self.dash.title(c, x, top);
+            self.dash.draw(c, body, &mut self.home.files);
+            let bottom = area.bottom() - 1;
+            if let Some(n) = &self.dash.notice {
+                c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));
+            }
+            if let Some(text) = self.dash.prompt() {
+                keybar::prompt(c, bottom, &text, &[]);
+                keybar::menu(c, body, &self.dash.command_menu());
+                return;
+            }
+            keybar::draw_badged(c, bottom, Some(("DASH", theme::TEAL)), &self.dash.hints());
+            if self.help {
+                keybar::help(c, body, dash::KEYS);
+            }
+            return;
+        }
         let bottom = area.bottom() - 1;
         let unsaved = self
             .buffers

@@ -21,6 +21,8 @@ const DEBOUNCE: Duration = Duration::from_millis(300);
 const MAX_WAIT: Duration = Duration::from_secs(2);
 /// Quiet time after an operation before reloading, so a burst reloads once.
 const OP_DEBOUNCE: Duration = Duration::from_millis(50);
+/// How often the files written are passed on, for the trees' heat.
+const WRITTEN_EVERY: Duration = Duration::from_millis(250);
 
 /// Must be called inside a tokio runtime.
 pub fn start(
@@ -58,8 +60,11 @@ pub fn start(
         // When the current run of edits started, and when it last grew.
         let mut edits: Option<(Instant, Instant)> = None;
         let mut op: Option<Instant> = None;
+        // Files written since they were last passed on, and when that was.
+        let mut written = std::collections::BTreeSet::new();
+        let mut written_at = Instant::now();
         loop {
-            let wait = if edits.is_some() || op.is_some() {
+            let wait = if edits.is_some() || op.is_some() || !written.is_empty() {
                 OP_DEBOUNCE
             } else {
                 Duration::from_secs(3600)
@@ -67,13 +72,23 @@ pub fn start(
             match tokio::time::timeout(wait, rx.recv()).await {
                 Ok(None) => return,
                 Ok(Some(Ping::Op)) => op = Some(Instant::now()),
-                Ok(Some(Ping::Edit)) if snapshots.load(Ordering::Relaxed) => {
-                    let now = Instant::now();
-                    edits = Some((edits.map_or(now, |(first, _)| first), now));
+                Ok(Some(Ping::Edit(path))) => {
+                    written.insert(path);
+                    if snapshots.load(Ordering::Relaxed) {
+                        let now = Instant::now();
+                        edits = Some((edits.map_or(now, |(first, _)| first), now));
+                    }
                 }
-                Ok(Some(Ping::Edit)) | Err(_) => {}
+                Err(_) => {}
             }
             let now = Instant::now();
+            if !written.is_empty() && now - written_at >= WRITTEN_EVERY {
+                written_at = now;
+                let paths = std::mem::take(&mut written).into_iter().collect();
+                if tx.send(Msg::Written(paths)).is_err() {
+                    return;
+                }
+            }
             if let Some((first, last)) = edits
                 && (now - last >= DEBOUNCE || now - first >= MAX_WAIT)
             {

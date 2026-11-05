@@ -25,6 +25,14 @@ pub struct WorkingCopyMoved {
     pub workspace: Option<String>,
 }
 
+/// Files of a workspace's working copy were written, by anyone. `paths` are from the
+/// workspace root.
+#[derive(Clone, Serialize, Type, Event)]
+pub struct FilesWritten {
+    pub workspace: Option<String>,
+    pub paths: Vec<String>,
+}
+
 /// File > Add Repository to this window's project.
 #[derive(Clone, Serialize, Type, Event)]
 pub struct AddRepo {}

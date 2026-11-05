@@ -77,3 +77,48 @@
   color: var(--error);
   white-space: pre-wrap;
 }
+
+/* A recent write: a tint that fades over HEAT_MS, behind the row's text. */
+.file-tree li > button {
+  position: relative;
+}
+
+.heat-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--heat) / 38%),
+    rgb(var(--heat) / 12%) 70%,
+    transparent
+  );
+  box-shadow: inset 2px 0 rgb(var(--heat));
+  animation: heat-fade 6s ease-in forwards;
+}
+
+.heat-glow.dir {
+  animation-name: heat-fade-dir;
+}
+
+.file-tree .heat-toggle[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+@keyframes heat-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes heat-fade-dir {
+  from {
+    opacity: 0.55;
+  }
+  to {
+    opacity: 0;
+  }
+}

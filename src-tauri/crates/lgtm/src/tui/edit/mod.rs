@@ -170,6 +170,20 @@ impl Editor {
         self.sidebar.decor = decor;
     }
 
+    /// Takes the files just written, for the sidebar's heat.
+    pub fn written(&mut self, paths: &[String]) {
+        self.sidebar.heat.written(paths);
+    }
+
+    /// Whether the sidebar shows heat.
+    pub fn heat_on(&self) -> bool {
+        self.sidebar.heat_on
+    }
+
+    pub fn set_heat_on(&mut self, on: bool) {
+        self.sidebar.heat_on = on;
+    }
+
     /// Takes the repo's files, for the sidebar and `space f`.
     pub fn set_files(&mut self, listing: crate::tui::walk::Listing) {
         self.sidebar.set_listing(listing);
@@ -295,6 +309,10 @@ impl Editor {
             KeyCode::Char('u') if ctrl => KeyCode::PageUp,
             KeyCode::Char('g') => KeyCode::Home,
             KeyCode::Char('G') => KeyCode::End,
+            KeyCode::Char('H') => {
+                self.sidebar.heat_on = !self.sidebar.heat_on;
+                return;
+            }
             KeyCode::Esc | KeyCode::Tab | KeyCode::Char(' ') => {
                 self.leave_sidebar();
                 return;

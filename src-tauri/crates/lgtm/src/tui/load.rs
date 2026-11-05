@@ -65,6 +65,13 @@ pub enum Msg {
     },
     /// A jj operation landed: commits may have changed.
     Changed,
+    /// Files were written, for the trees' heat.
+    Written(Vec<String>),
+    /// The agent turn's diff so far, from the commit it started on to `@`.
+    TurnDiff {
+        start: String,
+        result: anyhow::Result<Vec<FileDiff>>,
+    },
     /// An agent's request over MCP, and where its answer goes.
     Agent {
         req: crate::agent::Request,
@@ -183,6 +190,31 @@ impl Loader {
                 .into_iter()
                 .filter_map(|p| Some((p.path, Decor::of(p.status, p.conflict)?)));
             let _ = tx.send(Msg::Decor(Decorations::new(found)));
+        });
+    }
+
+    /// The name the store files the workspace at `root`'s turns under.
+    pub fn workspace_key(&self, root: &std::path::Path) -> Option<String> {
+        self.rt
+            .block_on(lgtm_core::turns::workspace_key(&self.jj, root))
+            .ok()
+    }
+
+    /// Snapshots the working copy, then diffs it against `start`, where a turn began.
+    pub fn turn_diff(&self, start: String) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let _ = jj.background_snapshot().await;
+            let result = async {
+                let at = jj.resolve("@").await?;
+                let range = Range {
+                    from: Some(start.clone()),
+                    to: at.to,
+                };
+                jj.diff(&range).await
+            }
+            .await;
+            let _ = tx.send(Msg::TurnDiff { start, result });
         });
     }
 

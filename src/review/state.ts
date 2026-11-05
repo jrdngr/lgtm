@@ -15,6 +15,8 @@ export interface MarkIndex {
   amber: Set<string>;
   /** Rows inside a comment. */
   commented: Set<string>;
+  /** Rows the latest reload added, while the review follows changes. */
+  fresh?: Set<string>;
 }
 
 /** Without `marks` in use, the review's marks are left out. */

@@ -11,8 +11,8 @@ use ignore::gitignore::Gitignore;
 pub enum Ping {
     /// A jj operation landed.
     Op,
-    /// A file of the working copy changed.
-    Edit,
+    /// A file of the working copy changed, with its path from the root, `/` between parts.
+    Edit(String),
 }
 
 /// Whether a path is ignored by the `.gitignore` files above it. Matchers load lazily.
@@ -66,11 +66,12 @@ pub fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping>
     {
         return None;
     }
+    let edit = || Ping::Edit(rel.to_string_lossy().replace('\\', "/"));
     if rel.file_name().is_some_and(|n| n == ".gitignore") {
         ignores.by_dir.clear();
-        return Some(Ping::Edit);
+        return Some(edit());
     }
-    (!ignores.ignored(path)).then_some(Ping::Edit)
+    (!ignores.ignored(path)).then(edit)
 }
 
 /// A secondary workspace's `.jj/repo` is a file pointing at the main repo, whose operations
@@ -100,12 +101,15 @@ mod tests {
         assert_eq!(c(".git/index"), None);
         assert_eq!(c(".workspaces/ws/.jj/working_copy/checkout"), None);
         assert_eq!(c("vendor/lib/.git/HEAD"), None);
-        assert_eq!(c("src/main.rs"), Some(Ping::Edit));
+        assert_eq!(c("src/main.rs"), Some(Ping::Edit("src/main.rs".into())));
         assert_eq!(c("target/debug/x"), None);
         assert_eq!(c("a/b.log"), None);
         assert_eq!(c("web/dist/app.js"), None);
-        assert_eq!(c("web/src/app.ts"), Some(Ping::Edit));
-        assert_eq!(c(".gitignore"), Some(Ping::Edit));
+        assert_eq!(
+            c("web/src/app.ts"),
+            Some(Ping::Edit("web/src/app.ts".into()))
+        );
+        assert_eq!(c(".gitignore"), Some(Ping::Edit(".gitignore".into())));
     }
 
     #[test]

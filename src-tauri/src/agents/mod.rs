@@ -74,6 +74,13 @@ async fn serve(app: AppHandle, stream: UnixStream) -> anyhow::Result<()> {
                     .map(|e| (e.path.as_str(), e.text.as_str()));
                 ctx.record_hook(session, report.prompt.as_deref(), edit);
             }
+            if let (Some(todos), Some(session)) = (&report.todos, &report.session)
+                && let Err(e) = ctx
+                    .set_todos(report.workspace.as_deref(), session, todos)
+                    .await
+            {
+                tracing::warn!("agent todos: {e:#}");
+            }
             if let (Some(point), Some(session)) = (report.checkpoint, &report.session) {
                 let workspace = report.workspace.as_deref();
                 let (tool, prompt) = (report.tool_use.as_deref(), report.prompt.as_deref());

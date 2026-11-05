@@ -6,6 +6,7 @@ import { IconButton } from "../ui/icons";
 import { Menu } from "../ui/Menu";
 import { showResolved } from "./agentComments";
 import { fixChoices } from "./fixes";
+import { followOn } from "./followChanges";
 import { MarkBar } from "./MarkBar";
 import { type MarkSetup, markVar } from "./marks";
 import type { ViewMode } from "./model";
@@ -186,6 +187,7 @@ export function ReviewBar(props: Props) {
           onClick={() => props.onMode("split")}
         />
       </span>
+      <FollowButton />
       <span className="spacer" />
       {props.setup.enabled && (
         <MarkBar
@@ -316,5 +318,20 @@ export function ReviewNotes({ review, stale }: { review?: ReviewDto; stale: stri
         </div>
       )}
     </>
+  );
+}
+
+/** Scrolls the review to each change as it's written. */
+function FollowButton() {
+  const on = followOn.use();
+  return (
+    <button
+      type="button"
+      className="follow-button"
+      aria-pressed={on}
+      onClick={() => followOn.set(!on)}
+    >
+      Follow
+    </button>
   );
 }

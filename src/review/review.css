@@ -282,3 +282,12 @@
   border-left: 1px solid var(--hair);
   cursor: pointer;
 }
+
+/* A row the latest reload added, while the review follows changes. */
+.cell.fresh.kind-added .strip {
+  background: var(--added);
+}
+
+.cell.fresh.kind-added {
+  background: rgb(46 160 67 / 32%);
+}

@@ -185,6 +185,10 @@ const PATHS = {
     </>
   ),
   guided: <path d="M5 5h14v4H5zM5 11h9v4H5zM5 17h5v3H5z" />,
+  flame: (
+    <path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.2 1.2-3.6 2.3-4.6.3 1.6 1.2 2.6 2.2 2.9C11 9 11 6 12 3z" />
+  ),
+  pulse: <path d="M22 12h-4l-3 9L9 3l-3 9H2" />,
   architecture: (
     <>
       <rect x="9" y="2.5" width="6" height="6" rx="1" />

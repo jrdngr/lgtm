@@ -14,6 +14,8 @@ pub struct Settings {
     pub wrap: bool,
     /// The file list in the review and the file tree in the editor.
     pub files: bool,
+    /// Heat on the file trees: rows glow as their files are written.
+    pub heat: bool,
     /// Widths `<` and `>` chose: the review's file list, the editor's file tree, and the home
     /// screen's revisions side. `None` is the default.
     pub review_files_width: Option<u16>,
@@ -30,6 +32,7 @@ impl Default for Settings {
             show_resolved: false,
             wrap: false,
             files: true,
+            heat: true,
             review_files_width: None,
             editor_files_width: None,
             home_revisions_width: None,

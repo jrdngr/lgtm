@@ -24,6 +24,7 @@ import { CommentBlock } from "./CommentBlock";
 import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
+import { useFollowChanges } from "./followChanges";
 import { MarkMenu } from "./MarkMenu";
 import { useMarkSetup } from "./marks";
 import { buildLines, changedRows, type DisplayLine, type ViewMode } from "./model";
@@ -169,6 +170,8 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     ],
   );
   const lines = useMemo(() => [...prLines(c.onPr), ...fileLines], [c.onPr, fileLines]);
+  const fresh = useFollowChanges(review, files, lines, setScrollTo);
+  const drawn = useMemo(() => (fresh.size > 0 ? { ...shown, fresh } : shown), [shown, fresh]);
   const navComments = useMemo(() => [...c.onPr, ...c.comments], [c.onPr, c.comments]);
   const s = useSelection(files, lines, loaded?.moves);
   const { cursor, sel, place } = s;
@@ -452,7 +455,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           files={files}
           lines={lines}
           mode={mode}
-          index={shown}
+          index={drawn}
           amber={amber}
           onToggleAmber={() => amberRows.set(!amber)}
           setup={setup}

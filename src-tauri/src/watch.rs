@@ -23,6 +23,8 @@ const SNAPSHOT_DEBOUNCE: Duration = Duration::from_millis(300);
 /// The longest a run of edits holds off a snapshot.
 const SNAPSHOT_MAX_WAIT: Duration = Duration::from_secs(2);
 const CHANGE_DEBOUNCE: Duration = Duration::from_millis(50);
+/// How often written files are passed on, at most, so a burst of writes sends one list.
+const WRITTEN_EVERY: Duration = Duration::from_millis(250);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event {
@@ -35,6 +37,8 @@ pub enum Event {
     WorkingCopyMoved,
     /// What the workspace's jj is doing.
     Jj(Notice),
+    /// Files of the working copy were written, by path from the root.
+    Written(Vec<String>),
     /// An agent asked about review `review`, which shows older commits than its revset has
     /// now. Sent whether or not the workspace is on screen.
     ReviewOutdated { review: u32 },
@@ -125,8 +129,14 @@ async fn run(
     let mut changed_at: Option<Instant> = None;
     // No snapshot before this, after one gave up waiting on a lock.
     let mut retry_at: Option<Instant> = None;
+    let mut written: std::collections::BTreeSet<String> = Default::default();
+    let mut written_at: Option<Instant> = None;
     loop {
-        let next = snapshot_at.into_iter().chain(changed_at).min();
+        let next = snapshot_at
+            .into_iter()
+            .chain(changed_at)
+            .chain(written_at)
+            .min();
         tokio::select! {
             ping = rx.recv() => match ping {
                 None => return,
@@ -139,8 +149,10 @@ async fn run(
                         snapshot_at.get_or_insert(retry_at.map_or(at, |r| at.max(r)));
                     }
                 }
-                Some(Ping::Edit) => {
+                Some(Ping::Edit(path)) => {
                     tracing::trace!(workspace = jj.name(), "edit");
+                    written.insert(path);
+                    written_at.get_or_insert(Instant::now() + WRITTEN_EVERY);
                     let now = Instant::now();
                     let first = *edits_since.get_or_insert(now);
                     let at = (now + SNAPSHOT_DEBOUNCE).min(first + SNAPSHOT_MAX_WAIT);
@@ -149,6 +161,10 @@ async fn run(
             },
             _ = sleep_until(next.unwrap_or_else(Instant::now)), if next.is_some() => {
                 let now = Instant::now();
+                if written_at.is_some_and(|t| t <= now) {
+                    written_at = None;
+                    emit(Event::Written(std::mem::take(&mut written).into_iter().collect()));
+                }
                 if changed_at.is_some_and(|t| t <= now) {
                     changed_at = None;
                     let snapshot = repo.as_ref().is_some_and(|r| {
@@ -219,11 +235,13 @@ mod tests {
         .unwrap();
         tokio::time::sleep(Duration::from_millis(200)).await;
         std::fs::write(root.join("a.txt"), "hi\n").unwrap();
-        let got = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
-        assert_eq!(
-            got.ok().flatten(),
-            Some(Event::RepoChanged { snapshot: true })
-        );
+        let mut got = vec![];
+        let changed = Event::RepoChanged { snapshot: true };
+        while !got.contains(&changed) {
+            let next = tokio::time::timeout(Duration::from_secs(10), rx.recv()).await;
+            got.push(next.ok().flatten().expect("no repo change"));
+        }
+        assert!(got.contains(&Event::Written(vec!["a.txt".into()])));
     }
 
     #[tokio::test]

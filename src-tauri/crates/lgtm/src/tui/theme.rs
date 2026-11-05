@@ -27,9 +27,12 @@ pub const CYAN: Color = rgb(0x39c5cf);
 pub const FUCHSIA: Color = rgb(0xd670d6);
 pub const AMBER: Color = rgb(0xd29922);
 pub const UNIQUE: Color = rgb(0xc586c0);
+pub const TEAL: Color = rgb(0x2fbfa0);
 
 pub const ADD: Color = tint((46, 160, 67), 15);
 pub const DEL: Color = tint((248, 81, 73), 15);
+/// An added row the live diff just got.
+pub const FRESH: Color = tint((46, 160, 67), 32);
 pub const SEL: Color = tint((79, 140, 201), 28);
 /// Behind a comment for the agent.
 pub const THREAD: Color = tint((57, 197, 207), 10);

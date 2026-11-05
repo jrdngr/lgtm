@@ -9,7 +9,8 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use super::decor::Decorations;
+use super::decor::{Decor, Decorations};
+use super::heat::{self, Heat};
 use super::paint::Canvas;
 use super::theme::{self, ACCENT, BG, FAINT, FG, HAIR, MUTED, SEL};
 use super::walk::{self, Listing};
@@ -68,6 +69,9 @@ pub struct FileTree {
     pub loaded: bool,
     /// How the working copy changes files, coloring their names.
     pub decor: Decorations,
+    /// Recent writes, glowing on their rows while `heat_on`.
+    pub heat: Heat,
+    pub heat_on: bool,
     /// Folders opened, by path, while there's no search.
     open: BTreeSet<String>,
     pub query: String,
@@ -422,7 +426,17 @@ impl FileTree {
                 (true, false) => HAIR,
                 _ => BG,
             };
+            let (level, decor) = match row {
+                Row::Dir { path, .. } => (self.heat.dir(path), self.decor.dir(path)),
+                Row::File { path, .. } => (self.heat.file(path), self.decor.file(path)),
+            };
+            let tint = decor.unwrap_or(Decor::Modified).color();
+            let hot = self.heat_on && level > 0.0;
+            let bg = if hot { heat::glow(bg, tint, level) } else { bg };
             sub.fill(area.x, y, area.width, bg);
+            if hot {
+                sub.put(area.x, y, "▎", theme::fg(heat::mix(BG, tint, level)).bg(bg));
+            }
             draw_row(&mut sub, area.x + 1, y, row, bg, marked, &self.decor);
         }
     }

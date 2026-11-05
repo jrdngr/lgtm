@@ -9,9 +9,12 @@ import { guideAt, indent, toggled } from "../review/tree";
 import { useSendFromMenu } from "../review/useSendText";
 import { pathItems } from "../services/pathMenu";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
+import { IconButton } from "../ui/icons";
 import { SectionHeader } from "../ui/SectionHeader";
 import { useRepoChanged } from "../workspaces/useRepoChanged";
 import { type Decor, decorate, decorLetter } from "./decor";
+import { HeatGlow } from "./HeatGlow";
+import { type Heat, heatOn, useHeat } from "./heat";
 import { openFile } from "./open";
 import { type Naming, TreeName } from "./TreeName";
 import { create, folderOf, foldersOf, openToSide, rename, trash } from "./treeActions";
@@ -68,6 +71,8 @@ interface DirProps {
   onToggle(dir: string): void;
   /** How the current review changes files and folders, by path. */
   decor: ReturnType<typeof decorate>;
+  /** When files and folders were last written, while they glow. */
+  heat: Heat;
   menu(entry: FileEntry): CtxEntry[];
   /** The folder files dragged over the tree would land in. */
   dropDir?: string;
@@ -90,7 +95,7 @@ function Name({ name, decor, dir }: { name: string; decor?: Decor; dir?: boolean
 }
 
 function Dir(props: DirProps) {
-  const { dir, depth, listings, open, onToggle, decor, menu, dropDir, naming } = props;
+  const { dir, depth, listings, open, onToggle, decor, heat, menu, dropDir, naming } = props;
   const listing = listings.get(dir);
   const pad = { paddingLeft: indent(depth) };
   const workspace = useWorkspace();
@@ -140,6 +145,7 @@ function Dir(props: DirProps) {
                     onClick={() => onToggle(e.path)}
                     onContextMenu={contextMenu(() => menu(e))}
                   >
+                    <HeatGlow at={heat.dirs.get(e.path)} decor={decor.byDir.get(e.path)} dir />
                     <span className="chevron">{open.has(e.path) ? "▾" : "▸"}</span>
                     <Name name={e.name} decor={decor.byDir.get(e.path)} dir />
                   </button>
@@ -158,6 +164,7 @@ function Dir(props: DirProps) {
                 onClick={() => openFile(workspace, e.path)}
                 onContextMenu={contextMenu(() => menu(e))}
               >
+                <HeatGlow at={heat.files.get(e.path)} decor={decor.byFile.get(e.path)} />
                 <span className="chevron" />
                 <Name name={e.name} decor={decor.byFile.get(e.path)} />
               </button>
@@ -180,6 +187,8 @@ export function RepoTree() {
   const { listings, reload } = useListings(workspace, open);
   const files = review?.files;
   const decor = useMemo(() => decorate(files?.map((f) => f.dto) ?? []), [files]);
+  const heat = useHeat(workspace);
+  const heatShown = heatOn.use();
   const { sender } = useSendFromMenu(workspace);
 
   const body = useRef<HTMLDivElement>(null);
@@ -263,7 +272,15 @@ export function RepoTree() {
   ];
   return (
     <div className="side-split">
-      <SectionHeader title="Files" />
+      <SectionHeader title="Files">
+        <IconButton
+          icon="flame"
+          label="Heat"
+          className="heat-toggle"
+          aria-pressed={heatShown}
+          onClick={() => heatOn.set(!heatShown)}
+        />
+      </SectionHeader>
       <div
         className={`side-split-body file-tree${dropDir === "" ? " drop-target" : ""}`}
         ref={body}
@@ -277,6 +294,7 @@ export function RepoTree() {
           open={open}
           onToggle={(d) => setOpen(toggled(open, d))}
           decor={decor}
+          heat={heat}
           menu={menu}
           dropDir={dropDir}
           naming={naming}
