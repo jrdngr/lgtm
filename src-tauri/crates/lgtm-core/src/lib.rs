@@ -10,6 +10,7 @@ pub mod gitmeta;
 pub mod jj;
 pub mod par;
 pub mod paths;
+pub mod resolve;
 pub mod review;
 pub mod store;
 pub mod syntax;

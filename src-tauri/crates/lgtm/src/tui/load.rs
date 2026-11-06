@@ -43,6 +43,12 @@ pub enum Msg {
     Files(super::walk::Listing),
     /// How the working copy changes files.
     Decor(super::decor::Decorations),
+    /// What jj knows about the sides of the conflicts in file `name`, read as `text`.
+    Resolve {
+        name: String,
+        text: String,
+        session: Box<lgtm_core::resolve::Session>,
+    },
     /// A file at `@-`, empty when it isn't there, for the editor's gutter.
     Base {
         name: String,
@@ -169,6 +175,21 @@ impl Loader {
                 let text = String::from_utf8_lossy(&bytes.unwrap_or_default()).into_owned();
                 let _ = tx.send(Msg::Base { name, text });
             }
+        });
+    }
+
+    /// Fills in the sides of the conflicts in `text`, the file `name`'s, from jj.
+    pub fn resolve(&self, name: String, text: String) {
+        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        self.rt.spawn(async move {
+            let mut session = lgtm_core::resolve::Session::new(&name, &text);
+            lgtm_core::resolve::fill(&mut session, &jj).await;
+            let session = Box::new(session);
+            let _ = tx.send(Msg::Resolve {
+                name,
+                text,
+                session,
+            });
         });
     }
 

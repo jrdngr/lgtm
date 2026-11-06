@@ -20,6 +20,8 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("wqa", "save all and leave"),
     ("close", "close the file in view"),
     ("reload", "read the file again, over edits"),
+    ("raw", "edit conflict markers as text"),
+    ("resolve", "resolve the file's conflicts"),
     ("vsplit", "open in a pane to the right"),
     ("split", "open in a pane below"),
     ("N", "go to line N"),
@@ -129,6 +131,24 @@ impl Editor {
             "q" | "qa" => return self.leave(false),
             "q!" | "qa!" => return self.leave(true),
             "close" | "c" => return self.close(),
+            "raw" => {
+                if let Some(o) = self.open.get_mut(self.cur) {
+                    if o.resolve.as_ref().is_some_and(|r| r.dirty()) {
+                        self.notice = Some("unsaved picks: :w or :q! first".into());
+                    } else {
+                        o.resolve = None;
+                    }
+                }
+            }
+            "resolve" => {
+                if let Some(o) = self.open.get_mut(self.cur)
+                    && o.resolve.is_none()
+                    && !o.buf.dirty()
+                    && !o.start_resolving()
+                {
+                    self.notice = Some("no conflicts".into());
+                }
+            }
             "reload" => {
                 if let Some(o) = self.open.get_mut(self.cur) {
                     match o.buf.reload() {
@@ -157,6 +177,9 @@ impl Editor {
         let Some(o) = self.open.get_mut(i) else {
             return false;
         };
+        if o.resolve.is_some() {
+            return self.save_resolved(i);
+        }
         match o.buf.save() {
             Ok(()) => {
                 o.conflict = false;
@@ -174,14 +197,59 @@ impl Editor {
 
     /// Saves every buffer with unsaved edits. Returns whether all saved.
     fn save_all(&mut self) -> bool {
-        let dirty: Vec<usize> = (0..self.open.len())
-            .filter(|&i| self.open[i].buf.dirty())
+        let dirty: Vec<String> = self
+            .open
+            .iter()
+            .filter(|o| o.dirty())
+            .map(|o| o.buf.name.clone())
             .collect();
         let mut ok = true;
-        for i in dirty {
-            ok &= self.save_at(i);
+        // Saving a resolved file can close it, so each is found by name.
+        for name in dirty {
+            if let Some(i) = self.open.iter().position(|o| o.buf.name == name) {
+                ok &= self.save_at(i);
+            }
         }
         ok
+    }
+
+    /// Writes what's resolved in buffer `i`, then reads the file back. A file saving removed
+    /// closes, and a file edits were carried to that came out with conflicts opens.
+    fn save_resolved(&mut self, i: usize) -> bool {
+        let root = self.root.clone();
+        let Some(o) = self.open.get_mut(i) else {
+            return false;
+        };
+        let Some(r) = o.resolve.as_mut() else {
+            return false;
+        };
+        let saved = match r.save(&root) {
+            Ok(saved) => saved,
+            Err(e) => {
+                self.notice = Some(format!("couldn't save {}: {e}", o.buf.name));
+                return false;
+            }
+        };
+        self.saved = true;
+        o.conflict = false;
+        if saved.removed {
+            let name = o.buf.name.clone();
+            self.open.remove(i);
+            self.cur = self.cur.min(self.open.len().saturating_sub(1));
+            self.sidebar.remove(&name);
+            if self.open.is_empty() {
+                self.in_sidebar = true;
+            }
+        } else if let Err(e) = o.buf.reload() {
+            self.notice = Some(format!("couldn't read {}: {e}", o.buf.name));
+        }
+        if let Some(to) = saved.clash {
+            match self.open(&to, 1) {
+                Ok(()) => self.notice = Some(format!("{to} has conflicts")),
+                Err(e) => self.notice = Some(format!("couldn't open {to}: {e}")),
+            }
+        }
+        true
     }
 
     /// Opens `path`, from the current directory or whole.
@@ -221,7 +289,7 @@ impl Editor {
         let Some(o) = self.open.get(self.cur) else {
             return Outcome::None;
         };
-        if o.buf.dirty() {
+        if o.dirty() {
             self.notice = Some(format!("unsaved: {}", o.buf.name));
             return Outcome::None;
         }
@@ -271,7 +339,7 @@ impl Editor {
     /// Leaves the editor unless a buffer has unsaved edits. `force` drops them.
     pub fn leave(&mut self, force: bool) -> Outcome {
         if force {
-            self.open.retain(|o| !o.buf.dirty());
+            self.open.retain(|o| !o.dirty());
             self.cur = 0;
             return Outcome::Back;
         }

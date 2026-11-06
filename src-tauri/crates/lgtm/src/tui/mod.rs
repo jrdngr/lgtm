@@ -14,6 +14,7 @@ mod motions;
 mod paint;
 mod picker;
 mod plain;
+mod resolve;
 mod review;
 mod serve;
 mod settings;
@@ -373,6 +374,9 @@ impl App {
             for name in self.buffers.take_base_requests() {
                 self.loader.base(name);
             }
+            for (name, text) in self.buffers.take_resolve_requests() {
+                self.loader.resolve(name, text);
+            }
             if std::mem::take(&mut self.buffers.saved) {
                 self.loader.decor();
             }
@@ -444,6 +448,11 @@ impl App {
                 self.buffers.set_files(listing);
             }
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
+            Msg::Resolve {
+                name,
+                text,
+                session,
+            } => self.buffers.set_resolve(&name, &text, &session),
             Msg::Decor(decor) => {
                 self.home.files.decor = decor.clone();
                 self.buffers.set_decor(decor);
@@ -854,12 +863,7 @@ fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool) {
         keybar::menu(c, body, &pending);
     }
     if help {
-        let keys: Vec<(&str, &str)> = crate::edit::keymap::BINDS
-            .iter()
-            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
-            .map(|b| (b.keys, b.label))
-            .collect();
-        keybar::help(c, body, &keys);
+        keybar::help(c, body, &e.help_keys());
     }
 }
 

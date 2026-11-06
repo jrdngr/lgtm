@@ -2,7 +2,7 @@
 
 pub mod clipboard;
 mod command;
-mod draw;
+pub(crate) mod draw;
 mod finder;
 mod split;
 
@@ -20,6 +20,7 @@ use crate::edit::keymap::Pick;
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
 use crate::tui::files::FileTree;
+use crate::tui::resolve::{self, Resolver};
 use crate::tui::width;
 
 pub enum Outcome {
@@ -50,6 +51,10 @@ pub struct Open {
     marks: Option<(u64, Vec<Option<Mark>>)>,
     /// Whether the file changed on disk under unsaved edits.
     pub conflict: bool,
+    /// Resolving the file's conflicts, which then shows in place of its text.
+    pub resolve: Option<Box<Resolver>>,
+    /// Whether jj was asked about the conflicts' sides.
+    resolve_asked: bool,
 }
 
 impl Open {
@@ -64,7 +69,25 @@ impl Open {
             base_asked: false,
             marks: None,
             conflict: false,
+            resolve: None,
+            resolve_asked: false,
         }
+    }
+
+    /// Resolves the file's conflicts, when it has any.
+    fn start_resolving(&mut self) -> bool {
+        let text = self.buf.text.to_string();
+        if !lgtm_core::resolve::has_conflicts(&text) {
+            return false;
+        }
+        self.resolve = Some(Box::new(Resolver::new(&self.buf.name, &text)));
+        self.resolve_asked = false;
+        true
+    }
+
+    /// Whether it has edits or picks that saving would write.
+    pub fn dirty(&self) -> bool {
+        self.buf.dirty() || self.resolve.as_ref().is_some_and(|r| r.dirty())
     }
 }
 
@@ -139,6 +162,27 @@ impl Editor {
             .collect()
     }
 
+    /// The files being resolved whose sides jj should fill in, marked as asked for.
+    pub fn take_resolve_requests(&mut self) -> Vec<(String, String)> {
+        self.open
+            .iter_mut()
+            .filter_map(|o| {
+                let ask = o.resolve.is_some() && !std::mem::replace(&mut o.resolve_asked, true);
+                ask.then(|| (o.buf.name.clone(), o.buf.text.to_string()))
+            })
+            .collect()
+    }
+
+    /// Takes the sides jj filled in for the file `name`, when its text is still `text`.
+    pub fn set_resolve(&mut self, name: &str, text: &str, filled: &lgtm_core::resolve::Session) {
+        if let Some(o) = self.open.iter_mut().find(|o| o.buf.name == name)
+            && o.buf.text == text
+            && let Some(r) = o.resolve.as_mut()
+        {
+            r.adopt(filled);
+        }
+    }
+
     /// Asks for every buffer's base again, after jj may have moved `@-`.
     pub fn bases_stale(&mut self) {
         self.open.iter_mut().for_each(|o| o.base_asked = false);
@@ -158,10 +202,13 @@ impl Editor {
     pub fn check_disk(&mut self) {
         for o in &mut self.open {
             if let Some(text) = o.buf.disk_text() {
-                if o.buf.dirty() {
+                if o.dirty() {
                     o.conflict = true;
                 } else {
                     o.buf.take_disk(&text);
+                    if o.resolve.is_some() && !o.start_resolving() {
+                        o.resolve = None;
+                    }
                 }
             }
         }
@@ -203,7 +250,7 @@ impl Editor {
 
     /// The files git doesn't ignore, each with whether it has unsaved edits.
     fn listed(&self) -> Vec<(String, bool)> {
-        let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.buf.dirty());
+        let dirty = |p: &str| self.open.iter().any(|o| o.buf.name == p && o.dirty());
         self.sidebar
             .files()
             .map(|p| (p.clone(), dirty(p)))
@@ -217,7 +264,9 @@ impl Editor {
             Some(i) => (i, false),
             None => {
                 let buf = Buffer::open(&self.root.join(name), name)?;
-                self.open.push(Open::new(buf));
+                let mut open = Open::new(buf);
+                open.start_resolving();
+                self.open.push(open);
                 (self.open.len() - 1, true)
             }
         };
@@ -416,17 +465,37 @@ impl Editor {
     pub fn unsaved(&self) -> Vec<&str> {
         self.open
             .iter()
-            .filter(|o| o.buf.dirty())
+            .filter(|o| o.dirty())
             .map(|o| o.buf.name.as_str())
             .collect()
     }
 
     /// Whether keys are going into text, so screen-wide keys like `?` aren't theirs.
     pub fn typing(&self) -> bool {
+        if let Some(r) = self.resolver() {
+            return self.prompt.is_some() || self.finder.is_some() || r.typing();
+        }
         self.prompt.is_some()
             || self.finder.is_some()
             || self.keys.mode == Mode::Insert
             || self.keys.waiting()
+    }
+
+    /// The resolver of the file in view, when it's resolving.
+    pub fn resolver(&self) -> Option<&Resolver> {
+        self.open.get(self.cur)?.resolve.as_deref()
+    }
+
+    /// The keys for `?`.
+    pub fn help_keys(&self) -> Vec<(&'static str, &'static str)> {
+        if self.resolver().is_some() {
+            return resolve::KEYS.to_vec();
+        }
+        crate::edit::keymap::BINDS
+            .iter()
+            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
+            .map(|b| (b.keys, b.label))
+            .collect()
     }
 
     /// Takes text the terminal pasted: into the line being typed, else the text.
@@ -439,6 +508,10 @@ impl Editor {
         if self.finder.is_some() || self.in_sidebar {
             return;
         }
+        if let Some(r) = self.open.get_mut(self.cur).and_then(|o| o.resolve.as_mut()) {
+            r.paste(text);
+            return;
+        }
         if let Some(open) = self.open.get_mut(self.cur) {
             self.keys
                 .put_text(&mut open.buf, &text.replace("\r\n", "\n"));
@@ -448,7 +521,10 @@ impl Editor {
     /// ⌘C copies the selection and ⌘V pastes, where the terminal passes them on.
     fn command_key(&mut self, key: &KeyEvent) -> bool {
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
-        if !key.modifiers.contains(KeyModifiers::SUPER) || self.prompt.is_some() {
+        if !key.modifiers.contains(KeyModifiers::SUPER)
+            || self.prompt.is_some()
+            || self.resolver().is_some()
+        {
             return false;
         }
         match key.code {
@@ -484,6 +560,15 @@ impl Editor {
         if self.in_sidebar || self.open.is_empty() {
             self.in_sidebar = true;
             self.sidebar_key(key);
+            return Outcome::None;
+        }
+        if let Some(r) = self.open.get_mut(self.cur).and_then(|o| o.resolve.as_mut()) {
+            match r.key(key) {
+                resolve::Outcome::None => {}
+                resolve::Outcome::Command => self.act(Action::Command),
+                resolve::Outcome::Notice(n) => self.notice = Some(n),
+                resolve::Outcome::Copy(text) => self.act(Action::Copy(text)),
+            }
             return Outcome::None;
         }
         let Some(open) = self.open.get_mut(self.cur) else {

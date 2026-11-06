@@ -32,6 +32,19 @@ impl Editor {
             return;
         };
         let x = c.put(x, y, &b.name, theme::bold(FG).bg(PANEL));
+        if let Some(r) = self.resolver() {
+            if r.dirty() {
+                c.put(x + 2, y, "●", theme::fg(FG).bg(PANEL));
+            }
+            match &self.notice {
+                Some(n) => c.put_right(y, 1, n, theme::fg(RED).bg(PANEL)),
+                None => {
+                    let (status, color) = r.status();
+                    c.put_right(y, 1, &status, theme::bold(color).bg(PANEL));
+                }
+            }
+            return;
+        }
         if b.dirty() {
             c.put(x + 2, y, "●", theme::fg(FG).bg(PANEL));
         }
@@ -52,6 +65,9 @@ impl Editor {
 
     /// The mode's badge for the key bar.
     pub fn badge(&self) -> (&'static str, Color) {
+        if let Some(r) = self.resolver() {
+            return r.badge();
+        }
         match self.keys.mode {
             Mode::Normal => ("NOR", ACCENT),
             Mode::Insert => ("INS", GREEN),
@@ -80,6 +96,9 @@ impl Editor {
                 hints.push(("Esc", "back", false));
             }
             return hints;
+        }
+        if let Some(r) = self.resolver() {
+            return r.hints();
         }
         let conflict = self.open.get(self.cur).is_some_and(|o| o.conflict);
         let mut hints = match self.keys.mode {
@@ -129,7 +148,7 @@ impl Editor {
         }
         self.sidebar_width = side;
         let open = &self.open;
-        let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
+        let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.dirty());
         let (files, divider, rest) = crate::tui::side::split(body, side.saturating_sub(1));
         let tree = Rect::new(files.x, files.y + 1, files.width, files.height - 1);
         self.sidebar.draw(c, tree, self.in_sidebar, &marked);
@@ -160,6 +179,10 @@ impl Editor {
         let Some(open) = self.open.get_mut(self.cur) else {
             return;
         };
+        if let Some(r) = open.resolve.as_mut() {
+            r.draw(c, body);
+            return;
+        }
         open.recolor();
         open.remark();
         open.folds.update(&open.buf);
@@ -277,7 +300,7 @@ fn column(b: &Buffer, at: usize) -> usize {
 }
 
 /// Each char's color in a line, from its highlight segments, which count UTF-16 units.
-fn char_colors(text: &str, segs: &[Segment]) -> Vec<Color> {
+pub(crate) fn char_colors(text: &str, segs: &[Segment]) -> Vec<Color> {
     let mut out = Vec::with_capacity(text.len());
     let mut segs = segs.iter().copied();
     let mut current = segs.next();
@@ -312,7 +335,7 @@ fn draw_fold(c: &mut Canvas, b: &Buffer, end: usize, x0: u16, y: u16, col: usize
 
 /// Draws a line of text. Returns the column after it.
 #[allow(clippy::too_many_arguments)]
-fn draw_line(
+pub(crate) fn draw_line(
     c: &mut Canvas,
     b: &Buffer,
     mode: Mode,

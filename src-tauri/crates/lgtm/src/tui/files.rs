@@ -169,6 +169,15 @@ impl FileTree {
         self.rebuild();
     }
 
+    /// Takes the file `path` out, as one just removed.
+    pub fn remove(&mut self, path: &str) {
+        let before = self.paths.len();
+        self.paths.retain(|p| p != path);
+        if self.paths.len() != before {
+            self.rebuild();
+        }
+    }
+
     pub fn selected(&self) -> Option<&str> {
         self.rows.get(self.sel).map(Row::path)
     }

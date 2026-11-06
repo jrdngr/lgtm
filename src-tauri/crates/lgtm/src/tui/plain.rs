@@ -104,6 +104,8 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             if std::mem::take(&mut e.saved) {
                 git_decor(&root, tx.clone());
             }
+            // Outside jj the markers' own labels are all there is.
+            e.take_resolve_requests();
             for name in e.take_base_requests() {
                 if git {
                     base(&root, name, tx.clone());
