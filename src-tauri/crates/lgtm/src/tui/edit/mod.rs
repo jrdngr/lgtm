@@ -312,7 +312,17 @@ impl Editor {
             KeyCode::Char('g') => KeyCode::Home,
             KeyCode::Char('G') => KeyCode::End,
             KeyCode::Esc | KeyCode::Tab | KeyCode::Char(' ') => {
-                self.leave_sidebar();
+                if !self.open.is_empty() {
+                    self.leave_sidebar();
+                }
+                return;
+            }
+            KeyCode::Char(':') => {
+                self.prompt = Some(command::Prompt::new(command::Line::Command));
+                return;
+            }
+            KeyCode::Char('a') => {
+                self.prompt = Some(command::Prompt::new(command::Line::New));
                 return;
             }
             code @ (KeyCode::Up
@@ -333,6 +343,11 @@ impl Editor {
                 Err(e) => self.notice = Some(format!("couldn't open {path}: {e}")),
             }
         }
+    }
+
+    /// Puts the keys in the sidebar, as when no file is open.
+    pub fn browse(&mut self) {
+        self.in_sidebar = true;
     }
 
     /// Back to the text, the tree's cursor back on the buffer in view.
@@ -365,7 +380,7 @@ impl Editor {
             finder::Outcome::Close => {
                 self.finder = None;
                 if self.open.is_empty() {
-                    return Outcome::Back;
+                    self.in_sidebar = true;
                 }
             }
             finder::Outcome::Open(path, line) => {
@@ -422,12 +437,13 @@ impl Editor {
         if self.finder.is_some() {
             return self.finder_key(key);
         }
-        if self.in_sidebar {
+        if self.in_sidebar || self.open.is_empty() {
+            self.in_sidebar = true;
             self.sidebar_key(key);
             return Outcome::None;
         }
         let Some(open) = self.open.get_mut(self.cur) else {
-            return Outcome::Back;
+            return Outcome::None;
         };
         open.folds.update(&open.buf);
         let hidden = open.folds.hidden();
@@ -629,7 +645,33 @@ mod tests {
         e.run_command("c");
         e.run_command("c");
         assert!(e.open.is_empty());
-        assert!(e.finder.is_some());
+        assert!(e.in_sidebar && e.finder.is_none());
+    }
+
+    #[test]
+    fn with_no_file_open_keys_stay_in_the_sidebar_where_a_makes_a_file_in_its_folder() {
+        let (dir, mut e) = editor_on("one\n");
+        std::fs::create_dir(dir.path().join("b")).unwrap();
+        std::fs::write(dir.path().join("b/c.txt"), "see\n").unwrap();
+        e.set_files(crate::tui::walk::list(dir.path()));
+        e.run_command("close");
+        press(&mut e, "<esc><space>");
+        assert!(e.in_sidebar);
+        e.sidebar.reveal("b/c.txt");
+        press(&mut e, "anew/d.txt<ret>");
+        let made = dir.path().join("b/new/d.txt");
+        assert_eq!(std::fs::read_to_string(&made).unwrap(), "");
+        assert_eq!(e.current().map(|b| b.name.as_str()), Some("b/new/d.txt"));
+        assert!(!e.in_sidebar);
+        assert!(e.sidebar.files().any(|p| p == "b/new/d.txt"));
+        // An existing file opens as it is.
+        press(&mut e, "<space>e");
+        e.sidebar.reveal("a.txt");
+        press(&mut e, "aa.txt<ret>");
+        assert_eq!(
+            e.current().map(|b| b.text.to_string()),
+            Some("one\n".into())
+        );
     }
 
     #[test]

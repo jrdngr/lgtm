@@ -34,7 +34,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                 return 1;
             }
         }
-        None => e.pick(crate::edit::keymap::Pick::Files),
+        None => e.browse(),
     }
     let git = root.join(".git").exists();
     let mut term = Term::start();

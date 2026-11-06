@@ -173,6 +173,14 @@ impl FileTree {
         self.rows.get(self.sel).map(Row::path)
     }
 
+    /// The folder at the cursor, or the one its file is in. None is the root.
+    pub fn selected_dir(&self) -> Option<&str> {
+        match self.rows.get(self.sel)? {
+            Row::Dir { path, .. } => Some(path),
+            Row::File { path, .. } => path.rsplit_once('/').map(|(dir, _)| dir),
+        }
+    }
+
     /// Opens the folders down to `path` and puts the cursor on it.
     pub fn reveal(&mut self, path: &str) {
         let mut dir = String::new();

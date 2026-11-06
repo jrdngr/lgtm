@@ -68,13 +68,18 @@ impl Editor {
             hints.push(("Esc", "close", false));
             return hints;
         }
-        if self.in_sidebar {
-            return vec![
+        if self.in_sidebar || self.open.is_empty() {
+            let mut hints = vec![
                 ("↑ ↓", "move", false),
                 ("← →", "close, open", false),
                 ("Enter", "open", false),
-                ("Esc", "back", false),
+                ("a", "new file", false),
+                (":", "command", false),
             ];
+            if !self.open.is_empty() {
+                hints.push(("Esc", "back", false));
+            }
+            return hints;
         }
         let conflict = self.open.get(self.cur).is_some_and(|o| o.conflict);
         let mut hints = match self.keys.mode {
@@ -116,7 +121,8 @@ impl Editor {
             body.width.saturating_sub(40),
         );
         let room = body.width >= MIN_SIDEBAR_WIDTH || self.in_sidebar && body.width > side * 2;
-        if !self.files || !room || self.sidebar.is_empty() || body.height < 2 {
+        let shown = self.files && room && !self.sidebar.is_empty();
+        if !(shown || self.open.is_empty()) || body.height < 2 {
             self.sidebar.hide();
             self.sidebar_width = 0;
             return body;

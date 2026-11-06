@@ -174,7 +174,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
                         return 1;
                     }
                 }
-                None => app.buffers.pick(crate::edit::keymap::Pick::Files),
+                None => app.buffers.browse(),
             }
             app.screen = Screen::Editor;
         }

@@ -29,6 +29,8 @@ pub const COMMANDS: &[(&str, &str)] = &[
 pub enum Line {
     Command,
     Search,
+    /// A new file's path, from the sidebar's folder.
+    New,
 }
 
 pub struct Prompt {
@@ -70,6 +72,7 @@ impl Editor {
                         }
                     }
                     Line::Search => {}
+                    Line::New => self.new_file(p.text.trim()),
                 }
             }
             _ => {}
@@ -210,8 +213,8 @@ impl Editor {
         crate::tui::workspace_name(&self.root, &cwd.join(path))
     }
 
-    /// Closes the buffer in view unless it has unsaved edits. The last one closed opens the
-    /// file list.
+    /// Closes the buffer in view unless it has unsaved edits. With the last one closed, keys
+    /// go to the sidebar.
     fn close(&mut self) -> Outcome {
         let Some(o) = self.open.get(self.cur) else {
             return Outcome::None;
@@ -228,9 +231,39 @@ impl Editor {
         match self.current().map(|b| b.name.clone()) {
             Some(name) if !Path::new(&name).is_absolute() => self.sidebar.reveal(&name),
             Some(_) => {}
-            None => self.pick(crate::edit::keymap::Pick::Files),
+            None => self.in_sidebar = true,
         }
         Outcome::None
+    }
+
+    /// Makes the file `path` in the sidebar's folder, with the folders it needs, and opens
+    /// it. A file that's there already just opens.
+    fn new_file(&mut self, path: &str) {
+        if path.is_empty() || path.ends_with('/') {
+            return;
+        }
+        let name = match self.sidebar.selected_dir() {
+            _ if Path::new(path).is_absolute() => self.name_of(path),
+            Some(dir) => format!("{dir}/{path}"),
+            None => path.to_string(),
+        };
+        let full = self.root.join(&name);
+        let made = full
+            .parent()
+            .map_or(Ok(()), std::fs::create_dir_all)
+            .and_then(|()| match std::fs::File::create_new(&full) {
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+                r => r.map(drop),
+            });
+        if let Err(e) = made {
+            self.notice = Some(format!("couldn't make {name}: {e}"));
+            return;
+        }
+        self.sidebar.add(&name);
+        match self.open(&name, 0) {
+            Ok(()) => self.in_sidebar = false,
+            Err(e) => self.notice = Some(format!("couldn't open {name}: {e}")),
+        }
     }
 
     /// Leaves the editor unless a buffer has unsaved edits. `force` drops them.
@@ -253,8 +286,9 @@ impl Editor {
     pub fn prompt(&self) -> Option<String> {
         let p = self.prompt.as_ref()?;
         let start = match p.line {
-            Line::Command => ':',
-            Line::Search => '/',
+            Line::Command => ":",
+            Line::Search => "/",
+            Line::New => "new: ",
         };
         Some(format!("{start}{}", p.text))
     }
