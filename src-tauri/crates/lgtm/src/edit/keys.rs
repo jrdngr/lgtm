@@ -268,6 +268,8 @@ impl Keys {
                 if self.select() {
                     self.mode = Mode::Normal;
                 }
+                // Yanks go on the system clipboard too.
+                return Action::Copy(self.register.text.clone());
             }
             Cmd::PasteAfter | Cmd::PasteBefore => {
                 let r = self.register.clone();
@@ -411,6 +413,17 @@ impl Keys {
     }
 
     /// Pastes `text`, from the system clipboard, after the selection.
+    /// Puts `text` in: at the cursor while inserting, else after the selection.
+    pub fn put_text(&mut self, b: &mut Buffer, text: &str) {
+        if self.mode == Mode::Insert {
+            let at = b.sel.head;
+            b.insert(at, text);
+            b.sel = Sel::point(at + text.chars().count());
+        } else {
+            self.paste_text(b, text);
+        }
+    }
+
     pub fn paste_text(&mut self, b: &mut Buffer, text: &str) {
         let r = Register {
             text: text.to_string(),

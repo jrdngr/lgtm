@@ -335,6 +335,9 @@ impl App {
                             return Ok(());
                         }
                     }
+                    Event::Paste(text) if self.screen == Screen::Editor && !self.help => {
+                        self.buffers.paste(&text);
+                    }
                     Event::Mouse(_) if self.help => {}
                     Event::Mouse(ev) => match self.screen {
                         Screen::Editor => self.buffers.mouse(ev),

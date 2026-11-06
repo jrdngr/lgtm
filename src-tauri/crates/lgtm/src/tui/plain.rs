@@ -85,6 +85,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                         }
                     }
                     Event::Mouse(ev) if !help => e.mouse(ev),
+                    Event::Paste(text) if !help => e.paste(&text),
                     _ => {}
                 }
             }

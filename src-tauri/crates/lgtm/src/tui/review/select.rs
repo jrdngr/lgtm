@@ -233,7 +233,9 @@ impl Review {
             height: self.height,
             hidden: &[],
         };
-        let action = if key.code == KeyCode::Char('y') && plain && !s.keys.waiting() {
+        let copy = (key.code == KeyCode::Char('y') && plain)
+            || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::SUPER));
+        let action = if copy && !s.keys.waiting() {
             Action::Copy(String::new())
         } else {
             s.keys.press(&mut s.buf, key, view)

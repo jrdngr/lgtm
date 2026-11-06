@@ -429,8 +429,52 @@ impl Editor {
             || self.keys.waiting()
     }
 
+    /// Takes text the terminal pasted: into the line being typed, else the text.
+    pub fn paste(&mut self, text: &str) {
+        self.notice = None;
+        if let Some(p) = self.prompt.as_mut() {
+            p.text.push_str(&text.replace(['\n', '\r'], " "));
+            return;
+        }
+        if self.finder.is_some() || self.in_sidebar {
+            return;
+        }
+        if let Some(open) = self.open.get_mut(self.cur) {
+            self.keys
+                .put_text(&mut open.buf, &text.replace("\r\n", "\n"));
+        }
+    }
+
+    /// ⌘C copies the selection and ⌘V pastes, where the terminal passes them on.
+    fn command_key(&mut self, key: &KeyEvent) -> bool {
+        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+        if !key.modifiers.contains(KeyModifiers::SUPER) || self.prompt.is_some() {
+            return false;
+        }
+        match key.code {
+            KeyCode::Char('c') => {
+                if let Some(b) = self.current().filter(|b| b.len() > 0) {
+                    let text = b.slice(b.sel.from(), b.sel.to() + 1);
+                    self.act(Action::Copy(text));
+                }
+                true
+            }
+            KeyCode::Char('v') => {
+                match clipboard::paste() {
+                    Ok(text) => self.paste(&text),
+                    Err(e) => self.notice = Some(format!("couldn't paste: {e}")),
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
+        if self.finder.is_none() && !self.in_sidebar && self.command_key(&key) {
+            return Outcome::None;
+        }
         if self.prompt.is_some() {
             return self.prompt_key(key);
         }
@@ -701,5 +745,20 @@ mod tests {
         e.set_files(crate::tui::walk::list(dir.path()));
         e.bases_stale();
         assert_eq!(e.take_base_requests(), ["a.txt"]);
+    }
+
+    #[test]
+    fn a_terminal_paste_types_into_insert_mode_the_command_line_or_after_the_selection() {
+        let (_dir, mut e) = editor_on("ab\n");
+        press(&mut e, "i");
+        e.paste("x\r\ny");
+        press(&mut e, "<esc>");
+        assert_eq!(e.open[0].buf.text.to_string(), "x\nyab\n");
+        e.open[0].buf.sel = Sel::point(0);
+        e.paste("Z");
+        assert_eq!(e.open[0].buf.text.to_string(), "xZ\nyab\n");
+        press(&mut e, ":");
+        e.paste("w\n");
+        assert_eq!(e.prompt.as_ref().map(|p| p.text.as_str()), Some("w "));
     }
 }
