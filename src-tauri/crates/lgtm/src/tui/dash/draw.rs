@@ -2,7 +2,7 @@
 //! todo list over the churn.
 
 use lgtm_core::diff::RowKind;
-use lgtm_core::store::{AgentActivity, TodoStatus};
+use lgtm_core::store::TodoStatus;
 use ratatui::layout::Rect;
 
 use super::diff::{self, Line};
@@ -11,7 +11,7 @@ use crate::tui::files::FileTree;
 use crate::tui::paint::Canvas;
 use crate::tui::picker::Picker;
 use crate::tui::theme::{
-    self, ACCENT, ADD, BG, DEL, FAINT, FG, FRESH, GREEN, HAIR, MUTED, PANEL, RED, SEL, TEAL,
+    self, ACCENT, ADD, BG, DEL, FAINT, FG, FRESH, GREEN, HAIR, MUTED, PANEL, RED, SEL,
 };
 
 /// How many rows the churn chart takes at most, and at least, with its title and totals.
@@ -19,38 +19,6 @@ const CHURN: u16 = 12;
 const CHURN_MIN: u16 = 7;
 
 impl Dash {
-    /// The running turn after the title at `x` of the top bar: its prompt, then its line
-    /// counts and how long it has run on the right.
-    pub fn title(&self, c: &mut Canvas, x: u16, y: u16) {
-        let Some(a) = &self.activity else {
-            c.put(x, y, "no agent turn", theme::fg(MUTED).bg(PANEL));
-            return;
-        };
-        let mut x = x;
-        if a.running {
-            x = c.put(x, y, "● ", theme::fg(ACCENT).bg(PANEL));
-        }
-        x = c.put(x, y, "›_ ", theme::fg(TEAL).bg(PANEL));
-        let prompt = a
-            .prompt
-            .as_deref()
-            .and_then(|p| p.lines().next())
-            .unwrap_or("");
-        c.put(x, y, prompt, theme::fg(FG).bg(PANEL));
-        let (added, removed) = a
-            .edits
-            .iter()
-            .fold((0, 0), |(x, y), e| (x + e.added, y + e.removed));
-        let time = elapsed(a);
-        let counts = format!("+{added} −{removed}");
-        let w = (counts.chars().count() + time.chars().count() + 2) as u16;
-        let right = c.area.right().saturating_sub(w + 1);
-        c.fill(right.saturating_sub(1), y, w + 1, PANEL);
-        let x = c.put(right, y, &format!("+{added}"), theme::fg(GREEN).bg(PANEL));
-        let x = c.put(x + 1, y, &format!("−{removed}"), theme::fg(RED).bg(PANEL));
-        c.put(x + 2, y, &time, theme::fg(MUTED).bg(PANEL));
-    }
-
     /// Draws the panes, the home screen's revisions under the todo list and churn.
     pub fn draw(&mut self, c: &mut Canvas, body: Rect, tree: &mut FileTree, log: &mut Picker) {
         let side_w = (body.width * 26 / 100).clamp(20, 48);
@@ -222,15 +190,4 @@ fn clip(text: &str, room: usize) -> String {
     let mut cut: String = text.chars().take(room.saturating_sub(1)).collect();
     cut.push('…');
     cut
-}
-
-/// How long the turn has run, or ran: `1m 42s`, or `42s` under a minute.
-fn elapsed(a: &AgentActivity) -> String {
-    let end = a.ended_at.unwrap_or_else(lgtm_core::turns::now_ms);
-    let s = (end - a.started_at).max(0) / 1000;
-    if s < 60 {
-        format!("{s}s")
-    } else {
-        format!("{}m {:02}s", s / 60, s % 60)
-    }
 }

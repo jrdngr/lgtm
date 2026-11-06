@@ -792,7 +792,6 @@ impl App {
         let area = c.area;
         let top = area.y;
         if self.screen == Screen::Dash {
-            self.dash.title(c, x, top);
             self.dash
                 .draw(c, body, &mut self.home.files, &mut self.home.picker);
             let bottom = area.bottom() - 1;
