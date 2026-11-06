@@ -152,6 +152,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         buffers,
         screen: Screen::Home,
         editor_back: None,
+        review_back: None,
         pr,
         prs: HashMap::new(),
         help: false,
@@ -235,6 +236,8 @@ struct App {
     screen: Screen,
     /// The screen leaving the editor goes back to. `None` quits.
     editor_back: Option<Screen>,
+    /// The screen the review was opened from, which Ctrl-o goes back to.
+    review_back: Option<Screen>,
     /// The PR given on the command line, whose threads `p` pulls.
     pr: Option<String>,
     /// The PR pulled for each review, by its name.
@@ -273,6 +276,7 @@ impl App {
             review.set_pr(pr.clone());
         }
         self.review = Some(review);
+        self.review_back = (!self.direct).then_some(Screen::Home);
         self.screen = Screen::Review;
     }
 
@@ -292,6 +296,23 @@ impl App {
         self.dash.clear();
         self.screen = Screen::Home;
         self.snapshots.store(false, Ordering::Relaxed);
+    }
+
+    /// Goes back to the screen this one was reached from, for Ctrl-o.
+    fn back(&mut self) {
+        let to = match self.screen {
+            Screen::Home => None,
+            Screen::Dash => Some(Screen::Home),
+            Screen::Editor => self.editor_back,
+            Screen::Review => self.review_back,
+        };
+        match to {
+            Some(Screen::Home) => self.go_home(),
+            Some(Screen::Dash) => self.show_dash(),
+            Some(Screen::Review) if self.review.is_some() => self.screen = Screen::Review,
+            Some(Screen::Editor) => self.screen = Screen::Editor,
+            _ => {}
+        }
     }
 
     /// Reads the newest turn again, and its diff when its edits changed.
@@ -342,6 +363,7 @@ impl App {
             r.go_to_line(path, line, text);
         }
         self.screen = Screen::Review;
+        self.review_back = Some(Screen::Editor);
     }
 
     fn run(&mut self, term: &mut Term, rx: &Receiver<Msg>) -> anyhow::Result<()> {
@@ -561,6 +583,10 @@ impl App {
         }
         if self.help {
             self.help = false;
+            return false;
+        }
+        if key.code == KeyCode::Char('o') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            self.back();
             return false;
         }
         if self.screen == Screen::Editor {

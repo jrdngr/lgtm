@@ -138,6 +138,7 @@ pub struct Review {
 pub const KEYS: &[(&str, &str)] = &[
     ("j k", "line"),
     ("Ctrl-d Ctrl-u", "half page"),
+    ("Ctrl-o", "back"),
     ("g G", "top, bottom"),
     ("n N", "next, previous file"),
     ("m M", "next, previous syntax item"),

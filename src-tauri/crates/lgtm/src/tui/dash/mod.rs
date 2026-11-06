@@ -48,6 +48,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("C-d C-u", "page"),
     ("g G", "top, bottom"),
     ("Enter", "open in review, or open the file"),
+    ("C-o", "back"),
     (":h", "home"),
     (":q", "quit"),
 ];

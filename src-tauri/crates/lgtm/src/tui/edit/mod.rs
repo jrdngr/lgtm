@@ -488,14 +488,16 @@ impl Editor {
 
     /// The keys for `?`.
     pub fn help_keys(&self) -> Vec<(&'static str, &'static str)> {
-        if self.resolver().is_some() {
-            return resolve::KEYS.to_vec();
-        }
-        crate::edit::keymap::BINDS
-            .iter()
-            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
-            .map(|b| (b.keys, b.label))
-            .collect()
+        let mut keys: Vec<_> = match self.resolver() {
+            Some(_) => resolve::KEYS.to_vec(),
+            None => crate::edit::keymap::BINDS
+                .iter()
+                .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
+                .map(|b| (b.keys, b.label))
+                .collect(),
+        };
+        keys.push(("C-o", "back"));
+        keys
     }
 
     /// Takes text the terminal pasted: into the line being typed, else the text.
