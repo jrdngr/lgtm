@@ -65,7 +65,12 @@ pub struct Home {
 const SIDE_MIN: u16 = 20;
 
 /// The `:` commands, for the menu over the command line.
-const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("heat", "heat on the files"), ("q", "quit")];
+const COMMANDS: &[(&str, &str)] = &[
+    ("h", "home"),
+    ("heat", "heat on the files"),
+    ("side", "files on the other side"),
+    ("q", "quit"),
+];
 
 impl Default for Home {
     fn default() -> Self {
@@ -153,6 +158,7 @@ impl Home {
                 match line.trim() {
                     "q" | "q!" | "quit" => return Outcome::Quit,
                     "heat" => self.files.heat_on = !self.files.heat_on,
+                    "side" => crate::tui::side::toggle(),
                     "h" | "home" | "" => {}
                     other => self.notice = Some(format!("no command {other}")),
                 }
@@ -335,8 +341,9 @@ impl Home {
         if self.cmd.is_some() {
             return self.command_key(key);
         }
-        if let Some(step) = width::step(&key) {
-            self.revisions_width = Some(width::moved(self.drawn_width, step, SIDE_MIN));
+        if let Some(step) = crate::tui::side::files_step(&key) {
+            // The width kept is the revisions side's, which a step widens the other way.
+            self.revisions_width = Some(width::moved(self.drawn_width, -step, SIDE_MIN));
             return Outcome::None;
         }
         if key.code == KeyCode::Char('d') && self.focus == Focus::Revisions {
@@ -384,8 +391,14 @@ impl Home {
         if !self.jj_mode() {
             return body;
         }
-        let x = body.x + self.drawn_width + 2;
-        Rect::new(x, body.y, body.right().saturating_sub(x), body.height)
+        let files_w = body.width.saturating_sub(self.drawn_width + 1);
+        let (files, ..) = crate::tui::side::split(body, files_w);
+        Rect::new(
+            files.x + 1,
+            files.y,
+            files.width.saturating_sub(1),
+            files.height,
+        )
     }
 
     /// jj mode's badge for the key bar, gray while a jj action runs.
@@ -444,13 +457,8 @@ impl Home {
             body.width.saturating_sub(SIDE_MIN + 1),
         );
         self.drawn_width = left_w;
-        let left = Rect::new(body.x, body.y, left_w, body.height);
-        let right = Rect::new(
-            body.x + left_w + 1,
-            body.y,
-            body.width.saturating_sub(left_w + 1),
-            body.height,
-        );
+        let files_w = body.width.saturating_sub(left_w + 1);
+        let (right, divider, left) = crate::tui::side::split(body, files_w);
         {
             let mut sub = Canvas::new(&mut *c.buf, left);
             self.picker
@@ -467,7 +475,7 @@ impl Home {
         // jj mode's frame stands in for the divider.
         if !self.jj_mode() {
             for y in body.y..body.bottom() {
-                c.put(body.x + left_w, y, "│", theme::fg(HAIR).bg(BG));
+                c.put(divider, y, "│", theme::fg(HAIR).bg(BG));
             }
         }
         let mut sub = Canvas::new(&mut *c.buf, right);

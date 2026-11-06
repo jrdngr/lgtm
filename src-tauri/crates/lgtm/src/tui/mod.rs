@@ -17,6 +17,7 @@ mod plain;
 mod review;
 mod serve;
 mod settings;
+mod side;
 mod term;
 mod theme;
 mod versions;

@@ -59,14 +59,20 @@ impl Dash {
             self.draw_diff(c, body);
             return;
         }
-        let mid_x = body.x + files_w + 1;
+        // The files on their side, the turn and the log on the other, the diff between.
         let mid_w = body.width - files_w - side_w - 2;
-        let side_x = mid_x + mid_w + 1;
+        let left = crate::tui::side::files_left();
+        let (files_x, side_x) = if left {
+            (body.x, body.right() - side_w)
+        } else {
+            (body.right() - files_w, body.x)
+        };
+        let mid_x = body.x + if left { files_w } else { side_w } + 1;
         for y in body.y..body.bottom() {
-            c.put(body.x + files_w, y, "│", theme::fg(HAIR).bg(BG));
-            c.put(side_x - 1, y, "│", theme::fg(HAIR).bg(BG));
+            c.put(mid_x - 1, y, "│", theme::fg(HAIR).bg(BG));
+            c.put(mid_x + mid_w, y, "│", theme::fg(HAIR).bg(BG));
         }
-        let files = Rect::new(body.x, body.y, files_w, body.height);
+        let files = Rect::new(files_x, body.y, files_w, body.height);
         let focused = self.focus == Focus::Files;
         let end = c.put(files.x + 1, files.y, "Files", theme::title(focused).bg(BG));
         crate::tui::heat::mark(c, end, files.y, tree.heat_on);

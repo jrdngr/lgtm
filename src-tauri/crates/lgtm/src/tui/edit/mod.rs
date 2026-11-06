@@ -298,7 +298,7 @@ impl Editor {
     fn sidebar_key(&mut self, key: KeyEvent) {
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        if let Some(step) = width::step(&key) {
+        if let Some(step) = crate::tui::side::files_step(&key) {
             self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
             return;
         }

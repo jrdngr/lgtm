@@ -45,7 +45,12 @@ pub const KEYS: &[(&str, &str)] = &[
 ];
 
 /// The `:` commands, for the menu over the command line.
-const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("heat", "heat on the files"), ("q", "quit")];
+const COMMANDS: &[(&str, &str)] = &[
+    ("h", "home"),
+    ("heat", "heat on the files"),
+    ("side", "files on the other side"),
+    ("q", "quit"),
+];
 
 pub struct Dash {
     /// The workspace's newest agent turn.
@@ -192,6 +197,7 @@ impl Dash {
                 match line.trim() {
                     "h" | "home" => return Outcome::Home,
                     "heat" => tree.heat_on = !tree.heat_on,
+                    "side" => crate::tui::side::toggle(),
                     "q" | "q!" | "quit" => return Outcome::Quit,
                     "" => {}
                     other => self.notice = Some(format!("no command {other}")),

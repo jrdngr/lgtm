@@ -13,6 +13,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("wa", "save all"),
     ("h", "home"),
     ("heat", "heat on the files"),
+    ("side", "files on the other side"),
     ("q", "leave the editor"),
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
@@ -124,6 +125,7 @@ impl Editor {
             }
             "h" | "home" => return Outcome::Home,
             "heat" => self.sidebar.heat_on = !self.sidebar.heat_on,
+            "side" => crate::tui::side::toggle(),
             "q" | "qa" => return self.leave(false),
             "q!" | "qa!" => return self.leave(true),
             "close" | "c" => return self.close(),

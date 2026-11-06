@@ -130,24 +130,20 @@ impl Editor {
         self.sidebar_width = side;
         let open = &self.open;
         let marked = |p: &str| open.iter().any(|o| o.buf.name == p && o.buf.dirty());
-        let tree = Rect::new(body.x, body.y + 1, side - 1, body.height - 1);
+        let (files, divider, rest) = crate::tui::side::split(body, side.saturating_sub(1));
+        let tree = Rect::new(files.x, files.y + 1, files.width, files.height - 1);
         self.sidebar.draw(c, tree, self.in_sidebar, &marked);
         let end = c.put(
-            body.x + 1,
+            files.x + 1,
             body.y,
             "Files",
             theme::title(self.in_sidebar).bg(BG),
         );
         crate::tui::heat::mark(c, end, body.y, self.sidebar.heat_on);
         for y in body.y..body.bottom() {
-            c.put(body.x + side, y, "│", theme::fg(HAIR).bg(BG));
+            c.put(divider, y, "│", theme::fg(HAIR).bg(BG));
         }
-        Rect::new(
-            body.x + side + 1,
-            body.y,
-            body.width - side - 1,
-            body.height,
-        )
+        rest
     }
 
     pub fn draw(&mut self, c: &mut Canvas, full: Rect) {

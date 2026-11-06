@@ -21,6 +21,8 @@ pub struct Settings {
     pub review_files_width: Option<u16>,
     pub editor_files_width: Option<u16>,
     pub home_revisions_width: Option<u16>,
+    /// The file trees and lists on the left, not the right.
+    pub files_left: bool,
 }
 
 impl Default for Settings {
@@ -36,6 +38,7 @@ impl Default for Settings {
             review_files_width: None,
             editor_files_width: None,
             home_revisions_width: None,
+            files_left: false,
         }
     }
 }
@@ -44,17 +47,29 @@ fn path() -> Option<PathBuf> {
     Some(lgtm_core::paths::data_dir()?.join("tui-settings.json"))
 }
 
-/// The settings last saved, or the defaults.
+/// The settings last saved, or the defaults. The files' side takes effect.
 pub fn load() -> Settings {
+    let settings = load_file();
+    super::side::set_files_left(settings.files_left);
+    settings
+}
+
+/// The settings last saved, or the defaults.
+pub fn load_file() -> Settings {
     path()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .and_then(|text| serde_json::from_str(&text).ok())
         .unwrap_or_default()
 }
 
+/// Saves `settings`, with the files on the side they're on now.
 pub fn save(settings: &Settings) {
     let Some(p) = path() else { return };
-    if let (Some(dir), Ok(text)) = (p.parent(), serde_json::to_string_pretty(settings)) {
+    let settings = Settings {
+        files_left: super::side::files_left(),
+        ..settings.clone()
+    };
+    if let (Some(dir), Ok(text)) = (p.parent(), serde_json::to_string_pretty(&settings)) {
         let _ = std::fs::create_dir_all(dir);
         let _ = std::fs::write(p, text);
     }

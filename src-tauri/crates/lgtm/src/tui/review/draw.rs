@@ -107,14 +107,15 @@ impl Review {
             0
         };
         self.list_area = Rect::default();
+        let mut diff = body;
         if list > 0 {
-            self.draw_list(c, Rect::new(body.x, body.y, list, body.height));
+            let (files, divider, rest) = crate::tui::side::split(body, list);
+            self.draw_list(c, files);
             for y in body.top()..body.bottom() {
-                c.put(body.x + list, y, "│", theme::fg(HAIR).bg(BG));
+                c.put(divider, y, "│", theme::fg(HAIR).bg(BG));
             }
+            diff = rest;
         }
-        let x0 = body.x + list + u16::from(list > 0);
-        let diff = Rect::new(x0, body.y, body.right() - x0, body.height);
         self.draw_diff(&mut Canvas::new(&mut *c.buf, diff));
     }
 

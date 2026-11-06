@@ -25,6 +25,7 @@ const COMMANDS: &[(&str, bool, &str)] = &[
     ("resolved", false, "show or hide resolved comments"),
     ("pull", false, "pull PR comments"),
     ("split", false, "side by side"),
+    ("side", false, "files on the other side"),
     ("edit", false, "open the editor"),
     ("h", false, "back to the home screen"),
     ("q", false, "quit"),
@@ -255,6 +256,7 @@ impl Review {
             "clear" => self.clear(&files, store),
             "clear-all" => self.confirm = Some(Confirm::ClearAll),
             "pull" => return Outcome::Pull,
+            "side" => crate::tui::side::toggle(),
             "split" => {
                 self.split = !self.split;
                 self.relayout();

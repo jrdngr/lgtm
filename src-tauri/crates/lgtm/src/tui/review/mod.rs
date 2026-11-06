@@ -541,7 +541,7 @@ impl Review {
                 _ => Outcome::None,
             };
         }
-        if let Some(step) = width::step(&key) {
+        if let Some(step) = crate::tui::side::files_step(&key) {
             if self.list_area.width > 0 {
                 self.list_width = Some(width::moved(self.list_area.width, step, LIST_MIN));
             }
