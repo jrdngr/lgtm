@@ -1,16 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { AgentActivity, Todo } from "../bindings";
 import { useWorkspace } from "../core/workspace";
 import { decorate } from "../editor/decor";
 import { HeatGlow } from "../editor/HeatGlow";
 import { useCurrentReview } from "../review/current";
-import { Icon } from "../ui/icons";
 import { Empty, SectionHeader } from "../ui/SectionHeader";
-import { elapsed, hotFiles, useAgentActivity } from "./activity";
+import { hotFiles, useAgentActivity } from "./activity";
 import { Churn } from "./Churn";
 import "./agent.css";
 
-/** The Agent sidebar tab: the workspace's newest agent turn, its todo list, each edit's
+/** The Agent sidebar tab: the workspace's newest agent turn's todo list, each edit's
  * churn, and the files it edited glowing as they're written. */
 export function AgentPanel() {
   const workspace = useWorkspace();
@@ -27,7 +26,6 @@ function Activity({ activity }: { activity: AgentActivity }) {
   const done = activity.todos.filter((t) => t.status === "completed").length;
   return (
     <div className="agent-body">
-      <TurnLine activity={activity} />
       {activity.todos.length > 0 && (
         <>
           <SectionHeader title="Todo">
@@ -50,27 +48,6 @@ function Activity({ activity }: { activity: AgentActivity }) {
       </SectionHeader>
       <Churn edits={activity.edits} />
       <HotFiles activity={activity} />
-    </div>
-  );
-}
-
-function TurnLine({ activity }: { activity: AgentActivity }) {
-  const [now, setNow] = useState(Date.now);
-  useEffect(() => {
-    if (!activity.running) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [activity.running]);
-  const start = activity.startedAt ?? now;
-  const end = activity.running ? now : (activity.endedAt ?? now);
-  return (
-    <div className="agent-turn">
-      {activity.running && <span className="agent-running" />}
-      <span className="agent-turn-icon">
-        <Icon name="terminal" size={14} />
-      </span>
-      <span className="agent-prompt">{activity.prompt?.split("\n")[0] ?? "Agent turn"}</span>
-      <span className="agent-time">{elapsed(end - start)}</span>
     </div>
   );
 }

@@ -11,38 +11,6 @@
   overflow-y: auto;
 }
 
-.agent-turn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--hair);
-}
-
-.agent-running {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 3px rgb(79 140 201 / 25%);
-}
-
-.agent-turn-icon {
-  display: flex;
-  flex: none;
-  color: var(--teal);
-}
-
-.agent-prompt {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.agent-time,
 .agent-count {
   color: var(--muted);
   font-variant-numeric: tabular-nums;

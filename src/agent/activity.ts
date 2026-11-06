@@ -30,12 +30,6 @@ export function useAgentActivity(workspace: WorkspaceName): AgentActivity | null
   return store.use(workspace);
 }
 
-/** "1m 42s", or "42s" under a minute. */
-export function elapsed(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
-}
-
 export interface HotFile {
   path: string;
   /** Edits that touched it. */
