@@ -76,6 +76,7 @@ impl Review {
             }
             [one] => {
                 let x = id(c, x, one);
+                let x = self.names(c, x, y);
                 match &self.target {
                     Target::Between { span, .. } => {
                         let x = c.put(x + 2, y, "◇ ", theme::fg(AMBER).bg(PANEL));
@@ -90,9 +91,29 @@ impl Review {
             [oldest, .., newest] => {
                 let x = id(c, x, oldest);
                 let x = c.put(x, y, "..", theme::fg(MUTED).bg(PANEL));
-                id(c, x, newest);
+                let x = id(c, x, newest);
+                self.names(c, x, y);
             }
         }
+    }
+
+    /// The bookmarks and `name@` workspaces that include the newest commit, after `x`, as
+    /// the home screen's log colors them.
+    fn names(&self, c: &mut Canvas, mut x: u16, y: u16) -> u16 {
+        let bookmarks = self
+            .containing
+            .bookmarks
+            .iter()
+            .map(|b| (b.clone(), Color::Magenta));
+        let spaces = self
+            .containing
+            .workspaces
+            .iter()
+            .map(|n| (format!("{n}@"), Color::Green));
+        for (name, color) in bookmarks.chain(spaces) {
+            x = c.put(x + 1, y, &name, theme::fg(color).bg(PANEL));
+        }
+        x
     }
 
     pub fn draw(&mut self, c: &mut Canvas, body: Rect) {

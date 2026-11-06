@@ -34,6 +34,43 @@ impl Jj {
     }
 }
 
+/// The bookmarks and workspaces nearest above a commit that include it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Containing {
+    pub bookmarks: Vec<String>,
+    pub workspaces: Vec<String>,
+}
+
+impl Jj {
+    /// The local bookmarks and workspace working copies on the closest commits at or above
+    /// `rev` that have any.
+    pub async fn containing(&self, rev: &str) -> anyhow::Result<Containing> {
+        let names = |set: &'static str, template: &'static str| {
+            let revset = format!("roots(({rev}):: & {set})");
+            async move {
+                let out = self
+                    .read(&["log", "--no-graph", "-r", &revset, "-T", template])
+                    .await?;
+                anyhow::Ok(out.split_whitespace().map(String::from).collect::<Vec<_>>())
+            }
+        };
+        let (bookmarks, workspaces) = tokio::try_join!(
+            names(
+                "bookmarks()",
+                r#"local_bookmarks.map(|b| b.name()).join(" ") ++ " ""#
+            ),
+            names(
+                "working_copies()",
+                r#"working_copies.map(|w| w.name()).join(" ") ++ " ""#
+            ),
+        )?;
+        Ok(Containing {
+            bookmarks,
+            workspaces,
+        })
+    }
+}
+
 fn parse(out: &str) -> Vec<BookmarkSpot> {
     let mut spots = Vec::new();
     for line in out.lines() {
@@ -96,5 +133,25 @@ mod tests {
         j.act(&create("fresh")).await.unwrap();
         assert_eq!(j.changes("fresh").await.unwrap()[0].change_id, c);
         assert!(j.act(&create("far")).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn containing_names_the_closest_bookmark_at_or_above_and_skips_ones_below() {
+        let (dir, j) = repo();
+        let d = dir.path();
+        for (msg, bookmark) in [("a", Some("below")), ("b", None), ("c", Some("near"))] {
+            jj(d, &["describe", "-m", msg]);
+            if let Some(b) = bookmark {
+                jj(d, &["bookmark", "create", b, "-r", "@"]);
+            }
+            jj(d, &["new"]);
+        }
+        jj(d, &["bookmark", "create", "far", "-r", "@"]);
+        let b = j.changes("@--").await.unwrap()[0].change_id.clone();
+
+        let found = j.containing(&b).await.unwrap();
+        assert_eq!(found.bookmarks, ["near"]);
+        assert!(found.workspaces.is_empty());
+        assert_eq!(j.containing("near").await.unwrap().bookmarks, ["near"]);
     }
 }

@@ -64,6 +64,11 @@ pub enum Msg {
         id: u64,
         result: anyhow::Result<(Vec<Change>, Vec<FileDiff>)>,
     },
+    /// The bookmarks and workspaces nearest above review `id`'s newest commit.
+    Containing {
+        id: u64,
+        found: lgtm_core::jj::Containing,
+    },
     Highlight {
         id: u64,
         file: usize,
@@ -312,6 +317,9 @@ impl Loader {
                 id,
                 result: Ok((changes, files.clone())),
             });
+            if let Ok(found) = jj.containing(&range.to).await {
+                let _ = tx.send(Msg::Containing { id, found });
+            }
             let config = Arc::new(config);
             let commits = Arc::new(Commits {
                 old: range.from.clone(),

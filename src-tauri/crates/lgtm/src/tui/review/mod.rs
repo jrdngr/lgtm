@@ -60,6 +60,8 @@ pub struct Review {
     pub revset: String,
     /// Tells this review's loads apart from an earlier one's.
     pub id: u64,
+    /// The bookmarks and workspaces nearest above its newest commit.
+    pub containing: lgtm_core::jj::Containing,
     changes: Vec<Change>,
     files: Vec<FileDiff>,
     sides: Vec<Option<Sides>>,
@@ -202,6 +204,7 @@ impl Review {
             revset: target.name(),
             target,
             id,
+            containing: Default::default(),
             changes: vec![],
             files: vec![],
             sides: vec![],

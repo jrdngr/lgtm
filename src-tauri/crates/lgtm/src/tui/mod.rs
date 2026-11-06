@@ -487,6 +487,11 @@ impl App {
                     self.snapshots.store(r.working_copy(), Ordering::Relaxed);
                 }
             }
+            Msg::Containing { id, found } => {
+                if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
+                    r.containing = found;
+                }
+            }
             Msg::Files(listing) => {
                 self.home.files.set_listing(listing.clone());
                 self.buffers.set_files(listing);

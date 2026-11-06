@@ -32,7 +32,7 @@ pub mod test_support;
 pub mod workspace;
 pub use at::WorkingCopyDto;
 pub use background::Snapshot;
-pub use bookmarks::BookmarkSpot;
+pub use bookmarks::{BookmarkSpot, Containing};
 pub use child::end_all;
 pub use conflicts::MarkerCommit;
 pub use diff::{DiffPath, FileDiff, Range};
