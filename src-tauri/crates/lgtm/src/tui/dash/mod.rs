@@ -1,6 +1,6 @@
 //! DASH mode: what the workspace's agent is doing while it works. The files glowing as
 //! they're written, a running log of each file's changes since the dashboard was last
-//! cleared, the newest turn's todo list, and its churn.
+//! cleared, the newest turn's todo list, and the churn of every turn since the clear.
 
 mod churn;
 mod diff;
@@ -8,7 +8,7 @@ mod draw;
 
 use lgtm_core::diff::RowKind;
 use lgtm_core::jj::FileDiff;
-use lgtm_core::store::AgentActivity;
+use lgtm_core::store::{AgentActivity, TurnEdit};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::files::{self, FileTree};
@@ -66,6 +66,8 @@ const COMMANDS: &[(&str, &str)] = &[
 pub struct Dash {
     /// The workspace's newest agent turn.
     pub activity: Option<AgentActivity>,
+    /// The edits of the turns before it since the dashboard was cleared, oldest first.
+    earlier: Vec<TurnEdit>,
     /// The commit the next diff starts from: the last one diffed to, or after a clear the
     /// start of the newest turn.
     since: Option<String>,
@@ -92,6 +94,7 @@ impl Default for Dash {
     fn default() -> Self {
         Self {
             activity: None,
+            earlier: vec![],
             since: None,
             diffs: vec![],
             lines: vec![],
@@ -115,6 +118,12 @@ impl Dash {
         let edits =
             |a: &Option<AgentActivity>| a.as_ref().map(|a| (a.start.clone(), a.edits.len()));
         let changed = edits(&self.activity) != edits(&activity);
+        let start = |a: &Option<AgentActivity>| a.as_ref().map(|a| a.start.clone());
+        if start(&self.activity) != start(&activity)
+            && let Some(old) = self.activity.take()
+        {
+            self.earlier.extend(old.edits);
+        }
         self.activity = activity;
         if self.since.is_none() {
             self.since = self.activity.as_ref().map(|a| a.start.clone());
@@ -125,12 +134,19 @@ impl Dash {
     /// Empties the log and starts it again from the newest turn's start. Returns the commit
     /// to diff from.
     pub fn clear(&mut self) -> Option<String> {
+        self.earlier.clear();
         self.diffs.clear();
         self.lines.clear();
         self.fresh = 0;
         self.top = 0;
         self.since = self.activity.as_ref().map(|a| a.start.clone());
         self.since.clone()
+    }
+
+    /// The edits of every turn since the dashboard was cleared, oldest first.
+    fn churn(&self) -> Vec<TurnEdit> {
+        let newest = self.activity.iter().flat_map(|a| &a.edits);
+        self.earlier.iter().chain(newest).cloned().collect()
     }
 
     /// The commit the next diff starts from.
@@ -350,7 +366,6 @@ fn files_key(key: KeyEvent, ctrl: bool, tree: &mut FileTree) -> Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lgtm_core::store::TurnEdit;
 
     fn turn(start: &str, edits: usize) -> Option<AgentActivity> {
         let edit = TurnEdit {
@@ -381,6 +396,17 @@ mod tests {
         assert_eq!(d.set_activity(turn("b", 0)).as_deref(), Some("a"));
         assert_eq!(d.clear().as_deref(), Some("b"));
         assert_eq!(d.set_activity(turn("b", 1)).as_deref(), Some("b"));
+    }
+
+    #[test]
+    fn churn_keeps_earlier_turns_until_cleared() {
+        let mut d = Dash::default();
+        d.set_activity(turn("a", 2));
+        d.set_activity(turn("a", 3));
+        d.set_activity(turn("b", 1));
+        assert_eq!(d.churn().len(), 4);
+        d.clear();
+        assert_eq!(d.churn().len(), 1);
     }
 
     fn loaded(d: &mut Dash, start: &str, files: &[(&str, &[&str])], to: &str) -> Option<String> {

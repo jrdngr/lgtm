@@ -173,12 +173,13 @@ impl Dash {
             return;
         }
         sub.put(x, y, "Churn", theme::title(false).bg(BG));
-        let n = a.edits.len();
-        let edits = format!("{n} edit{}", if n == 1 { "" } else { "s" });
-        sub.put_right(y, 1, &edits, theme::fg(MUTED).bg(BG));
+        let edits = self.churn();
+        let n = edits.len();
+        let count = format!("{n} edit{}", if n == 1 { "" } else { "s" });
+        sub.put_right(y, 1, &count, theme::fg(MUTED).bg(BG));
         let h = CHURN.min(area.bottom() - y - 1);
         let chart = Rect::new(x, y + 2, area.width.saturating_sub(2), h.saturating_sub(1));
-        churn::draw(&mut sub, chart, &a.edits);
+        churn::draw(&mut sub, chart, &edits);
     }
 }
 
