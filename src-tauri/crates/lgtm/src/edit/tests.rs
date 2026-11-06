@@ -86,6 +86,9 @@ fn goto_keys_go_to_file_and_line_ends() {
         ("  a[b]c", "gh", "[ ] abc"),
         ("[a]bc\nd", "gl", "ab[c]\nd"),
         ("  ab[c]", "gs", "  [a]bc"),
+        ("  a[b]c", "<home>", "[ ] abc"),
+        ("[a]bc\nd", "<end>", "ab[c]\nd"),
+        ("a[b]c\nd", "i<end>X<home>Y<esc>", "[Y]abcX\nd"),
     ]);
 }
 

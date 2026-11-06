@@ -840,7 +840,7 @@ fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool) {
     if help {
         let keys: Vec<(&str, &str)> = crate::edit::keymap::BINDS
             .iter()
-            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down"))
+            .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
             .map(|b| (b.keys, b.label))
             .collect();
         keybar::help(c, body, &keys);

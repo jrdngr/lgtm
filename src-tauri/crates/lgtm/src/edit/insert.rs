@@ -83,6 +83,8 @@ impl Keys {
             KeyCode::Delete if at < b.len() => b.remove(at, at + 1),
             KeyCode::Left => b.sel = Sel::point(at.saturating_sub(1)),
             KeyCode::Right => b.sel = Sel::point((at + 1).min(b.len())),
+            KeyCode::Home => b.sel = Sel::point(b.line_start(b.line_of(at))),
+            KeyCode::End => b.sel = Sel::point(b.line_end(b.line_of(at))),
             KeyCode::Up | KeyCode::Down => {
                 let by = if key.code == KeyCode::Up { -1 } else { 1 };
                 let (to, column) = motion::vertical(b, at, by, b.column);

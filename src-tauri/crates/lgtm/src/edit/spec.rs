@@ -100,6 +100,8 @@ pub fn keys(spec: &str) -> Vec<KeyEvent> {
             "right" => KeyCode::Right,
             "up" => KeyCode::Up,
             "down" => KeyCode::Down,
+            "home" => KeyCode::Home,
+            "end" => KeyCode::End,
             one => KeyCode::Char(one.chars().next().expect("a key")),
         };
         out.push(KeyEvent::new(code, mods));
