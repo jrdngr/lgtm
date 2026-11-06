@@ -1,5 +1,6 @@
 //! Tree-sitter: languages, highlighting, and symbol ranges.
 
+mod conflict;
 mod items;
 mod langs;
 mod queries;
@@ -37,6 +38,9 @@ pub const HIGHLIGHT_NAMES: &[&str] = &[
     "type",
     "variable.builtin",
     "variable.parameter",
+    "conflict.marker",
+    "diff.minus",
+    "diff.plus",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
@@ -162,7 +166,7 @@ pub fn highlight_file(path: &str, source: &str) -> Vec<Vec<Segment>> {
         .and_then(|k| LANGS.get(k))
         .or_else(named)
     else {
-        return vec![];
+        return conflict::overlay(source, vec![]);
     };
     // jj's notes in a description start `JJ:`: as `#` lines they're the comments git's are.
     let jj;
@@ -181,9 +185,10 @@ pub fn highlight_file(path: &str, source: &str) -> Vec<Vec<Segment>> {
     };
     let mut by_line = highlight_lines(lang, source, |_| true);
     let count = source.split('\n').count() as u32;
-    (1..=count)
+    let lines = (1..=count)
         .map(|l| by_line.remove(&l).unwrap_or_default())
-        .collect()
+        .collect();
+    conflict::overlay(source, lines)
 }
 
 fn highlight_lines(

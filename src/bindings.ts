@@ -591,7 +591,7 @@ export const events = {
 };
 
 /* Constants */
-export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","escape","function","keyword","label","module","number","operator","property","punctuation","string","tag","type","variable.builtin","variable.parameter"] as const;
+export const HIGHLIGHT_NAMES = ["attribute","comment","constant","constructor","escape","function","keyword","label","module","number","operator","property","punctuation","string","tag","type","variable.builtin","variable.parameter","conflict.marker","diff.minus","diff.plus"] as const;
 
 /* Types */
 export type Action = {

@@ -45,3 +45,15 @@
 .hl-punctuation {
   color: #d4d4d4;
 }
+
+.hl-conflict-marker {
+  color: #d29922;
+}
+
+.hl-diff-minus {
+  color: #f85149;
+}
+
+.hl-diff-plus {
+  color: #3fb950;
+}

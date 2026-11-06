@@ -64,6 +64,9 @@ pub fn syntax(name: &str) -> Color {
         "module" | "tag" | "type" => rgb(0x4ec9b0),
         "string" => rgb(0xce9178),
         "variable.builtin" => rgb(0x569cd6),
+        "conflict.marker" => AMBER,
+        "diff.minus" => RED,
+        "diff.plus" => GREEN,
         _ => FG,
     }
 }
