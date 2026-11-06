@@ -1,5 +1,6 @@
 //! DASH mode: what the workspace's agent is doing while it works. The files glowing as
-//! they're written, the turn's diff following each new hunk, its todo list, and its churn.
+//! they're written, the diff since the dashboard was last cleared following each new hunk,
+//! the newest turn's todo list, and its churn.
 
 mod churn;
 mod diff;
@@ -24,7 +25,12 @@ pub enum Outcome {
     Edit(String),
     /// Open the working copy's review on a path's line, with that line's text.
     Review(String, u32, String),
+    /// Start the diff again from the newest turn.
+    Clear,
 }
+
+/// The files' narrowest width.
+const FILES_MIN: u16 = 16;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Focus {
@@ -36,6 +42,8 @@ enum Focus {
 pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "files, diff"),
     ("f", "follow the newest change"),
+    ("c", "clear the diff"),
+    ("< >", "resize the files"),
     ("j k", "move"),
     ("C-d C-u", "page"),
     ("g G", "top, bottom"),
@@ -47,6 +55,7 @@ pub const KEYS: &[(&str, &str)] = &[
 /// The `:` commands, for the menu over the command line.
 const COMMANDS: &[(&str, &str)] = &[
     ("h", "home"),
+    ("clear", "clear the diff"),
     ("heat", "heat on the files"),
     ("side", "files on the other side"),
     ("q", "quit"),
@@ -55,10 +64,13 @@ const COMMANDS: &[(&str, &str)] = &[
 pub struct Dash {
     /// The workspace's newest agent turn.
     pub activity: Option<AgentActivity>,
-    /// The turn's diff so far, and its lines.
+    /// The commit the diff starts from: the start of the first turn since the dashboard
+    /// was cleared.
+    since: Option<String>,
+    /// The diff so far, and its lines.
     diffs: Vec<FileDiff>,
     lines: Vec<Line>,
-    /// Whether the turn's diff loaded since the turn started.
+    /// Whether the diff loaded since it was cleared.
     loaded: bool,
     /// Rows the latest load added.
     fresh: HashSet<(usize, usize, usize)>,
@@ -73,12 +85,16 @@ pub struct Dash {
     /// The `:` line being typed.
     cmd: Option<String>,
     pub notice: Option<String>,
+    /// The files' width once `<` or `>` set it, and as last drawn.
+    pub files_width: Option<u16>,
+    files_drawn: u16,
 }
 
 impl Default for Dash {
     fn default() -> Self {
         Self {
             activity: None,
+            since: None,
             diffs: vec![],
             lines: vec![],
             loaded: false,
@@ -90,35 +106,43 @@ impl Default for Dash {
             focus: Focus::Diff,
             cmd: None,
             notice: None,
+            files_width: None,
+            files_drawn: 0,
         }
     }
 }
 
 impl Dash {
     /// Takes the newest turn. Returns the commit to diff from when the turn or its edits
-    /// changed.
+    /// changed. A new turn adds to the diff; only clearing starts it again.
     pub fn set_activity(&mut self, activity: Option<AgentActivity>) -> Option<String> {
         let edits =
             |a: &Option<AgentActivity>| a.as_ref().map(|a| (a.start.clone(), a.edits.len()));
         let changed = edits(&self.activity) != edits(&activity);
-        if self.activity.as_ref().map(|a| &a.start) != activity.as_ref().map(|a| &a.start) {
-            self.diffs.clear();
-            self.lines.clear();
-            self.loaded = false;
-            self.fresh.clear();
-            self.top = 0;
-        }
         self.activity = activity;
-        let start = self.activity.as_ref().map(|a| a.start.clone());
-        start.filter(|_| changed)
+        if self.since.is_none() {
+            self.since = self.activity.as_ref().map(|a| a.start.clone());
+        }
+        self.since.clone().filter(|_| changed)
     }
 
-    /// The commit the turn started on, to diff from.
+    /// Starts the diff again from the newest turn's start. Returns the commit to diff from.
+    pub fn clear(&mut self) -> Option<String> {
+        self.diffs.clear();
+        self.lines.clear();
+        self.loaded = false;
+        self.fresh.clear();
+        self.top = 0;
+        self.since = self.activity.as_ref().map(|a| a.start.clone());
+        self.since.clone()
+    }
+
+    /// The commit the diff starts from.
     pub fn start(&self) -> Option<&str> {
-        self.activity.as_ref().map(|a| a.start.as_str())
+        self.since.as_deref()
     }
 
-    /// Takes the turn's diff from `start`. A stale one, or one that failed, is dropped.
+    /// Takes the diff from `start`. A stale one, or one that failed, is dropped.
     pub fn diff_loaded(&mut self, start: &str, result: anyhow::Result<Vec<FileDiff>>) {
         if self.start() != Some(start) {
             return;
@@ -196,6 +220,7 @@ impl Dash {
                 let line = self.cmd.take().unwrap_or_default();
                 match line.trim() {
                     "h" | "home" => return Outcome::Home,
+                    "clear" => return Outcome::Clear,
                     "heat" => tree.heat_on = !tree.heat_on,
                     "side" => crate::tui::side::toggle(),
                     "q" | "q!" | "quit" => return Outcome::Quit,
@@ -215,8 +240,13 @@ impl Dash {
             return self.command_key(key, tree);
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        if let Some(step) = crate::tui::side::files_step(&key) {
+            self.files_width = Some(crate::tui::width::moved(self.files_drawn, step, FILES_MIN));
+            return Outcome::None;
+        }
         match key.code {
             KeyCode::Char(':') => self.cmd = Some(String::new()),
+            KeyCode::Char('c') => return Outcome::Clear,
             KeyCode::Tab => {
                 self.focus = match self.focus {
                     Focus::Files => Focus::Diff,
@@ -280,6 +310,7 @@ impl Dash {
         vec![
             ("Tab", "pane", false),
             ("f", "follow", self.following),
+            ("c", "clear", false),
             ("Enter", "open in review", false),
             (":h", "home", false),
             (":q", "quit", false),
@@ -341,12 +372,14 @@ mod tests {
     }
 
     #[test]
-    fn the_diff_reloads_only_when_the_turn_or_its_edits_change() {
+    fn a_new_turn_adds_to_the_diff_from_the_first_and_clearing_starts_from_the_newest() {
         let mut d = Dash::default();
         assert_eq!(d.set_activity(turn("a", 1)).as_deref(), Some("a"));
         assert_eq!(d.set_activity(turn("a", 1)), None);
         assert_eq!(d.set_activity(turn("a", 2)).as_deref(), Some("a"));
-        assert_eq!(d.set_activity(turn("b", 0)).as_deref(), Some("b"));
+        assert_eq!(d.set_activity(turn("b", 0)).as_deref(), Some("a"));
+        assert_eq!(d.clear().as_deref(), Some("b"));
+        assert_eq!(d.set_activity(turn("b", 1)).as_deref(), Some("b"));
     }
 
     #[test]

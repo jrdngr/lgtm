@@ -158,6 +158,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.buffers.files = app.settings.files;
     app.buffers.files_width = app.settings.editor_files_width;
     app.home.revisions_width = app.settings.home_revisions_width;
+    app.dash.files_width = app.settings.dash_files_width;
     app.home.files.heat_on = app.settings.heat;
     app.buffers.set_heat_on(app.settings.heat);
     app.loader.log();
@@ -265,6 +266,7 @@ impl App {
     /// Goes to the home screen from any other, closing the review.
     fn go_home(&mut self) {
         self.review = None;
+        self.dash.clear();
         self.screen = Screen::Home;
         self.snapshots.store(false, Ordering::Relaxed);
     }
@@ -575,8 +577,18 @@ impl App {
             }
             let outcome = self.dash.key(key, &mut self.home.files);
             self.save_heat();
+            if self.dash.files_width != self.settings.dash_files_width {
+                self.settings.dash_files_width = self.dash.files_width;
+                settings::save(&self.settings);
+            }
             return match outcome {
                 dash::Outcome::None => false,
+                dash::Outcome::Clear => {
+                    if let Some(start) = self.dash.clear() {
+                        self.loader.turn_diff(start);
+                    }
+                    false
+                }
                 dash::Outcome::Home => {
                     self.go_home();
                     false

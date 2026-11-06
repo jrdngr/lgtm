@@ -53,8 +53,11 @@ impl Dash {
 
     /// Draws the panes, the home screen's revisions under the todo list and churn.
     pub fn draw(&mut self, c: &mut Canvas, body: Rect, tree: &mut FileTree, log: &mut Picker) {
-        let files_w = (body.width * 22 / 100).clamp(16, 40);
         let side_w = (body.width * 26 / 100).clamp(20, 48);
+        let most = body.width.saturating_sub(side_w + 22);
+        let default = (body.width * 22 / 100).clamp(super::FILES_MIN, 40);
+        let files_w = crate::tui::width::fit(self.files_width, default, super::FILES_MIN, most);
+        self.files_drawn = files_w;
         if body.width < files_w + side_w + 20 || body.height < 3 {
             self.draw_diff(c, body);
             return;
