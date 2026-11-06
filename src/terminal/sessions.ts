@@ -107,6 +107,8 @@ const PROMPTED_MS = 15_000;
 /** How long a working agent can go without output before it counts as done: Claude Code's
  * spinner writes every second while it works, so this means its Stop hook was lost. */
 const QUIET_MS = 20_000;
+/** How long a terminal's size holds still before Claude Code in it is told to redraw. */
+const REDRAW_AFTER_MS = 300;
 /** How long a terminal's size holds still before its shell starts. */
 const SETTLE_MS = 250;
 /** The longest a shell waits for its terminal's size to hold still. */
@@ -210,9 +212,23 @@ function startSession(
       if (early) commands.ptyWrite(pty, early);
       early = "";
       // Resizes while it started weren't sent.
-      if (term.cols !== cols || term.rows !== rows) commands.ptyResize(pty, term.cols, term.rows);
+      if (term.cols !== cols || term.rows !== rows) resized(term.cols, term.rows);
     }
   });
+
+  let redraw: number | undefined;
+  /** Sends the PTY its new size. Claude Code can leave blank rows behind when its terminal
+   * resizes while it draws, as when a resumed session starts while the window takes its
+   * place, so once the size holds still it gets Ctrl+L, which redraws it. */
+  function resized(cols: number, rows: number) {
+    if (pty === undefined) return;
+    commands.ptyResize(pty, cols, rows);
+    if (!launched && !hooked) return;
+    clearTimeout(redraw);
+    redraw = window.setTimeout(() => {
+      if (pty !== undefined && !exited && (launched || hooked)) commands.ptyWrite(pty, "\x0c");
+    }, REDRAW_AFTER_MS);
+  }
 
   function send(data: string) {
     if (pty === undefined) early += data;
@@ -237,7 +253,7 @@ function startSession(
       else if (isAgentTitle(t)) set(agent === "running" ? "done" : "idle");
       else set("gone");
     }),
-    term.onResize(({ cols, rows }) => pty !== undefined && commands.ptyResize(pty, cols, rows)),
+    term.onResize(({ cols, rows }) => resized(cols, rows)),
   ];
 
   return {
@@ -261,6 +277,7 @@ function startSession(
     running: async () => (pty === undefined ? null : commands.ptyRunning(pty)),
     dispose() {
       disposed = true;
+      clearTimeout(redraw);
       set("gone");
       unhook();
       for (const s of subs) s.dispose();
