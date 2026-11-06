@@ -94,7 +94,7 @@
     transparent
   );
   box-shadow: inset 2px 0 rgb(var(--heat));
-  animation: heat-fade 6s ease-in forwards;
+  animation: heat-fade 3s ease-in forwards;
 }
 
 .file-tree .heat-toggle[aria-pressed="true"] {

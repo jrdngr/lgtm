@@ -5,7 +5,7 @@ import { remembered } from "../core/remembered";
 import { type WorkspaceName, workspaceKey } from "../core/workspace";
 
 /** How long a write glows in the file trees. */
-export const HEAT_MS = 6000;
+export const HEAT_MS = 3000;
 
 /** Whether the file trees show heat. */
 export const heatOn = remembered("fileHeat", true, [true, false]);

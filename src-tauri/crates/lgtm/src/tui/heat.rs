@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use ratatui::style::Color;
 
 /// How long a write glows.
-pub const FADE: Duration = Duration::from_secs(6);
+pub const FADE: Duration = Duration::from_secs(3);
 /// How much of the tint a fresh write lays over the row.
 const STRENGTH: f32 = 0.38;
 
