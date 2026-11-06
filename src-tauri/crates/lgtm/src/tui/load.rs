@@ -221,6 +221,14 @@ impl Loader {
             .ok()
     }
 
+    /// The files with conflicts in the working copy, snapshotted first.
+    pub fn conflicted(&self) -> anyhow::Result<Vec<String>> {
+        self.rt.block_on(async {
+            let _ = self.jj.snapshot().await;
+            self.jj.conflicted_files("@").await
+        })
+    }
+
     /// Snapshots the working copy, then diffs it against `start`, where a turn began.
     pub fn turn_diff(&self, start: String) {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());

@@ -63,6 +63,8 @@ pub enum Start {
     /// A file, as given relative to the current directory, at a line from 1. A folder opens
     /// the list of files.
     File(PathBuf, u32),
+    /// Every file with conflicts in the working copy.
+    Conflicts,
 }
 
 /// Which screen is up.
@@ -95,7 +97,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     .unwrap_or_else(|| cwd.clone());
     let file = target.as_ref().filter(|(t, _)| !t.is_dir());
     let Some(root) = crate::agent::workspace(&near) else {
-        if matches!(start, Start::Revset(_)) {
+        if matches!(start, Start::Revset(_) | Start::Conflicts) {
             eprintln!("lgtm: not in a jj repo");
             return 1;
         }
@@ -167,6 +169,26 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.loader.decor();
     match start {
         Start::Home => {}
+        Start::Conflicts => {
+            let names = match app.loader.conflicted() {
+                Ok(names) => names,
+                Err(e) => {
+                    eprintln!("lgtm: {e:#}");
+                    return 1;
+                }
+            };
+            let Some(first) = names.first() else {
+                eprintln!("lgtm: no conflicts in the working copy");
+                return 0;
+            };
+            for name in names.iter().chain([first]) {
+                if let Err(e) = app.buffers.open(name, 1) {
+                    eprintln!("lgtm: couldn't open {name}: {e}");
+                    return 1;
+                }
+            }
+            app.screen = Screen::Editor;
+        }
         Start::Revset(revset) => app.open(Target::Revset(revset)),
         Start::File(..) => {
             match file {

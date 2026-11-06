@@ -46,6 +46,15 @@ impl Jj {
             .collect())
     }
 
+    /// The repo-relative paths of the files with conflicts in `rev`, as of the last snapshot.
+    pub async fn conflicted_files(&self, rev: &str) -> anyhow::Result<Vec<String>> {
+        let template = r#"if(conflict, path ++ "\n")"#;
+        let out = self
+            .read_lossy(&["file", "list", "-r", rev, "-T", template])
+            .await?;
+        Ok(out.lines().map(str::to_string).collect())
+    }
+
     /// Whether `path` is in `commit`.
     pub async fn has_file(&self, commit: &str, path: &str) -> anyhow::Result<bool> {
         let found = self.files_at(commit, &[path.to_string()]).await?;
