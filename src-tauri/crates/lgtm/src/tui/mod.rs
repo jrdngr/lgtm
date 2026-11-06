@@ -720,7 +720,8 @@ impl App {
         let top = area.y;
         if self.screen == Screen::Dash {
             self.dash.title(c, x, top);
-            self.dash.draw(c, body, &mut self.home.files);
+            self.dash
+                .draw(c, body, &mut self.home.files, &mut self.home.picker);
             let bottom = area.bottom() - 1;
             if let Some(n) = &self.dash.notice {
                 c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));

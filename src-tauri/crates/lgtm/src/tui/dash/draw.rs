@@ -9,12 +9,14 @@ use super::diff::{self, Line};
 use super::{Dash, Focus, churn};
 use crate::tui::files::FileTree;
 use crate::tui::paint::Canvas;
+use crate::tui::picker::Picker;
 use crate::tui::theme::{
     self, ACCENT, ADD, BG, DEL, FAINT, FG, FRESH, GREEN, HAIR, MUTED, PANEL, RED, SEL, TEAL,
 };
 
-/// How many rows the churn chart takes, with its title and totals.
+/// How many rows the churn chart takes at most, and at least, with its title and totals.
 const CHURN: u16 = 12;
+const CHURN_MIN: u16 = 7;
 
 impl Dash {
     /// The running turn after the title at `x` of the top bar: its prompt, then its line
@@ -49,7 +51,8 @@ impl Dash {
         c.put(x + 2, y, &time, theme::fg(MUTED).bg(PANEL));
     }
 
-    pub fn draw(&mut self, c: &mut Canvas, body: Rect, tree: &mut FileTree) {
+    /// Draws the panes, the home screen's revisions under the todo list and churn.
+    pub fn draw(&mut self, c: &mut Canvas, body: Rect, tree: &mut FileTree, log: &mut Picker) {
         let files_w = (body.width * 22 / 100).clamp(16, 40);
         let side_w = (body.width * 26 / 100).clamp(20, 48);
         if body.width < files_w + side_w + 20 || body.height < 3 {
@@ -70,7 +73,19 @@ impl Dash {
         let rows = Rect::new(files.x, files.y + 1, files.width, files.height - 1);
         tree.draw(c, rows, focused, &|_| false);
         self.draw_diff(c, Rect::new(mid_x, body.y, mid_w, body.height));
-        self.draw_side(c, Rect::new(side_x, body.y, side_w, body.height));
+        let top = body.height / 2;
+        self.draw_side(c, Rect::new(side_x, body.y, side_w, top));
+        let rule = "─".repeat(usize::from(side_w));
+        c.put(side_x, body.y + top, &rule, theme::fg(HAIR).bg(BG));
+        let revisions = Rect::new(side_x, body.y + top + 1, side_w, body.height - top - 1);
+        let mut sub = Canvas::new(&mut *c.buf, revisions);
+        log.draw(&mut sub, revisions, false);
+        sub.put(
+            side_x + 1,
+            revisions.y,
+            "Revisions",
+            theme::title(false).bg(BG),
+        );
     }
 
     fn draw_diff(&mut self, c: &mut Canvas, area: Rect) {
@@ -159,7 +174,7 @@ impl Dash {
             y += 1;
             let room = usize::from(area.width.saturating_sub(4));
             for t in &a.todos {
-                if y + CHURN + 1 >= area.bottom() {
+                if y + CHURN_MIN + 1 >= area.bottom() {
                     break;
                 }
                 let (mark, color, text, bg) = match t.status {
