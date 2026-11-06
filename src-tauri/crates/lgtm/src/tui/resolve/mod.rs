@@ -6,7 +6,7 @@ mod layout;
 
 use std::path::Path;
 
-use lgtm_core::resolve::{Choice, Fate, ResolveView, Session};
+use lgtm_core::resolve::{Fate, FileChoice, ResolveView, Session};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::edit::buffer::{Buffer, Sel};
@@ -264,11 +264,11 @@ impl Resolver {
                 let changed = self.session.redo();
                 self.act(changed);
             }
-            KeyCode::Char('F') => choose(self, Choice::Keep),
-            KeyCode::Char('D') => choose(self, Choice::Delete),
-            KeyCode::Char('c') => choose(self, Choice::Carry),
-            KeyCode::Char('b') => choose(self, Choice::Both),
-            KeyCode::Char('x') => choose(self, Choice::Drop),
+            KeyCode::Char('F') => choose(self, FileChoice::Keep),
+            KeyCode::Char('D') => choose(self, FileChoice::Delete),
+            KeyCode::Char('c') => choose(self, FileChoice::Carry),
+            KeyCode::Char('b') => choose(self, FileChoice::Both),
+            KeyCode::Char('x') => choose(self, FileChoice::Drop),
             _ => {}
         }
         Outcome::None
@@ -368,17 +368,17 @@ impl Resolver {
     }
 
     /// The file bar's choices for the file's fate: key, label, choice.
-    fn choices(&self) -> &'static [(&'static str, &'static str, Choice)] {
+    fn choices(&self) -> &'static [(&'static str, &'static str, FileChoice)] {
         match self.view.fate {
             Fate::Here => &[],
             Fate::Deleted { .. } => &[
-                ("F", "Keep file", Choice::Keep),
-                ("D", "Delete file", Choice::Delete),
+                ("F", "Keep file", FileChoice::Keep),
+                ("D", "Delete file", FileChoice::Delete),
             ],
             Fate::Moved { .. } => &[
-                ("c", "Carry edits", Choice::Carry),
-                ("b", "Keep both", Choice::Both),
-                ("x", "Drop edits", Choice::Drop),
+                ("c", "Carry edits", FileChoice::Carry),
+                ("b", "Keep both", FileChoice::Both),
+                ("x", "Drop edits", FileChoice::Drop),
             ],
         }
     }

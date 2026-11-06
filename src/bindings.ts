@@ -392,6 +392,13 @@ export const commands = {
 	 *  its turns show it as the user's edit.
 	 */
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
+	/**  The session on `path`, started from the file when there's none or `fresh` asks. */
+	resolveOpen: (workspace: string | null, path: string, fresh: boolean) => typedError<ResolveView, string>(__TAURI_INVOKE("resolve_open", { workspace, path, fresh })),
+	resolveAct: (workspace: string | null, path: string, act: ResolveAct) => typedError<ResolveView, string>(__TAURI_INVOKE("resolve_act", { workspace, path, act })),
+	/**  Writes what's resolved, between two snapshots of the working copy as a save is. */
+	resolveSave: (workspace: string | null, path: string) => typedError<ResolveSaved, string>(__TAURI_INVOKE("resolve_save", { workspace, path })),
+	/**  Ends the session on `path`, as its tab closes. */
+	resolveClose: (workspace: string | null, path: string) => typedError<null, string>(__TAURI_INVOKE("resolve_close", { workspace, path })),
 	/**
 	 *  Each of `paths` as a workspace file to open, if it is one: relative to the workspace's
 	 *  root, or absolute inside it. Terminals ask this of the paths in their output.
@@ -1100,6 +1107,17 @@ export type ComponentDto = {
 	severity: LookSeverity | null,
 };
 
+export type ConflictView = {
+	index: number,
+	resolved: boolean,
+	/**  The file line, from 1, its text starts on once saved. */
+	line: number,
+	/**  The sides it keeps, in order. */
+	picks: SideView[],
+	/**  The sides it doesn't, numbered sides first and the base last. */
+	rest: SideView[],
+};
+
 export type ContainerDescDto = {
 	id: string,
 	name: string,
@@ -1386,6 +1404,24 @@ export type ExternalDto = {
 	description: string,
 };
 
+/**  What a side did to the file as a whole. */
+export type Fate = 
+/**  No side removed it. */
+{ kind: "here" } | { kind: "deleted"; by: Label } | { kind: "moved"; to: string; by: Label };
+
+/**  What to do with a file one side deleted or moved. */
+export type FileChoice = 
+/**  Deleted: keep the file and resolve its conflicts. */
+"keep" | 
+/**  Deleted: remove the file. */
+"delete" | 
+/**  Moved: make this file's edits to the file it moved to, and remove this one. */
+"carry" | 
+/**  Moved: keep this file as well, resolving its conflicts. */
+"both" | 
+/**  Moved: remove this file and its edits. */
+"drop";
+
 export type FileDto = {
 	path: string,
 	oldPath: string | null,
@@ -1668,6 +1704,18 @@ export type JjPaused = {
 	paused: boolean,
 };
 
+/**  Where a side's text came from. */
+export type Label = {
+	/**  Empty when the marker doesn't name a commit. */
+	changeId: string,
+	commitId: string,
+	/**  The commit's description as the marker quotes it, else the marker's own words. */
+	description: string,
+	/**  Length of the shortest unique prefix of the change id, 0 until jj says. */
+	unique: number,
+	bookmarks: string[],
+};
+
 /**  One step of the change stack. */
 export type LayerDto = {
 	/**  1-based. */
@@ -1917,6 +1965,10 @@ export type Part = {
 	persona: string | null,
 	output: Output,
 };
+
+export type PartView = { kind: "text"; line: number; text: string } | {
+	kind: "conflict",
+} & ConflictView;
 
 /**  A reviewer with a section in a report. */
 export type Persona = {
@@ -2300,6 +2352,36 @@ export type ReportRunChanged = {
 	workspace: string | null,
 };
 
+/**  A change to a session. */
+export type ResolveAct = 
+/**  Keeps side `key` of `conflict` after the others it keeps, or drops it. */
+{ kind: "toggle"; conflict: number; key: number } | 
+/**  Moves the kept side at `from` to `to`. */
+{ kind: "place"; conflict: number; from: number; to: number } | { kind: "edit"; conflict: number; pick: number; text: string } | 
+/**  Switches an edited side between its edit and its text from before. */
+{ kind: "flip"; conflict: number; pick: number } | { kind: "choose"; choice: FileChoice } | { kind: "undo" } | { kind: "redo" };
+
+export type ResolveSaved = {
+	view: ResolveView,
+	saved: Saved,
+};
+
+export type ResolveView = {
+	path: string,
+	fate: Fate,
+	choice: FileChoice | null,
+	/**  Whether saving removes the file. */
+	removing: boolean,
+	parts: PartView[],
+	resolved: number,
+	total: number,
+	/**  Whether nothing is left to resolve. */
+	done: boolean,
+	dirty: boolean,
+	canUndo: boolean,
+	canRedo: boolean,
+};
+
 /**  The commit a design's revision resolves to now. */
 export type ResolvedDto = {
 	commit: string,
@@ -2422,6 +2504,14 @@ export type RowRef = {
 export type RowSpan = {
 	start: number,
 	end: number,
+};
+
+/**  What saving did. */
+export type Saved = {
+	/**  Whether the file was removed. */
+	removed: boolean,
+	/**  A file the edits were carried to that came out with conflicts of its own. */
+	clash: string | null,
 };
 
 export type Session = Session_Serialize | Session_Deserialize;
@@ -2561,6 +2651,18 @@ export type ShapeKind = "rect" | "ellipse" | "diamond";
 /**  The window shows the repo with `label`, asked for from outside the window. */
 export type ShowRepo = {
 	label: string,
+};
+
+export type SideView = {
+	/**  0 for the base, else the side's number. */
+	key: number,
+	label: Label,
+	text: string,
+	/**  The words it changes from the base. */
+	tints: Tint[],
+	/**  Whether it has an edit, and whether it shows the text from before it. */
+	edited: boolean,
+	original: boolean,
 };
 
 /**  How a change compares with the previous session. */
@@ -2958,6 +3060,13 @@ export type ThreadState_Serialize = {
 	summary: string,
 	/**  Set on a thread that answers part of a comment on the PR itself. */
 	quote: Quote | null,
+};
+
+/**  Chars `from..to` of `line`, from 0, that the side changed. */
+export type Tint = {
+	line: number,
+	from: number,
+	to: number,
 };
 
 /**  An item of the agent's todo list. */

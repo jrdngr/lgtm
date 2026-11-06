@@ -8,6 +8,8 @@ import { FindBar, stepKey } from "../find/FindBar";
 import { useCmFind } from "../find/useCmFind";
 import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
+import { hasConflicts } from "../resolve/markers";
+import { ResolvePanel } from "../resolve/ResolvePanel";
 import { ReviewedCheck } from "../review/ReviewedCheck";
 import { useSendText } from "../review/useSendText";
 import { registerEditor } from "../search/lsp";
@@ -41,9 +43,30 @@ const isMarkdown = (path: string) => /\.(md|markdown)$/i.test(path);
 /** Files with a rendered view next to their text. */
 const renders = (path: string) => isMarkdown(path) || isSvg(path) || isHtml(path);
 
-/** A working-copy file in its tab: an image view for images, else the text editor. */
+/** A working-copy file in its tab: an image view for images, the resolver for a file with
+ * conflicts, else the text editor. */
 export function EditorPanel(props: IDockviewPanelProps<EditorParams>) {
-  return imageType(props.params.path) ? <ImagePanel {...props} /> : <TextPanel {...props} />;
+  if (imageType(props.params.path)) return <ImagePanel {...props} />;
+  return <TextOrResolve {...props} />;
+}
+
+/** The resolver while the file has conflicts when the tab opens, else the text editor. */
+function TextOrResolve(props: IDockviewPanelProps<EditorParams>) {
+  const workspace = useWorkspace();
+  const { path, readOnly } = props.params;
+  const [resolving, setResolving] = useState<boolean>();
+  useEffect(() => {
+    let live = true;
+    unwrap(commands.readFile(workspace, path)).then(
+      (text) => live && setResolving(!readOnly && hasConflicts(text)),
+      () => live && setResolving(false),
+    );
+    return () => {
+      live = false;
+    };
+  }, [workspace, path, readOnly]);
+  if (resolving === undefined) return null;
+  return resolving ? <ResolvePanel {...props} /> : <TextPanel {...props} />;
 }
 
 /** A working-copy file in CodeMirror. Saving snapshots the working copy, so reviews of `@`

@@ -10,7 +10,7 @@ mod view;
 use std::path::Path;
 
 pub use parse::Label;
-pub use session::{Choice, Fate, Pick, Saved, Session};
+pub use session::{Fate, FileChoice, Pick, Saved, Session};
 pub use tint::Tint;
 pub use view::{ConflictView, PartView, ResolveView, SideView};
 

@@ -333,7 +333,7 @@ impl Resolver {
             .choices()
             .iter()
             .map(|(k, l, ch)| {
-                let l = if *ch == lgtm_core::resolve::Choice::Carry {
+                let l = if *ch == lgtm_core::resolve::FileChoice::Carry {
                     format!("{l}{to}")
                 } else {
                     l.to_string()

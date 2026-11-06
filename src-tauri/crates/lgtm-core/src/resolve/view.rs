@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::parse::{Label, Part};
-use super::session::{Choice, Fate, Session};
+use super::session::{Fate, FileChoice, Session};
 use super::tint::{Tint, tints};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
@@ -46,7 +46,7 @@ pub enum PartView {
 pub struct ResolveView {
     pub path: String,
     pub fate: Fate,
-    pub choice: Option<Choice>,
+    pub choice: Option<FileChoice>,
     /// Whether saving removes the file.
     pub removing: bool,
     pub parts: Vec<PartView>,

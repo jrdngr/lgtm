@@ -16,6 +16,7 @@ pub mod pty;
 pub mod qa;
 pub mod repo;
 pub mod reports;
+pub mod resolve;
 pub mod review;
 pub mod search;
 pub mod settings;

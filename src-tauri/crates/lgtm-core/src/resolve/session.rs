@@ -11,7 +11,7 @@ use super::parse::{Conflict, Label, Parsed, Part, parse};
 /// What to do with a file one side deleted or moved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub enum Choice {
+pub enum FileChoice {
     /// Deleted: keep the file and resolve its conflicts.
     Keep,
     /// Deleted: remove the file.
@@ -24,10 +24,13 @@ pub enum Choice {
     Drop,
 }
 
-impl Choice {
+impl FileChoice {
     /// Whether saving removes the file, which leaves nothing to resolve in it.
     pub fn removes(self) -> bool {
-        matches!(self, Choice::Delete | Choice::Carry | Choice::Drop)
+        matches!(
+            self,
+            FileChoice::Delete | FileChoice::Carry | FileChoice::Drop
+        )
     }
 }
 
@@ -60,7 +63,7 @@ pub struct Pick {
 struct State {
     /// Per conflict, the sides it keeps in order.
     picks: Vec<Vec<Pick>>,
-    choice: Option<Choice>,
+    choice: Option<FileChoice>,
 }
 
 /// What saving did.
@@ -128,7 +131,7 @@ impl Session {
         &self.state.picks[conflict]
     }
 
-    pub fn choice(&self) -> Option<Choice> {
+    pub fn choice(&self) -> Option<FileChoice> {
         self.state.choice
     }
 
@@ -240,11 +243,14 @@ impl Session {
     }
 
     /// Chooses what happens to a file a side removed; the same choice again clears it.
-    pub fn choose(&mut self, choice: Choice) -> bool {
+    pub fn choose(&mut self, choice: FileChoice) -> bool {
         let fits = match &self.fate {
             Fate::Here => false,
-            Fate::Deleted { .. } => matches!(choice, Choice::Keep | Choice::Delete),
-            Fate::Moved { .. } => matches!(choice, Choice::Carry | Choice::Both | Choice::Drop),
+            Fate::Deleted { .. } => matches!(choice, FileChoice::Keep | FileChoice::Delete),
+            Fate::Moved { .. } => matches!(
+                choice,
+                FileChoice::Carry | FileChoice::Both | FileChoice::Drop
+            ),
         };
         fits && self.change(|s| {
             s.choice = if s.choice == Some(choice) {
@@ -305,7 +311,7 @@ impl Session {
 
     /// Whether saving removes the file.
     pub fn removing(&self) -> bool {
-        self.state.choice.is_some_and(Choice::removes)
+        self.state.choice.is_some_and(FileChoice::removes)
     }
 
     pub fn resolved(&self, conflict: usize) -> bool {
@@ -355,7 +361,7 @@ impl Session {
     pub fn save(&mut self, root: &Path) -> std::io::Result<Saved> {
         let file = root.join(&self.path);
         let mut saved = Saved::default();
-        if let (Some(Choice::Carry), Fate::Moved { to, by }) = (self.state.choice, &self.fate) {
+        if let (Some(FileChoice::Carry), Fate::Moved { to, by }) = (self.state.choice, &self.fate) {
             let base = self.with(|c| self.parsed.conflicts[c].base.text.clone());
             let edited = self.with(|c| match self.state.picks[c].is_empty() {
                 true => self.kept_side(c).to_string(),

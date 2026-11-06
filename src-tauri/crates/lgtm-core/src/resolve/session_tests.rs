@@ -118,8 +118,8 @@ fn a_deleted_file_needs_a_choice_and_its_deleting_side_cant_be_picked() {
     assert!(!s.toggle(0, 1));
     s.toggle(0, 2);
     assert!(!s.done());
-    assert!(!s.choose(Choice::Carry));
-    s.choose(Choice::Keep);
+    assert!(!s.choose(FileChoice::Carry));
+    s.choose(FileChoice::Keep);
     assert!(s.done());
 }
 
@@ -128,7 +128,7 @@ fn delete_removes_the_file_on_save() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("g"), DELETED).unwrap();
     let mut s = deleted();
-    s.choose(Choice::Delete);
+    s.choose(FileChoice::Delete);
     assert!(s.done() && s.count() == (1, 1));
     assert!(s.save(dir.path()).unwrap().removed);
     assert!(!dir.path().join("g").exists());
@@ -152,7 +152,7 @@ fn carrying_edits_merges_them_into_the_file_it_moved_to() {
     let mut s = Session::new("f", text);
     let by = s.conflicts()[0].sides[0].label.clone();
     s.set_fate(Fate::Moved { to: "h".into(), by }, vec![1]);
-    s.choose(Choice::Carry);
+    s.choose(FileChoice::Carry);
     let saved = s.save(dir.path()).unwrap();
     assert_eq!(saved.clash, None);
     assert!(!dir.path().join("f").exists());

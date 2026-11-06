@@ -124,7 +124,7 @@ fn confined(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
 }
 
 /// Like `confined`, but a symlinked file can't lead out of the workspace either.
-fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
+pub(super) fn contained(ws: &Workspace, path: &str) -> CmdResult<PathBuf> {
     if Path::new(path).is_absolute() {
         return locate(ws, path);
     }
