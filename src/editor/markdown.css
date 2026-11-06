@@ -48,3 +48,27 @@
 .mermaid-error pre {
   white-space: pre-wrap;
 }
+
+.markdown-view mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+}
+
+.markdown-view dt {
+  font-weight: 600;
+}
+
+.markdown-view dd {
+  margin: 0 0 6px 20px;
+}
+
+.markdown-view .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.task-list-item input:not(:disabled) {
+  cursor: pointer;
+}

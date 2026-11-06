@@ -218,6 +218,35 @@ fn markdown_highlights_inline_text_and_fenced_code_by_language() {
 }
 
 #[test]
+fn fenced_code_highlights_by_the_names_blocks_go_by() {
+    for name in [
+        "rust",
+        "python",
+        "typescript",
+        "javascript",
+        "golang",
+        "bash",
+        "shell",
+        "yml",
+        "json",
+        "makefile",
+        "docker",
+        "justfile",
+        "terraform",
+        "swift",
+        "sql",
+        "html",
+        "toml",
+    ] {
+        assert!(super::langs::injected(name).is_some(), "{name}");
+        assert!(
+            super::langs::lang_key(&format!("code.{name}")).is_some(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
 fn terraform_highlights_blocks_attributes_and_references() {
     let src = "resource \"aws_s3_bucket\" \"logs\" {\n  bucket = var.name\n  count  = length(local.ids)\n}\n";
     let lines = highlight_file("main.tf", src);

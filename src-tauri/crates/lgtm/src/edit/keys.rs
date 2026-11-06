@@ -5,6 +5,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use super::buffer::{Buffer, Sel};
 use super::fold::Fold;
 use super::keymap::{self, Cmd, Found, Pick};
+use super::markdown;
 use super::motion;
 use super::objects;
 use super::ops::{self, Register};
@@ -134,13 +135,39 @@ impl Keys {
             }
             Found::Run(cmd) => {
                 self.pending.clear();
+                let version = b.version;
                 let action = self.run(b, cmd, view);
+                if self.mode != Mode::Insert
+                    && b.version != version
+                    && !matches!(cmd, Cmd::Undo | Cmd::Redo)
+                {
+                    renumber(b);
+                }
                 if !matches!(cmd, Cmd::Down | Cmd::Up | Cmd::HalfDown | Cmd::HalfUp) {
                     b.column = None;
                 }
                 action
             }
         }
+    }
+
+    /// Makes `f`'s markdown edit at the cursor, as one undo step, in a markdown file.
+    pub(super) fn markdown(
+        &mut self,
+        b: &mut Buffer,
+        f: fn(&str, usize) -> Option<markdown::Edit>,
+    ) -> bool {
+        if !markdown::is_markdown(&b.name) {
+            return false;
+        }
+        let Some(edit) = f(&b.text.to_string(), b.sel.head) else {
+            return false;
+        };
+        if self.mode != Mode::Insert {
+            self.edit(b);
+        }
+        apply(b, &edit);
+        true
     }
 
     fn select(&self) -> bool {
@@ -310,6 +337,12 @@ impl Keys {
             Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
+            Cmd::Smart => {
+                self.markdown(b, markdown::smart);
+            }
+            Cmd::ToggleCheck => {
+                self.markdown(b, markdown::toggle_check);
+            }
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}
             Cmd::ClipboardYank => {}
         }
@@ -386,5 +419,27 @@ impl Keys {
         self.edit(b);
         ops::paste(b, &r, true);
         b.drop_empty_checkpoint();
+    }
+}
+
+/// Makes a markdown edit's changes and puts the cursor where it says.
+pub(super) fn apply(b: &mut Buffer, edit: &markdown::Edit) {
+    for c in edit.changes.iter().rev() {
+        b.remove(c.from, c.to);
+        b.insert(c.from, &c.text);
+    }
+    b.sel = Sel::point(edit.cursor.min(b.len()));
+}
+
+/// Fixes the numbers of the ordered list at the cursor, in a markdown file.
+pub(super) fn renumber(b: &mut Buffer) {
+    if !markdown::is_markdown(&b.name) {
+        return;
+    }
+    if let Some(edit) = markdown::renumber(&b.text.to_string(), b.sel.head) {
+        let sel = b.sel;
+        apply(b, &edit);
+        b.sel = sel;
+        b.clamp();
     }
 }

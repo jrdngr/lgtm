@@ -16,6 +16,8 @@ import { diffGutter } from "./diffGutter";
 import { diffRuler, rulerTheme } from "./diffRuler";
 import { treeSitter } from "./highlight";
 import { linkClicks } from "./linkClicks";
+import { isMarkdown } from "./mdEdit";
+import { markdownKeys } from "./mdKeys";
 
 const theme = EditorView.theme(
   {
@@ -94,7 +96,7 @@ export function editorExtensions(
     lineEnding(text),
     wrapping.of(wrapExtension(wrap)),
     treeSitter(path),
-    /\.(md|markdown|mdx)$/i.test(path) ? linkClicks(hooks.link) : [],
+    isMarkdown(path) ? [linkClicks(hooks.link), markdownKeys()] : [],
     theme,
     EditorView.updateListener.of(hooks.changed),
   ];

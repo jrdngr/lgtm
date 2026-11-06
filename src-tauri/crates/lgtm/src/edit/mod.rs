@@ -7,6 +7,7 @@ pub mod gutter;
 mod insert;
 pub mod keymap;
 pub mod keys;
+pub mod markdown;
 pub mod motion;
 pub mod objects;
 pub mod ops;

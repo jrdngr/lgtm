@@ -79,6 +79,10 @@ pub enum Cmd {
     },
     Command,
     Escape,
+    /// Markdown's smart key: tables and footnotes.
+    Smart,
+    /// Checks or unchecks a markdown checkbox.
+    ToggleCheck,
 }
 
 impl Cmd {
@@ -107,6 +111,8 @@ impl Cmd {
                 | Undo
                 | Redo
                 | ClipboardPaste
+                | Smart
+                | ToggleCheck
         )
     }
 }
@@ -253,6 +259,8 @@ pub const BINDS: &[Bind] = &[
     b("space e", Sidebar, Both, "file tree"),
     b("space b", ToggleSidebar, Both, "toggle file tree"),
     b("space r", Review, Both, "review"),
+    b("space x", ToggleCheck, Both, "toggle checkbox"),
+    b("S-tab", Smart, Both, "markdown table cell, footnote"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
@@ -271,6 +279,7 @@ pub fn name(key: &KeyEvent) -> Option<String> {
         KeyCode::Backspace => "bs".into(),
         KeyCode::Delete => "del".into(),
         KeyCode::Tab => "tab".into(),
+        KeyCode::BackTab => "S-tab".into(),
         KeyCode::Left => "left".into(),
         KeyCode::Right => "right".into(),
         KeyCode::Up => "up".into(),

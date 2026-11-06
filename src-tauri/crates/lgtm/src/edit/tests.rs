@@ -258,3 +258,49 @@ fn j_steps_over_a_closed_fold() {
     }
     assert_eq!(marked(&b, k.mode), "a\n  b\n  c\n[d]");
 }
+
+/// Presses `spec` on a buffer named `name` holding `text` with the cursor at `at`, and gives
+/// its text and cursor.
+fn md(name: &str, text: &str, at: usize, spec: &str) -> (String, usize) {
+    use super::buffer::{Buffer, Sel};
+    use super::keys::{Keys, View};
+    let mut b = Buffer::with_text(std::path::Path::new(name), name, text);
+    b.sel = Sel::point(at);
+    let mut k = Keys::default();
+    let view = View {
+        height: 10,
+        hidden: &[],
+    };
+    for key in keys(spec) {
+        k.press(&mut b, key, view);
+    }
+    (b.text.to_string(), b.sel.head)
+}
+
+#[test]
+fn markdown_enter_continues_lists_only_in_markdown_files() {
+    assert_eq!(md("a.md", "1. a\n", 0, "Ab<ret>c<esc>").0, "1. ab\n2. c\n");
+    assert_eq!(md("a.txt", "1. a\n", 0, "Ab<ret>c<esc>").0, "1. ab\nc\n");
+}
+
+#[test]
+fn markdown_space_x_toggles_a_checkbox_and_u_takes_it_back() {
+    assert_eq!(md("a.md", "- [ ] a\n", 6, "<space>x").0, "- [x] a\n");
+    assert_eq!(md("a.md", "- [ ] a\n", 6, "<space>xu").0, "- [ ] a\n");
+    assert_eq!(md("a.txt", "- [ ] a\n", 6, "<space>x").0, "- [ ] a\n");
+}
+
+#[test]
+fn markdown_shift_tab_writes_a_footnote_and_goes_back_to_its_reference() {
+    let (text, at) = md("a.md", "See[^1].\n", 4, "<S-tab>");
+    assert_eq!(text, "See[^1].\n\n[^1]: \n");
+    assert_eq!(at, 16);
+    let (text, at) = md("a.md", "See[^1].\n", 4, "<S-tab>inote<esc><S-tab>");
+    assert_eq!(text, "See[^1].\n\n[^1]: note\n");
+    assert_eq!(at, 7);
+}
+
+#[test]
+fn markdown_deleting_an_item_renumbers_the_list() {
+    assert_eq!(md("a.md", "1. a\n2. b\n3. c\n", 5, "xd").0, "1. a\n2. c\n");
+}

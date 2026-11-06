@@ -27,6 +27,7 @@ import { ImagePanel } from "./ImagePanel";
 import { imageType, isSvg, svgUrl } from "./image";
 import { followLink } from "./links";
 import { MarkdownView } from "./MarkdownView";
+import { toggleCheckOn } from "./mdKeys";
 import { baseName, type EditorParams } from "./open";
 import { lineRef, renderedLines } from "./renderedLines";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
@@ -203,6 +204,14 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
     setDirty(false);
     setOnDisk(undefined);
     setError(undefined);
+  }
+
+  /** A rendered checkbox's click: checks it in the text, and saves when nothing else was
+   * unsaved. */
+  function toggleCheck(line: number) {
+    if (!view) return;
+    const clean = !!saved.current && view.state.doc.eq(saved.current);
+    if (toggleCheckOn(view, line) && clean) save();
   }
 
   async function save(): Promise<boolean> {
@@ -385,6 +394,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
               text={rendered}
               lines
               onLink={(href) => followLink(href, workspace, path)}
+              onToggle={readOnly ? undefined : toggleCheck}
             />
           )}
         </div>

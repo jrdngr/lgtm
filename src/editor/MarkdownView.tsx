@@ -1,6 +1,6 @@
 import { createElement, useMemo } from "react";
 import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
-import { components, gfmPlugins, LinkContext } from "./markdownParts";
+import { components, extendedMarkdown, LinkContext, ToggleContext } from "./markdownParts";
 
 /** Blocks that carry their source lines. */
 const BLOCKS = ["p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "tr", "hr"] as const;
@@ -52,27 +52,32 @@ function lineComponents(marks?: LineMarks): Components {
   return out as Components;
 }
 
-/** A markdown file rendered read-only, with GitHub's extensions (tables, task lists).
- * Raw HTML isn't rendered. With `lines`, blocks carry their source lines and `marks`. */
+/** A markdown file rendered read-only, with the extended syntax. Raw HTML isn't rendered.
+ * With `lines`, blocks carry their source lines and `marks`, and with `onToggle` too, its
+ * checkboxes check. */
 export function MarkdownView({
   text,
   lines,
   marks,
   onLink,
+  onToggle,
 }: {
   text: string;
   lines?: boolean;
   marks?: LineMarks;
   /** Follows a ⌘-clicked link, in place of opening only web addresses. */
   onLink?: (href: string) => void;
+  /** Checks or unchecks the checkbox on a line, from 1. */
+  onToggle?: (line: number) => void;
 }) {
   const parts = useMemo(() => (lines ? lineComponents(marks) : components), [lines, marks]);
   const view = (
     <div className="markdown-view">
-      <ReactMarkdown remarkPlugins={gfmPlugins} components={parts}>
+      <ReactMarkdown {...extendedMarkdown} components={parts}>
         {text}
       </ReactMarkdown>
     </div>
   );
-  return onLink ? <LinkContext.Provider value={onLink}>{view}</LinkContext.Provider> : view;
+  const toggling = <ToggleContext.Provider value={onToggle}>{view}</ToggleContext.Provider>;
+  return onLink ? <LinkContext.Provider value={onLink}>{toggling}</LinkContext.Provider> : toggling;
 }

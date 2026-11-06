@@ -1,16 +1,60 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import type { Components } from "react-markdown";
+import type { Components, Options } from "react-markdown";
+import "katex/dist/katex.min.css";
+import "remark-github-blockquote-alert/alert.css";
+import rehypeKatex from "rehype-katex";
+import { defListHastHandlers, remarkDefinitionList } from "remark-definition-list";
+import remarkEmoji from "remark-emoji";
 import gfm from "remark-gfm";
+import { remarkAlert } from "remark-github-blockquote-alert";
+import remarkMath from "remark-math";
 import { HIGHLIGHT_NAMES } from "../bindings";
 import { commands } from "../ipc";
 import { cmdClick, trackCmd } from "../ui/cmdHeld";
 import { followLink } from "./links";
 import { Mermaid } from "./Mermaid";
+import { remarkExtras } from "./mdExtras";
 import "../review/syntax.css";
 import "./markdown.css";
 
 /** GitHub's extensions: tables, task lists, strikethrough and footnotes. */
 export const gfmPlugins = [gfm];
+
+/** Markdown's whole extended syntax: GitHub's extensions, alerts, math, emoji shortcodes,
+ * definition lists, highlights, subscripts, superscripts and heading IDs. `~` is for
+ * subscripts, so strikethrough takes `~~`. */
+export const extendedMarkdown = {
+  remarkPlugins: [
+    [gfm, { singleTilde: false }],
+    remarkMath,
+    remarkEmoji,
+    remarkDefinitionList,
+    remarkAlert,
+    remarkExtras,
+  ] as NonNullable<Options["remarkPlugins"]>,
+  rehypePlugins: [rehypeKatex] as NonNullable<Options["rehypePlugins"]>,
+  remarkRehypeOptions: { handlers: defListHastHandlers },
+};
+
+/** Checks a rendered checkbox's line, from 1. Without it, checkboxes can't change. */
+export const ToggleContext = createContext<((line: number) => void) | undefined>(undefined);
+
+/** A task list's checkbox, which clicks check when the view can change its file. The line
+ * is its list item's, from `data-start`. */
+function Checkbox({ checked }: { checked?: boolean }) {
+  const toggle = useContext(ToggleContext);
+  return (
+    <input
+      type="checkbox"
+      checked={!!checked}
+      disabled={!toggle}
+      onChange={(e) => {
+        const line = Number(e.currentTarget.closest<HTMLElement>("[data-start]")?.dataset.start);
+        if (line) toggle?.(line);
+      }}
+    />
+  );
+}
 const hlClass = HIGHLIGHT_NAMES.map((n) => `hl-${n.replace(".", "-")}`);
 
 /** A fenced block's code, colored by the backend's tree-sitter highlighting for its language. */
@@ -81,6 +125,8 @@ function Link({ href, children }: { href?: string; children?: React.ReactNode })
  * and wide tables scroll. */
 export const components: Components = {
   a: ({ href, children }) => <Link href={href}>{children}</Link>,
+  input: ({ type, checked, ...rest }) =>
+    type === "checkbox" ? <Checkbox checked={checked} /> : <input type={type} {...rest} />,
   pre: ({ node, children, ...rest }) => {
     const code = node?.children[0];
     const cls = code?.type === "element" ? code.properties.className : undefined;

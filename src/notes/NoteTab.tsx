@@ -8,6 +8,7 @@ import { useWorkspace } from "../core/workspace";
 import { minimalChange } from "../editor/change";
 import { followLink } from "../editor/links";
 import { MarkdownView } from "../editor/MarkdownView";
+import { toggleCheckOn } from "../editor/mdKeys";
 import { editorExtensions, wrapExtension, wrapping } from "../editor/setup";
 import { ViewSwitch } from "../editor/ViewSwitch";
 import { commands, errorText, unwrap } from "../ipc";
@@ -153,7 +154,12 @@ export function NoteTab({ api, params }: IDockviewPanelProps<Params>) {
           // biome-ignore lint/a11y/noNoninteractiveTabindex: focusable so ⇧⌘V and scrolling keys work
           tabIndex={0}
         >
-          <MarkdownView text={rendered} onLink={(href) => followLink(href, workspace)} />
+          <MarkdownView
+            text={rendered}
+            lines
+            onLink={(href) => followLink(href, workspace)}
+            onToggle={(line) => view && toggleCheckOn(view, line)}
+          />
         </div>
       )}
       <div className="editor-host" ref={host} hidden={rendered !== undefined} />

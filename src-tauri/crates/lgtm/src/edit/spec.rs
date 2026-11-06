@@ -83,6 +83,10 @@ pub fn keys(spec: &str) -> Vec<KeyEvent> {
             continue;
         }
         let name: String = chars.by_ref().take_while(|&c| c != '>').collect();
+        if name == "S-tab" {
+            out.push(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+            continue;
+        }
         let (mods, base) = match name.split_once('-') {
             Some(("C", b)) => (KeyModifiers::CONTROL, b),
             Some(("A", b)) => (KeyModifiers::ALT, b),

@@ -45,6 +45,8 @@ impl Keys {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
             KeyCode::Esc => {
+                super::keys::renumber(b);
+                let at = b.sel.head;
                 b.drop_empty_checkpoint();
                 self.mode = Mode::Normal;
                 // Back onto the last char typed, as vim does.
@@ -67,6 +69,10 @@ impl Keys {
                 let tab = motion::indent_unit(b);
                 b.insert(at, &tab);
                 b.sel = Sel::point(at + tab.chars().count());
+            }
+            KeyCode::Enter if self.markdown(b, super::markdown::enter) => {}
+            KeyCode::BackTab => {
+                self.markdown(b, super::markdown::smart);
             }
             KeyCode::Enter => {
                 let indent = b.indent(b.line_of(at));
