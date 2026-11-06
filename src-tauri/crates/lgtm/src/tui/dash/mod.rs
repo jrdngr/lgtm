@@ -40,13 +40,12 @@ pub const KEYS: &[(&str, &str)] = &[
     ("C-d C-u", "page"),
     ("g G", "top, bottom"),
     ("Enter", "open in review, or open the file"),
-    ("H", "heat"),
     (":h", "home"),
     (":q", "quit"),
 ];
 
 /// The `:` commands, for the menu over the command line.
-const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("q", "quit")];
+const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("heat", "heat on the files"), ("q", "quit")];
 
 pub struct Dash {
     /// The workspace's newest agent turn.
@@ -178,7 +177,7 @@ impl Dash {
             .collect()
     }
 
-    fn command_key(&mut self, key: KeyEvent) -> Outcome {
+    fn command_key(&mut self, key: KeyEvent, tree: &mut FileTree) -> Outcome {
         let Some(typed) = self.cmd.as_mut() else {
             return Outcome::None;
         };
@@ -192,6 +191,7 @@ impl Dash {
                 let line = self.cmd.take().unwrap_or_default();
                 match line.trim() {
                     "h" | "home" => return Outcome::Home,
+                    "heat" => tree.heat_on = !tree.heat_on,
                     "q" | "q!" | "quit" => return Outcome::Quit,
                     "" => {}
                     other => self.notice = Some(format!("no command {other}")),
@@ -206,7 +206,7 @@ impl Dash {
     pub fn key(&mut self, key: KeyEvent, tree: &mut FileTree) -> Outcome {
         self.notice = None;
         if self.cmd.is_some() {
-            return self.command_key(key);
+            return self.command_key(key, tree);
         }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
@@ -223,7 +223,6 @@ impl Dash {
                     self.follow();
                 }
             }
-            KeyCode::Char('H') => tree.heat_on = !tree.heat_on,
             _ if self.focus == Focus::Files => return files_key(key, ctrl, tree),
             _ => return self.diff_key(key, ctrl),
         }

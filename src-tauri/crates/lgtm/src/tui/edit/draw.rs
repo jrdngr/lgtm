@@ -73,7 +73,6 @@ impl Editor {
                 ("↑ ↓", "move", false),
                 ("← →", "close, open", false),
                 ("Enter", "open", false),
-                ("H", "heat", self.sidebar.heat_on),
                 ("Esc", "back", false),
             ];
         }

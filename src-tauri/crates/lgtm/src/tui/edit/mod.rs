@@ -311,10 +311,6 @@ impl Editor {
             KeyCode::Char('u') if ctrl => KeyCode::PageUp,
             KeyCode::Char('g') => KeyCode::Home,
             KeyCode::Char('G') => KeyCode::End,
-            KeyCode::Char('H') => {
-                self.sidebar.heat_on = !self.sidebar.heat_on;
-                return;
-            }
             KeyCode::Esc | KeyCode::Tab | KeyCode::Char(' ') => {
                 self.leave_sidebar();
                 return;

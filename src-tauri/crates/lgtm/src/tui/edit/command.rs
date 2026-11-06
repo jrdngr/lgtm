@@ -12,6 +12,7 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("w", "save, or save as a path"),
     ("wa", "save all"),
     ("h", "home"),
+    ("heat", "heat on the files"),
     ("q", "leave the editor"),
     ("q!", "leave, dropping unsaved edits"),
     ("wq", "save and leave"),
@@ -119,6 +120,7 @@ impl Editor {
                 }
             }
             "h" | "home" => return Outcome::Home,
+            "heat" => self.sidebar.heat_on = !self.sidebar.heat_on,
             "q" | "qa" => return self.leave(false),
             "q!" | "qa!" => return self.leave(true),
             "close" | "c" => return self.close(),

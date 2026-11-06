@@ -65,7 +65,7 @@ pub struct Home {
 const SIDE_MIN: u16 = 20;
 
 /// The `:` commands, for the menu over the command line.
-const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("q", "quit")];
+const COMMANDS: &[(&str, &str)] = &[("h", "home"), ("heat", "heat on the files"), ("q", "quit")];
 
 impl Default for Home {
     fn default() -> Self {
@@ -152,6 +152,7 @@ impl Home {
                 let line = self.cmd.take().unwrap_or_default();
                 match line.trim() {
                     "q" | "q!" | "quit" => return Outcome::Quit,
+                    "heat" => self.files.heat_on = !self.files.heat_on,
                     "h" | "home" | "" => {}
                     other => self.notice = Some(format!("no command {other}")),
                 }
@@ -357,10 +358,6 @@ impl Home {
             };
             return Outcome::None;
         }
-        if key.code == KeyCode::Char('H') && self.focus == Focus::Files && empty_search {
-            self.files.heat_on = !self.files.heat_on;
-            return Outcome::None;
-        }
         match self.focus {
             Focus::Files => match self.files.key(key) {
                 files::Outcome::Open(path) => Outcome::Edit(path),
@@ -430,7 +427,6 @@ impl Home {
                 ];
                 if self.files.query.is_empty() {
                     hints.push(("← →", "close, open", false));
-                    hints.push(("H", "heat", self.files.heat_on));
                 } else {
                     hints.push(("Esc", "clear", false));
                 }
@@ -544,6 +540,15 @@ mod tests {
         // With a search typed, `:` is part of it.
         press(&mut h, "a:");
         assert_eq!(h.files.query, "a:");
+    }
+
+    #[test]
+    fn colon_heat_toggles_heat_from_either_side() {
+        let mut h = Home::default();
+        press(&mut h, ":heat<ret>");
+        assert!(h.files.heat_on);
+        press(&mut h, "<tab>:heat<ret>");
+        assert!(!h.files.heat_on);
     }
 
     fn with_log(changes: &[&str]) -> Home {
