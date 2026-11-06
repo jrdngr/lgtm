@@ -1,12 +1,10 @@
 //! DASH mode: what the workspace's agent is doing while it works. The files glowing as
-//! they're written, the diff since the dashboard was last cleared following each new hunk,
-//! the newest turn's todo list, and its churn.
+//! they're written, a running log of each file's changes since the dashboard was last
+//! cleared, the newest turn's todo list, and its churn.
 
 mod churn;
 mod diff;
 mod draw;
-
-use std::collections::HashSet;
 
 use lgtm_core::diff::RowKind;
 use lgtm_core::jj::FileDiff;
@@ -29,6 +27,9 @@ pub enum Outcome {
     Clear,
 }
 
+/// The most lines the log keeps; older entries drop off the top.
+const MAX_LINES: usize = 5000;
+
 /// The files' narrowest width.
 const FILES_MIN: u16 = 16;
 
@@ -41,7 +42,7 @@ enum Focus {
 /// The keys, for `?`.
 pub const KEYS: &[(&str, &str)] = &[
     ("Tab", "files, diff"),
-    ("f", "follow the newest change"),
+    ("f", "follow the bottom of the log"),
     ("c", "clear the diff"),
     ("< >", "resize the files"),
     ("j k", "move"),
@@ -65,20 +66,16 @@ const COMMANDS: &[(&str, &str)] = &[
 pub struct Dash {
     /// The workspace's newest agent turn.
     pub activity: Option<AgentActivity>,
-    /// The commit the diff starts from: the start of the first turn since the dashboard
-    /// was cleared.
+    /// The commit the next diff starts from: the last one diffed to, or after a clear the
+    /// start of the newest turn.
     since: Option<String>,
-    /// The diff so far, and its lines.
+    /// The log: each load's changed files, oldest first, and its lines.
     diffs: Vec<FileDiff>,
     lines: Vec<Line>,
-    /// Whether the diff loaded since it was cleared.
-    loaded: bool,
-    /// Rows the latest load added.
-    fresh: HashSet<(usize, usize, usize)>,
-    /// Whether the diff scrolls to each load's new rows.
+    /// Where the latest load's entries start in `diffs`.
+    fresh: usize,
+    /// Whether the log stays scrolled to its bottom.
     following: bool,
-    /// Whether to scroll to the fresh rows when next drawn.
-    jump: bool,
     top: usize,
     /// The diff's height as last drawn.
     height: usize,
@@ -98,10 +95,8 @@ impl Default for Dash {
             since: None,
             diffs: vec![],
             lines: vec![],
-            loaded: false,
-            fresh: HashSet::new(),
+            fresh: 0,
             following: true,
-            jump: false,
             top: 0,
             height: 0,
             focus: Focus::Diff,
@@ -115,7 +110,7 @@ impl Default for Dash {
 
 impl Dash {
     /// Takes the newest turn. Returns the commit to diff from when the turn or its edits
-    /// changed. A new turn adds to the diff; only clearing starts it again.
+    /// changed. A new turn adds to the log; only clearing starts it again.
     pub fn set_activity(&mut self, activity: Option<AgentActivity>) -> Option<String> {
         let edits =
             |a: &Option<AgentActivity>| a.as_ref().map(|a| (a.start.clone(), a.edits.len()));
@@ -127,64 +122,68 @@ impl Dash {
         self.since.clone().filter(|_| changed)
     }
 
-    /// Starts the diff again from the newest turn's start. Returns the commit to diff from.
+    /// Empties the log and starts it again from the newest turn's start. Returns the commit
+    /// to diff from.
     pub fn clear(&mut self) -> Option<String> {
         self.diffs.clear();
         self.lines.clear();
-        self.loaded = false;
-        self.fresh.clear();
+        self.fresh = 0;
         self.top = 0;
         self.since = self.activity.as_ref().map(|a| a.start.clone());
         self.since.clone()
     }
 
-    /// The commit the diff starts from.
+    /// The commit the next diff starts from.
     pub fn start(&self) -> Option<&str> {
         self.since.as_deref()
     }
 
-    /// Takes the diff from `start`. A stale one, or one that failed, is dropped.
-    pub fn diff_loaded(&mut self, start: &str, result: anyhow::Result<Vec<FileDiff>>) {
-        if self.start() != Some(start) {
-            return;
-        }
-        let diffs = match result {
-            Ok(d) => d,
+    /// Adds what changed from `start` to the log, and diffs from where it ended next. A
+    /// stale load is dropped, and returns the commit to diff from again when it saw more
+    /// than the log has.
+    pub fn diff_loaded(
+        &mut self,
+        start: &str,
+        result: anyhow::Result<(Vec<FileDiff>, String)>,
+    ) -> Option<String> {
+        let (diffs, to) = match result {
+            Ok(loaded) => loaded,
             Err(e) => {
-                self.notice = Some(format!("{e:#}"));
-                return;
+                if self.start() == Some(start) {
+                    self.notice = Some(format!("{e:#}"));
+                }
+                return None;
             }
         };
-        // The first load of a turn shows it from the top, with nothing new yet.
-        let first = !std::mem::replace(&mut self.loaded, true);
-        let fresh = diff::fresh(&self.diffs, &diffs);
-        self.lines = diff::layout(&diffs);
-        self.diffs = diffs;
-        self.top = self.top.min(self.lines.len().saturating_sub(1));
-        if first || fresh.is_empty() {
-            return;
+        let since = self.since.clone()?;
+        if since != start {
+            return (since != to).then_some(since);
         }
-        self.fresh = fresh;
-        if self.following {
-            self.follow();
+        self.since = Some(to);
+        let diffs: Vec<FileDiff> = diffs.into_iter().filter(|d| !d.hunks.is_empty()).collect();
+        if diffs.is_empty() {
+            return None;
         }
+        self.fresh = self.diffs.len();
+        self.diffs.extend(diffs);
+        let all = diff::layout(&self.diffs).len();
+        let mut lines = diff::layout(&self.diffs);
+        let mut dropped = 0;
+        while lines.len() > MAX_LINES && self.diffs.len() - dropped > 1 {
+            dropped += 1;
+            lines = diff::layout(&self.diffs[dropped..]);
+        }
+        self.diffs.drain(..dropped);
+        self.fresh = self.fresh.saturating_sub(dropped);
+        // Lines that dropped off the top take the view down with them.
+        self.top = self.top.saturating_sub(all - lines.len());
+        self.lines = lines;
+        None
     }
 
-    /// Scrolls to the first fresh row, a third of the way down, once the diff's height is
-    /// known.
-    fn follow(&mut self) {
-        self.jump = true;
-    }
-
-    fn jump_to_fresh(&mut self) {
-        self.jump = false;
-        let first = self.lines.iter().position(|l| match *l {
-            Line::Row { file, hunk, row } => self.fresh.contains(&(file, hunk, row)),
-            _ => false,
-        });
-        if let Some(at) = first {
-            self.top = at.saturating_sub(self.height / 3);
-        }
+    /// The lowest the log scrolls.
+    fn bottom(&self) -> usize {
+        self.lines.len().saturating_sub(self.height.max(1))
     }
 
     /// Whether keys are going into the `:` line.
@@ -254,12 +253,7 @@ impl Dash {
                     Focus::Diff => Focus::Files,
                 }
             }
-            KeyCode::Char('f') => {
-                self.following = !self.following;
-                if self.following {
-                    self.follow();
-                }
-            }
+            KeyCode::Char('f') => self.following = !self.following,
             _ if self.focus == Focus::Files => return files_key(key, ctrl, tree),
             _ => return self.diff_key(key, ctrl),
         }
@@ -283,11 +277,17 @@ impl Dash {
         Outcome::None
     }
 
-    /// Scrolls the diff by `n` lines, which stops following it.
+    /// Scrolls the log by `n` lines. Leaving the bottom stops following it, and reaching
+    /// the bottom follows it again.
     pub fn scroll(&mut self, n: isize) {
-        self.following = false;
-        let max = self.lines.len().saturating_sub(self.height.max(1));
-        self.top = (self.top as isize).saturating_add(n).clamp(0, max as isize) as usize;
+        let top = if self.following {
+            self.bottom()
+        } else {
+            self.top
+        };
+        let max = self.bottom();
+        self.top = (top as isize).saturating_add(n).clamp(0, max as isize) as usize;
+        self.following = self.top == max && n > 0;
     }
 
     /// The review of the working copy on the first row of the new side in view.
@@ -383,13 +383,70 @@ mod tests {
         assert_eq!(d.set_activity(turn("b", 1)).as_deref(), Some("b"));
     }
 
+    fn loaded(d: &mut Dash, start: &str, files: &[(&str, &[&str])], to: &str) -> Option<String> {
+        let diffs = files
+            .iter()
+            .map(|(p, rows)| diff::tests::file(p, rows))
+            .collect();
+        d.diff_loaded(start, Ok((diffs, to.into())))
+    }
+
+    fn paths(d: &Dash) -> Vec<&str> {
+        d.diffs.iter().map(|f| f.path.as_str()).collect()
+    }
+
     #[test]
-    fn scrolling_stops_following_and_f_starts_it_again() {
+    fn each_load_appends_its_files_and_the_next_diffs_from_where_it_ended() {
+        let mut d = Dash::default();
+        d.set_activity(turn("a", 1));
+        loaded(&mut d, "a", &[("x.rs", &["+1"])], "b");
+        loaded(&mut d, "b", &[("y.rs", &["+2"]), ("x.rs", &["+3"])], "c");
+        assert_eq!(paths(&d), ["x.rs", "y.rs", "x.rs"]);
+        assert_eq!(d.start(), Some("c"));
+        assert_eq!(d.fresh, 1);
+        // Nothing changed: nothing added.
+        loaded(&mut d, "c", &[], "d");
+        assert_eq!(paths(&d).len(), 3);
+    }
+
+    #[test]
+    fn a_stale_load_is_dropped_and_asks_again_when_it_saw_further() {
+        let mut d = Dash::default();
+        d.set_activity(turn("a", 1));
+        loaded(&mut d, "a", &[("x.rs", &["+1"])], "b");
+        assert_eq!(
+            loaded(&mut d, "a", &[("x.rs", &["+1", "+2"])], "c").as_deref(),
+            Some("b")
+        );
+        assert_eq!(loaded(&mut d, "a", &[("x.rs", &["+1"])], "b"), None);
+        assert_eq!(paths(&d), ["x.rs"]);
+    }
+
+    #[test]
+    fn the_log_drops_its_oldest_entries_past_the_cap() {
+        let mut d = Dash::default();
+        d.set_activity(turn("a", 1));
+        let big: Vec<&str> = vec!["+x"; MAX_LINES / 3];
+        loaded(&mut d, "a", &[("old.rs", &big)], "b");
+        loaded(&mut d, "b", &[("mid.rs", &big)], "c");
+        loaded(&mut d, "c", &[("new.rs", &big)], "d");
+        assert_eq!(paths(&d), ["mid.rs", "new.rs"]);
+        assert!(d.lines.len() <= MAX_LINES);
+    }
+
+    #[test]
+    fn scrolling_up_stops_following_and_scrolling_back_to_the_bottom_follows_again() {
         let mut d = Dash::default();
         let mut tree = FileTree::default();
-        d.key(KeyEvent::from(KeyCode::Char('j')), &mut tree);
+        d.set_activity(turn("a", 1));
+        loaded(&mut d, "a", &[("x.rs", &["+x"; 30])], "b");
+        d.height = 10;
+        d.key(KeyEvent::from(KeyCode::Char('k')), &mut tree);
         assert!(!d.following);
-        d.key(KeyEvent::from(KeyCode::Char('f')), &mut tree);
+        assert_eq!(d.top, d.bottom() - 1);
+        d.key(KeyEvent::from(KeyCode::Char('j')), &mut tree);
         assert!(d.following);
+        d.key(KeyEvent::from(KeyCode::Char('f')), &mut tree);
+        assert!(!d.following);
     }
 }

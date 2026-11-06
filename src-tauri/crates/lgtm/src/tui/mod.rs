@@ -543,7 +543,11 @@ impl App {
                     self.loader.turn_diff(start.to_string());
                 }
             }
-            Msg::TurnDiff { start, result } => self.dash.diff_loaded(&start, result),
+            Msg::TurnDiff { start, result } => {
+                if let Some(again) = self.dash.diff_loaded(&start, result) {
+                    self.loader.turn_diff(again);
+                }
+            }
             Msg::Agent { req, reply } => {
                 let answer = match self.review.as_mut() {
                     Some(r) => r.answer(req, self.store.as_mut()),

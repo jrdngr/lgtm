@@ -78,10 +78,10 @@ pub enum Msg {
     Changed,
     /// Files were written, for the trees' heat.
     Written(Vec<String>),
-    /// The agent turn's diff so far, from the commit it started on to `@`.
+    /// What changed from commit `start` to `@`, and the commit `@` was.
     TurnDiff {
         start: String,
-        result: anyhow::Result<Vec<FileDiff>>,
+        result: anyhow::Result<(Vec<FileDiff>, String)>,
     },
     /// An agent's request over MCP, and where its answer goes.
     Agent {
@@ -234,7 +234,7 @@ impl Loader {
         })
     }
 
-    /// Snapshots the working copy, then diffs it against `start`, where a turn began.
+    /// Snapshots the working copy, then diffs it against `start`, the commit last diffed to.
     pub fn turn_diff(&self, start: String) {
         let (jj, tx) = (self.jj.clone(), self.tx.clone());
         self.rt.spawn(async move {
@@ -245,7 +245,7 @@ impl Loader {
                     from: Some(start.clone()),
                     to: at.to,
                 };
-                jj.diff(&range).await
+                Ok((jj.diff(&range).await?, range.to))
             }
             .await;
             let _ = tx.send(Msg::TurnDiff { start, result });

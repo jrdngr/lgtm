@@ -78,8 +78,8 @@ impl Dash {
             head.put_right(area.y, 1, "following", theme::fg(ACCENT).bg(BG));
         }
         self.height = area.height.saturating_sub(1) as usize;
-        if self.jump {
-            self.jump_to_fresh();
+        if self.following {
+            self.top = self.bottom();
         }
         let mut sub = Canvas::new(&mut *c.buf, area);
         for (i, line) in self
@@ -101,7 +101,7 @@ impl Dash {
                 }
                 Line::Row { file, hunk, row } => {
                     let r = &self.diffs[file].hunks[hunk].rows[row];
-                    let fresh = r.kind == RowKind::Added && self.fresh.contains(&(file, hunk, row));
+                    let fresh = r.kind == RowKind::Added && file >= self.fresh;
                     let bg = match r.kind {
                         RowKind::Added if fresh => FRESH,
                         RowKind::Added => ADD,
