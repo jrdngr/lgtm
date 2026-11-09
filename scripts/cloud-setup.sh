@@ -35,3 +35,6 @@ node --version 2>/dev/null | grep -q '^v2[2-9]' || {
 command -v pnpm >/dev/null || $SUDO corepack enable
 
 pnpm install --frozen-lockfile
+
+# lgterm's build: GPUI's libraries, Zig, and Ghostty's Zig packages.
+scripts/lgterm-setup.sh

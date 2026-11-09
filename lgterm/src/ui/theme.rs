@@ -1,0 +1,40 @@
+//! Colors and sizes from the approved mockups.
+
+pub const WINDOW: u32 = 0x191919;
+pub const SIDEBAR: u32 = 0x141414;
+pub const SIDEBAR_BORDER: u32 = 0x2a2a2a;
+pub const ROW_SELECTED: u32 = 0x262626;
+pub const ROW_HOVER: u32 = 0x1f1f1f;
+pub const CARD: u32 = 0x1e1e1e;
+pub const CARD_BORDER: u32 = 0x3a3a3a;
+pub const FOCUS: u32 = 0x4f8cc9;
+pub const TAB_STRIP_BORDER: u32 = 0x2e2e2e;
+pub const TAB_ACTIVE: u32 = 0x313131;
+
+pub const TEXT: u32 = 0xd9d9da;
+pub const TEXT_STRONG: u32 = 0xeeeeef;
+pub const TEXT_MUTED: u32 = 0x9b9b9b;
+pub const TEXT_SPACE: u32 = 0xb8b8b8;
+pub const ICON: u32 = 0x8f8f8f;
+
+pub const TERM_FG: u32 = 0xd4d4d4;
+pub const TERM_BG: u32 = CARD;
+pub const SELECTION: u32 = 0x3a5a7a;
+
+pub const SIDEBAR_WIDTH: f32 = 264.;
+pub const GAP: f32 = 8.;
+pub const TITLEBAR: f32 = 46.;
+pub const TERM_PAD_X: f32 = 14.;
+pub const TERM_PAD_Y: f32 = 12.;
+
+pub const UI_FONT: &str = if cfg!(target_os = "macos") {
+    ".SystemUIFont"
+} else {
+    "DejaVu Sans"
+};
+pub const MONO_FONT: &str = if cfg!(target_os = "macos") {
+    "Menlo"
+} else {
+    "DejaVu Sans Mono"
+};
+pub const DEFAULT_FONT_SIZE: f32 = 13.;

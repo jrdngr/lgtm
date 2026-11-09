@@ -30,6 +30,7 @@ test:
     pnpm check
     cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
     pnpm test
+    cd lgterm && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 
 # Build the macOS app and the `lgtm` command in one cargo build, so they share every
 # dependency, then bundle the app. `tauri build` would compile the app on its own: the frontend
@@ -55,6 +56,11 @@ install-tui:
 install: build install-tui
     rm -rf /Applications/lgtm.app
     ditto src-tauri/target/release/bundle/macos/lgtm.app /Applications/lgtm.app
+
+# Build lgterm, the terminal multiplexer, and put lgterm.app in /Applications, replacing any
+# copy there. Needs Zig 0.17 and Rust 1.99 or newer.
+lgterm:
+    scripts/lgterm-app.sh
 
 # Run the app bundle from `just build`, optionally on a repo. Launching the
 # binary inside the .app gives it the bundle's Dock icon.

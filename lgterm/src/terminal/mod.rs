@@ -1,0 +1,315 @@
+//! One terminal: a shell on a pty, parsed by Ghostty, painted by GPUI.
+
+mod frame;
+mod input;
+mod keys;
+mod paint;
+mod pty;
+
+use std::path::{Path, PathBuf};
+
+use anyhow::Result;
+use ghostty_vt::style::RgbColor;
+use ghostty_vt::{Event, Terminal, TerminalOptions, key, mouse};
+use gpui::{
+    App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
+    Font, Global, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point,
+    Render, Size, Styled, Window, actions, canvas, div, font, px,
+};
+
+use frame::{Frame, Snapshotter};
+use paint::Grid;
+use pty::Pty;
+
+use crate::ui::theme;
+
+actions!(terminal, [Copy, Paste]);
+
+/// The terminal font size, shared by every terminal.
+pub struct FontSize(pub f32);
+
+impl Global for FontSize {}
+
+pub enum TermEvent {
+    /// The title or working folder changed.
+    Changed,
+    /// The shell exited.
+    Exited,
+}
+
+pub struct TermView {
+    pub id: u64,
+    focus: FocusHandle,
+    vt: Terminal,
+    snap: Snapshotter,
+    keys: key::Encoder,
+    key_event: key::Event,
+    mouse: mouse::Encoder,
+    pty: Pty,
+    /// Folder the shell started in.
+    start_cwd: PathBuf,
+    /// Folder the shell last reported with OSC 7.
+    osc_cwd: Option<PathBuf>,
+    pub title: String,
+    cols: u16,
+    rows: u16,
+    grid: Option<(Point<Pixels>, Size<Pixels>)>,
+    /// Scroll distance not yet turned into whole lines.
+    scroll_rest: f32,
+    /// Where a selection drag started, in screen rows.
+    drag_from: Option<(u16, u32)>,
+    mouse_down: bool,
+}
+
+fn rgb(c: u32) -> RgbColor {
+    RgbColor {
+        r: (c >> 16) as u8,
+        g: (c >> 8) as u8,
+        b: c as u8,
+    }
+}
+
+impl TermView {
+    /// Starts a shell in `cwd`.
+    pub fn spawn(id: u64, cwd: &Path, cx: &mut App) -> Result<Entity<Self>> {
+        let (cols, rows) = (80, 24);
+        let mut vt = Terminal::new(TerminalOptions {
+            cols,
+            rows,
+            ..Default::default()
+        })?;
+        vt.set_default_fg_color(Some(rgb(theme::TERM_FG)))?
+            .set_default_bg_color(Some(rgb(theme::TERM_BG)))?
+            .set_default_cursor_color(Some(rgb(theme::TERM_FG)))?;
+        let snap = Snapshotter::new()?;
+        let keys = key::Encoder::new()?;
+        let key_event = key::Event::new()?;
+        let mouse = mouse::Encoder::new()?;
+        let (pty, output) = Pty::spawn(id, cwd, cols, rows)?;
+        Ok(cx.new(|cx| {
+            cx.spawn(async move |this: gpui::WeakEntity<TermView>, cx| {
+                while let Ok(mut bytes) = output.recv().await {
+                    while let Ok(more) = output.try_recv() {
+                        bytes.extend(more);
+                    }
+                    if this.update(cx, |t, cx| t.feed(&bytes, cx)).is_err() {
+                        return;
+                    }
+                }
+                let _ = this.update(cx, |_, cx| cx.emit(TermEvent::Exited));
+            })
+            .detach();
+            TermView {
+                id,
+                focus: cx.focus_handle(),
+                vt,
+                snap,
+                keys,
+                key_event,
+                mouse,
+                pty,
+                start_cwd: cwd.to_path_buf(),
+                osc_cwd: None,
+                title: String::new(),
+                cols,
+                rows,
+                grid: None,
+                scroll_rest: 0.,
+                drag_from: None,
+                mouse_down: false,
+            }
+        }))
+    }
+
+    pub fn foreground_pid(&self) -> Option<i32> {
+        self.pty.foreground_pid()
+    }
+
+    /// Where the shell is, as best we know without asking the OS.
+    pub fn known_cwd(&self) -> &Path {
+        self.osc_cwd.as_deref().unwrap_or(&self.start_cwd)
+    }
+
+    fn feed(&mut self, bytes: &[u8], cx: &mut Context<Self>) {
+        self.vt.vt_write(bytes);
+        let mut changed = false;
+        let events: Vec<Event> = self.vt.events().collect();
+        for event in events {
+            match event {
+                Event::PtyWrite(reply) => self.pty.write(&reply),
+                Event::TitleChanged(title) => {
+                    self.title = title;
+                    changed = true;
+                }
+                Event::PwdChanged(pwd) => {
+                    self.osc_cwd = parse_pwd(&pwd);
+                    changed = true;
+                }
+                Event::ClipboardWrite(w) => {
+                    let text = w
+                        .contents
+                        .iter()
+                        .find(|c| c.mime.is_empty() || c.mime.starts_with("text/"));
+                    if let Some(text) = text.and_then(|c| String::from_utf8(c.data.clone()).ok()) {
+                        cx.write_to_clipboard(ClipboardItem::new_string(text));
+                    }
+                }
+                _ => {}
+            }
+        }
+        if changed {
+            cx.emit(TermEvent::Changed);
+        }
+        cx.notify();
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        self.pty.write(bytes);
+    }
+
+    fn font(&self, cx: &App) -> (Font, Pixels) {
+        (font(theme::MONO_FONT), px(cx.global::<FontSize>().0))
+    }
+
+    /// Fits the terminal to `bounds` and snapshots the screen.
+    fn layout(
+        &mut self,
+        bounds: Bounds<Pixels>,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Option<(Frame, Grid)> {
+        let (font, font_size) = self.font(cx);
+        let cell = paint::cell_size(&font, font_size, window);
+        let inner_w = bounds.size.width - px(2. * theme::TERM_PAD_X);
+        let inner_h = bounds.size.height - px(2. * theme::TERM_PAD_Y);
+        let cols = ((inner_w / cell.width).floor() as u16).max(2);
+        let rows = ((inner_h / cell.height).floor() as u16).max(1);
+        if (cols, rows) != (self.cols, self.rows) {
+            let (cw, ch) = (cell.width.as_f32() as u32, cell.height.as_f32() as u32);
+            if self.vt.resize(cols, rows, cw, ch).is_ok() {
+                self.pty.resize(
+                    cols,
+                    rows,
+                    (cols as u32 * cw) as u16,
+                    (rows as u32 * ch) as u16,
+                );
+                (self.cols, self.rows) = (cols, rows);
+            }
+        }
+        let origin = bounds.origin + gpui::point(px(theme::TERM_PAD_X), px(theme::TERM_PAD_Y));
+        self.grid = Some((origin, cell));
+        let frame = self.snap.frame(&self.vt).ok()?;
+        let grid = Grid {
+            origin,
+            cell,
+            font,
+            font_size,
+            focused: self.focus.is_focused(window),
+        };
+        Some((frame, grid))
+    }
+
+    fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
+        if let Some(text) = input::selection_text(&self.vt) {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
+        }
+    }
+
+    fn paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else {
+            return;
+        };
+        let bytes = input::paste(&self.vt, text);
+        self.write(&bytes);
+        self.scroll_to_bottom(cx);
+    }
+
+    fn scroll_to_bottom(&mut self, cx: &mut Context<Self>) {
+        self.vt
+            .scroll_viewport(ghostty_vt::terminal::ScrollViewport::Bottom);
+        let _ = self.vt.set_selection(None);
+        cx.notify();
+    }
+}
+
+/// The folder in an OSC 7 `file://host/path` report, or a bare path.
+fn parse_pwd(pwd: &str) -> Option<PathBuf> {
+    let path = match pwd.strip_prefix("file://") {
+        Some(rest) => &rest[rest.find('/')?..],
+        None => pwd,
+    };
+    let mut out = Vec::with_capacity(path.len());
+    let bytes = path.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(b) = u8::from_str_radix(&path[i + 1..i + 3], 16)
+        {
+            out.push(b);
+            i += 3;
+            continue;
+        }
+        out.push(bytes[i]);
+        i += 1;
+    }
+    let path = PathBuf::from(String::from_utf8(out).ok()?);
+    path.is_absolute().then_some(path)
+}
+
+impl EventEmitter<TermEvent> for TermView {}
+
+impl Focusable for TermView {
+    fn focus_handle(&self, _: &App) -> FocusHandle {
+        self.focus.clone()
+    }
+}
+
+impl Render for TermView {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let this = cx.entity();
+        div()
+            .id(("term", self.id))
+            .size_full()
+            .track_focus(&self.focus)
+            .key_context("Terminal")
+            .on_key_down(cx.listener(Self::key_down))
+            .on_action(cx.listener(Self::copy))
+            .on_action(cx.listener(Self::paste))
+            .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
+            .on_mouse_down(MouseButton::Middle, cx.listener(Self::mouse_down))
+            .on_mouse_down(MouseButton::Right, cx.listener(Self::mouse_down))
+            .on_mouse_move(cx.listener(Self::mouse_move))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
+            .on_mouse_up(MouseButton::Middle, cx.listener(Self::mouse_up))
+            .on_mouse_up(MouseButton::Right, cx.listener(Self::mouse_up))
+            .on_scroll(cx.listener(Self::scroll))
+            .child(
+                canvas(
+                    move |bounds, window, cx| this.update(cx, |t, cx| t.layout(bounds, window, cx)),
+                    |_, prepared, window, cx| {
+                        if let Some((frame, grid)) = prepared {
+                            grid.paint(&frame, window, cx);
+                        }
+                    },
+                )
+                .size_full(),
+            )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_pwd;
+    use std::path::PathBuf;
+
+    #[test]
+    fn osc7_reports_decode_to_paths() {
+        assert_eq!(
+            parse_pwd("file://mac.local/Users/j/my%20repo"),
+            Some(PathBuf::from("/Users/j/my repo"))
+        );
+        assert_eq!(parse_pwd("/tmp"), Some(PathBuf::from("/tmp")));
+        assert_eq!(parse_pwd("relative"), None);
+    }
+}

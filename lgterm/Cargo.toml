@@ -1,0 +1,24 @@
+[workspace]
+
+[package]
+name = "lgterm"
+version = "0.1.0"
+description = "Terminal multiplexer for coding agents"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+dirs = "6"
+ghostty-vt = "=0.8.0"
+gpui = { package = "gpui-pre", version = "=0.3.12" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
+libc = "0.2"
+portable-pty = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-channel = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 16
