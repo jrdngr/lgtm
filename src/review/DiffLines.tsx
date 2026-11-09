@@ -73,6 +73,8 @@ interface Props extends LineHandlers {
   progress: Progress[];
   selection: Selection;
   cursor: number;
+  /** The line whose text cursor sits past its text, while selecting text. */
+  eolLine?: number;
   collapsedFiles: ReadonlySet<string>;
   collapsedHunks: ReadonlySet<string>;
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -325,7 +327,7 @@ export function DiffLines(props: Props) {
                 key={v.key}
                 ref={sized ? virtualizer.measureElement : undefined}
                 data-index={v.index}
-                className={`line${selected ? " selected" : ""}${v.index === cursor ? " cursor" : ""}`}
+                className={`line${selected ? " selected" : ""}${v.index === cursor ? " cursor" : ""}${v.index === props.eolLine ? " text-eol" : ""}`}
                 style={{
                   position: "absolute",
                   top: 0,

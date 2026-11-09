@@ -12,7 +12,6 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
   const [sel, setSel] = useState<Selection>(lineSelection(0));
   const [anchor, setAnchor] = useState(0);
   const [shrinkStack, setShrinkStack] = useState<Selection[]>([]);
-  const [extending, setExtending] = useState(false);
   const placed = useRef({ files, lines });
 
   useLayoutEffect(() => {
@@ -74,19 +73,13 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
 
   /** Extends the selection one row, from the cursor unless it's already a range. */
   function extend(dir: 1 | -1) {
-    const from = !extending && sel.level !== "range" ? cursor : anchor;
+    const from = sel.level !== "range" ? cursor : anchor;
     setAnchor(from);
     move(dir, true, from);
   }
 
-  function toggleExtend() {
-    setExtending((x) => !x);
-    setAnchor(cursor);
-  }
-
-  /** Stops extending and clears the selection to the cursor. */
+  /** Clears the selection to the cursor. */
   function collapse() {
-    setExtending(false);
     place(cursor);
   }
 
@@ -94,7 +87,6 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
     cursor,
     sel,
     anchor,
-    extending,
     select,
     selectUnit,
     place,
@@ -102,7 +94,6 @@ export function useSelection(files: FlatFile[], lines: DisplayLine[], moves: Mov
     grow,
     shrink,
     extend,
-    toggleExtend,
     collapse,
   };
 }

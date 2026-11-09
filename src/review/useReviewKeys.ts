@@ -6,6 +6,7 @@ import { colorForKey, type MarkSetup } from "./marks";
 import { type DisplayLine, type FlatFile, nextRowLine } from "./model";
 import { expand, reviewSelection } from "./selection";
 import type { SelectionApi } from "./useSelection";
+import type { useTextSelect } from "./useTextSelect";
 
 interface Ctx {
   files: FlatFile[];
@@ -25,6 +26,8 @@ interface Ctx {
   setSpace(on: boolean): void;
   /** Runs the space menu's `key`. */
   spaceKey(key: string): void;
+  /** `v` text selection. */
+  text: ReturnType<typeof useTextSelect>;
   /** How many lines the review shows at once. */
   pageLines(): number;
   scrollSide(dir: 1 | -1): void;
@@ -75,6 +78,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
   return (e) => {
     if (isEditable(e.target)) return;
     const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (ctx.text.on) return ctx.text.key(e, mod);
     if (ctx.menu) {
       // Selected code text copies natively, as it does with the menu closed.
       if (mod && e.key.toLowerCase() === "c" && window.getSelection()?.isCollapsed === false) {
@@ -133,11 +137,11 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         break;
       case "j":
       case "ArrowDown":
-        s.move(1, s.extending);
+        s.move(1, false);
         break;
       case "k":
       case "ArrowUp":
-        s.move(-1, s.extending);
+        s.move(-1, false);
         break;
       case "J":
       case "K":
@@ -166,7 +170,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         ctx.scrollSide(1);
         break;
       case "v":
-        s.toggleExtend();
+        ctx.text.start(cursor);
         break;
       case "e": {
         const next = expand(files, lines, cursor, s.sel);

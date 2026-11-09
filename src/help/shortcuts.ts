@@ -135,7 +135,11 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: "Review",
     shortcuts: [
       { keys: ["j", "k"], action: "Move the cursor" },
-      { keys: ["J", "K"], action: "Extend the selection (or v, then j / k)" },
+      { keys: ["J", "K"], action: "Extend the selection" },
+      {
+        keys: ["v"],
+        action: "Select text with the editor's motions; y or ⌘C copies, v or Esc stops",
+      },
       { keys: ["g", "G"], action: "Top / bottom" },
       { keys: ["⌃D", "⌃U"], action: "Half a page down / up" },
       { keys: ["h", "l"], action: "Scroll sideways" },

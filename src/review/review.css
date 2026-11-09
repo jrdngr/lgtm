@@ -291,3 +291,19 @@
 .cell.fresh.kind-added {
   background: rgb(46 160 67 / 32%);
 }
+
+::highlight(lgtm-text-sel) {
+  background-color: var(--selection);
+}
+
+::highlight(lgtm-text-head) {
+  background-color: var(--fg);
+  color: var(--bg);
+}
+
+.line.text-eol .unified .code::after,
+.line.text-eol .cell.right .code::after,
+.line.text-eol .cell.left:has(+ .cell.empty) .code::after {
+  content: " ";
+  background: var(--fg);
+}

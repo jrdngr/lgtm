@@ -84,8 +84,9 @@ export function useReviewFind({ files, lines, mode, scrollRef, scrollTo, focus }
 
   return {
     open,
-    show() {
-      const picked = window.getSelection()?.toString() ?? "";
+    /** Opens the bar, on `query` if one is given, else on the selected text. */
+    show(query?: string) {
+      const picked = query ?? window.getSelection()?.toString() ?? "";
       if (!open && picked && !picked.includes("\n")) setState((s) => ({ ...s, query: picked }));
       setOpen(true);
       setFocusKey((k) => k + 1);

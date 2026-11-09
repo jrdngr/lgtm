@@ -54,6 +54,7 @@ import { type MenuAt, useRowMouse } from "./useRowMouse";
 import { useSavedView } from "./useSavedView";
 import { useSelection } from "./useSelection";
 import { useSendText } from "./useSendText";
+import { useTextSelect } from "./useTextSelect";
 import { useWorkingCopy } from "./workingCopy";
 
 /** Rows changed since they were reviewed show amber, in every review. */
@@ -377,6 +378,19 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     focus: focusRoot,
   });
 
+  const pageLines = () =>
+    Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 400) / LINE_PX));
+  const text = useTextSelect({
+    files,
+    lines,
+    mode,
+    scrollRef,
+    place,
+    pageLines,
+    find: find.show,
+    findQuery: () => (find.open ? find.bar.query : undefined),
+  });
+
   const [space, setSpace] = useState(false);
   const wrap = wordWrap.use();
   const cursorComment = () => {
@@ -416,7 +430,8 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     space,
     setSpace,
     spaceKey: (key) => spaceItems.find((x) => x.key === key)?.run(),
-    pageLines: () => Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 400) / LINE_PX)),
+    pageLines,
+    text,
     scrollSide(dir) {
       const left = dir * 4 * CHAR_PX;
       scrollRef.current?.scrollBy({ left });
@@ -496,6 +511,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       tabIndex={-1}
       onKeyDown={onReviewKey}
       onMouseDown={(e) => {
+        text.stop();
         if (!keepsFocus(e.target)) focusRoot();
       }}
     >
@@ -540,6 +556,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
           progress={progress}
           selection={sel}
           cursor={cursor}
+          eolLine={text.eolLine}
           collapsedFiles={collapsedFiles}
           collapsedHunks={collapsedHunks}
           scrollRef={scrollRef}
@@ -579,7 +596,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         <span>
           {changedCount} changed {plural(changedCount)}
         </span>
-        {s.extending && <span className="extending">extend</span>}
+        {text.on && <span className="extending">select</span>}
       </div>
       {picker}
       {space && <SpaceMenu items={spaceItems} />}
