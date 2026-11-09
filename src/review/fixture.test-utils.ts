@@ -55,6 +55,8 @@ export function file(path: string, hunks: RowDto[][], newSymbols: CodeSymbol[] =
     lineCount: 0,
     oldSymbols: [],
     newSymbols,
+    oldSteps: [],
+    newSteps: [],
   };
 }
 

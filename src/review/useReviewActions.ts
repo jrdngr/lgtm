@@ -95,6 +95,23 @@ export function useReviewActions(d: Deps) {
     settle(await commands.markRows(review.id, rows, color, check), (next) => applied(next, check));
   }
 
+  /** Marks every changed row of a hunk, or clears them when they all have the mark. The
+   * primary mark checks the file once every row of it has the mark. */
+  async function markHunk(file: number, hunk: number, asked: MarkColor) {
+    if (!review) return;
+    const f = files[file];
+    const changed = f.rows.flatMap((r, row) => (r.kind === "context" ? [] : [{ file, row }]));
+    const rows = changed.filter((r) => f.rowHunk[r.row] === hunk);
+    const color = toggledMark(rows, asked, d.rowState);
+    const rest = changed.filter((r) => f.rowHunk[r.row] !== hunk);
+    const whole =
+      color !== null &&
+      color === d.primary &&
+      rest.every((r) => d.rowState(r.file, r.row) === color);
+    const check = whole ? [file] : [];
+    settle(await commands.markRows(review.id, rows, color, check), (next) => applied(next, check));
+  }
+
   async function clearFile(file: number) {
     if (!review) return;
     settle(await commands.clearFileMarks(review.id, file), (next) => applied(next, [file]));
@@ -171,6 +188,7 @@ export function useReviewActions(d: Deps) {
     applyMark,
     setChecked,
     markFile,
+    markHunk,
     clearFile,
     step,
     resetMarks,

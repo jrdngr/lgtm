@@ -86,6 +86,8 @@ pub struct Review {
     sticky: Option<usize>,
     /// Where a selection of lines started, while there is one.
     anchor: Option<Line>,
+    /// The selections `e` grew from, last first out for `E`.
+    grown: Vec<(Option<Line>, usize)>,
     /// Whether keys move through the file list rather than the diff.
     in_list: bool,
     /// What's picked in the file list, when it isn't the cursor's file.
@@ -154,6 +156,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("u U", "undo, redo marks and comments"),
     ("z", "hide reviewed files"),
     ("J K", "select lines"),
+    ("e E", "grow, shrink selection: hunk, file, review"),
     ("v", "select text"),
     ("/", "search"),
     ("c", "comment for the agent, on the selected lines"),
@@ -221,6 +224,7 @@ impl Review {
             pinned: false,
             sticky: None,
             anchor: None,
+            grown: vec![],
             in_list: false,
             list_pick: None,
             group_reviewed: false,
@@ -555,8 +559,11 @@ impl Review {
             self.space = true;
             return Outcome::None;
         }
-        if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c')) {
+        if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c' | 'e' | 'E')) {
             self.anchor = None;
+        }
+        if !matches!(key.code, KeyCode::Char('c' | 'e' | 'E')) {
+            self.grown.clear();
         }
         if let KeyCode::Char(c) = key.code
             && !ctrl
@@ -578,6 +585,8 @@ impl Review {
             KeyCode::Char('j') | KeyCode::Down if self.in_list => self.list_step(1),
             KeyCode::Char('k') | KeyCode::Up if self.in_list => self.list_step(-1),
             KeyCode::Char(c @ ('r' | 'f')) if self.in_list => self.list_mark(c, store),
+            KeyCode::Char('e') if !self.in_list => self.grow(),
+            KeyCode::Char('E') if !self.in_list => self.shrink(),
             KeyCode::Char('J') if !self.in_list => self.extend(1),
             KeyCode::Char('K') if !self.in_list => self.extend(-1),
             KeyCode::Char('j') | KeyCode::Down => self.by(1),
@@ -640,6 +649,7 @@ impl Review {
         }
         if matches!(ev.kind, MouseEventKind::Down(_)) {
             self.anchor = None;
+            self.grown.clear();
             self.selecting = None;
         }
         match ev.kind {

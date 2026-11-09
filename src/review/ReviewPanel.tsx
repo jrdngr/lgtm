@@ -1,6 +1,7 @@
 import type { IDockviewPanelProps } from "dockview-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeDto, View } from "../bindings";
+import { runChord } from "../core/chords";
 import { isMac } from "../core/keys";
 import { openArchitecture } from "../core/panels";
 import { remembered } from "../core/remembered";
@@ -18,6 +19,7 @@ import { searchItems } from "../search/menu";
 import { useInfoLines } from "../symbolInfo/useInfoLines";
 import { useTurns } from "../turns/turnsStore";
 import { openMenu } from "../ui/contextMenu";
+import { wordWrap } from "../workbench/wordWrap";
 import { AgentCommentBlock } from "./AgentCommentBlock";
 import { agentId, agentSlots, isAgentId, mergeSlots, showResolved } from "./agentComments";
 import { CommentBlock } from "./CommentBlock";
@@ -25,13 +27,16 @@ import { commentSlots } from "./comments";
 import { DiffLines } from "./DiffLines";
 import { fileMenu } from "./fileMenu";
 import { useFollowChanges } from "./followChanges";
+import { hidePrComments, toggleHideReviewed } from "./listToggles";
 import { MarkMenu } from "./MarkMenu";
 import { useMarkSetup } from "./marks";
 import { buildLines, changedRows, type DisplayLine, type ViewMode } from "./model";
 import { PrCommentsHead, prLines } from "./PrCommentsHead";
 import { ReviewBar, ReviewNotes } from "./ReviewBar";
+import { commentAt, commentStep, itemTarget } from "./reviewSteps";
 import { startRevset, takeStartView, workspaceRevset } from "./revset";
 import type { Filter } from "./rowState";
+import { type SpaceItem, SpaceMenu } from "./SpaceMenu";
 import { filterLabel, plural, sumProgress } from "./state";
 import { useAgentComments } from "./useAgentComments";
 import { useAgentRequests } from "./useAgentRequests";
@@ -57,6 +62,9 @@ const amberRows = remembered("lgtm:amberRows", true, [true, false]);
 import "./review.css";
 
 const NO_CHANGES: ChangeDto[] = [];
+/** A review line's height, and a code character's width, in px. */
+const LINE_PX = 20;
+const CHAR_PX = 7.2;
 
 /** Whether a line belongs to a hunk that za can collapse. */
 const inHunk = (line: DisplayLine | undefined): line is Exclude<DisplayLine, { kind: "file" }> =>
@@ -129,13 +137,14 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     onDone: focusRoot,
   });
   const resolved = showResolved.use();
+  const hidePr = hidePrComments.use();
   const slots = useMemo(
     () =>
       mergeSlots(
-        commentSlots(c.comments, c.draft),
+        commentSlots(hidePr ? [] : c.comments, c.draft),
         agentSlots(agent.comments, agent.draft, resolved),
       ),
-    [c.comments, c.draft, agent.comments, agent.draft, resolved],
+    [c.comments, c.draft, agent.comments, agent.draft, resolved, hidePr],
   );
   const { collapsedFiles, collapsedHunks, revealed } = fold;
   const wc = useWorkingCopy(workspace)?.commitId;
@@ -169,7 +178,10 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
       context.lines,
     ],
   );
-  const lines = useMemo(() => [...prLines(c.onPr), ...fileLines], [c.onPr, fileLines]);
+  const lines = useMemo(
+    () => [...prLines(hidePr ? [] : c.onPr), ...fileLines],
+    [c.onPr, fileLines, hidePr],
+  );
   const fresh = useFollowChanges(review, files, lines, setScrollTo);
   const drawn = useMemo(() => (fresh.size > 0 ? { ...shown, fresh } : shown), [shown, fresh]);
   const navComments = useMemo(() => [...c.onPr, ...c.comments], [c.onPr, c.comments]);
@@ -255,7 +267,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     focusRoot();
   }
 
-  const { jump, jumpToComment, jumpToRow, stepHunk, stepFile, showLine } = useReviewNav({
+  const { jump, jumpToComment, jumpToRow, stepFile, showLine } = useReviewNav({
     lines,
     files,
     comments: navComments,
@@ -356,6 +368,39 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     openMenu(e, fileMenu(deps, file));
   }
 
+  const find = useReviewFind({
+    files,
+    lines,
+    mode,
+    scrollRef,
+    scrollTo: setScrollTo,
+    focus: focusRoot,
+  });
+
+  const [space, setSpace] = useState(false);
+  const wrap = wordWrap.use();
+  const cursorComment = () => {
+    const id = commentAt(lines, cursor);
+    return id === undefined ? undefined : agent.find(id);
+  };
+  const spaceItems: (SpaceItem & { run(): void })[] = [
+    { key: "f", label: "files", run: () => runChord("Mod+P") },
+    { key: "b", label: "file list", run: () => runChord("Mod+Alt+B") },
+    { key: "/", label: "search", run: () => runChord("Mod+Shift+F") },
+    {
+      key: "w",
+      label: "wrap",
+      run() {
+        wordWrap.set(!wrap);
+        commands.setWordWrap(!wrap);
+      },
+    },
+    { key: "r", label: "editor", run: openInEditor },
+    ...(c.canDraft ? [{ key: "c", label: "PR comment", run: a.startDraft }] : []),
+    { key: "m", label: "marks", run: openMenuAtCursor },
+    { key: "a", label: "architecture", run: () => openArchitecture(containerApi) },
+  ];
+
   const onKeyDown = useReviewKeys({
     files,
     lines,
@@ -368,26 +413,59 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
     copy: a.copy,
     sendToTerminal: () => a.sendSelection(true),
     applyMark: a.applyMark,
-    openMenuAtCursor,
-    startDraft: a.startDraft,
-    startComment: a.startComment,
-    openArchitecture: () => openArchitecture(containerApi),
-    openInEditor,
-    stepHunk,
+    space,
+    setSpace,
+    spaceKey: (key) => spaceItems.find((x) => x.key === key)?.run(),
+    pageLines: () => Math.max(1, Math.floor((scrollRef.current?.clientHeight ?? 400) / LINE_PX)),
+    scrollSide(dir) {
+      const left = dir * 4 * CHAR_PX;
+      scrollRef.current?.scrollBy({ left });
+      for (const bar of rootRef.current?.querySelectorAll(".split-bar") ?? [])
+        bar.scrollBy({ left });
+    },
     stepFile,
+    stepItem(dir) {
+      const i = itemTarget(files, lines, cursor, dir);
+      if (i !== undefined) place(i);
+    },
+    stepComment(dir) {
+      const id = commentStep(lines, cursor, dir);
+      if (id !== undefined) jumpToComment(id);
+    },
     toggleFile,
-    toggleHunk: fold.toggleHunk,
     toggleChecked: (file) => a.setChecked(file, index.checks[file] !== "checked"),
+    markFile: a.markFile,
+    markHunk: a.markHunk,
+    startComment: a.startComment,
+    editComment() {
+      const x = cursorComment();
+      if (x) agent.edit(x);
+    },
+    deleteComment() {
+      const x = cursorComment();
+      if (x) agent.remove(x);
+    },
+    toggleResolved() {
+      const x = cursorComment();
+      if (x) agent.setDone(x, !x.done);
+    },
+    find: find.show,
+    findStep(back) {
+      if (!find.open || find.bar.total === 0) return false;
+      find.bar.onStep(back);
+      return true;
+    },
+    closeFind() {
+      if (!find.open) return false;
+      find.bar.onClose();
+      return true;
+    },
+    toggleHideReviewed,
+    toggleHidePr: () => hidePrComments.set(!hidePr),
+    pull: () => pr.pull(),
+    toggleSplit: () => setMode((m) => (m === "split" ? "unified" : "split")),
   });
 
-  const find = useReviewFind({
-    files,
-    lines,
-    mode,
-    scrollRef,
-    scrollTo: setScrollTo,
-    focus: focusRoot,
-  });
   function onReviewKey(e: React.KeyboardEvent) {
     const mod = isMac ? e.metaKey : e.ctrlKey;
     if (mod && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
@@ -504,6 +582,7 @@ export function ReviewPanel({ api, containerApi, params }: IDockviewPanelProps) 
         {s.extending && <span className="extending">extend</span>}
       </div>
       {picker}
+      {space && <SpaceMenu items={spaceItems} />}
       {menu && (
         <MarkMenu
           x={menu.x}

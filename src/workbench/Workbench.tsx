@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { onAnyShowLook } from "../arch/showLook";
 import { bottom } from "../core/bottom";
+import { setChordRunner } from "../core/chords";
 import { bottomDockOf, dockOf, relayoutDocks, revealPanel } from "../core/docks";
 import { bottomKey, chord, symbolKey, tabKey } from "../core/keys";
 import { addTerminal, focusPanel, openReport } from "../core/panels";
@@ -332,6 +333,11 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
       run();
     };
     window.addEventListener("keydown", onKey, true);
+    setChordRunner((key) => {
+      const run = keyRef.current?.(key);
+      run?.();
+      return !!run;
+    });
     return () => window.removeEventListener("keydown", onKey, true);
   }, []);
 

@@ -3,7 +3,6 @@ import type { CommentDto } from "../bindings";
 import { activate } from "../core/panels";
 import { openFileIn } from "../editor/open";
 import {
-  changeTargets,
   commentJumpTarget,
   type DisplayLine,
   type FlatFile,
@@ -59,12 +58,6 @@ export function useReviewNav(n: Nav) {
     jumpTo(rowJumpTarget(at));
   }
 
-  /** Goes to the next or previous run of changed rows. */
-  function stepHunk(dir: 1 | -1) {
-    const target = stepTarget(changeTargets(files, lines), n.cursor, dir);
-    if (target) jumpTo(target);
-  }
-
   function stepFile(dir: 1 | -1) {
     const target = stepTarget(fileTargets(lines), n.cursor, dir);
     if (target) jumpTo(target);
@@ -87,5 +80,5 @@ export function useReviewNav(n: Nav) {
     else jumpToRow(file, best);
   }
 
-  return { jump, jumpToComment, jumpToRow, stepHunk, stepFile, showLine };
+  return { jump, jumpToComment, jumpToRow, stepFile, showLine };
 }

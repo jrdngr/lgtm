@@ -123,3 +123,10 @@
   color: var(--accent);
   font-size: var(--fs-sm);
 }
+
+.file-tree .flagged {
+  flex: none;
+  margin-left: 4px;
+  color: var(--mark-red);
+  font-weight: 600;
+}

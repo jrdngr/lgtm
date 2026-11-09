@@ -73,3 +73,15 @@
 .mark-menu button:disabled:hover {
   background: none;
 }
+
+.space-menu {
+  left: 12px;
+  bottom: 30px;
+}
+
+.space-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 8px;
+}

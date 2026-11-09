@@ -26,6 +26,15 @@ pub struct RowDto {
     pub hl: Option<Vec<Segment>>,
 }
 
+/// Where `m` and `M` go from a shown line: the shown lines its syntax item steps to. Lines
+/// count from 1.
+#[derive(Clone, Serialize, Type)]
+pub struct ItemStep {
+    pub line: u32,
+    pub next: Option<u32>,
+    pub prev: Option<u32>,
+}
+
 #[derive(Clone, Serialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct HunkDto {
@@ -54,6 +63,9 @@ pub struct FileDto {
     pub line_count: u32,
     pub old_symbols: Vec<CodeSymbol>,
     pub new_symbols: Vec<CodeSymbol>,
+    /// Item steps from the removed rows' old lines and from the new side's shown lines.
+    pub old_steps: Vec<ItemStep>,
+    pub new_steps: Vec<ItemStep>,
 }
 
 /// Builds a file's review state and the UI's view of it. CPU-bound: parsing and highlighting.
@@ -83,6 +95,8 @@ pub fn build_file(
     let new_hl = new_parsed
         .as_ref()
         .map(|p| p.highlight(new_text.as_deref().unwrap(), &new_lines));
+    let old_steps = item_steps(&old_path, old_text.as_deref(), &old_lines);
+    let new_steps = item_steps(&d.path, new_text.as_deref(), &new_lines);
 
     let file = ReviewFile::build(
         sides,
@@ -116,8 +130,26 @@ pub fn build_file(
         line_count: new_text.as_deref().map_or(0, |t| t.lines().count() as u32),
         old_symbols: file.old.symbols.clone(),
         new_symbols: file.new.symbols.clone(),
+        old_steps,
+        new_steps,
     };
     (file, dto)
+}
+
+fn item_steps(path: &str, text: Option<&str>, lines: &[u32]) -> Vec<ItemStep> {
+    let Some(text) = text else {
+        return Vec::new();
+    };
+    let shown: Vec<u32> = lines.iter().map(|l| l.saturating_sub(1)).collect();
+    syntax::items(path, text)
+        .shown_steps(&shown)
+        .into_iter()
+        .map(|(line, next, prev)| ItemStep {
+            line: line + 1,
+            next: next.map(|n| n + 1),
+            prev: prev.map(|p| p + 1),
+        })
+        .collect()
 }
 
 fn hunk_dto(

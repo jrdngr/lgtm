@@ -4,7 +4,6 @@ import { file, layout, review, rows } from "./fixture.test-utils";
 import {
   buildLines,
   changedRows,
-  changeTargets,
   commentJumpTarget,
   type DisplayLine,
   fileJumpTarget,
@@ -140,40 +139,18 @@ describe("jump targets", () => {
   });
 });
 
-describe("change stepping", () => {
-  // One long hunk with two edits, as prose often diffs, then a collapsed hunk, then a file.
+describe("file stepping", () => {
   const stepFiles = flatten(
-    review([
-      file("doc.md", [rows([" a", "-b", "+B", " c", " d", "+e", " f"]), rows(["+g"])]),
-      file("b.rs", [rows([" x", "-y"])]),
-    ]),
+    review([file("doc.md", [rows([" a", "-b", "+B", " c"])]), file("b.rs", [rows([" x", "-y"])])]),
   );
-  const lines = buildLines(stepFiles, layout({ collapsedHunks: new Set([hunkKey("doc.md", 1)]) }));
-  const targets = changeTargets(stepFiles, lines);
-  const step = (cursor: number, dir: 1 | -1) => stepTarget(targets, cursor, dir)?.cursor;
+  const lines = buildLines(stepFiles, layout());
 
-  it("stops at each run of changed rows, or a collapsed hunk's header", () => {
-    // 0 file, 1 hunk, 2-8 rows, 9 hunk (collapsed), 10 file, 11 hunk, 12-13 rows
-    expect(targets).toEqual([
-      { cursor: 3, top: 0 },
-      { cursor: 7, top: 4 },
-      { cursor: 9, top: 7 },
-      { cursor: 13, top: 9 },
-    ]);
-  });
-
-  it("goes back from inside a change and stops at the ends", () => {
-    expect(step(5, 1)).toBe(7);
-    expect(step(5, -1)).toBe(3);
-    expect(step(13, 1)).toBeUndefined();
-    expect(step(3, -1)).toBeUndefined();
-  });
-
-  it("steps files the same way, going back to the current file's start first", () => {
-    const fileStops = fileTargets(lines);
-    expect(fileStops.map((t) => t.cursor)).toEqual([2, 12]);
-    expect(stepTarget(fileStops, 5, 1)?.cursor).toBe(12);
-    expect(stepTarget(fileStops, 5, -1)?.cursor).toBe(2);
+  it("goes to the next file, or back to the current file's start first", () => {
+    const stops = fileTargets(lines);
+    expect(stops.map((t) => t.cursor)).toEqual([2, 8]);
+    expect(stepTarget(stops, 5, 1)?.cursor).toBe(8);
+    expect(stepTarget(stops, 5, -1)?.cursor).toBe(2);
+    expect(stepTarget(stops, 8, 1)).toBeUndefined();
   });
 });
 

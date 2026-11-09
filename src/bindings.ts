@@ -1437,6 +1437,9 @@ export type FileDto = {
 	lineCount: number,
 	oldSymbols: CodeSymbol[],
 	newSymbols: CodeSymbol[],
+	/**  Item steps from the removed rows' old lines and from the new side's shown lines. */
+	oldSteps: ItemStep[],
+	newSteps: ItemStep[],
 };
 
 export type FileEntry = {
@@ -1653,6 +1656,16 @@ export type InterfaceDto = {
 	description: string,
 	spec: SpecRefDto[],
 	built: DesignBuilt | null,
+};
+
+/**
+ *  Where `m` and `M` go from a shown line: the shown lines its syntax item steps to. Lines
+ *  count from 1.
+ */
+export type ItemStep = {
+	line: number,
+	next: number | null,
+	prev: number | null,
 };
 
 /**  A change to the repo, on a revision given by change id. */

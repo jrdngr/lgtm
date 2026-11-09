@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { loadState, saveState, useSavedSet } from "../core/savedState";
+import { useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
 import { Icon, IconButton } from "../ui/icons";
@@ -11,6 +11,7 @@ import { type CurrentReview, useCurrentReview } from "./current";
 import { Diffstat } from "./Diffstat";
 import { STATUS_LABEL } from "./FileHeader";
 import { type LineStat, lineStat, sumStats } from "./lineStat";
+import { toggleHideReviewed, useHideReviewed } from "./listToggles";
 import { MarkCounts } from "./MarkCounts";
 import { type MarkSetup, useMarkSetup } from "./marks";
 import { ProgressCard } from "./ProgressCard";
@@ -31,22 +32,8 @@ const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
 const fileCount = (d: TreeDir): number =>
   d.children.reduce((n, c) => n + (c.kind === "dir" ? fileCount(c) : 1), 0);
 
-const HIDE_REVIEWED = "changes-hide-reviewed";
 /** The closed set's key for the reviewed files' heading, which no folder path can be. */
 const REVIEWED_OPEN = "/reviewed";
-
-/** Whether reviewed files go in their own collapsed list, remembered across windows. */
-function useHideReviewed() {
-  const [on, setOn] = useState(() =>
-    loadState(HIDE_REVIEWED, true, (v): v is boolean => typeof v === "boolean"),
-  );
-  const toggle = () =>
-    setOn((prev) => {
-      saveState(HIDE_REVIEWED, !prev);
-      return !prev;
-    });
-  return [on, toggle] as const;
-}
 
 interface TreeProps {
   depth: number;
@@ -126,7 +113,10 @@ function Node({
               )}
             </>
           ) : (
-            (isDone(p) || check === "checked") && <Ring done={1} by={by} />
+            <>
+              {!!p.marks.red && <span className="flagged">!</span>}
+              {(isDone(p) || check === "checked") && <Ring done={1} by={by} />}
+            </>
           )}
         </button>
       </li>
@@ -193,7 +183,7 @@ export function FilesPanel() {
   const setup = useMarkSetup();
   const { sender } = useSendFromMenu(workspace);
   const [closed, setClosed] = useSavedSet(`changes-closed:${workspace ?? ""}`);
-  const [hideReviewed, toggleHideReviewed] = useHideReviewed();
+  const hideReviewed = useHideReviewed();
   const open = useMemo(() => openCounts(review?.agentComments ?? []), [review?.agentComments]);
   const trees = useMemo(() => {
     if (!review) return undefined;

@@ -3,7 +3,7 @@ import type { MarkColor } from "../bindings";
 import { isMac } from "../core/keys";
 import { type MenuAction, menuAction } from "./MarkMenu";
 import { colorForKey, type MarkSetup } from "./marks";
-import type { DisplayLine, FlatFile } from "./model";
+import { type DisplayLine, type FlatFile, nextRowLine } from "./model";
 import { expand, reviewSelection } from "./selection";
 import type { SelectionApi } from "./useSelection";
 
@@ -20,19 +20,35 @@ interface Ctx {
   /** Sends where the selection is to the most recently used terminal. */
   sendToTerminal(): void;
   applyMark(color: MarkColor | null): void;
-  openMenuAtCursor(): void;
-  /** Opens a draft for the PR on GitHub on the selection. */
-  startDraft(): void;
+  /** Whether `space` waits for its next key. */
+  space: boolean;
+  setSpace(on: boolean): void;
+  /** Runs the space menu's `key`. */
+  spaceKey(key: string): void;
+  /** How many lines the review shows at once. */
+  pageLines(): number;
+  scrollSide(dir: 1 | -1): void;
+  stepFile(dir: 1 | -1): void;
+  stepItem(dir: 1 | -1): void;
+  stepComment(dir: 1 | -1): void;
+  toggleFile(file: number): void;
+  toggleChecked(file: number): void;
+  markFile(file: number, color: MarkColor): void;
+  markHunk(file: number, hunk: number, color: MarkColor): void;
   /** Opens a comment for the agent on the selection. */
   startComment(): void;
-  /** Opens the agent box of the comment at the cursor. */
-  openArchitecture(): void;
-  openInEditor(): void;
-  stepHunk(dir: 1 | -1): void;
-  stepFile(dir: 1 | -1): void;
-  toggleFile(file: number): void;
-  toggleHunk(file: number, hunk: number): void;
-  toggleChecked(file: number): void;
+  /** Edits the comment under the cursor's line. */
+  editComment(): void;
+  deleteComment(): void;
+  toggleResolved(): void;
+  find(): void;
+  /** Steps through the find's matches while it's open. Returns whether it did. */
+  findStep(back: boolean): boolean;
+  closeFind(): boolean;
+  toggleHideReviewed(): void;
+  toggleHidePr(): void;
+  pull(): void;
+  toggleSplit(): void;
 }
 
 /** Form fields keep their own keys. */
@@ -41,11 +57,20 @@ const isEditable = (t: EventTarget) =>
   t instanceof HTMLSelectElement ||
   t instanceof HTMLTextAreaElement;
 
-/** The review's keyboard handler. */
+/** The review's keyboard handler: the TUI review's keys. */
 export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
   const pendingZ = useRef(false);
   const { files, lines, s } = ctx;
-  const { cursor, sel, select } = s;
+  const { cursor, select } = s;
+
+  /** Puts the cursor `by` lines away, on the nearest row line. */
+  function moveBy(by: number) {
+    const to = Math.max(0, Math.min(lines.length - 1, cursor + by));
+    if (lines[to]?.kind === "rows") return s.place(to);
+    const dir = by > 0 ? 1 : -1;
+    const near = nextRowLine(lines, to, dir);
+    s.place(near !== to ? near : nextRowLine(lines, to, dir === 1 ? -1 : 1));
+  }
 
   return (e) => {
     if (isEditable(e.target)) return;
@@ -70,6 +95,13 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       }
       return;
     }
+    if (ctx.space) {
+      e.preventDefault();
+      if (["Shift", "Alt", "Control", "Meta"].includes(e.key)) return;
+      ctx.setSpace(false);
+      ctx.spaceKey(e.key);
+      return;
+    }
     if (mod) {
       const key = e.key.toLowerCase();
       if (key === "a") select(reviewSelection(lines));
@@ -85,16 +117,20 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       e.preventDefault();
       return;
     }
-    if (pendingZ.current && e.key === "a") {
-      pendingZ.current = false;
-      const line = lines[cursor];
-      if (line?.kind === "file") ctx.toggleFile(line.file);
-      else if (line) ctx.toggleHunk(line.file, line.hunk);
+    if (e.ctrlKey) {
+      if (e.key === "d") moveBy(Math.floor(ctx.pageLines() / 2));
+      else if (e.key === "u") moveBy(-Math.floor(ctx.pageLines() / 2));
+      else return;
       e.preventDefault();
       return;
     }
-    pendingZ.current = e.key === "z";
+    if (e.altKey) return;
+    const line = lines[cursor];
+    const once = !e.repeat;
     switch (e.key) {
+      case " ":
+        ctx.setSpace(true);
+        break;
       case "j":
       case "ArrowDown":
         s.move(1, s.extending);
@@ -107,11 +143,33 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "K":
         s.extend(e.key === "J" ? 1 : -1);
         break;
+      case "g":
+      case "Home":
+        moveBy(-lines.length);
+        break;
+      case "G":
+      case "End":
+        moveBy(lines.length);
+        break;
+      case "PageDown":
+        moveBy(ctx.pageLines());
+        break;
+      case "PageUp":
+        moveBy(-ctx.pageLines());
+        break;
+      case "h":
+      case "ArrowLeft":
+        ctx.scrollSide(-1);
+        break;
+      case "l":
+      case "ArrowRight":
+        ctx.scrollSide(1);
+        break;
       case "v":
         s.toggleExtend();
         break;
       case "e": {
-        const next = expand(files, lines, cursor, sel);
+        const next = expand(files, lines, cursor, s.sel);
         if (next) s.grow(next);
         break;
       }
@@ -119,7 +177,7 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
         s.shrink();
         break;
       case "Escape":
-        s.collapse();
+        if (!ctx.closeFind()) s.collapse();
         break;
       case "1":
       case "2":
@@ -131,40 +189,67 @@ export function useReviewKeys(ctx: Ctx): (e: React.KeyboardEvent) => void {
       case "8":
       case "9": {
         const color = colorForKey(ctx.setup, e.key);
-        if (color && !e.repeat) ctx.applyMark(color);
+        if (color && once) ctx.applyMark(color);
         break;
       }
       case "0":
-        if (ctx.setup.enabled && !e.repeat) ctx.applyMark(null);
+        if (ctx.setup.enabled && once) ctx.applyMark(null);
+        break;
+      case "n":
+      case "N":
+        if (!ctx.findStep(e.key === "N")) ctx.stepFile(e.key === "n" ? 1 : -1);
         break;
       case "m":
-        ctx.openMenuAtCursor();
-        break;
-      case "C":
-        if (!e.repeat) ctx.startDraft();
-        break;
-      case "c":
-        if (!e.repeat) ctx.startComment();
-        break;
-      case "g":
-        ctx.openArchitecture();
-        break;
-      case "o":
-        ctx.openInEditor();
+      case "M":
+        ctx.stepItem(e.key === "m" ? 1 : -1);
         break;
       case "]":
       case "[":
-        ctx.stepHunk(e.key === "]" ? 1 : -1);
+        ctx.stepComment(e.key === "]" ? 1 : -1);
         break;
-      case "}":
-      case "{":
-        ctx.stepFile(e.key === "}" ? 1 : -1);
+      case "r":
+        if (line && once) ctx.toggleChecked(line.file);
         break;
-      case "x": {
-        const file = lines[cursor]?.file;
-        if (file !== undefined && !e.repeat) ctx.toggleChecked(file);
+      case "f":
+        if (line && once) ctx.markFile(line.file, "red");
         break;
-      }
+      case "R":
+      case "F":
+        if (line && line.kind !== "file" && line.hunk >= 0 && once)
+          ctx.markHunk(line.file, line.hunk, e.key === "R" ? "green" : "red");
+        break;
+      case "u":
+      case "U":
+        ctx.step(e.key === "u");
+        break;
+      case "c":
+        if (once) ctx.startComment();
+        break;
+      case "Enter":
+        if (line?.kind === "file") ctx.toggleFile(line.file);
+        else ctx.editComment();
+        break;
+      case "d":
+        if (once) ctx.deleteComment();
+        break;
+      case "C":
+        if (once) ctx.toggleResolved();
+        break;
+      case "/":
+        ctx.find();
+        break;
+      case "z":
+        ctx.toggleHideReviewed();
+        break;
+      case "P":
+        ctx.toggleHidePr();
+        break;
+      case "p":
+        if (once) ctx.pull();
+        break;
+      case "t":
+        ctx.toggleSplit();
+        break;
       default:
         return;
     }

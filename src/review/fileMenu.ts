@@ -60,7 +60,7 @@ export function fileMenu(d: Deps, file: number): CtxEntry[] {
           "-",
         ] as CtxEntry[])
       : []),
-    { label: "Open File", keys: "o", disabled: removed, onSelect: () => d.openFile(path) },
+    { label: "Open File", keys: "space r", disabled: removed, onSelect: () => d.openFile(path) },
     { label: "Copy Path", onSelect: () => copy(absolutePath(d.workspace, path)) },
     {
       label: "Reveal in Files",
