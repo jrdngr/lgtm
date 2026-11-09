@@ -18,6 +18,7 @@ import { treeSitter } from "./highlight";
 import { linkClicks } from "./linkClicks";
 import { isMarkdown } from "./mdEdit";
 import { markdownKeys } from "./mdKeys";
+import { type ModalHooks, modal } from "./modal/cm";
 
 const theme = EditorView.theme(
   {
@@ -47,6 +48,8 @@ interface Hooks {
   link(href: string): void;
   /** Opens the find bar, which then stands in for CodeMirror's own search panel. */
   find?(): void;
+  /** What the modal keys ask of the tab, besides saving. */
+  modal?: Omit<ModalHooks, "save">;
 }
 
 /** CodeMirror's search panel, empty: the find bar over the editor takes its place. */
@@ -73,6 +76,7 @@ export function editorExtensions(
     return true;
   };
   return [
+    modal(path, { save: () => hooks.save(), ...hooks.modal }),
     symbolInfo,
     diffGutter,
     lineNumbers(),

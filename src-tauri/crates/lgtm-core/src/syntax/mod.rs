@@ -3,6 +3,7 @@
 mod conflict;
 mod items;
 mod langs;
+pub mod nodes;
 mod queries;
 mod refs;
 

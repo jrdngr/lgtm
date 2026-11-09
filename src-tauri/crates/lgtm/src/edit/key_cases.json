@@ -1,0 +1,120 @@
+{
+  "h and l stay on the line": [
+    ["a[b]c", "l", "ab[c]"],
+    ["ab[c]\nd", "l", "ab[c]\nd"],
+    ["a\n[b]", "h", "a\n[b]"],
+    ["ab[c]", "hh", "[a]bc"]
+  ],
+  "j and k keep the column across a shorter line": [
+    ["abc[d]\nx\nabcdef", "j", "abcd\n[x]\nabcdef"],
+    ["abc[d]\nx\nabcdef", "jj", "abcd\nx\nabc[d]ef"],
+    ["abcd\nx\nabc[d]ef", "kk", "abc[d]\nx\nabcdef"],
+    ["ab\n[c]d", "jj", "ab\n[c]d"]
+  ],
+  "insert and append type before and after the selection": [
+    ["a[b]c", "iX<esc>", "a[X]bc"],
+    ["a[b]c", "aX<esc>", "ab[X]c"],
+    ["  a[b]c\nd", "IX<esc>", "  [X]abc\nd"],
+    ["a[b]c\nd", "AX<esc>", "abc[X]\nd"],
+    ["a\n[b]", "i<bs><esc>", "[a]b"],
+    ["foo ba[r]", "a<C-w><esc>", "foo[ ]"]
+  ],
+  "new lines keep the indent": [
+    ["    a[b]\nc", "ox<esc>", "    ab\n    [x]\nc"],
+    ["a\n  [b]", "Ox<esc>", "a\n  [x]\n  b"],
+    ["    a[b]", "a<ret>c<esc>", "    ab\n    [c]"]
+  ],
+  "undo takes back a whole insert and redo puts it back": [
+    ["a[b]c", "iXY<esc>u", "a[b]c"],
+    ["a[b]c", "iXY<esc>uU", "aX[Y]bc"],
+    ["a[b]c", "i<esc>iX<esc>u", "a[b]c"]
+  ],
+  "word motions select what they move over": [
+    ["let [a]rgv = 1", "w", "let [argv ]= 1"],
+    ["x = [1]\nfoo", "w", "x = 1\n[foo]"],
+    ["[a].b c", "w", "a[.]b c"],
+    ["[a].b c", "W", "[a.b ]c"],
+    ["[l]et argv", "e", "[let] argv"],
+    ["le[t] argv", "e", "let[ argv]"],
+    ["let ar[g]v", "b", "let [<arg]v"],
+    ["a.b [c]", "B", "[<a.b ]c"]
+  ],
+  "find and till stop on or next to the char on the same line": [
+    ["[a]bcabc", "fc", "[abc]abc"],
+    ["[a]bcabc", "tc", "[ab]cabc"],
+    ["abcab[c]", "Fa", "abc[<abc]"],
+    ["abcab[c]", "Ta", "abca[<bc]"],
+    ["[a]bc", "fz", "[a]bc"],
+    ["[a]b\nc", "fc", "[a]b\nc"]
+  ],
+  "goto keys go to file and line ends": [
+    ["ab\n  c[d]", "gg", "[a]b\n  cd"],
+    ["a[b]\ncd", "ge", "ab\n[c]d"],
+    ["  a[b]c", "gh", "[ ] abc"],
+    ["[a]bc\nd", "gl", "ab[c]\nd"],
+    ["  ab[c]", "gs", "  [a]bc"],
+    ["  a[b]c", "<home>", "[ ] abc"],
+    ["[a]bc\nd", "<end>", "ab[c]\nd"],
+    ["a[b]c\nd", "i<end>X<home>Y<esc>", "[Y]abcX\nd"]
+  ],
+  "x selects lines and extends a line at a time": [
+    ["a[b]\ncd\ne", "x", "[ab\n]cd\ne"],
+    ["a[b]\ncd\ne", "xx", "[ab\ncd\n]e"],
+    ["ab\nc[d]", "x", "ab\n[cd]"],
+    ["a[b]c", "%", "[abc]"]
+  ],
+  "select mode extends and ends after an edit": [
+    ["[a]bc", "vll", "[abc]"],
+    ["[a]bc", "vll;", "ab[c]"],
+    ["[a]b cd", "vww", "[ab cd]"],
+    ["[a]bc", "vld", "[c]"],
+    ["[a]bcd", "vldl", "c[d]"]
+  ],
+  "delete change yank and paste": [
+    ["a[b]c", "d", "a[c]"],
+    ["[ab\n]cd", "d", "[c]d"],
+    ["let [a]rgv = 1", "wcx<esc>", "let [x]= 1"],
+    ["[a]b", "yp", "a[a]b"],
+    ["[a]b\ncd", "xyp", "ab\n[ab\n]cd"],
+    ["[a]b\ncd", "xyP", "[ab\n]ab\ncd"],
+    ["[a]b\ncd", "xcz<esc>", "[z]\ncd"],
+    ["a[b]c", "du", "a[b]c"]
+  ],
+  "replace case indent and join": [
+    ["[ab]\nc", "r-", "[--]\nc"],
+    ["[aB]c", "~", "[Ab]c"],
+    ["[a]b\ncd", ">", "    [a]b\ncd"],
+    ["    [a]b", "<lt>", "[a]b"],
+    ["\tx\n[a]", ">", "\tx\n\t[a]"],
+    ["[ab\ncd]", ">", "    [ab\n    cd]"],
+    ["[a]b\n   cd\ne", "J", "ab[ ]cd\ne"],
+    ["[a]b\n\ncd", "J", "ab[\n]cd"]
+  ],
+  "surround adds deletes and replaces the nearest pair": [
+    ["x[ab]y", "ms(", "x[(ab)]y"],
+    ["x[ab]y", "ms)", "x[(ab)]y"],
+    ["(a[b])", "md(", "a[b]"],
+    ["((a)[b])", "md(", "(a)[b]"],
+    ["\"a[b]\"", "md\"", "a[b]"],
+    ["(a[b])", "mr({", "{a[b]}"],
+    ["a[b]", "md(", "a[b]"]
+  ],
+  "star searches the selection and n wraps around": [
+    ["[f]oo bar foo", "*n", "foo bar [f]oo"],
+    ["foo bar [f]oo", "*n", "[f]oo bar foo"],
+    ["foo bar [f]oo", "*N", "[f]oo bar foo"],
+    ["[F]oo foo Foo", "*n", "Foo foo [F]oo"],
+    ["[f]oo Foo", "*n", "foo [F]oo"]
+  ],
+  "mi and ma select words pairs and quotes": [
+    ["ab c[d]e fg", "miw", "ab [cde] fg"],
+    ["ab c[d]e fg", "maw", "ab [cde ]fg"],
+    ["ab c[d]e", "maw", "ab[ cde]"],
+    ["f(a, [b])", "mi(", "f([a, b])"],
+    ["f(a, [b])", "ma)", "f[(a, b)]"],
+    ["{x {[y]} z}", "mi{", "{x {[y]} z}"],
+    ["{x {y} [z]}", "mi{", "{[x {y} z]}"],
+    ["s = \"a [b]\"", "mi\"", "s = \"[a b]\""],
+    ["s = 'a[b]'", "ma'", "s = ['ab']"]
+  ]
+}

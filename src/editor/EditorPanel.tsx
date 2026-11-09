@@ -2,7 +2,9 @@ import { EditorState, type Text, Transaction } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import type { IDockviewPanelProps } from "dockview-react";
 import { useEffect, useRef, useState } from "react";
+import { runChord } from "../core/chords";
 import { isMac } from "../core/keys";
+import { splitGroup } from "../core/panels";
 import { useWorkspace } from "../core/workspace";
 import { FindBar, stepKey } from "../find/FindBar";
 import { useCmFind } from "../find/useCmFind";
@@ -10,6 +12,7 @@ import { useDomFind } from "../find/useDomFind";
 import { commands, errorText, unwrap } from "../ipc";
 import { hasConflicts } from "../resolve/markers";
 import { ResolvePanel } from "../resolve/ResolvePanel";
+import { currentReview } from "../review/current";
 import { ReviewedCheck } from "../review/ReviewedCheck";
 import { useSendText } from "../review/useSendText";
 import { registerEditor } from "../search/lsp";
@@ -30,7 +33,7 @@ import { imageType, isSvg, svgUrl } from "./image";
 import { followLink } from "./links";
 import { MarkdownView } from "./MarkdownView";
 import { toggleCheckOn } from "./mdKeys";
-import { baseName, type EditorParams } from "./open";
+import { baseName, type EditorParams, openFileIn } from "./open";
 import { lineRef, renderedLines } from "./renderedLines";
 import { editorExtensions, wrapExtension, wrapping } from "./setup";
 import { setUnsaved } from "./unsaved";
@@ -71,7 +74,7 @@ function TextOrResolve(props: IDockviewPanelProps<EditorParams>) {
 
 /** A working-copy file in CodeMirror. Saving snapshots the working copy, so reviews of `@`
  * update. Changes on disk load in place, or wait behind a bar while there are unsaved edits. */
-function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
+function TextPanel({ params, api, containerApi }: IDockviewPanelProps<EditorParams>) {
   const workspace = useWorkspace();
   const { path, line, col, anchor, nonce, readOnly } = params;
   const host = useRef<HTMLDivElement>(null);
@@ -108,6 +111,16 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
           save: () => saveRef.current(),
           link: (href) => followLink(href, workspace, path),
           find: () => findRef.current.show(),
+          modal: {
+            readOnly,
+            close: () => runChord("Mod+W"),
+            open: (p) => openFileIn(containerApi, p),
+            review: (line) => currentReview(workspace)?.show(path, line),
+            split(right) {
+              const group = containerApi.getPanel(api.id)?.group;
+              if (group) splitGroup(containerApi, group, right ? "right" : "below");
+            },
+          },
           changed: (u) => {
             findRef.current.changed(u);
             if (u.selectionSet) saveTabParams(api, { cursor: u.state.selection.main.head });
@@ -144,7 +157,7 @@ function TextPanel({ params, api }: IDockviewPanelProps<EditorParams>) {
       live = false;
       made?.destroy();
     };
-  }, [api, workspace, path, readOnly]);
+  }, [api, containerApi, workspace, path, readOnly]);
 
   // Rendered markdown goes back to where it was scrolled, once, when its text first shows.
   useEffect(() => {

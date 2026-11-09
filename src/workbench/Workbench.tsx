@@ -13,6 +13,7 @@ import { onScaleSettled } from "../core/scale";
 import { WorkspaceContext, type WorkspaceName, workspaceKey } from "../core/workspace";
 import { DesignFormHost } from "../design/DesignFormHost";
 import { requestNewDrawing } from "../drawings/store";
+import { modalEditing } from "../editor/modal/cm";
 import { confirmClose, confirmWorkspace } from "../editor/unsaved";
 import { useProjectFrame } from "../frame/useProjectFrame";
 import { forgetPr } from "../github/pr";
@@ -252,6 +253,7 @@ export function Workbench({ repo }: { repo: RepoInfo }) {
     "Mod+W": () => void closeTab(),
     "Mod+B": () => toggle("left"),
     "Mod+Alt+B": () => toggle("right"),
+    "Mod+Alt+M": () => modalEditing.set(!modalEditing.get()),
     "Mod+Shift+K": () => {
       showView("left", "workspaces", false);
       focusLog();

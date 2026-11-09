@@ -207,6 +207,8 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::files::read_image,
             commands::files::save_file,
             commands::resolve::resolve_open,
+            commands::syntax::syntax_node,
+            commands::syntax::fold_spans,
             commands::resolve::resolve_act,
             commands::resolve::resolve_save,
             commands::resolve::resolve_close,

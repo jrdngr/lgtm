@@ -27,5 +27,7 @@ export function remembered<T extends string | boolean>(key: string, initial: T, 
       for (const l of listeners) l();
     },
     use: () => useSyncExternalStore(subscribe, () => value),
+    /** Calls `l` on every change; returns how to stop. */
+    subscribe,
   };
 }

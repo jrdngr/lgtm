@@ -3,10 +3,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use tree_sitter::Node;
+use lgtm_core::syntax::nodes::{self, add_span};
 
 use super::buffer::Buffer;
-use super::objects;
 
 /// A foldable run of lines: `start` stays in view, `start + 1..=end` hide when it's closed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,8 +177,8 @@ impl Folds {
 /// Every foldable range, sorted by start line, one per start line.
 pub fn ranges(b: &Buffer) -> Vec<Range> {
     let mut ends: BTreeMap<usize, usize> = BTreeMap::new();
-    match objects::parse(b) {
-        Some(parsed) => syntax_ranges(parsed.root(), &mut ends),
+    match nodes::fold_spans(&b.name, &b.text.to_string()) {
+        Some(spans) => ends = spans,
         None => indent_ranges(b, &mut ends),
     }
     let spans: Vec<(usize, usize)> = ends.into_iter().collect();
@@ -194,56 +193,6 @@ pub fn ranges(b: &Buffer) -> Vec<Range> {
                 .count(),
         })
         .collect()
-}
-
-/// Keeps the longest span for each start line.
-fn add(ends: &mut BTreeMap<usize, usize>, start: usize, end: usize) {
-    if end > start {
-        let e = ends.entry(start).or_insert(end);
-        *e = (*e).max(end);
-    }
-}
-
-/// Named nodes over two lines or more, and runs of comments or imports.
-fn syntax_ranges(root: Node, ends: &mut BTreeMap<usize, usize>) {
-    let mut stack = vec![root];
-    while let Some(node) = stack.pop() {
-        let mut cursor = node.walk();
-        let children: Vec<Node> = node.named_children(&mut cursor).collect();
-        let mut run: Option<(&str, usize, usize)> = None;
-        for child in &children {
-            let (start, end) = (child.start_position().row, last_row(*child));
-            add(ends, start, end);
-            let kind = child.kind();
-            let groups =
-                kind.contains("comment") || kind.contains("import") || kind == "use_declaration";
-            match run {
-                Some((k, s, e)) if groups && k == kind && start == e + 1 => {
-                    run = Some((k, s, end));
-                }
-                _ => {
-                    if let Some((_, s, e)) = run {
-                        add(ends, s, e);
-                    }
-                    run = groups.then_some((kind, start, end));
-                }
-            }
-            stack.push(*child);
-        }
-        if let Some((_, s, e)) = run {
-            add(ends, s, e);
-        }
-    }
-}
-
-/// The node's last row, not counting a row it only ends at the start of.
-fn last_row(node: Node) -> usize {
-    let end = node.end_position();
-    if end.column == 0 && end.row > node.start_position().row {
-        end.row - 1
-    } else {
-        end.row
-    }
 }
 
 /// For a file with no grammar: a line and the more indented lines after it.
@@ -271,6 +220,6 @@ fn indent_ranges(b: &Buffer, ends: &mut BTreeMap<usize, usize>) {
             }
             end = next;
         }
-        add(ends, line, end);
+        add_span(ends, line, end);
     }
 }

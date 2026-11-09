@@ -1,3 +1,5 @@
+import { BINDS } from "../editor/modal/keymap";
+
 /** Every keyboard shortcut, grouped by where it works, for Help › Keyboard Shortcuts. */
 
 export interface Shortcut {
@@ -11,6 +13,30 @@ export interface ShortcutGroup {
   shortcuts: Shortcut[];
 }
 
+/** A modal key as Help shows it: `g g` as gg, `C-d` as ⌃D. */
+function keyLabel(keys: string): string {
+  const one = (k: string) =>
+    k
+      .replace(/^C-(.)$/, (_, c: string) => `⌃${c.toUpperCase()}`)
+      .replace(/^A-(.)$/, (_, c: string) => `⌥${c.toUpperCase()}`)
+      .replace(/^S-tab$/, "⇧⇥")
+      .replace(/^esc$/, "Esc")
+      .replace(/^ret$/, "↵");
+  const parts = keys.split(" ").map(one);
+  return parts[0] === "space" || parts[0].length > 1 ? parts.join(" ") : parts.join("");
+}
+
+/** The modal editor's keys, from its key table, with keys that do the same side by side. */
+function modalShortcuts(): Shortcut[] {
+  const out: Shortcut[] = [];
+  for (const b of BINDS) {
+    const same = out.find((s) => s.action === b.label);
+    if (same) same.keys.push(keyLabel(b.keys));
+    else out.push({ keys: [keyLabel(b.keys)], action: b.label });
+  }
+  return out;
+}
+
 export const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "App",
@@ -22,6 +48,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ["⇧⌘T"], action: "Reopen the last closed tab, again to go further back" },
       { keys: ["⇧⌘W"], action: "Close the window" },
       { keys: ["⌥Z"], action: "Word wrap" },
+      { keys: ["⌥⌘M"], action: "Modal editing on / off" },
       { keys: ["⌘=", "⌘-", "⌘0"], action: "Zoom in, zoom out, actual size" },
     ],
   },
@@ -59,6 +86,10 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
         action: "Markdown, SVG or HTML file: switch between editor and rendered view",
       },
     ],
+  },
+  {
+    title: "Editor, modal (⌥⌘M)",
+    shortcuts: modalShortcuts(),
   },
   {
     title: "Editor or rendered markdown",

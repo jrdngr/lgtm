@@ -394,6 +394,10 @@ export const commands = {
 	saveFile: (workspace: string | null, path: string, text: string) => typedError<null, string>(__TAURI_INVOKE("save_file", { workspace, path, text })),
 	/**  The session on `path`, started from the file when there's none or `fresh` asks. */
 	resolveOpen: (workspace: string | null, path: string, fresh: boolean) => typedError<ResolveView, string>(__TAURI_INVOKE("resolve_open", { workspace, path, fresh })),
+	/**  The node `op` finds for bytes `start..end` of `text`, a file at `path`. */
+	syntaxNode: (path: string, text: string, start: number, end: number, op: SyntaxOp) => __TAURI_INVOKE<[number, number] | null>("syntax_node", { path, text, start, end, op }),
+	/**  The lines folds can cover, as start and end lines from 0, or none without a grammar. */
+	foldSpans: (path: string, text: string) => __TAURI_INVOKE<([number, number])[] | null>("fold_spans", { path, text }),
 	resolveAct: (workspace: string | null, path: string, act: ResolveAct) => typedError<ResolveView, string>(__TAURI_INVOKE("resolve_act", { workspace, path, act })),
 	/**  Writes what's resolved, between two snapshots of the working copy as a save is. */
 	resolveSave: (workspace: string | null, path: string) => typedError<ResolveSaved, string>(__TAURI_INVOKE("resolve_save", { workspace, path })),
@@ -2861,6 +2865,9 @@ export type SymbolsDto = {
 	calls: SymNodeDto[],
 	edges: SymEdgeDto[],
 };
+
+/**  What the modal keys ask the syntax tree for. */
+export type SyntaxOp = "grow" | "shrink" | "inFunction" | "aroundFunction";
 
 export type SysComponentDto = {
 	id: string,

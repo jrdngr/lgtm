@@ -20,6 +20,7 @@ pub mod resolve;
 pub mod review;
 pub mod search;
 pub mod settings;
+pub mod syntax;
 pub mod turns;
 pub mod workspaces;
 
