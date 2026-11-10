@@ -112,8 +112,9 @@ impl Workspace {
         result.unwrap_or_else(|e| e)
     }
 
-    /// Opens a terminal beside `from`, or the focused tab, and returns its id. A new layout
-    /// starts in the home folder. Without `focus`, focus and zoom stay as they are.
+    /// Opens a terminal beside `from`, or the focused tab, and returns its id. A new space from
+    /// the sidebar, or one in an empty slot, starts in the home folder. Without `focus`, focus
+    /// and zoom stay as they are.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn open(
         &mut self,
@@ -125,17 +126,19 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Result<TermId, String> {
-        let from = from.unwrap_or_else(|| self.model.tab());
-        let cwd = cwd.unwrap_or_else(|| match place {
-            Place::Layout => self.home_dir(),
-            _ => self.cwd_of(from),
+        let from = from.or_else(|| self.model.tab());
+        let cwd = cwd.unwrap_or_else(|| match (place, from) {
+            (Place::Layout, _) | (_, None) => self.home_dir(),
+            (_, Some(from)) => self.cwd_of(from),
         });
         let m = &mut self.model;
-        let id = if focus {
-            m.focus_tab(from);
-            Some(open_focused(m, place))
-        } else {
-            open_at(m, from, place)
+        let id = match from {
+            Some(from) if !focus => open_at(m, from, place),
+            Some(from) => {
+                m.focus_tab(from);
+                Some(open_focused(m, place))
+            }
+            None => Some(open_focused(m, place)),
         };
         let id = id.ok_or("no such terminal")?;
         if let Err(err) = self.spawn(id, &cwd, argv, window, cx) {
@@ -149,16 +152,22 @@ impl Workspace {
         Ok(id)
     }
 
-    /// The agents in `term`'s layout, in reading order, as JSON.
+    /// The agents shown with `term`, in reading order, as JSON: those in the shown layout when
+    /// `term` is there, else those in the first layout showing it, else those in its space.
     fn agents_near(&self, term: TermId) -> String {
-        let layout = self
-            .model
-            .layouts
-            .iter()
-            .find(|l| l.terms().any(|t| t == term));
-        let agents: Vec<_> = layout
+        let m = &self.model;
+        let Some(own) = m.space_of(Tab::Term(term)).map(|s| s.id) else {
+            return "[]".to_owned();
+        };
+        let spaces = std::iter::once(m.layout())
+            .chain(&m.layouts)
+            .map(|l| l.spaces())
+            .find(|s| s.contains(&own))
+            .unwrap_or_else(|| vec![own]);
+        let agents: Vec<_> = spaces
             .into_iter()
-            .flat_map(|l| l.terms())
+            .filter_map(|s| m.find_space(s))
+            .flat_map(|s| s.terms())
             .filter(|&t| t != term && self.is_agent(Tab::Term(t)))
             .map(|t| json!({ "id": t.to_string(), "label": self.term_label(Tab::Term(t)) }))
             .collect();
@@ -168,21 +177,17 @@ impl Workspace {
     fn list(&self, as_json: bool) -> String {
         let focused = self.model.term();
         let mut rows = Vec::new();
-        for layout in &self.model.layouts {
-            let layout_label = self.layout_label(layout);
-            for space in layout.spaces.leaves() {
-                let space_label = self.space_label(space);
-                for term in space.terms() {
-                    rows.push(json!({
-                        "id": term.to_string(),
-                        "label": self.term_label(Tab::Term(term)),
-                        "status": self.agents.status(term).map(|s| s.name()),
-                        "layout": layout_label,
-                        "space": space_label,
-                        "cwd": self.cwd_of(Tab::Term(term)),
-                        "focused": Some(term) == focused,
-                    }));
-                }
+        for space in &self.model.spaces {
+            let space_label = self.space_label(space);
+            for term in space.terms() {
+                rows.push(json!({
+                    "id": term.to_string(),
+                    "label": self.term_label(Tab::Term(term)),
+                    "status": self.agents.status(term).map(|s| s.name()),
+                    "space": space_label,
+                    "cwd": self.cwd_of(Tab::Term(term)),
+                    "focused": Some(term) == focused,
+                }));
             }
         }
         if as_json {
@@ -191,11 +196,10 @@ impl Workspace {
         rows.iter()
             .map(|r| {
                 format!(
-                    "{}{:<5} {:<8} {} › {} · {}",
+                    "{}{:<5} {:<8} {} · {}",
                     if r["focused"] == true { "*" } else { " " },
                     r["id"].as_str().unwrap_or_default(),
                     r["status"].as_str().unwrap_or("-"),
-                    r["layout"].as_str().unwrap_or_default(),
                     r["space"].as_str().unwrap_or_default(),
                     r["label"].as_str().unwrap_or_default(),
                 )
@@ -211,9 +215,9 @@ fn open_focused(m: &mut Model, place: Place) -> TermId {
         Place::Tab => m.new_tab(),
         Place::Right => m.split_split(Axis::Row),
         Place::Down => m.split_split(Axis::Column),
-        Place::SpaceRight => m.split_space(Axis::Row),
-        Place::SpaceDown => m.split_space(Axis::Column),
-        Place::Layout => m.new_layout(),
+        Place::SpaceRight => m.split_slot_with_space(Axis::Row),
+        Place::SpaceDown => m.split_slot_with_space(Axis::Column),
+        Place::Layout => m.add_space(),
     }
 }
 
@@ -223,8 +227,8 @@ fn open_at(m: &mut Model, at: Tab, place: Place) -> Option<TermId> {
         Place::Tab => m.new_tab_at(at),
         Place::Right => m.split_split_at(at, Axis::Row),
         Place::Down => m.split_split_at(at, Axis::Column),
-        Place::SpaceRight => m.split_space_at(at, Axis::Row),
-        Place::SpaceDown => m.split_space_at(at, Axis::Column),
-        Place::Layout => Some(m.new_layout_behind()),
+        Place::SpaceRight => m.split_slot_at(at, Axis::Row),
+        Place::SpaceDown => m.split_slot_at(at, Axis::Column),
+        Place::Layout => Some(m.add_space_behind()),
     }
 }

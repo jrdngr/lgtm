@@ -24,6 +24,7 @@ actions!(
         FocusRight,
         FocusUp,
         FocusDown,
+        NewSpace,
         NewLayout,
         NextLayout,
         PrevLayout,
@@ -62,8 +63,8 @@ commands! {
     "Previous tab", ["cmd-shift-[", "cmd-{"], PrevTab;
     "Split right", ["cmd-d"], SplitRight;
     "Split down", ["cmd-shift-d"], SplitDown;
-    "Split space right", ["cmd-n"], SplitSpaceRight;
-    "Split space down", ["cmd-shift-n"], SplitSpaceDown;
+    "Split window right", ["cmd-n"], SplitSpaceRight;
+    "Split window down", ["cmd-shift-n"], SplitSpaceDown;
     "Close split", ["cmd-shift-w"], CloseSplit;
     "Zoom split", ["cmd-shift-enter"], ZoomSplit;
     "Next split", ["cmd-]"], NextSplit;
@@ -73,6 +74,7 @@ commands! {
     "Focus right", ["cmd-alt-right"], FocusRight;
     "Focus up", ["cmd-alt-up"], FocusUp;
     "Focus down", ["cmd-alt-down"], FocusDown;
+    "New space", [], NewSpace;
     "New layout", [], NewLayout;
     "Next layout", ["ctrl-cmd-down"], NextLayout;
     "Previous layout", ["ctrl-cmd-up"], PrevLayout;

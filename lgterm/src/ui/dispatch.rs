@@ -12,7 +12,7 @@ use super::sidebar::{self, SidebarDrag};
 use super::space_drag::SpaceDrag;
 use crate::fonts;
 use crate::ipc::Place;
-use crate::model::{Dir, Model};
+use crate::model::{Axis, Dir, Model};
 use crate::terminal::FontSize;
 use crate::theme;
 
@@ -41,6 +41,7 @@ impl Render for Workspace {
         let mut el = div()
             .id("workspace")
             .key_context("Workspace")
+            .track_focus(&self.root_focus)
             .size_full()
             .relative()
             .flex()
@@ -62,9 +63,10 @@ impl Render for Workspace {
         el = on_open!(el, cx, NewTab, Place::Tab);
         el = on_open!(el, cx, SplitRight, Place::Right);
         el = on_open!(el, cx, SplitDown, Place::Down);
-        el = on_open!(el, cx, SplitSpaceRight, Place::SpaceRight);
-        el = on_open!(el, cx, SplitSpaceDown, Place::SpaceDown);
-        el = on_open!(el, cx, NewLayout, Place::Layout);
+        el = on_model!(el, cx, SplitSpaceRight, |m| m.split_slot(Axis::Row));
+        el = on_model!(el, cx, SplitSpaceDown, |m| m.split_slot(Axis::Column));
+        el = on_model!(el, cx, NewLayout, Model::new_layout);
+        el = on_open!(el, cx, NewSpace, Place::Layout);
         el = on_model!(el, cx, NextTab, |m| m.cycle_tab(1));
         el = on_model!(el, cx, PrevTab, |m| m.cycle_tab(-1));
         el = on_model!(el, cx, ZoomSplit, |m| m.toggle_zoom());
@@ -77,49 +79,50 @@ impl Render for Workspace {
         el = on_model!(el, cx, FocusDown, |m| m.focus_dir(Dir::Down));
         el = on_model!(el, cx, NextLayout, |m| m.cycle_layout(1));
         el = on_model!(el, cx, PrevLayout, |m| m.cycle_layout(-1));
-        el.on_action(cx.listener(|w, _: &CloseTab, win, cx| w.close(w.model.tab(), win, cx)))
-            .on_action(cx.listener(|w, _: &CloseSplit, win, cx| w.close_split(win, cx)))
-            .on_action(cx.listener(|w, _: &NextWaiting, win, cx| {
-                let next = w.agents.next_waiting(&w.model.terms(), w.model.term());
-                if let Some(term) = next {
-                    w.model.focus_term(term);
-                    w.focus_current(win, cx);
-                }
-            }))
-            .on_action(
-                cx.listener(|w, _: &ShowMessages, win, cx| w.apply(win, cx, Model::show_messages)),
-            )
-            .on_action(cx.listener(|w, _: &TogglePalette, win, cx| w.toggle_palette(win, cx)))
-            .on_action(cx.listener(|w, _: &OpenSettings, win, cx| w.open_settings(win, cx)))
-            .on_action(cx.listener(|w, _: &Find, win, cx| {
-                if let Some(t) = w.model.term().and_then(|t| w.terms.get(&t)) {
-                    t.view.update(cx, |v, cx| v.open_find(win, cx));
-                }
-            }))
-            .on_action(cx.listener(|w, _: &ToggleSidebar, win, cx| {
-                w.sidebar = !w.sidebar;
-                if w.renaming().is_some() {
-                    w.focus_current(win, cx);
-                }
-                cx.notify();
-            }))
-            .on_action(cx.listener(|w, _: &FontBigger, _, cx| {
-                w.set_font_size(cx.global::<FontSize>().0 + 1., cx)
-            }))
-            .on_action(cx.listener(|w, _: &FontSmaller, _, cx| {
-                w.set_font_size(cx.global::<FontSize>().0 - 1., cx)
-            }))
-            .on_action(
-                cx.listener(|w, _: &FontReset, _, cx| {
-                    w.set_font_size(theme::DEFAULT_FONT_SIZE, cx)
-                }),
-            )
-            .when(self.sidebar, |d| d.child(self.render_sidebar(window, cx)))
-            .child(self.render_main(window, cx))
-            .children(self.render_toasts(cx))
-            .children(self.render_space_drop(cx))
-            .children(self.render_palette(cx))
-            .children(self.render_settings(cx))
-            .children(self.render_tab_menu(cx))
+        el.on_action(cx.listener(|w, _: &CloseTab, win, cx| match w.model.tab() {
+            Some(tab) => w.close(tab, win, cx),
+            None => w.close_split(win, cx),
+        }))
+        .on_action(cx.listener(|w, _: &CloseSplit, win, cx| w.close_split(win, cx)))
+        .on_action(cx.listener(|w, _: &NextWaiting, win, cx| {
+            let next = w.agents.next_waiting(&w.model.terms(), w.model.term());
+            if let Some(term) = next {
+                w.model.focus_term(term);
+                w.focus_current(win, cx);
+            }
+        }))
+        .on_action(
+            cx.listener(|w, _: &ShowMessages, win, cx| w.apply(win, cx, Model::show_messages)),
+        )
+        .on_action(cx.listener(|w, _: &TogglePalette, win, cx| w.toggle_palette(win, cx)))
+        .on_action(cx.listener(|w, _: &OpenSettings, win, cx| w.open_settings(win, cx)))
+        .on_action(cx.listener(|w, _: &Find, win, cx| {
+            if let Some(t) = w.model.term().and_then(|t| w.terms.get(&t)) {
+                t.view.update(cx, |v, cx| v.open_find(win, cx));
+            }
+        }))
+        .on_action(cx.listener(|w, _: &ToggleSidebar, win, cx| {
+            w.sidebar = !w.sidebar;
+            if w.renaming().is_some() {
+                w.focus_current(win, cx);
+            }
+            cx.notify();
+        }))
+        .on_action(cx.listener(|w, _: &FontBigger, _, cx| {
+            w.set_font_size(cx.global::<FontSize>().0 + 1., cx)
+        }))
+        .on_action(cx.listener(|w, _: &FontSmaller, _, cx| {
+            w.set_font_size(cx.global::<FontSize>().0 - 1., cx)
+        }))
+        .on_action(
+            cx.listener(|w, _: &FontReset, _, cx| w.set_font_size(theme::DEFAULT_FONT_SIZE, cx)),
+        )
+        .when(self.sidebar, |d| d.child(self.render_sidebar(window, cx)))
+        .child(self.render_main(window, cx))
+        .children(self.render_toasts(cx))
+        .children(self.render_space_drop(cx))
+        .children(self.render_palette(cx))
+        .children(self.render_settings(cx))
+        .children(self.render_menu(cx))
     }
 }

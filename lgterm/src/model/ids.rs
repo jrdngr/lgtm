@@ -16,6 +16,7 @@ macro_rules! id {
 id!(SplitId);
 id!(SpaceId);
 id!(LayoutId);
+id!(SlotId);
 
 /// What a tab shows: a terminal, or the window's one Messages tab. Saved as the terminal's
 /// number, or null for Messages.

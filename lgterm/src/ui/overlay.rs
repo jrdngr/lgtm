@@ -7,9 +7,9 @@ use gpui::{
 };
 
 use super::Workspace;
+use super::menu::Menu;
 use super::palette::Palette;
 use super::rename::Rename;
-use super::tab_menu::TabMenu;
 
 pub enum Overlay {
     Rename(Rename),
@@ -19,7 +19,7 @@ pub enum Overlay {
         _blur: Subscription,
     },
     /// Leaves the keyboard where it is.
-    TabMenu(TabMenu),
+    Menu(Menu),
 }
 
 impl Workspace {
@@ -27,7 +27,7 @@ impl Workspace {
     pub(super) fn overlay_has_keyboard(&self) -> bool {
         self.overlay
             .as_ref()
-            .is_some_and(|o| !matches!(o, Overlay::TabMenu(_)))
+            .is_some_and(|o| !matches!(o, Overlay::Menu(_)))
     }
 
     /// Puts `make`'s overlay up with the keyboard, closing whatever was up. It closes when the

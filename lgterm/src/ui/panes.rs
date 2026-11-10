@@ -1,19 +1,28 @@
-//! The main area: the active layout's spaces, each a tree of split cards with tabs.
+//! The main area: the shown layout's slots, each empty or a space in its color holding a tree
+//! of split cards with tabs.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, Context, CursorStyle, DragMoveEvent, FontWeight, InteractiveElement,
     IntoElement, MouseButton, MouseDownEvent, ParentElement, Render, StatefulInteractiveElement,
-    StyleRefinement, Styled, Window, div, px, rgb,
+    StyleRefinement, Styled, Window, div, px, rgb, rgba,
 };
 
+use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::{MovesWindow, Workspace};
 use crate::ipc::Place;
-use crate::model::{Axis, LayoutId, Rect, Space, SpaceId, Split, Tab, Tree, tree};
+use crate::model::{
+    Axis, LayoutId, Rect, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree,
+};
 use crate::theme;
 
-/// Which tree a branch belongs to: a layout's spaces or a space's splits.
+/// A space's title height.
+const SPACE_TITLE: f32 = 26.;
+/// The tinted border around a space's splits.
+const SPACE_PAD: f32 = 5.;
+
+/// Which tree a branch belongs to: a layout's slots or a space's splits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Owner {
     Layout(LayoutId),
@@ -40,17 +49,23 @@ impl Render for Nothing {
 impl Workspace {
     pub(super) fn render_main(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let layout = self.model.layout();
-        let body = match layout.zoom.and_then(|z| {
-            layout
+        let zoomed = layout.zoom.and_then(|z| {
+            self.model
                 .spaces
-                .leaves()
-                .into_iter()
-                .find_map(|s| s.splits.find(z))
-        }) {
-            Some(split) => self.card(split, true, cx),
+                .iter()
+                .find_map(|s| s.splits.find(z).map(|split| (s, split)))
+        });
+        let body = match zoomed {
+            Some((space, split)) => self.card(split, Some(space.color), cx),
             None => {
-                let multi = matches!(layout.spaces, Tree::Branch { .. });
-                self.space_tree(&layout.spaces, multi, Owner::Layout(layout.id), vec![], cx)
+                let top: Vec<SlotId> = layout
+                    .slots
+                    .rects(Rect::UNIT)
+                    .into_iter()
+                    .filter(|(_, r)| r.y == 0.)
+                    .map(|(id, _)| id)
+                    .collect();
+                self.slot_tree(&layout.slots, &top, Owner::Layout(layout.id), vec![], cx)
             }
         };
         let titlebar = div()
@@ -79,17 +94,25 @@ impl Workspace {
         space_drag::track_main(main, cx).into_any_element()
     }
 
-    /// The spaces; with `multi`, each title drags its space.
-    fn space_tree(
+    /// The slots; `top` are those along the window's top edge, whose titles move the window.
+    fn slot_tree(
         &self,
-        t: &Tree<Space>,
-        multi: bool,
+        t: &Tree<Slot>,
+        top: &[SlotId],
         owner: Owner,
         path: Vec<usize>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         match t {
-            Tree::Leaf(space) => self.space(space, multi, cx),
+            Tree::Leaf(slot) => {
+                let focused = slot.id == self.model.layout().focus;
+                let space = slot.space.and_then(|s| self.model.find_space(s));
+                let el = match space {
+                    Some(space) => self.space(space, focused, top.contains(&slot.id), cx),
+                    None => self.empty_slot(slot.id, focused, cx),
+                };
+                space_drag::track_slot(el, slot.id, cx).into_any_element()
+            }
             Tree::Branch { axis, children } => {
                 let kids = children
                     .iter()
@@ -97,7 +120,7 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (c.weight, self.space_tree(&c.tree, multi, owner, path, cx))
+                        (c.weight, self.slot_tree(&c.tree, top, owner, path, cx))
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -105,74 +128,131 @@ impl Workspace {
         }
     }
 
-    fn space(&self, space: &Space, multi: bool, cx: &mut Context<Self>) -> AnyElement {
+    fn empty_slot(
+        &self,
+        slot: SlotId,
+        focused: bool,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
+        div()
+            .id(("empty-slot", slot.0))
+            .size_full()
+            .min_w_0()
+            .min_h_0()
+            .flex()
+            .pt(px(SPACE_TITLE))
+            .child(
+                div()
+                    .size_full()
+                    .bg(rgb(theme::CARD))
+                    .border_1()
+                    .border_color(rgb(if focused {
+                        theme::FOCUS
+                    } else {
+                        theme::CARD_BORDER
+                    }))
+                    .rounded(px(10.)),
+            )
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |w, _, window, cx| {
+                    cx.stop_propagation();
+                    w.apply(window, cx, |m| m.focus_slot(slot));
+                }),
+            )
+    }
+
+    /// A space in its color: a tinted title and background around its splits, brighter when
+    /// focused.
+    fn space(
+        &self,
+        space: &Space,
+        focused: bool,
+        top: bool,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
         let label = self.space_label(space);
-        let top = self
-            .model
-            .layout()
-            .spaces
-            .rects(Rect::UNIT)
-            .iter()
-            .any(|(id, r)| *id == space.id && r.y == 0.);
+        let color = theme::space_color(space.color);
+        let id = space.id;
         let title = div()
             .id(("space-title", space.id.0))
-            .h(px(20.))
+            .h(px(SPACE_TITLE))
             .flex_none()
             .flex()
             .items_center()
             .gap(px(6.))
-            .px(px(4.))
+            .px(px(10.))
+            .rounded_t(px(12.))
+            .bg(rgba(theme::tint(color, if focused { 0x66 } else { 0x33 })))
             .text_size(px(12.))
             .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(theme::TEXT_SPACE))
+            .text_color(rgb(if focused { theme::TEXT_STRONG } else { color }))
             .when(top, |d| d.moves_window())
             .when(!top, |d| {
                 d.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             })
-            .when(multi, |d| {
-                d.child(
-                    div()
-                        .id(("space-grip", space.id.0))
-                        .cursor_grab()
-                        .text_size(px(11.))
-                        .text_color(rgb(theme::ICON))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child("⠿")
-                        .drags_space(space.id, label.clone()),
-                )
-            })
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    w.open_menu(For::Space(id), ev.position, window, cx)
+                }),
+            )
+            .child(
+                div()
+                    .id(("space-grip", space.id.0))
+                    .cursor_grab()
+                    .text_size(px(11.))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child("⠿")
+                    .drags_space(space.id, label.clone()),
+            )
             .child(label);
-        let el = div()
+        let focused_split = focused.then_some(space.focus);
+        div()
+            .id(("space", space.id.0))
             .size_full()
             .min_w_0()
             .min_h_0()
             .flex()
             .flex_col()
-            .gap(px(theme::GAP))
+            .rounded(px(12.))
+            .bg(rgba(theme::tint(color, if focused { 0x38 } else { 0x1c })))
             .when(self.dragged_space(cx) == Some(space.id), |d| {
                 d.opacity(0.35)
             })
             .child(title)
-            .child(div().flex_1().min_h_0().flex().child(self.split_tree(
-                &space.splits,
-                Owner::Space(space.id),
-                vec![],
-                cx,
-            )));
-        space_drag::track_space(el, space.id, cx).into_any_element()
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .flex()
+                    .p(px(SPACE_PAD))
+                    .child(self.split_tree(
+                        &space.splits,
+                        space.color,
+                        focused_split,
+                        Owner::Space(space.id),
+                        vec![],
+                        cx,
+                    )),
+            )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn split_tree(
         &self,
         t: &Tree<Split>,
+        color: usize,
+        focused: Option<SplitId>,
         owner: Owner,
         path: Vec<usize>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         match t {
             Tree::Leaf(split) => {
-                let focused = split.id == self.model.split().id;
-                self.card(split, focused, cx)
+                let outline = (Some(split.id) == focused).then_some(color);
+                self.card(split, outline, cx)
             }
             Tree::Branch { axis, children } => {
                 let kids = children
@@ -181,7 +261,10 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (c.weight, self.split_tree(&c.tree, owner, path, cx))
+                        (
+                            c.weight,
+                            self.split_tree(&c.tree, color, focused, owner, path, cx),
+                        )
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -261,7 +344,7 @@ impl Workspace {
                     Owner::Layout(id) => w
                         .model
                         .find_layout_mut(id)
-                        .and_then(|l| l.spaces.branch_mut(&here))
+                        .and_then(|l| l.slots.branch_mut(&here))
                         .map(|c| tree::move_boundary(c, index, at, min)),
                     Owner::Space(id) => w
                         .model
@@ -277,7 +360,8 @@ impl Workspace {
             .into_any_element()
     }
 
-    fn card(&self, split: &Split, focused: bool, cx: &mut Context<Self>) -> AnyElement {
+    /// A split's card; `outline` is the space color when it's the focused split.
+    fn card(&self, split: &Split, outline: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
         let split_id = split.id;
         let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
             let active = i == split.active;
@@ -366,18 +450,14 @@ impl Workspace {
             .flex_col()
             .bg(rgb(theme::CARD))
             .border_1()
-            .border_color(rgb(if focused {
-                theme::FOCUS
-            } else {
-                theme::CARD_BORDER
-            }))
+            .border_color(rgb(outline.map_or(theme::CARD_BORDER, theme::space_color)))
             .rounded(px(10.))
             .overflow_hidden()
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |w, _, window, cx| {
                     cx.stop_propagation();
-                    if w.model.split().id != split_id {
+                    if w.model.split().map(|s| s.id) != Some(split_id) {
                         w.model.focus_split(split_id);
                         w.focus_current(window, cx);
                     }
@@ -397,7 +477,7 @@ impl Workspace {
                     .on_mouse_down(
                         MouseButton::Right,
                         cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                            w.open_tab_menu(split_id, ev.position, window, cx)
+                            w.open_menu(For::Tabs(split_id), ev.position, window, cx)
                         }),
                     )
                     .children(tabs)

@@ -7,7 +7,7 @@ use gpui::{App, Context, Entity, Subscription, Window};
 
 use super::Workspace;
 use crate::agents::{Env, Kind, Seen};
-use crate::model::{Layout, Space, Tab, TermId};
+use crate::model::{Space, Tab, TermId};
 use crate::procinfo;
 use crate::terminal::{TermEvent, TermView};
 
@@ -195,16 +195,11 @@ impl Workspace {
             .map_or_else(|| self.home_name.clone(), |t| t.space_name.clone())
     }
 
-    pub(super) fn layout_label(&self, layout: &Layout) -> String {
-        match &layout.name {
-            Some(name) => name.clone(),
-            None => layout
-                .spaces
-                .leaves()
-                .into_iter()
-                .map(|s| self.space_label(s))
-                .collect::<Vec<_>>()
-                .join(" · "),
+    /// A layout's name, or its place in the list.
+    pub(super) fn layout_label(&self, index: usize) -> String {
+        match self.model.layouts.get(index).and_then(|l| l.name.clone()) {
+            Some(name) => name,
+            None => format!("Layout {}", index + 1),
         }
     }
 

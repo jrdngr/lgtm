@@ -6,16 +6,17 @@ mod badge;
 mod control;
 mod dispatch;
 mod marks;
+mod menu;
 mod messages;
 mod overlay;
 mod palette;
 mod panes;
+mod picker;
 mod rename;
 mod restore;
 mod settings_view;
 mod sidebar;
 mod space_drag;
-mod tab_menu;
 mod terms;
 mod toasts;
 
@@ -61,6 +62,8 @@ pub struct Workspace {
     home_name: String,
     settings: Settings,
     messages_focus: FocusHandle,
+    /// Has the keyboard while an empty slot is focused.
+    root_focus: FocusHandle,
     /// The terminal last given focus, told when it loses it.
     focused: Option<TermId>,
     /// Agents on the Dock badge.
@@ -99,6 +102,7 @@ impl Workspace {
             home_name,
             settings,
             messages_focus: cx.focus_handle(),
+            root_focus: cx.focus_handle(),
             focused: None,
             badge: 0,
             spawn_env: SpawnEnv {
@@ -228,7 +232,8 @@ impl Workspace {
                 let handle = t.view.read(cx).focus_handle(cx);
                 window.focus(&handle, cx);
             }
-            None => window.focus(&self.messages_focus, cx),
+            None if self.model.tab().is_some() => window.focus(&self.messages_focus, cx),
+            None => window.focus(&self.root_focus, cx),
         }
         self.with_agents(window, cx, |a, env| a.settle(env));
         cx.notify();
@@ -251,7 +256,7 @@ impl Workspace {
             self.agents.closed(term);
             self.run_effects(cx);
         }
-        let was_focused = self.model.tab() == tab;
+        let was_focused = self.model.tab() == Some(tab);
         if !self.model.remove_tab(tab) {
             cx.quit();
             return;
@@ -263,7 +268,14 @@ impl Workspace {
         }
     }
 
+    /// Closes the focused split's tabs, or the focused slot when it's empty.
     fn close_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.model.tab().is_none() {
+            self.apply(window, cx, |m| {
+                m.close_slot();
+            });
+            return;
+        }
         for tab in self.model.split_tabs() {
             self.close(tab, window, cx);
         }

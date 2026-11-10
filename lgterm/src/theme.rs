@@ -53,3 +53,17 @@ pub const DIALOG: u32 = 0x272727;
 pub const MATCH: u32 = 0x79b8ff;
 pub const CODE: u32 = 0x39c5cf;
 pub const ROW_RULE: u32 = 0x2a2a2a;
+
+/// The space colors, also the sidebar badges'.
+const SPACE_COLORS: [u32; 8] = [
+    0x3f9e98, 0x5a9a52, 0xd27a45, 0x5b86e5, 0xa066d3, 0xc95a7a, 0xb59a3c, 0x4f9ac9,
+];
+
+pub fn space_color(index: usize) -> u32 {
+    SPACE_COLORS[index % SPACE_COLORS.len()]
+}
+
+/// `color` with `alpha` (0 to 255), for gpui's `rgba`.
+pub fn tint(color: u32, alpha: u8) -> u32 {
+    (color << 8) | alpha as u32
+}

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::agents::{Kind, Message};
+use crate::model::legacy::OldModel;
 use crate::model::{Model, Tab, TermId};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,6 +18,7 @@ pub struct SavedTerm {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct State {
+    #[serde(deserialize_with = "any_model")]
     pub model: Model,
     pub terms: BTreeMap<TermId, SavedTerm>,
     pub messages: Vec<Message>,
@@ -28,6 +30,20 @@ pub struct State {
     /// The Messages tab's id, from states saved before tabs said what they show.
     #[serde(default, skip_serializing)]
     messages_tab: Option<TermId>,
+}
+
+/// A model as saved now, or as saved before spaces left layouts.
+fn any_model<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Model, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Any {
+        Now(Model),
+        Old(OldModel),
+    }
+    Ok(match Any::deserialize(d)? {
+        Any::Now(m) => m,
+        Any::Old(m) => m.into(),
+    })
 }
 
 /// The newest messages kept across a restart.
@@ -107,7 +123,7 @@ mod tests {
             .to_json()
             .unwrap();
         let back = State::parse(&json).unwrap();
-        assert_eq!(back.model.tab(), Tab::Messages);
+        assert_eq!(back.model.tab(), Some(Tab::Messages));
         assert_eq!(back.terms[&first].agent, Some((Kind::Claude, "abc".into())));
         assert_eq!(back.collapsed, [3]);
     }
@@ -121,7 +137,28 @@ mod tests {
                 .unwrap();
         json["messages_tab"] = old.0.into();
         let back = State::parse(json.to_string().as_bytes()).unwrap();
-        assert_eq!(back.model.tab(), Tab::Messages);
+        assert_eq!(back.model.tab(), Some(Tab::Messages));
         assert_eq!(back.model.terms().len(), 1);
+    }
+
+    #[test]
+    fn layouts_saved_with_their_spaces_become_slots() {
+        let old = r#"{"layouts":[
+            {"id":1,"name":"work","focus":3,"zoom":null,"spaces":{"Branch":{"axis":"Row","children":[
+                {"weight":1.0,"tree":{"Leaf":{"id":2,"name":null,"focus":4,"splits":{"Leaf":{"id":4,"tabs":[5],"active":0}}}}},
+                {"weight":1.0,"tree":{"Leaf":{"id":3,"name":"api","focus":6,"splits":{"Leaf":{"id":6,"tabs":[7],"active":0}}}}}
+            ]}}},
+            {"id":8,"name":null,"focus":9,"zoom":null,"spaces":{"Leaf":{"id":9,"name":null,"focus":10,"splits":{"Leaf":{"id":10,"tabs":[11],"active":0}}}}}
+        ],"active":0,"next":12}"#;
+        let json = format!(
+            r#"{{"model":{old},"terms":{{}},"messages":[],"collapsed":[],"sidebar":true}}"#
+        );
+        let m = State::parse(json.as_bytes()).unwrap().model;
+        assert_eq!(m.terms(), [TermId(5), TermId(7), TermId(11)]);
+        assert_eq!(m.layouts[0].spaces().len(), 2);
+        assert_eq!(m.layouts[1].spaces().len(), 1);
+        assert_eq!(m.term(), Some(TermId(7)));
+        let colors: Vec<usize> = m.spaces.iter().map(|s| s.color).collect();
+        assert_eq!(colors, [0, 1, 2]);
     }
 }

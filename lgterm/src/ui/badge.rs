@@ -1,13 +1,9 @@
-//! A layout's colored letter badge in the sidebar.
+//! A space's colored letter badge in the sidebar.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{AnyElement, FontWeight, IntoElement, ParentElement, Styled, div, px, rgb};
 
 use crate::theme;
-
-const COLORS: [u32; 8] = [
-    0x3f9e98, 0x5a9a52, 0xd27a45, 0x5b86e5, 0xa066d3, 0xc95a7a, 0xb59a3c, 0x4f9ac9,
-];
 
 /// The badge's letter: the label's first letter or digit, uppercased, or `~` for home.
 pub fn letter(label: &str) -> String {
@@ -21,13 +17,8 @@ pub fn letter(label: &str) -> String {
         .unwrap_or_else(|| "·".to_owned())
 }
 
-/// The color for the layout at `index` in the sidebar, so neighbors always differ.
-fn color(index: usize) -> u32 {
-    COLORS[index % COLORS.len()]
-}
-
 /// The badge, with a status mark on its corner when given.
-pub fn badge(index: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> AnyElement {
+pub fn badge(color: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> AnyElement {
     div()
         .relative()
         .size(px(20.))
@@ -36,7 +27,7 @@ pub fn badge(index: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> 
         .items_center()
         .justify_center()
         .rounded(px(5.))
-        .bg(rgb(color(index)))
+        .bg(rgb(theme::space_color(color)))
         .text_size(px(11.))
         .font_weight(FontWeight::BOLD)
         .text_color(rgb(theme::BADGE_TEXT))

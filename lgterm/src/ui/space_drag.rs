@@ -1,5 +1,5 @@
-//! Dragging a space: from a sidebar row or its title in the window, into the window beside a
-//! space or along an edge, into the sidebar as a layout of its own, or onto another space's row.
+//! Dragging a space by a sidebar row or its title's grip: into a slot, beside one, or along an
+//! edge of the window; or to a new place in the sidebar list.
 
 use std::collections::HashMap;
 
@@ -10,13 +10,13 @@ use gpui::{
 };
 
 use super::Workspace;
-use crate::model::{Side, SpaceId, Tree, WindowDrop};
+use crate::model::{Side, SlotId, SpaceId, Tree, WindowDrop};
 use crate::theme;
 
 /// How close to the window's edge a drop splits the whole layout.
 const EDGE: f32 = 26.;
-/// How far into a layout row a drop still lands before it.
-const ROW_TOP: f32 = 7.;
+/// The share of a slot's width or height, from each side, where a drop splits it.
+const SIDE: f32 = 0.25;
 
 /// A space being dragged.
 pub(super) struct SpaceDrag {
@@ -44,22 +44,11 @@ impl Render for SpaceDrag {
     }
 }
 
-/// A sidebar row that takes part in a space drop.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(super) enum DropRow {
-    /// A layout's own row, with its space when it has only one.
-    Layout(usize, Option<SpaceId>),
-    /// A space row under a layout of several.
-    Space(SpaceId),
-    /// Any other row.
-    Other(u64),
-}
-
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Target {
     Window(WindowDrop),
-    Layout(usize),
-    Beside(SpaceId),
+    /// Before the space at this place in the sidebar list, or last.
+    List(usize),
 }
 
 /// Where things are while a space is dragged, and where it would land.
@@ -69,8 +58,8 @@ pub(super) struct SpaceDrop {
     target: Option<Target>,
     main: Option<Bounds<Pixels>>,
     sidebar: Option<Bounds<Pixels>>,
-    spaces: HashMap<SpaceId, Bounds<Pixels>>,
-    rows: HashMap<DropRow, Bounds<Pixels>>,
+    slots: HashMap<SlotId, Bounds<Pixels>>,
+    rows: HashMap<SpaceId, Bounds<Pixels>>,
 }
 
 pub(super) trait DragsSpace {
@@ -110,23 +99,24 @@ pub(super) fn track_sidebar<E: InteractiveElement>(el: E, cx: &mut Context<Works
     track(el, cx, |d, b| d.sidebar = Some(b))
 }
 
+/// Records a space's sidebar row.
 pub(super) fn track_row<E: InteractiveElement>(
-    el: E,
-    row: DropRow,
-    cx: &mut Context<Workspace>,
-) -> E {
-    track(el, cx, move |d, b| {
-        d.rows.insert(row, b);
-    })
-}
-
-pub(super) fn track_space<E: InteractiveElement>(
     el: E,
     space: SpaceId,
     cx: &mut Context<Workspace>,
 ) -> E {
     track(el, cx, move |d, b| {
-        d.spaces.insert(space, b);
+        d.rows.insert(space, b);
+    })
+}
+
+pub(super) fn track_slot<E: InteractiveElement>(
+    el: E,
+    slot: SlotId,
+    cx: &mut Context<Workspace>,
+) -> E {
+    track(el, cx, move |d, b| {
+        d.slots.insert(slot, b);
     })
 }
 
@@ -134,8 +124,9 @@ fn f(p: Pixels) -> f32 {
     p.as_f32()
 }
 
-/// The side of `b` nearest `p`, measured as a share of its width or height.
-fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Side {
+/// The side of `b` nearest `p`, measured as a share of its width or height, when it's within
+/// `SIDE` of it; none in the middle.
+fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
     let (x, y) = (f(p.x - b.origin.x), f(p.y - b.origin.y));
     let (w, h) = (f(b.size.width), f(b.size.height));
     [
@@ -145,9 +136,9 @@ fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Side {
         ((h - y) / h, Side::Bottom),
     ]
     .into_iter()
+    .filter(|(share, _)| *share < SIDE)
     .min_by(|a, b| a.0.total_cmp(&b.0))
     .map(|(_, s)| s)
-    .unwrap_or(Side::Right)
 }
 
 /// The side of `b` within `EDGE` of `p`.
@@ -204,57 +195,35 @@ impl Workspace {
 
     fn space_target(&self, id: SpaceId, p: Point<Pixels>) -> Option<Target> {
         let d = &self.space_drop;
+        let layout = self.model.layout();
         if d.main.is_some_and(|b| b.contains(&p)) {
-            let shown = &self.model.layout().spaces;
-            if matches!(shown, Tree::Leaf(s) if s.id == id) {
-                return None;
-            }
+            let from = layout.slot_of(id);
+            let alone = matches!(layout.slots, Tree::Leaf(_));
             if let Some(side) = edge(&d.main?, p) {
-                return Some(Target::Window(WindowDrop::Edge(side)));
+                return (!(alone && from.is_some()))
+                    .then_some(Target::Window(WindowDrop::Edge(side)));
             }
-            let (&space, b) = d
-                .spaces
+            let (&slot, b) = d
+                .slots
                 .iter()
-                .find(|(s, b)| shown.contains(**s) && b.contains(&p))?;
-            return (space != id)
-                .then(|| Target::Window(WindowDrop::Space(space, nearest_side(b, p))));
+                .find(|(s, b)| layout.slots.contains(**s) && b.contains(&p))?;
+            return (from != Some(slot))
+                .then(|| Target::Window(WindowDrop::Slot(slot, nearest_side(b, p))));
         }
         if !d.sidebar.is_some_and(|b| b.contains(&p)) {
             return None;
         }
-        let hit = d.rows.iter().find(|(_, b)| b.contains(&p));
-        if let Some((row, b)) = hit {
-            let space = match *row {
-                DropRow::Space(s) => Some(s),
-                DropRow::Layout(_, s) if f(p.y - b.origin.y) >= ROW_TOP => s,
-                _ => None,
-            };
-            if let Some(space) = space {
-                return (space != id).then_some(Target::Beside(space));
-            }
-        }
-        let mut layouts: Vec<(usize, Bounds<Pixels>)> = d
-            .rows
+        let spaces = &self.model.spaces;
+        let index = spaces
             .iter()
-            .filter_map(|(row, b)| match row {
-                DropRow::Layout(i, _) => Some((*i, *b)),
-                _ => None,
+            .position(|s| {
+                d.rows
+                    .get(&s.id)
+                    .is_some_and(|b| p.y < b.origin.y + b.size.height / 2.)
             })
-            .collect();
-        layouts.sort_by_key(|l| l.0);
-        let index = layouts
-            .iter()
-            .find(|(_, b)| p.y < b.bottom())
-            .map_or(self.model.layouts.len(), |l| l.0);
-        let own = self
-            .model
-            .layouts
-            .iter()
-            .position(|l| l.spaces.contains(id));
-        if self.model.is_alone(id) && own.is_some_and(|o| index == o || index == o + 1) {
-            return None;
-        }
-        Some(Target::Layout(index))
+            .unwrap_or(spaces.len());
+        let own = spaces.iter().position(|s| s.id == id)?;
+        (index != own && index != own + 1).then_some(Target::List(index))
     }
 
     pub(super) fn space_drop(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -262,8 +231,7 @@ impl Workspace {
         if let (Some(id), Some(target)) = (d.dragging, d.target) {
             match target {
                 Target::Window(at) => self.model.drop_in_window(id, at),
-                Target::Layout(index) => self.model.drop_as_layout(id, index),
-                Target::Beside(space) => self.model.drop_beside(id, space),
+                Target::List(index) => self.model.move_space(id, index),
             }
         }
         self.focus_current(window, cx);
@@ -288,32 +256,24 @@ impl Workspace {
         }
         let d = &self.space_drop;
         let (bounds, line) = match d.target? {
-            Target::Window(WindowDrop::Space(s, side)) => (half(*d.spaces.get(&s)?, side), false),
+            Target::Window(WindowDrop::Slot(s, side)) => {
+                let b = *d.slots.get(&s)?;
+                (side.map_or(b, |side| half(b, side)), false)
+            }
             Target::Window(WindowDrop::Edge(side)) => {
-                let shown = &self.model.layout().spaces;
+                let layout = &self.model.layout().slots;
                 let all = d
-                    .spaces
+                    .slots
                     .iter()
-                    .filter(|(s, _)| shown.contains(**s))
+                    .filter(|(s, _)| layout.contains(**s))
                     .map(|(_, b)| *b)
                     .reduce(|a, b| a.union(&b))?;
                 (half(all, side), false)
             }
-            Target::Beside(s) => {
-                let row = d
-                    .rows
-                    .iter()
-                    .find(|(r, _)| matches!(r, DropRow::Space(x) | DropRow::Layout(_, Some(x)) if *x == s))?;
-                (*row.1, false)
-            }
-            Target::Layout(index) => {
+            Target::List(index) => {
                 let side = d.sidebar?;
-                let y = match d
-                    .rows
-                    .iter()
-                    .find(|(r, _)| matches!(r, DropRow::Layout(i, _) if *i == index))
-                {
-                    Some((_, b)) => b.origin.y - px(4.),
+                let y = match self.model.spaces.get(index).and_then(|s| d.rows.get(&s.id)) {
+                    Some(b) => b.origin.y - px(4.),
                     None => d.rows.values().map(|b| b.bottom()).max()? + px(3.),
                 };
                 let b = Bounds::new(
@@ -351,11 +311,24 @@ mod tests {
     }
 
     #[test]
-    fn the_nearest_side_is_measured_by_share() {
-        assert_eq!(nearest_side(&b(), point(px(450.), px(200.))), Side::Right);
-        assert_eq!(nearest_side(&b(), point(px(300.), px(120.))), Side::Top);
-        assert_eq!(nearest_side(&b(), point(px(130.), px(200.))), Side::Left);
-        assert_eq!(nearest_side(&b(), point(px(300.), px(290.))), Side::Bottom);
+    fn the_nearest_side_is_measured_by_share_and_the_middle_has_none() {
+        assert_eq!(
+            nearest_side(&b(), point(px(450.), px(200.))),
+            Some(Side::Right)
+        );
+        assert_eq!(
+            nearest_side(&b(), point(px(300.), px(120.))),
+            Some(Side::Top)
+        );
+        assert_eq!(
+            nearest_side(&b(), point(px(130.), px(200.))),
+            Some(Side::Left)
+        );
+        assert_eq!(
+            nearest_side(&b(), point(px(300.), px(290.))),
+            Some(Side::Bottom)
+        );
+        assert_eq!(nearest_side(&b(), point(px(300.), px(200.))), None);
     }
 
     #[test]

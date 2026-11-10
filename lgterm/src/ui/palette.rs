@@ -254,8 +254,8 @@ mod tests {
             [
                 "Split right",
                 "Split down",
-                "Split space right",
-                "Split space down"
+                "Split window right",
+                "Split window down"
             ]
         );
         assert!(names.contains(&"Close split"));

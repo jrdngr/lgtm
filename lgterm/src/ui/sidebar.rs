@@ -1,71 +1,22 @@
-//! The sidebar: layouts, their spaces, and the agents in each space; or only layout badges when narrow.
+//! The sidebar: every space and the agents in it, with the layout picker at the bottom; or only
+//! space badges when narrow.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, AppContext, ClickEvent, Context, CursorStyle, ElementId, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
+    AnyElement, AppContext, ClickEvent, Context, CursorStyle, FontWeight, InteractiveElement,
+    IntoElement, MouseButton, MouseDownEvent, ParentElement, SharedString, Stateful,
     StatefulInteractiveElement, Styled, Window, div, px, rgb, svg,
 };
 
+use super::menu::For;
 use super::panes::Nothing;
 use super::rename::Target;
-use super::space_drag::{self, DragsSpace, DropRow};
+use super::space_drag::{self, DragsSpace};
 use super::{MovesWindow, Workspace, badge};
-use crate::agents::{Kind, Status};
+use crate::agents::Kind;
 use crate::ipc::Place;
-use crate::model::{SpaceId, Tab};
+use crate::model::{Space, SpaceId, TermId};
 use crate::theme;
-
-struct Row {
-    id: ElementId,
-    depth: u8,
-    badge: Option<AnyElement>,
-    /// The agent's icon, on agent rows.
-    icon: Option<Kind>,
-    label: String,
-    /// Some when the row folds: whether it's folded now.
-    folded: Option<bool>,
-    bold: bool,
-    bg: Option<u32>,
-    rename: Option<Target>,
-    status: Option<Status>,
-    /// Some for a layout row: its index, so layouts dropped on it take its place.
-    layout: Option<usize>,
-    /// The space this row drags; a layout row without one drags the layout.
-    space: Option<SpaceId>,
-    drop: DropRow,
-}
-
-/// A layout being dragged to a new place in the sidebar.
-pub(super) struct LayoutDrag {
-    index: usize,
-    label: String,
-}
-
-impl Render for LayoutDrag {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui::IntoElement {
-        div()
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .h(px(28.))
-            .px(px(10.))
-            .rounded(px(6.))
-            .bg(rgb(theme::ROW_SELECTED))
-            .border_1()
-            .border_color(rgb(theme::CARD_BORDER))
-            .text_size(px(13.))
-            .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(theme::TEXT))
-            .child(badge::badge(
-                self.index,
-                &self.label,
-                None,
-                theme::ROW_SELECTED,
-            ))
-            .child(self.label.clone())
-    }
-}
 
 /// Dragged by the sidebar's right edge.
 pub(super) struct SidebarDrag;
@@ -80,7 +31,7 @@ pub(super) fn snap(x: f32) -> f32 {
 }
 
 impl Workspace {
-    /// Whether the sidebar shows only layout badges.
+    /// Whether the sidebar shows only space badges.
     pub(super) fn sidebar_icons(&self) -> bool {
         self.sidebar_width <= theme::SIDEBAR_ICONS
     }
@@ -90,10 +41,10 @@ impl Workspace {
         let rows = if icons {
             self.badge_rows(cx)
         } else {
-            self.tree_rows(cx)
+            self.space_rows(cx)
         };
         let plus = div()
-            .id("new-layout")
+            .id("new-space")
             .text_size(px(16.))
             .cursor_pointer()
             .child("+")
@@ -147,13 +98,15 @@ impl Workspace {
                     .text_color(rgb(theme::TEXT_MUTED))
                     .when(icons, |d| d.justify_center())
                     .when(!icons, |d| {
-                        d.justify_between().pl(px(20.)).pr(px(18.)).child("LAYOUTS")
+                        d.justify_between().pl(px(20.)).pr(px(18.)).child("SPACES")
                     })
                     .child(plus),
             )
             .child(
                 div()
                     .id("sidebar-rows")
+                    .flex_1()
+                    .min_h_0()
                     .flex()
                     .flex_col()
                     .when(icons, |d| d.items_center().gap(px(6.)))
@@ -161,29 +114,29 @@ impl Workspace {
                     .overflow_y_scroll()
                     .children(rows),
             )
+            .child(self.layout_picker(icons, cx))
             .child(handle);
-        if icons {
-            side.into_any_element()
-        } else {
-            space_drag::track_sidebar(side, cx).into_any_element()
-        }
+        space_drag::track_sidebar(side, cx).into_any_element()
     }
 
-    /// One badge per layout, with its worst status on the corner.
+    /// One badge per space, with its worst status on the corner.
     fn badge_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let mut rows = Vec::new();
-        for (i, layout) in self.model.layouts.iter().enumerate() {
-            let active = i == self.model.active;
-            let status = self.agents.worst(layout.terms());
-            let ring = if active {
-                theme::ROW_SELECTED
-            } else {
-                theme::SIDEBAR
-            };
-            let label = self.layout_label(layout);
-            rows.push(
-                div()
-                    .id(("layout", layout.id.0))
+        let shown = self.model.layout().spaces();
+        self.model
+            .spaces
+            .iter()
+            .map(|space| {
+                let id = space.id;
+                let on = shown.contains(&id);
+                let status = self.agents.worst(space.terms());
+                let ring = if on {
+                    theme::ROW_SELECTED
+                } else {
+                    theme::SIDEBAR
+                };
+                let label = self.space_label(space);
+                let el = div()
+                    .id(("space-badge", id.0))
                     .w(px(36.))
                     .h(px(32.))
                     .flex_none()
@@ -191,138 +144,142 @@ impl Workspace {
                     .items_center()
                     .justify_center()
                     .rounded(px(6.))
-                    .when(active, |d| d.bg(rgb(theme::ROW_SELECTED)))
-                    .when(!active, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
+                    .when(on, |d| d.bg(rgb(theme::ROW_SELECTED)))
+                    .when(!on, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
                     .cursor_pointer()
-                    .child(badge::badge(i, &label, status.map(|s| self.mark(s)), ring))
-                    .reorders(i, &label, cx)
-                    .on_click(cx.listener(move |w, _, window, cx| {
-                        w.model.select_layout(i);
-                        w.focus_current(window, cx);
-                    }))
-                    .into_any_element(),
-            );
-        }
-        rows
+                    .child(badge::badge(
+                        space.color,
+                        &label,
+                        status.map(|s| self.mark(s)),
+                        ring,
+                    ))
+                    .space_row(id, label, cx);
+                space_drag::track_row(el, id, cx).into_any_element()
+            })
+            .collect()
     }
 
-    /// Layouts, their spaces, and the agents in each. A layout with one space has no space row.
-    fn tree_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    /// Each space, then the agents in it unless it's folded.
+    fn space_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut rows = Vec::new();
-        for (i, layout) in self.model.layouts.iter().enumerate() {
-            let folded = self.collapsed.contains(&layout.id.0);
-            let active = i == self.model.active;
-            let spaces = layout.spaces.leaves();
-            let single = spaces.len() == 1;
-            let has_agents = spaces
-                .iter()
-                .any(|s| s.terms().any(|t| self.is_agent(Tab::Term(t))));
-            let label = self.layout_label(layout);
-            rows.push(self.row(
-                Row {
-                    id: ("layout", layout.id.0).into(),
-                    depth: 0,
-                    badge: Some(badge::badge(i, &label, None, theme::SIDEBAR)),
-                    icon: None,
-                    label,
-                    folded: (!single || has_agents).then_some(folded),
-                    bold: true,
-                    bg: active.then_some(theme::ROW_SELECTED),
-                    rename: Some(Target::Layout(layout.id)),
-                    status: folded.then(|| self.agents.worst(layout.terms())).flatten(),
-                    layout: Some(i),
-                    space: single.then(|| spaces[0].id),
-                    drop: DropRow::Layout(i, single.then(|| spaces[0].id)),
-                },
-                i > 0,
-                layout.id.0,
-                cx,
-                move |w, _, _| w.model.select_layout(i),
-            ));
-            if folded {
+        for (i, space) in self.model.spaces.iter().enumerate() {
+            rows.push(self.space_row(space, i > 0, cx));
+            if self.collapsed.contains(&space.id.0) {
                 continue;
             }
-            for space in spaces {
-                let space_agents = space.terms().any(|t| self.is_agent(Tab::Term(t)));
-                let space_folded = !single && space_agents && self.collapsed.contains(&space.id.0);
-                let space_id = space.id;
-                if !single {
-                    rows.push(
-                        self.row(
-                            Row {
-                                id: ("space", space.id.0).into(),
-                                depth: 1,
-                                badge: None,
-                                icon: None,
-                                label: self.space_label(space),
-                                folded: space_agents.then_some(space_folded),
-                                bold: false,
-                                bg: None,
-                                rename: Some(Target::Space(space.id)),
-                                status: space_folded
-                                    .then(|| self.agents.worst(space.terms()))
-                                    .flatten(),
-                                layout: None,
-                                space: Some(space.id),
-                                drop: DropRow::Space(space.id),
-                            },
-                            false,
-                            space.id.0,
-                            cx,
-                            move |w, _, _| w.model.focus_space(space_id),
-                        ),
-                    );
-                }
-                if space_folded {
-                    continue;
-                }
-                for term in space.terms().filter(|t| self.is_agent(Tab::Term(*t))) {
-                    let focused = active && Some(term) == self.model.term();
-                    rows.push(self.row(
-                        Row {
-                            id: ("term", term.0).into(),
-                            depth: if single { 3 } else { 2 },
-                            badge: None,
-                            icon: self.agents.get(term).map(|a| a.kind),
-                            label: self.term_label(Tab::Term(term)),
-                            folded: None,
-                            bold: false,
-                            bg: focused.then_some(theme::ROW_HOVER),
-                            rename: None,
-                            status: self.agents.status(term),
-                            layout: None,
-                            space: None,
-                            drop: DropRow::Other(term.0),
-                        },
-                        false,
-                        term.0,
-                        cx,
-                        move |w, _, _| w.model.focus_term(term),
-                    ));
-                }
+            for term in space.terms().filter(|t| self.is_agent((*t).into())) {
+                rows.push(self.agent_row(term, cx));
             }
         }
         rows
     }
 
-    fn row(
+    fn space_row(&self, space: &Space, gap_above: bool, cx: &mut Context<Self>) -> AnyElement {
+        let id = space.id;
+        let layout = self.model.layout();
+        let on = layout.slot_of(id).is_some();
+        let focused = layout.slot().space == Some(id);
+        let agents: Vec<TermId> = space
+            .terms()
+            .filter(|t| self.is_agent((*t).into()))
+            .collect();
+        let folded = self.collapsed.contains(&id.0);
+        let label = self.space_label(space);
+        let group = SharedString::from(format!("space-row-{}", id.0));
+        let chevron = div()
+            .id(("fold", id.0))
+            .w(px(12.))
+            .flex_none()
+            .text_size(px(10.))
+            .text_color(gpui::transparent_black())
+            .when(!agents.is_empty(), |d| {
+                d.group_hover(group.clone(), |s| s.text_color(rgb(theme::ICON)))
+                    .child(if folded { "▸" } else { "▾" })
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .on_click(cx.listener(move |w, _, win, cx| {
+                        if !w.collapsed.remove(&id.0) {
+                            w.collapsed.insert(id.0);
+                        }
+                        if w.renaming().is_some() {
+                            w.focus_current(win, cx);
+                        }
+                        cx.stop_propagation();
+                        cx.notify();
+                    }))
+            });
+        let status = folded
+            .then(|| self.agents.worst(agents.iter().copied()))
+            .flatten();
+        let el = div()
+            .id(("space-row", id.0))
+            .group(group)
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .h(px(28.))
+            .flex_none()
+            .pl(px(4.))
+            .pr(px(10.))
+            .rounded(px(6.))
+            .text_size(px(13.))
+            .text_color(rgb(theme::TEXT))
+            .when(focused, |d| d.font_weight(FontWeight::SEMIBOLD))
+            .when(gap_above, |d| d.mt(px(6.)))
+            .when(on, |d| d.bg(rgb(theme::ROW_SELECTED)))
+            .when(!on, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
+            .cursor_pointer()
+            .when(self.dragged_space(cx) == Some(id), |d| d.opacity(0.35))
+            .child(chevron)
+            .child(badge::badge(space.color, &label, None, theme::SIDEBAR))
+            .child(self.row_label(Target::Space(id), label.clone(), cx))
+            .children(status.map(|s| self.mark(s)))
+            .space_row(id, label, cx);
+        space_drag::track_row(el, id, cx).into_any_element()
+    }
+
+    fn agent_row(&self, term: TermId, cx: &mut Context<Self>) -> AnyElement {
+        let focused = Some(term) == self.model.term();
+        div()
+            .id(("term", term.0))
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .h(px(28.))
+            .flex_none()
+            .pl(px(52.))
+            .pr(px(10.))
+            .rounded(px(6.))
+            .text_size(px(13.))
+            .text_color(rgb(theme::TEXT))
+            .when(focused, |d| d.bg(rgb(theme::ROW_HOVER)))
+            .when(!focused, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
+            .cursor_pointer()
+            .children(self.agents.get(term).map(|a| agent_icon(a.kind)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .text_ellipsis()
+                    .whitespace_nowrap()
+                    .child(self.term_label(term.into())),
+            )
+            .children(self.agents.status(term).map(|s| self.mark(s)))
+            .on_click(cx.listener(move |w, _, window, cx| {
+                w.model.focus_term(term);
+                w.focus_current(window, cx);
+            }))
+            .into_any_element()
+    }
+
+    /// A row's name, or the field renaming it.
+    pub(super) fn row_label(
         &self,
-        row: Row,
-        gap_above: bool,
-        fold_id: u64,
+        target: Target,
+        label: String,
         cx: &mut Context<Self>,
-        on_click: impl Fn(&mut Workspace, &mut Window, &mut Context<Workspace>) + 'static,
     ) -> AnyElement {
-        let layout = row.layout;
-        let drop_row = row.drop;
-        let drag = match (row.space, row.layout) {
-            (Some(space), _) => Some((Some(space), row.label.clone())),
-            (None, Some(_)) => Some((None, row.label.clone())),
-            _ => None,
-        };
-        let dragged = row.space.is_some() && row.space == self.dragged_space(cx);
-        let renaming = self.renaming().filter(|r| Some(r.target) == row.rename);
-        let label: AnyElement = match renaming {
+        match self.renaming().filter(|r| r.target == target) {
             Some(r) => div()
                 .flex_1()
                 .min_w_0()
@@ -339,123 +296,40 @@ impl Workspace {
                 .overflow_hidden()
                 .text_ellipsis()
                 .whitespace_nowrap()
-                .child(row.label)
+                .child(label)
                 .into_any_element(),
-        };
-        let rename = row.rename;
-        let slot = (row.folded.is_none() && (row.badge.is_some() || row.depth == 1))
-            .then(|| div().w(px(12.)).flex_none());
-        let chevron = row.folded.map(|folded| {
-            div()
-                .id(("fold", fold_id))
-                .w(px(12.))
-                .flex_none()
-                .text_size(px(10.))
-                .text_color(rgb(theme::ICON))
-                .child(if folded { "▸" } else { "▾" })
-                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_click(cx.listener(move |w, _, win, cx| {
-                    if !w.collapsed.remove(&fold_id) {
-                        w.collapsed.insert(fold_id);
-                    }
-                    if w.renaming().is_some() {
-                        w.focus_current(win, cx);
-                    }
-                    cx.stop_propagation();
-                    cx.notify();
-                }))
-        });
-        let el = div()
-            .id(row.id)
-            .flex()
-            .items_center()
-            .gap(px(8.))
-            .h(px(28.))
-            .flex_none()
-            .pr(px(10.))
-            .pl(px(10. + [0., 16., 38., 56.][row.depth as usize]))
-            .rounded(px(6.))
-            .text_size(px(13.))
-            .text_color(rgb(theme::TEXT))
-            .when(row.bold, |d| d.font_weight(FontWeight::SEMIBOLD))
-            .when(gap_above, |d| d.mt(px(6.)))
-            .when_some(row.bg, |d, bg| d.bg(rgb(bg)))
-            .when(row.bg.is_none(), |d| {
-                d.hover(|s| s.bg(rgb(theme::ROW_HOVER)))
-            })
-            .cursor_pointer()
-            .children(slot)
-            .children(chevron)
-            .children(row.badge)
-            .children(row.icon.map(agent_icon))
-            .child(label)
-            .children(row.status.map(|s| self.mark(s)))
-            .when(dragged, |d| d.opacity(0.35))
-            .when_some(layout, |d, i| d.takes_layouts(i, cx))
-            .when_some(drag, |d, (space, label)| match (space, layout) {
-                (Some(space), _) => d.drags_space(space, label),
-                (None, Some(i)) => d.drags_layout(i, label),
-                _ => d,
-            })
-            .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
-                if ev.click_count() == 2
-                    && let Some(target) = rename
-                {
-                    let text = w.current_name(target);
-                    w.start_rename(target, text, window, cx);
-                    return;
-                }
-                on_click(w, window, cx);
-                w.focus_current(window, cx);
-            }));
-        space_drag::track_row(el, drop_row, cx).into_any_element()
-    }
-
-    fn current_name(&self, target: Target) -> String {
-        match target {
-            Target::Layout(id) => self
-                .model
-                .layouts
-                .iter()
-                .find(|l| l.id == id)
-                .map(|l| self.layout_label(l)),
-            Target::Space(id) => self.model.find_space(id).map(|s| self.space_label(s)),
         }
-        .unwrap_or_default()
     }
 }
 
-trait Reorders: Sized {
-    /// Drags the layout at `index`.
-    fn drags_layout(self, index: usize, label: String) -> Self;
-    /// Takes layouts dropped here into the place of the layout at `index`.
-    fn takes_layouts(self, index: usize, cx: &mut Context<Workspace>) -> Self;
-    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self {
-        self.drags_layout(index, label.to_owned())
-            .takes_layouts(index, cx)
-    }
+trait SpaceRow: Sized {
+    /// Shows the space on click, renames it on double click, opens its menu on right click,
+    /// and drags it.
+    fn space_row(self, id: SpaceId, label: String, cx: &mut Context<Workspace>) -> Self;
 }
 
-impl Reorders for Stateful<gpui::Div> {
-    fn drags_layout(self, index: usize, label: String) -> Self {
-        self.on_drag(LayoutDrag { index, label }, |d, _, _, cx| {
-            cx.new(|_| LayoutDrag {
-                index: d.index,
-                label: d.label.clone(),
-            })
-        })
-    }
-
-    fn takes_layouts(self, index: usize, cx: &mut Context<Workspace>) -> Self {
-        self.drag_over::<LayoutDrag>(move |s, d, _, _| match d.index {
-            from if from > index => s.border_t_2().border_color(rgb(theme::FOCUS)),
-            from if from < index => s.border_b_2().border_color(rgb(theme::FOCUS)),
-            _ => s,
-        })
-        .on_drop(cx.listener(move |w, d: &LayoutDrag, window, cx| {
-            w.model.move_layout(d.index, index);
+impl SpaceRow for Stateful<gpui::Div> {
+    fn space_row(self, id: SpaceId, label: String, cx: &mut Context<Workspace>) -> Self {
+        self.on_mouse_down(
+            MouseButton::Right,
+            cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                w.open_menu(For::Space(id), ev.position, window, cx)
+            }),
+        )
+        .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
+            if ev.click_count() == 2 {
+                let text = w
+                    .model
+                    .find_space(id)
+                    .map(|s| w.space_label(s))
+                    .unwrap_or_default();
+                w.start_rename(Target::Space(id), text, window, cx);
+                return;
+            }
+            w.model.show_space(id);
             w.focus_current(window, cx);
         }))
+        .drags_space(id, label)
     }
 }
 
