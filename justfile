@@ -16,8 +16,8 @@ app: fresh dev
 # Fetch, start a new change on main@origin, and install the `lgtm` command
 tui: fresh build-tui install-tui
 
-# Fetch, start a new change on main@origin, and install the app and the `lgtm` command
-go: fresh install
+# Fetch, start a new change on main@origin, and install the app, the `lgtm` command, and lgterm
+go: fresh install lgterm
 
 [private]
 fresh:
