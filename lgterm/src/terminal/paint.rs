@@ -147,6 +147,8 @@ impl Grid {
     pub fn paint(&self, frame: &Frame, window: &mut Window, cx: &mut App) {
         let mut cache = self.lines.0.borrow_mut();
         cache.resize_with(frame.rows.len(), Shaped::default);
+        // Every row's background first, so no row's background covers a line or block
+        // reaching into it from the row above.
         for (y, row) in frame.rows.iter().enumerate() {
             for run in &row.runs {
                 if let Some(bg) = run.bg.filter(|bg| *bg != frame.bg) {
@@ -157,6 +159,8 @@ impl Grid {
                 let r = self.rect(start, y, end + 1 - start);
                 window.paint_quad(fill(r, color(theme::SELECTION)));
             }
+        }
+        for (y, row) in frame.rows.iter().enumerate() {
             let shaped = &mut cache[y];
             if shaped.version != row.version
                 || shaped.font_size != self.font_size
@@ -201,11 +205,17 @@ impl Grid {
             let Some(pieces) = boxes::pieces(c, w, h, light) else {
                 continue;
             };
-            let cell = self.rect(run.col + i as u16, y, 1).origin;
+            let col = run.col + i as u16;
+            let cell = self.rect(col, y, 1).origin;
+            // The next cell's own origin for the far edges, so neighbors snap to the same
+            // pixel and nothing shows between them.
+            let next = self.rect(col + 1, y + 1, 1).origin;
             let (ox, oy) = (cell.x.as_f32(), cell.y.as_f32());
+            let at_x = |v: f32| snap(if v >= w { next.x.as_f32() } else { ox + v });
+            let at_y = |v: f32| snap(if v >= h { next.y.as_f32() } else { oy + v });
             for ([x0, y0, x1, y1], alpha) in pieces {
-                let (x0, y0) = (snap(ox + x0), snap(oy + y0));
-                let (x1, y1) = (snap(ox + x1), snap(oy + y1));
+                let (x0, y0) = (at_x(x0), at_y(y0));
+                let (x1, y1) = (at_x(x1), at_y(y1));
                 let bounds = Bounds {
                     origin: point(px(x0), px(y0)),
                     size: size(px((x1 - x0).max(1. / scale)), px((y1 - y0).max(1. / scale))),

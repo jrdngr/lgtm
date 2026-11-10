@@ -44,20 +44,21 @@ pub const CHECK_FILES: &str = "Check or uncheck files in the open review as revi
 
 pub const MARK_LINES: &str = "Mark changed lines of a file in the open review with your own \
     marks: reviewed (counts as done) or flagged (doesn't). The human sees your marks apart \
-    from theirs, and lines they marked keep their marks. Leave mark out to clear yours.";
+    from theirs, and lines they marked keep their marks. Leave mark out to clear yours. Flag \
+    only extremely sensitive lines, each with a comment from add_comment saying why.";
 
 pub const ADD_COMMENT: &str = "Leave a comment for the human on a line of the open review. \
     Use it only for what they must see: a likely bug, a risky change, or a question only they \
     can answer. A review rarely needs more than three. No style notes, praise or summaries.";
 
 /// What the server's instructions say about reviewing a change for the human.
-pub const REVIEW_INSTRUCTIONS: &str = "When the human asks you to review the change in lgtm: \
-    call get_review, read the diff of every file in it, then mark_lines reviewed for lines you \
-    checked and are sure of; mark_lines flagged for lines the human must read themselves \
-    (behavior changes, security, concurrency, data loss, public APIs, anything you aren't sure \
-    of); check_files for files with nothing flagged; and add_comment only on flagged lines \
-    whose reason isn't obvious from the code. Then tell the human in a line or two what you \
-    flagged.";
+pub const REVIEW_INSTRUCTIONS: &str = "When the human asks you to review the change in lgtm, \
+    or says `lgtm flag review`: call get_review, read the diff of every file in it, then \
+    mark_lines reviewed for lines you checked and are sure of, and check_files for files with \
+    nothing flagged. Flag very conservatively: mark_lines flagged only for the few extremely \
+    sensitive lines the human must read themselves (security, data loss, money, irreversible \
+    or breaking behavior), never for routine changes or style, and add_comment on every \
+    flagged line saying why. Then tell the human in a line or two what you flagged.";
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

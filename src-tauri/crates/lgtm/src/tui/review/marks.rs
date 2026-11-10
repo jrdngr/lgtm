@@ -126,13 +126,15 @@ impl Marks {
         if colors.contains(&Some(MarkColor::Red)) {
             return State::Flagged;
         }
+        // The user's check outranks an agent's flags; an agent's check doesn't.
+        if self.checked(file) == Some(false) {
+            return State::Reviewed;
+        }
         if colors.contains(&Some(MarkColor::AgentFlagged)) {
             return State::AgentFlagged;
         }
-        match self.checked(file) {
-            Some(false) => return State::Reviewed,
-            Some(true) => return State::Agent,
-            None => {}
+        if self.checked(file) == Some(true) {
+            return State::Agent;
         }
         let done_rows = colors.iter().filter(|c| c.is_some_and(done)).count();
         let agent = colors.contains(&Some(MarkColor::AgentReviewed));
@@ -153,12 +155,17 @@ impl Marks {
             }
             let rows = self.rows(i, None, false);
             total += rows.len();
-            let checked = self.checked(i).is_some();
+            let checked = self.checked(i);
             done_rows += rows
                 .iter()
                 .filter(|r| match self.matched.get(r).map(|m| m.color) {
-                    Some(c) => done(c) || checked && !flagged(c),
-                    None => checked,
+                    // The user's check covers an agent's flags too.
+                    Some(c) => match checked {
+                        Some(false) => c != MarkColor::Red,
+                        Some(true) => !flagged(c),
+                        None => done(c),
+                    },
+                    None => checked.is_some(),
                 })
                 .count();
         }
@@ -472,6 +479,20 @@ pub(super) mod tests {
         step.run(&mut store, true).unwrap();
         m.rematch(&store).unwrap();
         assert_eq!(m.state(0, Some(1)), State::Flagged);
+    }
+
+    #[test]
+    fn the_users_check_outranks_an_agents_flags() {
+        let mut store = Store::in_memory();
+        let mut m = marks();
+        m.agent_mark(&mut store, 0, &[(2, 2)], &[], Some(MarkColor::AgentFlagged))
+            .unwrap();
+        assert_eq!(m.state(0, None), State::AgentFlagged);
+        m.agent_check(&mut store, &[0], true).unwrap();
+        assert_eq!(m.state(0, None), State::AgentFlagged);
+        m.toggle_checks(&mut store, &[0]).unwrap();
+        assert_eq!(m.state(0, None), State::Reviewed);
+        assert_eq!(m.percent(), Some(100));
     }
 
     #[test]

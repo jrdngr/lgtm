@@ -37,13 +37,13 @@ impl Review {
         self.relayout();
     }
 
-    /// The reviewed files' paths, by the marks as last matched.
+    /// The reviewed files' paths, the user's and an agent's, by the marks as last matched.
     pub(super) fn reviewed_paths(&self) -> HashSet<String> {
         let Some(marks) = &self.marks else {
             return HashSet::new();
         };
         (0..marks.file_count())
-            .filter(|&f| marks.state(f, None) == State::Reviewed)
+            .filter(|&f| matches!(marks.state(f, None), State::Reviewed | State::Agent))
             .map(|f| marks.path(f).to_string())
             .collect()
     }

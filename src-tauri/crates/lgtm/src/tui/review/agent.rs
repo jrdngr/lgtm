@@ -125,6 +125,15 @@ impl Review {
         comment_core::range_code(&rows)
     }
 
+    /// Folds those of `files` an agent's writes left all reviewed with nothing flagged.
+    fn fold_agent_reviewed(&mut self, files: impl IntoIterator<Item = usize>) {
+        for f in files {
+            if self.file_state(f) == super::marks::State::Agent {
+                self.set_folded(f, true);
+            }
+        }
+    }
+
     fn same_review(&self, revset: &str) -> Result<(), String> {
         if revset == self.revset {
             Ok(())
@@ -154,6 +163,7 @@ impl Review {
         marks
             .agent_check(store, &files, c.checked)
             .map_err(|e| format!("{e:#}"))?;
+        self.fold_agent_reviewed(files.iter().map(|&f| f as usize));
         let verb = if c.checked { "Checked" } else { "Unchecked" };
         Ok(format!("{verb} {} files.", files.len()))
     }
@@ -194,6 +204,7 @@ impl Review {
         let n = marks
             .agent_mark(store, file, &lines, &removed, color)
             .map_err(|e| format!("{e:#}"))?;
+        self.fold_agent_reviewed([file]);
         if n == 0 {
             return Err("none of those lines changed in the review".into());
         }
