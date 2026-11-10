@@ -1,6 +1,6 @@
 //! Renaming a layout or space in place in the sidebar.
 
-use gpui::{Context, FocusHandle, KeyDownEvent, Window};
+use gpui::{Context, FocusHandle, KeyDownEvent, Subscription, Window};
 
 use super::Workspace;
 use super::overlay::Overlay;
@@ -17,6 +17,8 @@ pub struct Rename {
     pub target: Target,
     pub text: String,
     pub focus: FocusHandle,
+    /// Saves the name when the keyboard goes elsewhere, like on a click off the field.
+    _blur: Subscription,
 }
 
 impl Workspace {
@@ -30,10 +32,17 @@ impl Workspace {
         self.finish_rename(true);
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
+        let blur = cx.on_focus_out(&focus, window, |w, _, window, cx| {
+            if window.is_window_active() {
+                w.finish_rename(true);
+                cx.notify();
+            }
+        });
         self.overlay = Some(Overlay::Rename(Rename {
             target,
             text,
             focus,
+            _blur: blur,
         }));
         cx.notify();
     }
@@ -64,6 +73,16 @@ impl Workspace {
                     s.name = name;
                 }
             }
+        }
+    }
+
+    /// Adds a layout and puts its name field up, empty: leaving it empty keeps "Layout N".
+    /// The badges-only sidebar has no name field.
+    pub(super) fn new_layout(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.apply(window, cx, |m| m.new_layout());
+        if !self.sidebar_icons() {
+            let id = self.model.layout().id;
+            self.start_rename(Target::Layout(id), String::new(), window, cx);
         }
     }
 

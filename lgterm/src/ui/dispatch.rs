@@ -68,7 +68,7 @@ impl Render for Workspace {
         el = on_open!(el, cx, SplitDown, Place::Down);
         el = on_model!(el, cx, SplitSpaceRight, |m| m.split_slot(Axis::Row));
         el = on_model!(el, cx, SplitSpaceDown, |m| m.split_slot(Axis::Column));
-        el = on_model!(el, cx, NewLayout, Model::new_layout);
+        el = el.on_action(cx.listener(|w, _: &NewLayout, win, cx| w.new_layout(win, cx)));
         el = on_open!(el, cx, NewSpace, Place::Layout);
         el = on_model!(el, cx, NextTab, |m| m.cycle_tab(1));
         el = on_model!(el, cx, PrevTab, |m| m.cycle_tab(-1));

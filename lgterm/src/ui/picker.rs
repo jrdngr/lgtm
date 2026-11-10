@@ -60,7 +60,7 @@ impl Workspace {
             .text_size(px(16.))
             .text_color(rgb(theme::ICON))
             .child("+")
-            .on_click(cx.listener(|w, _, window, cx| w.apply(window, cx, |m| m.new_layout())));
+            .on_click(cx.listener(|w, _, window, cx| w.new_layout(window, cx)));
         let picker = field(div().id("layout-picker"))
             .flex_1()
             .min_w_0()
