@@ -43,6 +43,17 @@ impl Term {
     }
 }
 
+/// The folder's own name after a slash, like `/lgtm`, or `~` at home.
+fn folder_name(dir: &Path, home: Option<&Path>) -> String {
+    if home == Some(dir) {
+        return "~".into();
+    }
+    match dir.file_name() {
+        Some(name) => format!("/{}", name.to_string_lossy()),
+        None => dir.to_string_lossy().into_owned(),
+    }
+}
+
 /// A program's title without the spinner or status glyph agents put in front.
 pub fn clean_title(title: &str) -> Option<&str> {
     let t = title
@@ -181,7 +192,7 @@ impl Workspace {
         }
         match t.info.process.as_deref() {
             Some(p) => p.to_owned(),
-            None => clean_title(&t.title).unwrap_or("shell").to_owned(),
+            None => folder_name(t.cwd(), self.home.as_deref()),
         }
     }
 
@@ -211,6 +222,17 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_idle_shell_goes_by_its_folder() {
+        let home = Path::new("/Users/j");
+        assert_eq!(
+            folder_name(Path::new("/Users/j/dev/lgtm"), Some(home)),
+            "/lgtm"
+        );
+        assert_eq!(folder_name(home, Some(home)), "~");
+        assert_eq!(folder_name(Path::new("/"), Some(home)), "/");
+    }
 
     #[test]
     fn titles_lose_leading_glyphs() {
