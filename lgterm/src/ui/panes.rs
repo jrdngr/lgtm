@@ -82,11 +82,7 @@ impl Workspace {
             .min_w_0()
             .h_full()
             .flex()
-            .pt(px(if self.sidebar && !self.sidebar_icons() {
-                10.
-            } else {
-                theme::TITLEBAR
-            }))
+            .pt(px(if self.sidebar { 10. } else { theme::TITLEBAR }))
             .px(px(theme::GAP))
             .pb(px(theme::GAP))
             .child(titlebar)

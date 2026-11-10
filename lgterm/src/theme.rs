@@ -24,8 +24,8 @@ pub const TERM_BG: u32 = CARD;
 pub const SELECTION: u32 = 0x3a5a7a;
 
 pub const SIDEBAR_WIDTH: f32 = 264.;
-/// The sidebar with only space badges. It starts below a top row the traffic lights sit in.
-pub const SIDEBAR_ICONS: f32 = 57.;
+/// The sidebar with only space badges: room for the traffic lights and the sidebar button.
+pub const SIDEBAR_ICONS: f32 = 108.;
 pub const SIDEBAR_MIN: f32 = 150.;
 pub const SIDEBAR_MAX: f32 = 420.;
 pub const GAP: f32 = 8.;

@@ -51,7 +51,16 @@ pub fn badge(color: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> 
         .text_size(px(11.))
         .font_weight(FontWeight::BOLD)
         .text_color(rgb(theme::BADGE_TEXT))
-        .child(letter(label))
+        // A line as tall as the badge, centered across it, so the letter sits in the middle
+        // whatever the font's own line height.
+        .child(
+            div()
+                .w_full()
+                .h_full()
+                .line_height(px(20.))
+                .text_center()
+                .child(letter(label)),
+        )
         .when_some(mark, |d, mark| {
             d.child(
                 div()
