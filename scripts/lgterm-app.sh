@@ -14,8 +14,9 @@ cargo build --release --locked
 
 app=target/release/bundle/lgterm.app
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp target/release/lgterm "$app/Contents/MacOS/lgterm"
+cp icons/lgterm.icns "$app/Contents/Resources/lgterm.icns"
 version=$(sed -nE 's/^version = "(.*)"/\1/p' Cargo.toml | head -1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,6 +28,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>dev.lgtm.lgterm</string>
   <key>CFBundleExecutable</key><string>lgterm</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>lgterm</string>
   <key>CFBundleShortVersionString</key><string>$version</string>
   <key>CFBundleVersion</key><string>$version</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
@@ -38,4 +40,6 @@ codesign --force --sign - "$app" >/dev/null 2>&1 || true
 
 rm -rf /Applications/lgterm.app
 ditto "$app" /Applications/lgterm.app
-echo "Installed /Applications/lgterm.app"
+mkdir -p "$HOME/.local/bin"
+ln -sf /Applications/lgterm.app/Contents/MacOS/lgterm "$HOME/.local/bin/lgterm"
+echo "Installed /Applications/lgterm.app and ~/.local/bin/lgterm"

@@ -182,6 +182,21 @@ fn same_style(a: &Run, b: &Run) -> bool {
 }
 
 impl Row {
+    /// The row as text, with gaps between runs filled with spaces.
+    pub fn text(&self) -> String {
+        let mut out = String::new();
+        let mut col = 0;
+        for run in &self.runs {
+            while col < run.col {
+                out.push(' ');
+                col += 1;
+            }
+            out.push_str(&run.text);
+            col = run.col + run.cells;
+        }
+        out.trim_end().to_owned()
+    }
+
     /// The text in column `col`, if a run starts or covers it.
     pub fn text_at(&self, col: u16) -> Option<&str> {
         let run = self
@@ -211,6 +226,12 @@ mod tests {
         .unwrap();
         vt.vt_write(input);
         Snapshotter::new().unwrap().frame(&vt).unwrap()
+    }
+
+    #[test]
+    fn rows_read_back_as_text() {
+        let f = frame(b"ab \x1b[1mcd\x1b[0m  e");
+        assert_eq!(f.rows[0].text(), "ab cd  e");
     }
 
     #[test]

@@ -38,3 +38,12 @@ pub const MONO_FONT: &str = if cfg!(target_os = "macos") {
     "DejaVu Sans Mono"
 };
 pub const DEFAULT_FONT_SIZE: f32 = 13.;
+
+pub const BLOCKED: u32 = 0xe3b341;
+pub const DONE: u32 = 0x3fb950;
+pub const WORKING: u32 = 0x58a6ff;
+pub const IDLE: u32 = 0x7a7a7a;
+pub const DIALOG: u32 = 0x272727;
+pub const MATCH: u32 = 0x79b8ff;
+pub const CODE: u32 = 0x39c5cf;
+pub const ROW_RULE: u32 = 0x2a2a2a;

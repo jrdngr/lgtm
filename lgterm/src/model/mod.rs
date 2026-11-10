@@ -3,16 +3,18 @@
 
 pub mod tree;
 
+use serde::{Deserialize, Serialize};
+
 pub use tree::{Axis, Dir, Keyed, Rect, Tree};
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Split {
     pub id: u64,
     pub tabs: Vec<u64>,
     pub active: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Space {
     pub id: u64,
     /// A name the user gave it. Unnamed spaces follow their first terminal's folder.
@@ -21,7 +23,7 @@ pub struct Space {
     pub focus: u64,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Layout {
     pub id: u64,
     pub name: Option<String>,
@@ -102,7 +104,7 @@ pub struct Place {
     pub tab: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Model {
     pub layouts: Vec<Layout>,
     pub active: usize,
@@ -324,6 +326,61 @@ impl Model {
         !self.layouts.is_empty()
     }
 
+    /// Moves the focused tab into a new split to the right of its own.
+    pub fn move_tab_to_new_split(&mut self) {
+        if self.split().tabs.len() < 2 {
+            return;
+        }
+        let id = self.id();
+        let layout = self.layout_mut();
+        layout.zoom = None;
+        let space = layout.space_mut();
+        let from = space.split_mut();
+        let term = from.tabs.remove(from.active);
+        from.active = from.active.min(from.tabs.len() - 1);
+        let split = Split {
+            id,
+            tabs: vec![term],
+            active: 0,
+        };
+        let at = space.focus;
+        space
+            .splits
+            .insert(at, split, Axis::Row)
+            .expect("focused split");
+        space.focus = id;
+    }
+
+    /// Every terminal in every layout.
+    pub fn terms(&self) -> Vec<u64> {
+        self.layouts
+            .iter()
+            .flat_map(|l| l.spaces.leaves())
+            .flat_map(|s| s.terms().collect::<Vec<_>>())
+            .collect()
+    }
+
+    /// Whether a loaded model holds together: everything focused exists and every id is
+    /// below the next one handed out.
+    pub fn is_valid(&self) -> bool {
+        if self.active >= self.layouts.len() {
+            return false;
+        }
+        self.layouts.iter().all(|l| {
+            l.id < self.next
+                && l.spaces.contains(l.focus)
+                && l.spaces.leaves().into_iter().all(|s| {
+                    s.id < self.next
+                        && s.splits.contains(s.focus)
+                        && s.splits.leaves().into_iter().all(|sp| {
+                            sp.id < self.next
+                                && sp.active < sp.tabs.len()
+                                && sp.tabs.iter().all(|t| *t < self.next)
+                        })
+                })
+        })
+    }
+
     /// Every terminal in the focused split.
     pub fn split_terms(&self) -> Vec<u64> {
         self.split().tabs.clone()
@@ -434,6 +491,35 @@ mod tests {
         m.select_tab(0);
         assert!(m.remove_term(b));
         assert_eq!(m.term(), a);
+    }
+
+    #[test]
+    fn models_survive_a_save_and_load() {
+        let (mut m, _) = Model::new();
+        m.split_split(Axis::Row);
+        m.new_layout();
+        let json = serde_json::to_string(&m).unwrap();
+        let back: Model = serde_json::from_str(&json).unwrap();
+        assert!(back.is_valid());
+        assert_eq!(back.terms(), m.terms());
+        assert_eq!(back.term(), m.term());
+        let broken = json.replace("\"active\":1", "\"active\":7");
+        let broken: Model = serde_json::from_str(&broken).unwrap();
+        assert!(!broken.is_valid());
+    }
+
+    #[test]
+    fn a_tab_moves_into_a_split_of_its_own() {
+        let (mut m, a) = Model::new();
+        let b = m.new_tab();
+        m.move_tab_to_new_split();
+        assert_eq!(m.term(), b);
+        assert_eq!(m.split().tabs, [b]);
+        let splits = m.space().splits.leaves();
+        assert_eq!(splits.len(), 2);
+        assert_eq!(splits[0].tabs, [a]);
+        m.move_tab_to_new_split();
+        assert_eq!(m.space().splits.leaves().len(), 2);
     }
 
     #[test]

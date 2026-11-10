@@ -12,7 +12,8 @@ use gpui::{
     Pixels, Point, ScrollEvent, Window,
 };
 
-use super::{TermView, keys};
+use super::links::{self, Link};
+use super::{TermEvent, TermView, keys};
 
 pub fn selection_text(vt: &Terminal) -> Option<String> {
     let opts = FormatOptions::new()
@@ -127,6 +128,13 @@ impl TermView {
         }
     }
 
+    fn link_at(&mut self, pos: Point<Pixels>) -> Option<Link> {
+        let (x, y) = self.cell_at(pos)?;
+        let frame = self.snap.frame(&self.vt).ok()?;
+        let line = frame.rows.get(y as usize)?.text();
+        links::at(&line, x as usize)
+    }
+
     fn screen_point(&self, (x, y): (u16, u16)) -> (u16, u32) {
         let top = self.vt.scrollbar().map_or(0, |s| s.offset);
         (x, top as u32 + y as u32)
@@ -139,6 +147,13 @@ impl TermView {
         cx: &mut Context<Self>,
     ) {
         window.focus(&self.focus, cx);
+        if ev.modifiers.platform
+            && ev.button == MouseButton::Left
+            && let Some(link) = self.link_at(ev.position)
+        {
+            cx.emit(TermEvent::Link(link));
+            return;
+        }
         if self.reports_mouse(&ev.modifiers) {
             self.send_mouse(
                 mouse::Action::Press,

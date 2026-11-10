@@ -1,6 +1,7 @@
 //! Claude Code registers `lgtm mcp` and `lgtm hook` once. Inside a desktop app terminal they
 //! hand over to the app's binary, which talks to the app. Anywhere else in a jj workspace
-//! `mcp` serves the terminal app's tools, and `hook` records the agent's turns.
+//! `mcp` serves the terminal app's tools, and `hook` records the agent's turns and, in an
+//! lgterm terminal, passes the hook on to lgterm.
 
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
@@ -43,9 +44,35 @@ pub fn mcp() -> i32 {
 }
 
 pub fn hook() -> i32 {
-    match app_terminal() {
-        Some(app) => hand_over(&app, &["hook".into()]),
-        None => crate::turn_hook::run(),
+    if let Some(app) = app_terminal() {
+        return hand_over(&app, &["hook".into()]);
+    }
+    let input = crate::turn_hook::read_input();
+    tell_lgterm(&input);
+    crate::turn_hook::run_on(&input)
+}
+
+/// Passes a hook on to lgterm when this runs in one of its terminals, so it can show the
+/// agent's status.
+fn tell_lgterm(input: &str) {
+    use std::io::Write;
+    use std::process::Stdio;
+
+    if var("LGTERM_TERMINAL_ID").is_none() {
+        return;
+    }
+    let Some(bin) = var("LGTERM_BIN") else { return };
+    let child = Command::new(bin)
+        .arg("hook")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn();
+    if let Ok(mut child) = child {
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(input.as_bytes());
+        }
+        let _ = child.wait();
     }
 }
 

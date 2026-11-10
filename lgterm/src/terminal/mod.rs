@@ -1,16 +1,20 @@
 //! One terminal: a shell on a pty, parsed by Ghostty, painted by GPUI.
 
+mod find;
 mod frame;
 mod input;
 mod keys;
+pub mod links;
 mod paint;
 mod pty;
+
+pub use pty::SOCKET;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use ghostty_vt::style::RgbColor;
-use ghostty_vt::{Event, Terminal, TerminalOptions, key, mouse};
+use ghostty_vt::{Event, Terminal, TerminalOptions, fmt, key, mouse};
 use gpui::{
     App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
     Font, Global, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point,
@@ -35,6 +39,8 @@ pub enum TermEvent {
     Changed,
     /// The shell exited.
     Exited,
+    /// A link was ⌘-clicked.
+    Link(links::Link),
 }
 
 pub struct TermView {
@@ -59,6 +65,7 @@ pub struct TermView {
     /// Where a selection drag started, in screen rows.
     drag_from: Option<(u16, u32)>,
     mouse_down: bool,
+    find: Option<find::Find>,
 }
 
 fn rgb(c: u32) -> RgbColor {
@@ -70,8 +77,8 @@ fn rgb(c: u32) -> RgbColor {
 }
 
 impl TermView {
-    /// Starts a shell in `cwd`.
-    pub fn spawn(id: u64, cwd: &Path, cx: &mut App) -> Result<Entity<Self>> {
+    /// Starts a shell in `cwd`, running `argv` if it's not empty.
+    pub fn spawn(id: u64, cwd: &Path, argv: &[String], cx: &mut App) -> Result<Entity<Self>> {
         let (cols, rows) = (80, 24);
         let mut vt = Terminal::new(TerminalOptions {
             cols,
@@ -85,7 +92,7 @@ impl TermView {
         let keys = key::Encoder::new()?;
         let key_event = key::Event::new()?;
         let mouse = mouse::Encoder::new()?;
-        let (pty, output) = Pty::spawn(id, cwd, cols, rows)?;
+        let (pty, output) = Pty::spawn(id, cwd, argv, cols, rows)?;
         Ok(cx.new(|cx| {
             cx.spawn(async move |this: gpui::WeakEntity<TermView>, cx| {
                 while let Ok(mut bytes) = output.recv().await {
@@ -117,6 +124,7 @@ impl TermView {
                 scroll_rest: 0.,
                 drag_from: None,
                 mouse_down: false,
+                find: None,
             }
         }))
     }
@@ -165,6 +173,42 @@ impl TermView {
 
     fn write(&mut self, bytes: &[u8]) {
         self.pty.write(bytes);
+    }
+
+    /// Types `bytes` into the terminal.
+    pub fn input(&mut self, bytes: &[u8], cx: &mut Context<Self>) {
+        self.write(bytes);
+        self.scroll_to_bottom(cx);
+    }
+
+    /// Pastes `text`, bracketed if the program asked for that.
+    pub fn paste_text(&mut self, text: String, cx: &mut Context<Self>) {
+        let bytes = input::paste(&self.vt, text);
+        self.input(&bytes, cx);
+    }
+
+    /// The screen as it is now, one line per row.
+    pub fn screen_text(&mut self) -> String {
+        let Ok(frame) = self.snap.frame(&self.vt) else {
+            return String::new();
+        };
+        let lines: Vec<String> = frame.rows.iter().map(|r| r.text()).collect();
+        lines.join("\n")
+    }
+
+    /// The last `lines` lines of scrollback and screen, or a screenful.
+    pub fn text(&self, lines: Option<usize>) -> String {
+        let opts = fmt::FormatterOptions::new()
+            .with_format(fmt::Format::Plain)
+            .with_unwrap(true)
+            .with_trim(true);
+        let all = fmt::Formatter::new(&self.vt, opts)
+            .and_then(|mut f| f.format_alloc())
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .unwrap_or_default();
+        let all: Vec<&str> = all.trim_end().lines().collect();
+        let n = lines.unwrap_or(self.rows as usize).min(all.len());
+        all[all.len() - n..].join("\n")
     }
 
     fn font(&self, cx: &App) -> (Font, Pixels) {
@@ -219,9 +263,7 @@ impl TermView {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else {
             return;
         };
-        let bytes = input::paste(&self.vt, text);
-        self.write(&bytes);
-        self.scroll_to_bottom(cx);
+        self.paste_text(text, cx);
     }
 
     fn scroll_to_bottom(&mut self, cx: &mut Context<Self>) {
@@ -271,6 +313,7 @@ impl Render for TermView {
         div()
             .id(("term", self.id))
             .size_full()
+            .relative()
             .track_focus(&self.focus)
             .key_context("Terminal")
             .on_key_down(cx.listener(Self::key_down))
@@ -295,6 +338,7 @@ impl Render for TermView {
                 )
                 .size_full(),
             )
+            .children(self.render_find(cx))
     }
 }
 

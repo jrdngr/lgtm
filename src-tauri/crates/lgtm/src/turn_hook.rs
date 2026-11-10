@@ -9,13 +9,18 @@ use std::sync::Mutex;
 use lgtm_core::jj::Jj;
 use lgtm_core::turns::{self, Point};
 
-pub fn run() -> i32 {
+/// The hook's input, read from stdin.
+pub fn read_input() -> String {
     let mut input = String::new();
     std::io::stdin()
         .take(1 << 20)
         .read_to_string(&mut input)
         .ok();
-    let Ok(input) = serde_json::from_str::<serde_json::Value>(&input) else {
+    input
+}
+
+pub fn run_on(input: &str) -> i32 {
+    let Ok(input) = serde_json::from_str::<serde_json::Value>(input) else {
         return 0;
     };
     // A hook that can't record leaves the turn out rather than fail.

@@ -281,8 +281,8 @@ impl Editor {
         Ok(())
     }
 
-    /// Opens `file`, else the buffer in view at its cursor's line, in a herdr pane to the
-    /// right or below. Outside herdr `file` opens as a buffer here.
+    /// Opens `file`, else the buffer in view at its cursor's line, in an lgterm or herdr pane
+    /// to the right or below. Elsewhere `file` opens as a buffer here.
     pub fn split(&mut self, file: Option<&str>, right: bool) {
         let here = self
             .current()
@@ -293,12 +293,12 @@ impl Editor {
             (None, Some(at)) => at,
             (None, None) => return,
         };
-        let failed = if split::herdr() {
-            split::open(&self.root.join(&name), line, right).err()
+        let failed = if let Some(host) = split::host() {
+            split::open(&host, &self.root.join(&name), line, right).err()
         } else if file.is_some() {
             self.open(&name, 0).err()
         } else {
-            self.notice = Some("no herdr pane to split".into());
+            self.notice = Some("no pane to split".into());
             return;
         };
         if let Some(e) = failed {

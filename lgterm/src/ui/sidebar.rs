@@ -8,8 +8,10 @@ use gpui::{
 };
 
 use super::Workspace;
+use super::marks;
 use super::rename::Target;
 use super::theme;
+use crate::status::Status;
 
 struct Row {
     id: ElementId,
@@ -20,6 +22,7 @@ struct Row {
     bold: bool,
     bg: Option<u32>,
     rename: Option<Target>,
+    status: Option<Status>,
 }
 
 impl Workspace {
@@ -28,21 +31,30 @@ impl Workspace {
         for (i, layout) in self.model.layouts.iter().enumerate() {
             let folded = self.collapsed.contains(&layout.id);
             let active = i == self.model.active;
-            rows.push(self.row(
-                Row {
-                    id: ("layout", layout.id).into(),
-                    depth: 0,
-                    label: self.layout_label(layout, cx),
-                    folded: Some(folded),
-                    bold: true,
-                    bg: active.then_some(theme::ROW_SELECTED),
-                    rename: Some(Target::Layout(layout.id)),
-                },
-                i > 0,
-                layout.id,
-                cx,
-                move |w, _, _| w.model.select_layout(i),
-            ));
+            rows.push(
+                self.row(
+                    Row {
+                        id: ("layout", layout.id).into(),
+                        depth: 0,
+                        label: self.layout_label(layout, cx),
+                        folded: Some(folded),
+                        bold: true,
+                        bg: active.then_some(theme::ROW_SELECTED),
+                        rename: Some(Target::Layout(layout.id)),
+                        status: folded
+                            .then(|| {
+                                self.worst(
+                                    layout.spaces.leaves().into_iter().flat_map(|s| s.terms()),
+                                )
+                            })
+                            .flatten(),
+                    },
+                    i > 0,
+                    layout.id,
+                    cx,
+                    move |w, _, _| w.model.select_layout(i),
+                ),
+            );
             if folded {
                 continue;
             }
@@ -58,6 +70,7 @@ impl Workspace {
                         bold: false,
                         bg: None,
                         rename: Some(Target::Space(space.id)),
+                        status: space_folded.then(|| self.worst(space.terms())).flatten(),
                     },
                     false,
                     space.id,
@@ -78,6 +91,7 @@ impl Workspace {
                             bold: false,
                             bg: focused.then_some(theme::ROW_HOVER),
                             rename: None,
+                            status: self.status(term),
                         },
                         false,
                         term,
@@ -211,6 +225,7 @@ impl Workspace {
             .cursor_pointer()
             .children(chevron)
             .child(label)
+            .children(row.status.map(marks::mark))
             .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
                 if ev.click_count() == 2
                     && let Some(target) = rename

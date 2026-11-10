@@ -3,6 +3,7 @@
 use gpui::{Context, FocusHandle, KeyDownEvent, Window};
 
 use super::Workspace;
+use super::field::{self, Key};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
@@ -62,28 +63,14 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) {
         let Some(r) = &mut self.rename else { return };
-        let k = &ev.keystroke;
-        if k.modifiers.platform {
-            return;
-        }
-        match k.key.as_str() {
-            "enter" | "escape" => {
-                self.finish_rename(k.key == "enter");
+        match field::key(&mut r.text, &ev.keystroke) {
+            Key::Other => return,
+            Key::Enter | Key::Escape => {
+                let save = ev.keystroke.key == "enter";
+                self.finish_rename(save);
                 self.focus_current(window, cx);
             }
-            "backspace" => {
-                r.text.pop();
-            }
-            _ => {
-                if let Some(text) = k
-                    .key_char
-                    .as_deref()
-                    .filter(|t| !t.chars().any(char::is_control))
-                    && !k.modifiers.control
-                {
-                    r.text.push_str(text);
-                }
-            }
+            _ => {}
         }
         cx.stop_propagation();
         cx.notify();

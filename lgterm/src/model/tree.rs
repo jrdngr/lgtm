@@ -1,7 +1,9 @@
 //! A split tree: leaves laid out in rows or columns, nested to any depth.
 
+use serde::{Deserialize, Serialize};
+
 /// How a branch lays out its children.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Axis {
     /// Side by side, left to right.
     Row,
@@ -22,14 +24,14 @@ pub trait Keyed {
     fn key(&self) -> u64;
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Tree<T> {
     Leaf(T),
     Branch { axis: Axis, children: Vec<Node<T>> },
 }
 
 /// A child of a branch with its share of the branch's length.
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node<T> {
     pub weight: f32,
     pub tree: Tree<T>,

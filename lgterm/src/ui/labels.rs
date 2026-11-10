@@ -8,11 +8,6 @@ pub fn clean_title(title: &str) -> Option<&str> {
     (!t.is_empty()).then_some(t)
 }
 
-/// Whether a process is a coding agent.
-pub fn is_agent(process: &str) -> bool {
-    matches!(process, "claude" | "codex")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

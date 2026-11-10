@@ -8,6 +8,7 @@ use gpui::{
 };
 
 use super::Workspace;
+use super::marks;
 use super::theme;
 use crate::model::{Axis, Space, Split, Tree, tree};
 
@@ -251,6 +252,7 @@ impl Workspace {
                         .text_color(rgb(theme::TEXT_STRONG))
                 })
                 .child(self.term_label(term, cx))
+                .children(self.status(term).map(marks::mark))
                 .when(active, |d| {
                     d.child(
                         div()
@@ -285,7 +287,19 @@ impl Workspace {
                 w.model.focus_split(split_id);
                 w.apply(window, cx, |m| Some(m.new_tab()));
             }));
-        let view = self.terms.get(&split.term()).map(|t| t.view.clone());
+        let body = if self.messages_tab == Some(split.term()) {
+            Some(
+                div()
+                    .size_full()
+                    .track_focus(&self.messages_focus)
+                    .child(self.render_messages())
+                    .into_any_element(),
+            )
+        } else {
+            self.terms
+                .get(&split.term())
+                .map(|t| t.view.clone().into_any_element())
+        };
         div()
             .size_full()
             .min_w_0()
@@ -324,7 +338,7 @@ impl Workspace {
                     .children(tabs)
                     .child(plus),
             )
-            .child(div().flex_1().min_h_0().children(view))
+            .child(div().flex_1().min_h_0().children(body))
             .into_any_element()
     }
 }
