@@ -10,7 +10,7 @@ use gpui::{
 
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
-use super::{MovesWindow, Workspace, badge};
+use super::{MovesWindow, Workspace, badge, expand};
 use crate::ipc::Place;
 use crate::model::{
     Axis, LayoutId, Rect, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree,
@@ -49,14 +49,15 @@ impl Render for Nothing {
 impl Workspace {
     pub(super) fn render_main(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let layout = self.model.layout();
-        let zoomed = layout.zoom.and_then(|z| {
-            self.model
-                .spaces
-                .iter()
-                .find_map(|s| s.splits.find(z).map(|split| (s, split)))
-        });
-        let body = match zoomed {
-            Some((space, split)) => self.card(split, Some(space.color), cx),
+        let expanded = layout
+            .expanded
+            .and_then(|e| Some((layout.slot_of(e)?, self.model.find_space(e)?)));
+        let body = match expanded {
+            Some((slot, space)) => {
+                let focused = slot == layout.focus;
+                let el = self.space(space, focused, true, cx);
+                space_drag::track_slot(el, slot, cx).into_any_element()
+            }
             None => {
                 let top: Vec<SlotId> = layout
                     .slots
@@ -170,6 +171,7 @@ impl Workspace {
         let label = self.space_label(space);
         let color = theme::space_color(space.color);
         let id = space.id;
+        let expanded = self.model.layout().expanded == Some(id);
         let title = div()
             .id(("space-title", space.id.0))
             .h(px(SPACE_TITLE))
@@ -216,8 +218,28 @@ impl Workspace {
                         .drags_space(space.id, label.clone()),
                 ),
             })
-            .child(label);
+            .child(div().flex_1().min_w_0().overflow_hidden().child(label))
+            .child(expand::button(
+                ("expand-space", id.0),
+                expanded,
+                cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.toggle_expand(id))),
+            ));
         let focused_split = focused.then_some(space.focus);
+        let zoomed = space.zoom.and_then(|z| space.splits.find(z));
+        let splits = match zoomed {
+            Some(split) => {
+                let outline = (focused_split == Some(split.id)).then_some(space.color);
+                self.card(split, outline, cx)
+            }
+            None => self.split_tree(
+                &space.splits,
+                space.color,
+                focused_split,
+                Owner::Space(space.id),
+                vec![],
+                cx,
+            ),
+        };
         div()
             .id(("space", space.id.0))
             .size_full()
@@ -228,6 +250,7 @@ impl Workspace {
             .relative()
             .rounded(px(12.))
             .bg(rgba(theme::tint(color, if focused { 0x38 } else { 0x1c })))
+            .when(expanded, |d| d.border_2().border_color(rgb(color)))
             .when(self.dragged_space(cx) == Some(space.id), |d| {
                 d.opacity(0.35)
             })
@@ -238,14 +261,7 @@ impl Workspace {
                     .min_h_0()
                     .flex()
                     .p(px(SPACE_PAD))
-                    .child(self.split_tree(
-                        &space.splits,
-                        space.color,
-                        focused_split,
-                        Owner::Space(space.id),
-                        vec![],
-                        cx,
-                    )),
+                    .child(splits),
             )
             .children(self.render_toasts(Some(id), cx))
     }
@@ -374,6 +390,7 @@ impl Workspace {
     /// A split's card; `outline` is the space color when it's the focused split.
     fn card(&self, split: &Split, outline: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
         let split_id = split.id;
+        let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
         let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
             let active = i == split.active;
@@ -464,7 +481,7 @@ impl Workspace {
             .flex()
             .flex_col()
             .bg(rgb(theme::CARD))
-            .border_1()
+            .map(|d| if zoomed { d.border_2() } else { d.border_1() })
             .border_color(rgb(outline.map_or(theme::CARD_BORDER, theme::space_color)))
             .rounded(px(10.))
             .overflow_hidden()
@@ -495,8 +512,25 @@ impl Workspace {
                             w.open_menu(For::Tabs(split_id), ev.position, window, cx)
                         }),
                     )
-                    .children(tabs)
-                    .child(plus),
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .items_center()
+                            .gap(px(3.))
+                            .overflow_hidden()
+                            .children(tabs)
+                            .child(plus),
+                    )
+                    .child(expand::button(
+                        ("zoom-split", split_id.0),
+                        zoomed,
+                        cx.listener(move |w, _, window, cx| {
+                            w.model.focus_split(split_id);
+                            w.apply(window, cx, |m| m.toggle_zoom())
+                        }),
+                    )),
             )
             .child(div().flex_1().min_h_0().children(body))
             .into_any_element()

@@ -4,7 +4,7 @@
 use serde::Deserialize;
 
 use super::tree::Node;
-use super::{COLORS, Layout, LayoutId, Model, Slot, SlotId, Space, SpaceId, SplitId, Tree};
+use super::{COLORS, Layout, LayoutId, Model, Slot, SlotId, Space, SpaceId, Tree};
 
 #[derive(Deserialize)]
 pub struct OldModel {
@@ -19,7 +19,6 @@ struct OldLayout {
     name: Option<String>,
     spaces: Tree<Space>,
     focus: SpaceId,
-    zoom: Option<SplitId>,
 }
 
 impl From<OldModel> for Model {
@@ -50,7 +49,7 @@ impl From<OldModel> for Model {
                     name: l.name,
                     focus: focus.unwrap_or_else(|| slots.first().id),
                     slots,
-                    zoom: l.zoom,
+                    expanded: None,
                 }
             })
             .collect();

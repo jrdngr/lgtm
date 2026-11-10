@@ -304,13 +304,50 @@ fn zoom_ends_when_focus_leaves_the_split_or_it_splits() {
     let (mut m, a) = Model::new();
     let b = m.split_split(Axis::Row);
     m.toggle_zoom();
+    let zoom = |m: &Model| m.space().unwrap().zoom;
     m.focus_dir(Dir::Left);
     assert_eq!(m.term(), Some(b));
     m.focus_term(a);
-    assert_eq!(m.layout().zoom, None);
+    assert_eq!(zoom(&m), None);
     m.toggle_zoom();
     m.split_split(Axis::Row);
-    assert_eq!(m.layout().zoom, None);
+    assert_eq!(zoom(&m), None);
+}
+
+#[test]
+fn a_zoomed_split_stays_zoomed_while_another_space_has_focus() {
+    let (mut m, a) = Model::new();
+    let b = m.split_split(Axis::Row);
+    m.toggle_zoom();
+    m.split_slot(Axis::Row);
+    let c = m.new_tab();
+    assert_eq!(m.cells().len(), 2);
+    m.focus_dir(Dir::Left);
+    assert_eq!(m.term(), Some(b));
+    assert_eq!(m.space().unwrap().zoom, m.split().map(|s| s.id));
+    m.focus_term(c);
+    m.focus_term(a);
+    assert_eq!(m.space().unwrap().zoom, None);
+}
+
+#[test]
+fn an_expanded_space_fills_the_window_until_focus_goes_to_another() {
+    let (mut m, a) = Model::new();
+    let s1 = space_of(&m, a);
+    let b = m.split_split(Axis::Column);
+    m.split_slot(Axis::Row);
+    let c = m.new_tab();
+    m.toggle_expand(s1);
+    assert_eq!(m.layout().expanded, Some(s1));
+    assert_eq!(m.cells().len(), 2);
+    m.focus_dir(Dir::Right);
+    assert_eq!((m.term(), m.layout().expanded), (Some(b), Some(s1)));
+    m.toggle_expand(s1);
+    assert_eq!(m.layout().expanded, None);
+    m.toggle_expand(s1);
+    m.focus_term(c);
+    assert_eq!(m.layout().expanded, None);
+    assert!(m.is_valid());
 }
 
 #[test]
@@ -318,11 +355,12 @@ fn opening_at_a_terminal_leaves_focus_and_zoom_alone() {
     let (mut m, a) = Model::new();
     let b = m.split_split(Axis::Row);
     m.toggle_zoom();
-    let zoom = m.layout().zoom;
+    let zoom = m.space().unwrap().zoom;
     let tab = m.new_tab_at(a.into()).unwrap();
     let split = m.split_split_at(a.into(), Axis::Column).unwrap();
     let space = m.split_slot_at(a.into(), Axis::Row).unwrap();
-    assert_eq!((m.term(), m.layout().zoom), (Some(b), zoom));
+    assert_eq!(m.term(), Some(b));
+    assert_eq!(m.find_space(space_of(&m, b)).unwrap().zoom, zoom);
     assert_eq!(
         m.locate(tab.into()).unwrap().split,
         m.locate(a.into()).unwrap().split

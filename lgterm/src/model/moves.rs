@@ -104,6 +104,6 @@ impl Model {
         if let Some(slot) = layout.slot_of(space) {
             layout.focus = slot;
         }
-        layout.zoom = None;
+        layout.expanded = None;
     }
 }

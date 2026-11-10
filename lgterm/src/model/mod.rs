@@ -36,6 +36,9 @@ pub struct Space {
     pub color: usize,
     pub splits: Tree<Split>,
     pub focus: SplitId,
+    /// A split filling the space.
+    #[serde(default)]
+    pub zoom: Option<SplitId>,
 }
 
 /// A place in a layout for one space.
@@ -51,8 +54,9 @@ pub struct Layout {
     pub name: Option<String>,
     pub slots: Tree<Slot>,
     pub focus: SlotId,
-    /// A split filling the whole window.
-    pub zoom: Option<SplitId>,
+    /// A space filling the window.
+    #[serde(default)]
+    pub expanded: Option<SpaceId>,
 }
 
 impl Keyed for Split {
@@ -172,7 +176,7 @@ impl Model {
             name: None,
             focus: slot.id,
             slots: Tree::Leaf(slot),
-            zoom: None,
+            expanded: None,
         });
         model.name_layouts();
         (model, term)
@@ -209,6 +213,7 @@ impl Model {
             color: self.free_color(),
             focus: split.id,
             splits: Tree::Leaf(split),
+            zoom: None,
         };
         let id = space.id;
         self.spaces.push(space);
@@ -307,8 +312,8 @@ impl Model {
         }
         let (split, term) = self.new_split();
         let id = split.id;
-        self.layout_mut().zoom = None;
         let space = self.space_mut().expect("focused space");
+        space.zoom = None;
         let at = space.focus;
         space.splits.insert(at, split, axis).expect("focused split");
         space.focus = id;
@@ -353,11 +358,10 @@ impl Model {
     pub fn focus_tab(&mut self, tab: Tab) {
         let Some(p) = self.locate(tab) else { return };
         self.show_space(p.space);
-        let layout = self.layout_mut();
-        if layout.zoom.is_some_and(|z| z != p.split) {
-            layout.zoom = None;
-        }
         let space = self.find_space_mut(p.space).expect("space");
+        if space.zoom.is_some_and(|z| z != p.split) {
+            space.zoom = None;
+        }
         space.focus = p.split;
         space.split_mut().active = p.tab;
     }
@@ -405,10 +409,8 @@ impl Model {
             if space.focus == p.split {
                 space.focus = space.splits.first().id;
             }
-            for layout in &mut self.layouts {
-                if layout.zoom == Some(p.split) {
-                    layout.zoom = None;
-                }
+            if space.zoom == Some(p.split) {
+                space.zoom = None;
             }
             return true;
         }
@@ -424,13 +426,13 @@ impl Model {
         let Some(i) = self.spaces.iter().position(|s| s.id == id) else {
             return;
         };
-        let space = self.spaces.remove(i);
+        self.spaces.remove(i);
         for layout in &mut self.layouts {
             if let Some(slot) = layout.slot_of(id) {
                 layout.slots.find_mut(slot).expect("slot").space = None;
             }
-            if layout.zoom.is_some_and(|z| space.splits.contains(z)) {
-                layout.zoom = None;
+            if layout.expanded == Some(id) {
+                layout.expanded = None;
             }
         }
     }
@@ -441,8 +443,8 @@ impl Model {
             return;
         }
         let id = SplitId(self.id());
-        self.layout_mut().zoom = None;
         let space = self.space_mut().expect("focused space");
+        space.zoom = None;
         let from = space.split_mut();
         let tab = from.tabs.remove(from.active);
         from.active = from.active.min(from.tabs.len() - 1);
@@ -530,22 +532,28 @@ impl Model {
         }
     }
 
-    /// Each split and empty slot in the shown layout, with its rectangle.
+    /// Each split and empty slot the window shows, with its rectangle: only the expanded
+    /// space's, and only a space's zoomed split.
     pub fn cells(&self) -> Vec<(Cell, Rect)> {
         let layout = self.layout();
-        layout
-            .slots
-            .rects(Rect::UNIT)
+        let slots = match layout.expanded.and_then(|e| layout.slot_of(e)) {
+            Some(slot) => vec![(slot, Rect::UNIT)],
+            None => layout.slots.rects(Rect::UNIT),
+        };
+        slots
             .into_iter()
             .flat_map(|(slot, area)| {
                 let slot = layout.slots.find(slot).expect("slot");
                 match slot.space.and_then(|s| self.find_space(s)) {
-                    Some(space) => space
-                        .splits
-                        .rects(area)
-                        .into_iter()
-                        .map(|(id, r)| (Cell::Split(id), r))
-                        .collect(),
+                    Some(space) => match space.zoom.filter(|&z| space.splits.contains(z)) {
+                        Some(z) => vec![(Cell::Split(z), area)],
+                        None => space
+                            .splits
+                            .rects(area)
+                            .into_iter()
+                            .map(|(id, r)| (Cell::Split(id), r))
+                            .collect(),
+                    },
                     None => vec![(Cell::Slot(slot.id), area)],
                 }
             })
@@ -577,24 +585,30 @@ impl Model {
     }
 
     pub fn focus_dir(&mut self, dir: Dir) {
-        if self.layout().zoom.is_some() {
-            return;
-        }
         let cells = self.cells();
         if let Some(next) = tree::neighbor(&cells, self.cell(), dir) {
             self.focus_cell(next);
         }
     }
 
+    /// Fills the focused space with its focused split, or puts its splits back.
     pub fn toggle_zoom(&mut self) {
-        let Some(split) = self.split().map(|s| s.id) else {
+        if let Some(space) = self.space_mut() {
+            space.zoom = match space.zoom {
+                Some(_) => None,
+                None => Some(space.focus),
+            };
+        }
+    }
+
+    /// Fills the window with `space`, or puts the layout back when it already does.
+    pub fn toggle_expand(&mut self, space: SpaceId) {
+        if self.layout().expanded == Some(space) {
+            self.layout_mut().expanded = None;
             return;
-        };
-        let layout = self.layout_mut();
-        layout.zoom = match layout.zoom {
-            Some(_) => None,
-            None => Some(split),
-        };
+        }
+        self.show_space(space);
+        self.layout_mut().expanded = Some(space);
     }
 
     /// Puts `to` where `from` is.

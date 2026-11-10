@@ -7,10 +7,6 @@ impl Model {
     /// Puts `space` in `slot` of the shown layout and focuses it. A slot already showing it
     /// goes empty, since a layout shows a space at most once.
     pub fn assign(&mut self, slot: SlotId, space: SpaceId) {
-        let keep_zoom = self
-            .layout()
-            .zoom
-            .is_some_and(|z| self.find_space(space).is_some_and(|s| s.splits.contains(z)));
         let layout = self.layout_mut();
         if let Some(old) = layout.slot_of(space).filter(|&s| s != slot) {
             layout.slots.find_mut(old).expect("slot").space = None;
@@ -20,8 +16,8 @@ impl Model {
         };
         target.space = Some(space);
         layout.focus = slot;
-        if !keep_zoom {
-            layout.zoom = None;
+        if layout.expanded.is_some_and(|e| e != space) {
+            layout.expanded = None;
         }
     }
 
@@ -54,8 +50,11 @@ impl Model {
         let layout = self.layout_mut();
         if layout.slots.contains(slot) {
             layout.focus = slot;
-            if layout.zoom.is_some() {
-                layout.zoom = None;
+            if layout
+                .expanded
+                .is_some_and(|e| layout.slot_of(e) != Some(slot))
+            {
+                layout.expanded = None;
             }
         }
     }
@@ -75,7 +74,7 @@ impl Model {
         let at = layout.focus;
         layout.slots.insert(at, slot, axis).expect("focused slot");
         layout.focus = id;
-        layout.zoom = None;
+        layout.expanded = None;
     }
 
     /// Splits the focused slot and puts a new space in the new one.
@@ -122,7 +121,9 @@ impl Model {
         if let Some(slot) = layout.slot_of(space) {
             layout.slots.find_mut(slot).expect("slot").space = None;
             layout.focus = slot;
-            layout.zoom = None;
+            if layout.expanded == Some(space) {
+                layout.expanded = None;
+            }
         }
     }
 
@@ -134,7 +135,7 @@ impl Model {
             name: None,
             focus: slot.id,
             slots: Tree::Leaf(slot),
-            zoom: None,
+            expanded: None,
         };
         self.layouts.insert(self.active + 1, layout);
         self.active += 1;

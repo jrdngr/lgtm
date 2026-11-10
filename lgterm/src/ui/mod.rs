@@ -5,6 +5,7 @@ mod agents;
 mod badge;
 mod control;
 mod dispatch;
+mod expand;
 mod marks;
 mod menu;
 mod messages;

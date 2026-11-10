@@ -17,6 +17,7 @@ actions!(
         SplitSpaceDown,
         CloseSplit,
         ZoomSplit,
+        ExpandSpace,
         NextSplit,
         PrevSplit,
         MoveTabToNewSplit,
@@ -69,6 +70,7 @@ commands! {
     "Split window down", ["cmd-shift-n"], SplitSpaceDown;
     "Close split", ["cmd-shift-w"], CloseSplit;
     "Zoom split", ["cmd-shift-enter"], ZoomSplit;
+    "Expand space", [], ExpandSpace;
     "Next split", ["cmd-]"], NextSplit;
     "Previous split", ["cmd-["], PrevSplit;
     "Move tab to new split", [], MoveTabToNewSplit;

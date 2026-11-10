@@ -73,6 +73,11 @@ impl Render for Workspace {
         el = on_model!(el, cx, NextTab, |m| m.cycle_tab(1));
         el = on_model!(el, cx, PrevTab, |m| m.cycle_tab(-1));
         el = on_model!(el, cx, ZoomSplit, |m| m.toggle_zoom());
+        el = on_model!(el, cx, ExpandSpace, |m| {
+            if let Some(space) = m.layout().slot().space {
+                m.toggle_expand(space)
+            }
+        });
         el = on_model!(el, cx, NextSplit, |m| m.cycle_split(1));
         el = on_model!(el, cx, PrevSplit, |m| m.cycle_split(-1));
         el = on_model!(el, cx, MoveTabToNewSplit, |m| m.move_tab_to_new_split());
