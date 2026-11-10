@@ -1,4 +1,5 @@
-//! Alerts shown inside the window, in the bottom right corner, until clicked, closed, or timed out.
+//! Alerts shown inside the window, in the bottom right corner of the agent's space (or of the
+//! window when its space isn't shown), until clicked, closed, or timed out.
 
 use std::time::Duration;
 
@@ -9,7 +10,7 @@ use gpui::{
 
 use super::Workspace;
 use crate::agents::Status;
-use crate::model::TermId;
+use crate::model::{SpaceId, TermId};
 use crate::theme;
 
 /// How long a toast stays up.
@@ -63,15 +64,32 @@ impl Workspace {
         }
     }
 
-    pub(super) fn render_toasts(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.toasts.is_empty() {
+    /// The space a toast shows in: its agent's, when the window shows that space.
+    fn toast_space(&self, term: TermId) -> Option<SpaceId> {
+        let space = self.model.locate(term.into())?.space;
+        self.model.layout().slot_of(space).map(|_| space)
+    }
+
+    /// The toasts for `space`'s bottom right corner, or with None, the window's.
+    pub(super) fn render_toasts(
+        &self,
+        space: Option<SpaceId>,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let toasts: Vec<&Toast> = self
+            .toasts
+            .iter()
+            .filter(|t| self.toast_space(t.term) == space)
+            .collect();
+        if toasts.is_empty() {
             return None;
         }
-        let cards = self.toasts.iter().map(|t| {
+        let cards = toasts.into_iter().map(|t| {
             let (id, term) = (t.id, t.term);
             div()
                 .id(("toast", id))
                 .w(px(300.))
+                .max_w_full()
                 .flex()
                 .items_center()
                 .gap(px(10.))
@@ -134,8 +152,10 @@ impl Workspace {
                 .absolute()
                 .bottom(px(theme::GAP * 2.))
                 .right(px(theme::GAP * 2.))
+                .left(px(theme::GAP * 2.))
                 .flex()
                 .flex_col()
+                .items_end()
                 .gap(px(8.))
                 .children(cards)
                 .into_any_element(),

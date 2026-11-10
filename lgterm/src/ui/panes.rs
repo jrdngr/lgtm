@@ -226,6 +226,7 @@ impl Workspace {
             .min_h_0()
             .flex()
             .flex_col()
+            .relative()
             .rounded(px(12.))
             .bg(rgba(theme::tint(color, if focused { 0x38 } else { 0x1c })))
             .when(self.dragged_space(cx) == Some(space.id), |d| {
@@ -247,6 +248,7 @@ impl Workspace {
                         cx,
                     )),
             )
+            .children(self.render_toasts(Some(id), cx))
     }
 
     #[allow(clippy::too_many_arguments)]
