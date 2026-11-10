@@ -270,7 +270,8 @@ impl Workspace {
             .gap(px(8.))
             .h(px(28.))
             .flex_none()
-            .pl(px(52.))
+            // Lines the icon up under the space row's badge.
+            .pl(px(24.))
             .pr(px(10.))
             .rounded(px(6.))
             .text_size(px(13.))
@@ -278,7 +279,14 @@ impl Workspace {
             .when(focused, |d| d.bg(rgb(theme::ROW_HOVER)))
             .when(!focused, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
             .cursor_pointer()
-            .children(self.agents.get(term).map(|a| agent_icon(a.kind)))
+            .child(
+                div()
+                    .w(px(20.))
+                    .flex_none()
+                    .flex()
+                    .justify_center()
+                    .children(self.agents.get(term).map(|a| agent_icon(a.kind))),
+            )
             .child(
                 div()
                     .flex_1()
