@@ -45,9 +45,11 @@ fn main() {
             MenuItem::separator(),
             MenuItem::action("Quit lgterm", Quit),
         ])]);
+        let (bounds, display_id) = window_place::load(cx);
         let opened = cx.open_window(
             WindowOptions {
-                window_bounds: Some(window_place::load(cx)),
+                window_bounds: Some(bounds),
+                display_id,
                 titlebar: Some(TitlebarOptions {
                     title: Some("lgterm".into()),
                     appears_transparent: true,
