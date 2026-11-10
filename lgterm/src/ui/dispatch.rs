@@ -49,6 +49,12 @@ impl Render for Workspace {
             .bg(rgb(theme::WINDOW))
             .font_family(fonts::ui())
             .capture_key_down(cx.listener(Self::key_down))
+            // A ⌘-click on a space's title picks it; any other click drops the picks.
+            .capture_any_mouse_down(cx.listener(|w, ev: &gpui::MouseDownEvent, _, cx| {
+                if !ev.modifiers.platform {
+                    w.deselect(cx);
+                }
+            }))
             .on_modifiers_changed(cx.listener(|w, ev: &ModifiersChangedEvent, _, cx| {
                 w.set_held(Held::from(ev.modifiers), cx)
             }))

@@ -58,7 +58,7 @@ impl Workspace {
     }
 }
 
-/// A dialog over the window; a click outside it closes it.
+/// A dialog over the window; a click outside it closes it and drops the picked spaces.
 pub(super) fn backdrop(
     id: &'static str,
     dialog: AnyElement,
@@ -77,7 +77,10 @@ pub(super) fn backdrop(
         .occlude()
         .on_mouse_down(
             MouseButton::Left,
-            cx.listener(|w, _, window, cx| w.close_overlay(window, cx)),
+            cx.listener(|w, _, window, cx| {
+                w.selected.clear();
+                w.close_overlay(window, cx)
+            }),
         )
         .child(dialog)
         .into_any_element()

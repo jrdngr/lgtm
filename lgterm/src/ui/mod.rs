@@ -355,6 +355,10 @@ impl Workspace {
     /// Runs before the terminal sees the key.
     fn key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &ev.keystroke;
+        if k.key == "escape" && self.deselect(cx) {
+            cx.stop_propagation();
+            return;
+        }
         let Some(d) = k.key.parse::<usize>().ok().filter(|d| (1..=9).contains(d)) else {
             return;
         };
@@ -364,6 +368,17 @@ impl Workspace {
             Held::None => return,
         }
         cx.stop_propagation();
+    }
+
+    /// Drops the picked spaces, unless the palette is up to act on them. Returns whether there
+    /// were any.
+    fn deselect(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.selected.is_empty() || matches!(self.overlay, Some(Overlay::Palette(_))) {
+            return false;
+        }
+        self.selected.clear();
+        cx.notify();
+        true
     }
 
     fn set_held(&mut self, held: Held, cx: &mut Context<Self>) {
