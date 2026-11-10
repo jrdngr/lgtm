@@ -73,9 +73,11 @@ impl Workspace {
             let resume = saved
                 .and_then(|s| s.agent.as_ref())
                 .filter(|_| self.settings.resume);
-            if let (Some((kind, session)), Some(t)) = (resume, self.terms.get(&id)) {
-                let command = format!("{}\r", kind.resume(session));
-                t.view.update(cx, |v, cx| v.input(command.as_bytes(), cx));
+            if let (Some((kind, session)), Some(t)) = (resume, self.terms.get_mut(&id)) {
+                let command = self.settings.agent_command(*kind);
+                let line = format!("{}\r", kind.resume(command, session));
+                t.view.update(cx, |v, cx| v.input(line.as_bytes(), cx));
+                t.hint = Some(*kind);
             }
         }
     }

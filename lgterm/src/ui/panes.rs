@@ -208,6 +208,17 @@ impl Workspace {
                     .overflow_hidden()
                     .child(label.clone()),
             )
+            .child(expand::lock(
+                ("lock-space", id.0),
+                group.clone(),
+                space.locked,
+                cx.listener(move |w, _, _, cx| {
+                    if let Some(s) = w.model.find_space_mut(id) {
+                        s.locked = !s.locked;
+                    }
+                    cx.notify();
+                }),
+            ))
             .child(expand::button(
                 ("expand-space", id.0),
                 group,

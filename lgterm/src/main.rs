@@ -4,6 +4,7 @@ mod cli;
 mod dock;
 mod field;
 mod fonts;
+mod guide;
 mod ipc;
 mod model;
 mod procinfo;
@@ -32,6 +33,9 @@ fn main() {
         .filter(|d| d.parent().is_some())
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
+    if let Some(home) = dirs::home_dir() {
+        guide::install_skill(&home);
+    }
     let app = gpui_platform::application().with_assets(assets::Assets);
     app.on_reopen(|cx| cx.activate(true));
     app.run(move |cx: &mut App| {

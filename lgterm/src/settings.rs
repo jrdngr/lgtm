@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::agents::Kind;
 use crate::fonts::Fonts;
 use crate::theme;
 
@@ -20,6 +21,9 @@ pub struct Settings {
     pub resume: bool,
     pub font_size: f32,
     pub fonts: Fonts,
+    /// The command that starts Claude Code, like the alias `cc`.
+    pub claude_command: String,
+    pub codex_command: String,
 }
 
 impl Default for Settings {
@@ -34,6 +38,8 @@ impl Default for Settings {
             resume: true,
             font_size: theme::DEFAULT_FONT_SIZE,
             fonts: Fonts::System,
+            claude_command: "claude".into(),
+            codex_command: "codex".into(),
         }
     }
 }
@@ -43,6 +49,29 @@ fn path() -> Option<PathBuf> {
 }
 
 impl Settings {
+    /// The command that starts `kind`: the user's, or its own name.
+    pub fn agent_command(&self, kind: Kind) -> &str {
+        let set = match kind {
+            Kind::Claude => &self.claude_command,
+            Kind::Codex => &self.codex_command,
+            Kind::Pi => "",
+        };
+        if set.trim().is_empty() {
+            kind.name()
+        } else {
+            set
+        }
+    }
+
+    /// Where the user's command for `kind` is kept, if it has one.
+    pub fn agent_command_mut(&mut self, kind: Kind) -> Option<&mut String> {
+        match kind {
+            Kind::Claude => Some(&mut self.claude_command),
+            Kind::Codex => Some(&mut self.codex_command),
+            Kind::Pi => None,
+        }
+    }
+
     pub fn load() -> Self {
         path()
             .and_then(|p| std::fs::read(p).ok())

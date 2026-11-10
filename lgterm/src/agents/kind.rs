@@ -19,7 +19,7 @@ pub struct Behavior {
     pub name: &'static str,
     /// Parts of a path that run it: the native installer's versions folder or the npm package.
     install_paths: &'static [&'static str],
-    /// The command that picks a session back up, before the session id.
+    /// What follows the agent's command to pick a session back up, before the session id.
     resume: &'static str,
     /// Its hooks report every change of status, so its screen only fills gaps.
     pub hooks_say_everything: bool,
@@ -34,7 +34,7 @@ const BEHAVIORS: &[Behavior] = &[
         kind: Kind::Claude,
         name: "claude",
         install_paths: &["/claude/versions/", "@anthropic-ai/claude-code/"],
-        resume: "claude --resume",
+        resume: "--resume",
         hooks_say_everything: true,
         blocked: &["Do you want to proceed?", "Do you want to make this edit"],
         interrupted: &["Interrupted by user", "What should Claude do instead"],
@@ -43,7 +43,7 @@ const BEHAVIORS: &[Behavior] = &[
         kind: Kind::Codex,
         name: "codex",
         install_paths: &["@openai/codex/"],
-        resume: "codex resume",
+        resume: "resume",
         hooks_say_everything: false,
         blocked: &[
             "Would you like to run the following command?",
@@ -56,7 +56,7 @@ const BEHAVIORS: &[Behavior] = &[
         kind: Kind::Pi,
         name: "pi",
         install_paths: &["@mariozechner/pi-coding-agent/"],
-        resume: "pi --session",
+        resume: "--session",
         hooks_say_everything: false,
         blocked: &[],
         interrupted: &[],
@@ -100,9 +100,9 @@ impl Kind {
         })
     }
 
-    /// The command that picks a session back up.
-    pub fn resume(self, session: &str) -> String {
-        format!("{} {session}", self.behavior().resume)
+    /// The command line that picks a session back up, run with the user's `command` for it.
+    pub fn resume(self, command: &str, session: &str) -> String {
+        format!("{} {} {session}", command.trim(), self.behavior().resume)
     }
 
     /// What the agent's screen shows it doing, if anything telling.
@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn sessions_resume_with_each_agents_command() {
-        assert_eq!(Kind::Claude.resume("abc"), "claude --resume abc");
-        assert_eq!(Kind::Codex.resume("th1"), "codex resume th1");
+        assert_eq!(Kind::Claude.resume("cc", "abc"), "cc --resume abc");
+        assert_eq!(Kind::Codex.resume("codex", "th1"), "codex resume th1");
     }
 }

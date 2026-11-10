@@ -2,6 +2,7 @@
 //! on them. This decides; the window carries out the effects.
 
 pub mod kind;
+pub mod launch;
 pub mod messages;
 pub mod status;
 

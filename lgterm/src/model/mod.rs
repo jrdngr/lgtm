@@ -6,9 +6,10 @@ mod ids;
 mod layouts;
 pub mod legacy;
 mod moves;
+mod owners;
 pub mod tree;
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +40,9 @@ pub struct Space {
     /// A split filling the space.
     #[serde(default)]
     pub zoom: Option<SplitId>,
+    /// Agents can't change it.
+    #[serde(default)]
+    pub locked: bool,
 }
 
 /// A place in a layout for one space.
@@ -154,6 +158,12 @@ pub struct Model {
     /// The shown layout.
     pub active: usize,
     next: u64,
+    /// The terminal that asked for each terminal opened from a terminal.
+    #[serde(default)]
+    openers: BTreeMap<TermId, TermId>,
+    /// Tabs' names.
+    #[serde(default)]
+    names: BTreeMap<TermId, String>,
 }
 
 impl Model {
@@ -164,6 +174,8 @@ impl Model {
             layouts: vec![],
             active: 0,
             next: 1,
+            openers: BTreeMap::new(),
+            names: BTreeMap::new(),
         };
         let (space, term) = model.make_space();
         let slot = Slot {
@@ -214,6 +226,7 @@ impl Model {
             focus: split.id,
             splits: Tree::Leaf(split),
             zoom: None,
+            locked: false,
         };
         let id = space.id;
         self.spaces.push(space);

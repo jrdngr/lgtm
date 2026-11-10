@@ -11,21 +11,24 @@ use crate::ipc::{self, Place, Reply, Request};
 const USAGE: &str = "\
 usage:
   lgterm ls [--json]
-  lgterm split [--right|--down] [--from T] [--cwd DIR] [--focus] [-- CMD...]
-  lgterm tab [--from T] [--cwd DIR] [--focus] [-- CMD...]
-  lgterm space [--right|--down] [--from T] [--cwd DIR] [--focus] [-- CMD...]
-  lgterm layout [--cwd DIR] [--focus] [-- CMD...]
+  lgterm split [--right|--down] [OPEN...]
+  lgterm tab [OPEN...]
+  lgterm space [--right|--down] [OPEN...]
+  lgterm layout [OPEN...]
+    OPEN: [--from T] [--cwd DIR] [--focus] [--name NAME]
+          [--agent claude|codex|pi] [-- CMD... | -- AGENT ARGS...]
   lgterm send T MESSAGE...
   lgterm type T TEXT... [--enter]
   lgterm wait T [--timeout SECONDS]
   lgterm read T [--lines N]
   lgterm focus T
   lgterm close T
+  lgterm guide
   lgterm hook [JSON]";
 
 const COMMANDS: &[&str] = &[
     "ls", "split", "tab", "space", "layout", "send", "type", "wait", "read", "focus", "close",
-    "hook", "help", "--help", "-h",
+    "guide", "hook", "help", "--help", "-h",
 ];
 
 /// Whether these arguments are a command rather than a launch of the app.
@@ -35,6 +38,10 @@ pub fn is_command(args: &[String]) -> bool {
 
 /// Runs a command and returns the exit code.
 pub fn run(args: &[String]) -> i32 {
+    if args[0] == "guide" {
+        print!("{}", crate::guide::GUIDE);
+        return 0;
+    }
     let hook = args[0] == "hook";
     match parse(args) {
         Ok(None) => {
@@ -128,6 +135,9 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
                 cwd: f.value("--cwd")?.map(absolute),
                 focus: f.switch("--focus"),
                 argv: rest,
+                by: this_term(),
+                agent: f.value("--agent")?,
+                name: f.value("--name")?,
             }
         }
         "send" => {
@@ -177,6 +187,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
         },
         "close" => Request::Close {
             term: f.positional("terminal")?,
+            by: this_term(),
         },
         "hook" => {
             let raw = match f.args.first() {
@@ -285,6 +296,27 @@ mod tests {
         assert_eq!(place, Place::Down);
         assert!(focus);
         assert_eq!(argv, ["cargo", "test", "--all"]);
+    }
+
+    #[test]
+    fn agents_start_with_a_name_and_a_prompt() {
+        let Request::Open {
+            agent, name, argv, ..
+        } = p(&[
+            "tab",
+            "--agent",
+            "claude",
+            "--name",
+            "api lead",
+            "--",
+            "Build the API",
+        ])
+        else {
+            panic!("not an open")
+        };
+        assert_eq!(agent.as_deref(), Some("claude"));
+        assert_eq!(name.as_deref(), Some("api lead"));
+        assert_eq!(argv, ["Build the API"]);
     }
 
     #[test]

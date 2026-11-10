@@ -36,11 +36,15 @@ impl Workspace {
             self.show_overlay(window, cx, |focus, _blur| Overlay::Settings {
                 focus,
                 _blur,
+                editing: None,
             });
         }
     }
 
     fn settings_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if self.command_key(ev, cx) {
+            return;
+        }
         if ev.keystroke.key == "escape" {
             self.close_overlay(window, cx);
             cx.stop_propagation();
@@ -171,6 +175,8 @@ impl Workspace {
             .children(attention)
             .child(section("SESSIONS"))
             .children(sessions)
+            .child(section("AGENTS"))
+            .children(self.command_rows(cx))
             .child(section("APPEARANCE"))
             .child(
                 div()

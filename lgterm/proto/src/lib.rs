@@ -67,6 +67,15 @@ pub enum Request {
         cwd: Option<PathBuf>,
         argv: Vec<String>,
         focus: bool,
+        /// The terminal asking, which becomes the new one's opener.
+        #[serde(default)]
+        by: Option<String>,
+        /// An agent to start, like `claude`, with `argv` as its arguments.
+        #[serde(default)]
+        agent: Option<String>,
+        /// The tab's name.
+        #[serde(default)]
+        name: Option<String>,
     },
     /// A message for the agent in `to`, queued until it's ready.
     Send {
@@ -101,8 +110,12 @@ pub enum Request {
         text: String,
         focus: bool,
     },
+    /// Closes `term`. Asked from terminal `by`, `term` has to be `by` or one `by` opened,
+    /// directly or through the terminals it opened.
     Close {
         term: String,
+        #[serde(default)]
+        by: Option<String>,
     },
 }
 

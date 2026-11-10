@@ -16,6 +16,7 @@ mod picker;
 mod rename;
 mod restore;
 mod select;
+mod settings_commands;
 mod settings_view;
 mod sidebar;
 mod space_drag;
@@ -279,6 +280,9 @@ impl Workspace {
         if !self.model.remove_tab(tab) {
             cx.quit();
             return;
+        }
+        if let Tab::Term(term) = tab {
+            self.model.forget(term);
         }
         if was_focused && !self.overlay_has_keyboard() {
             self.focus_current(window, cx);

@@ -10,6 +10,7 @@ use super::Workspace;
 use super::menu::Menu;
 use super::palette::Palette;
 use super::rename::Rename;
+use crate::agents::Kind;
 
 pub enum Overlay {
     Rename(Rename),
@@ -17,6 +18,8 @@ pub enum Overlay {
     Settings {
         focus: FocusHandle,
         _blur: Subscription,
+        /// The agent whose command is being typed.
+        editing: Option<Kind>,
     },
     /// Leaves the keyboard where it is.
     Menu(Menu),

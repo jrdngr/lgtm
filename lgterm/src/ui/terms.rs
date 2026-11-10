@@ -25,6 +25,9 @@ pub struct Info {
 pub struct Term {
     pub view: Entity<TermView>,
     pub info: Info,
+    /// The agent it was started for, which counts when what runs can't be told apart, like a
+    /// wrapper the user's command runs it through.
+    pub hint: Option<Kind>,
     /// The program's title.
     pub title: String,
     /// The folder the view knows the shell is in.
@@ -90,6 +93,7 @@ impl Workspace {
             Term {
                 view,
                 info: Info::default(),
+                hint: None,
                 title: String::new(),
                 known_cwd: cwd.to_path_buf(),
                 space_name,
@@ -135,10 +139,14 @@ impl Workspace {
             let pid = view.foreground_pid();
             let process = pid.and_then(procinfo::name);
             let shell_foreground = pid.is_some() && pid == view.shell_pid();
-            let kind = process.as_deref().and_then(Kind::from_process).or_else(|| {
-                let (exe, argv) = procinfo::command(pid.filter(|_| !shell_foreground)?)?;
-                Kind::from_command(&exe, &argv)
-            });
+            let kind = process
+                .as_deref()
+                .and_then(Kind::from_process)
+                .or_else(|| {
+                    let (exe, argv) = procinfo::command(pid.filter(|_| !shell_foreground)?)?;
+                    Kind::from_command(&exe, &argv)
+                })
+                .or(term.hint.filter(|_| pid.is_some() && !shell_foreground));
             let info = Info {
                 process,
                 kind,
@@ -185,6 +193,9 @@ impl Workspace {
         let Some(t) = self.terms.get(&term) else {
             return String::new();
         };
+        if let Some(name) = self.model.name(term) {
+            return name.to_owned();
+        }
         if let Some(agent) = self.agents.get(term) {
             return clean_title(&t.title)
                 .unwrap_or(agent.kind.name())

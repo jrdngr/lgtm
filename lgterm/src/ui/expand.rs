@@ -1,5 +1,5 @@
-//! The button at the right of a space's title or a split's tabs that fills the window or the
-//! space with it, and puts the layout back.
+//! The buttons at the right of a space's title or a split's tabs: expand, which fills the
+//! window or the space with it and puts the layout back, and a space's lock against agents.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -17,6 +17,38 @@ pub fn button(
     expanded: bool,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
+    let icon = if expanded {
+        "ui/collapse.svg"
+    } else {
+        "ui/expand.svg"
+    };
+    icon_button(id, parent, icon, expanded, on_click)
+}
+
+/// A space's lock: open, shown while the pointer is over the element of group `parent`, or
+/// closed and always shown when `locked`.
+pub fn lock(
+    id: impl Into<ElementId>,
+    parent: String,
+    locked: bool,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    let icon = if locked {
+        "ui/lock.svg"
+    } else {
+        "ui/unlock.svg"
+    };
+    icon_button(id, parent, icon, locked, on_click)
+}
+
+/// `icon` as a button, always shown when `on`, else while the pointer is over `parent`.
+fn icon_button(
+    id: impl Into<ElementId>,
+    parent: String,
+    icon: &'static str,
+    on: bool,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
     let id = id.into();
     let group = format!("{id:?}");
     div()
@@ -27,7 +59,7 @@ pub fn button(
         .items_center()
         .justify_center()
         .rounded(px(5.))
-        .when(!expanded, |d| {
+        .when(!on, |d| {
             d.opacity(0.).group_hover(parent, |s| s.opacity(1.))
         })
         .cursor_pointer()
@@ -35,11 +67,7 @@ pub fn button(
         .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
         .child(
             svg()
-                .path(if expanded {
-                    "ui/collapse.svg"
-                } else {
-                    "ui/expand.svg"
-                })
+                .path(icon)
                 .size(px(14.))
                 .text_color(rgb(theme::ICON))
                 .group_hover(group, |s| s.text_color(rgb(theme::TEXT))),

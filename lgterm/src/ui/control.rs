@@ -6,6 +6,7 @@ use gpui::{Context, Window};
 use serde_json::json;
 
 use super::Workspace;
+use crate::agents::{Kind, launch};
 use crate::ipc::{Incoming, Place, Reply, Request};
 use crate::model::{Axis, Model, Tab, TermId};
 
@@ -22,6 +23,17 @@ impl Workspace {
             request => self.reply(request, window, cx),
         };
         let _ = inc.reply.try_send(reply);
+    }
+
+    /// Refuses a change in `at`'s space when the user locked it.
+    fn unlocked(&self, at: Tab) -> Result<(), Reply> {
+        match self.model.space_of(at) {
+            Some(s) if s.locked => Err(Reply::Err(format!(
+                "the space {} is locked: the user has to unlock it",
+                self.space_label(s)
+            ))),
+            _ => Ok(()),
+        }
     }
 
     fn term_arg(&self, term: &str) -> Result<TermId, Reply> {
@@ -45,15 +57,38 @@ impl Workspace {
                     cwd,
                     argv,
                     focus,
+                    by,
+                    agent,
+                    name,
                 } => {
                     let from = match from {
                         Some(f) => Some(Tab::Term(self.term_arg(&f)?)),
                         None => None,
                     };
-                    match self.open(from, place, cwd, &argv, focus, window, cx) {
-                        Ok(id) => Reply::Ok(id.to_string()),
-                        Err(err) => Reply::Err(err),
+                    if let Some(at) = from.or(self.model.tab()) {
+                        self.unlocked(at)?;
                     }
+                    let kind = agent.as_deref().map(agent_kind).transpose()?;
+                    let argv = match kind {
+                        Some(kind) => {
+                            let shell = std::env::var("SHELL").unwrap_or_default();
+                            launch::argv(self.settings.agent_command(kind), &argv, &shell)
+                        }
+                        None => argv,
+                    };
+                    let id = self
+                        .open(from, place, cwd, &argv, focus, window, cx)
+                        .map_err(Reply::Err)?;
+                    if let Some(by) = by.as_deref().and_then(TermId::parse) {
+                        self.model.set_opener(id, by);
+                    }
+                    if let Some(name) = name.filter(|n| !n.trim().is_empty()) {
+                        self.model.set_name(id, name.trim().to_owned());
+                    }
+                    if let Some(t) = self.terms.get_mut(&id) {
+                        t.hint = kind;
+                    }
+                    Reply::Ok(id.to_string())
                 }
                 Request::Send { from, to, text } => {
                     let to = self.term_arg(&to)?;
@@ -62,6 +97,7 @@ impl Workspace {
                 }
                 Request::Type { to, text, enter } => {
                     let to = self.term_arg(&to)?;
+                    self.unlocked(Tab::Term(to))?;
                     let mut bytes = text.into_bytes();
                     if enter {
                         bytes.push(b'\r');
@@ -82,6 +118,7 @@ impl Workspace {
                 }
                 Request::Focus { term } => {
                     let id = self.term_arg(&term)?;
+                    self.unlocked(Tab::Term(id))?;
                     self.model.focus_term(id);
                     self.focus_current(window, cx);
                     Reply::Ok(String::new())
@@ -92,6 +129,7 @@ impl Workspace {
                 }
                 Request::Paste { to, text, focus } => {
                     let to = self.term_arg(&to)?;
+                    self.unlocked(Tab::Term(to))?;
                     if let Some(t) = self.terms.get(&to) {
                         t.view.update(cx, |v, cx| v.paste_text(text, cx));
                     }
@@ -101,8 +139,17 @@ impl Workspace {
                     }
                     Reply::Ok(String::new())
                 }
-                Request::Close { term } => {
+                Request::Close { term, by } => {
                     let id = self.term_arg(&term)?;
+                    self.unlocked(Tab::Term(id))?;
+                    if let Some(by) = by.as_deref().and_then(TermId::parse)
+                        && !self.model.opened_by(id, by)
+                    {
+                        return Err(Reply::Err(format!(
+                            "{id} isn't yours to close: you can close terminals you opened and \
+                             the ones they opened"
+                        )));
+                    }
                     self.close(Tab::Term(id), window, cx);
                     Reply::Ok(String::new())
                 }
@@ -196,6 +243,12 @@ impl Workspace {
             .collect::<Vec<_>>()
             .join("\n")
     }
+}
+
+/// The agent a `--agent` value names.
+fn agent_kind(name: &str) -> Result<Kind, Reply> {
+    Kind::from_process(name)
+        .ok_or_else(|| Reply::Err(format!("unknown agent {name}: pick claude, codex or pi")))
 }
 
 /// Opens a terminal beside the focused tab, focusing it.
