@@ -47,6 +47,7 @@ fn main() {
                     appears_transparent: true,
                     traffic_light_position: Some(point(px(16.), px(17.))),
                 }),
+                app_owns_titlebar_drag: true,
                 ..Default::default()
             },
             |window, cx| cx.new(|cx| Workspace::new(cwd, window, cx)),

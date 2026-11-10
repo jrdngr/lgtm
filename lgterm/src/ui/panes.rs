@@ -7,8 +7,8 @@ use gpui::{
     StyleRefinement, Styled, Window, div, px, rgb,
 };
 
-use super::Workspace;
 use super::space_drag::{self, DragsSpace};
+use super::{MovesWindow, Workspace};
 use crate::ipc::Place;
 use crate::model::{Axis, LayoutId, Space, SpaceId, Split, Tab, Tree, tree};
 use crate::theme;
@@ -53,7 +53,16 @@ impl Workspace {
                 self.space_tree(&layout.spaces, multi, Owner::Layout(layout.id), vec![], cx)
             }
         };
+        let titlebar = div()
+            .id("main-titlebar")
+            .absolute()
+            .top_0()
+            .left_0()
+            .w_full()
+            .h(px(theme::TITLEBAR))
+            .moves_window();
         let main = div()
+            .relative()
             .flex_1()
             .min_w_0()
             .h_full()
@@ -65,6 +74,7 @@ impl Workspace {
             }))
             .px(px(theme::GAP))
             .pb(px(theme::GAP))
+            .child(titlebar)
             .child(body);
         space_drag::track_main(main, cx).into_any_element()
     }
@@ -110,6 +120,7 @@ impl Workspace {
             .text_color(rgb(theme::TEXT_SPACE))
             .when(multi, |d| {
                 d.cursor_grab()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         div()
                             .text_size(px(11.))
@@ -353,6 +364,7 @@ impl Workspace {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |w, _, window, cx| {
+                    cx.stop_propagation();
                     if w.model.split().id != split_id {
                         w.model.focus_split(split_id);
                         w.focus_current(window, cx);

@@ -4,13 +4,13 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClickEvent, Context, CursorStyle, ElementId, FontWeight,
     InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
-    StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px, rgb,
+    StatefulInteractiveElement, Styled, Window, div, px, rgb,
 };
 
 use super::panes::Nothing;
 use super::rename::Target;
 use super::space_drag::{self, DragsSpace, DropRow};
-use super::{Workspace, badge};
+use super::{MovesWindow, Workspace, badge};
 use crate::agents::Status;
 use crate::ipc::Place;
 use crate::model::{SpaceId, Tab};
@@ -129,9 +129,10 @@ impl Workspace {
             .flex_col()
             .child(
                 div()
+                    .id("sidebar-titlebar")
                     .h(px(theme::TITLEBAR))
                     .flex_none()
-                    .window_control_area(WindowControlArea::Drag),
+                    .moves_window(),
             )
             .child(
                 div()
@@ -239,7 +240,8 @@ impl Workspace {
                 continue;
             }
             for space in spaces {
-                let space_folded = !single && self.collapsed.contains(&space.id.0);
+                let space_agents = space.terms().any(|t| self.is_agent(Tab::Term(t)));
+                let space_folded = !single && space_agents && self.collapsed.contains(&space.id.0);
                 let space_id = space.id;
                 if !single {
                     rows.push(
@@ -249,7 +251,7 @@ impl Workspace {
                                 depth: 1,
                                 badge: None,
                                 label: self.space_label(space),
-                                folded: Some(space_folded),
+                                folded: space_agents.then_some(space_folded),
                                 bold: false,
                                 bg: None,
                                 rename: Some(Target::Space(space.id)),
@@ -336,8 +338,8 @@ impl Workspace {
                 .into_any_element(),
         };
         let rename = row.rename;
-        let slot =
-            (row.folded.is_none() && row.badge.is_some()).then(|| div().w(px(12.)).flex_none());
+        let slot = (row.folded.is_none() && (row.badge.is_some() || row.depth == 1))
+            .then(|| div().w(px(12.)).flex_none());
         let chevron = row.folded.map(|folded| {
             div()
                 .id(("fold", fold_id))

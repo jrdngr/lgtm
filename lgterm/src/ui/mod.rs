@@ -298,3 +298,22 @@ impl Workspace {
         }
     }
 }
+
+/// Empty titlebar space: dragging it moves the window, and a double click does what the
+/// system's titlebar double click setting says.
+trait MovesWindow {
+    fn moves_window(self) -> Self;
+}
+
+impl MovesWindow for gpui::Stateful<gpui::Div> {
+    fn moves_window(self) -> Self {
+        use gpui::InteractiveElement;
+        self.on_mouse_down(gpui::MouseButton::Left, |ev, window, _| {
+            if ev.click_count == 2 {
+                window.titlebar_double_click();
+            } else {
+                window.start_window_move();
+            }
+        })
+    }
+}
