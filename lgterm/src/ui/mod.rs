@@ -17,6 +17,7 @@ mod sidebar;
 mod space_drag;
 mod tab_menu;
 mod terms;
+mod toasts;
 
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
@@ -26,6 +27,7 @@ use std::time::Duration;
 use gpui::{Context, FocusHandle, Focusable, KeyDownEvent, Window};
 
 use crate::agents::Agents;
+use crate::fonts::{self, Fonts};
 use crate::ipc::{self, Place};
 use crate::model::{Model, Tab, TermId};
 use crate::procinfo;
@@ -51,6 +53,8 @@ pub struct Workspace {
     /// Layouts and spaces folded in the sidebar, by id.
     collapsed: HashSet<u64>,
     overlay: Option<Overlay>,
+    toasts: Vec<toasts::Toast>,
+    toast_id: u64,
     space_drop: space_drag::SpaceDrop,
     home: Option<PathBuf>,
     /// What an unnamed space with no terminal is called.
@@ -75,6 +79,7 @@ impl Workspace {
     pub fn new(cwd: PathBuf, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let settings = Settings::load();
         cx.set_global(FontSize(settings.font_size));
+        fonts::set(settings.fonts);
         let (model, first) = Model::new();
         let home = dirs::home_dir();
         let home_name =
@@ -87,6 +92,8 @@ impl Workspace {
             sidebar_width: theme::SIDEBAR_WIDTH,
             collapsed: HashSet::new(),
             overlay: None,
+            toasts: Vec::new(),
+            toast_id: 0,
             space_drop: Default::default(),
             home,
             home_name,
@@ -296,6 +303,16 @@ impl Workspace {
         let size = size.clamp(8., 32.);
         cx.set_global(FontSize(size));
         self.settings.font_size = size;
+        self.settings.save();
+        for t in self.terms.values() {
+            t.view.update(cx, |_, cx| cx.notify());
+        }
+        cx.notify();
+    }
+
+    fn set_fonts(&mut self, fonts: Fonts, cx: &mut Context<Self>) {
+        fonts::set(fonts);
+        self.settings.fonts = fonts;
         self.settings.save();
         for t in self.terms.values() {
             t.view.update(cx, |_, cx| cx.notify());

@@ -10,6 +10,7 @@ use super::Workspace;
 use super::actions::*;
 use super::sidebar::{self, SidebarDrag};
 use super::space_drag::SpaceDrag;
+use crate::fonts;
 use crate::ipc::Place;
 use crate::model::{Dir, Model};
 use crate::terminal::FontSize;
@@ -45,7 +46,7 @@ impl Render for Workspace {
             .flex()
             .flex_row()
             .bg(rgb(theme::WINDOW))
-            .font_family(theme::UI_FONT)
+            .font_family(fonts::ui())
             .on_key_down(cx.listener(Self::key_down))
             .on_drag_move(cx.listener(|w, ev: &DragMoveEvent<SidebarDrag>, _, cx| {
                 let width = sidebar::snap(ev.event.position.x.as_f32());
@@ -115,6 +116,7 @@ impl Render for Workspace {
             )
             .when(self.sidebar, |d| d.child(self.render_sidebar(window, cx)))
             .child(self.render_main(window, cx))
+            .children(self.render_toasts(cx))
             .children(self.render_space_drop(cx))
             .children(self.render_palette(cx))
             .children(self.render_settings(cx))

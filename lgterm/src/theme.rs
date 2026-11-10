@@ -17,6 +17,7 @@ pub const TEXT_MUTED: u32 = 0x9b9b9b;
 pub const TEXT_SPACE: u32 = 0xb8b8b8;
 pub const ICON: u32 = 0x8f8f8f;
 pub const BADGE_TEXT: u32 = 0xffffff;
+pub const CLAUDE: u32 = 0xd97757;
 
 pub const TERM_FG: u32 = 0xd4d4d4;
 pub const TERM_BG: u32 = CARD;

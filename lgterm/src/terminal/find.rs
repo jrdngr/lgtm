@@ -10,6 +10,7 @@ use gpui::{
 
 use super::{Paste, TermView};
 use crate::field::{self, Key};
+use crate::fonts;
 use crate::theme;
 
 pub struct Find {
@@ -154,7 +155,7 @@ impl TermView {
                 .border_color(rgb(theme::CARD_BORDER))
                 .rounded(px(8.))
                 .shadow_md()
-                .font_family(theme::UI_FONT)
+                .font_family(fonts::ui())
                 .text_size(px(13.))
                 .text_color(rgb(theme::TEXT_STRONG))
                 .track_focus(&f.focus)

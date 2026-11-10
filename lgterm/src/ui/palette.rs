@@ -11,6 +11,7 @@ use super::Workspace;
 use super::actions::{COMMANDS, Command, display};
 use super::overlay::{Overlay, backdrop};
 use crate::field::{self, Key};
+use crate::fonts;
 use crate::theme;
 
 pub struct Palette {
@@ -221,7 +222,7 @@ fn name(text: &str, hits: &[usize], on: bool) -> StyledText {
     let mut runs: Vec<TextRun> = Vec::new();
     for (i, ch) in text.char_indices() {
         let hit = hits.contains(&i);
-        let mut f = font(theme::UI_FONT);
+        let mut f = font(fonts::ui());
         if hit {
             f.weight = FontWeight::SEMIBOLD;
         }

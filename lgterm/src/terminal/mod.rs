@@ -28,6 +28,7 @@ use frame::{Frame, Snapshotter};
 use paint::{Grid, LineCache};
 use pty::Pty;
 
+use crate::fonts;
 use crate::model::TermId;
 use crate::theme;
 
@@ -276,7 +277,7 @@ impl TermView {
     }
 
     fn font(&self, cx: &App) -> (Font, Pixels) {
-        (font(theme::MONO_FONT), px(cx.global::<FontSize>().0))
+        (font(fonts::mono()), px(cx.global::<FontSize>().0))
     }
 
     /// Fits the terminal to `bounds` and snapshots the screen.

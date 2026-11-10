@@ -91,12 +91,17 @@ impl Workspace {
                 Status::Blocked => "Blocked",
                 _ => "Done",
             };
-            cx.show_system_notification(SystemNotification {
-                tag: term.to_string().into(),
-                title: self.term_label(Tab::Term(term)).into(),
-                body: format!("{state} · {space}").into(),
-                actions: vec![],
-            });
+            let title = self.term_label(Tab::Term(term));
+            let body = format!("{state} · {space}");
+            if self.settings.system_notifications {
+                cx.show_system_notification(SystemNotification {
+                    tag: term.to_string().into(),
+                    title: title.clone().into(),
+                    body: body.clone().into(),
+                    actions: vec![],
+                });
+            }
+            self.toast(term, status, title, body, cx);
         }
         if self.settings.sound {
             dock::play_sound();

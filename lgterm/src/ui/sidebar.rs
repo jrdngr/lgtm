@@ -4,14 +4,14 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClickEvent, Context, CursorStyle, ElementId, FontWeight,
     InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
-    StatefulInteractiveElement, Styled, Window, div, px, rgb,
+    StatefulInteractiveElement, Styled, Window, div, px, rgb, svg,
 };
 
 use super::panes::Nothing;
 use super::rename::Target;
 use super::space_drag::{self, DragsSpace, DropRow};
 use super::{MovesWindow, Workspace, badge};
-use crate::agents::Status;
+use crate::agents::{Kind, Status};
 use crate::ipc::Place;
 use crate::model::{SpaceId, Tab};
 use crate::theme;
@@ -20,6 +20,8 @@ struct Row {
     id: ElementId,
     depth: u8,
     badge: Option<AnyElement>,
+    /// The agent's icon, on agent rows.
+    icon: Option<Kind>,
     label: String,
     /// Some when the row folds: whether it's folded now.
     folded: Option<bool>,
@@ -221,6 +223,7 @@ impl Workspace {
                     id: ("layout", layout.id.0).into(),
                     depth: 0,
                     badge: Some(badge::badge(i, &label, None, theme::SIDEBAR)),
+                    icon: None,
                     label,
                     folded: (!single || has_agents).then_some(folded),
                     bold: true,
@@ -250,6 +253,7 @@ impl Workspace {
                                 id: ("space", space.id.0).into(),
                                 depth: 1,
                                 badge: None,
+                                icon: None,
                                 label: self.space_label(space),
                                 folded: space_agents.then_some(space_folded),
                                 bold: false,
@@ -279,6 +283,7 @@ impl Workspace {
                             id: ("term", term.0).into(),
                             depth: if single { 3 } else { 2 },
                             badge: None,
+                            icon: self.agents.get(term).map(|a| a.kind),
                             label: self.term_label(Tab::Term(term)),
                             folded: None,
                             bold: false,
@@ -382,6 +387,7 @@ impl Workspace {
             .children(slot)
             .children(chevron)
             .children(row.badge)
+            .children(row.icon.map(agent_icon))
             .child(label)
             .children(row.status.map(|s| self.mark(s)))
             .when(dragged, |d| d.opacity(0.35))
@@ -451,6 +457,21 @@ impl Reorders for Stateful<gpui::Div> {
             w.focus_current(window, cx);
         }))
     }
+}
+
+/// The agent's mark, in its own color.
+fn agent_icon(kind: Kind) -> AnyElement {
+    let (path, color) = match kind {
+        Kind::Claude => ("agents/claude.svg", theme::CLAUDE),
+        Kind::Codex => ("agents/codex.svg", theme::TEXT),
+        Kind::Pi => ("agents/pi.svg", theme::TEXT),
+    };
+    svg()
+        .path(path)
+        .size(px(13.))
+        .flex_none()
+        .text_color(rgb(color))
+        .into_any_element()
 }
 
 #[cfg(test)]

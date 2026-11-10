@@ -1,7 +1,9 @@
 mod agents;
+mod assets;
 mod cli;
 mod dock;
 mod field;
+mod fonts;
 mod ipc;
 mod model;
 mod procinfo;
@@ -18,7 +20,7 @@ use gpui::{App, AppContext, Menu, MenuItem, TitlebarOptions, WindowOptions, poin
 
 use terminal::FontSize;
 use ui::Workspace;
-use ui::actions::{self, Quit};
+use ui::actions::{self, OpenSettings, Quit};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -30,14 +32,19 @@ fn main() {
         .filter(|d| d.parent().is_some())
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
-    let app = gpui_platform::application();
+    let app = gpui_platform::application().with_assets(assets::Assets);
     app.on_reopen(|cx| cx.activate(true));
     app.run(move |cx: &mut App| {
         cx.set_global(FontSize(theme::DEFAULT_FONT_SIZE));
         cx.set_app_identity("dev.lgtm.lgterm", "lgterm");
         actions::bind(cx);
         cx.on_action(|_: &Quit, cx| cx.quit());
-        cx.set_menus([Menu::new("lgterm").items([MenuItem::action("Quit lgterm", Quit)])]);
+        fonts::load(cx);
+        cx.set_menus([Menu::new("lgterm").items([
+            MenuItem::action("Settings…", OpenSettings),
+            MenuItem::separator(),
+            MenuItem::action("Quit lgterm", Quit),
+        ])]);
         let opened = cx.open_window(
             WindowOptions {
                 window_bounds: Some(window_place::load(cx)),

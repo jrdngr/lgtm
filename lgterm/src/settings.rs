@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::fonts::Fonts;
 use crate::theme;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -12,10 +13,13 @@ pub struct Settings {
     pub dock_badge: bool,
     pub notify_blocked: bool,
     pub notify_done: bool,
+    /// Alerts also go to the system, not only the window.
+    pub system_notifications: bool,
     pub sound: bool,
     pub restore: bool,
     pub resume: bool,
     pub font_size: f32,
+    pub fonts: Fonts,
 }
 
 impl Default for Settings {
@@ -24,10 +28,12 @@ impl Default for Settings {
             dock_badge: true,
             notify_blocked: true,
             notify_done: true,
+            system_notifications: true,
             sound: false,
             restore: true,
             resume: true,
             font_size: theme::DEFAULT_FONT_SIZE,
+            fonts: Fonts::System,
         }
     }
 }
@@ -65,5 +71,6 @@ mod tests {
         assert!(s.sound);
         assert!(s.notify_done);
         assert_eq!(s.font_size, theme::DEFAULT_FONT_SIZE);
+        assert_eq!(s.fonts, Fonts::System);
     }
 }

@@ -8,6 +8,7 @@ use gpui::{
 
 use super::Workspace;
 use super::overlay::{Overlay, backdrop};
+use crate::fonts::Fonts;
 use crate::settings::Settings;
 use crate::terminal::FontSize;
 use crate::theme;
@@ -18,6 +19,7 @@ const ATTENTION: &[Toggle] = &[
     ("Dock badge", |s| &mut s.dock_badge),
     ("Notify when blocked", |s| &mut s.notify_blocked),
     ("Notify when done", |s| &mut s.notify_done),
+    ("System notifications", |s| &mut s.system_notifications),
     ("Sound", |s| &mut s.sound),
 ];
 
@@ -110,6 +112,26 @@ impl Workspace {
                     w.set_font_size(size, cx);
                 }))
         };
+        let current = self.settings.fonts;
+        let choices = Fonts::ALL.map(|f| {
+            div()
+                .id(f.name())
+                .px(px(10.))
+                .h(px(24.))
+                .flex()
+                .items_center()
+                .text_size(px(12.))
+                .cursor_pointer()
+                .when(f == current, |d| {
+                    d.bg(rgb(theme::TAB_ACTIVE))
+                        .text_color(rgb(theme::TEXT_STRONG))
+                })
+                .when(f != current, |d| {
+                    d.bg(rgb(theme::CARD)).text_color(rgb(0xcfcfcf))
+                })
+                .child(f.name())
+                .on_click(cx.listener(move |w, _, _, cx| w.set_fonts(f, cx)))
+        });
         let dialog = div()
             .id("settings")
             .w(px(520.))
@@ -149,7 +171,29 @@ impl Workspace {
             .children(attention)
             .child(section("SESSIONS"))
             .children(sessions)
-            .child(section("TERMINAL"))
+            .child(section("APPEARANCE"))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .h(px(36.))
+                    .text_size(px(13.))
+                    .text_color(rgb(theme::TEXT))
+                    .border_b_1()
+                    .border_color(rgb(0x333333))
+                    .child("Fonts")
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .border_1()
+                            .border_color(rgb(theme::CARD_BORDER))
+                            .rounded(px(6.))
+                            .overflow_hidden()
+                            .children(choices),
+                    ),
+            )
             .child(
                 div()
                     .flex()

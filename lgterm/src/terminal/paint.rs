@@ -21,14 +21,14 @@ pub struct Grid {
     pub lines: LineCache,
 }
 
-/// Each row's runs as shaped for the last frame, kept while the row and font size stay the
-/// same.
+/// Each row's runs as shaped for the last frame, kept while the row and font stay the same.
 #[derive(Clone, Default)]
 pub struct LineCache(Rc<RefCell<Vec<Shaped>>>);
 
 #[derive(Default)]
 struct Shaped {
     version: u64,
+    font: Option<Font>,
     font_size: Pixels,
     /// One per run, none for a run with nothing to draw.
     runs: Vec<Option<ShapedLine>>,
@@ -150,10 +150,12 @@ impl Grid {
             let shaped = &mut cache[y];
             if shaped.version != row.version
                 || shaped.font_size != self.font_size
+                || shaped.font.as_ref() != Some(&self.font)
                 || shaped.runs.len() != row.runs.len()
             {
                 *shaped = Shaped {
                     version: row.version,
+                    font: Some(self.font.clone()),
                     font_size: self.font_size,
                     runs: self.shape_row(row, window),
                 };

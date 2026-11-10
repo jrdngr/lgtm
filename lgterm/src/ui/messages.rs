@@ -9,6 +9,7 @@ use gpui::{
 use super::Workspace;
 use crate::agents::Message;
 use crate::agents::messages::clock;
+use crate::fonts;
 use crate::ipc::Reply;
 use crate::model::{Tab, TermId};
 use crate::theme;
@@ -60,7 +61,7 @@ impl Workspace {
                         d.child(
                             div()
                                 .flex_none()
-                                .font_family(theme::MONO_FONT)
+                                .font_family(fonts::mono())
                                 .text_size(px(11.5))
                                 .text_color(rgb(theme::TEXT_MUTED))
                                 .child(id.to_string()),
@@ -81,7 +82,7 @@ impl Workspace {
                     div()
                         .w(px(48.))
                         .flex_none()
-                        .font_family(theme::MONO_FONT)
+                        .font_family(fonts::mono())
                         .text_size(px(11.5))
                         .text_color(rgb(theme::TEXT_MUTED))
                         .child(m.time.clone()),
@@ -138,8 +139,8 @@ impl Workspace {
 
 /// Message text with `code` spans in the mono font.
 fn body(text: &str) -> AnyElement {
-    let plain = font(theme::UI_FONT);
-    let mono = font(theme::MONO_FONT);
+    let plain = font(fonts::ui());
+    let mono = font(fonts::mono());
     let mut shown = String::new();
     let mut runs = Vec::new();
     for (i, part) in text.split('`').enumerate() {

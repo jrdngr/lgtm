@@ -10,6 +10,7 @@ use super::status::Status;
 pub enum Kind {
     Claude,
     Codex,
+    Pi,
 }
 
 /// What lgterm knows about one kind of agent.
@@ -49,6 +50,15 @@ const BEHAVIORS: &[Behavior] = &[
             "Would you like to make the following edits?",
             "Allow command?",
         ],
+        interrupted: &[],
+    },
+    Behavior {
+        kind: Kind::Pi,
+        name: "pi",
+        install_paths: &["@mariozechner/pi-coding-agent/"],
+        resume: "pi --session",
+        hooks_say_everything: false,
+        blocked: &[],
         interrupted: &[],
     },
 ];
@@ -151,6 +161,11 @@ mod tests {
         assert_eq!(
             Kind::from_command("/opt/bin/node", &argv(&["node", codex])),
             Some(Kind::Codex)
+        );
+        let pi = "/opt/lib/node_modules/@mariozechner/pi-coding-agent/dist/cli.js";
+        assert_eq!(
+            Kind::from_command("/opt/bin/node", &argv(&["node", pi])),
+            Some(Kind::Pi)
         );
         assert_eq!(
             Kind::from_command("/usr/bin/less", &argv(&["less", "claude"])),
