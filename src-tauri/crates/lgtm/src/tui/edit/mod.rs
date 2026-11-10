@@ -119,8 +119,11 @@ pub struct Editor {
     in_sidebar: bool,
     /// Whether the sidebar shows, when there's room.
     pub files: bool,
-    /// Whether `space b` showed the sidebar, so it shows on a narrow screen too.
-    files_asked: bool,
+    /// The text area's width when `space b` showed the sidebar, so it shows on a narrow
+    /// screen too until the screen gets narrower.
+    files_asked: Option<u16>,
+    /// The text area's width as last drawn, with the sidebar.
+    body_width: u16,
     /// Whether a file was saved since this was last cleared.
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
@@ -145,7 +148,8 @@ impl Editor {
             sidebar: FileTree::default(),
             in_sidebar: false,
             files: true,
-            files_asked: false,
+            files_asked: None,
+            body_width: 0,
             saved: false,
             files_width: None,
             wrap: false,
@@ -642,7 +646,7 @@ impl Editor {
                 // It flips what shows: a sidebar hidden for want of room comes up.
                 let shown = self.sidebar_width > 0;
                 self.files = !shown;
-                self.files_asked = !shown;
+                self.files_asked = (!shown).then_some(self.body_width);
                 self.in_sidebar = false;
             }
             Action::ToggleWrap => self.wrap = !self.wrap,
@@ -786,22 +790,28 @@ mod tests {
     }
 
     #[test]
-    fn space_b_shows_the_file_tree_on_a_narrow_screen_and_hides_it_again() {
+    fn the_file_tree_hides_on_a_narrow_screen_until_space_b_shows_it() {
         use ratatui::buffer::Buffer as Screen;
         use ratatui::layout::Rect;
         let (dir, mut e) = editor_on("one\n");
         e.set_files(crate::tui::walk::list(dir.path()));
-        let area = Rect::new(0, 0, 80, 10);
-        let draw = |e: &mut Editor| {
+        let draw = |e: &mut Editor, width| {
+            let area = Rect::new(0, 0, width, 10);
             let mut screen = Screen::empty(area);
             e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
             e.sidebar_width > 0
         };
-        assert!(!draw(&mut e));
+        assert!(draw(&mut e, 120));
+        assert!(!draw(&mut e, 80));
         press(&mut e, "<space>b");
-        assert!(draw(&mut e));
+        assert!(draw(&mut e, 80));
         press(&mut e, "<space>b");
-        assert!(!draw(&mut e));
+        assert!(!draw(&mut e, 80));
+        // Shown by hand, it still goes when the screen gets narrower.
+        press(&mut e, "<space>b");
+        assert!(draw(&mut e, 80));
+        assert!(!draw(&mut e, 76));
+        assert!(!draw(&mut e, 80));
     }
 
     #[test]

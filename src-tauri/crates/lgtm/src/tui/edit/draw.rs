@@ -139,8 +139,12 @@ impl Editor {
             SIDEBAR_MIN,
             body.width.saturating_sub(40),
         );
-        let room = body.width >= MIN_SIDEBAR_WIDTH
-            || (self.in_sidebar || self.files_asked) && body.width > side * 2;
+        self.body_width = body.width;
+        if self.files_asked.is_some_and(|w| body.width < w) {
+            self.files_asked = None;
+        }
+        let asked = self.in_sidebar || self.files_asked.is_some();
+        let room = body.width >= MIN_SIDEBAR_WIDTH || asked && body.width > side * 2;
         let shown = self.files && room && !self.sidebar.is_empty();
         if !(shown || self.open.is_empty()) || body.height < 2 {
             self.sidebar.hide();
