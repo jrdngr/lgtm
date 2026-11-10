@@ -119,6 +119,8 @@ pub struct Editor {
     in_sidebar: bool,
     /// Whether the sidebar shows, when there's room.
     pub files: bool,
+    /// Whether `space b` showed the sidebar, so it shows on a narrow screen too.
+    files_asked: bool,
     /// Whether a file was saved since this was last cleared.
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
@@ -143,6 +145,7 @@ impl Editor {
             sidebar: FileTree::default(),
             in_sidebar: false,
             files: true,
+            files_asked: false,
             saved: false,
             files_width: None,
             wrap: false,
@@ -636,7 +639,10 @@ impl Editor {
                 self.in_sidebar = true;
             }
             Action::ToggleSidebar => {
-                self.files = !self.files;
+                // It flips what shows: a sidebar hidden for want of room comes up.
+                let shown = self.sidebar_width > 0;
+                self.files = !shown;
+                self.files_asked = !shown;
                 self.in_sidebar = false;
             }
             Action::ToggleWrap => self.wrap = !self.wrap,
@@ -777,6 +783,25 @@ mod tests {
         // The second long line's last row is the fifth row down, so the view moves a line.
         press(&mut e, "jj$");
         assert_eq!(draw(&mut e), ["end", "abcdefghij", "klmnopqrst", "uvwxyz"]);
+    }
+
+    #[test]
+    fn space_b_shows_the_file_tree_on_a_narrow_screen_and_hides_it_again() {
+        use ratatui::buffer::Buffer as Screen;
+        use ratatui::layout::Rect;
+        let (dir, mut e) = editor_on("one\n");
+        e.set_files(crate::tui::walk::list(dir.path()));
+        let area = Rect::new(0, 0, 80, 10);
+        let mut draw = |e: &mut Editor| {
+            let mut screen = Screen::empty(area);
+            e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
+            e.sidebar_width > 0
+        };
+        assert!(!draw(&mut e));
+        press(&mut e, "<space>b");
+        assert!(draw(&mut e));
+        press(&mut e, "<space>b");
+        assert!(!draw(&mut e));
     }
 
     #[test]
