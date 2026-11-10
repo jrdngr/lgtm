@@ -16,12 +16,17 @@ pub const TEXT_STRONG: u32 = 0xeeeeef;
 pub const TEXT_MUTED: u32 = 0x9b9b9b;
 pub const TEXT_SPACE: u32 = 0xb8b8b8;
 pub const ICON: u32 = 0x8f8f8f;
+pub const BADGE_TEXT: u32 = 0xffffff;
 
 pub const TERM_FG: u32 = 0xd4d4d4;
 pub const TERM_BG: u32 = CARD;
 pub const SELECTION: u32 = 0x3a5a7a;
 
 pub const SIDEBAR_WIDTH: f32 = 264.;
+/// The sidebar with only layout badges: wide enough for the traffic lights.
+pub const SIDEBAR_ICONS: f32 = 76.;
+pub const SIDEBAR_MIN: f32 = 150.;
+pub const SIDEBAR_MAX: f32 = 420.;
 pub const GAP: f32 = 8.;
 pub const TITLEBAR: f32 = 46.;
 pub const TERM_PAD_X: f32 = 14.;

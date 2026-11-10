@@ -2,10 +2,12 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Context, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window, div, rgb,
+    Context, DragMoveEvent, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window,
+    div, rgb,
 };
 
 use super::actions::*;
+use super::sidebar::{self, SidebarDrag};
 use super::{Workspace, theme};
 use crate::model::{Axis, Dir, Model};
 use crate::terminal::FontSize;
@@ -44,7 +46,14 @@ impl Render for Workspace {
             .flex_row()
             .bg(rgb(theme::WINDOW))
             .font_family(theme::UI_FONT)
-            .on_key_down(cx.listener(Self::key_down));
+            .on_key_down(cx.listener(Self::key_down))
+            .on_drag_move(cx.listener(|w, ev: &DragMoveEvent<SidebarDrag>, _, cx| {
+                let width = sidebar::snap(ev.event.position.x.as_f32());
+                if width != w.sidebar_width {
+                    w.sidebar_width = width;
+                    cx.notify();
+                }
+            }));
         el = on_open!(el, cx, NewTab, |m| m.new_tab());
         el = on_open!(el, cx, SplitRight, |m| m.split_split(Axis::Row));
         el = on_open!(el, cx, SplitDown, |m| m.split_split(Axis::Column));
@@ -101,5 +110,6 @@ impl Render for Workspace {
             .child(self.render_main(window, cx))
             .children(self.render_palette(cx))
             .children(self.render_settings(cx))
+            .children(self.render_tab_menu(cx))
     }
 }

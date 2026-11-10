@@ -1,21 +1,22 @@
-//! The sidebar: layouts, their spaces, and the agents in each space.
+//! The sidebar: layouts, their spaces, and the agents in each space; or only layout badges when narrow.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, ClickEvent, Context, ElementId, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, ParentElement, SharedString, StatefulInteractiveElement, Styled, Window,
-    WindowControlArea, div, px, rgb,
+    AnyElement, AppContext, ClickEvent, Context, CursorStyle, ElementId, FontWeight,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, SharedString,
+    StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px, rgb,
 };
 
-use super::Workspace;
-use super::marks;
+use super::panes::Nothing;
 use super::rename::Target;
 use super::theme;
+use super::{Workspace, badge, marks};
 use crate::status::Status;
 
 struct Row {
     id: ElementId,
     depth: u8,
+    badge: Option<AnyElement>,
     label: String,
     /// Some when the row folds: whether it's folded now.
     folded: Option<bool>,
@@ -25,85 +26,61 @@ struct Row {
     status: Option<Status>,
 }
 
+/// Dragged by the sidebar's right edge.
+pub(super) struct SidebarDrag;
+
+/// The sidebar width for a drag to `x`: badges only below halfway to the minimum.
+pub(super) fn snap(x: f32) -> f32 {
+    if x < (theme::SIDEBAR_ICONS + theme::SIDEBAR_MIN) / 2. {
+        theme::SIDEBAR_ICONS
+    } else {
+        x.clamp(theme::SIDEBAR_MIN, theme::SIDEBAR_MAX)
+    }
+}
+
 impl Workspace {
+    /// Whether the sidebar shows only layout badges.
+    pub(super) fn sidebar_icons(&self) -> bool {
+        self.sidebar_width <= theme::SIDEBAR_ICONS
+    }
+
     pub(super) fn render_sidebar(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let mut rows = Vec::new();
-        for (i, layout) in self.model.layouts.iter().enumerate() {
-            let folded = self.collapsed.contains(&layout.id);
-            let active = i == self.model.active;
-            rows.push(
-                self.row(
-                    Row {
-                        id: ("layout", layout.id).into(),
-                        depth: 0,
-                        label: self.layout_label(layout, cx),
-                        folded: Some(folded),
-                        bold: true,
-                        bg: active.then_some(theme::ROW_SELECTED),
-                        rename: Some(Target::Layout(layout.id)),
-                        status: folded
-                            .then(|| {
-                                self.worst(
-                                    layout.spaces.leaves().into_iter().flat_map(|s| s.terms()),
-                                )
-                            })
-                            .flatten(),
-                    },
-                    i > 0,
-                    layout.id,
-                    cx,
-                    move |w, _, _| w.model.select_layout(i),
-                ),
+        let icons = self.sidebar_icons();
+        let rows = if icons {
+            self.badge_rows(cx)
+        } else {
+            self.tree_rows(cx)
+        };
+        let plus = div()
+            .id("new-layout")
+            .text_size(px(16.))
+            .cursor_pointer()
+            .child("+")
+            .on_click(
+                cx.listener(|w, _, window, cx| w.apply(window, cx, |m| Some(m.new_layout()))),
             );
-            if folded {
-                continue;
-            }
-            for space in layout.spaces.leaves() {
-                let space_folded = self.collapsed.contains(&space.id);
-                let space_id = space.id;
-                rows.push(self.row(
-                    Row {
-                        id: ("space", space.id).into(),
-                        depth: 1,
-                        label: self.space_label(space, cx),
-                        folded: Some(space_folded),
-                        bold: false,
-                        bg: None,
-                        rename: Some(Target::Space(space.id)),
-                        status: space_folded.then(|| self.worst(space.terms())).flatten(),
-                    },
-                    false,
-                    space.id,
-                    cx,
-                    move |w, _, _| w.model.focus_space(space_id),
-                ));
-                if space_folded {
-                    continue;
-                }
-                for term in space.terms().filter(|t| self.is_agent(*t)) {
-                    let focused = active && term == self.model.term();
-                    rows.push(self.row(
-                        Row {
-                            id: ("term", term).into(),
-                            depth: 2,
-                            label: self.term_label(term, cx),
-                            folded: None,
-                            bold: false,
-                            bg: focused.then_some(theme::ROW_HOVER),
-                            rename: None,
-                            status: self.status(term),
-                        },
-                        false,
-                        term,
-                        cx,
-                        move |w, _, _| w.model.focus_term(term),
-                    ));
-                }
-            }
-        }
+        let handle = div()
+            .id("sidebar-edge")
+            .group("sidebar-edge")
+            .absolute()
+            .top_0()
+            .right(px(-4.))
+            .w(px(8.))
+            .h_full()
+            .flex()
+            .justify_center()
+            .cursor(CursorStyle::ResizeLeftRight)
+            .child(
+                div()
+                    .w(px(2.))
+                    .h_full()
+                    .group_hover("sidebar-edge", |s| s.bg(rgb(theme::FOCUS))),
+            )
+            .on_drag(SidebarDrag, |_, _, _, cx| cx.new(|_| Nothing));
 
         div()
-            .w(px(theme::SIDEBAR_WIDTH))
+            .relative()
+            .w(px(self.sidebar_width))
             .flex_none()
             .h_full()
             .bg(rgb(theme::SIDEBAR))
@@ -121,37 +98,149 @@ impl Workspace {
                 div()
                     .flex()
                     .items_center()
-                    .justify_between()
                     .pt(px(4.))
                     .pb(px(8.))
-                    .pl(px(20.))
-                    .pr(px(18.))
                     .text_size(px(11.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(theme::TEXT_MUTED))
-                    .child("LAYOUTS")
-                    .child(
-                        div()
-                            .id("new-layout")
-                            .text_size(px(16.))
-                            .cursor_pointer()
-                            .child("+")
-                            .on_click(cx.listener(|w, _, window, cx| {
-                                w.apply(window, cx, |m| Some(m.new_layout()))
-                            })),
-                    ),
+                    .when(icons, |d| d.justify_center())
+                    .when(!icons, |d| {
+                        d.justify_between().pl(px(20.)).pr(px(18.)).child("LAYOUTS")
+                    })
+                    .child(plus),
             )
             .child(
                 div()
                     .id("sidebar-rows")
                     .flex()
                     .flex_col()
-                    .gap(px(1.))
-                    .px(px(8.))
+                    .when(icons, |d| d.items_center().gap(px(6.)))
+                    .when(!icons, |d| d.gap(px(1.)).px(px(8.)))
                     .overflow_y_scroll()
                     .children(rows),
             )
+            .child(handle)
             .into_any_element()
+    }
+
+    /// One badge per layout, with its worst status on the corner.
+    fn badge_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let mut rows = Vec::new();
+        for (i, layout) in self.model.layouts.iter().enumerate() {
+            let active = i == self.model.active;
+            let status = self.worst(layout.spaces.leaves().into_iter().flat_map(|s| s.terms()));
+            let ring = if active {
+                theme::ROW_SELECTED
+            } else {
+                theme::SIDEBAR
+            };
+            let label = self.layout_label(layout, cx);
+            rows.push(
+                div()
+                    .id(("layout", layout.id))
+                    .w(px(36.))
+                    .h(px(32.))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(6.))
+                    .when(active, |d| d.bg(rgb(theme::ROW_SELECTED)))
+                    .when(!active, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
+                    .cursor_pointer()
+                    .child(badge::badge(i, &label, status, ring))
+                    .on_click(cx.listener(move |w, _, window, cx| {
+                        w.model.select_layout(i);
+                        w.focus_current(window, cx);
+                    }))
+                    .into_any_element(),
+            );
+        }
+        rows
+    }
+
+    /// Layouts, their spaces, and the agents in each. A layout with one space has no space row.
+    fn tree_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let mut rows = Vec::new();
+        for (i, layout) in self.model.layouts.iter().enumerate() {
+            let folded = self.collapsed.contains(&layout.id);
+            let active = i == self.model.active;
+            let spaces = layout.spaces.leaves();
+            let single = spaces.len() == 1;
+            let has_agents = spaces.iter().any(|s| s.terms().any(|t| self.is_agent(t)));
+            let label = self.layout_label(layout, cx);
+            rows.push(
+                self.row(
+                    Row {
+                        id: ("layout", layout.id).into(),
+                        depth: 0,
+                        badge: Some(badge::badge(i, &label, None, theme::SIDEBAR)),
+                        label,
+                        folded: (!single || has_agents).then_some(folded),
+                        bold: true,
+                        bg: active.then_some(theme::ROW_SELECTED),
+                        rename: Some(Target::Layout(layout.id)),
+                        status: folded
+                            .then(|| self.worst(spaces.iter().flat_map(|s| s.terms())))
+                            .flatten(),
+                    },
+                    i > 0,
+                    layout.id,
+                    cx,
+                    move |w, _, _| w.model.select_layout(i),
+                ),
+            );
+            if folded {
+                continue;
+            }
+            for space in spaces {
+                let space_folded = !single && self.collapsed.contains(&space.id);
+                let space_id = space.id;
+                if !single {
+                    rows.push(self.row(
+                        Row {
+                            id: ("space", space.id).into(),
+                            depth: 1,
+                            badge: None,
+                            label: self.space_label(space, cx),
+                            folded: Some(space_folded),
+                            bold: false,
+                            bg: None,
+                            rename: Some(Target::Space(space.id)),
+                            status: space_folded.then(|| self.worst(space.terms())).flatten(),
+                        },
+                        false,
+                        space.id,
+                        cx,
+                        move |w, _, _| w.model.focus_space(space_id),
+                    ));
+                }
+                if space_folded {
+                    continue;
+                }
+                for term in space.terms().filter(|t| self.is_agent(*t)) {
+                    let focused = active && term == self.model.term();
+                    rows.push(self.row(
+                        Row {
+                            id: ("term", term).into(),
+                            depth: if single { 3 } else { 2 },
+                            badge: None,
+                            label: self.term_label(term, cx),
+                            folded: None,
+                            bold: false,
+                            bg: focused.then_some(theme::ROW_HOVER),
+                            rename: None,
+                            status: self.status(term),
+                        },
+                        false,
+                        term,
+                        cx,
+                        move |w, _, _| w.model.focus_term(term),
+                    ));
+                }
+            }
+        }
+        rows
     }
 
     fn row(
@@ -187,6 +276,8 @@ impl Workspace {
                 .into_any_element(),
         };
         let rename = row.rename;
+        let slot =
+            (row.folded.is_none() && row.badge.is_some()).then(|| div().w(px(12.)).flex_none());
         let chevron = row.folded.map(|folded| {
             div()
                 .id(("fold", fold_id))
@@ -215,7 +306,7 @@ impl Workspace {
             .h(px(28.))
             .flex_none()
             .pr(px(10.))
-            .pl(px(10. + [0., 16., 38.][row.depth as usize]))
+            .pl(px(10. + [0., 16., 38., 56.][row.depth as usize]))
             .rounded(px(6.))
             .text_size(px(13.))
             .text_color(rgb(theme::TEXT))
@@ -226,7 +317,9 @@ impl Workspace {
                 d.hover(|s| s.bg(rgb(theme::ROW_HOVER)))
             })
             .cursor_pointer()
+            .children(slot)
             .children(chevron)
+            .children(row.badge)
             .child(label)
             .children(row.status.map(marks::mark))
             .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
@@ -258,5 +351,20 @@ impl Workspace {
                 .map(|s| self.space_label(s, cx)),
         }
         .unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::snap;
+    use crate::ui::theme::{SIDEBAR_ICONS, SIDEBAR_MAX, SIDEBAR_MIN};
+
+    #[test]
+    fn drags_snap_to_badges_or_clamp() {
+        assert_eq!(snap(20.), SIDEBAR_ICONS);
+        assert_eq!(snap(110.), SIDEBAR_ICONS);
+        assert_eq!(snap(120.), SIDEBAR_MIN);
+        assert_eq!(snap(300.), 300.);
+        assert_eq!(snap(900.), SIDEBAR_MAX);
     }
 }

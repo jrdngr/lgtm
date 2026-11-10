@@ -24,6 +24,8 @@ pub struct State {
     pub messages: Vec<Message>,
     pub collapsed: Vec<u64>,
     pub sidebar: bool,
+    #[serde(default)]
+    pub sidebar_width: Option<f32>,
 }
 
 fn path() -> Option<PathBuf> {

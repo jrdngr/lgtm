@@ -2,6 +2,7 @@
 
 pub mod actions;
 mod agents;
+mod badge;
 mod control;
 mod dispatch;
 pub mod field;
@@ -14,6 +15,7 @@ mod rename;
 mod restore;
 mod settings_view;
 mod sidebar;
+mod tab_menu;
 pub mod theme;
 
 use std::collections::{HashMap, HashSet};
@@ -56,6 +58,9 @@ pub struct Workspace {
     model: Model,
     terms: HashMap<u64, Term>,
     sidebar: bool,
+    sidebar_width: f32,
+    /// The tab bar's right-click menu, while it's open.
+    tab_menu: Option<tab_menu::TabMenu>,
     /// Layouts and spaces folded in the sidebar.
     collapsed: HashSet<u64>,
     rename: Option<Rename>,
@@ -86,6 +91,8 @@ impl Workspace {
             model,
             terms: HashMap::new(),
             sidebar: true,
+            sidebar_width: theme::SIDEBAR_WIDTH,
+            tab_menu: None,
             collapsed: HashSet::new(),
             rename: None,
             home: dirs::home_dir(),

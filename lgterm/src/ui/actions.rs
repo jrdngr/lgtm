@@ -62,8 +62,8 @@ commands! {
     "Previous tab", ["cmd-shift-[", "cmd-{"], PrevTab;
     "Split right", ["cmd-d"], SplitRight;
     "Split down", ["cmd-shift-d"], SplitDown;
-    "Split space right", ["cmd-alt-d"], SplitSpaceRight;
-    "Split space down", ["cmd-alt-shift-d"], SplitSpaceDown;
+    "Split space right", ["cmd-n"], SplitSpaceRight;
+    "Split space down", ["cmd-shift-n"], SplitSpaceDown;
     "Close split", ["cmd-shift-w"], CloseSplit;
     "Zoom split", ["cmd-shift-enter"], ZoomSplit;
     "Next split", ["cmd-]"], NextSplit;
@@ -73,7 +73,7 @@ commands! {
     "Focus right", ["cmd-alt-right"], FocusRight;
     "Focus up", ["cmd-alt-up"], FocusUp;
     "Focus down", ["cmd-alt-down"], FocusDown;
-    "New layout", ["cmd-shift-n"], NewLayout;
+    "New layout", [], NewLayout;
     "Next layout", ["ctrl-cmd-down"], NextLayout;
     "Previous layout", ["ctrl-cmd-up"], PrevLayout;
     "Next waiting agent", ["cmd-j"], NextWaiting;

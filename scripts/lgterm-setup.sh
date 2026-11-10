@@ -54,3 +54,12 @@ tarball translate_c-2.0.0-Q_BUWltOBwBYABF84EUL208pIFeUIwbBs29FmVBaafN5 \
   https://deps.files.ghostty.org/translate_c-02ff0c523fb92a38939b04d0145c4a9602a74d56.tar.gz
 git_commit aro-0.0.0-JSD1QtuBNwCASyBtNF3pqTl_W3oAJQGEVyFAtrBSE_Pa \
   https://github.com/Vexu/arocc d0c8c4d9c55daa7ef6e40cf0f630a5b5e900989b
+# Lazy packages zig asks for when building from a Ghostty checkout (GHOSTTY_SOURCE_DIR).
+tarball N-V-__8AAB0eQwD-0MdOEBmz7intriBReIsIDNlukNVoNu6o \
+  https://deps.files.ghostty.org/zlib-1220fed0c74e1019b3ee29edae2051788b080cd96e90d56836eea857b0b966742efb.tar.gz
+tarball N-V-__8AAGmZhABbsPJLfbqrh6JTHsXhY6qCaLAQyx25e0XE \
+  https://deps.files.ghostty.org/highway-66486a10623fa0d72fe91260f96c892e41aceb06.tar.gz
+tarball N-V-__8AAP5JWgCGP_AD0teWpa4krRvE9VPZzvviGdbmN4jI \
+  https://deps.files.ghostty.org/wuffs-7411f488fe2e2c205c3d3b3d28638b7356522930.tar.gz
+tarball N-V-__8AADYiAAB_80AWnH1AxXC0tql9thT-R-DYO1gBqTLc \
+  https://deps.files.ghostty.org/pixels-12207ff340169c7d40c570b4b6a97db614fe47e0d83b5801a932dcd44917424c8806.tar.gz

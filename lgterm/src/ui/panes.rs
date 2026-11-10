@@ -3,8 +3,8 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, Context, CursorStyle, DragMoveEvent, FontWeight, InteractiveElement,
-    IntoElement, MouseButton, ParentElement, Render, StatefulInteractiveElement, Styled, Window,
-    div, px, rgb,
+    IntoElement, MouseButton, MouseDownEvent, ParentElement, Render, StatefulInteractiveElement,
+    Styled, Window, div, px, rgb,
 };
 
 use super::Workspace;
@@ -28,7 +28,7 @@ struct Divider {
 }
 
 /// What a divider drag shows under the pointer: nothing.
-struct Nothing;
+pub(super) struct Nothing;
 
 impl Render for Nothing {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
@@ -54,7 +54,11 @@ impl Workspace {
             .min_w_0()
             .h_full()
             .flex()
-            .pt(px(if self.sidebar { 10. } else { theme::TITLEBAR }))
+            .pt(px(if self.sidebar && !self.sidebar_icons() {
+                10.
+            } else {
+                theme::TITLEBAR
+            }))
             .px(px(theme::GAP))
             .pb(px(theme::GAP))
             .child(body)
@@ -335,6 +339,12 @@ impl Workspace {
                     .border_b_1()
                     .border_color(rgb(theme::TAB_STRIP_BORDER))
                     .overflow_hidden()
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |w, ev: &MouseDownEvent, _, cx| {
+                            w.open_tab_menu(split_id, ev.position, cx)
+                        }),
+                    )
                     .children(tabs)
                     .child(plus),
             )

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use gpui::{Context, Window};
 
-use super::Workspace;
+use super::{Workspace, sidebar};
 use crate::state::{SavedTerm, State};
 
 impl Workspace {
@@ -34,6 +34,7 @@ impl Workspace {
             messages: self.messages.clone(),
             collapsed,
             sidebar: self.sidebar,
+            sidebar_width: Some(self.sidebar_width),
         }
     }
 
@@ -55,6 +56,9 @@ impl Workspace {
         self.messages = state.messages;
         self.collapsed = state.collapsed.into_iter().collect();
         self.sidebar = state.sidebar;
+        if let Some(w) = state.sidebar_width {
+            self.sidebar_width = sidebar::snap(w);
+        }
         let home = self.home.clone().unwrap_or_else(|| PathBuf::from("/"));
         for id in self.model.terms() {
             if Some(id) == self.messages_tab {
