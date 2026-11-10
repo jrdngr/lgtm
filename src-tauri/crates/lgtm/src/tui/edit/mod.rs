@@ -792,7 +792,7 @@ mod tests {
         let (dir, mut e) = editor_on("one\n");
         e.set_files(crate::tui::walk::list(dir.path()));
         let area = Rect::new(0, 0, 80, 10);
-        let mut draw = |e: &mut Editor| {
+        let draw = |e: &mut Editor| {
             let mut screen = Screen::empty(area);
             e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
             e.sidebar_width > 0
