@@ -3,7 +3,7 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, ClickEvent, Context, CursorStyle, ElementId, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, SharedString,
+    InteractiveElement, IntoElement, MouseButton, ParentElement, Render, SharedString, Stateful,
     StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px, rgb,
 };
 
@@ -26,6 +26,39 @@ struct Row {
     bg: Option<u32>,
     rename: Option<Target>,
     status: Option<Status>,
+    /// Some for a layout row: its index, so it drags to reorder.
+    layout: Option<usize>,
+}
+
+/// A layout being dragged to a new place in the sidebar.
+pub(super) struct LayoutDrag {
+    index: usize,
+    label: String,
+}
+
+impl Render for LayoutDrag {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl gpui::IntoElement {
+        div()
+            .flex()
+            .items_center()
+            .gap(px(8.))
+            .h(px(28.))
+            .px(px(10.))
+            .rounded(px(6.))
+            .bg(rgb(theme::ROW_SELECTED))
+            .border_1()
+            .border_color(rgb(theme::CARD_BORDER))
+            .text_size(px(13.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(rgb(theme::TEXT))
+            .child(badge::badge(
+                self.index,
+                &self.label,
+                None,
+                theme::ROW_SELECTED,
+            ))
+            .child(self.label.clone())
+    }
 }
 
 /// Dragged by the sidebar's right edge.
@@ -151,6 +184,7 @@ impl Workspace {
                     .when(!active, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
                     .cursor_pointer()
                     .child(badge::badge(i, &label, status.map(|s| self.mark(s)), ring))
+                    .reorders(i, &label, cx)
                     .on_click(cx.listener(move |w, _, window, cx| {
                         w.model.select_layout(i);
                         w.focus_current(window, cx);
@@ -184,6 +218,7 @@ impl Workspace {
                     bg: active.then_some(theme::ROW_SELECTED),
                     rename: Some(Target::Layout(layout.id)),
                     status: folded.then(|| self.agents.worst(layout.terms())).flatten(),
+                    layout: Some(i),
                 },
                 i > 0,
                 layout.id.0,
@@ -211,6 +246,7 @@ impl Workspace {
                                 status: space_folded
                                     .then(|| self.agents.worst(space.terms()))
                                     .flatten(),
+                                layout: None,
                             },
                             false,
                             space.id.0,
@@ -235,6 +271,7 @@ impl Workspace {
                             bg: focused.then_some(theme::ROW_HOVER),
                             rename: None,
                             status: self.agents.status(term),
+                            layout: None,
                         },
                         false,
                         term.0,
@@ -255,6 +292,7 @@ impl Workspace {
         cx: &mut Context<Self>,
         on_click: impl Fn(&mut Workspace, &mut Window, &mut Context<Workspace>) + 'static,
     ) -> AnyElement {
+        let layout = row.layout.map(|i| (i, row.label.clone()));
         let renaming = self.renaming().filter(|r| Some(r.target) == row.rename);
         let label: AnyElement = match renaming {
             Some(r) => div()
@@ -323,6 +361,7 @@ impl Workspace {
             .children(row.badge)
             .child(label)
             .children(row.status.map(|s| self.mark(s)))
+            .when_some(layout, |d, (i, label)| d.reorders(i, &label, cx))
             .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
                 if ev.click_count() == 2
                     && let Some(target) = rename
@@ -348,6 +387,35 @@ impl Workspace {
             Target::Space(id) => self.model.find_space(id).map(|s| self.space_label(s)),
         }
         .unwrap_or_default()
+    }
+}
+
+trait Reorders {
+    /// Drags the layout at `index` and takes dropped layouts into its place.
+    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self;
+}
+
+impl Reorders for Stateful<gpui::Div> {
+    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self {
+        let drag = LayoutDrag {
+            index,
+            label: label.to_owned(),
+        };
+        self.on_drag(drag, |d, _, _, cx| {
+            cx.new(|_| LayoutDrag {
+                index: d.index,
+                label: d.label.clone(),
+            })
+        })
+        .drag_over::<LayoutDrag>(move |s, d, _, _| match d.index {
+            from if from > index => s.border_t_2().border_color(rgb(theme::FOCUS)),
+            from if from < index => s.border_b_2().border_color(rgb(theme::FOCUS)),
+            _ => s,
+        })
+        .on_drop(cx.listener(move |w, d: &LayoutDrag, window, cx| {
+            w.model.move_layout(d.index, index);
+            w.focus_current(window, cx);
+        }))
     }
 }
 

@@ -97,8 +97,8 @@ impl Workspace {
         result.unwrap_or_else(|e| e)
     }
 
-    /// Opens a terminal beside `from`, or the focused tab, and returns its id. Without
-    /// `focus`, focus and zoom stay as they are.
+    /// Opens a terminal beside `from`, or the focused tab, and returns its id. A new layout
+    /// starts in the home folder. Without `focus`, focus and zoom stay as they are.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn open(
         &mut self,
@@ -111,7 +111,10 @@ impl Workspace {
         cx: &mut Context<Self>,
     ) -> Result<TermId, String> {
         let from = from.unwrap_or_else(|| self.model.tab());
-        let cwd = cwd.unwrap_or_else(|| self.cwd_of(from));
+        let cwd = cwd.unwrap_or_else(|| match place {
+            Place::Layout => self.home_dir(),
+            _ => self.cwd_of(from),
+        });
         let m = &mut self.model;
         let id = if focus {
             m.focus_tab(from);

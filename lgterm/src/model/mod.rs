@@ -525,6 +525,17 @@ impl Model {
         }
     }
 
+    /// Moves the layout at `from` to `to`, keeping the same layout shown.
+    pub fn move_layout(&mut self, from: usize, to: usize) {
+        if from >= self.layouts.len() || to >= self.layouts.len() || from == to {
+            return;
+        }
+        let shown = self.layouts[self.active].id;
+        let layout = self.layouts.remove(from);
+        self.layouts.insert(to, layout);
+        self.active = self.layouts.iter().position(|l| l.id == shown).unwrap_or(0);
+    }
+
     pub fn find_space(&self, id: SpaceId) -> Option<&Space> {
         self.layouts.iter().find_map(|l| l.spaces.find(id))
     }
@@ -566,6 +577,27 @@ mod tests {
 
     fn tabs(terms: &[TermId]) -> Vec<Tab> {
         terms.iter().map(|t| Tab::Term(*t)).collect()
+    }
+
+    #[test]
+    fn moving_a_layout_keeps_the_shown_one() {
+        let (mut m, a) = Model::new();
+        let b = m.new_layout();
+        let c = m.new_layout();
+        let order = |m: &Model| -> Vec<TermId> {
+            m.layouts.iter().filter_map(|l| l.terms().next()).collect()
+        };
+
+        m.move_layout(2, 0);
+        assert_eq!(order(&m), [c, a, b]);
+        assert_eq!(m.term(), Some(c));
+
+        m.move_layout(1, 2);
+        assert_eq!(order(&m), [c, b, a]);
+        assert_eq!(m.term(), Some(c));
+
+        m.move_layout(0, 5);
+        assert_eq!(order(&m), [c, b, a]);
     }
 
     #[test]
