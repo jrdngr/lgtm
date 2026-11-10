@@ -36,6 +36,19 @@ pub fn key(name: &str) -> Key {
         "f10" => Key::F10,
         "f11" => Key::F11,
         "f12" => Key::F12,
+        "f13" => Key::F13,
+        "f14" => Key::F14,
+        "f15" => Key::F15,
+        "f16" => Key::F16,
+        "f17" => Key::F17,
+        "f18" => Key::F18,
+        "f19" => Key::F19,
+        "f20" => Key::F20,
+        "f21" => Key::F21,
+        "f22" => Key::F22,
+        "f23" => Key::F23,
+        "f24" => Key::F24,
+        "f25" => Key::F25,
         _ => Key::Unidentified,
     }
 }
@@ -115,6 +128,18 @@ pub fn text(k: &Keystroke) -> Option<&str> {
     (!k.modifiers.control && !text.chars().any(char::is_control)).then_some(text)
 }
 
+/// Whether a keystroke adds to a prompt being typed (true) or sends or drops it (false).
+pub fn drafts(k: &Keystroke) -> Option<bool> {
+    let m = &k.modifiers;
+    match k.key.as_str() {
+        "enter" if m.shift || m.alt => Some(true),
+        "enter" | "escape" => Some(false),
+        "c" if m.control => Some(false),
+        "backspace" | "delete" => Some(true),
+        _ => text(k).is_some().then_some(true),
+    }
+}
+
 /// The modifiers spent producing `text`, like shift on `A`.
 pub fn consumed(k: &Keystroke) -> Mods {
     let mut out = Mods::empty();
@@ -167,5 +192,19 @@ mod tests {
         assert_eq!(encode("up"), b"\x1b[A");
         assert_eq!(encode("backspace"), b"\x7f");
         assert_eq!(encode("shift-tab"), b"\x1b[Z");
+    }
+
+    #[test]
+    fn typing_starts_a_draft_and_sending_or_cancelling_ends_it() {
+        let d = |s| drafts(&Keystroke::parse(s).unwrap());
+        assert_eq!(d("backspace"), Some(true));
+        assert_eq!(d("shift-enter"), Some(true));
+        assert_eq!(d("enter"), Some(false));
+        assert_eq!(d("escape"), Some(false));
+        assert_eq!(d("ctrl-c"), Some(false));
+        assert_eq!(d("up"), None);
+        let mut a = Keystroke::parse("a").unwrap();
+        a.key_char = Some("a".into());
+        assert_eq!(drafts(&a), Some(true));
     }
 }

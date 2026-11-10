@@ -197,6 +197,25 @@ impl Row {
         out.trim_end().to_owned()
     }
 
+    /// The index in `text()` of the char drawn in column `col`.
+    pub fn char_index(&self, col: u16) -> Option<usize> {
+        let mut idx = 0;
+        let mut at = 0;
+        for run in &self.runs {
+            if col < run.col {
+                return Some(idx + (col - at) as usize);
+            }
+            idx += (run.col - at) as usize;
+            if col < run.col + run.cells {
+                let offset = if run.single { 0 } else { col - run.col };
+                return Some(idx + offset as usize);
+            }
+            idx += run.text.chars().count();
+            at = run.col + run.cells;
+        }
+        None
+    }
+
     /// The text in column `col`, if a run starts or covers it.
     pub fn text_at(&self, col: u16) -> Option<&str> {
         let run = self
@@ -252,6 +271,18 @@ mod tests {
         assert_eq!((runs[1].col, runs[1].cells, runs[1].single), (1, 2, true));
         assert_eq!((runs[2].col, runs[2].text.chars().next()), (3, Some('b')));
         assert_eq!(f.rows[0].text_at(2), Some("中"));
+    }
+
+    #[test]
+    fn columns_map_to_chars_past_wide_cells_and_clusters() {
+        let char_at = |input: &str, col| {
+            let row = &frame(input.as_bytes()).rows[0];
+            row.text().chars().nth(row.char_index(col)?)
+        };
+        assert_eq!(char_at("中中 ab", 1), Some('中'));
+        assert_eq!(char_at("中中 ab", 5), Some('a'));
+        assert_eq!(char_at("e\u{301} ab", 2), Some('a'));
+        assert_eq!(char_at("e\u{301} ab", 3), Some('b'));
     }
 
     #[test]

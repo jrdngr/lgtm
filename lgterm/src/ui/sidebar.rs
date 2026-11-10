@@ -196,9 +196,12 @@ impl Workspace {
                 .text_color(rgb(theme::ICON))
                 .child(if folded { "▸" } else { "▾" })
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                .on_click(cx.listener(move |w, _, _, cx| {
+                .on_click(cx.listener(move |w, _, win, cx| {
                     if !w.collapsed.remove(&fold_id) {
                         w.collapsed.insert(fold_id);
+                    }
+                    if w.rename.is_some() {
+                        w.focus_current(win, cx);
                     }
                     cx.stop_propagation();
                     cx.notify();

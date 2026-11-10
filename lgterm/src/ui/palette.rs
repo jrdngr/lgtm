@@ -4,7 +4,7 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, Context, FocusHandle, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
     MouseButton, ParentElement, PathBuilder, StatefulInteractiveElement, Styled, StyledText,
-    TextRun, Window, canvas, div, font, point, px, rgb,
+    Subscription, TextRun, Window, canvas, div, font, point, px, rgb,
 };
 
 use super::actions::{COMMANDS, Command, display};
@@ -15,6 +15,7 @@ pub struct Palette {
     pub query: String,
     pub selected: usize,
     pub focus: FocusHandle,
+    _blur: Subscription,
 }
 
 /// Rows shown at once.
@@ -64,10 +65,17 @@ impl Workspace {
         self.settings_open = None;
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
+        let blur = cx.on_focus_out(&focus, window, |w, _, window, cx| {
+            if window.is_window_active() {
+                w.palette = None;
+                cx.notify();
+            }
+        });
         self.palette = Some(Palette {
             query: String::new(),
             selected: 0,
             focus,
+            _blur: blur,
         });
         cx.notify();
     }
@@ -198,6 +206,7 @@ pub(super) fn overlay(
         .justify_center()
         .items_start()
         .pt(px(80.))
+        .occlude()
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(|w, _, window, cx| {

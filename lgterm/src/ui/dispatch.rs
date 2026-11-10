@@ -79,8 +79,11 @@ impl Render for Workspace {
                     t.view.update(cx, |v, cx| v.open_find(win, cx));
                 }
             }))
-            .on_action(cx.listener(|w, _: &ToggleSidebar, _, cx| {
+            .on_action(cx.listener(|w, _: &ToggleSidebar, win, cx| {
                 w.sidebar = !w.sidebar;
+                if w.rename.is_some() {
+                    w.focus_current(win, cx);
+                }
                 cx.notify();
             }))
             .on_action(cx.listener(|w, _: &FontBigger, _, cx| {

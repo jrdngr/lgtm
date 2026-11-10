@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use super::agents::DELIVERY_GAP;
 use super::{Workspace, theme};
 use crate::ipc::Reply;
+use crate::status::Status;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
@@ -23,6 +24,9 @@ pub struct Message {
     pub to_label: String,
     pub text: String,
     pub queued: bool,
+    /// The agent it was queued for left before it could go in.
+    #[serde(default)]
+    pub dropped: bool,
 }
 
 /// The oldest messages are dropped past this many.
@@ -41,6 +45,14 @@ fn clock() -> String {
         tm
     };
     format!("{:02}:{:02}", tm.tm_hour, tm.tm_min)
+}
+
+/// Drops the oldest message past `KEEP`, sparing queued ones unless nothing else is left.
+fn trim(messages: &mut Vec<Message>) {
+    if messages.len() > KEEP {
+        let i = messages.iter().position(|m| !m.queued).unwrap_or(0);
+        messages.remove(i);
+    }
 }
 
 /// What the receiving agent reads.
@@ -77,17 +89,29 @@ impl Workspace {
             to_label: self.term_label(to, cx),
             text,
             queued: true,
+            dropped: false,
         });
-        if self.messages.len() > KEEP {
-            self.messages.remove(0);
-        }
+        trim(&mut self.messages);
         self.deliver(to, cx);
         cx.notify();
         let queued = self.messages.last().is_some_and(|m| m.queued);
         Reply::Ok(if queued { "queued" } else { "sent" }.into())
     }
 
-    /// Hands `term` its oldest queued message, if it's ready for one.
+    /// Gives up on messages queued for `term`, whose agent is gone.
+    pub(super) fn drop_queued(&mut self, term: u64) {
+        for m in self
+            .messages
+            .iter_mut()
+            .filter(|m| m.queued && m.to == term)
+        {
+            m.queued = false;
+            m.dropped = true;
+        }
+    }
+
+    /// Hands `term` its oldest queued message, if it's ready for one and the user isn't
+    /// typing there. The agent counts as working until its own status says otherwise.
     pub(super) fn deliver(&mut self, term: u64, cx: &mut Context<Self>) {
         let Some(t) = self.terms.get_mut(&term) else {
             return;
@@ -95,11 +119,16 @@ impl Workspace {
         let Some(agent) = t.agent.as_mut().filter(|a| a.can_take_message()) else {
             return;
         };
+        if t.view.read(cx).typing() {
+            return;
+        }
         let Some(m) = self.messages.iter_mut().find(|m| m.queued && m.to == term) else {
             return;
         };
         m.queued = false;
         agent.busy_until = Some(Instant::now() + DELIVERY_GAP);
+        agent.status = Status::Working;
+        agent.quiet = 0;
         let text = envelope(m);
         let view = t.view.clone();
         view.update(cx, |v, cx| v.paste_text(text, cx));
@@ -110,6 +139,7 @@ impl Workspace {
             view.update(cx, |v, cx| v.input(b"\r", cx));
         })
         .detach();
+        self.update_badge();
         cx.notify();
     }
 
@@ -184,7 +214,7 @@ impl Workspace {
                         .justify_between()
                         .gap(px(12.))
                         .child(body(&m.text))
-                        .when(m.queued, |d| {
+                        .when(m.queued || m.dropped, |d| {
                             d.child(
                                 div()
                                     .flex_none()
@@ -194,7 +224,7 @@ impl Workspace {
                                     .rounded(px(5.))
                                     .text_size(px(11.))
                                     .text_color(rgb(theme::BLOCKED))
-                                    .child("Queued"),
+                                    .child(if m.queued { "Queued" } else { "Undelivered" }),
                             )
                         }),
                 )
@@ -250,6 +280,7 @@ mod tests {
             to_label: "Modal bar".into(),
             text: "tests pass".into(),
             queued: true,
+            dropped: false,
         }
     }
 
@@ -259,6 +290,23 @@ mod tests {
         assert!(e.starts_with("[lgterm message from t2 · Review keys] tests pass"));
         assert!(e.contains("lgterm send t2"));
         assert_eq!(envelope(&message(None)), "[lgterm message] tests pass");
+    }
+
+    #[test]
+    fn trimming_keeps_undelivered_messages() {
+        let mut log = vec![message(Some(1))];
+        log.extend((0..KEEP).map(|_| Message {
+            queued: false,
+            ..message(Some(2))
+        }));
+        trim(&mut log);
+        assert_eq!(log.len(), KEEP);
+        assert_eq!(log[0], message(Some(1)));
+
+        let mut queued = vec![message(Some(1)); KEEP + 1];
+        queued[1].text = "second".into();
+        trim(&mut queued);
+        assert_eq!((queued.len(), queued[0].text.as_str()), (KEEP, "second"));
     }
 
     #[test]

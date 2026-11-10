@@ -25,12 +25,14 @@ impl Workspace {
                 (*id, saved)
             })
             .collect();
+        let mut collapsed: Vec<u64> = self.collapsed.iter().copied().collect();
+        collapsed.sort_unstable();
         State {
             model: self.model.clone(),
             terms,
             messages_tab: self.messages_tab,
             messages: self.messages.clone(),
-            collapsed: self.collapsed.iter().copied().collect(),
+            collapsed,
             sidebar: self.sidebar,
         }
     }
@@ -63,7 +65,7 @@ impl Workspace {
                 .map(|s| s.cwd.clone())
                 .filter(|c| c.is_dir())
                 .unwrap_or_else(|| home.clone());
-            self.spawn(id, &cwd, &[], window, cx);
+            let _ = self.spawn(id, &cwd, &[], window, cx);
             let resume = saved
                 .and_then(|s| s.agent.as_ref())
                 .filter(|_| self.settings.resume);
@@ -75,7 +77,7 @@ impl Workspace {
         if self.terms.is_empty() && self.messages_tab.is_none() {
             let (model, first) = crate::model::Model::new();
             self.model = model;
-            self.spawn(first, &home, &[], window, cx);
+            let _ = self.spawn(first, &home, &[], window, cx);
         }
     }
 
@@ -85,6 +87,12 @@ impl Workspace {
                 w.save_state(cx);
             }
             async {}
+        })
+        .detach();
+        cx.on_release(|w, cx| {
+            if w.settings.restore {
+                w.save_state(cx);
+            }
         })
         .detach();
         cx.spawn_in(window, async move |this, cx| {

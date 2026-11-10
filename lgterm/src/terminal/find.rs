@@ -6,7 +6,7 @@ use gpui::{
     ParentElement, Styled, Window, div, px, rgb,
 };
 
-use super::TermView;
+use super::{Paste, TermView};
 use crate::ui::field::{self, Key};
 use crate::ui::theme;
 
@@ -66,26 +66,41 @@ impl TermView {
         let _ = vt.set_selection(selected.as_ref());
     }
 
+    /// Searches again for the current query, from the newest match.
+    fn find_query_changed(&mut self) {
+        let Some(f) = &mut self.find else { return };
+        let needle = Some(f.query.as_str()).filter(|q| !q.is_empty());
+        let _ = f.search.set_needle(&self.vt, needle);
+        f.total = 0;
+        f.index = None;
+        if needle.is_some() {
+            self.find_step(false);
+        } else {
+            let _ = self.vt.set_selection(None);
+        }
+    }
+
+    fn find_paste(&mut self, _: &Paste, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else {
+            return;
+        };
+        let Some(f) = &mut self.find else { return };
+        f.query.extend(text.chars().filter(|c| !c.is_control()));
+        self.find_query_changed();
+        cx.notify();
+    }
+
     fn find_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let Some(f) = &mut self.find else { return };
         match field::key(&mut f.query, &ev.keystroke) {
-            Key::Other => return,
+            Key::Other if ev.keystroke.modifiers.platform => return,
+            Key::Other => {}
             Key::Escape => {
                 self.close_find(window, cx);
                 cx.stop_propagation();
                 return;
             }
-            Key::Edited => {
-                let needle = Some(f.query.as_str()).filter(|q| !q.is_empty());
-                let _ = f.search.set_needle(&self.vt, needle);
-                f.total = 0;
-                f.index = None;
-                if needle.is_some() {
-                    self.find_step(false);
-                } else {
-                    let _ = self.vt.set_selection(None);
-                }
-            }
+            Key::Edited => self.find_query_changed(),
             Key::Enter | Key::Up => self.find_step(false),
             Key::ShiftEnter | Key::Down => self.find_step(true),
         }
@@ -121,6 +136,7 @@ impl TermView {
                 .text_color(rgb(theme::TEXT_STRONG))
                 .track_focus(&f.focus)
                 .on_key_down(cx.listener(Self::find_key))
+                .on_action(cx.listener(Self::find_paste))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
                     div()

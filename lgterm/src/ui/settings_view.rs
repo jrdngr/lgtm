@@ -34,7 +34,13 @@ impl Workspace {
         self.palette = None;
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
-        self.settings_open = Some(focus);
+        let blur = cx.on_focus_out(&focus, window, |w, _, window, cx| {
+            if window.is_window_active() {
+                w.settings_open = None;
+                cx.notify();
+            }
+        });
+        self.settings_open = Some((focus, blur));
         cx.notify();
     }
 
@@ -55,7 +61,7 @@ impl Workspace {
     }
 
     pub(super) fn render_settings(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let focus = self.settings_open.as_ref()?;
+        let (focus, _) = self.settings_open.as_ref()?;
         let mut settings = self.settings.clone();
         let section = |title: &'static str| {
             div()

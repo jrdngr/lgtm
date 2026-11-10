@@ -88,6 +88,19 @@ impl<T: Keyed> Tree<T> {
         }
     }
 
+    /// Whether every branch has at least two children, each with a finite positive weight.
+    pub fn well_formed(&self) -> bool {
+        match self {
+            Tree::Leaf(_) => true,
+            Tree::Branch { children, .. } => {
+                children.len() >= 2
+                    && children
+                        .iter()
+                        .all(|c| c.weight.is_finite() && c.weight > 0. && c.tree.well_formed())
+            }
+        }
+    }
+
     pub fn first(&self) -> &T {
         match self {
             Tree::Leaf(leaf) => leaf,

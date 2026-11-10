@@ -23,7 +23,7 @@ pub struct Agent {
     /// Whether its hooks report its status.
     pub hooked: bool,
     pub session: Option<String>,
-    quiet: u8,
+    pub(super) quiet: u8,
     pub(super) busy_until: Option<Instant>,
 }
 
@@ -109,6 +109,7 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let reported = status;
         let viewed = self.viewed(term, window);
         let status = if status == Status::Done && viewed {
             Status::Idle
@@ -120,26 +121,42 @@ impl Workspace {
         };
         agent.quiet = 0;
         let old = agent.status;
-        if old == status {
-            return;
-        }
         agent.status = status;
-        if matches!(status, Status::Blocked | Status::Done) {
-            self.alert(term, status, cx);
-        }
-        if status != Status::Working && (status != Status::Idle || old == Status::Working) {
-            self.finish_waits(term, status.name());
+        if old != status {
+            if status == Status::Working
+                && let Some(t) = self.terms.get(&term)
+            {
+                t.view.update(cx, |v, _| v.clear_draft());
+            }
+            if matches!(status, Status::Blocked | Status::Done) {
+                self.alert(term, status, cx);
+            }
         }
         if status.ready() {
             self.deliver(term, cx);
         }
-        self.update_badge();
-        cx.notify();
+        // A queued message went in, so waiters hear about the turn it starts instead.
+        let delivered = status != Status::Working && self.status(term) == Some(Status::Working);
+        if !delivered {
+            if reported == Status::Done {
+                self.finish_waits(term, "done");
+            } else if old != status
+                && status != Status::Working
+                && (status != Status::Idle || old == Status::Working)
+            {
+                self.finish_waits(term, status.name());
+            }
+        }
+        if old != status || delivered {
+            self.update_badge();
+            cx.notify();
+        }
     }
 
     /// An agent quit: anything waiting on it stops waiting.
     pub(super) fn agent_left(&mut self, term: u64, cx: &mut Context<Self>) {
         self.finish_waits(term, "gone");
+        self.drop_queued(term);
         self.update_badge();
         cx.notify();
     }
@@ -147,7 +164,7 @@ impl Workspace {
     pub(super) fn finish_waits(&mut self, term: u64, outcome: &str) {
         self.waiters.retain(|(t, reply)| {
             if *t != term {
-                return true;
+                return !reply.is_closed();
             }
             let _ = reply.try_send(Reply::Ok(outcome.to_owned()));
             false
@@ -161,9 +178,9 @@ impl Workspace {
             let Some(t) = self.terms.get_mut(&id) else {
                 continue;
             };
-            let kind = t.info.process.as_deref().and_then(Kind::from_process);
+            let kind = t.info.kind;
             match (&t.agent, kind, t.info.process.is_some()) {
-                (Some(_), None, true) => {
+                (Some(a), None, true) if !a.hooked || t.info.shell_foreground => {
                     t.agent = None;
                     self.agent_left(id, cx);
                     continue;
@@ -174,15 +191,17 @@ impl Workspace {
             let Some(agent) = &mut t.agent else { continue };
             let scrape = !agent.hooked || agent.kind == Kind::Codex;
             let kind = agent.kind;
-            let screen = t.view.update(cx, |v, _| v.screen_text());
+            let screen = t.view.read(cx).screen_text();
             let seen = status::from_screen(kind, &screen);
             let agent = t.agent.as_mut().expect("agent");
             let next = match seen {
                 Some(s) if scrape => Some(s),
-                Some(_) => {
+                Some(s) => {
                     agent.quiet = 0;
-                    None
+                    (s == Status::Working && agent.status == Status::Idle).then_some(s)
                 }
+                // A message just went in, and the agent may not show it yet.
+                None if agent.busy_until.is_some_and(|t| Instant::now() < t) => None,
                 None if agent.status == Status::Working => {
                     agent.quiet += 1;
                     (scrape || agent.quiet >= QUIET_POLLS).then_some(if scrape {
@@ -192,6 +211,12 @@ impl Workspace {
                     })
                 }
                 None if scrape && agent.status == Status::Blocked => Some(Status::Done),
+                None if agent.status == Status::Blocked
+                    && kind == Kind::Claude
+                    && status::claude_interrupted(&screen) =>
+                {
+                    Some(Status::Idle)
+                }
                 None => None,
             };
             if let Some(s) = next {

@@ -1,6 +1,7 @@
 //! The app's control socket: one JSON request and one JSON reply per connection.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::net::Shutdown;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -132,6 +133,7 @@ fn handle(stream: UnixStream, tx: async_channel::Sender<Incoming>) {
             if tx.send_blocking(Incoming { request, reply }).is_err() {
                 return;
             }
+            watch_hangup(&stream, answer.clone());
             match answer.recv_blocking() {
                 Ok(r) => r,
                 Err(_) => Reply::Err("lgterm closed".into()),
@@ -144,6 +146,21 @@ fn handle(stream: UnixStream, tx: async_channel::Sender<Incoming>) {
         out.push(b'\n');
         let _ = stream.write_all(&out);
     }
+    let _ = stream.shutdown(Shutdown::Both);
+}
+
+/// Closes `answer` once the client hangs up, so a reply nobody will read isn't waited for.
+fn watch_hangup(stream: &UnixStream, answer: async_channel::Receiver<Reply>) {
+    let Ok(mut peer) = stream.try_clone() else {
+        return;
+    };
+    let _ = std::thread::Builder::new()
+        .name("lgterm-hangup".into())
+        .spawn(move || {
+            let mut buf = [0u8; 64];
+            while matches!(peer.read(&mut buf), Ok(n) if n > 0) {}
+            answer.close();
+        });
 }
 
 /// Sends a request to the app at `path` and waits up to `timeout` for the reply.
@@ -182,6 +199,24 @@ mod tests {
         });
         let reply = call(&path, &Request::Focus { term: "t3".into() }, None).unwrap();
         assert_eq!(reply, Reply::Ok("t3".into()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_hung_up_client_closes_its_pending_reply() {
+        let dir = std::env::temp_dir().join(format!("lgterm-hangup-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("s.sock");
+        let (_server, rx) = serve(&path).unwrap();
+        let wait = Request::Wait { term: "t1".into() };
+        let err = call(&path, &wait, Some(Duration::from_millis(50))).unwrap_err();
+        assert!(err.downcast_ref::<std::io::Error>().is_some());
+        let inc = rx.recv_blocking().unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !inc.reply.is_closed() {
+            assert!(std::time::Instant::now() < deadline, "reply never closed");
+            std::thread::sleep(Duration::from_millis(10));
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 

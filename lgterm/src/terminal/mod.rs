@@ -11,9 +11,12 @@ mod pty;
 pub use pty::SOCKET;
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use ghostty_vt::selection::Selection;
 use ghostty_vt::style::RgbColor;
+use ghostty_vt::terminal::{Point as VtPoint, PointCoordinate};
 use ghostty_vt::{Event, Terminal, TerminalOptions, fmt, key, mouse};
 use gpui::{
     App, AppContext, Bounds, ClipboardItem, Context, Entity, EventEmitter, FocusHandle, Focusable,
@@ -28,6 +31,9 @@ use pty::Pty;
 use crate::ui::theme;
 
 actions!(terminal, [Copy, Paste]);
+
+/// How long after the last keypress the user counts as still typing.
+const TYPING_PAUSE: Duration = Duration::from_secs(2);
 
 /// The terminal font size, shared by every terminal.
 pub struct FontSize(pub f32);
@@ -65,7 +71,12 @@ pub struct TermView {
     /// Where a selection drag started, in screen rows.
     drag_from: Option<(u16, u32)>,
     mouse_down: bool,
+    /// The button held down over the terminal, and whether its press went to the program.
+    pressed: Option<(MouseButton, bool)>,
     find: Option<find::Find>,
+    /// The user typed a prompt and hasn't sent or dropped it yet.
+    draft: bool,
+    last_key: Option<Instant>,
 }
 
 fn rgb(c: u32) -> RgbColor {
@@ -124,13 +135,30 @@ impl TermView {
                 scroll_rest: 0.,
                 drag_from: None,
                 mouse_down: false,
+                pressed: None,
                 find: None,
+                draft: false,
+                last_key: None,
             }
         }))
     }
 
     pub fn foreground_pid(&self) -> Option<i32> {
         self.pty.foreground_pid()
+    }
+
+    pub fn shell_pid(&self) -> Option<i32> {
+        self.pty.shell_pid()
+    }
+
+    /// Whether the user is in the middle of typing something.
+    pub fn typing(&self) -> bool {
+        self.draft || self.last_key.is_some_and(|t| t.elapsed() < TYPING_PAUSE)
+    }
+
+    /// Forgets a typed prompt, once the program has taken it.
+    pub fn clear_draft(&mut self) {
+        self.draft = false;
     }
 
     /// Where the shell is, as best we know without asking the OS.
@@ -187,13 +215,27 @@ impl TermView {
         self.input(&bytes, cx);
     }
 
-    /// The screen as it is now, one line per row.
-    pub fn screen_text(&mut self) -> String {
-        let Ok(frame) = self.snap.frame(&self.vt) else {
+    /// The live screen, wherever the user has scrolled, one line per row.
+    pub fn screen_text(&self) -> String {
+        let at = |x, y| self.vt.grid_ref(VtPoint::Active(PointCoordinate { x, y }));
+        let (Ok(start), Ok(end)) = (
+            at(0, 0),
+            at(
+                self.cols.saturating_sub(1),
+                self.rows.saturating_sub(1) as u32,
+            ),
+        ) else {
             return String::new();
         };
-        let lines: Vec<String> = frame.rows.iter().map(|r| r.text()).collect();
-        lines.join("\n")
+        let sel = Selection::new(start, end, false);
+        let opts = fmt::FormatterOptions::new()
+            .with_format(fmt::Format::Plain)
+            .with_trim(true)
+            .with_selection(&sel);
+        fmt::Formatter::new(&self.vt, opts)
+            .and_then(|mut f| f.format_alloc())
+            .map(|b| String::from_utf8_lossy(&b).into_owned())
+            .unwrap_or_default()
     }
 
     /// The last `lines` lines of scrollback and screen, or a screenful.
@@ -263,6 +305,8 @@ impl TermView {
         let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) else {
             return;
         };
+        self.draft = true;
+        self.last_key = Some(Instant::now());
         self.paste_text(text, cx);
     }
 
@@ -286,9 +330,9 @@ fn parse_pwd(pwd: &str) -> Option<PathBuf> {
     while i < bytes.len() {
         if bytes[i] == b'%'
             && i + 2 < bytes.len()
-            && let Ok(b) = u8::from_str_radix(&path[i + 1..i + 3], 16)
+            && let (Some(hi), Some(lo)) = (hex_digit(bytes[i + 1]), hex_digit(bytes[i + 2]))
         {
-            out.push(b);
+            out.push(hi << 4 | lo);
             i += 3;
             continue;
         }
@@ -297,6 +341,10 @@ fn parse_pwd(pwd: &str) -> Option<PathBuf> {
     }
     let path = PathBuf::from(String::from_utf8(out).ok()?);
     path.is_absolute().then_some(path)
+}
+
+fn hex_digit(b: u8) -> Option<u8> {
+    (b as char).to_digit(16).map(|d| d as u8)
 }
 
 impl EventEmitter<TermEvent> for TermView {}
@@ -326,6 +374,9 @@ impl Render for TermView {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_up(MouseButton::Middle, cx.listener(Self::mouse_up))
             .on_mouse_up(MouseButton::Right, cx.listener(Self::mouse_up))
+            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up_out))
+            .on_mouse_up_out(MouseButton::Middle, cx.listener(Self::mouse_up_out))
+            .on_mouse_up_out(MouseButton::Right, cx.listener(Self::mouse_up_out))
             .on_scroll(cx.listener(Self::scroll))
             .child(
                 canvas(
@@ -355,5 +406,14 @@ mod tests {
         );
         assert_eq!(parse_pwd("/tmp"), Some(PathBuf::from("/tmp")));
         assert_eq!(parse_pwd("relative"), None);
+    }
+
+    #[test]
+    fn stray_percents_stay_literal() {
+        assert_eq!(
+            parse_pwd("file://h/tmp/50%aé"),
+            Some(PathBuf::from("/tmp/50%aé"))
+        );
+        assert_eq!(parse_pwd("/tmp/%+a"), Some(PathBuf::from("/tmp/%+a")));
     }
 }

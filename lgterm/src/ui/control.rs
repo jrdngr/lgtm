@@ -13,11 +13,17 @@ impl Workspace {
     pub(super) fn handle(&mut self, inc: Incoming, window: &mut Window, cx: &mut Context<Self>) {
         let reply = match inc.request {
             Request::Wait { term } => match self.term_arg(&term) {
+                Ok(id) if !self.terms.contains_key(&id) => {
+                    Reply::Err(format!("no terminal {term}"))
+                }
                 Ok(id) => match self.status(id) {
-                    Some(s @ (crate::status::Status::Done | crate::status::Status::Blocked)) => {
+                    Some(s @ (crate::status::Status::Done | crate::status::Status::Blocked))
+                        if !self.messages.iter().any(|m| m.queued && m.to == id) =>
+                    {
                         Reply::Ok(s.name().into())
                     }
                     _ => {
+                        self.waiters.retain(|(_, r)| !r.is_closed());
                         self.waiters.push((id, inc.reply));
                         return;
                     }
@@ -54,8 +60,10 @@ impl Workspace {
                         Some(f) => Some(self.term_arg(&f)?),
                         None => None,
                     };
-                    let id = self.open(from, place, cwd, &argv, focus, window, cx);
-                    Reply::Ok(format!("t{id}"))
+                    match self.open(from, place, cwd, &argv, focus, window, cx) {
+                        Ok(id) => Reply::Ok(format!("t{id}")),
+                        Err(err) => Reply::Err(err),
+                    }
                 }
                 Request::Send { from, to, text } => {
                     let to = self.term_arg(&to)?;
@@ -99,7 +107,8 @@ impl Workspace {
         result.unwrap_or_else(|e| e)
     }
 
-    /// Opens a terminal beside `from`, or the focused terminal, and returns its id.
+    /// Opens a terminal beside `from`, or the focused terminal, and returns its id. Without
+    /// `focus`, focus and zoom stay as they are.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn open(
         &mut self,
@@ -110,28 +119,45 @@ impl Workspace {
         focus: bool,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> u64 {
-        let before = self.model.term();
-        let from = from.unwrap_or(before);
+    ) -> Result<u64, String> {
+        let from = from.unwrap_or_else(|| self.model.term());
         let cwd = cwd.unwrap_or_else(|| self.cwd_of(from, cx));
-        self.model.focus_term(from);
         let m = &mut self.model;
-        let id = match place {
-            Place::Tab => m.new_tab(),
-            Place::Right => m.split_split(Axis::Row),
-            Place::Down => m.split_split(Axis::Column),
-            Place::SpaceRight => m.split_space(Axis::Row),
-            Place::SpaceDown => m.split_space(Axis::Column),
-            Place::Layout => m.new_layout(),
+        let id = if focus {
+            m.focus_term(from);
+            Some(match place {
+                Place::Tab => m.new_tab(),
+                Place::Right => m.split_split(Axis::Row),
+                Place::Down => m.split_split(Axis::Column),
+                Place::SpaceRight => m.split_space(Axis::Row),
+                Place::SpaceDown => m.split_space(Axis::Column),
+                Place::Layout => m.new_layout(),
+            })
+        } else {
+            match place {
+                Place::Tab => m.new_tab_at(from),
+                Place::Right => m.split_split_at(from, Axis::Row),
+                Place::Down => m.split_split_at(from, Axis::Column),
+                Place::SpaceRight => m.split_space_at(from, Axis::Row),
+                Place::SpaceDown => m.split_space_at(from, Axis::Column),
+                Place::Layout => {
+                    let active = m.active;
+                    let id = m.new_layout();
+                    m.active = active;
+                    Some(id)
+                }
+            }
         };
-        self.spawn(id, &cwd, argv, window, cx);
+        let id = id.ok_or_else(|| format!("no terminal t{from}"))?;
+        if let Err(err) = self.spawn(id, &cwd, argv, window, cx) {
+            return Err(format!("can't start terminal: {err:#}"));
+        }
         if focus {
             self.focus_current(window, cx);
         } else {
-            self.model.focus_term(before);
             cx.notify();
         }
-        id
+        Ok(id)
     }
 
     fn list(&self, as_json: bool, cx: &mut Context<Self>) -> String {

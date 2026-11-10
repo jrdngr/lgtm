@@ -65,13 +65,16 @@ pub fn argv(host: &Host, exe: &Path, file: &Path, line: u32, right: bool) -> Vec
 pub fn open(host: &Host, file: &Path, line: u32, right: bool) -> std::io::Result<()> {
     let exe = std::env::current_exe()?;
     let argv = argv(host, &exe, file, line, right);
-    Command::new(&argv[0])
+    let mut child = Command::new(&argv[0])
         .args(&argv[1..])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .spawn()
-        .map(drop)
+        .spawn()?;
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
+    Ok(())
 }
 
 #[cfg(test)]

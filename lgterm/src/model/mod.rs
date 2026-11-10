@@ -3,6 +3,8 @@
 
 pub mod tree;
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 pub use tree::{Axis, Dir, Keyed, Rect, Tree};
@@ -226,6 +228,42 @@ impl Model {
         term
     }
 
+    /// Opens a tab after `term`, leaving focus and zoom as they are.
+    pub fn new_tab_at(&mut self, term: u64) -> Option<u64> {
+        let p = self.locate(term)?;
+        let new = self.id();
+        let split = self.layouts[p.layout]
+            .spaces
+            .find_mut(p.space)?
+            .splits
+            .find_mut(p.split)?;
+        split.tabs.insert(p.tab + 1, new);
+        if split.active > p.tab {
+            split.active += 1;
+        }
+        Some(new)
+    }
+
+    /// Splits `term`'s split, leaving focus and zoom as they are.
+    pub fn split_split_at(&mut self, term: u64, axis: Axis) -> Option<u64> {
+        let p = self.locate(term)?;
+        let (split, new) = self.new_split();
+        let space = self.layouts[p.layout].spaces.find_mut(p.space)?;
+        space.splits.insert(p.split, split, axis).ok()?;
+        Some(new)
+    }
+
+    /// Opens a space beside `term`'s, leaving focus and zoom as they are.
+    pub fn split_space_at(&mut self, term: u64, axis: Axis) -> Option<u64> {
+        let p = self.locate(term)?;
+        let (space, new) = self.new_space();
+        self.layouts[p.layout]
+            .spaces
+            .insert(p.space, space, axis)
+            .ok()?;
+        Some(new)
+    }
+
     pub fn locate(&self, term: u64) -> Option<Place> {
         self.layouts.iter().enumerate().find_map(|(layout, l)| {
             l.spaces.leaves().into_iter().find_map(|space| {
@@ -289,7 +327,7 @@ impl Model {
     }
 
     /// Takes a terminal out, closing whatever is left empty: its split, space and layout.
-    /// Returns false once no terminals are left.
+    /// Returns false, leaving the model as it is, when `term` is the last terminal.
     pub fn remove_term(&mut self, term: u64) -> bool {
         let Some(p) = self.locate(term) else {
             return true;
@@ -319,11 +357,14 @@ impl Model {
             }
             return true;
         }
+        if self.layouts.len() == 1 {
+            return false;
+        }
         self.layouts.remove(p.layout);
         if self.active > p.layout || self.active == self.layouts.len() {
             self.active = self.active.saturating_sub(1);
         }
-        !self.layouts.is_empty()
+        true
     }
 
     /// Moves the focused tab into a new split to the right of its own.
@@ -360,22 +401,28 @@ impl Model {
             .collect()
     }
 
-    /// Whether a loaded model holds together: everything focused exists and every id is
-    /// below the next one handed out.
+    /// Whether a loaded model holds together: every tree is well formed, everything focused
+    /// exists, and every id is unique and below the next one handed out.
     pub fn is_valid(&self) -> bool {
         if self.active >= self.layouts.len() {
             return false;
         }
+        let mut ids: [HashSet<u64>; 4] = Default::default();
         self.layouts.iter().all(|l| {
             l.id < self.next
+                && ids[0].insert(l.id)
+                && l.spaces.well_formed()
                 && l.spaces.contains(l.focus)
                 && l.spaces.leaves().into_iter().all(|s| {
                     s.id < self.next
+                        && ids[1].insert(s.id)
+                        && s.splits.well_formed()
                         && s.splits.contains(s.focus)
                         && s.splits.leaves().into_iter().all(|sp| {
                             sp.id < self.next
+                                && ids[2].insert(sp.id)
                                 && sp.active < sp.tabs.len()
-                                && sp.tabs.iter().all(|t| *t < self.next)
+                                && sp.tabs.iter().all(|t| *t < self.next && ids[3].insert(*t))
                         })
                 })
         })
@@ -478,6 +525,7 @@ mod tests {
         assert!(m.remove_term(other));
         assert_eq!(m.active, 0);
         assert!(!m.remove_term(first));
+        assert_eq!(m.term(), first);
     }
 
     #[test]
@@ -506,6 +554,39 @@ mod tests {
         let broken = json.replace("\"active\":1", "\"active\":7");
         let broken: Model = serde_json::from_str(&broken).unwrap();
         assert!(!broken.is_valid());
+    }
+
+    #[test]
+    fn degenerate_trees_and_duplicate_ids_are_invalid() {
+        let (mut m, _) = Model::new();
+        m.split_split(Axis::Row);
+        assert!(m.is_valid());
+
+        let mut lone = m.clone();
+        let focus = lone.layouts[0].focus;
+        let space = lone.layouts[0].spaces.find_mut(focus).unwrap();
+        let Tree::Branch { children, .. } = &mut space.splits else {
+            panic!("split space");
+        };
+        children.pop();
+        space.focus = children[0].tree.first().id;
+        assert!(!lone.is_valid());
+
+        let mut twin = m.clone();
+        let focus = twin.layouts[0].focus;
+        let space = twin.layouts[0].spaces.find_mut(focus).unwrap();
+        let Tree::Branch { children, .. } = &mut space.splits else {
+            panic!("split space");
+        };
+        let Tree::Leaf(first) = &children[0].tree else {
+            panic!("leaf");
+        };
+        let id = first.id;
+        let Tree::Leaf(second) = &mut children[1].tree else {
+            panic!("leaf");
+        };
+        second.id = id;
+        assert!(!twin.is_valid());
     }
 
     #[test]
@@ -566,5 +647,21 @@ mod tests {
         m.toggle_zoom();
         m.split_split(Axis::Row);
         assert_eq!(m.layout().zoom, None);
+    }
+
+    #[test]
+    fn opening_at_a_terminal_leaves_focus_and_zoom_alone() {
+        let (mut m, a) = Model::new();
+        let b = m.split_split(Axis::Row);
+        m.toggle_zoom();
+        let zoom = m.layout().zoom;
+        let tab = m.new_tab_at(a).unwrap();
+        let split = m.split_split_at(a, Axis::Column).unwrap();
+        let space = m.split_space_at(a, Axis::Row).unwrap();
+        assert_eq!((m.term(), m.layout().zoom), (b, zoom));
+        assert_eq!(m.locate(tab).unwrap().split, m.locate(a).unwrap().split);
+        assert_eq!(m.split().tabs, [b]);
+        assert!(m.locate(split).is_some() && m.locate(space).is_some());
+        assert!(m.is_valid());
     }
 }

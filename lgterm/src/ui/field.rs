@@ -31,8 +31,10 @@ pub fn key(text: &mut String, k: &Keystroke) -> Key {
             if k.modifiers.alt {
                 let trimmed = text.trim_end().len();
                 let cut = text[..trimmed]
-                    .rfind(char::is_whitespace)
-                    .map_or(0, |i| i + 1);
+                    .char_indices()
+                    .rev()
+                    .find(|(_, c)| c.is_whitespace())
+                    .map_or(0, |(i, c)| i + c.len_utf8());
                 text.truncate(cut);
             } else {
                 text.pop();
@@ -78,5 +80,12 @@ mod tests {
         assert_eq!(press(&mut t, "cmd-a"), Key::Other);
         assert_eq!(press(&mut t, "ctrl-a"), Key::Other);
         assert_eq!(t, "split");
+    }
+
+    #[test]
+    fn alt_backspace_keeps_multibyte_whitespace() {
+        let mut t = String::from("foo\u{3000}bar");
+        assert_eq!(press(&mut t, "alt-backspace"), Key::Edited);
+        assert_eq!(t, "foo\u{3000}");
     }
 }

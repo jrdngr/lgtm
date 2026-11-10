@@ -42,6 +42,7 @@ pub fn run(args: &[String]) -> i32 {
             0
         }
         Ok(Some((request, timeout))) => send(&request, timeout, hook),
+        Err(_) if hook => 0,
         Err(e) => {
             eprintln!("lgterm: {e}\n{USAGE}");
             2
@@ -64,6 +65,7 @@ fn send(request: &Request, timeout: Option<Duration>, quiet: bool) -> i32 {
             }
             0
         }
+        Ok(Reply::Err(_)) if quiet => 0,
         Ok(Reply::Err(e)) => {
             eprintln!("lgterm: {e}");
             1
@@ -133,7 +135,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             Request::Send {
                 from: this_term(),
                 to,
-                text: f.text("message")?,
+                text: f.text("message", &rest)?,
             }
         }
         "type" => {
@@ -141,16 +143,21 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             let to = f.positional("terminal")?;
             Request::Type {
                 to,
-                text: f.text("text")?,
+                text: f.text("text", &rest)?,
                 enter,
             }
         }
         "wait" => {
             let timeout = f
                 .value("--timeout")?
-                .map(|t| t.parse::<f64>().map_err(|_| format!("bad timeout: {t}")))
-                .transpose()?
-                .map(Duration::from_secs_f64);
+                .map(|t| {
+                    t.parse::<f64>()
+                        .ok()
+                        .and_then(|s| Duration::try_from_secs_f64(s).ok())
+                        .filter(|d| !d.is_zero())
+                        .ok_or_else(|| format!("bad timeout: {t}"))
+                })
+                .transpose()?;
             let term = f.positional("terminal")?;
             f.done()?;
             return Ok(Some((Request::Wait { term }, timeout)));
@@ -240,12 +247,14 @@ impl Flags {
         Ok(self.args.remove(i))
     }
 
-    /// Everything left, as one string.
-    fn text(&mut self, what: &str) -> Result<String, String> {
-        if self.args.is_empty() {
+    /// Everything left, then everything after `--`, as one string.
+    fn text(&mut self, what: &str, rest: &[String]) -> Result<String, String> {
+        let mut words = std::mem::take(&mut self.args);
+        words.extend_from_slice(rest);
+        if words.is_empty() {
             return Err(format!("missing {what}"));
         }
-        Ok(std::mem::take(&mut self.args).join(" "))
+        Ok(words.join(" "))
     }
 
     fn done(&self) -> Result<(), String> {
@@ -292,12 +301,33 @@ mod tests {
     }
 
     #[test]
+    fn text_after_a_double_dash_is_kept() {
+        let Request::Send { text, .. } = p(&["send", "t2", "a", "--", "--b"]) else {
+            panic!("not a send")
+        };
+        assert_eq!(text, "a --b");
+        let Request::Type { text, enter, .. } = p(&["type", "t3", "--enter", "--", "--enter"])
+        else {
+            panic!("not a type")
+        };
+        assert!(enter);
+        assert_eq!(text, "--enter");
+        let Request::Type { text, .. } = p(&["type", "t3", "--", "-x"]) else {
+            panic!("not a type")
+        };
+        assert_eq!(text, "-x");
+    }
+
+    #[test]
     fn bad_arguments_are_errors() {
         let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
         assert!(parse(&args(&["split", "--right", "--down"])).is_err());
         assert!(parse(&args(&["read", "t1", "--lines"])).is_err());
         assert!(parse(&args(&["focus", "t1", "t2"])).is_err());
         assert!(parse(&args(&["send", "t1"])).is_err());
+        for t in ["-1", "nan", "0", "1e-12", "inf"] {
+            assert!(parse(&args(&["wait", "t1", "--timeout", t])).is_err());
+        }
     }
 
     #[test]

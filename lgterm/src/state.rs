@@ -1,6 +1,6 @@
 //! Layouts saved on quit and restored on launch.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ pub struct SavedTerm {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct State {
     pub model: Model,
-    pub terms: HashMap<u64, SavedTerm>,
+    pub terms: BTreeMap<u64, SavedTerm>,
     pub messages_tab: Option<u64>,
     pub messages: Vec<Message>,
     pub collapsed: Vec<u64>,

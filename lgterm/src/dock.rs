@@ -21,10 +21,15 @@ pub fn set_badge(_: usize) {}
 
 #[cfg(target_os = "macos")]
 pub fn play_sound() {
-    let _ = std::process::Command::new("afplay")
+    let child = std::process::Command::new("afplay")
         .arg("/System/Library/Sounds/Glass.aiff")
         .stdin(std::process::Stdio::null())
         .spawn();
+    if let Ok(mut child) = child {
+        std::thread::spawn(move || {
+            let _ = child.wait();
+        });
+    }
 }
 
 #[cfg(not(target_os = "macos"))]

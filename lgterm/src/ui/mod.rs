@@ -27,6 +27,7 @@ use crate::model::Model;
 use crate::procinfo;
 use crate::settings::Settings;
 use crate::state::State;
+use crate::status::Kind;
 use crate::terminal::links::Link;
 use crate::terminal::{FontSize, TermEvent, TermView};
 use agents::Agent;
@@ -37,7 +38,11 @@ use rename::Rename;
 #[derive(Clone, Debug, Default, PartialEq)]
 struct Info {
     process: Option<String>,
+    /// The agent the foreground process runs.
+    kind: Option<Kind>,
     cwd: Option<PathBuf>,
+    /// The shell itself is in the foreground, running nothing.
+    shell_foreground: bool,
 }
 
 struct Term {
@@ -65,8 +70,8 @@ pub struct Workspace {
     /// Agents on the Dock badge.
     badge: usize,
     palette: Option<palette::Palette>,
-    /// The Settings dialog's focus, while it's open.
-    settings_open: Option<FocusHandle>,
+    /// The Settings dialog's focus and the subscription that closes it on blur, while it's open.
+    settings_open: Option<(FocusHandle, Subscription)>,
     /// The state last written to disk.
     saved: Option<Vec<u8>>,
     _server: Option<ipc::Server>,
@@ -98,7 +103,9 @@ impl Workspace {
         this.listen(window, cx);
         match State::load().filter(|_| this.settings.restore) {
             Some(state) => this.restore(state, window, cx),
-            None => this.spawn(first, &cwd, &[], window, cx),
+            None => {
+                let _ = this.spawn(first, &cwd, &[], window, cx);
+            }
         }
         this.focus_current(window, cx);
         this.start_timers(window, cx);
@@ -184,13 +191,13 @@ impl Workspace {
         argv: &[String],
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) {
+    ) -> anyhow::Result<()> {
         let view = match TermView::spawn(id, cwd, argv, cx) {
             Ok(view) => view,
             Err(err) => {
                 eprintln!("lgterm: can't start a shell: {err:#}");
                 self.close(id, window, cx);
-                return;
+                return Err(err);
             }
         };
         let sub = cx.subscribe_in(&view, window, move |this, _, ev, window, cx| match ev {
@@ -207,6 +214,7 @@ impl Workspace {
                 _sub: sub,
             },
         );
+        Ok(())
     }
 
     /// The folder new terminals beside `term` start in.
@@ -223,10 +231,19 @@ impl Workspace {
     fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let mut changed = false;
         for term in self.terms.values_mut() {
-            let pid = term.view.read(cx).foreground_pid();
+            let view = term.view.read(cx);
+            let pid = view.foreground_pid();
+            let process = pid.and_then(procinfo::name);
+            let shell_foreground = pid.is_some() && pid == view.shell_pid();
+            let kind = process.as_deref().and_then(Kind::from_process).or_else(|| {
+                let (exe, argv) = procinfo::command(pid.filter(|_| !shell_foreground)?)?;
+                Kind::from_command(&exe, &argv)
+            });
             let info = Info {
-                process: pid.and_then(procinfo::name),
+                process,
+                kind,
                 cwd: pid.and_then(procinfo::cwd),
+                shell_foreground,
             };
             if info != term.info {
                 term.info = info;
@@ -261,24 +278,32 @@ impl Workspace {
     ) {
         let cwd = self.cwd_of(self.model.term(), cx);
         if let Some(new) = change(&mut self.model) {
-            self.spawn(new, &cwd, &[], window, cx);
+            let _ = self.spawn(new, &cwd, &[], window, cx);
         }
         self.focus_current(window, cx);
     }
 
     fn close(&mut self, term: u64, window: &mut Window, cx: &mut Context<Self>) {
         if self.terms.remove(&term).is_some() {
-            self.finish_waits(term, "exited");
             self.update_badge();
         }
+        self.finish_waits(term, "exited");
+        self.drop_queued(term);
         if self.messages_tab == Some(term) {
             self.messages_tab = None;
         }
+        let was_focused = self.model.term() == term;
         if !self.model.remove_term(term) {
             cx.quit();
             return;
         }
-        self.focus_current(window, cx);
+        let overlay =
+            self.rename.is_some() || self.palette.is_some() || self.settings_open.is_some();
+        if was_focused && !overlay {
+            self.focus_current(window, cx);
+        } else {
+            cx.notify();
+        }
     }
 
     fn close_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -295,8 +320,8 @@ impl Workspace {
             return String::new();
         };
         let title = t.view.read(cx).title.as_str();
-        if t.agent.is_some() {
-            let name = t.info.process.as_deref().unwrap_or("agent");
+        if let Some(agent) = &t.agent {
+            let name = agent.kind.name();
             return labels::clean_title(title).unwrap_or(name).to_owned();
         }
         match t.info.process.as_deref() {
@@ -327,7 +352,7 @@ impl Workspace {
                     "--split".to_owned(),
                     format!("{}:{}", path.display(), line.unwrap_or(1)),
                 ];
-                self.open(Some(term), Place::Right, Some(cwd), &argv, true, window, cx);
+                let _ = self.open(Some(term), Place::Right, Some(cwd), &argv, true, window, cx);
             }
         }
     }

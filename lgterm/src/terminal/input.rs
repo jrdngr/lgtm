@@ -9,7 +9,7 @@ use ghostty_vt::terminal::{Mode, Point as VtPoint, PointCoordinate, ScrollViewpo
 use ghostty_vt::{Terminal, fmt};
 use gpui::{
     Context, KeyDownEvent, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, Point, ScrollEvent, Window,
+    Pixels, Point, ScrollEvent, Window, px,
 };
 
 use super::links::{self, Link};
@@ -53,6 +53,10 @@ impl TermView {
         if k.modifiers.platform {
             return;
         }
+        self.last_key = Some(std::time::Instant::now());
+        if let Some(draft) = keys::drafts(k) {
+            self.draft = draft;
+        }
         let e = &mut self.key_event;
         e.set_action(if ev.is_held {
             Action::Repeat
@@ -62,10 +66,8 @@ impl TermView {
         .set_key(keys::key(&k.key))
         .set_mods(keys::mods(&k.modifiers))
         .set_consumed_mods(keys::consumed(k))
-        .set_utf8(keys::text(k).map(str::to_owned));
-        if let Some(c) = keys::unshifted(&k.key) {
-            e.set_unshifted_codepoint(c);
-        }
+        .set_utf8(keys::text(k).map(str::to_owned))
+        .set_unshifted_codepoint(keys::unshifted(&k.key).unwrap_or('\0'));
         self.keys.set_options_from_terminal(&self.vt);
         let mut out = Vec::new();
         if self.keys.encode_to_vec(&self.key_event, &mut out).is_ok() && !out.is_empty() {
@@ -98,11 +100,15 @@ impl TermView {
         let Some((origin, cell)) = self.grid else {
             return;
         };
+        // The encoder takes whole-pixel cells, as the vt does, so the position is scaled to
+        // land in the same cell it's drawn in.
+        let cw = (cell.width.as_f32() as u32).max(1);
+        let ch = (cell.height.as_f32() as u32).max(1);
         let size = EncoderSize {
-            screen_width: (cell.width * self.cols as f32).as_f32() as u32,
-            screen_height: (cell.height * self.rows as f32).as_f32() as u32,
-            cell_width: cell.width.as_f32() as u32,
-            cell_height: cell.height.as_f32() as u32,
+            screen_width: cw * self.cols as u32,
+            screen_height: ch * self.rows as u32,
+            cell_width: cw,
+            cell_height: ch,
             padding_top: 0,
             padding_bottom: 0,
             padding_right: 0,
@@ -116,8 +122,8 @@ impl TermView {
             .set_button(button)
             .set_mods(keys::mods(mods))
             .set_position(mouse::Position {
-                x: (pos.x - origin.x).as_f32(),
-                y: (pos.y - origin.y).as_f32(),
+                x: (pos.x - origin.x).as_f32() * cw as f32 / cell.width.as_f32(),
+                y: (pos.y - origin.y).as_f32() * ch as f32 / cell.height.as_f32(),
             });
         self.mouse
             .set_options_from_terminal(&self.vt)
@@ -131,8 +137,8 @@ impl TermView {
     fn link_at(&mut self, pos: Point<Pixels>) -> Option<Link> {
         let (x, y) = self.cell_at(pos)?;
         let frame = self.snap.frame(&self.vt).ok()?;
-        let line = frame.rows.get(y as usize)?.text();
-        links::at(&line, x as usize)
+        let row = frame.rows.get(y as usize)?;
+        links::at(&row.text(), row.char_index(x)?)
     }
 
     fn screen_point(&self, (x, y): (u16, u16)) -> (u16, u32) {
@@ -155,6 +161,7 @@ impl TermView {
             return;
         }
         if self.reports_mouse(&ev.modifiers) {
+            self.pressed = Some((ev.button, true));
             self.send_mouse(
                 mouse::Action::Press,
                 mouse_button(ev.button),
@@ -170,6 +177,7 @@ impl TermView {
             return;
         };
         let at = self.screen_point(cell);
+        self.pressed = Some((ev.button, false));
         self.mouse_down = true;
         self.drag_from = Some(at);
         let point = VtPoint::Screen(PointCoordinate { x: at.0, y: at.1 });
@@ -203,6 +211,10 @@ impl TermView {
             self.send_mouse(mouse::Action::Motion, button, ev.position, &ev.modifiers);
             return;
         }
+        if ev.pressed_button != Some(MouseButton::Left) {
+            self.mouse_down = false;
+            return;
+        }
         let (Some(from), Some(cell), true) =
             (self.drag_from, self.cell_at(ev.position), self.mouse_down)
         else {
@@ -218,6 +230,7 @@ impl TermView {
     }
 
     pub(super) fn mouse_up(&mut self, ev: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.pressed = None;
         if self.reports_mouse(&ev.modifiers) {
             self.send_mouse(
                 mouse::Action::Release,
@@ -228,6 +241,40 @@ impl TermView {
             return;
         }
         self.mouse_down = false;
+        cx.notify();
+    }
+
+    /// Ends a press that started here but was released elsewhere.
+    pub(super) fn mouse_up_out(
+        &mut self,
+        ev: &MouseUpEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((button, reported)) = self.pressed else {
+            return;
+        };
+        if button != ev.button {
+            return;
+        }
+        self.pressed = None;
+        self.mouse_down = false;
+        if reported && let Some((origin, cell)) = self.grid {
+            let clamp = |at: Pixels, n: u16, size: Pixels| {
+                px(at.as_f32().clamp(0., size.as_f32() * (n as f32 - 0.5)))
+            };
+            let pos = origin
+                + Point {
+                    x: clamp(ev.position.x - origin.x, self.cols, cell.width),
+                    y: clamp(ev.position.y - origin.y, self.rows, cell.height),
+                };
+            self.send_mouse(
+                mouse::Action::Release,
+                mouse_button(ev.button),
+                pos,
+                &ev.modifiers,
+            );
+        }
         cx.notify();
     }
 
@@ -268,7 +315,8 @@ impl TermView {
                 .set_key(arrow)
                 .set_mods(key::Mods::empty())
                 .set_consumed_mods(key::Mods::empty())
-                .set_utf8(None::<String>);
+                .set_utf8(None::<String>)
+                .set_unshifted_codepoint('\0');
             self.keys.set_options_from_terminal(&self.vt);
             let mut out = Vec::new();
             if self.keys.encode_to_vec(&self.key_event, &mut out).is_ok() {
