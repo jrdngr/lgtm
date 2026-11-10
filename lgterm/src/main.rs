@@ -10,13 +10,11 @@ mod state;
 mod terminal;
 mod theme;
 mod ui;
+mod window_place;
 
 use std::path::PathBuf;
 
-use gpui::{
-    App, AppContext, Bounds, Menu, MenuItem, TitlebarOptions, WindowBounds, WindowOptions, point,
-    px, size,
-};
+use gpui::{App, AppContext, Menu, MenuItem, TitlebarOptions, WindowOptions, point, px};
 
 use terminal::FontSize;
 use ui::Workspace;
@@ -32,16 +30,17 @@ fn main() {
         .filter(|d| d.parent().is_some())
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
-    gpui_platform::application().run(move |cx: &mut App| {
+    let app = gpui_platform::application();
+    app.on_reopen(|cx| cx.activate(true));
+    app.run(move |cx: &mut App| {
         cx.set_global(FontSize(theme::DEFAULT_FONT_SIZE));
         cx.set_app_identity("dev.lgtm.lgterm", "lgterm");
         actions::bind(cx);
         cx.on_action(|_: &Quit, cx| cx.quit());
         cx.set_menus([Menu::new("lgterm").items([MenuItem::action("Quit lgterm", Quit)])]);
-        let bounds = Bounds::centered(None, size(px(1440.), px(900.)), cx);
         let opened = cx.open_window(
             WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_bounds: Some(window_place::load(cx)),
                 titlebar: Some(TitlebarOptions {
                     title: Some("lgterm".into()),
                     appears_transparent: true,

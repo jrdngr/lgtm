@@ -113,7 +113,26 @@ impl Workspace {
         this.focus_current(window, cx);
         this.start_timers(window, cx);
         this.start_saving(window, cx);
+        this.keep_running_on_close(window, cx);
         this
+    }
+
+    /// Closing the window hides the app on macOS, so terminals keep running until Quit. The
+    /// window's place is saved on close, on quit, and as it moves.
+    fn keep_running_on_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        cx.observe_window_bounds(window, |_, window, _| {
+            crate::window_place::save(window.window_bounds())
+        })
+        .detach();
+        window.on_window_should_close(cx, |window, cx| {
+            crate::window_place::save(window.window_bounds());
+            if cfg!(target_os = "macos") {
+                cx.hide();
+                false
+            } else {
+                true
+            }
+        });
     }
 
     /// Serves the control socket and answers notification clicks.
