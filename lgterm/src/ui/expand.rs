@@ -1,6 +1,7 @@
 //! The button at the right of a space's title or a split's tabs that fills the window or the
 //! space with it, and puts the layout back.
 
+use gpui::prelude::FluentBuilder;
 use gpui::{
     App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px, rgb, svg,
@@ -8,8 +9,8 @@ use gpui::{
 
 use crate::theme;
 
-/// The expand button, or the collapse button when `expanded`, shown while the pointer is over
-/// the element of group `parent`.
+/// The expand button, shown while the pointer is over the element of group `parent`, or the
+/// collapse button, always shown, when `expanded`.
 pub fn button(
     id: impl Into<ElementId>,
     parent: String,
@@ -26,8 +27,9 @@ pub fn button(
         .items_center()
         .justify_center()
         .rounded(px(5.))
-        .opacity(0.)
-        .group_hover(parent, |s| s.opacity(1.))
+        .when(!expanded, |d| {
+            d.opacity(0.).group_hover(parent, |s| s.opacity(1.))
+        })
         .cursor_pointer()
         .group(group.clone())
         .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
