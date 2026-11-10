@@ -74,19 +74,24 @@ impl Workspace {
             .relative()
             .w(px(self.sidebar_width))
             .flex_none()
-            .h_full()
+            .when(!icons, |d| d.h_full())
             .bg(rgb(theme::SIDEBAR))
             .border_r_1()
             .border_color(rgb(theme::SIDEBAR_BORDER))
             .flex()
             .flex_col()
-            .child(
-                div()
-                    .id("sidebar-titlebar")
-                    .h(px(theme::TITLEBAR))
-                    .flex_none()
-                    .moves_window(),
-            )
+            .when(icons, |d| {
+                d.flex_1().min_h_0().border_t_1().rounded_tr(px(8.))
+            })
+            .when(!icons, |d| {
+                d.child(
+                    div()
+                        .id("sidebar-titlebar")
+                        .h(px(theme::TITLEBAR))
+                        .flex_none()
+                        .moves_window(),
+                )
+            })
             .child(
                 div()
                     .flex()
@@ -116,7 +121,26 @@ impl Workspace {
             )
             .child(self.layout_picker(icons, cx))
             .child(handle);
-        space_drag::track_sidebar(side, cx).into_any_element()
+        let side = space_drag::track_sidebar(side, cx);
+        if !icons {
+            return side.into_any_element();
+        }
+        // Too narrow for the traffic lights: they get a row of their own above it, which the
+        // main area's own top row continues.
+        div()
+            .h_full()
+            .flex_none()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .id("sidebar-titlebar")
+                    .h(px(theme::TITLEBAR))
+                    .flex_none()
+                    .moves_window(),
+            )
+            .child(side)
+            .into_any_element()
     }
 
     /// One badge per space, with its worst status on the corner.
@@ -356,8 +380,8 @@ mod tests {
     #[test]
     fn drags_snap_to_badges_or_clamp() {
         assert_eq!(snap(20.), SIDEBAR_ICONS);
-        assert_eq!(snap(110.), SIDEBAR_ICONS);
-        assert_eq!(snap(120.), SIDEBAR_MIN);
+        assert_eq!(snap(100.), SIDEBAR_ICONS);
+        assert_eq!(snap(110.), SIDEBAR_MIN);
         assert_eq!(snap(300.), 300.);
         assert_eq!(snap(900.), SIDEBAR_MAX);
     }
