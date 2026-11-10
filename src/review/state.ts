@@ -20,15 +20,19 @@ export interface MarkIndex {
 }
 
 /** Without `marks` in use, the review's marks are left out. */
+/** Without `marks` in use, only an agent's marks show. */
 export function indexState(state: StateDto, marks = true): MarkIndex {
+  const shown = marks ? state.marks : state.marks.filter((m) => isAgentColor(m.color));
   return {
-    marks: new Map(marks ? state.marks.map((m) => [markKey(m.file, m.row), m]) : []),
+    marks: new Map(shown.map((m) => [markKey(m.file, m.row), m])),
     checks: state.checks,
     agentChecks: new Set(state.agentChecks),
     amber: new Set(state.amber.map((r) => markKey(r.file, r.row))),
     commented: commentedRows(state.comments),
   };
 }
+
+export const isAgentColor = (c: MarkColor) => c === "agentReviewed" || c === "agentFlagged";
 
 /** A checked file's rows count as checked whatever their line marks say. Unmarked rows in a
  * file matching a `skip` glob count as skipped. Amber rows are unmarked. */

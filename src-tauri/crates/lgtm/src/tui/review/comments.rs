@@ -126,7 +126,7 @@ impl Review {
 
     /// A comment's body wrapped to the diff, beside its number.
     pub(super) fn comment_lines(&self, c: &AgentComment) -> Vec<String> {
-        let id = format!("C{} ", c.number).len();
+        let id = format!("C{} ", c.number).len() + c.author.as_ref().map_or(0, |b| b.len() + 2);
         wrap(&c.body, self.width.saturating_sub(5 + id))
     }
 
@@ -394,6 +394,7 @@ mod tests {
             review: String::new(),
             created_at: 0,
             done: false,
+            author: None,
         }
     }
 
@@ -494,6 +495,7 @@ mod tests {
         // Resolved, it goes on the nearest row of its side instead.
         let resolved = AgentComment {
             done: true,
+            author: None,
             ..comment(Side::New, 4, "gone();")
         };
         assert_eq!(place(&files, &resolved), Some((0, 0, 3)));

@@ -1,6 +1,6 @@
 //! The tools an agent in a terminal gets. Each acts on the review open in the terminal's
-//! workspace. Agents read everything and add comments and findings, but can't mark code
-//! reviewed: that's the human's record.
+//! workspace. Agents read everything, add comments and findings, and check files and mark
+//! lines with marks of their own, apart from the human's.
 
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -9,7 +9,8 @@ use anyhow::Context;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use rmcp::service::RequestContext;
+use rmcp::{RoleServer, ServerHandler, tool, tool_handler, tool_router};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
@@ -29,7 +30,7 @@ store an architecture assessment; publish review findings \
 to a report; point the review \
 at code or a revset; and set the revset the revisions log lists. Tools that write to the review take its revset, from your prompt or \
 get_review, and tools that write to a PR thread take the thread's PR number, from your prompt \
-or list_threads; lgtm refuses a write once the review or PR has moved on. You can check files and mark lines with marks of your own, which the human sees apart from theirs. Lines are on the new side of the diff. To work \
+or list_threads; lgtm refuses a write once the review or PR has moved on. You can check files, mark lines with marks of your own, and leave comments, which the human sees apart from theirs. Lines are on the new side of the diff. To work \
 through decisions with the human, including whenever they say qq or ask for a qqueue \
 session, ask through lgtm's Q&A queue (qa_ask) instead of in the chat. Then stop: they \
 answer in lgtm, which sends you prompts starting with `lgtm Q&A` to update and discuss \
@@ -178,6 +179,22 @@ impl Lgtm {
             .await
             .map_err(failed)?;
         Ok(if p.checked { "Checked." } else { "Unchecked." }.into())
+    }
+
+    #[tool(description = agent::ADD_COMMENT)]
+    async fn add_comment(
+        &self,
+        Parameters(mut p): Parameters<agent::AddComment>,
+        rc: RequestContext<RoleServer>,
+    ) -> Out {
+        let client = rc.peer.peer_info().map(|i| i.client_info.name.clone());
+        p.author = Some(agent::agent_name(client.as_deref().unwrap_or("")));
+        let (_, ctx) = self.repo().map_err(failed)?;
+        let number = ctx
+            .agent_add_comment(self.workspace(), &p)
+            .await
+            .map_err(failed)?;
+        Ok(format!("Added C{number}."))
     }
 
     #[tool(description = agent::MARK_LINES)]
@@ -446,7 +463,11 @@ impl ServerHandler for Lgtm {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
-            .with_instructions(format!("{INSTRUCTIONS} {}", agent::COMMENTS_INSTRUCTIONS))
+            .with_instructions(format!(
+                "{INSTRUCTIONS} {} {}",
+                agent::COMMENTS_INSTRUCTIONS,
+                agent::REVIEW_INSTRUCTIONS
+            ))
     }
 }
 

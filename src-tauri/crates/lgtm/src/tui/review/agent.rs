@@ -9,7 +9,7 @@ use lgtm_core::review::comments as comment_core;
 use lgtm_core::review::slots;
 use lgtm_core::review::view::{About, parse_range};
 
-use crate::agent::{CheckFiles, MarkLines, Request, Response};
+use crate::agent::{AddComment, CheckFiles, MarkLines, Request, Response};
 
 fn pretty(v: serde_json::Value) -> Response {
     serde_json::to_string_pretty(&v).map_err(|e| e.to_string())
@@ -25,6 +25,7 @@ impl Review {
             Request::UnresolveComment(r) => self.set_done(r.number, false, store),
             Request::CheckFiles(c) => self.check_files(c, store),
             Request::MarkLines(m) => self.mark_lines(m, store),
+            Request::AddComment(a) => self.add_comment(a, store),
         }
     }
 
@@ -155,6 +156,22 @@ impl Review {
             .map_err(|e| format!("{e:#}"))?;
         let verb = if c.checked { "Checked" } else { "Unchecked" };
         Ok(format!("{verb} {} files.", files.len()))
+    }
+
+    fn add_comment(&mut self, a: AddComment, store: Option<&mut Store>) -> Response {
+        self.same_review(&a.revset)?;
+        let store = store.ok_or("lgtm couldn't open its store")?;
+        let file = self
+            .files
+            .iter()
+            .find(|f| f.path == a.path)
+            .ok_or_else(|| format!("`{}` isn't in the review", a.path))?;
+        let rows = comments::rows(file).map(|(_, row)| row);
+        let c =
+            comment_core::from_agent(rows, &file.path, file.old_path.as_deref(), &a, &self.revset)?;
+        let added = store.add_agent_comment(&c).map_err(|e| e.to_string())?;
+        self.load_comments(store);
+        Ok(format!("Added C{}.", added.number))
     }
 
     fn mark_lines(&mut self, m: MarkLines, store: Option<&mut Store>) -> Response {

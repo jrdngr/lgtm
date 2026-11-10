@@ -88,6 +88,7 @@ mod tests {
             review: "@".into(),
             created_at: 0,
             done: false,
+            author: None,
         }
     }
 

@@ -348,3 +348,27 @@ async fn agent_marks_leave_the_users_and_clearing_clears_only_the_agents() {
     };
     assert!(err.to_string().contains("own colors"), "{err}");
 }
+
+#[tokio::test]
+async fn an_agents_comment_is_its_own_and_its_add_undoes_like_the_users() {
+    let (dir, ctx) = repo();
+    let d = dir.path();
+    write(d, "a.rs", "fn a() {}\nfn b() {}\n");
+    let review = ctx.open(None, "@", false).await.unwrap();
+    ctx.focus(None, review.id);
+    let add = |line| lgtm_core::review::agent::AddComment {
+        revset: "@".into(),
+        path: "a.rs".into(),
+        line: Some(line),
+        removed_line: None,
+        body: "Why b?".into(),
+        author: Some("Claude".into()),
+    };
+    assert_eq!(ctx.agent_add_comment(None, &add(2)).await.unwrap(), 1);
+    assert!(ctx.agent_add_comment(None, &add(9)).await.is_err());
+    let listed = ctx.agent_comments_listing(None).unwrap();
+    assert_eq!(listed[0]["author"], "Claude");
+    assert_eq!(listed[0]["code"], "fn b() {}");
+    let state = ctx.undo(review.id).unwrap();
+    assert!(state.agent_comments.is_empty());
+}

@@ -215,6 +215,14 @@ describe("fileProgress", () => {
       fileProgress(files, rowStates(files, indexed(marks, "checked", false)), done)[0].done,
     ).toBe(2);
   });
+
+  it("keeps an agent's marks while the user's marks are off", () => {
+    const marks = [mark(3, "agentReviewed"), mark(5, "green")];
+    const agentDone = (c: MarkColor) => c !== "red" && c !== "agentFlagged";
+    expect(
+      fileProgress(files, rowStates(files, indexed(marks, "unchecked", false)), agentDone)[0],
+    ).toEqual({ marks: { agentReviewed: 1 }, byFile: 0, done: 1, changed: 2 });
+  });
 });
 
 describe("hidden unchanged code", () => {

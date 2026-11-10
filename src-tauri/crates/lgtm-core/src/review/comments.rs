@@ -1,10 +1,11 @@
-//! Comments for the agent (C1, C2, …) as both apps use them: placing one on a diff's rows,
-//! listing it for an agent, and undoing changes to it.
+//! Comments (C1, C2, …) as both apps use them: placing one on a diff's rows, an agent's
+//! from where it asked, listing them for an agent, and undoing changes to them.
 
 use serde_json::{Value, json};
 
 use crate::anchor::Side;
 use crate::diff::RowKind;
+use crate::review::agent::AddComment;
 use crate::store::{AgentComment, Edit, Store};
 
 /// What placing and listing a comment need of a row.
@@ -62,7 +63,37 @@ pub fn new_comment(
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_millis() as i64),
         done: false,
+        author: None,
     }
+}
+
+/// The comment an agent asked for with `add`, on the row of the file's `rows` at its line.
+pub fn from_agent<'a>(
+    mut rows: impl Iterator<Item = RowText<'a>>,
+    path: &str,
+    old_path: Option<&str>,
+    add: &AddComment,
+    review: &str,
+) -> Result<AgentComment, String> {
+    let body = add.body.trim();
+    if body.is_empty() {
+        return Err("the comment has no text".into());
+    }
+    let row = match (add.line, add.removed_line) {
+        (Some(n), None) => rows.find(|r| r.kind != RowKind::Removed && r.new_line == Some(n)),
+        (None, Some(n)) => rows.find(|r| r.kind == RowKind::Removed && r.old_line == Some(n)),
+        _ => return Err("give either line or removedLine".into()),
+    };
+    let row = row.ok_or_else(|| {
+        format!(
+            "that line isn't in the diff of `{}`: comment on a changed line or one beside it",
+            add.path
+        )
+    })?;
+    Ok(AgentComment {
+        author: Some(add.author.clone().unwrap_or_else(|| "Agent".into())),
+        ..new_comment(path, old_path, None, row, body, review)
+    })
 }
 
 /// Whether a review shows comment `c`, found on a row of kind `at`, or nowhere: always when
@@ -135,6 +166,9 @@ pub fn listing(c: &AgentComment, line: Option<u32>, range: Option<(Option<u32>, 
     });
     if c.done {
         out["resolved"] = json!(true);
+    }
+    if let Some(author) = &c.author {
+        out["author"] = json!(author);
     }
     if let Some((start, code)) = range {
         out["startLine"] = json!(start);
@@ -237,6 +271,7 @@ mod tests {
             review: "@".into(),
             created_at: 0,
             done,
+            author: None,
         }
     }
 
@@ -251,5 +286,37 @@ mod tests {
         assert_eq!(place(at(), &comment(18, "x", false)), Some(2));
         assert_eq!(place(at(), &comment(10, "gone", false)), None);
         assert_eq!(place(at(), &comment(10, "gone", true)), Some(1));
+    }
+
+    #[test]
+    fn an_agent_comments_on_a_diff_line_by_its_number_on_either_side() {
+        let rows = [
+            row(RowKind::Removed, Some(19), None, "a > b"),
+            row(RowKind::Added, None, Some(21), "a >= b"),
+        ];
+        let add = |line, removed_line| AddComment {
+            revset: "@".into(),
+            path: "a.rs".into(),
+            line,
+            removed_line,
+            body: " Off by one? ".into(),
+            author: Some("Claude".into()),
+        };
+        let on = |a: &AddComment| from_agent(rows.iter().copied(), "a.rs", None, a, "@");
+        let new = on(&add(Some(21), None)).unwrap();
+        assert_eq!(
+            (
+                new.side,
+                new.line,
+                new.line_text.as_str(),
+                new.body.as_str()
+            ),
+            (Side::New, 21, "a >= b", "Off by one?")
+        );
+        assert_eq!(new.author.as_deref(), Some("Claude"));
+        let old = on(&add(None, Some(19))).unwrap();
+        assert_eq!((old.side, old.line), (Side::Old, 19));
+        assert!(on(&add(Some(19), None)).is_err());
+        assert!(on(&add(Some(21), Some(19))).is_err());
     }
 }

@@ -6,11 +6,12 @@ use std::collections::BTreeMap;
 /// A line of the tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry {
-    /// A directory: what it shows as, its path, and how deep it is.
+    /// A directory: what it shows as, its path, how deep it is, and the review files under it.
     Dir {
         name: String,
         path: String,
         depth: usize,
+        files: Vec<usize>,
     },
     /// A review file by index, and its name.
     File {
@@ -18,8 +19,13 @@ pub enum Entry {
         name: String,
         depth: usize,
     },
-    /// The heading over reviewed files, set apart, with how many there are.
-    Reviewed { count: usize, open: bool },
+    /// The heading over reviewed files, set apart, with how many there are: the user's, or
+    /// with `agent` those only an agent reviewed.
+    Reviewed {
+        agent: bool,
+        count: usize,
+        open: bool,
+    },
 }
 
 #[derive(Default)]
@@ -84,9 +90,16 @@ fn emit(node: &Node, parent: &str, depth: usize, out: &mut Vec<Entry>) {
             name,
             path: path.clone(),
             depth,
+            files: under(dir),
         });
         emit(dir, &path, depth + 1, out);
     }
+}
+
+fn under(node: &Node) -> Vec<usize> {
+    let mut out: Vec<usize> = node.files.iter().map(|&(_, i)| i).collect();
+    out.extend(node.dirs.values().flat_map(under));
+    out
 }
 
 #[cfg(test)]
@@ -102,10 +115,11 @@ mod tests {
             "src/main.rs",
         ];
         let got = tree(paths.into_iter().enumerate(), 0);
-        let dir = |name: &str, path: &str, depth| Entry::Dir {
+        let dir = |name: &str, path: &str, depth, files: &[usize]| Entry::Dir {
             name: name.into(),
             path: path.into(),
             depth,
+            files: files.to_vec(),
         };
         let file = |file, name: &str, depth| Entry::File {
             file,
@@ -116,9 +130,9 @@ mod tests {
             got,
             [
                 file(1, "README.md", 0),
-                dir("src", "src", 0),
+                dir("src", "src", 0, &[3, 0, 2]),
                 file(3, "main.rs", 1),
-                dir("tui/review", "src/tui/review", 1),
+                dir("tui/review", "src/tui/review", 1, &[0, 2]),
                 file(0, "a.rs", 2),
                 file(2, "b.rs", 2),
             ]

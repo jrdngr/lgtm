@@ -644,6 +644,8 @@ export type AgentCommentDto = {
 	body: string,
 	done: boolean,
 	createdAt: number | null,
+	/**  The agent that wrote it, like `Claude`; absent for the user's own. */
+	author: string | null,
 };
 
 /**  How a terminal's agent stands after a hook event. */

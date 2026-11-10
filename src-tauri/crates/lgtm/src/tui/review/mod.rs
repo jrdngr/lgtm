@@ -97,6 +97,7 @@ pub struct Review {
     /// Whether reviewed files are set apart at the bottom of the list.
     group_reviewed: bool,
     reviewed_open: bool,
+    agent_reviewed_open: bool,
     /// Folders closed in the file list, by path.
     closed_dirs: HashSet<String>,
     list_top: usize,
@@ -232,6 +233,7 @@ impl Review {
             list_pick: None,
             group_reviewed: false,
             reviewed_open: false,
+            agent_reviewed_open: false,
             closed_dirs: HashSet::new(),
             list_top: 0,
             height: 0,
@@ -587,8 +589,9 @@ impl Review {
             KeyCode::Tab => self.set_in_list(!self.in_list),
             KeyCode::Enter if self.in_list && self.list_pick.is_some() => {
                 match self.list_pick.clone() {
-                    Some(list::Pick::Dir(dir)) => self.toggle_dir(&dir),
-                    _ => self.toggle_reviewed_open(),
+                    Some(list::Pick::Dir(dir, files)) => self.toggle_dir(&dir, &files),
+                    Some(list::Pick::Reviewed(agent)) => self.toggle_reviewed_open(agent),
+                    None => {}
                 }
             }
             KeyCode::Esc | KeyCode::Enter if self.in_list => self.set_in_list(false),
@@ -678,8 +681,8 @@ impl Review {
                     self.in_list = !matches!(entry, tree::Entry::File { .. });
                     self.pick_entry(&entry);
                     match &entry {
-                        tree::Entry::Reviewed { .. } => self.toggle_reviewed_open(),
-                        tree::Entry::Dir { path, .. } => self.toggle_dir(path),
+                        tree::Entry::Reviewed { agent, .. } => self.toggle_reviewed_open(*agent),
+                        tree::Entry::Dir { path, files, .. } => self.toggle_dir(path, files),
                         tree::Entry::File { .. } => {}
                     }
                 }

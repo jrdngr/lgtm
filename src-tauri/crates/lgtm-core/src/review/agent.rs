@@ -15,9 +15,10 @@ pub const GET_REVIEW: &str = "The open review as the human has reviewed it so fa
 #[macro_export]
 macro_rules! get_comments_doc {
     () => {
-        "The human's comments for you, by number (C1, C2, ...): the file, the line it's on \
-        now, that line's code, and what they wrote. Resolved ones come last, marked resolved: \
-        leave them alone unless the human asks."
+        "The comments on the code, by number (C1, C2, ...): the file, the line it's on now, \
+        that line's code, and what was written. The human's are for you; ones an agent left \
+        with add_comment name it as author. Resolved ones come last, marked resolved: leave \
+        them alone unless the human asks."
     };
 }
 
@@ -43,8 +44,58 @@ pub const CHECK_FILES: &str = "Check or uncheck files in the open review as revi
 
 pub const MARK_LINES: &str = "Mark changed lines of a file in the open review with your own \
     marks: reviewed (counts as done) or flagged (doesn't). The human sees your marks apart \
-    from theirs, and lines they marked keep their marks. Leave mark out to clear yours. Marks \
-    show only while the human uses marks (get_review's marks).";
+    from theirs, and lines they marked keep their marks. Leave mark out to clear yours.";
+
+pub const ADD_COMMENT: &str = "Leave a comment for the human on a line of the open review. \
+    Use it only for what they must see: a likely bug, a risky change, or a question only they \
+    can answer. A review rarely needs more than three. No style notes, praise or summaries.";
+
+/// What the server's instructions say about reviewing a change for the human.
+pub const REVIEW_INSTRUCTIONS: &str = "When the human asks you to review the change in lgtm: \
+    call get_review, read the diff of every file in it, then mark_lines reviewed for lines you \
+    checked and are sure of; mark_lines flagged for lines the human must read themselves \
+    (behavior changes, security, concurrency, data loss, public APIs, anything you aren't sure \
+    of); check_files for files with nothing flagged; and add_comment only on flagged lines \
+    whose reason isn't obvious from the code. Then tell the human in a line or two what you \
+    flagged.";
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AddComment {
+    /// The review's revset, as get_review gives it. lgtm refuses the call once its review
+    /// shows another.
+    pub revset: String,
+    pub path: String,
+    /// A new-side line number, of a line in the file's diff.
+    #[serde(default)]
+    pub line: Option<u32>,
+    /// Or an old-side line number of a removed line.
+    #[serde(default)]
+    pub removed_line: Option<u32>,
+    /// Markdown.
+    pub body: String,
+    /// Who wrote it, filled in by lgtm from the MCP client.
+    #[serde(default)]
+    #[schemars(skip)]
+    pub author: Option<String>,
+}
+
+/// The name an agent goes by in the review, from its MCP client's name.
+pub fn agent_name(client: &str) -> String {
+    let client = client.to_lowercase();
+    if client.contains("claude") {
+        "Claude".into()
+    } else if client.contains("codex") {
+        "Codex".into()
+    } else if client
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|w| w == "pi")
+    {
+        "Pi".into()
+    } else {
+        "Agent".into()
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -90,4 +141,17 @@ pub struct MarkLines {
     pub removed_lines: Vec<String>,
     /// The mark to set. Leave it out to clear your marks on those lines.
     pub mark: Option<AgentMark>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::agent_name;
+
+    #[test]
+    fn agents_go_by_their_clients_names() {
+        assert_eq!(agent_name("claude-code"), "Claude");
+        assert_eq!(agent_name("codex-mcp-client"), "Codex");
+        assert_eq!(agent_name("pi"), "Pi");
+        assert_eq!(agent_name("pipeline"), "Agent");
+    }
 }

@@ -10,13 +10,13 @@ use ratatui::style::Color;
 use super::marks::State;
 use super::rows::{Line, NoteKey};
 use super::wrap::{self, code_parts};
-use super::{LIST_MIN, Review, tree};
+use super::{LIST_MIN, Review, list, tree};
 use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
-    self, ACCENT, ADD, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR, MUTED, NOTE,
-    PANEL, RED, SEL, THREAD, UNIQUE,
+    self, ACCENT, ADD, AGENT_NOTE, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR,
+    MUTED, NOTE, PANEL, RED, SEL, THREAD, UNIQUE,
 };
 use crate::tui::width;
 
@@ -167,14 +167,19 @@ impl Review {
             };
             c.fill(area.x, y, area.width, bg);
             let (state, name, depth, color) = match entry {
-                tree::Entry::Dir { name, path, depth } => {
+                tree::Entry::Dir {
+                    name,
+                    path,
+                    depth,
+                    files,
+                } => {
                     let fold = if self.closed_dirs.contains(path) {
                         "▸"
                     } else {
                         "▾"
                     };
                     (
-                        self.dir_state(path),
+                        list::combined(files.iter().map(|&f| self.file_state(f))),
                         format!("{fold} {name}/"),
                         *depth,
                         MUTED,
@@ -183,9 +188,10 @@ impl Review {
                 tree::Entry::File { file, name, depth } => {
                     (self.file_state(*file), name.clone(), *depth, FG)
                 }
-                tree::Entry::Reviewed { count, open } => {
+                tree::Entry::Reviewed { agent, count, open } => {
                     let fold = if *open { "▾" } else { "▸" };
-                    (State::None, format!("{fold} Reviewed {count}"), 0, MUTED)
+                    let name = if *agent { "Agent reviewed" } else { "Reviewed" };
+                    (State::None, format!("{fold} {name} {count}"), 0, MUTED)
                 }
             };
             let (mark, mark_color) = icon(state);
@@ -370,21 +376,31 @@ impl Review {
                 let Some(comment) = self.comment(n) else {
                     return;
                 };
-                let bg = if cursor { SEL } else { NOTE };
+                // An agent's comment says who wrote it, in its own color.
+                let by = comment.author.as_ref().map(|a| a.to_lowercase());
+                let note = if by.is_some() { AGENT_NOTE } else { NOTE };
+                let bg = if cursor { SEL } else { note };
                 let (accent, fg) = if comment.done {
                     (MUTED, MUTED)
+                } else if by.is_some() {
+                    (FUCHSIA, FG)
                 } else {
                     (ACCENT, FG)
                 };
                 c.fill(x0, y, w, bg);
                 c.put(x0, y, "▎", theme::fg(accent).bg(bg));
                 let id = format!("C{n} ");
+                let width = id.len() + by.as_ref().map_or(0, |b| b.len() + 2);
                 let lines = self.comment_lines(comment);
                 let text = lines.get(part).map_or("", String::as_str);
                 let x = if part == 0 {
-                    c.put(x0 + 2, y, &id, theme::bold(accent).bg(bg))
+                    let x = c.put(x0 + 2, y, &id, theme::bold(accent).bg(bg));
+                    match &by {
+                        Some(b) => c.put(x, y, &format!("{b}  "), theme::fg(accent).bg(bg)),
+                        None => x,
+                    }
                 } else {
-                    x0 + 2 + id.len() as u16
+                    x0 + 2 + width as u16
                 };
                 c.put(x, y, text, theme::fg(fg).bg(bg));
             }

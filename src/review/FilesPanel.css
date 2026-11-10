@@ -130,3 +130,7 @@
   color: var(--mark-red);
   font-weight: 600;
 }
+
+.file-tree .flagged.agent {
+  color: var(--mark-agentFlagged);
+}

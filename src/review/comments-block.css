@@ -14,6 +14,34 @@
   border-style: dashed;
 }
 
+.comment-block.agent {
+  border-color: rgb(214 112 214 / 45%);
+  background: rgb(214 112 214 / 7%);
+  box-shadow: inset 3px 0 var(--mark-agentFlagged);
+}
+
+.comment-block.agent .card-source,
+.comment-block.agent .agent-name {
+  color: var(--mark-agentFlagged);
+}
+
+.comment-block.agent .avatar {
+  background: var(--mark-agentFlagged);
+  color: #fff;
+}
+
+.comment-block.agent .post {
+  grid-template-columns: 18px auto 1fr;
+}
+
+.comment-block.agent .post-body {
+  grid-column: 3;
+}
+
+.agent-name {
+  font-weight: 600;
+}
+
 .card-bar {
   display: flex;
   flex-wrap: wrap;

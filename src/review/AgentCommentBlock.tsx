@@ -15,13 +15,16 @@ interface Props {
   viewer?: string;
 }
 
-/** A comment for the agent under its code: C# and its text, or an editor for it. Any folds to a line;
+/** A comment under its code: C# and its text, or an editor for it. The user's are for the agent; an
+ * agent's for the user show its name in its own color, and aren't edited. Any folds to a line;
  * resolved ones start folded. */
 export function AgentCommentBlock({ id, a, viewer }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const comment = a.find(id);
   const editing = a.edits.get(id);
   const number = comment?.number ?? a.next;
+  const by = comment?.author;
+  const agent = by ? " agent" : "";
 
   useEffect(() => {
     if (a.focus !== id) return;
@@ -36,7 +39,7 @@ export function AgentCommentBlock({ id, a, viewer }: Props) {
 
   if (comment && editing === undefined && comment.done !== a.toggled.has(id)) {
     return (
-      <div className="comment-block folded resolved">
+      <div className={`comment-block folded resolved${agent}`}>
         <button
           type="button"
           className="card-bar collapsed"
@@ -61,7 +64,7 @@ export function AgentCommentBlock({ id, a, viewer }: Props) {
   }
 
   return (
-    <div className={`comment-block${comment?.done ? " resolved" : ""}`}>
+    <div className={`comment-block${comment?.done ? " resolved" : ""}${agent}`}>
       <div className="card-bar">
         {comment && (
           <button
@@ -86,7 +89,7 @@ export function AgentCommentBlock({ id, a, viewer }: Props) {
             >
               {comment.done ? "Reopen" : "✓ Resolve"}
             </button>
-            <IconButton icon="edit" label="Edit" onClick={() => a.edit(comment)} />
+            {!by && <IconButton icon="edit" label="Edit" onClick={() => a.edit(comment)} />}
             <IconButton
               icon="terminal"
               className="pipe-icon"
@@ -99,7 +102,16 @@ export function AgentCommentBlock({ id, a, viewer }: Props) {
       </div>
       {editing === undefined && comment ? (
         <div className="post">
-          <Avatar name={viewer ?? "You"} />
+          {by ? (
+            <>
+              <span className="avatar" aria-hidden="true">
+                {by.slice(0, 1)}
+              </span>
+              <span className="agent-name">{by}</span>
+            </>
+          ) : (
+            <Avatar name={viewer ?? "You"} />
+          )}
           <div className="post-body">
             <Markdown>{comment.body}</Markdown>
           </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import type { MarkColor } from "../bindings";
 import { useSavedSet } from "../core/savedState";
 import { useWorkspace } from "../core/workspace";
 import { type CtxEntry, contextMenu } from "../ui/contextMenu";
@@ -17,6 +18,7 @@ import { type MarkSetup, useMarkSetup } from "./marks";
 import { ProgressCard } from "./ProgressCard";
 import {
   filterLabel,
+  isAgentColor,
   matchesFilter,
   type Progress,
   progressParts,
@@ -28,12 +30,16 @@ import { useSendFromMenu } from "./useSendText";
 import "./FilesPanel.css";
 
 const isDone = (p: Progress) => p.changed > 0 && p.done === p.changed;
+/** Done by an agent's marks alone. */
+const doneByAgent = (p: Progress) =>
+  isDone(p) && p.byFile === 0 && Object.keys(p.marks).every((c) => isAgentColor(c as MarkColor));
 
 const fileCount = (d: TreeDir): number =>
   d.children.reduce((n, c) => n + (c.kind === "dir" ? fileCount(c) : 1), 0);
 
 /** The closed set's key for the reviewed files' heading, which no folder path can be. */
 const REVIEWED_OPEN = "/reviewed";
+const AGENT_REVIEWED_OPEN = "/agent-reviewed";
 
 interface TreeProps {
   depth: number;
@@ -76,7 +82,8 @@ function Node({
     const dto = review.files[node.file].dto;
     const check = review.checks[node.file];
     const changed = check === "changedSinceReviewed";
-    const by = check === "checked" && review.agentChecks.has(node.file) ? "agent" : "user";
+    const agent = check === "checked" ? review.agentChecks.has(node.file) : doneByAgent(p);
+    const by = agent ? "agent" : "user";
     const cls = [
       (isDone(p) || check === "checked") && "done",
       dto.status === "removed" && "removed",
@@ -115,6 +122,7 @@ function Node({
           ) : (
             <>
               {!!p.marks.red && <span className="flagged">!</span>}
+              {!!p.marks.agentFlagged && <span className="flagged agent">!</span>}
               {(isDone(p) || check === "checked") && <Ring done={1} by={by} />}
             </>
           )}
@@ -191,14 +199,23 @@ export function FilesPanel() {
     // A reviewed file with open comments stays with the files left.
     const reviewed = (f: number) =>
       (review.checks[f] === "checked" || isDone(review.progress[f])) && !open.get(f);
+    // Files only an agent checked gather apart from the user's.
+    const byAgent = (f: number) =>
+      review.checks[f] === "checked" ? review.agentChecks.has(f) : doneByAgent(review.progress[f]);
     if (!hideReviewed) return { tree: buildTree(review.files, review.progress, shown) };
     return {
       tree: buildTree(review.files, review.progress, (f) => shown(f) && !reviewed(f)),
-      done: buildTree(review.files, review.progress, (f) => shown(f) && reviewed(f)),
+      agentDone: buildTree(
+        review.files,
+        review.progress,
+        (f) => shown(f) && reviewed(f) && byAgent(f),
+      ),
+      done: buildTree(review.files, review.progress, (f) => shown(f) && reviewed(f) && !byAgent(f)),
     };
   }, [review, hideReviewed, open]);
   const tree = trees?.tree;
   const done = trees?.done;
+  const agentDone = trees?.agentDone;
   const stats = useMemo(() => review?.files.map((f) => lineStat(f.dto)) ?? [], [review?.files]);
   if (!review || !tree) {
     return (
@@ -208,8 +225,10 @@ export function FilesPanel() {
       </div>
     );
   }
-  const p = sumProgress([tree.progress, ...(done ? [done.progress] : [])]);
-  const reviewedOpen = closed.has(REVIEWED_OPEN);
+  const p = sumProgress([
+    tree.progress,
+    ...[agentDone, done].flatMap((d) => (d ? [d.progress] : [])),
+  ]);
   const treeProps = {
     review,
     stats,
@@ -255,26 +274,37 @@ export function FilesPanel() {
           />
         )}
       </SectionHeader>
-      {tree.children.length === 0 && !done?.children.length ? (
+      {tree.children.length === 0 && !done?.children.length && !agentDone?.children.length ? (
         <Empty>{review.files.length === 0 ? "No changes" : `No ${filter} files`}</Empty>
       ) : (
         <div className="side-split-body file-tree">
           <Children nodes={tree.children} depth={0} {...treeProps} />
-          {done && done.children.length > 0 && (
-            <ul>
-              <li>
-                <button
-                  type="button"
-                  className="dir"
-                  onClick={() => setClosed(toggled(closed, REVIEWED_OPEN))}
-                >
-                  <span className="chevron">{reviewedOpen ? "▾" : "▸"}</span>
-                  <span className="name">Reviewed</span>
-                  <span className="dir-count">{fileCount(done)}</span>
-                </button>
-                {reviewedOpen && <Children nodes={done.children} depth={1} {...treeProps} />}
-              </li>
-            </ul>
+          {(
+            [
+              ["Agent reviewed", agentDone, AGENT_REVIEWED_OPEN],
+              ["Reviewed", done, REVIEWED_OPEN],
+            ] as const
+          ).map(
+            ([name, group, key]) =>
+              group &&
+              group.children.length > 0 && (
+                <ul key={key}>
+                  <li>
+                    <button
+                      type="button"
+                      className="dir"
+                      onClick={() => setClosed(toggled(closed, key))}
+                    >
+                      <span className="chevron">{closed.has(key) ? "▾" : "▸"}</span>
+                      <span className="name">{name}</span>
+                      <span className="dir-count">{fileCount(group)}</span>
+                    </button>
+                    {closed.has(key) && (
+                      <Children nodes={group.children} depth={1} {...treeProps} />
+                    )}
+                  </li>
+                </ul>
+              ),
           )}
         </div>
       )}

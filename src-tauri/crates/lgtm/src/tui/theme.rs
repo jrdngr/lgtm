@@ -37,6 +37,8 @@ pub const SEL: Color = tint((79, 140, 201), 28);
 /// Behind a comment for the agent.
 pub const THREAD: Color = tint((57, 197, 207), 10);
 pub const NOTE: Color = tint((79, 140, 201), 12);
+/// Behind an agent's comment for the human.
+pub const AGENT_NOTE: Color = tint((214, 112, 214), 12);
 pub const BLANK: Color = tint((60, 60, 60), 35);
 
 pub fn fg(c: Color) -> Style {

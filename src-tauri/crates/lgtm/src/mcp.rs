@@ -8,15 +8,17 @@ use lgtm_core::turns::{self, StartSnapshot};
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-use rmcp::{ServerHandler, tool, tool_handler, tool_router};
+use rmcp::service::RequestContext;
+use rmcp::{RoleServer, ServerHandler, tool, tool_handler, tool_router};
 
-use crate::agent::{self, CheckFiles, MarkLines, Request, ResolveComment, Response};
+use crate::agent::{self, AddComment, CheckFiles, MarkLines, Request, ResolveComment, Response};
 
 const INSTRUCTIONS: &str = "lgtm is the terminal code review app open in this workspace. \
 The human reviews a change there and marks hunks reviewed or flagged.";
 
-const MORE_INSTRUCTIONS: &str = "You can check files and mark lines with marks of your \
-own, which the human sees apart from theirs. Lines are on the new side of the diff.";
+const MORE_INSTRUCTIONS: &str = "You can check files, mark lines with marks of your \
+own, and leave comments, which the human sees apart from theirs. Lines are on the new side \
+of the diff.";
 
 #[derive(Clone)]
 pub struct Tui {
@@ -82,6 +84,17 @@ impl Tui {
         Ok(format!("Edits from here go into the snapshot \"{label}\"."))
     }
 
+    #[tool(description = review_agent::ADD_COMMENT)]
+    async fn add_comment(
+        &self,
+        Parameters(mut p): Parameters<AddComment>,
+        ctx: RequestContext<RoleServer>,
+    ) -> Response {
+        let client = ctx.peer.peer_info().map(|i| i.client_info.name.clone());
+        p.author = Some(review_agent::agent_name(client.as_deref().unwrap_or("")));
+        self.ask(Request::AddComment(p)).await
+    }
+
     #[tool(description = review_agent::MARK_LINES)]
     async fn mark_lines(&self, Parameters(p): Parameters<MarkLines>) -> Response {
         self.ask(Request::MarkLines(p)).await
@@ -94,8 +107,9 @@ impl ServerHandler for Tui {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
             .with_instructions(format!(
-                "{INSTRUCTIONS} {} {MORE_INSTRUCTIONS}",
-                review_agent::COMMENTS_INSTRUCTIONS
+                "{INSTRUCTIONS} {} {MORE_INSTRUCTIONS} {}",
+                review_agent::COMMENTS_INSTRUCTIONS,
+                review_agent::REVIEW_INSTRUCTIONS
             ))
     }
 }

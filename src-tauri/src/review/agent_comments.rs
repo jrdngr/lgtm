@@ -1,6 +1,8 @@
-//! Comments for the agent (C1, C2, …) on a review, the same ones the terminal app shows:
-//! placing them on rows, and writing, editing, resolving and deleting them as undo steps.
+//! Comments (C1, C2, …) on a review, the same ones the terminal app shows: the user's for the
+//! agent and an agent's for the user. Placing them on rows, and writing, editing, resolving
+//! and deleting them as undo steps.
 
+use lgtm_core::review::agent::AddComment;
 use lgtm_core::review::comments::{self as core, RowText, Step};
 use std::sync::{Arc, Mutex};
 
@@ -27,6 +29,8 @@ pub struct AgentCommentDto {
     pub body: String,
     pub done: bool,
     pub created_at: f64,
+    /// The agent that wrote it, like `Claude`; absent for the user's own.
+    pub author: Option<String>,
 }
 
 /// A file's rows by index, as placing and listing comments see them.
@@ -92,6 +96,7 @@ impl Review {
                     body: c.body.clone(),
                     done: c.done,
                     created_at: c.created_at as f64,
+                    author: c.author.clone(),
                 })
             })
             .collect();
@@ -251,6 +256,36 @@ impl RepoCtx {
         let store = self.store.lock().unwrap();
         self.with_current(workspace, |r| r.agent_comments_listing(&store))?
             .1
+    }
+
+    /// Writes the comment an agent in `workspace`'s terminal asked for with `add`, as an undo
+    /// step on the current review. Returns its number.
+    pub async fn agent_add_comment(
+        &self,
+        workspace: Option<&str>,
+        add: &AddComment,
+    ) -> anyhow::Result<i64> {
+        let at = self.current_review_at(workspace, &add.revset).await?;
+        let mut number = 0;
+        let state = {
+            let review = self.review(at.id)?;
+            self.check_at(&review.lock().unwrap(), &at)?;
+            self.agent_comment_step(at.id, |review, store| {
+                let f = review
+                    .files
+                    .iter()
+                    .find(|f| f.path == add.path)
+                    .ok_or_else(|| anyhow::anyhow!("`{}` isn't in the review", add.path))?;
+                let rows = rows(f).map(|(_, row)| row);
+                let c = core::from_agent(rows, &f.path, f.old_path.as_deref(), add, &review.revset)
+                    .map_err(anyhow::Error::msg)?;
+                let added = store.add_agent_comment(&c)?;
+                number = added.number;
+                Ok(Step::Added(added))
+            })?
+        };
+        self.state_changed(at.id, &state);
+        Ok(number)
     }
 
     /// Resolves or reopens comment `number` for an agent in `workspace`'s terminal, as an undo

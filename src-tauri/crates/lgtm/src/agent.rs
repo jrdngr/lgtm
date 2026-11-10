@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-pub use lgtm_core::review::agent::{CheckFiles, MarkLines, ResolveComment};
+pub use lgtm_core::review::agent::{AddComment, CheckFiles, MarkLines, ResolveComment};
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "tool", rename_all = "snake_case")]
@@ -19,6 +19,7 @@ pub enum Request {
     MarkLines(MarkLines),
     ResolveComment(ResolveComment),
     UnresolveComment(ResolveComment),
+    AddComment(AddComment),
 }
 
 pub type Response = Result<String, String>;

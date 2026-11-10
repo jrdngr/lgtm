@@ -356,8 +356,13 @@ pub(super) mod tests {
 
     /// `a.rs` with two hunks: one adding a line, one replacing a line.
     pub(in super::super) fn marks() -> Marks {
-        let diff = FileDiff {
-            path: "a.rs".into(),
+        marks_for(&["a.rs"])
+    }
+
+    /// The same changes in each of `paths`.
+    pub(in super::super) fn marks_for(paths: &[&str]) -> Marks {
+        let diff = |path: &str| FileDiff {
+            path: path.into(),
             old_path: None,
             status: FileStatus::Modified,
             binary: false,
@@ -392,28 +397,30 @@ pub(super) mod tests {
         };
         let old: String = (1..=12).map(|i| format!("line {i}\n")).collect();
         let new: String = (1..=12).map(|i| format!("line {i} new\n")).collect();
-        let file = ReviewFile::build(
-            &Sides {
-                old: Some("aaaa".into()),
-                new: "bbbb".into(),
-            },
-            &diff,
-            Text {
-                text: Some(&old),
-                parsed: None,
-            },
-            Text {
-                text: Some(&new),
-                parsed: None,
-            },
-            MatchConfig::default(),
-            false,
-        );
+        let file = |path: &str| {
+            ReviewFile::build(
+                &Sides {
+                    old: Some("aaaa".into()),
+                    new: "bbbb".into(),
+                },
+                &diff(path),
+                Text {
+                    text: Some(&old),
+                    parsed: None,
+                },
+                Text {
+                    text: Some(&new),
+                    parsed: None,
+                },
+                MatchConfig::default(),
+                false,
+            )
+        };
         Marks::new(
-            vec![file],
+            paths.iter().map(|p| file(p)).collect(),
             MatchConfig::default(),
             "@".into(),
-            vec![vec![2, 2]],
+            paths.iter().map(|_| vec![2, 2]).collect(),
         )
     }
 
