@@ -113,6 +113,26 @@ impl Model {
         };
         self.layouts.insert(self.active + 1, layout);
         self.active += 1;
+        self.name_layouts();
+    }
+
+    /// Names each unnamed layout "Layout N" with the lowest N no layout has, so names stay put
+    /// when others are deleted.
+    pub fn name_layouts(&mut self) {
+        for i in 0..self.layouts.len() {
+            if self.layouts[i].name.is_some() {
+                continue;
+            }
+            let n = (1..)
+                .find(|n| {
+                    let name = format!("Layout {n}");
+                    self.layouts
+                        .iter()
+                        .all(|l| l.name.as_deref() != Some(&name))
+                })
+                .expect("a free number");
+            self.layouts[i].name = Some(format!("Layout {n}"));
+        }
     }
 
     /// Deletes a layout, unless it's the last one. Spaces stay.

@@ -313,3 +313,17 @@ fn opening_at_a_terminal_leaves_focus_and_zoom_alone() {
     assert!(m.layout().slot_of(space_of(&m, space)).is_some());
     assert!(m.is_valid());
 }
+
+#[test]
+fn layout_names_stay_put_when_another_is_deleted() {
+    let (mut m, _) = Model::new();
+    m.new_layout();
+    m.new_layout();
+    let names =
+        |m: &Model| -> Vec<String> { m.layouts.iter().filter_map(|l| l.name.clone()).collect() };
+    assert_eq!(names(&m), ["Layout 1", "Layout 2", "Layout 3"]);
+    m.delete_layout(m.layouts[0].id);
+    assert_eq!(names(&m), ["Layout 2", "Layout 3"]);
+    m.new_layout();
+    assert_eq!(names(&m), ["Layout 2", "Layout 3", "Layout 1"]);
+}

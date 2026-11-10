@@ -83,6 +83,7 @@ impl State {
         if let Some(id) = state.messages_tab.take() {
             state.model.replace_tab(Tab::Term(id), Tab::Messages);
         }
+        state.model.name_layouts();
         state.model.is_valid().then_some(state)
     }
 

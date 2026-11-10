@@ -174,6 +174,7 @@ impl Model {
             slots: Tree::Leaf(slot),
             zoom: None,
         });
+        model.name_layouts();
         (model, term)
     }
 

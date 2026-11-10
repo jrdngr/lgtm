@@ -38,7 +38,8 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Saves the name being typed. An empty name goes back to following the folder.
+    /// Saves the name being typed. An empty space name goes back to following the folder; an
+    /// empty layout name keeps the old one.
     pub(super) fn finish_rename(&mut self, save: bool) {
         if !matches!(self.overlay, Some(Overlay::Rename(_))) {
             return;
@@ -52,7 +53,9 @@ impl Workspace {
         let name = Some(r.text.trim().to_owned()).filter(|t| !t.is_empty());
         match r.target {
             Target::Layout(id) => {
-                if let Some(l) = self.model.find_layout_mut(id) {
+                if let Some(l) = self.model.find_layout_mut(id)
+                    && name.is_some()
+                {
                     l.name = name;
                 }
             }
