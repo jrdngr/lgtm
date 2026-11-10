@@ -38,6 +38,8 @@ pub enum Action {
     Pick(Pick),
     /// Go to the review.
     Review,
+    /// Send where the selection is to an agent.
+    SendToAgent,
     /// Move to the file tree.
     Sidebar,
     /// Show or hide the file tree.
@@ -334,6 +336,7 @@ impl Keys {
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Review => return Action::Review,
+            Cmd::SendToAgent => return Action::SendToAgent,
             Cmd::Sidebar => return Action::Sidebar,
             Cmd::ToggleSidebar => return Action::ToggleSidebar,
             Cmd::Split { right } => return Action::Split { right },

@@ -99,10 +99,58 @@ impl Review {
     }
 }
 
+impl Review {
+    /// The screen lines the text selection covers.
+    pub(super) fn selecting_lines(&self) -> Option<RangeInclusive<usize>> {
+        let b = &self.selecting.as_ref()?.buf;
+        Some(b.line_of(b.sel.from())..=b.line_of(b.sel.to()))
+    }
+
+    /// Where the code rows on screen lines `range` are, one `path:lines` per hunk.
+    pub(super) fn mention(&self, range: RangeInclusive<usize>) -> Option<String> {
+        let mut hunks: Vec<((usize, usize), Vec<usize>)> = Vec::new();
+        for line in self.lines.get(range)? {
+            let Line::Code {
+                file,
+                hunk,
+                old,
+                new,
+                ..
+            } = *line
+            else {
+                continue;
+            };
+            let at = match hunks.last_mut() {
+                Some((key, rows)) if *key == (file, hunk) => rows,
+                _ => {
+                    hunks.push(((file, hunk), Vec::new()));
+                    &mut hunks.last_mut().expect("just pushed").1
+                }
+            };
+            for row in [old, new].into_iter().flatten() {
+                if !at.contains(&row) {
+                    at.push(row);
+                }
+            }
+        }
+        let refs: Vec<String> = hunks
+            .into_iter()
+            .map(|((file, hunk), mut rows)| {
+                let f = &self.files[file];
+                rows.sort_unstable();
+                let rows: Vec<_> = rows.iter().map(|&r| &f.hunks[hunk].rows[r]).collect();
+                crate::tui::mention::rows(&f.path, &rows)
+            })
+            .collect();
+        (!refs.is_empty()).then(|| refs.join("\n"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ratatui::crossterm::event::KeyCode;
 
+    use super::super::Outcome;
     use super::super::tests::{press, review};
     use super::*;
 
@@ -120,6 +168,27 @@ mod tests {
             .copied()
             .filter(|l| matches!(*l, Line::Code { file, hunk, .. } if keep(file, hunk)))
             .collect()
+    }
+
+    #[test]
+    fn a_sends_where_the_picked_rows_are_per_hunk() {
+        use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
+        let mut r = review();
+        r.cursor = r
+            .lines
+            .iter()
+            .position(|l| matches!(l, Line::Code { .. }))
+            .unwrap();
+        press(&mut r, KeyCode::Char('e'));
+        press(&mut r, KeyCode::Char('e'));
+        let out = r.key(KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE), None);
+        let hunks = r.files[0].hunks.len();
+        let one = "a.rs:1, and removed old line 1";
+        let Outcome::Mention(text) = out else {
+            panic!("no mention")
+        };
+        assert_eq!(text, vec![one; hunks].join("\n"));
+        assert_eq!(r.selection(), None);
     }
 
     #[test]

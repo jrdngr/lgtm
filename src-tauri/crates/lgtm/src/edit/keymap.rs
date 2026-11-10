@@ -69,6 +69,8 @@ pub enum Cmd {
     Pick(Pick),
     /// Go to the review, on the cursor's line.
     Review,
+    /// Send where the selection is to an agent.
+    SendToAgent,
     /// Move to the file tree beside the text.
     Sidebar,
     /// Show or hide the file tree beside the text.
@@ -259,6 +261,7 @@ pub const BINDS: &[Bind] = &[
     b("space e", Sidebar, Both, "file tree"),
     b("space b", ToggleSidebar, Both, "toggle file tree"),
     b("space r", Review, Both, "review"),
+    b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),
     b("S-tab", Smart, Both, "markdown table cell, footnote"),
     b("C-w v", Split { right: true }, Both, "split to the right"),

@@ -31,6 +31,8 @@ pub enum Outcome {
     Home,
     /// Go to the review, on this file's line from 1, which holds this text.
     Review(String, u32, String),
+    /// Send where these lines are to an agent.
+    Mention(String),
 }
 
 /// A buffer with where it's scrolled to and its colors.
@@ -589,6 +591,11 @@ impl Editor {
             let text = b.slice(b.line_start(line), b.line_end(line));
             return Outcome::Review(b.name.clone(), line as u32 + 1, text);
         }
+        if action == Action::SendToAgent {
+            let b = &open.buf;
+            let (from, to) = (b.line_of(b.sel.from()), b.line_of(b.sel.to()));
+            return Outcome::Mention(crate::tui::mention::lines(&b.name, from + 1, to + 1));
+        }
         self.act(action);
         if let Some(open) = self.open.get_mut(self.cur) {
             // Whatever moved the cursor into a closed fold opens it.
@@ -620,7 +627,7 @@ impl Editor {
             },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
-            Action::Review => {}
+            Action::Review | Action::SendToAgent => {}
             Action::Sidebar => {
                 self.files = true;
                 self.in_sidebar = true;
@@ -736,6 +743,24 @@ mod tests {
         for key in crate::edit::spec::keys(keys) {
             e.key(key);
         }
+    }
+
+    #[test]
+    fn space_a_sends_the_selected_lines() {
+        let (_dir, mut e) = editor_on("one\ntwo\nthree\n");
+        let out = press_last(&mut e, "j<space>a");
+        assert!(matches!(out, Outcome::Mention(t) if t == "a.txt:2"));
+        press(&mut e, "xx");
+        let out = press_last(&mut e, "<space>a");
+        assert!(matches!(out, Outcome::Mention(t) if t == "a.txt:2-3"));
+    }
+
+    fn press_last(e: &mut Editor, keys: &str) -> Outcome {
+        let mut out = Outcome::None;
+        for key in crate::edit::spec::keys(keys) {
+            out = e.key(key);
+        }
+        out
     }
 
     #[test]

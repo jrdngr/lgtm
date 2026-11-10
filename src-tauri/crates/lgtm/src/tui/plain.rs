@@ -11,7 +11,7 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers
 use super::load::Msg;
 use super::paint::Canvas;
 use super::term::{self, Term};
-use super::{POLL, edit, settings, walk};
+use super::{POLL, edit, mention, settings, walk};
 
 /// Opens `file`, a name in `root` and a line from 1, else the list of files.
 pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
@@ -39,12 +39,14 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
     let git = root.join(".git").exists();
     let mut term = Term::start();
     let mut help = false;
+    let mut pick: Option<mention::Pick> = None;
     let mut polled = Instant::now();
     let result = (|| -> anyhow::Result<()> {
         loop {
             term.terminal.draw(|f| {
                 let area = f.area();
-                super::draw_editor(&mut Canvas::new(f.buffer_mut(), area), &mut e, help);
+                let c = &mut Canvas::new(f.buffer_mut(), area);
+                super::draw_editor(c, &mut e, help, pick.as_ref());
             })?;
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {
@@ -61,6 +63,8 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             e.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
                         } else if help {
                             help = false;
+                        } else if let Some(p) = pick.take() {
+                            e.notice = p.key(key);
                         } else if key.code == KeyCode::Char('?') && !e.typing() {
                             help = true;
                         } else {
@@ -81,6 +85,11 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                                 edit::Outcome::Review(..) => {
                                     e.notice = Some("not in a jj repo".into());
                                 }
+                                edit::Outcome::Mention(text) => match mention::send(text) {
+                                    mention::Sent::Done => {}
+                                    mention::Sent::Pick(p) => pick = Some(p),
+                                    mention::Sent::Notice(n) => e.notice = Some(n),
+                                },
                             }
                         }
                     }

@@ -10,6 +10,7 @@ mod highlight;
 mod home;
 mod keybar;
 mod load;
+mod mention;
 mod motions;
 mod paint;
 mod picker;
@@ -156,6 +157,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         pr,
         prs: HashMap::new(),
         help: false,
+        agent_pick: None,
         loads: 0,
         settings: settings::load(),
     };
@@ -225,6 +227,8 @@ struct App {
     _server: Option<serve::Server>,
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
+    /// Agents to pick from for a selection sent with `a`.
+    agent_pick: Option<mention::Pick>,
     home: home::Home,
     dash: dash::Dash,
     /// The name the store files this workspace's turns under, once DASH mode asked.
@@ -594,6 +598,12 @@ impl App {
             self.help = false;
             return false;
         }
+        if let Some(pick) = self.agent_pick.take() {
+            if let Some(n) = pick.key(key) {
+                self.notice(n);
+            }
+            return false;
+        }
         if key.code == KeyCode::Char('o') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.back();
             return false;
@@ -625,6 +635,10 @@ impl App {
                 }
                 edit::Outcome::Home => {
                     self.go_home();
+                    false
+                }
+                edit::Outcome::Mention(text) => {
+                    self.mention(text);
                     false
                 }
                 edit::Outcome::Back => match self.editor_back {
@@ -704,6 +718,7 @@ impl App {
                     let pr = r.pr().map(|(_, n)| n.to_string()).or(self.pr.clone());
                     self.loader.pull(r.id, pr, r.bookmarks());
                 }
+                review::Outcome::Mention(text) => self.mention(text),
                 review::Outcome::None => {}
             }
             return false;
@@ -792,7 +807,7 @@ impl App {
 
     fn draw(&mut self, c: &mut Canvas) {
         if self.screen == Screen::Editor {
-            draw_editor(c, &mut self.buffers, self.help);
+            draw_editor(c, &mut self.buffers, self.help, self.agent_pick.as_ref());
             return;
         }
         let Some((x, body)) = frame(c) else {
@@ -837,6 +852,9 @@ impl App {
                 }
                 keybar::draw_badged(c, bottom, Some(("REV", CYAN)), &r.hints(self.shift));
                 keybar::menu(c, body, &r.space_menu());
+                if let Some(pick) = &self.agent_pick {
+                    keybar::menu(c, body, &pick.menu());
+                }
                 if self.help {
                     keybar::help(c, body, &r.help_keys());
                 }
@@ -877,6 +895,23 @@ impl App {
 }
 
 impl App {
+    /// Sends `text` to an agent, or asks which.
+    fn mention(&mut self, text: String) {
+        match mention::send(text) {
+            mention::Sent::Done => {}
+            mention::Sent::Pick(pick) => self.agent_pick = Some(pick),
+            mention::Sent::Notice(n) => self.notice(n),
+        }
+    }
+
+    /// Shows `n` on the screen that's up.
+    fn notice(&mut self, n: String) {
+        match self.review.as_mut() {
+            Some(r) if self.screen != Screen::Editor => r.notice = Some(n),
+            _ => self.buffers.notice = Some(n),
+        }
+    }
+
     /// Runs a jj action, showing it as running until it's done.
     fn act(&mut self, action: lgtm_core::jj::JjAction) {
         self.busy = Some((motions::doing(&action), Instant::now()));
@@ -901,7 +936,7 @@ fn frame(c: &mut Canvas) -> Option<(u16, Rect)> {
 }
 
 /// Draws the editor screen, with the keys over it when `help` is up.
-fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool) {
+fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool, pick: Option<&mention::Pick>) {
     let Some((x, body)) = frame(c) else {
         return;
     };
@@ -917,6 +952,9 @@ fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool) {
     let pending = e.pending_menu();
     if !pending.is_empty() {
         keybar::menu(c, body, &pending);
+    }
+    if let Some(pick) = pick {
+        keybar::menu(c, body, &pick.menu());
     }
     if help {
         keybar::help(c, body, &e.help_keys());

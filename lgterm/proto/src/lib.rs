@@ -91,6 +91,16 @@ pub enum Request {
     Focus {
         term: String,
     },
+    /// The agents in `term`'s layout, as a JSON list of `{id, label}`.
+    Agents {
+        term: String,
+    },
+    /// Pastes `text` into `to` as the terminal's paste would, without pressing Enter.
+    Paste {
+        to: String,
+        text: String,
+        focus: bool,
+    },
     Close {
         term: String,
     },

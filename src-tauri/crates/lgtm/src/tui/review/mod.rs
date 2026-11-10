@@ -52,6 +52,8 @@ pub enum Outcome {
     Pick(Pick),
     /// Pull the PR's threads from GitHub.
     Pull,
+    /// Send where these lines are to an agent.
+    Mention(String),
 }
 
 pub struct Review {
@@ -160,6 +162,7 @@ pub const KEYS: &[(&str, &str)] = &[
     ("v", "select text"),
     ("/", "search"),
     ("c", "comment for the agent, on the selected lines"),
+    ("a", "send the selected lines to an lgterm agent"),
     ("] [", "next, previous comment"),
     ("C", "resolve, reopen comment"),
     ("d", "delete comment"),
@@ -526,6 +529,13 @@ impl Review {
             return Outcome::None;
         }
         if self.selecting.is_some() {
+            if key.code == KeyCode::Char('a')
+                && !ctrl
+                && let Some(text) = self.selecting_lines().and_then(|r| self.mention(r))
+            {
+                self.selecting = None;
+                return Outcome::Mention(text);
+            }
             self.select_key(key);
             return Outcome::None;
         }
@@ -559,10 +569,10 @@ impl Review {
             self.space = true;
             return Outcome::None;
         }
-        if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c' | 'e' | 'E')) {
+        if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c' | 'a' | 'e' | 'E')) {
             self.anchor = None;
         }
-        if !matches!(key.code, KeyCode::Char('c' | 'e' | 'E')) {
+        if !matches!(key.code, KeyCode::Char('c' | 'a' | 'e' | 'E')) {
             self.grown.clear();
         }
         if let KeyCode::Char(c) = key.code
@@ -617,6 +627,14 @@ impl Review {
                 _ => {}
             },
             KeyCode::Char('c') if !ctrl => self.start_comment(store.as_deref()),
+            KeyCode::Char('a') if !ctrl && !self.in_list => {
+                let range = self.selection().unwrap_or(self.cursor..=self.cursor);
+                self.anchor = None;
+                self.grown.clear();
+                if let Some(text) = self.mention(range) {
+                    return Outcome::Mention(text);
+                }
+            }
             KeyCode::Char(']') => self.next_comment(true),
             KeyCode::Char('[') => self.next_comment(false),
             KeyCode::Char('C') => self.toggle_resolved(store.as_deref()),

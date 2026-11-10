@@ -86,6 +86,21 @@ impl Workspace {
                     self.focus_current(window, cx);
                     Reply::Ok(String::new())
                 }
+                Request::Agents { term } => {
+                    let id = self.term_arg(&term)?;
+                    Reply::Ok(self.agents_near(id))
+                }
+                Request::Paste { to, text, focus } => {
+                    let to = self.term_arg(&to)?;
+                    if let Some(t) = self.terms.get(&to) {
+                        t.view.update(cx, |v, cx| v.paste_text(text, cx));
+                    }
+                    if focus {
+                        self.model.focus_term(to);
+                        self.focus_current(window, cx);
+                    }
+                    Reply::Ok(String::new())
+                }
                 Request::Close { term } => {
                     let id = self.term_arg(&term)?;
                     self.close(Tab::Term(id), window, cx);
@@ -132,6 +147,22 @@ impl Workspace {
             cx.notify();
         }
         Ok(id)
+    }
+
+    /// The agents in `term`'s layout, in reading order, as JSON.
+    fn agents_near(&self, term: TermId) -> String {
+        let layout = self
+            .model
+            .layouts
+            .iter()
+            .find(|l| l.terms().any(|t| t == term));
+        let agents: Vec<_> = layout
+            .into_iter()
+            .flat_map(|l| l.terms())
+            .filter(|&t| t != term && self.is_agent(Tab::Term(t)))
+            .map(|t| json!({ "id": t.to_string(), "label": self.term_label(Tab::Term(t)) }))
+            .collect();
+        serde_json::to_string(&agents).unwrap_or_default()
     }
 
     fn list(&self, as_json: bool) -> String {
