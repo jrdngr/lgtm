@@ -198,7 +198,13 @@ impl Workspace {
     pub(super) fn layout_label(&self, layout: &Layout) -> String {
         match &layout.name {
             Some(name) => name.clone(),
-            None => self.space_label(layout.spaces.first()),
+            None => layout
+                .spaces
+                .leaves()
+                .into_iter()
+                .map(|s| self.space_label(s))
+                .collect::<Vec<_>>()
+                .join(" · "),
         }
     }
 

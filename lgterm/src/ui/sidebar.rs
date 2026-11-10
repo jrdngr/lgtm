@@ -9,10 +9,11 @@ use gpui::{
 
 use super::panes::Nothing;
 use super::rename::Target;
+use super::space_drag::{self, DragsSpace, DropRow};
 use super::{Workspace, badge};
 use crate::agents::Status;
 use crate::ipc::Place;
-use crate::model::Tab;
+use crate::model::{SpaceId, Tab};
 use crate::theme;
 
 struct Row {
@@ -26,8 +27,11 @@ struct Row {
     bg: Option<u32>,
     rename: Option<Target>,
     status: Option<Status>,
-    /// Some for a layout row: its index, so it drags to reorder.
+    /// Some for a layout row: its index, so layouts dropped on it take its place.
     layout: Option<usize>,
+    /// The space this row drags; a layout row without one drags the layout.
+    space: Option<SpaceId>,
+    drop: DropRow,
 }
 
 /// A layout being dragged to a new place in the sidebar.
@@ -113,7 +117,7 @@ impl Workspace {
             )
             .on_drag(SidebarDrag, |_, _, _, cx| cx.new(|_| Nothing));
 
-        div()
+        let side = div()
             .relative()
             .w(px(self.sidebar_width))
             .flex_none()
@@ -154,8 +158,12 @@ impl Workspace {
                     .overflow_y_scroll()
                     .children(rows),
             )
-            .child(handle)
-            .into_any_element()
+            .child(handle);
+        if icons {
+            side.into_any_element()
+        } else {
+            space_drag::track_sidebar(side, cx).into_any_element()
+        }
     }
 
     /// One badge per layout, with its worst status on the corner.
@@ -219,6 +227,8 @@ impl Workspace {
                     rename: Some(Target::Layout(layout.id)),
                     status: folded.then(|| self.agents.worst(layout.terms())).flatten(),
                     layout: Some(i),
+                    space: single.then(|| spaces[0].id),
+                    drop: DropRow::Layout(i, single.then(|| spaces[0].id)),
                 },
                 i > 0,
                 layout.id.0,
@@ -247,6 +257,8 @@ impl Workspace {
                                     .then(|| self.agents.worst(space.terms()))
                                     .flatten(),
                                 layout: None,
+                                space: Some(space.id),
+                                drop: DropRow::Space(space.id),
                             },
                             false,
                             space.id.0,
@@ -272,6 +284,8 @@ impl Workspace {
                             rename: None,
                             status: self.agents.status(term),
                             layout: None,
+                            space: None,
+                            drop: DropRow::Other(term.0),
                         },
                         false,
                         term.0,
@@ -292,7 +306,14 @@ impl Workspace {
         cx: &mut Context<Self>,
         on_click: impl Fn(&mut Workspace, &mut Window, &mut Context<Workspace>) + 'static,
     ) -> AnyElement {
-        let layout = row.layout.map(|i| (i, row.label.clone()));
+        let layout = row.layout;
+        let drop_row = row.drop;
+        let drag = match (row.space, row.layout) {
+            (Some(space), _) => Some((Some(space), row.label.clone())),
+            (None, Some(_)) => Some((None, row.label.clone())),
+            _ => None,
+        };
+        let dragged = row.space.is_some() && row.space == self.dragged_space(cx);
         let renaming = self.renaming().filter(|r| Some(r.target) == row.rename);
         let label: AnyElement = match renaming {
             Some(r) => div()
@@ -337,7 +358,7 @@ impl Workspace {
                     cx.notify();
                 }))
         });
-        div()
+        let el = div()
             .id(row.id)
             .flex()
             .items_center()
@@ -361,7 +382,13 @@ impl Workspace {
             .children(row.badge)
             .child(label)
             .children(row.status.map(|s| self.mark(s)))
-            .when_some(layout, |d, (i, label)| d.reorders(i, &label, cx))
+            .when(dragged, |d| d.opacity(0.35))
+            .when_some(layout, |d, i| d.takes_layouts(i, cx))
+            .when_some(drag, |d, (space, label)| match (space, layout) {
+                (Some(space), _) => d.drags_space(space, label),
+                (None, Some(i)) => d.drags_layout(i, label),
+                _ => d,
+            })
             .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
                 if ev.click_count() == 2
                     && let Some(target) = rename
@@ -372,8 +399,8 @@ impl Workspace {
                 }
                 on_click(w, window, cx);
                 w.focus_current(window, cx);
-            }))
-            .into_any_element()
+            }));
+        space_drag::track_row(el, drop_row, cx).into_any_element()
     }
 
     fn current_name(&self, target: Target) -> String {
@@ -390,24 +417,29 @@ impl Workspace {
     }
 }
 
-trait Reorders {
-    /// Drags the layout at `index` and takes dropped layouts into its place.
-    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self;
+trait Reorders: Sized {
+    /// Drags the layout at `index`.
+    fn drags_layout(self, index: usize, label: String) -> Self;
+    /// Takes layouts dropped here into the place of the layout at `index`.
+    fn takes_layouts(self, index: usize, cx: &mut Context<Workspace>) -> Self;
+    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self {
+        self.drags_layout(index, label.to_owned())
+            .takes_layouts(index, cx)
+    }
 }
 
 impl Reorders for Stateful<gpui::Div> {
-    fn reorders(self, index: usize, label: &str, cx: &mut Context<Workspace>) -> Self {
-        let drag = LayoutDrag {
-            index,
-            label: label.to_owned(),
-        };
-        self.on_drag(drag, |d, _, _, cx| {
+    fn drags_layout(self, index: usize, label: String) -> Self {
+        self.on_drag(LayoutDrag { index, label }, |d, _, _, cx| {
             cx.new(|_| LayoutDrag {
                 index: d.index,
                 label: d.label.clone(),
             })
         })
-        .drag_over::<LayoutDrag>(move |s, d, _, _| match d.index {
+    }
+
+    fn takes_layouts(self, index: usize, cx: &mut Context<Workspace>) -> Self {
+        self.drag_over::<LayoutDrag>(move |s, d, _, _| match d.index {
             from if from > index => s.border_t_2().border_color(rgb(theme::FOCUS)),
             from if from < index => s.border_b_2().border_color(rgb(theme::FOCUS)),
             _ => s,

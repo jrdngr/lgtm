@@ -109,31 +109,17 @@ impl<T: Keyed> Tree<T> {
         }
     }
 
-    /// Put `new` next to the leaf `at`, splitting it along `axis`. A branch that already runs
+    /// Put `new` after the leaf `at`, splitting it along `axis`. A branch that already runs
     /// along `axis` takes `new` as another child, sharing the old leaf's weight.
     pub fn insert(&mut self, at: T::Key, new: T, axis: Axis) -> Result<(), T> {
+        self.insert_beside(at, new, axis, false)
+    }
+
+    /// Put `new` before or after the leaf `at`, splitting it along `axis` with half its share.
+    pub fn insert_beside(&mut self, at: T::Key, new: T, axis: Axis, before: bool) -> Result<(), T> {
         match self {
             Tree::Leaf(leaf) if leaf.key() == at => {
-                let old = std::mem::replace(
-                    self,
-                    Tree::Branch {
-                        axis,
-                        children: vec![],
-                    },
-                );
-                *self = Tree::Branch {
-                    axis,
-                    children: vec![
-                        Node {
-                            weight: 1.,
-                            tree: old,
-                        },
-                        Node {
-                            weight: 1.,
-                            tree: Tree::Leaf(new),
-                        },
-                    ],
-                };
+                self.wrap(new, axis, before);
                 Ok(())
             }
             Tree::Leaf(_) => Err(new),
@@ -149,7 +135,7 @@ impl<T: Keyed> Tree<T> {
                     let half = children[i].weight / 2.;
                     children[i].weight = half;
                     children.insert(
-                        i + 1,
+                        if before { i } else { i + 1 },
                         Node {
                             weight: half,
                             tree: Tree::Leaf(new),
@@ -157,10 +143,35 @@ impl<T: Keyed> Tree<T> {
                     );
                     Ok(())
                 } else {
-                    children[i].tree.insert(at, new, axis)
+                    children[i].tree.insert_beside(at, new, axis, before)
                 }
             }
         }
+    }
+
+    /// Put `new` before or after the whole tree along `axis`, each taking half.
+    pub fn wrap(&mut self, new: T, axis: Axis, before: bool) {
+        let old = std::mem::replace(
+            self,
+            Tree::Branch {
+                axis,
+                children: vec![],
+            },
+        );
+        let mut children = vec![
+            Node {
+                weight: 1.,
+                tree: old,
+            },
+            Node {
+                weight: 1.,
+                tree: Tree::Leaf(new),
+            },
+        ];
+        if before {
+            children.reverse();
+        }
+        *self = Tree::Branch { axis, children };
     }
 
     /// Take the leaf `key` out, giving its share to a neighbor and folding branches left with

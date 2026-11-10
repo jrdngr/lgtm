@@ -14,6 +14,7 @@ mod rename;
 mod restore;
 mod settings_view;
 mod sidebar;
+mod space_drag;
 mod tab_menu;
 mod terms;
 
@@ -50,6 +51,7 @@ pub struct Workspace {
     /// Layouts and spaces folded in the sidebar, by id.
     collapsed: HashSet<u64>,
     overlay: Option<Overlay>,
+    space_drop: space_drag::SpaceDrop,
     home: Option<PathBuf>,
     /// What an unnamed space with no terminal is called.
     home_name: String,
@@ -85,6 +87,7 @@ impl Workspace {
             sidebar_width: theme::SIDEBAR_WIDTH,
             collapsed: HashSet::new(),
             overlay: None,
+            space_drop: Default::default(),
             home,
             home_name,
             settings,

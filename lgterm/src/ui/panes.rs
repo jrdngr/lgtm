@@ -8,6 +8,7 @@ use gpui::{
 };
 
 use super::Workspace;
+use super::space_drag::{self, DragsSpace};
 use crate::ipc::Place;
 use crate::model::{Axis, LayoutId, Space, SpaceId, Split, Tab, Tree, tree};
 use crate::theme;
@@ -47,9 +48,12 @@ impl Workspace {
                 .find_map(|s| s.splits.find(z))
         }) {
             Some(split) => self.card(split, true, cx),
-            None => self.space_tree(&layout.spaces, Owner::Layout(layout.id), vec![], cx),
+            None => {
+                let multi = matches!(layout.spaces, Tree::Branch { .. });
+                self.space_tree(&layout.spaces, multi, Owner::Layout(layout.id), vec![], cx)
+            }
         };
-        div()
+        let main = div()
             .flex_1()
             .min_w_0()
             .h_full()
@@ -61,19 +65,21 @@ impl Workspace {
             }))
             .px(px(theme::GAP))
             .pb(px(theme::GAP))
-            .child(body)
-            .into_any_element()
+            .child(body);
+        space_drag::track_main(main, cx).into_any_element()
     }
 
+    /// The spaces; with `multi`, each title drags its space.
     fn space_tree(
         &self,
         t: &Tree<Space>,
+        multi: bool,
         owner: Owner,
         path: Vec<usize>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         match t {
-            Tree::Leaf(space) => self.space(space, cx),
+            Tree::Leaf(space) => self.space(space, multi, cx),
             Tree::Branch { axis, children } => {
                 let kids = children
                     .iter()
@@ -81,7 +87,7 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (c.weight, self.space_tree(&c.tree, owner, path, cx))
+                        (c.weight, self.space_tree(&c.tree, multi, owner, path, cx))
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -89,33 +95,48 @@ impl Workspace {
         }
     }
 
-    fn space(&self, space: &Space, cx: &mut Context<Self>) -> AnyElement {
-        div()
+    fn space(&self, space: &Space, multi: bool, cx: &mut Context<Self>) -> AnyElement {
+        let label = self.space_label(space);
+        let title = div()
+            .id(("space-title", space.id.0))
+            .h(px(20.))
+            .flex_none()
+            .flex()
+            .items_center()
+            .gap(px(6.))
+            .px(px(4.))
+            .text_size(px(12.))
+            .font_weight(FontWeight::SEMIBOLD)
+            .text_color(rgb(theme::TEXT_SPACE))
+            .when(multi, |d| {
+                d.cursor_grab()
+                    .child(
+                        div()
+                            .text_size(px(11.))
+                            .text_color(rgb(theme::ICON))
+                            .child("⠿"),
+                    )
+                    .drags_space(space.id, label.clone())
+            })
+            .child(label);
+        let el = div()
             .size_full()
             .min_w_0()
             .min_h_0()
             .flex()
             .flex_col()
             .gap(px(theme::GAP))
-            .child(
-                div()
-                    .h(px(20.))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .px(px(4.))
-                    .text_size(px(12.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(rgb(theme::TEXT_SPACE))
-                    .child(self.space_label(space)),
-            )
+            .when(self.dragged_space(cx) == Some(space.id), |d| {
+                d.opacity(0.35)
+            })
+            .child(title)
             .child(div().flex_1().min_h_0().flex().child(self.split_tree(
                 &space.splits,
                 Owner::Space(space.id),
                 vec![],
                 cx,
-            )))
-            .into_any_element()
+            )));
+        space_drag::track_space(el, space.id, cx).into_any_element()
     }
 
     fn split_tree(

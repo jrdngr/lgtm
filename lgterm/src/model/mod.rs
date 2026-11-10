@@ -2,6 +2,7 @@
 //! window shows one layout at a time.
 
 mod ids;
+mod moves;
 pub mod tree;
 
 use std::collections::HashSet;
@@ -9,6 +10,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 pub use ids::{LayoutId, SpaceId, SplitId, Tab, TermId};
+pub use moves::{Side, WindowDrop};
 pub use tree::{Axis, Dir, Keyed, Rect, Tree};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

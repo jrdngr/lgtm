@@ -9,6 +9,7 @@ use gpui::{
 use super::Workspace;
 use super::actions::*;
 use super::sidebar::{self, SidebarDrag};
+use super::space_drag::SpaceDrag;
 use crate::ipc::Place;
 use crate::model::{Dir, Model};
 use crate::terminal::FontSize;
@@ -52,7 +53,11 @@ impl Render for Workspace {
                     w.sidebar_width = width;
                     cx.notify();
                 }
-            }));
+            }))
+            .on_drag_move(
+                cx.listener(|w, ev: &DragMoveEvent<SpaceDrag>, _, cx| w.space_drag_move(ev, cx)),
+            )
+            .on_drop(cx.listener(|w, _: &SpaceDrag, win, cx| w.space_drop(win, cx)));
         el = on_open!(el, cx, NewTab, Place::Tab);
         el = on_open!(el, cx, SplitRight, Place::Right);
         el = on_open!(el, cx, SplitDown, Place::Down);
@@ -110,6 +115,7 @@ impl Render for Workspace {
             )
             .when(self.sidebar, |d| d.child(self.render_sidebar(window, cx)))
             .child(self.render_main(window, cx))
+            .children(self.render_space_drop(cx))
             .children(self.render_palette(cx))
             .children(self.render_settings(cx))
             .children(self.render_tab_menu(cx))
