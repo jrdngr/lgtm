@@ -161,6 +161,7 @@ impl Workspace {
                 let label = self.space_label(space);
                 let el = div()
                     .id(("space-badge", id.0))
+                    .relative()
                     .w(px(36.))
                     .h(px(32.))
                     .flex_none()
@@ -177,6 +178,10 @@ impl Workspace {
                         status.map(|s| self.mark(s)),
                         ring,
                     ))
+                    .children(
+                        self.space_number(id)
+                            .map(|n| badge::chip(n).absolute().top(px(-3.)).right(px(-5.))),
+                    )
                     .space_row(id, label, cx);
                 space_drag::track_row(el, id, cx).into_any_element()
             })
@@ -256,7 +261,10 @@ impl Workspace {
             .child(chevron)
             .child(badge::badge(space.color, &label, None, theme::SIDEBAR))
             .child(self.row_label(Target::Space(id), label.clone(), cx))
-            .children(status.map(|s| self.mark(s)))
+            .map(|d| match self.space_number(id) {
+                Some(n) => d.child(badge::chip(n)),
+                None => d.children(status.map(|s| self.mark(s))),
+            })
             .space_row(id, label, cx);
         space_drag::track_row(el, id, cx).into_any_element()
     }

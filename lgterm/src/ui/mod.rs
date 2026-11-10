@@ -30,7 +30,7 @@ use gpui::{Context, FocusHandle, Focusable, KeyDownEvent, Window};
 use crate::agents::Agents;
 use crate::fonts::{self, Fonts};
 use crate::ipc::{self, Place};
-use crate::model::{Model, Tab, TermId};
+use crate::model::{Model, SpaceId, Tab, TermId};
 use crate::procinfo;
 use crate::settings::Settings;
 use crate::state::State;
@@ -66,6 +66,8 @@ pub struct Workspace {
     root_focus: FocusHandle,
     /// The terminal last given focus, told when it loses it.
     focused: Option<TermId>,
+    /// The modifier held on its own, showing number chips.
+    held: Held,
     /// Agents on the Dock badge.
     badge: usize,
     spawn_env: SpawnEnv,
@@ -104,6 +106,7 @@ impl Workspace {
             messages_focus: cx.focus_handle(),
             root_focus: cx.focus_handle(),
             focused: None,
+            held: Held::None,
             badge: 0,
             spawn_env: SpawnEnv {
                 socket: None,
@@ -125,6 +128,13 @@ impl Workspace {
         this.start_timers(window, cx);
         this.start_saving(window, cx);
         this.keep_running_on_close(window, cx);
+        // A modifier let go in another app never reaches this window.
+        cx.observe_window_activation(window, |w, window, cx| {
+            if !window.is_window_active() {
+                w.set_held(Held::None, cx);
+            }
+        })
+        .detach();
         this
     }
 
@@ -332,17 +342,60 @@ impl Workspace {
         cx.notify();
     }
 
+    /// ⌘1-9 focus a space by its place in the window, and ⌃1-9 a tab in the focused split.
+    /// Runs before the terminal sees the key.
     fn key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &ev.keystroke;
-        let m = k.modifiers;
-        if m.platform
-            && !m.alt
-            && !m.control
-            && !m.shift
-            && let Some(d) = k.key.parse::<usize>().ok().filter(|d| (1..=9).contains(d))
-        {
-            self.apply(window, cx, |m| m.select_tab(d - 1));
-            cx.stop_propagation();
+        let Some(d) = k.key.parse::<usize>().ok().filter(|d| (1..=9).contains(d)) else {
+            return;
+        };
+        match Held::from(k.modifiers) {
+            Held::Cmd => self.apply(window, cx, |m| m.select_slot(d - 1)),
+            Held::Ctrl => self.apply(window, cx, |m| m.select_tab(d - 1)),
+            Held::None => return,
+        }
+        cx.stop_propagation();
+    }
+
+    fn set_held(&mut self, held: Held, cx: &mut Context<Self>) {
+        if held != self.held {
+            self.held = held;
+            cx.notify();
+        }
+    }
+
+    /// The number ⌘ plus it focuses `space` with, while ⌘ is held.
+    fn space_number(&self, space: SpaceId) -> Option<usize> {
+        if self.held != Held::Cmd {
+            return None;
+        }
+        let slot = self.model.layout().slot_of(space)?;
+        let i = self
+            .model
+            .slots_in_order()
+            .iter()
+            .position(|&s| s == slot)?;
+        (i < 9).then_some(i + 1)
+    }
+}
+
+/// The modifier held on its own, which shows the numbers its digit keys pick.
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+enum Held {
+    #[default]
+    None,
+    /// Spaces.
+    Cmd,
+    /// Tabs in the focused split.
+    Ctrl,
+}
+
+impl From<gpui::Modifiers> for Held {
+    fn from(m: gpui::Modifiers) -> Self {
+        match (m.platform, m.control, m.alt || m.shift || m.function) {
+            (true, false, false) => Held::Cmd,
+            (false, true, false) => Held::Ctrl,
+            _ => Held::None,
         }
     }
 }

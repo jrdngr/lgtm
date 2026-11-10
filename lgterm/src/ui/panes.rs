@@ -10,7 +10,7 @@ use gpui::{
 
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
-use super::{MovesWindow, Workspace};
+use super::{MovesWindow, Workspace, badge};
 use crate::ipc::Place;
 use crate::model::{
     Axis, LayoutId, Rect, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree,
@@ -208,15 +208,18 @@ impl Workspace {
                     w.open_menu(For::Space(id), ev.position, window, cx)
                 }),
             )
-            .child(
-                div()
-                    .id(("space-grip", space.id.0))
-                    .cursor_grab()
-                    .text_size(px(11.))
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child("⠿")
-                    .drags_space(space.id, label.clone()),
-            )
+            .map(|d| match self.space_number(id) {
+                Some(n) => d.child(badge::chip(n)),
+                None => d.child(
+                    div()
+                        .id(("space-grip", space.id.0))
+                        .cursor_grab()
+                        .text_size(px(11.))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child("⠿")
+                        .drags_space(space.id, label.clone()),
+                ),
+            })
             .child(label);
         let focused_split = focused.then_some(space.focus);
         div()
@@ -375,6 +378,7 @@ impl Workspace {
     /// A split's card; `outline` is the space color when it's the focused split.
     fn card(&self, split: &Split, outline: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
         let split_id = split.id;
+        let numbered = outline.is_some() && self.held == super::Held::Ctrl;
         let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
             let active = i == split.active;
             let key = match tab {
@@ -398,6 +402,9 @@ impl Workspace {
                     d.bg(rgb(theme::TAB_ACTIVE))
                         .border_color(rgb(theme::CARD_BORDER))
                         .text_color(rgb(theme::TEXT_STRONG))
+                })
+                .when(numbered && i < 9, |d| {
+                    d.child(badge::chip(i + 1).ml(px(-3.)))
                 })
                 .child(self.term_label(tab))
                 .children(

@@ -2,14 +2,14 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    Context, DragMoveEvent, InteractiveElement, IntoElement, ParentElement, Render, Styled, Window,
-    div, rgb,
+    Context, DragMoveEvent, InteractiveElement, IntoElement, ModifiersChangedEvent, ParentElement,
+    Render, Styled, Window, div, rgb,
 };
 
-use super::Workspace;
 use super::actions::*;
 use super::sidebar::{self, SidebarDrag};
 use super::space_drag::SpaceDrag;
+use super::{Held, Workspace};
 use crate::fonts;
 use crate::ipc::Place;
 use crate::model::{Axis, Dir, Model};
@@ -48,7 +48,10 @@ impl Render for Workspace {
             .flex_row()
             .bg(rgb(theme::WINDOW))
             .font_family(fonts::ui())
-            .on_key_down(cx.listener(Self::key_down))
+            .capture_key_down(cx.listener(Self::key_down))
+            .on_modifiers_changed(cx.listener(|w, ev: &ModifiersChangedEvent, _, cx| {
+                w.set_held(Held::from(ev.modifiers), cx)
+            }))
             .on_drag_move(cx.listener(|w, ev: &DragMoveEvent<SidebarDrag>, _, cx| {
                 let width = sidebar::snap(ev.event.position.x.as_f32());
                 if width != w.sidebar_width {
@@ -77,6 +80,8 @@ impl Render for Workspace {
         el = on_model!(el, cx, FocusRight, |m| m.focus_dir(Dir::Right));
         el = on_model!(el, cx, FocusUp, |m| m.focus_dir(Dir::Up));
         el = on_model!(el, cx, FocusDown, |m| m.focus_dir(Dir::Down));
+        el = on_model!(el, cx, NextSpace, |m| m.cycle_slot(1));
+        el = on_model!(el, cx, PrevSpace, |m| m.cycle_slot(-1));
         el = on_model!(el, cx, NextLayout, |m| m.cycle_layout(1));
         el = on_model!(el, cx, PrevLayout, |m| m.cycle_layout(-1));
         el.on_action(cx.listener(|w, _: &CloseTab, win, cx| match w.model.tab() {

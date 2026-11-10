@@ -17,6 +17,26 @@ pub fn letter(label: &str) -> String {
         .unwrap_or_else(|| "·".to_owned())
 }
 
+/// A number chip, shown while a modifier is held, for the digit key that picks its item.
+pub fn chip(n: usize) -> gpui::Div {
+    div()
+        .flex_none()
+        .min_w(px(16.))
+        .h(px(16.))
+        .px(px(4.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(4.))
+        .bg(rgb(theme::CHIP))
+        .border_1()
+        .border_color(rgb(theme::CHIP_BORDER))
+        .text_size(px(10.))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(rgb(theme::TEXT))
+        .child(n.to_string())
+}
+
 /// The badge, with a status mark on its corner when given.
 pub fn badge(color: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> AnyElement {
     div()

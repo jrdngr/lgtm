@@ -26,6 +26,8 @@ actions!(
         FocusDown,
         NewSpace,
         NewLayout,
+        NextSpace,
+        PrevSpace,
         NextLayout,
         PrevLayout,
         NextWaiting,
@@ -59,8 +61,8 @@ macro_rules! commands {
 commands! {
     "New tab", ["cmd-t"], NewTab;
     "Close tab", ["cmd-w"], CloseTab;
-    "Next tab", ["cmd-shift-]", "cmd-}"], NextTab;
-    "Previous tab", ["cmd-shift-[", "cmd-{"], PrevTab;
+    "Next tab", ["ctrl-tab", "cmd-shift-]", "cmd-}"], NextTab;
+    "Previous tab", ["ctrl-shift-tab", "cmd-shift-[", "cmd-{"], PrevTab;
     "Split right", ["cmd-d"], SplitRight;
     "Split down", ["cmd-shift-d"], SplitDown;
     "Split window right", ["cmd-n"], SplitSpaceRight;
@@ -76,6 +78,8 @@ commands! {
     "Focus down", ["cmd-alt-down"], FocusDown;
     "New space", [], NewSpace;
     "New layout", [], NewLayout;
+    "Next space", ["ctrl-cmd-right"], NextSpace;
+    "Previous space", ["ctrl-cmd-left"], PrevSpace;
     "Next layout", ["ctrl-cmd-down"], NextLayout;
     "Previous layout", ["ctrl-cmd-up"], PrevLayout;
     "Next waiting agent", ["cmd-j"], NextWaiting;

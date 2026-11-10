@@ -266,6 +266,26 @@ fn new_tabs_open_after_the_active_one() {
 }
 
 #[test]
+fn numbered_slots_go_along_rows_then_down_and_cycling_wraps() {
+    // a and d stacked on the left, b tall on the right: reading order is a, b, d.
+    let (mut m, a) = Model::new();
+    let b = m.split_slot_with_space(Axis::Row);
+    m.focus_term(a);
+    m.split_slot(Axis::Column);
+    let d = m.new_tab();
+    m.select_slot(1);
+    assert_eq!(m.term(), Some(b));
+    m.select_slot(2);
+    assert_eq!(m.term(), Some(d));
+    m.select_slot(5);
+    assert_eq!(m.term(), Some(d));
+    m.cycle_slot(1);
+    assert_eq!(m.term(), Some(a));
+    m.cycle_slot(-1);
+    assert_eq!(m.term(), Some(d));
+}
+
+#[test]
 fn moving_focus_crosses_slots_and_reaches_empty_ones() {
     let (mut m, a) = Model::new();
     let b = m.split_slot_with_space(Axis::Row);

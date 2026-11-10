@@ -25,6 +25,31 @@ impl Model {
         }
     }
 
+    /// The shown layout's slots in reading order: left to right along a row, then rows top to
+    /// bottom.
+    pub fn slots_in_order(&self) -> Vec<SlotId> {
+        let mut rects = self.layout().slots.rects(super::Rect::UNIT);
+        rects.sort_by(|(_, a), (_, b)| a.y.total_cmp(&b.y).then(a.x.total_cmp(&b.x)));
+        rects.into_iter().map(|(id, _)| id).collect()
+    }
+
+    /// Focuses the slot at `index` in reading order.
+    pub fn select_slot(&mut self, index: usize) {
+        if let Some(&slot) = self.slots_in_order().get(index) {
+            self.focus_slot(slot);
+        }
+    }
+
+    /// Focuses the slot `delta` away from the focused one in reading order, wrapping.
+    pub fn cycle_slot(&mut self, delta: isize) {
+        let order = self.slots_in_order();
+        let at = order
+            .iter()
+            .position(|&s| s == self.layout().focus)
+            .unwrap_or(0);
+        self.focus_slot(order[cycle(at, order.len(), delta)]);
+    }
+
     pub fn focus_slot(&mut self, slot: SlotId) {
         let layout = self.layout_mut();
         if layout.slots.contains(slot) {
