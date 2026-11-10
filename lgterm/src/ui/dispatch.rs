@@ -124,6 +124,7 @@ impl Render for Workspace {
         )
         .when(self.sidebar, |d| d.child(self.render_sidebar(window, cx)))
         .child(self.render_main(window, cx))
+        .child(self.render_sidebar_toggle())
         .children(self.render_toasts(None, cx))
         .children(self.render_space_drop(cx))
         .children(self.render_palette(cx))

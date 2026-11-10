@@ -8,6 +8,7 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px, rgb, svg,
 };
 
+use super::actions::ToggleSidebar;
 use super::menu::For;
 use super::panes::Nothing;
 use super::rename::Target;
@@ -370,6 +371,40 @@ impl SpaceRow for Stateful<gpui::Div> {
             w.focus_current(window, cx);
         }))
         .drags_space(id, label)
+    }
+}
+
+impl Workspace {
+    /// The button that shows or hides the sidebar, just right of the traffic lights.
+    pub(super) fn render_sidebar_toggle(&self) -> AnyElement {
+        let icon = if self.sidebar {
+            "ui/sidebar-open.svg"
+        } else {
+            "ui/sidebar-closed.svg"
+        };
+        div()
+            .id("sidebar-toggle")
+            .absolute()
+            .top(px(12.))
+            .left(px(78.))
+            .size(px(22.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(px(5.))
+            .occlude()
+            .cursor_pointer()
+            .group("sidebar-toggle")
+            .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
+            .child(
+                svg()
+                    .path(icon)
+                    .size(px(16.))
+                    .text_color(rgb(theme::TEXT_MUTED))
+                    .group_hover("sidebar-toggle", |s| s.text_color(rgb(theme::TEXT))),
+            )
+            .on_click(|_, window, cx| window.dispatch_action(Box::new(ToggleSidebar), cx))
+            .into_any_element()
     }
 }
 
