@@ -228,11 +228,14 @@ impl Editor {
             let segs = colors.get(line).map(Vec::as_slice).unwrap_or(&[]);
             let fold = hidden.iter().find(|&&(s, _)| s == line).map(|&(_, e)| e);
             if wrap {
-                let rows = wrapped_rows(b, line, width).min((body.bottom() - y) as usize);
-                let end = draw_wrapped(c, b, mode, line, segs, code_x, y, width, rows);
+                let starts = row_starts(b, line, width);
+                let rows = starts.len().min((body.bottom() - y) as usize);
+                let end = draw_wrapped(c, b, mode, line, segs, code_x, y, width, &starts[..rows]);
                 if let Some(fold_end) = fold {
-                    let last = y + (end / width.max(1)).min(rows - 1) as u16;
-                    draw_fold(c, b, fold_end, code_x, last, end % width.max(1));
+                    let (row, x) = place(&starts, end);
+                    if row < rows {
+                        draw_fold(c, b, fold_end, code_x, y + row as u16, x);
+                    }
                 }
                 y += rows as u16;
             } else {
@@ -293,9 +296,9 @@ impl Open {
             let below = |top: usize| {
                 visible[top..at]
                     .iter()
-                    .map(|&l| wrapped_rows(b, l, width))
+                    .map(|&l| row_starts(b, l, width).len())
                     .sum::<usize>()
-                    + column(b, b.sel.head) / width.max(1)
+                    + place(&row_starts(b, line, width), column(b, b.sel.head)).0
             };
             while height > 0 && top < at && below(top) >= height {
                 top += 1;
@@ -382,7 +385,8 @@ pub(crate) fn draw_line(
     })
 }
 
-/// Draws a line of text wrapped at `width` columns, over at most `rows` rows from `y`.
+/// Draws a line of text wrapped at `width` columns, its rows starting at the columns
+/// `starts`, from `y`.
 #[allow(clippy::too_many_arguments)]
 fn draw_wrapped(
     c: &mut Canvas,
@@ -393,12 +397,18 @@ fn draw_wrapped(
     x0: u16,
     y: u16,
     width: usize,
-    rows: usize,
+    starts: &[usize],
 ) -> usize {
     paint_line(c, b, mode, line, segs, |col| {
-        let row = col / width.max(1);
-        (row < rows).then(|| (x0 + (col % width.max(1)) as u16, y + row as u16))
+        let (row, x) = place(starts, col);
+        (row < starts.len() && x < width).then(|| (x0 + x as u16, y + row as u16))
     })
+}
+
+/// The row of a wrapped line that column `col` is on, and its column there.
+fn place(starts: &[usize], col: usize) -> (usize, usize) {
+    let row = starts.partition_point(|&s| s <= col).saturating_sub(1);
+    (row, col - starts.get(row).copied().unwrap_or(0))
 }
 
 /// Paints a line's chars where `at` puts each column, if anywhere. Returns the column after
@@ -454,22 +464,56 @@ fn paint_line(
     col
 }
 
-/// How many rows line `line` takes wrapped at `width` columns, with room after it for the
-/// cursor at its end.
-fn wrapped_rows(b: &Buffer, line: usize, width: usize) -> usize {
-    let start = b.line_start(line);
-    let text = b.slice(start, b.line_end(line));
-    let cols: usize = text
-        .trim_end_matches('\r')
-        .chars()
-        .map(|c| if c == '\t' { TAB } else { 1 })
-        .sum();
-    cols / width.max(1) + 1
+/// The columns line `line`'s rows start at, wrapped at `width` columns.
+fn row_starts(b: &Buffer, line: usize, width: usize) -> Vec<usize> {
+    let text = b.slice(b.line_start(line), b.line_end(line));
+    wrap_starts(text.trim_end_matches('\r'), width)
+}
+
+/// The columns the rows of `text` start at, wrapped at `width` columns: after the last space
+/// that fits, or mid-word when a word is wider than the row. A full last row gets one after
+/// it, for the cursor at the line's end.
+fn wrap_starts(text: &str, width: usize) -> Vec<usize> {
+    let width = width.max(1);
+    let mut starts = vec![0];
+    // Where the row would break: the column after the last space on it.
+    let mut after_space = None;
+    let mut col = 0;
+    for ch in text.chars() {
+        let w = if ch == '\t' { TAB } else { 1 };
+        let start = *starts.last().unwrap_or(&0);
+        // A space may hang past the edge; anything else starts a new row.
+        if col + w > start + width && !ch.is_whitespace() {
+            let at = after_space.filter(|&a| a > start).unwrap_or(col);
+            starts.push(at);
+            after_space = None;
+        }
+        col += w;
+        if ch.is_whitespace() {
+            after_space = Some(col);
+        }
+    }
+    let last = *starts.last().unwrap_or(&0);
+    if col - last >= width {
+        starts.push(col);
+    }
+    starts
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wrapping_breaks_after_spaces_and_inside_only_words_wider_than_the_row() {
+        assert_eq!(wrap_starts("the cat sat", 8), [0, 8]);
+        assert_eq!(wrap_starts("ab cdefghij", 5), [0, 3, 8]);
+        // Spaces hang past the edge rather than start a row.
+        assert_eq!(wrap_starts("abcd  efg", 4), [0, 6]);
+        // A full last row leaves a row for the cursor at the end.
+        assert_eq!(wrap_starts("abcd", 4), [0, 4]);
+        assert_eq!(wrap_starts("", 4), [0]);
+    }
 
     #[test]
     fn char_colors_follow_utf16_segments() {
