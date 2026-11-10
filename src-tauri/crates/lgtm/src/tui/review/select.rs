@@ -41,6 +41,7 @@ pub fn select_keys() -> Vec<(&'static str, &'static str)> {
                     | Cmd::SendToAgent
                     | Cmd::Sidebar
                     | Cmd::ToggleSidebar
+                    | Cmd::ToggleWrap
                     | Cmd::Split { .. }
                     | Cmd::Command
                     | Cmd::Fold(_)

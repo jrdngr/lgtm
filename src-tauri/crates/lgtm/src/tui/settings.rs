@@ -24,6 +24,8 @@ pub struct Settings {
     pub dash_files_width: Option<u16>,
     /// The file trees and lists on the left, not the right.
     pub files_left: bool,
+    /// Whether the editor wraps long lines.
+    pub editor_wrap: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +43,7 @@ impl Default for Settings {
             home_revisions_width: None,
             dash_files_width: None,
             files_left: false,
+            editor_wrap: false,
         }
     }
 }

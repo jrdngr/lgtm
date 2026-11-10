@@ -192,7 +192,8 @@ impl Editor {
         // A column for the diff gutter, the numbers, then a space before the text.
         let code_x = body.x + 1 + num_w + 2;
         let width = body.right().saturating_sub(code_x) as usize;
-        open.scroll(&visible, body.height as usize, width);
+        let wrap = self.wrap;
+        open.scroll(&visible, body.height as usize, width, wrap);
         let first = visible.partition_point(|&l| l < open.top);
         let left = open.left;
         let b = &open.buf;
@@ -208,13 +209,11 @@ impl Editor {
             .map(|(_, m)| m.as_slice())
             .unwrap_or(&[]);
         let cursor_line = b.line_of(b.sel.head);
-        for (row, &line) in visible
-            .iter()
-            .skip(first)
-            .take(body.height as usize)
-            .enumerate()
-        {
-            let y = body.y + row as u16;
+        let mut y = body.y;
+        for &line in visible.iter().skip(first) {
+            if y >= body.bottom() {
+                break;
+            }
             let num = if line == cursor_line { FG } else { FAINT };
             let n = format!("{:>w$}", line + 1, w = num_w as usize);
             c.put(body.x + 1, y, &n, theme::fg(num).bg(BG));
@@ -227,9 +226,21 @@ impl Editor {
                 c.put(body.x, y, s, theme::fg(color).bg(BG));
             }
             let segs = colors.get(line).map(Vec::as_slice).unwrap_or(&[]);
-            let end = draw_line(c, b, mode, line, segs, code_x, y, left, width);
-            if let Some(&(_, fold_end)) = hidden.iter().find(|&&(s, _)| s == line) {
-                draw_fold(c, b, fold_end, code_x, y, end.saturating_sub(left));
+            let fold = hidden.iter().find(|&&(s, _)| s == line).map(|&(_, e)| e);
+            if wrap {
+                let rows = wrapped_rows(b, line, width).min((body.bottom() - y) as usize);
+                let end = draw_wrapped(c, b, mode, line, segs, code_x, y, width, rows);
+                if let Some(fold_end) = fold {
+                    let last = y + (end / width.max(1)).min(rows - 1) as u16;
+                    draw_fold(c, b, fold_end, code_x, last, end % width.max(1));
+                }
+                y += rows as u16;
+            } else {
+                let end = draw_line(c, b, mode, line, segs, code_x, y, left, width);
+                if let Some(fold_end) = fold {
+                    draw_fold(c, b, fold_end, code_x, y, end.saturating_sub(left));
+                }
+                y += 1;
             }
         }
     }
@@ -266,12 +277,32 @@ impl Open {
         self.colors = Some((self.buf.version, colors));
     }
 
-    /// Scrolls so the cursor is in view, `height` of the `visible` lines by `width` columns.
-    fn scroll(&mut self, visible: &[usize], height: usize, width: usize) {
+    /// Scrolls so the cursor is in view, `height` rows of the `visible` lines by `width`
+    /// columns, lines wrapped with `wrap`.
+    fn scroll(&mut self, visible: &[usize], height: usize, width: usize, wrap: bool) {
         let b = &self.buf;
         let line = b.line_of(b.sel.head);
         let at = visible.partition_point(|&l| l < line);
-        let top = visible.partition_point(|&l| l < self.top);
+        let mut top = visible.partition_point(|&l| l < self.top);
+        if wrap {
+            self.left = 0;
+            if at < top {
+                top = at;
+            }
+            // Rows from the top line down to the cursor's row.
+            let below = |top: usize| {
+                visible[top..at]
+                    .iter()
+                    .map(|&l| wrapped_rows(b, l, width))
+                    .sum::<usize>()
+                    + column(b, b.sel.head) / width.max(1)
+            };
+            while height > 0 && top < at && below(top) >= height {
+                top += 1;
+            }
+            self.top = visible.get(top).copied().unwrap_or(0);
+            return;
+        }
         let top = if at < top {
             at
         } else if height > 0 && at >= top + height {
@@ -346,6 +377,40 @@ pub(crate) fn draw_line(
     left: usize,
     width: usize,
 ) -> usize {
+    paint_line(c, b, mode, line, segs, |col| {
+        (col >= left && col < left + width).then(|| (x0 + (col - left) as u16, y))
+    })
+}
+
+/// Draws a line of text wrapped at `width` columns, over at most `rows` rows from `y`.
+#[allow(clippy::too_many_arguments)]
+fn draw_wrapped(
+    c: &mut Canvas,
+    b: &Buffer,
+    mode: Mode,
+    line: usize,
+    segs: &[Segment],
+    x0: u16,
+    y: u16,
+    width: usize,
+    rows: usize,
+) -> usize {
+    paint_line(c, b, mode, line, segs, |col| {
+        let row = col / width.max(1);
+        (row < rows).then(|| (x0 + (col % width.max(1)) as u16, y + row as u16))
+    })
+}
+
+/// Paints a line's chars where `at` puts each column, if anywhere. Returns the column after
+/// the line.
+fn paint_line(
+    c: &mut Canvas,
+    b: &Buffer,
+    mode: Mode,
+    line: usize,
+    segs: &[Segment],
+    at: impl Fn(usize) -> Option<(u16, u16)>,
+) -> usize {
     let start = b.line_start(line);
     let end = b.line_end(line);
     let text: String = b.text.slice(start..end).chars().collect();
@@ -355,8 +420,8 @@ pub(crate) fn draw_line(
     let cursor = |i: usize| i == b.sel.head;
     let mut col = 0usize;
     let cell = |c: &mut Canvas, col: usize, s: &str, style: Style| {
-        if col >= left && col < left + width {
-            c.put(x0 + (col - left) as u16, y, s, style);
+        if let Some((x, y)) = at(col) {
+            c.put(x, y, s, style);
         }
     };
     for (k, ch) in text.chars().enumerate() {
@@ -387,6 +452,19 @@ pub(crate) fn draw_line(
         cell(c, col, " ", theme::fg(FG).bg(SEL));
     }
     col
+}
+
+/// How many rows line `line` takes wrapped at `width` columns, with room after it for the
+/// cursor at its end.
+fn wrapped_rows(b: &Buffer, line: usize, width: usize) -> usize {
+    let start = b.line_start(line);
+    let text = b.slice(start, b.line_end(line));
+    let cols: usize = text
+        .trim_end_matches('\r')
+        .chars()
+        .map(|c| if c == '\t' { TAB } else { 1 })
+        .sum();
+    cols / width.max(1) + 1
 }
 
 #[cfg(test)]

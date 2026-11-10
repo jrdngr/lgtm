@@ -44,6 +44,8 @@ pub enum Action {
     Sidebar,
     /// Show or hide the file tree.
     ToggleSidebar,
+    /// Wrap long lines, or not.
+    ToggleWrap,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -339,6 +341,7 @@ impl Keys {
             Cmd::SendToAgent => return Action::SendToAgent,
             Cmd::Sidebar => return Action::Sidebar,
             Cmd::ToggleSidebar => return Action::ToggleSidebar,
+            Cmd::ToggleWrap => return Action::ToggleWrap,
             Cmd::Split { right } => return Action::Split { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,

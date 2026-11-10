@@ -163,6 +163,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     };
     app.buffers.files = app.settings.files;
     app.buffers.files_width = app.settings.editor_files_width;
+    app.buffers.wrap = app.settings.editor_wrap;
     app.home.revisions_width = app.settings.home_revisions_width;
     app.dash.files_width = app.settings.dash_files_width;
     app.home.files.heat_on = app.settings.heat;
@@ -617,8 +618,10 @@ impl App {
             if self.buffers.files != self.settings.files
                 || self.buffers.files_width != self.settings.editor_files_width
                 || self.buffers.heat_on() != self.settings.heat
+                || self.buffers.wrap != self.settings.editor_wrap
             {
                 self.settings.files = self.buffers.files;
+                self.settings.editor_wrap = self.buffers.wrap;
                 self.settings.editor_files_width = self.buffers.files_width;
                 self.settings.heat = self.buffers.heat_on();
                 self.home.files.heat_on = self.settings.heat;

@@ -75,6 +75,8 @@ pub enum Cmd {
     Sidebar,
     /// Show or hide the file tree beside the text.
     ToggleSidebar,
+    /// Wrap long lines at the view's edge, or not.
+    ToggleWrap,
     /// Open the file in a pane to the right, or below.
     Split {
         right: bool,
@@ -260,6 +262,7 @@ pub const BINDS: &[Bind] = &[
     b("space /", Pick(Pick::Grep), Both, "search"),
     b("space e", Sidebar, Both, "file tree"),
     b("space b", ToggleSidebar, Both, "toggle file tree"),
+    b("space w", ToggleWrap, Both, "toggle word wrap"),
     b("space r", Review, Both, "review"),
     b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),

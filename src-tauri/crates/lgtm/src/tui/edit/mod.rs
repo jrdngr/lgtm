@@ -123,6 +123,8 @@ pub struct Editor {
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
     pub files_width: Option<u16>,
+    /// Whether long lines wrap at the view's edge.
+    pub wrap: bool,
     /// The sidebar's width as last drawn, 0 when hidden.
     sidebar_width: u16,
 }
@@ -143,6 +145,7 @@ impl Editor {
             files: true,
             saved: false,
             files_width: None,
+            wrap: false,
             sidebar_width: 0,
         }
     }
@@ -636,6 +639,7 @@ impl Editor {
                 self.files = !self.files;
                 self.in_sidebar = false;
             }
+            Action::ToggleWrap => self.wrap = !self.wrap,
             Action::Split { right } => self.split(None, right),
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
@@ -743,6 +747,36 @@ mod tests {
         for key in crate::edit::spec::keys(keys) {
             e.key(key);
         }
+    }
+
+    #[test]
+    fn space_w_wraps_long_lines_and_the_view_follows_the_cursor_down_the_rows() {
+        use ratatui::buffer::Buffer as Screen;
+        use ratatui::layout::Rect;
+        let long = "abcdefghijklmnopqrstuvwxyz";
+        let (_dir, mut e) = editor_on(&format!("{long}\nend\n").repeat(3));
+        e.files = false;
+        // Three columns of numbers and three of gutter leave ten for the text.
+        let area = Rect::new(0, 0, 16, 4);
+        let draw = |e: &mut Editor| {
+            let mut screen = Screen::empty(area);
+            e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
+            (0..area.height)
+                .map(|y| {
+                    (6..area.width)
+                        .map(|x| screen[(x, y)].symbol())
+                        .collect::<String>()
+                        .trim_end()
+                        .to_string()
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(draw(&mut e), ["abcdefghij", "end", "abcdefghij", "end"]);
+        press(&mut e, "<space>w");
+        assert_eq!(draw(&mut e), ["abcdefghij", "klmnopqrst", "uvwxyz", "end"]);
+        // The second long line's last row is the fifth row down, so the view moves a line.
+        press(&mut e, "jj$");
+        assert_eq!(draw(&mut e), ["end", "abcdefghij", "klmnopqrst", "uvwxyz"]);
     }
 
     #[test]

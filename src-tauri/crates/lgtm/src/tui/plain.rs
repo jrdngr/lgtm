@@ -20,6 +20,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
     let mut settings = settings::load();
     e.files = settings.files;
     e.files_width = settings.editor_files_width;
+    e.wrap = settings.editor_wrap;
     {
         let (root, tx) = (root.clone(), tx.clone());
         std::thread::spawn(move || {
@@ -71,8 +72,10 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             let outcome = e.key(key);
                             if e.files != settings.files
                                 || e.files_width != settings.editor_files_width
+                                || e.wrap != settings.editor_wrap
                             {
                                 settings.files = e.files;
+                                settings.editor_wrap = e.wrap;
                                 settings.editor_files_width = e.files_width;
                                 settings::save(&settings);
                             }
