@@ -187,10 +187,20 @@ impl Workspace {
             .text_size(px(12.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(if focused { theme::TEXT_STRONG } else { color }))
-            .when(top, |d| d.moves_window())
-            .when(!top, |d| {
-                d.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-            })
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                    cx.stop_propagation();
+                    w.apply(window, cx, |m| m.show_space(id));
+                    if top {
+                        if ev.click_count == 2 {
+                            window.titlebar_double_click();
+                        } else {
+                            window.start_window_move();
+                        }
+                    }
+                }),
+            )
             .on_mouse_down(
                 MouseButton::Right,
                 cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
