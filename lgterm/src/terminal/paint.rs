@@ -9,6 +9,7 @@ use gpui::{
     size,
 };
 
+use super::boxes;
 use super::frame::{CursorShape, Frame, Row, Run};
 use crate::theme;
 
@@ -123,12 +124,21 @@ impl Grid {
         row.runs
             .iter()
             .map(|run| {
-                let trimmed = run.text.trim_end_matches(' ');
+                // Box and block characters are drawn as rectangles instead.
+                let text: String = if run.single {
+                    run.text.clone()
+                } else {
+                    run.text
+                        .chars()
+                        .map(|c| if boxes::drawn(c) { ' ' } else { c })
+                        .collect()
+                };
+                let trimmed = text.trim_end_matches(' ');
                 let lines = run.underline || run.strike;
                 if trimmed.is_empty() && !lines {
                     return None;
                 }
-                let text = if lines { run.text.as_str() } else { trimmed };
+                let text = if lines { text.as_str() } else { trimmed };
                 Some(self.shape(run, text, run.fg, w))
             })
             .collect()
@@ -160,6 +170,9 @@ impl Grid {
                     runs: self.shape_row(row, window),
                 };
             }
+            for run in row.runs.iter().filter(|r| !r.single) {
+                self.paint_boxes(run, y, window);
+            }
             for (run, line) in row.runs.iter().zip(&shaped.runs) {
                 if let Some(line) = line {
                     let at = self.rect(run.col, y, run.cells).origin;
@@ -169,6 +182,39 @@ impl Grid {
         }
         drop(cache);
         self.paint_cursor(frame, window, cx);
+    }
+
+    /// Draws `run`'s box and block characters, edges on device pixels so neighbors meet.
+    fn paint_boxes(&self, run: &Run, y: usize, window: &mut Window) {
+        if !run.text.chars().any(boxes::drawn) {
+            return;
+        }
+        let scale = window.scale_factor();
+        let snap = |v: f32| (v * scale).round() / scale;
+        let mut fg = color(run.fg);
+        if run.faint {
+            fg.a = 0.6;
+        }
+        let (w, h) = (self.cell.width.as_f32(), self.cell.height.as_f32());
+        let light = (self.font_size.as_f32() / 13.).round().max(1.);
+        for (i, c) in run.text.chars().enumerate() {
+            let Some(pieces) = boxes::pieces(c, w, h, light) else {
+                continue;
+            };
+            let cell = self.rect(run.col + i as u16, y, 1).origin;
+            let (ox, oy) = (cell.x.as_f32(), cell.y.as_f32());
+            for ([x0, y0, x1, y1], alpha) in pieces {
+                let (x0, y0) = (snap(ox + x0), snap(oy + y0));
+                let (x1, y1) = (snap(ox + x1), snap(oy + y1));
+                let bounds = Bounds {
+                    origin: point(px(x0), px(y0)),
+                    size: size(px((x1 - x0).max(1. / scale)), px((y1 - y0).max(1. / scale))),
+                };
+                let mut c = fg;
+                c.a *= alpha;
+                window.paint_quad(fill(bounds, c));
+            }
+        }
     }
 
     fn paint_cursor(&self, frame: &Frame, window: &mut Window, cx: &mut App) {

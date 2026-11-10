@@ -1,5 +1,6 @@
 //! One terminal: a shell on a pty, parsed by Ghostty, painted by GPUI.
 
+mod boxes;
 mod find;
 mod frame;
 mod input;
