@@ -30,7 +30,7 @@ test:
     pnpm check
     cd src-tauri && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
     pnpm test
-    cd lgterm && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
+    cd lgterm && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
 
 # Build the macOS app and the `lgtm` command in one cargo build, so they share every
 # dependency, then bundle the app. `tauri build` would compile the app on its own: the frontend

@@ -5,13 +5,16 @@ use gpui::{
     Point, StatefulInteractiveElement, Styled, Window, anchored, deferred, div, px, rgb,
 };
 
+use super::Workspace;
 use super::actions::{self, COMMANDS};
-use super::{Workspace, theme};
-use crate::model::Axis;
+use super::overlay::Overlay;
+use crate::ipc::Place;
+use crate::model::{Model, SplitId};
+use crate::theme;
 
 pub struct TabMenu {
     pub at: Point<Pixels>,
-    pub split: u64,
+    pub split: SplitId,
 }
 
 #[derive(Clone, Copy)]
@@ -38,25 +41,37 @@ fn key(command: &str) -> String {
 }
 
 impl Workspace {
-    pub(super) fn open_tab_menu(&mut self, split: u64, at: Point<Pixels>, cx: &mut Context<Self>) {
-        self.tab_menu = Some(TabMenu { at, split });
+    pub(super) fn open_tab_menu(
+        &mut self,
+        split: SplitId,
+        at: Point<Pixels>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.overlay_has_keyboard() {
+            self.close_overlay(window, cx);
+        }
+        self.overlay = Some(Overlay::TabMenu(TabMenu { at, split }));
         cx.notify();
     }
 
     fn run_tab_menu(&mut self, item: Item, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(menu) = self.tab_menu.take() else {
+        let Some(Overlay::TabMenu(menu)) = self.overlay.take() else {
             return;
         };
         self.model.focus_split(menu.split);
-        match item {
-            Item::NewTerminal => self.apply(window, cx, |m| Some(m.new_tab())),
-            Item::NewSpace => self.apply(window, cx, |m| Some(m.split_space(Axis::Row))),
-            Item::Messages => self.show_messages(window, cx),
-        }
+        let place = match item {
+            Item::NewTerminal => Place::Tab,
+            Item::NewSpace => Place::SpaceRight,
+            Item::Messages => return self.apply(window, cx, Model::show_messages),
+        };
+        let _ = self.open(None, place, None, &[], true, window, cx);
     }
 
     pub(super) fn render_tab_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let menu = self.tab_menu.as_ref()?;
+        let Some(Overlay::TabMenu(menu)) = &self.overlay else {
+            return None;
+        };
         let rows = ITEMS.iter().map(|&(item, name, command)| {
             div()
                 .id(name)
@@ -93,8 +108,10 @@ impl Workspace {
             .shadow_lg()
             .text_size(px(13.))
             .on_mouse_down_out(cx.listener(|w, _, _, cx| {
-                w.tab_menu = None;
-                cx.notify();
+                if matches!(w.overlay, Some(Overlay::TabMenu(_))) {
+                    w.overlay = None;
+                    cx.notify();
+                }
             }))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .children(rows);

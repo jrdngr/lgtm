@@ -51,7 +51,7 @@ pub fn run(args: &[String]) -> i32 {
 }
 
 fn send(request: &Request, timeout: Option<Duration>, quiet: bool) -> i32 {
-    let Some(socket) = std::env::var_os(ipc::SOCKET_ENV) else {
+    let Some(socket) = std::env::var_os(lgterm_proto::SOCKET_ENV) else {
         if quiet {
             return 0;
         }
@@ -89,7 +89,7 @@ fn send(request: &Request, timeout: Option<Duration>, quiet: bool) -> i32 {
 }
 
 fn this_term() -> Option<String> {
-    std::env::var("LGTERM_TERMINAL_ID")
+    std::env::var(lgterm_proto::TERMINAL_ENV)
         .ok()
         .filter(|t| !t.is_empty())
 }

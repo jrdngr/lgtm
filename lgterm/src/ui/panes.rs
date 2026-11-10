@@ -4,19 +4,19 @@ use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, AppContext, Context, CursorStyle, DragMoveEvent, FontWeight, InteractiveElement,
     IntoElement, MouseButton, MouseDownEvent, ParentElement, Render, StatefulInteractiveElement,
-    Styled, Window, div, px, rgb,
+    StyleRefinement, Styled, Window, div, px, rgb,
 };
 
 use super::Workspace;
-use super::marks;
-use super::theme;
-use crate::model::{Axis, Space, Split, Tree, tree};
+use crate::ipc::Place;
+use crate::model::{Axis, LayoutId, Space, SpaceId, Split, Tab, Tree, tree};
+use crate::theme;
 
 /// Which tree a branch belongs to: a layout's spaces or a space's splits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Owner {
-    Layout(u64),
-    Space(u64),
+    Layout(LayoutId),
+    Space(SpaceId),
 }
 
 /// A divider being dragged: the boundary after child `index` of the branch at `path`.
@@ -107,7 +107,7 @@ impl Workspace {
                     .text_size(px(12.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(theme::TEXT_SPACE))
-                    .child(self.space_label(space, cx)),
+                    .child(self.space_label(space)),
             )
             .child(div().flex_1().min_h_0().flex().child(self.split_tree(
                 &space.splits,
@@ -235,10 +235,14 @@ impl Workspace {
 
     fn card(&self, split: &Split, focused: bool, cx: &mut Context<Self>) -> AnyElement {
         let split_id = split.id;
-        let tabs = split.tabs.iter().enumerate().map(|(i, &term)| {
+        let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
             let active = i == split.active;
+            let key = match tab {
+                Tab::Term(t) => t.0,
+                Tab::Messages => 0,
+            };
             div()
-                .id(("tab", term))
+                .id(("tab", key))
                 .flex()
                 .items_center()
                 .gap(px(7.))
@@ -255,29 +259,33 @@ impl Workspace {
                         .border_color(rgb(theme::CARD_BORDER))
                         .text_color(rgb(theme::TEXT_STRONG))
                 })
-                .child(self.term_label(term, cx))
-                .children(self.status(term).map(marks::mark))
+                .child(self.term_label(tab))
+                .children(
+                    tab.term()
+                        .and_then(|t| self.agents.status(t))
+                        .map(|s| self.mark(s)),
+                )
                 .when(active, |d| {
                     d.child(
                         div()
-                            .id(("close", term))
+                            .id(("close", key))
                             .text_size(px(13.))
                             .text_color(rgb(theme::ICON))
                             .child("×")
                             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                             .on_click(cx.listener(move |w, _, window, cx| {
                                 cx.stop_propagation();
-                                w.close(term, window, cx)
+                                w.close(tab, window, cx)
                             })),
                     )
                 })
                 .on_click(cx.listener(move |w, _, window, cx| {
-                    w.model.focus_term(term);
+                    w.model.focus_tab(tab);
                     w.focus_current(window, cx);
                 }))
         });
         let plus = div()
-            .id(("new-tab", split_id))
+            .id(("new-tab", split_id.0))
             .w(px(26.))
             .h(px(26.))
             .flex()
@@ -289,20 +297,22 @@ impl Workspace {
             .child("+")
             .on_click(cx.listener(move |w, _, window, cx| {
                 w.model.focus_split(split_id);
-                w.apply(window, cx, |m| Some(m.new_tab()));
+                let _ = w.open(None, Place::Tab, None, &[], true, window, cx);
             }));
-        let body = if self.messages_tab == Some(split.term()) {
-            Some(
+        let body = match split.tab() {
+            Tab::Messages => Some(
                 div()
                     .size_full()
                     .track_focus(&self.messages_focus)
                     .child(self.render_messages())
                     .into_any_element(),
-            )
-        } else {
-            self.terms
-                .get(&split.term())
-                .map(|t| t.view.clone().into_any_element())
+            ),
+            Tab::Term(t) => self.terms.get(&t).map(|t| {
+                t.view
+                    .clone()
+                    .cached(StyleRefinement::default().size_full())
+                    .into_any_element()
+            }),
         };
         div()
             .size_full()
@@ -341,8 +351,8 @@ impl Workspace {
                     .overflow_hidden()
                     .on_mouse_down(
                         MouseButton::Right,
-                        cx.listener(move |w, ev: &MouseDownEvent, _, cx| {
-                            w.open_tab_menu(split_id, ev.position, cx)
+                        cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                            w.open_tab_menu(split_id, ev.position, window, cx)
                         }),
                     )
                     .children(tabs)

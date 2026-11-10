@@ -1,13 +1,20 @@
 //! A shell on a pseudo-terminal.
 
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use lgterm_proto::{BIN_ENV, SOCKET_ENV, TERMINAL_ENV, TermId};
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-/// The app's control socket, given to every terminal.
-pub static SOCKET: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+/// What every terminal is told about the app it runs in.
+#[derive(Clone, Debug, Default)]
+pub struct SpawnEnv {
+    /// The control socket.
+    pub socket: Option<PathBuf>,
+    /// The `lgterm` binary.
+    pub bin: Option<PathBuf>,
+}
 
 /// Variables from a terminal lgterm may itself be running in, which would point its
 /// programs at the wrong app.
@@ -19,6 +26,9 @@ const HIDDEN_ENV: &[&str] = &[
     "LGTM_WORKSPACE",
     "HC_TERMINAL_ID",
 ];
+
+/// Reads from the shell held in the channel before the reader waits.
+const OUTPUT_CHUNKS: usize = 16;
 
 pub struct Pty {
     master: Box<dyn MasterPty + Send>,
@@ -34,9 +44,10 @@ pub type Output = async_channel::Receiver<Vec<u8>>;
 impl Pty {
     /// Starts the user's login shell in `cwd`, running `argv` if it's not empty.
     pub fn spawn(
-        term_id: u64,
+        term_id: TermId,
         cwd: &Path,
         argv: &[String],
+        app: &SpawnEnv,
         cols: u16,
         rows: u16,
     ) -> Result<(Self, Output)> {
@@ -72,12 +83,12 @@ impl Pty {
         cmd.env("COLORTERM", "truecolor");
         cmd.env("TERM_PROGRAM", "lgterm");
         cmd.env("TERM_PROGRAM_VERSION", env!("CARGO_PKG_VERSION"));
-        cmd.env("LGTERM_TERMINAL_ID", format!("t{term_id}"));
-        if let Some(socket) = SOCKET.get() {
-            cmd.env(crate::ipc::SOCKET_ENV, socket);
+        cmd.env(TERMINAL_ENV, term_id.to_string());
+        if let Some(socket) = &app.socket {
+            cmd.env(SOCKET_ENV, socket);
         }
-        if let Ok(exe) = std::env::current_exe() {
-            cmd.env("LGTERM_BIN", exe);
+        if let Some(bin) = &app.bin {
+            cmd.env(BIN_ENV, bin);
         }
         let child = pair.slave.spawn_command(cmd)?;
         drop(pair.slave);
@@ -86,7 +97,7 @@ impl Pty {
         let mut writer = pair.master.take_writer()?;
         let (input, inputs) = std::sync::mpsc::channel::<Vec<u8>>();
         std::thread::Builder::new()
-            .name(format!("pty-t{term_id}-in"))
+            .name(format!("pty-{term_id}-in"))
             .spawn(move || {
                 for bytes in inputs {
                     if writer.write_all(&bytes).is_err() || writer.flush().is_err() {
@@ -94,9 +105,10 @@ impl Pty {
                     }
                 }
             })?;
-        let (tx, rx) = async_channel::unbounded();
+        // Bounded, so a flood of output waits in the pty instead of piling up in memory.
+        let (tx, rx) = async_channel::bounded(OUTPUT_CHUNKS);
         std::thread::Builder::new()
-            .name(format!("pty-t{term_id}"))
+            .name(format!("pty-{term_id}"))
             .spawn(move || {
                 let mut buf = vec![0u8; 64 * 1024];
                 loop {

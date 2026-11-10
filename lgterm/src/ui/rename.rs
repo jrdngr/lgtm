@@ -3,12 +3,14 @@
 use gpui::{Context, FocusHandle, KeyDownEvent, Window};
 
 use super::Workspace;
-use super::field::{self, Key};
+use super::overlay::Overlay;
+use crate::field::{self, Key};
+use crate::model::{LayoutId, SpaceId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
-    Layout(u64),
-    Space(u64),
+    Layout(LayoutId),
+    Space(SpaceId),
 }
 
 pub struct Rename {
@@ -25,19 +27,25 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.finish_rename(true);
         let focus = cx.focus_handle();
         window.focus(&focus, cx);
-        self.rename = Some(Rename {
+        self.overlay = Some(Overlay::Rename(Rename {
             target,
             text,
             focus,
-        });
+        }));
         cx.notify();
     }
 
     /// Saves the name being typed. An empty name goes back to following the folder.
     pub(super) fn finish_rename(&mut self, save: bool) {
-        let Some(r) = self.rename.take() else { return };
+        if !matches!(self.overlay, Some(Overlay::Rename(_))) {
+            return;
+        }
+        let Some(Overlay::Rename(r)) = self.overlay.take() else {
+            return;
+        };
         if !save {
             return;
         }
@@ -56,13 +64,22 @@ impl Workspace {
         }
     }
 
+    pub(super) fn renaming(&self) -> Option<&Rename> {
+        match &self.overlay {
+            Some(Overlay::Rename(r)) => Some(r),
+            _ => None,
+        }
+    }
+
     pub(super) fn rename_key(
         &mut self,
         ev: &KeyDownEvent,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(r) = &mut self.rename else { return };
+        let Some(Overlay::Rename(r)) = &mut self.overlay else {
+            return;
+        };
         match field::key(&mut r.text, &ev.keystroke) {
             Key::Other => return,
             Key::Enter | Key::Escape => {

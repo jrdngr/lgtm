@@ -6,10 +6,11 @@ use gpui::{
     ParentElement, StatefulInteractiveElement, Styled, Window, div, px, rgb,
 };
 
-use super::palette::overlay;
-use super::{Workspace, theme};
+use super::Workspace;
+use super::overlay::{Overlay, backdrop};
 use crate::settings::Settings;
 use crate::terminal::FontSize;
+use crate::theme;
 
 type Toggle = (&'static str, fn(&mut Settings) -> &mut bool);
 
@@ -27,27 +28,19 @@ const SESSIONS: &[Toggle] = &[
 
 impl Workspace {
     pub(super) fn open_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.settings_open.take().is_some() {
-            self.focus_current(window, cx);
-            return;
+        if matches!(self.overlay, Some(Overlay::Settings { .. })) {
+            self.close_overlay(window, cx);
+        } else {
+            self.show_overlay(window, cx, |focus, _blur| Overlay::Settings {
+                focus,
+                _blur,
+            });
         }
-        self.palette = None;
-        let focus = cx.focus_handle();
-        window.focus(&focus, cx);
-        let blur = cx.on_focus_out(&focus, window, |w, _, window, cx| {
-            if window.is_window_active() {
-                w.settings_open = None;
-                cx.notify();
-            }
-        });
-        self.settings_open = Some((focus, blur));
-        cx.notify();
     }
 
     fn settings_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if ev.keystroke.key == "escape" {
-            self.settings_open = None;
-            self.focus_current(window, cx);
+            self.close_overlay(window, cx);
             cx.stop_propagation();
         }
     }
@@ -61,7 +54,9 @@ impl Workspace {
     }
 
     pub(super) fn render_settings(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let (focus, _) = self.settings_open.as_ref()?;
+        let Some(Overlay::Settings { focus, .. }) = &self.overlay else {
+            return None;
+        };
         let mut settings = self.settings.clone();
         let section = |title: &'static str| {
             div()
@@ -147,10 +142,7 @@ impl Workspace {
                             .text_color(rgb(theme::TEXT_MUTED))
                             .cursor_pointer()
                             .child("×")
-                            .on_click(cx.listener(|w, _, window, cx| {
-                                w.settings_open = None;
-                                w.focus_current(window, cx);
-                            })),
+                            .on_click(cx.listener(|w, _, window, cx| w.close_overlay(window, cx))),
                     ),
             )
             .child(section("ATTENTION"))
@@ -187,7 +179,7 @@ impl Workspace {
                             .child(step("font-bigger", "+", 1., cx)),
                     ),
             );
-        Some(overlay("settings-overlay", dialog.into_any_element(), cx))
+        Some(backdrop("settings-overlay", dialog.into_any_element(), cx))
     }
 }
 

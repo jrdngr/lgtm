@@ -1,0 +1,11 @@
+[package]
+name = "lgterm-proto"
+version = "0.1.0"
+description = "What lgterm and the programs in its terminals say to each other"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

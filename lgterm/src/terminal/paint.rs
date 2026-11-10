@@ -1,12 +1,16 @@
 //! Drawing a frame: backgrounds, selection, text, cursor.
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use gpui::{
-    App, Bounds, Font, FontStyle, FontWeight, Hsla, Pixels, Point, Size, StrikethroughStyle,
-    TextAlign, TextRun, UnderlineStyle, Window, fill, outline, point, px, rgb, size,
+    App, Bounds, Font, FontStyle, FontWeight, Hsla, Pixels, Point, ShapedLine, Size,
+    StrikethroughStyle, TextAlign, TextRun, UnderlineStyle, Window, fill, outline, point, px, rgb,
+    size,
 };
 
-use super::frame::{CursorShape, Frame, Run};
-use crate::ui::theme;
+use super::frame::{CursorShape, Frame, Row, Run};
+use crate::theme;
 
 pub struct Grid {
     pub origin: Point<Pixels>,
@@ -14,6 +18,20 @@ pub struct Grid {
     pub font: Font,
     pub font_size: Pixels,
     pub focused: bool,
+    pub lines: LineCache,
+}
+
+/// Each row's runs as shaped for the last frame, kept while the row and font size stay the
+/// same.
+#[derive(Clone, Default)]
+pub struct LineCache(Rc<RefCell<Vec<Shaped>>>);
+
+#[derive(Default)]
+struct Shaped {
+    version: u64,
+    font_size: Pixels,
+    /// One per run, none for a run with nothing to draw.
+    runs: Vec<Option<ShapedLine>>,
 }
 
 /// The cell size for `font`: the width of `M` by the line height.
@@ -77,6 +95,16 @@ impl Grid {
         }
     }
 
+    fn shape(&self, run: &Run, text: &str, fg: u32, w: &Window) -> ShapedLine {
+        let force = (!run.single).then_some(self.cell.width);
+        w.text_system().shape_line(
+            text.to_owned().into(),
+            self.font_size,
+            &[self.text_run(run, fg, text.len())],
+            force,
+        )
+    }
+
     fn text(
         &self,
         run: &Run,
@@ -86,17 +114,29 @@ impl Grid {
         w: &mut Window,
         cx: &mut App,
     ) {
-        let force = (!run.single).then_some(self.cell.width);
-        let line = w.text_system().shape_line(
-            text.to_owned().into(),
-            self.font_size,
-            &[self.text_run(run, fg, text.len())],
-            force,
-        );
+        let line = self.shape(run, text, fg, w);
         let _ = line.paint(at.origin, self.cell.height, TextAlign::Left, None, w, cx);
     }
 
+    /// A row's runs shaped, each with nothing for a run that draws nothing.
+    fn shape_row(&self, row: &Row, w: &Window) -> Vec<Option<ShapedLine>> {
+        row.runs
+            .iter()
+            .map(|run| {
+                let trimmed = run.text.trim_end_matches(' ');
+                let lines = run.underline || run.strike;
+                if trimmed.is_empty() && !lines {
+                    return None;
+                }
+                let text = if lines { run.text.as_str() } else { trimmed };
+                Some(self.shape(run, text, run.fg, w))
+            })
+            .collect()
+    }
+
     pub fn paint(&self, frame: &Frame, window: &mut Window, cx: &mut App) {
+        let mut cache = self.lines.0.borrow_mut();
+        cache.resize_with(frame.rows.len(), Shaped::default);
         for (y, row) in frame.rows.iter().enumerate() {
             for run in &row.runs {
                 if let Some(bg) = run.bg.filter(|bg| *bg != frame.bg) {
@@ -107,26 +147,25 @@ impl Grid {
                 let r = self.rect(start, y, end + 1 - start);
                 window.paint_quad(fill(r, color(theme::SELECTION)));
             }
-            for run in &row.runs {
-                let text = run.text.trim_end_matches(' ');
-                if text.is_empty() && !run.underline && !run.strike {
-                    continue;
-                }
-                let text = if run.underline || run.strike {
-                    run.text.as_str()
-                } else {
-                    text
+            let shaped = &mut cache[y];
+            if shaped.version != row.version
+                || shaped.font_size != self.font_size
+                || shaped.runs.len() != row.runs.len()
+            {
+                *shaped = Shaped {
+                    version: row.version,
+                    font_size: self.font_size,
+                    runs: self.shape_row(row, window),
                 };
-                self.text(
-                    run,
-                    text,
-                    run.fg,
-                    self.rect(run.col, y, run.cells),
-                    window,
-                    cx,
-                );
+            }
+            for (run, line) in row.runs.iter().zip(&shaped.runs) {
+                if let Some(line) = line {
+                    let at = self.rect(run.col, y, run.cells).origin;
+                    let _ = line.paint(at, self.cell.height, TextAlign::Left, None, window, cx);
+                }
             }
         }
+        drop(cache);
         self.paint_cursor(frame, window, cx);
     }
 

@@ -1,14 +1,16 @@
 //! Finding text in a terminal's scrollback.
 
+use std::time::Duration;
+
 use ghostty_vt::search::Search;
 use gpui::{
     AnyElement, Context, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, MouseButton,
-    ParentElement, Styled, Window, div, px, rgb,
+    ParentElement, Styled, Task, Window, div, px, rgb,
 };
 
 use super::{Paste, TermView};
-use crate::ui::field::{self, Key};
-use crate::ui::theme;
+use crate::field::{self, Key};
+use crate::theme;
 
 pub struct Find {
     query: String,
@@ -16,7 +18,12 @@ pub struct Find {
     focus: FocusHandle,
     total: usize,
     index: Option<usize>,
+    /// A search for the query as typed, waiting for the typing to pause.
+    pending: Option<Task<()>>,
 }
+
+/// How long typing pauses before the query is searched for.
+const SEARCH_PAUSE: Duration = Duration::from_millis(120);
 
 impl TermView {
     pub fn open_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -30,6 +37,7 @@ impl TermView {
                 focus: cx.focus_handle(),
                 total: 0,
                 index: None,
+                pending: None,
             });
         }
         if let Some(f) = &self.find {
@@ -66,9 +74,22 @@ impl TermView {
         let _ = vt.set_selection(selected.as_ref());
     }
 
+    /// Searches for the query once typing pauses.
+    fn find_soon(&mut self, cx: &mut Context<Self>) {
+        let Some(f) = &mut self.find else { return };
+        f.pending = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(SEARCH_PAUSE).await;
+            let _ = this.update(cx, |t, cx| {
+                t.find_query_changed();
+                cx.notify();
+            });
+        }));
+    }
+
     /// Searches again for the current query, from the newest match.
     fn find_query_changed(&mut self) {
         let Some(f) = &mut self.find else { return };
+        f.pending = None;
         let needle = Some(f.query.as_str()).filter(|q| !q.is_empty());
         let _ = f.search.set_needle(&self.vt, needle);
         f.total = 0;
@@ -86,7 +107,7 @@ impl TermView {
         };
         let Some(f) = &mut self.find else { return };
         f.query.extend(text.chars().filter(|c| !c.is_control()));
-        self.find_query_changed();
+        self.find_soon(cx);
         cx.notify();
     }
 
@@ -100,7 +121,9 @@ impl TermView {
                 cx.stop_propagation();
                 return;
             }
-            Key::Edited => self.find_query_changed(),
+            Key::Edited => self.find_soon(cx),
+            // A search still waiting runs now, landing on the newest match.
+            Key::Enter | Key::Up if f.pending.is_some() => self.find_query_changed(),
             Key::Enter | Key::Up => self.find_step(false),
             Key::ShiftEnter | Key::Down => self.find_step(true),
         }

@@ -8,7 +8,7 @@ use ghostty_vt::screen::CellWide;
 use ghostty_vt::style::{RgbColor, Underline};
 use ghostty_vt::{RenderState, Terminal};
 
-use crate::ui::theme;
+use crate::theme;
 
 /// Cells in one row that share a style. Narrow runs hold one char per cell; a wide character
 /// or a multi-codepoint cluster gets a run of its own.
@@ -31,6 +31,8 @@ pub struct Run {
 #[derive(Clone, Debug, Default)]
 pub struct Row {
     pub runs: Vec<Run>,
+    /// Changes whenever the runs do.
+    pub version: u64,
     /// Selected columns, inclusive.
     pub selection: Option<(u16, u16)>,
 }
@@ -63,6 +65,7 @@ pub struct Snapshotter {
     rows: RowIterator,
     cells: CellIterator,
     lines: Rc<Vec<Row>>,
+    versions: u64,
 }
 
 fn hex(c: RgbColor) -> u32 {
@@ -76,6 +79,7 @@ impl Snapshotter {
             rows: RowIterator::new()?,
             cells: CellIterator::new()?,
             lines: Rc::default(),
+            versions: 0,
         })
     }
 
@@ -98,6 +102,8 @@ impl Snapshotter {
             line.selection = row.selection()?.map(|s| (s.start_x, s.end_x));
             if full || row.dirty()? {
                 line.runs.clear();
+                self.versions += 1;
+                line.version = self.versions;
                 let mut cells = self.cells.update(row)?;
                 let mut x = 0u16;
                 let mut text = String::new();

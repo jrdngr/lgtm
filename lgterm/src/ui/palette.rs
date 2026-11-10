@@ -7,15 +7,28 @@ use gpui::{
     Subscription, TextRun, Window, canvas, div, font, point, px, rgb,
 };
 
+use super::Workspace;
 use super::actions::{COMMANDS, Command, display};
-use super::field::{self, Key};
-use super::{Workspace, theme};
+use super::overlay::{Overlay, backdrop};
+use crate::field::{self, Key};
+use crate::theme;
 
 pub struct Palette {
     pub query: String,
     pub selected: usize,
     pub focus: FocusHandle,
     _blur: Subscription,
+}
+
+impl Palette {
+    fn new(focus: FocusHandle, blur: Subscription) -> Self {
+        Palette {
+            query: String::new(),
+            selected: 0,
+            focus,
+            _blur: blur,
+        }
+    }
 }
 
 /// Rows shown at once.
@@ -58,46 +71,34 @@ pub fn matches(query: &str) -> Vec<(&'static Command, Vec<usize>)> {
 
 impl Workspace {
     pub(super) fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.palette.take().is_some() {
-            self.focus_current(window, cx);
-            return;
+        if matches!(self.overlay, Some(Overlay::Palette(_))) {
+            self.close_overlay(window, cx);
+        } else {
+            self.show_overlay(window, cx, |f, b| Overlay::Palette(Palette::new(f, b)));
         }
-        self.settings_open = None;
-        let focus = cx.focus_handle();
-        window.focus(&focus, cx);
-        let blur = cx.on_focus_out(&focus, window, |w, _, window, cx| {
-            if window.is_window_active() {
-                w.palette = None;
-                cx.notify();
-            }
-        });
-        self.palette = Some(Palette {
-            query: String::new(),
-            selected: 0,
-            focus,
-            _blur: blur,
-        });
-        cx.notify();
+    }
+
+    fn palette(&mut self) -> Option<&mut Palette> {
+        match &mut self.overlay {
+            Some(Overlay::Palette(p)) => Some(p),
+            _ => None,
+        }
     }
 
     fn run_command(&mut self, command: &Command, window: &mut Window, cx: &mut Context<Self>) {
-        self.palette = None;
-        self.focus_current(window, cx);
+        self.close_overlay(window, cx);
         window.dispatch_action((command.action)(), cx);
     }
 
     fn palette_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(p) = &mut self.palette else { return };
+        let Some(p) = self.palette() else { return };
         let count = matches(&p.query).len().min(ROWS);
         match field::key(&mut p.query, &ev.keystroke) {
             Key::Other => return,
             Key::Edited => p.selected = 0,
             Key::Up => p.selected = p.selected.saturating_sub(1),
             Key::Down => p.selected = (p.selected + 1).min(count.saturating_sub(1)),
-            Key::Escape => {
-                self.palette = None;
-                self.focus_current(window, cx);
-            }
+            Key::Escape => self.close_overlay(window, cx),
             Key::Enter | Key::ShiftEnter => {
                 if let Some((c, _)) = matches(&p.query).into_iter().nth(p.selected) {
                     self.run_command(c, window, cx);
@@ -109,7 +110,9 @@ impl Workspace {
     }
 
     pub(super) fn render_palette(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let p = self.palette.as_ref()?;
+        let Some(Overlay::Palette(p)) = &self.overlay else {
+            return None;
+        };
         let rows = matches(&p.query)
             .into_iter()
             .take(ROWS)
@@ -152,7 +155,7 @@ impl Workspace {
                             })),
                     )
                     .on_click(cx.listener(move |w, _, window, cx| {
-                        let query = w.palette.as_ref().map(|p| p.query.clone());
+                        let query = w.palette().map(|p| p.query.clone());
                         if let Some((c, _)) = query.and_then(|q| matches(&q).into_iter().nth(i)) {
                             w.run_command(c, window, cx);
                         }
@@ -186,39 +189,11 @@ impl Workspace {
                     .child(div().w(px(1.5)).h(px(17.)).bg(rgb(theme::FOCUS))),
             )
             .child(div().p(px(6.)).flex().flex_col().gap(px(1.)).children(rows));
-        Some(overlay("palette-overlay", dialog.into_any_element(), cx))
+        Some(backdrop("palette-overlay", dialog.into_any_element(), cx))
     }
 }
 
 /// A dialog over the window. Clicking outside it closes it.
-pub(super) fn overlay(
-    id: &'static str,
-    dialog: AnyElement,
-    cx: &mut Context<Workspace>,
-) -> AnyElement {
-    div()
-        .id(id)
-        .absolute()
-        .top_0()
-        .left_0()
-        .size_full()
-        .flex()
-        .justify_center()
-        .items_start()
-        .pt(px(80.))
-        .occlude()
-        .on_mouse_down(
-            MouseButton::Left,
-            cx.listener(|w, _, window, cx| {
-                w.palette = None;
-                w.settings_open = None;
-                w.focus_current(window, cx);
-            }),
-        )
-        .child(dialog)
-        .into_any_element()
-}
-
 fn magnifier() -> AnyElement {
     canvas(
         |_, _, _| {},

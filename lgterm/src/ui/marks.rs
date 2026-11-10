@@ -6,8 +6,9 @@ use std::time::Instant;
 
 use gpui::{AnyElement, IntoElement, PathBuilder, Styled, canvas, div, point, px, rgb, rgba};
 
-use super::theme;
-use crate::status::Status;
+use super::Workspace;
+use crate::agents::Status;
+use crate::theme;
 
 /// How far round the spinner is, from 0 to 1.
 fn phase() -> f32 {
@@ -16,7 +17,17 @@ fn phase() -> f32 {
     (ms % 900) as f32 / 900.
 }
 
-pub fn mark(status: Status) -> AnyElement {
+impl Workspace {
+    /// A status mark, noting a spinner so the window keeps turning it.
+    pub(super) fn mark(&self, status: Status) -> AnyElement {
+        if status == Status::Working {
+            self.spinning.set(true);
+        }
+        mark(status)
+    }
+}
+
+fn mark(status: Status) -> AnyElement {
     match status {
         Status::Blocked => dot(theme::BLOCKED),
         Status::Done => dot(theme::DONE),

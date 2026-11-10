@@ -8,7 +8,7 @@ pub mod links;
 mod paint;
 mod pty;
 
-pub use pty::SOCKET;
+pub use pty::SpawnEnv;
 
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -25,15 +25,19 @@ use gpui::{
 };
 
 use frame::{Frame, Snapshotter};
-use paint::Grid;
+use paint::{Grid, LineCache};
 use pty::Pty;
 
-use crate::ui::theme;
+use crate::model::TermId;
+use crate::theme;
 
 actions!(terminal, [Copy, Paste]);
 
 /// How long after the last keypress the user counts as still typing.
 const TYPING_PAUSE: Duration = Duration::from_secs(2);
+
+/// Output parsed at once before the window gets a chance to draw.
+const FEED_LIMIT: usize = 256 * 1024;
 
 /// The terminal font size, shared by every terminal.
 pub struct FontSize(pub f32);
@@ -50,7 +54,7 @@ pub enum TermEvent {
 }
 
 pub struct TermView {
-    pub id: u64,
+    pub id: TermId,
     focus: FocusHandle,
     vt: Terminal,
     snap: Snapshotter,
@@ -77,6 +81,7 @@ pub struct TermView {
     /// The user typed a prompt and hasn't sent or dropped it yet.
     draft: bool,
     last_key: Option<Instant>,
+    lines: LineCache,
 }
 
 fn rgb(c: u32) -> RgbColor {
@@ -89,7 +94,13 @@ fn rgb(c: u32) -> RgbColor {
 
 impl TermView {
     /// Starts a shell in `cwd`, running `argv` if it's not empty.
-    pub fn spawn(id: u64, cwd: &Path, argv: &[String], cx: &mut App) -> Result<Entity<Self>> {
+    pub fn spawn(
+        id: TermId,
+        cwd: &Path,
+        argv: &[String],
+        app: &SpawnEnv,
+        cx: &mut App,
+    ) -> Result<Entity<Self>> {
         let (cols, rows) = (80, 24);
         let mut vt = Terminal::new(TerminalOptions {
             cols,
@@ -103,11 +114,13 @@ impl TermView {
         let keys = key::Encoder::new()?;
         let key_event = key::Event::new()?;
         let mouse = mouse::Encoder::new()?;
-        let (pty, output) = Pty::spawn(id, cwd, argv, cols, rows)?;
+        let (pty, output) = Pty::spawn(id, cwd, argv, app, cols, rows)?;
         Ok(cx.new(|cx| {
             cx.spawn(async move |this: gpui::WeakEntity<TermView>, cx| {
                 while let Ok(mut bytes) = output.recv().await {
-                    while let Ok(more) = output.try_recv() {
+                    while bytes.len() < FEED_LIMIT
+                        && let Ok(more) = output.try_recv()
+                    {
                         bytes.extend(more);
                     }
                     if this.update(cx, |t, cx| t.feed(&bytes, cx)).is_err() {
@@ -139,6 +152,7 @@ impl TermView {
                 find: None,
                 draft: false,
                 last_key: None,
+                lines: LineCache::default(),
             }
         }))
     }
@@ -215,42 +229,50 @@ impl TermView {
         self.input(&bytes, cx);
     }
 
-    /// The live screen, wherever the user has scrolled, one line per row.
-    pub fn screen_text(&self) -> String {
-        let at = |x, y| self.vt.grid_ref(VtPoint::Active(PointCoordinate { x, y }));
-        let (Ok(start), Ok(end)) = (
-            at(0, 0),
-            at(
-                self.cols.saturating_sub(1),
-                self.rows.saturating_sub(1) as u32,
-            ),
-        ) else {
+    /// The bottom `rows` rows of the live screen, wherever the user has scrolled, one line
+    /// per row.
+    pub fn screen_bottom(&self, rows: u16) -> String {
+        let top = self.rows.saturating_sub(rows) as u32;
+        let bottom = self.rows.saturating_sub(1) as u32;
+        let at = |x, y| VtPoint::Active(PointCoordinate { x, y });
+        self.format(at(0, top), at(self.cols.saturating_sub(1), bottom), false)
+    }
+
+    /// The last `lines` lines of scrollback and screen, or a screenful, with wrapped lines
+    /// joined. Formats only as far back as it needs to.
+    pub fn text(&self, lines: Option<usize>) -> String {
+        let want = lines.unwrap_or(self.rows as usize);
+        let total = self.vt.total_rows().unwrap_or(0);
+        let mut span = want.max(1) + self.rows as usize;
+        loop {
+            let start = total.saturating_sub(span);
+            let at = |x, y: usize| VtPoint::Screen(PointCoordinate { x, y: y as u32 });
+            let end = at(self.cols.saturating_sub(1), total.saturating_sub(1));
+            let text = self.format(at(0, start), end, true);
+            let all: Vec<&str> = text.trim_end().lines().collect();
+            if all.len() >= want || start == 0 {
+                let n = want.min(all.len());
+                return all[all.len() - n..].join("\n");
+            }
+            span *= 2;
+        }
+    }
+
+    /// Plain text from `start` to `end`.
+    fn format(&self, start: VtPoint, end: VtPoint, unwrap: bool) -> String {
+        let (Ok(start), Ok(end)) = (self.vt.grid_ref(start), self.vt.grid_ref(end)) else {
             return String::new();
         };
         let sel = Selection::new(start, end, false);
         let opts = fmt::FormatterOptions::new()
             .with_format(fmt::Format::Plain)
+            .with_unwrap(unwrap)
             .with_trim(true)
             .with_selection(&sel);
         fmt::Formatter::new(&self.vt, opts)
             .and_then(|mut f| f.format_alloc())
             .map(|b| String::from_utf8_lossy(&b).into_owned())
             .unwrap_or_default()
-    }
-
-    /// The last `lines` lines of scrollback and screen, or a screenful.
-    pub fn text(&self, lines: Option<usize>) -> String {
-        let opts = fmt::FormatterOptions::new()
-            .with_format(fmt::Format::Plain)
-            .with_unwrap(true)
-            .with_trim(true);
-        let all = fmt::Formatter::new(&self.vt, opts)
-            .and_then(|mut f| f.format_alloc())
-            .map(|b| String::from_utf8_lossy(&b).into_owned())
-            .unwrap_or_default();
-        let all: Vec<&str> = all.trim_end().lines().collect();
-        let n = lines.unwrap_or(self.rows as usize).min(all.len());
-        all[all.len() - n..].join("\n")
     }
 
     fn font(&self, cx: &App) -> (Font, Pixels) {
@@ -291,6 +313,7 @@ impl TermView {
             font,
             font_size,
             focused: self.focus.is_focused(window),
+            lines: self.lines.clone(),
         };
         Some((frame, grid))
     }
@@ -359,7 +382,7 @@ impl Render for TermView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let this = cx.entity();
         div()
-            .id(("term", self.id))
+            .id(("term", self.id.0))
             .size_full()
             .relative()
             .track_focus(&self.focus)

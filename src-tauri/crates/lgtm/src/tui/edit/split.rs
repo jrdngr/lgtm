@@ -21,8 +21,8 @@ pub enum Host {
 
 /// The app this terminal is a pane of, if it can split.
 pub fn host() -> Option<Host> {
-    if var("LGTERM_TERMINAL_ID").is_some()
-        && let Some(bin) = var("LGTERM_BIN")
+    if var(lgterm_proto::TERMINAL_ENV).is_some()
+        && let Some(bin) = var(lgterm_proto::BIN_ENV)
     {
         return Some(Host::Lgterm(bin));
     }

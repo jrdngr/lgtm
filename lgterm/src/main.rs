@@ -1,12 +1,14 @@
+mod agents;
 mod cli;
 mod dock;
+mod field;
 mod ipc;
 mod model;
 mod procinfo;
 mod settings;
 mod state;
-mod status;
 mod terminal;
+mod theme;
 mod ui;
 
 use std::path::PathBuf;
@@ -31,7 +33,7 @@ fn main() {
         .or_else(dirs::home_dir)
         .unwrap_or_else(|| PathBuf::from("/"));
     gpui_platform::application().run(move |cx: &mut App| {
-        cx.set_global(FontSize(ui::theme::DEFAULT_FONT_SIZE));
+        cx.set_global(FontSize(theme::DEFAULT_FONT_SIZE));
         cx.set_app_identity("dev.lgtm.lgterm", "lgterm");
         actions::bind(cx);
         cx.on_action(|_: &Quit, cx| cx.quit());

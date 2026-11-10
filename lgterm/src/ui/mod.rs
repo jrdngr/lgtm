@@ -5,10 +5,9 @@ mod agents;
 mod badge;
 mod control;
 mod dispatch;
-pub mod field;
-mod labels;
 mod marks;
 mod messages;
+mod overlay;
 mod palette;
 mod panes;
 mod rename;
@@ -16,67 +15,55 @@ mod restore;
 mod settings_view;
 mod sidebar;
 mod tab_menu;
-pub mod theme;
+mod terms;
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
 
-use gpui::{App, Context, Entity, FocusHandle, Focusable, KeyDownEvent, Subscription, Window};
+use gpui::{Context, FocusHandle, Focusable, KeyDownEvent, Window};
 
-use crate::ipc::{self, Place, Reply};
-use crate::model::Model;
+use crate::agents::Agents;
+use crate::ipc::{self, Place};
+use crate::model::{Model, Tab, TermId};
 use crate::procinfo;
 use crate::settings::Settings;
 use crate::state::State;
-use crate::status::Kind;
 use crate::terminal::links::Link;
-use crate::terminal::{FontSize, TermEvent, TermView};
-use agents::Agent;
-pub use messages::Message;
-use rename::Rename;
+use crate::terminal::{FontSize, SpawnEnv};
+use crate::theme;
+use overlay::Overlay;
+use terms::Term;
 
-/// What polling found a terminal running.
-#[derive(Clone, Debug, Default, PartialEq)]
-struct Info {
-    process: Option<String>,
-    /// The agent the foreground process runs.
-    kind: Option<Kind>,
-    cwd: Option<PathBuf>,
-    /// The shell itself is in the foreground, running nothing.
-    shell_foreground: bool,
-}
-
-struct Term {
-    view: Entity<TermView>,
-    info: Info,
-    agent: Option<Agent>,
-    _sub: Subscription,
-}
+/// How often terminals are checked for what they run.
+const POLL: Duration = Duration::from_secs(1);
+/// How often a spinner turns.
+const SPIN: Duration = Duration::from_millis(80);
 
 pub struct Workspace {
     model: Model,
-    terms: HashMap<u64, Term>,
+    terms: HashMap<TermId, Term>,
+    agents: Agents,
     sidebar: bool,
     sidebar_width: f32,
-    /// The tab bar's right-click menu, while it's open.
-    tab_menu: Option<tab_menu::TabMenu>,
-    /// Layouts and spaces folded in the sidebar.
+    /// Layouts and spaces folded in the sidebar, by id.
     collapsed: HashSet<u64>,
-    rename: Option<Rename>,
+    overlay: Option<Overlay>,
     home: Option<PathBuf>,
+    /// What an unnamed space with no terminal is called.
+    home_name: String,
     settings: Settings,
-    messages: Vec<Message>,
-    /// The Messages tab, if one is open.
-    messages_tab: Option<u64>,
     messages_focus: FocusHandle,
-    /// `lgterm wait` calls, by terminal.
-    waiters: Vec<(u64, async_channel::Sender<Reply>)>,
+    /// The terminal last given focus, told when it loses it.
+    focused: Option<TermId>,
     /// Agents on the Dock badge.
     badge: usize,
-    palette: Option<palette::Palette>,
-    /// The Settings dialog's focus and the subscription that closes it on blur, while it's open.
-    settings_open: Option<(FocusHandle, Subscription)>,
+    spawn_env: SpawnEnv,
+    /// The last frame drew a spinner.
+    spinning: Cell<bool>,
+    /// Something changed since the state was last saved.
+    dirty: bool,
     /// The state last written to disk.
     saved: Option<Vec<u8>>,
     _server: Option<ipc::Server>,
@@ -87,23 +74,29 @@ impl Workspace {
         let settings = Settings::load();
         cx.set_global(FontSize(settings.font_size));
         let (model, first) = Model::new();
+        let home = dirs::home_dir();
+        let home_name =
+            procinfo::space_name(home.as_deref().unwrap_or("/".as_ref()), home.as_deref());
         let mut this = Workspace {
             model,
             terms: HashMap::new(),
+            agents: Agents::default(),
             sidebar: true,
             sidebar_width: theme::SIDEBAR_WIDTH,
-            tab_menu: None,
             collapsed: HashSet::new(),
-            rename: None,
-            home: dirs::home_dir(),
+            overlay: None,
+            home,
+            home_name,
             settings,
-            messages: Vec::new(),
-            messages_tab: None,
             messages_focus: cx.focus_handle(),
-            waiters: Vec::new(),
+            focused: None,
             badge: 0,
-            palette: None,
-            settings_open: None,
+            spawn_env: SpawnEnv {
+                socket: None,
+                bin: std::env::current_exe().ok(),
+            },
+            spinning: Cell::new(false),
+            dirty: false,
             saved: None,
             _server: None,
         };
@@ -125,7 +118,7 @@ impl Workspace {
         let path = ipc::socket_path();
         match ipc::serve(&path) {
             Ok((server, requests)) => {
-                let _ = crate::terminal::SOCKET.set(path);
+                self.spawn_env.socket = Some(path);
                 self._server = Some(server);
                 cx.spawn_in(window, async move |this, cx| {
                     while let Ok(inc) = requests.recv().await {
@@ -144,7 +137,7 @@ impl Workspace {
         let this = cx.entity().downgrade();
         let handle = window.window_handle();
         cx.on_system_notification_response(move |response, cx| {
-            let Some(term) = ipc::parse_term(&response.tag) else {
+            let Some(term) = TermId::parse(&response.tag) else {
                 return;
             };
             let this = this.clone();
@@ -159,11 +152,11 @@ impl Workspace {
         });
     }
 
-    /// Polls terminals every second, and spins working marks.
+    /// Polls terminals every second, and turns spinners while one shows.
     fn start_timers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         cx.spawn_in(window, async move |this, cx| {
             loop {
-                cx.background_executor().timer(Duration::from_secs(1)).await;
+                cx.background_executor().timer(POLL).await;
                 if this
                     .update_in(cx, |w, window, cx| w.poll(window, cx))
                     .is_err()
@@ -175,11 +168,9 @@ impl Workspace {
         .detach();
         cx.spawn_in(window, async move |this, cx| {
             loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(80))
-                    .await;
+                cx.background_executor().timer(SPIN).await;
                 let alive = this.update(cx, |w, cx| {
-                    if w.any_working() {
+                    if w.spinning.get() {
                         cx.notify();
                     }
                 });
@@ -191,122 +182,52 @@ impl Workspace {
         .detach();
     }
 
-    fn spawn(
-        &mut self,
-        id: u64,
-        cwd: &Path,
-        argv: &[String],
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> anyhow::Result<()> {
-        let view = match TermView::spawn(id, cwd, argv, cx) {
-            Ok(view) => view,
-            Err(err) => {
-                eprintln!("lgterm: can't start a shell: {err:#}");
-                self.close(id, window, cx);
-                return Err(err);
-            }
-        };
-        let sub = cx.subscribe_in(&view, window, move |this, _, ev, window, cx| match ev {
-            TermEvent::Exited => this.close(id, window, cx),
-            TermEvent::Changed => cx.notify(),
-            TermEvent::Link(link) => this.open_link(id, link, window, cx),
-        });
-        self.terms.insert(
-            id,
-            Term {
-                view,
-                info: Info::default(),
-                agent: None,
-                _sub: sub,
-            },
-        );
-        Ok(())
-    }
-
-    /// The folder new terminals beside `term` start in.
-    fn cwd_of(&self, term: u64, cx: &App) -> PathBuf {
-        let Some(t) = self.terms.get(&term) else {
-            return self.home.clone().unwrap_or_else(|| PathBuf::from("/"));
-        };
-        t.info
-            .cwd
-            .clone()
-            .unwrap_or_else(|| t.view.read(cx).known_cwd().to_path_buf())
-    }
-
-    fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let mut changed = false;
-        for term in self.terms.values_mut() {
-            let view = term.view.read(cx);
-            let pid = view.foreground_pid();
-            let process = pid.and_then(procinfo::name);
-            let shell_foreground = pid.is_some() && pid == view.shell_pid();
-            let kind = process.as_deref().and_then(Kind::from_process).or_else(|| {
-                let (exe, argv) = procinfo::command(pid.filter(|_| !shell_foreground)?)?;
-                Kind::from_command(&exe, &argv)
-            });
-            let info = Info {
-                process,
-                kind,
-                cwd: pid.and_then(procinfo::cwd),
-                shell_foreground,
-            };
-            if info != term.info {
-                term.info = info;
-                changed = true;
-            }
-        }
-        if changed {
-            cx.notify();
-        }
-        self.poll_agents(window, cx);
-    }
-
     fn focus_current(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.finish_rename(true);
-        let term = self.model.term();
-        if self.messages_tab == Some(term) {
-            window.focus(&self.messages_focus, cx);
-        } else if let Some(t) = self.terms.get(&term) {
-            let handle = t.view.read(cx).focus_handle(cx);
-            window.focus(&handle, cx);
+        let now = self.model.term();
+        if now != self.focused {
+            // Terminal views draw again only when told, and both show focus in their cursor.
+            for t in [self.focused, now].into_iter().flatten() {
+                if let Some(t) = self.terms.get(&t) {
+                    t.view.update(cx, |_, cx| cx.notify());
+                }
+            }
+            self.focused = now;
         }
-        self.clear_viewed(window, cx);
+        match now.and_then(|t| self.terms.get(&t)) {
+            Some(t) => {
+                let handle = t.view.read(cx).focus_handle(cx);
+                window.focus(&handle, cx);
+            }
+            None => window.focus(&self.messages_focus, cx),
+        }
+        self.with_agents(window, cx, |a, env| a.settle(env));
         cx.notify();
     }
 
-    /// Runs a model change that may open a terminal, then focuses whatever is focused now.
+    /// Runs a model change, then focuses whatever is focused now.
     fn apply(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        change: impl FnOnce(&mut Model) -> Option<u64>,
+        change: impl FnOnce(&mut Model),
     ) {
-        let cwd = self.cwd_of(self.model.term(), cx);
-        if let Some(new) = change(&mut self.model) {
-            let _ = self.spawn(new, &cwd, &[], window, cx);
-        }
+        change(&mut self.model);
         self.focus_current(window, cx);
     }
 
-    fn close(&mut self, term: u64, window: &mut Window, cx: &mut Context<Self>) {
-        if self.terms.remove(&term).is_some() {
-            self.update_badge();
+    fn close(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+        if let Tab::Term(term) = tab {
+            self.terms.remove(&term);
+            self.agents.closed(term);
+            self.run_effects(cx);
         }
-        self.finish_waits(term, "exited");
-        self.drop_queued(term);
-        if self.messages_tab == Some(term) {
-            self.messages_tab = None;
-        }
-        let was_focused = self.model.term() == term;
-        if !self.model.remove_term(term) {
+        let was_focused = self.model.tab() == tab;
+        if !self.model.remove_tab(tab) {
             cx.quit();
             return;
         }
-        let overlay =
-            self.rename.is_some() || self.palette.is_some() || self.settings_open.is_some();
-        if was_focused && !overlay {
+        if was_focused && !self.overlay_has_keyboard() {
             self.focus_current(window, cx);
         } else {
             cx.notify();
@@ -314,39 +235,23 @@ impl Workspace {
     }
 
     fn close_split(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        for term in self.model.split_terms() {
-            self.close(term, window, cx);
+        for tab in self.model.split_tabs() {
+            self.close(tab, window, cx);
         }
-    }
-
-    fn term_label(&self, term: u64, cx: &App) -> String {
-        if self.messages_tab == Some(term) {
-            return "Messages".into();
-        }
-        let Some(t) = self.terms.get(&term) else {
-            return String::new();
-        };
-        let title = t.view.read(cx).title.as_str();
-        if let Some(agent) = &t.agent {
-            let name = agent.kind.name();
-            return labels::clean_title(title).unwrap_or(name).to_owned();
-        }
-        match t.info.process.as_deref() {
-            Some(p) => p.to_owned(),
-            None => labels::clean_title(title).unwrap_or("shell").to_owned(),
-        }
-    }
-
-    fn is_agent(&self, term: u64) -> bool {
-        self.terms.get(&term).is_some_and(|t| t.agent.is_some())
     }
 
     /// Opens a URL in the browser, or a file at its line in `lgtm` in a split beside `term`.
-    fn open_link(&mut self, term: u64, link: &Link, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_link(
+        &mut self,
+        term: TermId,
+        link: &Link,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match link {
             Link::Url(url) => cx.open_url(url),
             Link::File(path, line) => {
-                let cwd = self.cwd_of(term, cx);
+                let cwd = self.cwd_of(Tab::Term(term));
                 let path = match (path.strip_prefix("~/"), &self.home) {
                     (Some(rest), Some(home)) => home.join(rest),
                     _ => cwd.join(path),
@@ -359,32 +264,9 @@ impl Workspace {
                     "--split".to_owned(),
                     format!("{}:{}", path.display(), line.unwrap_or(1)),
                 ];
-                let _ = self.open(Some(term), Place::Right, Some(cwd), &argv, true, window, cx);
+                let from = Some(Tab::Term(term));
+                let _ = self.open(from, Place::Right, Some(cwd), &argv, true, window, cx);
             }
-        }
-    }
-
-    /// Opens the Messages tab beside the focused terminal, or shows it if it's open.
-    fn show_messages(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        match self.messages_tab {
-            Some(tab) => self.model.focus_term(tab),
-            None => self.messages_tab = Some(self.model.new_tab()),
-        }
-        self.focus_current(window, cx);
-    }
-
-    fn space_label(&self, space: &crate::model::Space, cx: &App) -> String {
-        if let Some(name) = &space.name {
-            return name.clone();
-        }
-        let cwd = self.cwd_of(space.first_term(), cx);
-        procinfo::space_name(&cwd, self.home.as_deref())
-    }
-
-    fn layout_label(&self, layout: &crate::model::Layout, cx: &App) -> String {
-        match &layout.name {
-            Some(name) => name.clone(),
-            None => self.space_label(layout.spaces.first(), cx),
         }
     }
 
@@ -408,10 +290,7 @@ impl Workspace {
             && !m.shift
             && let Some(d) = k.key.parse::<usize>().ok().filter(|d| (1..=9).contains(d))
         {
-            self.apply(window, cx, |m| {
-                m.select_tab(d - 1);
-                None
-            });
+            self.apply(window, cx, |m| m.select_tab(d - 1));
             cx.stop_propagation();
         }
     }

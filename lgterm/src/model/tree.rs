@@ -21,7 +21,8 @@ pub enum Dir {
 
 /// A leaf with a stable id.
 pub trait Keyed {
-    fn key(&self) -> u64;
+    type Key: Copy + Eq;
+    fn key(&self) -> Self::Key;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -56,18 +57,18 @@ impl Rect {
 }
 
 impl<T: Keyed> Tree<T> {
-    pub fn contains(&self, key: u64) -> bool {
+    pub fn contains(&self, key: T::Key) -> bool {
         self.find(key).is_some()
     }
 
-    pub fn find(&self, key: u64) -> Option<&T> {
+    pub fn find(&self, key: T::Key) -> Option<&T> {
         match self {
             Tree::Leaf(leaf) => (leaf.key() == key).then_some(leaf),
             Tree::Branch { children, .. } => children.iter().find_map(|c| c.tree.find(key)),
         }
     }
 
-    pub fn find_mut(&mut self, key: u64) -> Option<&mut T> {
+    pub fn find_mut(&mut self, key: T::Key) -> Option<&mut T> {
         match self {
             Tree::Leaf(leaf) => (leaf.key() == key).then_some(leaf),
             Tree::Branch { children, .. } => children.iter_mut().find_map(|c| c.tree.find_mut(key)),
@@ -110,7 +111,7 @@ impl<T: Keyed> Tree<T> {
 
     /// Put `new` next to the leaf `at`, splitting it along `axis`. A branch that already runs
     /// along `axis` takes `new` as another child, sharing the old leaf's weight.
-    pub fn insert(&mut self, at: u64, new: T, axis: Axis) -> Result<(), T> {
+    pub fn insert(&mut self, at: T::Key, new: T, axis: Axis) -> Result<(), T> {
         match self {
             Tree::Leaf(leaf) if leaf.key() == at => {
                 let old = std::mem::replace(
@@ -164,7 +165,7 @@ impl<T: Keyed> Tree<T> {
 
     /// Take the leaf `key` out, giving its share to a neighbor and folding branches left with
     /// one child. The root leaf can't be removed: its owner drops the whole tree instead.
-    pub fn remove(&mut self, key: u64) -> Option<T> {
+    pub fn remove(&mut self, key: T::Key) -> Option<T> {
         let Tree::Branch { children, .. } = self else {
             return None;
         };
@@ -189,13 +190,13 @@ impl<T: Keyed> Tree<T> {
     }
 
     /// Each leaf's rectangle when the tree fills `area`.
-    pub fn rects(&self, area: Rect) -> Vec<(u64, Rect)> {
+    pub fn rects(&self, area: Rect) -> Vec<(T::Key, Rect)> {
         let mut out = Vec::new();
         self.place(area, &mut out);
         out
     }
 
-    fn place(&self, area: Rect, out: &mut Vec<(u64, Rect)>) {
+    fn place(&self, area: Rect, out: &mut Vec<(T::Key, Rect)>) {
         match self {
             Tree::Leaf(leaf) => out.push((leaf.key(), area)),
             Tree::Branch { axis, children } => {
@@ -251,7 +252,7 @@ pub fn move_boundary<T>(children: &mut [Node<T>], index: usize, at: f32, min: f3
 
 /// The rectangle beside `from` in `dir`: of those touching that edge, the one that shares the
 /// most of it.
-pub fn neighbor(rects: &[(u64, Rect)], from: u64, dir: Dir) -> Option<u64> {
+pub fn neighbor<K: Copy + Eq>(rects: &[(K, Rect)], from: K, dir: Dir) -> Option<K> {
     const EPS: f32 = 1e-4;
     let (_, a) = rects.iter().find(|(k, _)| *k == from)?;
     let overlap = |lo1: f32, hi1: f32, lo2: f32, hi2: f32| hi1.min(hi2) - lo1.max(lo2);
@@ -282,6 +283,7 @@ mod tests {
     #[derive(Debug, PartialEq)]
     struct L(u64);
     impl Keyed for L {
+        type Key = u64;
         fn key(&self) -> u64 {
             self.0
         }

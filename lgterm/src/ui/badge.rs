@@ -3,8 +3,7 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{AnyElement, FontWeight, IntoElement, ParentElement, Styled, div, px, rgb};
 
-use super::{marks, theme};
-use crate::status::Status;
+use crate::theme;
 
 const COLORS: [u32; 8] = [
     0x3f9e98, 0x5a9a52, 0xd27a45, 0x5b86e5, 0xa066d3, 0xc95a7a, 0xb59a3c, 0x4f9ac9,
@@ -27,8 +26,8 @@ fn color(index: usize) -> u32 {
     COLORS[index % COLORS.len()]
 }
 
-/// The badge, with `status` on its corner when given.
-pub fn badge(index: usize, label: &str, status: Option<Status>, ring: u32) -> AnyElement {
+/// The badge, with a status mark on its corner when given.
+pub fn badge(index: usize, label: &str, mark: Option<AnyElement>, ring: u32) -> AnyElement {
     div()
         .relative()
         .size(px(20.))
@@ -42,7 +41,7 @@ pub fn badge(index: usize, label: &str, status: Option<Status>, ring: u32) -> An
         .font_weight(FontWeight::BOLD)
         .text_color(rgb(theme::BADGE_TEXT))
         .child(letter(label))
-        .when_some(status, |d, s| {
+        .when_some(mark, |d, mark| {
             d.child(
                 div()
                     .absolute()
@@ -54,7 +53,7 @@ pub fn badge(index: usize, label: &str, status: Option<Status>, ring: u32) -> An
                     .justify_center()
                     .rounded_full()
                     .bg(rgb(ring))
-                    .child(marks::mark(s)),
+                    .child(mark),
             )
         })
         .into_any_element()
