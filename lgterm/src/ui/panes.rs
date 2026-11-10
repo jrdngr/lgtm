@@ -10,7 +10,7 @@ use gpui::{
 use super::space_drag::{self, DragsSpace};
 use super::{MovesWindow, Workspace};
 use crate::ipc::Place;
-use crate::model::{Axis, LayoutId, Space, SpaceId, Split, Tab, Tree, tree};
+use crate::model::{Axis, LayoutId, Rect, Space, SpaceId, Split, Tab, Tree, tree};
 use crate::theme;
 
 /// Which tree a branch belongs to: a layout's spaces or a space's splits.
@@ -107,6 +107,13 @@ impl Workspace {
 
     fn space(&self, space: &Space, multi: bool, cx: &mut Context<Self>) -> AnyElement {
         let label = self.space_label(space);
+        let top = self
+            .model
+            .layout()
+            .spaces
+            .rects(Rect::UNIT)
+            .iter()
+            .any(|(id, r)| *id == space.id && r.y == 0.);
         let title = div()
             .id(("space-title", space.id.0))
             .h(px(20.))
@@ -118,16 +125,21 @@ impl Workspace {
             .text_size(px(12.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(theme::TEXT_SPACE))
+            .when(top, |d| d.moves_window())
+            .when(!top, |d| {
+                d.on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            })
             .when(multi, |d| {
-                d.cursor_grab()
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(
-                        div()
-                            .text_size(px(11.))
-                            .text_color(rgb(theme::ICON))
-                            .child("⠿"),
-                    )
-                    .drags_space(space.id, label.clone())
+                d.child(
+                    div()
+                        .id(("space-grip", space.id.0))
+                        .cursor_grab()
+                        .text_size(px(11.))
+                        .text_color(rgb(theme::ICON))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child("⠿")
+                        .drags_space(space.id, label.clone()),
+                )
             })
             .child(label);
         let el = div()
