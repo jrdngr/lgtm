@@ -228,9 +228,9 @@ impl Home {
         }
     }
 
-    /// A click in the file tree opens a file or a folder, and the wheel scrolls it. A click
-    /// in the log picks a commit or snapshot, a double click opens it, and the wheel moves
-    /// through them.
+    /// A click in the file tree selects a file and a double click opens it, a click opens or
+    /// closes a folder, and the wheel scrolls it. A click in the log picks a commit or
+    /// snapshot, a double click opens it, and the wheel moves through them.
     pub fn mouse(&mut self, ev: MouseEvent) -> Outcome {
         let jj = self.jj_mode();
         if jj && !self.menu.as_ref().is_some_and(Menu::idle) {
@@ -267,7 +267,7 @@ impl Home {
             MouseEventKind::ScrollUp => self.files.scroll(-3),
             MouseEventKind::Down(MouseButton::Left) => {
                 self.focus = Focus::Files;
-                if let files::Outcome::Open(path) = self.files.click(ev.row) {
+                if let files::Outcome::Open(path) = self.files.pick(ev.row) {
                     return Outcome::Edit(path);
                 }
             }
