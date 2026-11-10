@@ -385,3 +385,39 @@ fn layout_names_stay_put_when_another_is_deleted() {
     m.new_layout();
     assert_eq!(names(&m), ["Layout 2", "Layout 3", "Layout 1"]);
 }
+
+#[test]
+fn distributing_evens_out_the_branches_holding_the_picked_spaces() {
+    let (mut m, a) = Model::new();
+    m.split_slot(Axis::Row);
+    let b = m.new_tab();
+    m.split_slot(Axis::Row);
+    let c = m.new_tab();
+    m.split_slot(Axis::Column);
+    let d = m.new_tab();
+    let weights = |m: &Model| -> Vec<f32> {
+        let Tree::Branch { children, .. } = &m.layout().slots else {
+            panic!("not a branch")
+        };
+        children.iter().map(|c| c.weight).collect()
+    };
+    let Tree::Branch { children, .. } = &mut m.layout_mut().slots else {
+        panic!("not a branch")
+    };
+    for (c, w) in children.iter_mut().zip([1.0, 2.0, 3.0]) {
+        c.weight = w;
+    }
+    let ids = [a, c].map(|t| space_of(&m, t));
+    m.distribute(Some(&ids));
+    assert_eq!(weights(&m), [2.0, 2.0, 2.0]);
+    let Tree::Branch { children, .. } = &mut m.layout_mut().slots else {
+        panic!("not a branch")
+    };
+    children[1].weight = 1.0;
+    // One picked space has nothing to even out with.
+    m.distribute(Some(&[space_of(&m, b)]));
+    assert_eq!(weights(&m), [2.0, 1.0, 2.0]);
+    m.distribute(None);
+    assert_eq!(weights(&m), [5.0 / 3.0; 3]);
+    assert!(m.layout().slot_of(space_of(&m, d)).is_some());
+}

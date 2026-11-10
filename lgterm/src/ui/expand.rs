@@ -8,9 +8,11 @@ use gpui::{
 
 use crate::theme;
 
-/// The expand button, or the collapse button when `expanded`.
+/// The expand button, or the collapse button when `expanded`, shown while the pointer is over
+/// the element of group `parent`.
 pub fn button(
     id: impl Into<ElementId>,
+    parent: String,
     expanded: bool,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
@@ -24,6 +26,8 @@ pub fn button(
         .items_center()
         .justify_center()
         .rounded(px(5.))
+        .opacity(0.)
+        .group_hover(parent, |s| s.opacity(1.))
         .cursor_pointer()
         .group(group.clone())
         .hover(|s| s.bg(rgb(theme::ROW_HOVER)))

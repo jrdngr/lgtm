@@ -161,6 +161,37 @@ impl Model {
         }
     }
 
+    /// Evens out the shown layout's slots: in each branch, the children holding two or more
+    /// of `spaces` (every slot, when `None`) share what they had equally. Others keep theirs.
+    pub fn distribute(&mut self, spaces: Option<&[SpaceId]>) {
+        fn walk(t: &mut Tree<Slot>, pick: &dyn Fn(&Slot) -> bool) {
+            let Tree::Branch { children, .. } = t else {
+                return;
+            };
+            let has: Vec<bool> = children
+                .iter()
+                .map(|c| c.tree.leaves().into_iter().any(pick))
+                .collect();
+            let n = has.iter().filter(|&&h| h).count();
+            if n >= 2 {
+                let total: f32 = children
+                    .iter()
+                    .zip(&has)
+                    .filter(|(_, h)| **h)
+                    .map(|(c, _)| c.weight)
+                    .sum();
+                for (c, _) in children.iter_mut().zip(&has).filter(|(_, h)| **h) {
+                    c.weight = total / n as f32;
+                }
+            }
+            for c in children {
+                walk(&mut c.tree, pick);
+            }
+        }
+        let pick = |s: &Slot| spaces.is_none_or(|ids| s.space.is_some_and(|id| ids.contains(&id)));
+        walk(&mut self.layout_mut().slots, &pick);
+    }
+
     /// Deletes a layout, unless it's the last one. Spaces stay.
     pub fn delete_layout(&mut self, id: LayoutId) {
         if self.layouts.len() < 2 {

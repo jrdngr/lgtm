@@ -15,6 +15,7 @@ mod panes;
 mod picker;
 mod rename;
 mod restore;
+mod select;
 mod settings_view;
 mod sidebar;
 mod space_drag;
@@ -58,6 +59,8 @@ pub struct Workspace {
     toasts: Vec<toasts::Toast>,
     toast_id: u64,
     space_drop: space_drag::SpaceDrop,
+    /// Spaces picked with ⌘-click on their titles, for commands like distribute.
+    selected: Vec<SpaceId>,
     home: Option<PathBuf>,
     /// What an unnamed space with no terminal is called.
     home_name: String,
@@ -101,6 +104,7 @@ impl Workspace {
             toasts: Vec::new(),
             toast_id: 0,
             space_drop: Default::default(),
+            selected: Vec::new(),
             home,
             home_name,
             settings,

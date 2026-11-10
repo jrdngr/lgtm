@@ -18,6 +18,8 @@ actions!(
         CloseSplit,
         ZoomSplit,
         ExpandSpace,
+        DistributeSpaces,
+        DistributeAllSpaces,
         NextSplit,
         PrevSplit,
         MoveTabToNewSplit,
@@ -71,6 +73,8 @@ commands! {
     "Close split", ["cmd-shift-w"], CloseSplit;
     "Zoom split", ["cmd-shift-enter"], ZoomSplit;
     "Expand space", [], ExpandSpace;
+    "Distribute selected spaces", [], DistributeSpaces;
+    "Distribute all spaces", [], DistributeAllSpaces;
     "Next split", ["cmd-]"], NextSplit;
     "Previous split", ["cmd-["], PrevSplit;
     "Move tab to new split", [], MoveTabToNewSplit;

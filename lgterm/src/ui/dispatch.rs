@@ -73,6 +73,12 @@ impl Render for Workspace {
         el = on_model!(el, cx, NextTab, |m| m.cycle_tab(1));
         el = on_model!(el, cx, PrevTab, |m| m.cycle_tab(-1));
         el = on_model!(el, cx, ZoomSplit, |m| m.toggle_zoom());
+        el = el.on_action(
+            cx.listener(|w, _: &DistributeSpaces, win, cx| w.distribute(false, win, cx)),
+        );
+        el = el.on_action(
+            cx.listener(|w, _: &DistributeAllSpaces, win, cx| w.distribute(true, win, cx)),
+        );
         el = on_model!(el, cx, ExpandSpace, |m| {
             if let Some(space) = m.layout().slot().space {
                 m.toggle_expand(space)

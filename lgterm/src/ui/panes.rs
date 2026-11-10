@@ -12,13 +12,11 @@ use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::{MovesWindow, Workspace, badge, expand};
 use crate::ipc::Place;
-use crate::model::{
-    Axis, LayoutId, Rect, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree,
-};
+use crate::model::{Axis, LayoutId, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree};
 use crate::theme;
 
 /// A space's title height.
-const SPACE_TITLE: f32 = 26.;
+pub(super) const SPACE_TITLE: f32 = 26.;
 /// The tinted border around a space's splits.
 const SPACE_PAD: f32 = 5.;
 
@@ -55,19 +53,10 @@ impl Workspace {
         let body = match expanded {
             Some((slot, space)) => {
                 let focused = slot == layout.focus;
-                let el = self.space(space, focused, true, cx);
+                let el = self.space(space, focused, cx);
                 space_drag::track_slot(el, slot, cx).into_any_element()
             }
-            None => {
-                let top: Vec<SlotId> = layout
-                    .slots
-                    .rects(Rect::UNIT)
-                    .into_iter()
-                    .filter(|(_, r)| r.y == 0.)
-                    .map(|(id, _)| id)
-                    .collect();
-                self.slot_tree(&layout.slots, &top, Owner::Layout(layout.id), vec![], cx)
-            }
+            None => self.slot_tree(&layout.slots, Owner::Layout(layout.id), vec![], cx),
         };
         let titlebar = div()
             .id("main-titlebar")
@@ -91,11 +80,10 @@ impl Workspace {
         space_drag::track_main(main, cx).into_any_element()
     }
 
-    /// The slots; `top` are those along the window's top edge, whose titles move the window.
+    /// The slots.
     fn slot_tree(
         &self,
         t: &Tree<Slot>,
-        top: &[SlotId],
         owner: Owner,
         path: Vec<usize>,
         cx: &mut Context<Self>,
@@ -105,7 +93,7 @@ impl Workspace {
                 let focused = slot.id == self.model.layout().focus;
                 let space = slot.space.and_then(|s| self.model.find_space(s));
                 let el = match space {
-                    Some(space) => self.space(space, focused, top.contains(&slot.id), cx),
+                    Some(space) => self.space(space, focused, cx),
                     None => self.empty_slot(slot.id, focused, cx),
                 };
                 space_drag::track_slot(el, slot.id, cx).into_any_element()
@@ -117,7 +105,7 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (c.weight, self.slot_tree(&c.tree, top, owner, path, cx))
+                        (c.weight, self.slot_tree(&c.tree, owner, path, cx))
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -165,13 +153,14 @@ impl Workspace {
         &self,
         space: &Space,
         focused: bool,
-        top: bool,
         cx: &mut Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
         let label = self.space_label(space);
         let color = theme::space_color(space.color);
         let id = space.id;
         let expanded = self.model.layout().expanded == Some(id);
+        let selected = self.selected.contains(&id);
+        let group = format!("space-title-{}", id.0);
         let title = div()
             .id(("space-title", space.id.0))
             .h(px(SPACE_TITLE))
@@ -185,17 +174,19 @@ impl Workspace {
             .text_size(px(12.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(if focused { theme::TEXT_STRONG } else { color }))
+            .when(selected, |d| d.border_2().border_color(rgb(color)))
+            .group(group.clone())
+            .cursor_grab()
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
-                    w.apply(window, cx, |m| m.show_space(id));
-                    if top {
-                        if ev.click_count == 2 {
-                            window.titlebar_double_click();
-                        } else {
-                            window.start_window_move();
-                        }
+                    if ev.modifiers.platform {
+                        w.toggle_selected(id);
+                        cx.notify();
+                    } else {
+                        w.selected.clear();
+                        w.apply(window, cx, |m| m.show_space(id));
                     }
                 }),
             )
@@ -208,22 +199,22 @@ impl Workspace {
             )
             .map(|d| match self.space_number(id) {
                 Some(n) => d.child(badge::chip(n)),
-                None => d.child(
-                    div()
-                        .id(("space-grip", space.id.0))
-                        .cursor_grab()
-                        .text_size(px(11.))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child("⠿")
-                        .drags_space(space.id, label.clone()),
-                ),
+                None => d.child(div().text_size(px(11.)).child("⠿")),
             })
-            .child(div().flex_1().min_w_0().overflow_hidden().child(label))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .child(label.clone()),
+            )
             .child(expand::button(
                 ("expand-space", id.0),
+                group,
                 expanded,
                 cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.toggle_expand(id))),
-            ));
+            ))
+            .drags_space(id, label);
         let focused_split = focused.then_some(space.focus);
         let zoomed = space.zoom.and_then(|z| space.splits.find(z));
         let splits = match zoomed {
@@ -505,6 +496,7 @@ impl Workspace {
                     .px(px(6.))
                     .border_b_1()
                     .border_color(rgb(theme::TAB_STRIP_BORDER))
+                    .group(format!("tab-bar-{}", split_id.0))
                     .overflow_hidden()
                     .on_mouse_down(
                         MouseButton::Right,
@@ -525,6 +517,7 @@ impl Workspace {
                     )
                     .child(expand::button(
                         ("zoom-split", split_id.0),
+                        format!("tab-bar-{}", split_id.0),
                         zoomed,
                         cx.listener(move |w, _, window, cx| {
                             w.model.focus_split(split_id);

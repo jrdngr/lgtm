@@ -1,5 +1,6 @@
-//! Dragging a space by a sidebar row or its title's grip: into a slot, beside one, or along an
-//! edge of the window; or to a new place in the sidebar list.
+//! Dragging a space by a sidebar row or its title: into a slot, onto another space's title to
+//! swap with it, beside a slot, or along an edge of the window; or to a new place in the
+//! sidebar list.
 
 use std::collections::HashMap;
 
@@ -199,6 +200,16 @@ impl Workspace {
         if d.main.is_some_and(|b| b.contains(&p)) {
             let from = layout.slot_of(id);
             let alone = matches!(layout.slots, Tree::Leaf(_));
+            // Over another space's title, it swaps with that space.
+            let title = d.slots.iter().find(|(s, b)| {
+                layout.slots.contains(**s)
+                    && b.contains(&p)
+                    && f(p.y - b.origin.y) < super::panes::SPACE_TITLE
+            });
+            if let Some((&slot, _)) = title {
+                return (from != Some(slot))
+                    .then_some(Target::Window(WindowDrop::Slot(slot, None)));
+            }
             if let Some(side) = edge(&d.main?, p) {
                 return (!(alone && from.is_some()))
                     .then_some(Target::Window(WindowDrop::Edge(side)));
