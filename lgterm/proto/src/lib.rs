@@ -91,7 +91,7 @@ pub enum Request {
     Focus {
         term: String,
     },
-    /// The agents in `term`'s layout, as a JSON list of `{id, label}`.
+    /// The other agents in `term`'s space, as a JSON list of `{id, label}`.
     Agents {
         term: String,
     },

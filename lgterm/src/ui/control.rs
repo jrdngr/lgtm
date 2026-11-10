@@ -152,21 +152,10 @@ impl Workspace {
         Ok(id)
     }
 
-    /// The agents shown with `term`, in reading order, as JSON: those in the shown layout when
-    /// `term` is there, else those in the first layout showing it, else those in its space.
+    /// The other agents in `term`'s space, in reading order, as JSON.
     fn agents_near(&self, term: TermId) -> String {
-        let m = &self.model;
-        let Some(own) = m.space_of(Tab::Term(term)).map(|s| s.id) else {
-            return "[]".to_owned();
-        };
-        let spaces = std::iter::once(m.layout())
-            .chain(&m.layouts)
-            .map(|l| l.spaces())
-            .find(|s| s.contains(&own))
-            .unwrap_or_else(|| vec![own]);
+        let spaces = self.model.space_of(Tab::Term(term)).into_iter();
         let agents: Vec<_> = spaces
-            .into_iter()
-            .filter_map(|s| m.find_space(s))
             .flat_map(|s| s.terms())
             .filter(|&t| t != term && self.is_agent(Tab::Term(t)))
             .map(|t| json!({ "id": t.to_string(), "label": self.term_label(Tab::Term(t)) }))

@@ -1,4 +1,4 @@
-//! Sending where a selection is to an agent in the same lgterm layout: its `path:lines`, pasted
+//! Sending where a selection is to an agent in the same lgterm space: its `path:lines`, pasted
 //! at the agent's prompt without Enter, with the agent focused.
 
 use std::time::Duration;
@@ -47,7 +47,7 @@ fn paste(agent: &Agent, text: &str) -> Result<()> {
     .map(|_| ())
 }
 
-/// Sends `text` to the agent in this layout, or asks which when there are several.
+/// Sends `text` to the agent in this space, or asks which when there are several.
 pub fn send(text: String) -> Sent {
     let Some((term, _)) = lgterm_proto::here() else {
         return Sent::Notice("send to agent works in lgterm".into());
@@ -58,7 +58,7 @@ pub fn send(text: String) -> Sent {
     .and_then(|json| Ok(serde_json::from_str::<Vec<Agent>>(&json)?));
     match agents {
         Err(e) => Sent::Notice(format!("send to agent: {e:#}")),
-        Ok(agents) if agents.is_empty() => Sent::Notice("no agent in this layout".into()),
+        Ok(agents) if agents.is_empty() => Sent::Notice("no agent in this space".into()),
         Ok(agents) if agents.len() == 1 => match paste(&agents[0], &text) {
             Ok(()) => Sent::Done,
             Err(e) => Sent::Notice(format!("send to agent: {e:#}")),
