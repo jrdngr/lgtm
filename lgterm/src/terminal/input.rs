@@ -15,6 +15,21 @@ use gpui::{
 use super::links::{self, Link};
 use super::{TermEvent, TermView, keys};
 
+/// How far, in points, the pointer moves with the button down before a drag selects.
+const DRAG_THRESHOLD: f32 = 4.;
+
+/// Whether a drag from `press` to `now` selects: it has to go `DRAG_THRESHOLD` and leave the
+/// cell it started in, so a click that wobbles selects nothing.
+fn drag_selects(
+    press: Point<Pixels>,
+    now: Point<Pixels>,
+    from: (u16, u32),
+    to: (u16, u32),
+) -> bool {
+    let (dx, dy) = ((now.x - press.x).as_f32(), (now.y - press.y).as_f32());
+    from != to && dx.hypot(dy) >= DRAG_THRESHOLD
+}
+
 pub fn selection_text(vt: &Terminal) -> Option<String> {
     let opts = FormatOptions::new()
         .with_emit_format(fmt::Format::Plain)
@@ -180,6 +195,7 @@ impl TermView {
         self.pressed = Some((ev.button, false));
         self.mouse_down = true;
         self.drag_from = Some(at);
+        self.press_at = Some(ev.position);
         let point = VtPoint::Screen(PointCoordinate { x: at.0, y: at.1 });
         let vt = &self.vt;
         let selection = match ev.click_count {
@@ -221,6 +237,12 @@ impl TermView {
             return;
         };
         let to = self.screen_point(cell);
+        if let Some(press) = self.press_at {
+            if !drag_selects(press, ev.position, from, to) {
+                return;
+            }
+            self.press_at = None;
+        }
         let vt = &self.vt;
         let point = |(x, y): (u16, u32)| vt.grid_ref(VtPoint::Screen(PointCoordinate { x, y }));
         if let (Ok(a), Ok(b)) = (point(from), point(to)) {
@@ -331,5 +353,34 @@ impl TermView {
             self.vt.scroll_viewport(ScrollViewport::Delta(delta));
             cx.notify();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gpui::{point, px};
+
+    #[test]
+    fn a_drag_selects_once_it_goes_four_points_and_leaves_its_cell() {
+        let press = point(px(100.), px(100.));
+        assert!(!drag_selects(
+            press,
+            point(px(102.), px(101.)),
+            (3, 1),
+            (4, 1)
+        ));
+        assert!(!drag_selects(
+            press,
+            point(px(100.), px(110.)),
+            (3, 1),
+            (3, 1)
+        ));
+        assert!(drag_selects(
+            press,
+            point(px(104.), px(100.)),
+            (3, 1),
+            (4, 1)
+        ));
     }
 }

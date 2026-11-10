@@ -76,6 +76,8 @@ pub struct TermView {
     scroll_rest: f32,
     /// Where a selection drag started, in screen rows.
     drag_from: Option<(u16, u32)>,
+    /// Where the button went down, until the drag has gone far enough to select.
+    press_at: Option<gpui::Point<gpui::Pixels>>,
     mouse_down: bool,
     /// The button held down over the terminal, and whether its press went to the program.
     pressed: Option<(MouseButton, bool)>,
@@ -149,6 +151,7 @@ impl TermView {
                 grid: None,
                 scroll_rest: 0.,
                 drag_from: None,
+                press_at: None,
                 mouse_down: false,
                 pressed: None,
                 find: None,
