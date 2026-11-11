@@ -187,6 +187,7 @@ impl Workspace {
         let id = space.id;
         let expanded = self.model.layout().expanded == Some(id);
         let selected = self.selected.contains(&id);
+        let magnet = self.model.magnet == Some(slot);
         let group = format!("space-title-{}", id.0);
         let title = div()
             .id(("space-title", space.id.0))
@@ -235,32 +236,48 @@ impl Workspace {
                     .overflow_hidden()
                     .child(label.clone()),
             )
-            .child(expand::magnet(
-                ("magnet", slot.0),
-                group.clone(),
-                self.model.magnet == Some(slot),
-                cx.listener(move |w, _, _, cx| {
-                    w.model.toggle_magnet(slot);
-                    cx.notify();
-                }),
-            ))
-            .child(expand::lock(
-                ("lock-space", id.0),
-                group.clone(),
-                space.locked,
-                cx.listener(move |w, _, _, cx| {
-                    if let Some(s) = w.model.find_space_mut(id) {
-                        s.locked = !s.locked;
-                    }
-                    cx.notify();
-                }),
-            ))
-            .child(expand::button(
-                ("expand-space", id.0),
-                group,
-                expanded,
-                cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.toggle_expand(id))),
-            ))
+            .children(on_right(vec![
+                (
+                    magnet,
+                    expand::magnet(
+                        ("magnet", slot.0),
+                        group.clone(),
+                        magnet,
+                        cx.listener(move |w, _, _, cx| {
+                            w.model.toggle_magnet(slot);
+                            cx.notify();
+                        }),
+                    )
+                    .into_any_element(),
+                ),
+                (
+                    space.locked,
+                    expand::lock(
+                        ("lock-space", id.0),
+                        group.clone(),
+                        space.locked,
+                        cx.listener(move |w, _, _, cx| {
+                            if let Some(s) = w.model.find_space_mut(id) {
+                                s.locked = !s.locked;
+                            }
+                            cx.notify();
+                        }),
+                    )
+                    .into_any_element(),
+                ),
+                (
+                    expanded,
+                    expand::button(
+                        ("expand-space", id.0),
+                        group,
+                        expanded,
+                        cx.listener(move |w, _, window, cx| {
+                            w.apply(window, cx, |m| m.toggle_expand(id))
+                        }),
+                    )
+                    .into_any_element(),
+                ),
+            ]))
             .drags_space(id, label);
         let focused_split = focused.then_some(space.focus);
         let zoomed = space.zoom.and_then(|z| space.splits.find(z));
@@ -576,4 +593,10 @@ impl Workspace {
             .child(div().flex_1().min_h_0().children(body));
         tab_drag::track_card(card, split_id, cx).into_any_element()
     }
+}
+
+/// Header buttons in their order, the ones that are on moved after the rest.
+fn on_right(mut buttons: Vec<(bool, AnyElement)>) -> impl Iterator<Item = AnyElement> {
+    buttons.sort_by_key(|(on, _)| *on);
+    buttons.into_iter().map(|(_, b)| b)
 }

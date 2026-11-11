@@ -61,7 +61,8 @@ pub fn add(
     icon_button(id, String::new(), "ui/plus.svg", true, on_click)
 }
 
-/// `icon` as a button, always shown when `on`, else while the pointer is over `parent`.
+/// `icon` as a button: bright and always shown when `on`, else dim and shown while the pointer is
+/// over `parent`.
 fn icon_button(
     id: impl Into<ElementId>,
     parent: String,
@@ -80,18 +81,20 @@ fn icon_button(
         .justify_center()
         .rounded(px(5.))
         .when(!on, |d| {
-            d.opacity(0.).group_hover(parent, |s| s.opacity(1.))
+            d.opacity(0.)
+                .group_hover(parent, |s| s.opacity(1.))
+                .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
         })
         .cursor_pointer()
         .group(group.clone())
-        .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
-        .child(
-            svg()
-                .path(icon)
-                .size(px(14.))
-                .text_color(rgb(theme::ICON))
-                .group_hover(group, |s| s.text_color(rgb(theme::TEXT))),
-        )
+        .child(svg().path(icon).size(px(14.)).map(|s| {
+            if on {
+                s.text_color(rgb(theme::ICON_ON))
+            } else {
+                s.text_color(rgb(theme::ICON))
+                    .group_hover(group, |s| s.text_color(rgb(theme::TEXT)))
+            }
+        }))
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .on_click(move |ev, window, cx| {
             cx.stop_propagation();
