@@ -187,7 +187,7 @@ impl Workspace {
         let id = space.id;
         let expanded = self.model.layout().expanded == Some(id);
         let selected = self.selected.contains(&id);
-        let magnet = self.model.magnet == Some(slot);
+        let magnet = self.model.layout().magnet == Some(slot);
         let group = format!("space-title-{}", id.0);
         let title = div()
             .id(("space-title", space.id.0))

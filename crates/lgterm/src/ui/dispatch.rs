@@ -152,6 +152,7 @@ impl Render for Workspace {
         .children(self.render_tab_drop(cx))
         .children(self.render_palette(cx))
         .children(self.render_settings(window, cx))
+        .children(self.render_confirm(cx))
         .children(self.render_layout_list())
         .children(self.render_menu(cx))
     }

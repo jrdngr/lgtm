@@ -1,5 +1,5 @@
-//! What sits over the window and has the keyboard: a rename, the palette, or Settings. One at
-//! a time.
+//! What sits over the window and has the keyboard: a rename, the palette, Settings, or a
+//! delete to confirm. One at a time.
 
 use gpui::{
     AnyElement, Context, FocusHandle, InteractiveElement, IntoElement, MouseButton, ParentElement,
@@ -7,6 +7,7 @@ use gpui::{
 };
 
 use super::Workspace;
+use super::confirm::Confirm;
 use super::menu::Menu;
 use super::palette::Palette;
 use super::rename::Rename;
@@ -20,6 +21,7 @@ pub enum Overlay {
         _blur: Subscription,
         commands: Vec<CommandBox>,
     },
+    Confirm(Confirm),
     /// Leaves the keyboard where it is.
     Menu(Menu),
 }

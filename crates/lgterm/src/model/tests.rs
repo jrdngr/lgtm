@@ -73,6 +73,17 @@ fn a_hidden_space_opens_in_the_magnet_slot_not_the_focused_one() {
 }
 
 #[test]
+fn each_layout_keeps_its_own_magnet_through_a_save() {
+    let (mut m, _) = Model::new();
+    let slot = m.layout().focus;
+    m.toggle_magnet(slot);
+    m.new_layout();
+    assert_eq!(m.layout().magnet, None);
+    let saved: Model = serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();
+    assert_eq!(saved.layouts[0].magnet, Some(slot));
+}
+
+#[test]
 fn each_layout_keeps_its_own_spaces() {
     let (mut m, a) = Model::new();
     let s1 = space_of(&m, a);

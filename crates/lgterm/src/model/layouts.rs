@@ -102,9 +102,10 @@ impl Model {
         layout.slot().space.is_none() && self.remove_slot(layout.focus)
     }
 
-    /// Makes `slot` the magnet, or turns the magnet off when it already is.
+    /// Makes `slot` the shown layout's magnet, or turns the magnet off when it already is.
     pub fn toggle_magnet(&mut self, slot: SlotId) {
-        self.magnet = (self.magnet != Some(slot)).then_some(slot);
+        let layout = self.layout_mut();
+        layout.magnet = (layout.magnet != Some(slot)).then_some(slot);
     }
 
     /// Takes a slot out of the shown layout, with any space in it, unless it's the only one.
@@ -125,6 +126,9 @@ impl Model {
         layout.slots.remove(slot);
         if layout.focus == slot {
             layout.focus = before.unwrap_or_else(|| layout.slots.first().id);
+        }
+        if layout.magnet == Some(slot) {
+            layout.magnet = None;
         }
         if space.is_some() && layout.expanded == space {
             layout.expanded = None;
@@ -153,6 +157,7 @@ impl Model {
             focus: slot.id,
             slots: Tree::Leaf(slot),
             expanded: None,
+            magnet: None,
         };
         self.layouts.insert(self.active + 1, layout);
         self.active += 1;

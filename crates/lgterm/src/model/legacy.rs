@@ -50,6 +50,7 @@ impl From<OldModel> for Model {
                     focus: focus.unwrap_or_else(|| slots.first().id),
                     slots,
                     expanded: None,
+                    magnet: None,
                 }
             })
             .collect();
@@ -60,7 +61,6 @@ impl From<OldModel> for Model {
             next,
             openers: Default::default(),
             names: Default::default(),
-            magnet: None,
         }
     }
 }

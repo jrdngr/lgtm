@@ -110,7 +110,7 @@ impl Workspace {
                     self.start_rename(Target::Layout(id), text, window, cx);
                 }
             }
-            (For::Layout(id), Item::Delete) => self.apply(window, cx, |m| m.delete_layout(id)),
+            (For::Layout(id), Item::Delete) => self.confirm_delete_layout(id, window, cx),
             _ => cx.notify(),
         }
     }

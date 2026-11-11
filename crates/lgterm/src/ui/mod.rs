@@ -3,6 +3,7 @@
 pub mod actions;
 mod agents;
 mod badge;
+mod confirm;
 mod control;
 mod dispatch;
 mod expand;

@@ -61,6 +61,9 @@ pub struct Layout {
     /// A space filling the window.
     #[serde(default)]
     pub expanded: Option<SpaceId>,
+    /// The slot spaces picked in the sidebar open in.
+    #[serde(default)]
+    pub magnet: Option<SlotId>,
 }
 
 impl Keyed for Split {
@@ -164,9 +167,6 @@ pub struct Model {
     /// Tabs' names.
     #[serde(default)]
     names: BTreeMap<TermId, String>,
-    /// The slot spaces picked in the sidebar open in. Off at every launch.
-    #[serde(skip)]
-    pub magnet: Option<SlotId>,
 }
 
 impl Model {
@@ -179,7 +179,6 @@ impl Model {
             next: 1,
             openers: BTreeMap::new(),
             names: BTreeMap::new(),
-            magnet: None,
         };
         let (space, term) = model.make_space();
         let slot = Slot {
@@ -193,6 +192,7 @@ impl Model {
             focus: slot.id,
             slots: Tree::Leaf(slot),
             expanded: None,
+            magnet: None,
         });
         model.name_layouts();
         (model, term)
@@ -391,8 +391,10 @@ impl Model {
     /// the focused one, when it isn't shown.
     pub fn show_space(&mut self, space: SpaceId) {
         let layout = self.layout();
-        let magnet = self.magnet.filter(|&s| layout.slots.contains(s));
-        let slot = layout.slot_of(space).or(magnet).unwrap_or(layout.focus);
+        let slot = layout
+            .slot_of(space)
+            .or(layout.magnet.filter(|&s| layout.slots.contains(s)))
+            .unwrap_or(layout.focus);
         self.assign(slot, space);
     }
 
