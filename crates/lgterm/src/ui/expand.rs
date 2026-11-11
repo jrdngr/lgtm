@@ -1,5 +1,6 @@
-//! The buttons at the right of a space's title or a split's tabs: expand, which fills the
-//! window or the space with it and puts the layout back, and a space's lock against agents.
+//! The buttons in a space's title or a split's tabs: expand, which fills the window or the
+//! space with it and puts the layout back, a space's lock against agents, and an empty slot's
+//! add.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -39,6 +40,14 @@ pub fn lock(
         "ui/unlock.svg"
     };
     icon_button(id, parent, icon, locked, on_click)
+}
+
+/// The button that adds a space to an empty slot.
+pub fn add(
+    id: impl Into<ElementId>,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    icon_button(id, String::new(), "ui/plus.svg", true, on_click)
 }
 
 /// `icon` as a button, always shown when `on`, else while the pointer is over `parent`.

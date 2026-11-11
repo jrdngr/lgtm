@@ -31,6 +31,7 @@ const FILES: &[(&str, &[u8])] = &[
     ),
     ("ui/lock.svg", include_bytes!("../icons/ui/lock.svg")),
     ("ui/unlock.svg", include_bytes!("../icons/ui/unlock.svg")),
+    ("ui/plus.svg", include_bytes!("../icons/ui/plus.svg")),
 ];
 
 impl AssetSource for Assets {

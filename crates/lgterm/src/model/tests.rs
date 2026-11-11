@@ -90,6 +90,23 @@ fn closing_a_space_empties_its_slots_and_the_last_one_stays() {
 }
 
 #[test]
+fn removing_a_slot_keeps_its_space_and_the_last_slot_stays() {
+    let (mut m, a) = Model::new();
+    let s1 = space_of(&m, a);
+    m.split_slot(Axis::Row);
+    let b = m.new_tab();
+    let s2 = space_of(&m, b);
+    let left = m.layout().slot_of(s1).unwrap();
+    assert!(m.remove_slot(left));
+    assert_eq!(shown(&m), [Some(s2)]);
+    assert!(m.find_space(s1).is_some());
+    assert_eq!(m.term(), Some(b));
+    let last = m.layout().focus;
+    assert!(!m.remove_slot(last));
+    assert!(m.is_valid());
+}
+
+#[test]
 fn only_an_empty_slot_that_isnt_alone_closes() {
     let (mut m, _) = Model::new();
     assert!(!m.close_slot());

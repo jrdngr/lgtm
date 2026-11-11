@@ -98,20 +98,32 @@ impl Model {
 
     /// Closes the focused slot when it's empty and not the layout's only one.
     pub fn close_slot(&mut self) -> bool {
+        let layout = self.layout();
+        layout.slot().space.is_none() && self.remove_slot(layout.focus)
+    }
+
+    /// Takes a slot out of the shown layout, with any space in it, unless it's the only one.
+    /// The space stays in the sidebar. Focus moves to the slot before it.
+    pub fn remove_slot(&mut self, slot: SlotId) -> bool {
         let layout = self.layout_mut();
-        if layout.slot().space.is_some() || matches!(layout.slots, Tree::Leaf(_)) {
+        if matches!(layout.slots, Tree::Leaf(_)) || !layout.slots.contains(slot) {
             return false;
         }
-        let focus = layout.focus;
-        let next = layout
+        let before = layout
             .slots
             .rects(super::Rect::UNIT)
             .into_iter()
             .map(|(id, _)| id)
-            .take_while(|id| *id != focus)
+            .take_while(|id| *id != slot)
             .last();
-        layout.slots.remove(focus);
-        layout.focus = next.unwrap_or_else(|| layout.slots.first().id);
+        let space = layout.slots.find(slot).and_then(|s| s.space);
+        layout.slots.remove(slot);
+        if layout.focus == slot {
+            layout.focus = before.unwrap_or_else(|| layout.slots.first().id);
+        }
+        if space.is_some() && layout.expanded == space {
+            layout.expanded = None;
+        }
         true
     }
 

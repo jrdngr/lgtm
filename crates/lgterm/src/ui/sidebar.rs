@@ -330,7 +330,7 @@ impl SpaceRow for Stateful<gpui::Div> {
         self.on_mouse_down(
             MouseButton::Right,
             cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                w.open_menu(For::Space(id), ev.position, window, cx)
+                w.open_menu(For::Space(id, None), ev.position, window, cx)
             }),
         )
         .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {

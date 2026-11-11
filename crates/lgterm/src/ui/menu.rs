@@ -1,4 +1,5 @@
-//! Right-click menus: a tab bar's, a space's, and a layout's; and the layout picker's list.
+//! Right-click menus: a tab bar's, a space's, an empty slot's, and a layout's; and the layout
+//! picker's list.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -13,14 +14,17 @@ use super::overlay::Overlay;
 use super::rename::Target;
 use crate::agents::Kind;
 use crate::ipc::Place;
-use crate::model::{COLORS, LayoutId, Model, SpaceId, SplitId};
+use crate::model::{COLORS, LayoutId, Model, SlotId, SpaceId, SplitId};
 use crate::theme;
 
 /// What a menu is for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum For {
     Tabs(SplitId),
-    Space(SpaceId),
+    /// A space, and the slot whose title it was opened on.
+    Space(SpaceId, Option<SlotId>),
+    /// An empty slot.
+    Slot(SlotId),
     Layout(LayoutId),
     /// The layout picker's list.
     Layouts,
@@ -39,6 +43,7 @@ enum Item {
     Messages,
     Rename,
     RemoveFromWindow,
+    RemoveSplit,
     Delete,
     PickLayout(usize),
 }
@@ -90,7 +95,7 @@ impl Workspace {
                 };
                 let _ = self.open(None, place, None, &[], true, window, cx);
             }
-            (For::Space(id), Item::Rename) => {
+            (For::Space(id, _), Item::Rename) => {
                 let text = self
                     .model
                     .find_space(id)
@@ -98,7 +103,12 @@ impl Workspace {
                     .unwrap_or_default();
                 self.start_rename(Target::Space(id), text, window, cx);
             }
-            (For::Space(id), Item::RemoveFromWindow) => self.apply(window, cx, |m| m.unassign(id)),
+            (For::Space(id, _), Item::RemoveFromWindow) => {
+                self.apply(window, cx, |m| m.unassign(id))
+            }
+            (For::Space(_, Some(slot)) | For::Slot(slot), Item::RemoveSplit) => {
+                self.remove_slot(slot, window, cx)
+            }
             (For::Layout(id), Item::Rename) => {
                 if let Some(i) = self.model.layouts.iter().position(|l| l.id == id) {
                     self.model.select_layout(i);
@@ -110,6 +120,29 @@ impl Workspace {
             (_, Item::PickLayout(i)) => self.apply(window, cx, |m| m.select_layout(i)),
             _ => cx.notify(),
         }
+    }
+
+    /// Whether a slot can come out of the layout: it isn't the only one, and the terminals that
+    /// close with it aren't the last ones.
+    fn removable(&self, slot: SlotId) -> bool {
+        let slots = &self.model.layout().slots;
+        let space = slots.find(slot).and_then(|s| s.space);
+        slots.leaves().len() > 1 && (space.is_none() || self.model.spaces.len() > 1)
+    }
+
+    /// Closes the terminals of the space in a slot, then takes the slot out of the layout.
+    fn remove_slot(&mut self, slot: SlotId, window: &mut Window, cx: &mut Context<Self>) {
+        let space = self.model.layout().slots.find(slot).and_then(|s| s.space);
+        let tabs: Vec<_> = space
+            .and_then(|id| self.model.find_space(id))
+            .map(|s| s.tabs().collect())
+            .unwrap_or_default();
+        for tab in tabs {
+            self.close(tab, window, cx);
+        }
+        self.apply(window, cx, |m| {
+            m.remove_slot(slot);
+        });
     }
 
     fn set_color(&mut self, space: SpaceId, color: usize, cx: &mut Context<Self>) {
@@ -128,13 +161,20 @@ impl Workspace {
                 named(Item::NewSpace, "New space", ""),
                 named(Item::Messages, "Messages", "Messages"),
             ],
-            For::Space(id) => {
+            For::Space(id, slot) => {
                 let mut items = vec![named(Item::Rename, "Rename", "")];
                 if self.model.layout().slot_of(id).is_some() {
                     items.push(named(Item::RemoveFromWindow, "Remove from window", ""));
                 }
+                if slot.is_some_and(|s| self.removable(s)) {
+                    items.push(named(Item::RemoveSplit, "Remove split", ""));
+                }
                 items
             }
+            For::Slot(slot) => [named(Item::RemoveSplit, "Remove split", "")]
+                .into_iter()
+                .filter(|_| self.removable(slot))
+                .collect(),
             For::Layout(_) => {
                 let mut items = vec![named(Item::Rename, "Rename", "")];
                 if self.model.layouts.len() > 1 {
@@ -200,7 +240,7 @@ impl Workspace {
             })
             .collect::<Vec<_>>();
         let swatches = match target {
-            For::Space(id) => Some(self.swatches(id, cx)),
+            For::Space(id, _) => Some(self.swatches(id, cx)),
             _ => None,
         };
         let list = div()

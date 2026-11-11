@@ -54,7 +54,7 @@ impl Workspace {
         let body = match expanded {
             Some((slot, space)) => {
                 let focused = slot == layout.focus;
-                let el = self.space(space, focused, cx);
+                let el = self.space(space, slot, focused, cx);
                 space_drag::track_slot(el, slot, cx).into_any_element()
             }
             None => self.slot_tree(&layout.slots, Owner::Layout(layout.id), vec![], cx),
@@ -94,7 +94,7 @@ impl Workspace {
                 let focused = slot.id == self.model.layout().focus;
                 let space = slot.space.and_then(|s| self.model.find_space(s));
                 let el = match space {
-                    Some(space) => self.space(space, focused, cx),
+                    Some(space) => self.space(space, slot.id, focused, cx),
                     None => self.empty_slot(slot.id, focused, cx),
                 };
                 space_drag::track_slot(el, slot.id, cx).into_any_element()
@@ -126,10 +126,35 @@ impl Workspace {
             .min_w_0()
             .min_h_0()
             .flex()
-            .pt(px(SPACE_TITLE))
+            .flex_col()
             .child(
                 div()
-                    .size_full()
+                    .id(("empty-slot-title", slot.0))
+                    .h(px(SPACE_TITLE))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .px(px(4.))
+                    .child(expand::add(
+                        ("add-space", slot.0),
+                        cx.listener(move |w, _, window, cx| {
+                            w.model.focus_slot(slot);
+                            let _ = w.open(None, Place::Layout, None, &[], true, window, cx);
+                        }),
+                    ))
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                            cx.stop_propagation();
+                            w.open_menu(For::Slot(slot), ev.position, window, cx)
+                        }),
+                    ),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
                     .bg(rgb(theme::CARD))
                     .border_1()
                     .border_color(rgb(if focused {
@@ -153,6 +178,7 @@ impl Workspace {
     fn space(
         &self,
         space: &Space,
+        slot: SlotId,
         focused: bool,
         cx: &mut Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
@@ -195,7 +221,7 @@ impl Workspace {
                 MouseButton::Right,
                 cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
                     cx.stop_propagation();
-                    w.open_menu(For::Space(id), ev.position, window, cx)
+                    w.open_menu(For::Space(id, Some(slot)), ev.position, window, cx)
                 }),
             )
             .map(|d| match self.space_number(id) {
