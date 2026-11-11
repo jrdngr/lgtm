@@ -164,6 +164,9 @@ pub struct Model {
     /// Tabs' names.
     #[serde(default)]
     names: BTreeMap<TermId, String>,
+    /// The slot spaces picked in the sidebar open in. Off at every launch.
+    #[serde(skip)]
+    pub magnet: Option<SlotId>,
 }
 
 impl Model {
@@ -176,6 +179,7 @@ impl Model {
             next: 1,
             openers: BTreeMap::new(),
             names: BTreeMap::new(),
+            magnet: None,
         };
         let (space, term) = model.make_space();
         let slot = Slot {
@@ -383,11 +387,12 @@ impl Model {
         self.focus_tab(Tab::Term(term));
     }
 
-    /// Focuses a space's slot in the shown layout, first putting it in the focused slot when
-    /// it isn't shown.
+    /// Focuses a space's slot in the shown layout, first putting it in the magnet slot, or else
+    /// the focused one, when it isn't shown.
     pub fn show_space(&mut self, space: SpaceId) {
         let layout = self.layout();
-        let slot = layout.slot_of(space).unwrap_or(layout.focus);
+        let magnet = self.magnet.filter(|&s| layout.slots.contains(s));
+        let slot = layout.slot_of(space).or(magnet).unwrap_or(layout.focus);
         self.assign(slot, space);
     }
 

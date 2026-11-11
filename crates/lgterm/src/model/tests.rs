@@ -55,6 +55,24 @@ fn focusing_a_hidden_terminal_swaps_its_space_into_the_focused_slot() {
 }
 
 #[test]
+fn a_hidden_space_opens_in_the_magnet_slot_not_the_focused_one() {
+    let (mut m, a) = Model::new();
+    let s1 = space_of(&m, a);
+    let left = m.layout().focus;
+    m.split_slot(Axis::Row);
+    let b = m.add_space();
+    let c = m.add_space_behind();
+    let (s2, s3) = (space_of(&m, b), space_of(&m, c));
+    m.toggle_magnet(left);
+    m.show_space(s3);
+    assert_eq!(shown(&m), [Some(s3), Some(s2)]);
+    m.toggle_magnet(left);
+    m.focus_term(b);
+    m.show_space(s1);
+    assert_eq!(shown(&m), [Some(s3), Some(s1)]);
+}
+
+#[test]
 fn each_layout_keeps_its_own_spaces() {
     let (mut m, a) = Model::new();
     let s1 = space_of(&m, a);

@@ -102,6 +102,11 @@ impl Model {
         layout.slot().space.is_none() && self.remove_slot(layout.focus)
     }
 
+    /// Makes `slot` the magnet, or turns the magnet off when it already is.
+    pub fn toggle_magnet(&mut self, slot: SlotId) {
+        self.magnet = (self.magnet != Some(slot)).then_some(slot);
+    }
+
     /// Takes a slot out of the shown layout, with any space in it, unless it's the only one.
     /// The space stays in the sidebar. Focus moves to the slot before it.
     pub fn remove_slot(&mut self, slot: SlotId) -> bool {

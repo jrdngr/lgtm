@@ -60,6 +60,7 @@ impl From<OldModel> for Model {
             next,
             openers: Default::default(),
             names: Default::default(),
+            magnet: None,
         }
     }
 }

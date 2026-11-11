@@ -235,6 +235,15 @@ impl Workspace {
                     .overflow_hidden()
                     .child(label.clone()),
             )
+            .child(expand::magnet(
+                ("magnet", slot.0),
+                group.clone(),
+                self.model.magnet == Some(slot),
+                cx.listener(move |w, _, _, cx| {
+                    w.model.toggle_magnet(slot);
+                    cx.notify();
+                }),
+            ))
             .child(expand::lock(
                 ("lock-space", id.0),
                 group.clone(),
