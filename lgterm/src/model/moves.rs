@@ -1,6 +1,7 @@
 //! Dropping a space in the window: into a slot, beside one, or along an edge of the layout.
+//! Dropping a tab on a split: into its tabs, or beside it in a new split.
 
-use super::{Axis, Model, SlotId, SpaceId};
+use super::{Axis, Model, SlotId, SpaceId, Split, SplitId, Tab};
 
 /// A side of a slot or of the whole layout.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -78,6 +79,44 @@ impl Model {
                 self.focus_new(id);
             }
         }
+    }
+
+    /// Moves a tab into `to`'s tabs, or into a new split on `side` of it, in any space, and
+    /// focuses it. What it leaves empty closes, as when it's closed.
+    pub fn move_tab(&mut self, tab: Tab, to: SplitId, side: Option<Side>) {
+        let Some(from) = self.locate(tab) else { return };
+        let alone = self
+            .find_space(from.space)
+            .and_then(|s| s.splits.find(from.split))
+            .is_some_and(|s| s.tabs.len() == 1);
+        if from.split == to && (side.is_none() || alone) {
+            return;
+        }
+        if !self.spaces.iter().any(|s| s.splits.contains(to)) || !self.remove_tab(tab) {
+            return;
+        }
+        let id = SplitId(self.id());
+        let Some(space) = self.spaces.iter_mut().find(|s| s.splits.contains(to)) else {
+            return;
+        };
+        space.zoom = None;
+        match side {
+            None => {
+                let split = space.splits.find_mut(to).expect("split");
+                split.tabs.push(tab);
+            }
+            Some(side) => {
+                let split = Split {
+                    id,
+                    tabs: vec![tab],
+                    active: 0,
+                };
+                let _ = space
+                    .splits
+                    .insert_beside(to, split, side.axis(), side.before());
+            }
+        }
+        self.focus_tab(tab);
     }
 
     fn new_slot_for(&mut self, space: SpaceId) -> super::Slot {

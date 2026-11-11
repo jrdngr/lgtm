@@ -421,3 +421,42 @@ fn distributing_evens_out_the_branches_holding_the_picked_spaces() {
     assert_eq!(weights(&m), [5.0 / 3.0; 3]);
     assert!(m.layout().slot_of(space_of(&m, d)).is_some());
 }
+
+#[test]
+fn a_dragged_tab_joins_another_spaces_split_or_splits_beside_it() {
+    let (mut m, a) = Model::new();
+    let b = m.new_tab();
+    m.split_slot(Axis::Row);
+    let c = m.new_tab();
+    let (s1, s2) = (space_of(&m, a), space_of(&m, c));
+    let right = m.locate(Tab::Term(c)).unwrap().split;
+    m.move_tab(Tab::Term(b), right, None);
+    assert_eq!(m.space().unwrap().id, s2);
+    assert_eq!(m.split().unwrap().tabs, tabs(&[c, b]));
+    assert_eq!(m.term(), Some(b));
+    m.move_tab(Tab::Term(a), right, Some(Side::Left));
+    assert_eq!(shown(&m), [None, Some(s2)]);
+    assert!(m.find_space(s1).is_none());
+    let splits = m.space().unwrap().splits.leaves();
+    assert_eq!(splits.len(), 2);
+    assert_eq!(splits[0].tabs, tabs(&[a]));
+    assert_eq!(m.term(), Some(a));
+    assert!(m.is_valid());
+}
+
+#[test]
+fn dropping_a_tab_where_it_already_is_does_nothing() {
+    let (mut m, a) = Model::new();
+    let split = m.split().unwrap().id;
+    m.move_tab(Tab::Term(a), split, None);
+    m.move_tab(Tab::Term(a), split, Some(Side::Right));
+    assert_eq!(m.space().unwrap().splits.leaves().len(), 1);
+    let b = m.new_tab();
+    m.move_tab(Tab::Term(b), split, Some(Side::Bottom));
+    let splits = m.space().unwrap().splits.leaves();
+    assert_eq!(
+        (splits[0].tabs.clone(), splits[1].tabs.clone()),
+        (tabs(&[a]), tabs(&[b]))
+    );
+    assert!(m.is_valid());
+}

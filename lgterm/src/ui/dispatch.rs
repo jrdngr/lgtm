@@ -9,6 +9,7 @@ use gpui::{
 use super::actions::*;
 use super::sidebar::{self, SidebarDrag};
 use super::space_drag::SpaceDrag;
+use super::tab_drag::TabDrag;
 use super::{Held, Workspace};
 use crate::fonts;
 use crate::ipc::Place;
@@ -68,7 +69,11 @@ impl Render for Workspace {
             .on_drag_move(
                 cx.listener(|w, ev: &DragMoveEvent<SpaceDrag>, _, cx| w.space_drag_move(ev, cx)),
             )
-            .on_drop(cx.listener(|w, _: &SpaceDrag, win, cx| w.space_drop(win, cx)));
+            .on_drop(cx.listener(|w, _: &SpaceDrag, win, cx| w.space_drop(win, cx)))
+            .on_drag_move(
+                cx.listener(|w, ev: &DragMoveEvent<TabDrag>, _, cx| w.tab_drag_move(ev, cx)),
+            )
+            .on_drop(cx.listener(|w, d: &TabDrag, win, cx| w.tab_drop(d, win, cx)));
         el = on_open!(el, cx, NewTab, Place::Tab);
         el = on_open!(el, cx, SplitRight, Place::Right);
         el = on_open!(el, cx, SplitDown, Place::Down);
@@ -144,6 +149,7 @@ impl Render for Workspace {
         .child(self.render_sidebar_toggle())
         .children(self.render_toasts(None, cx))
         .children(self.render_space_drop(cx))
+        .children(self.render_tab_drop(cx))
         .children(self.render_palette(cx))
         .children(self.render_settings(window, cx))
         .children(self.render_menu(cx))

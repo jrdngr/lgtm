@@ -20,6 +20,7 @@ mod settings_commands;
 mod settings_view;
 mod sidebar;
 mod space_drag;
+mod tab_drag;
 mod terms;
 mod toasts;
 
@@ -60,6 +61,7 @@ pub struct Workspace {
     toasts: Vec<toasts::Toast>,
     toast_id: u64,
     space_drop: space_drag::SpaceDrop,
+    tab_drop: tab_drag::TabDrop,
     /// Spaces picked with ⌘-click on their titles, for commands like distribute.
     selected: Vec<SpaceId>,
     home: Option<PathBuf>,
@@ -105,6 +107,7 @@ impl Workspace {
             toasts: Vec::new(),
             toast_id: 0,
             space_drop: Default::default(),
+            tab_drop: Default::default(),
             selected: Vec::new(),
             home,
             home_name,

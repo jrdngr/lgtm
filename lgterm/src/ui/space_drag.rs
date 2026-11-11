@@ -127,7 +127,7 @@ fn f(p: Pixels) -> f32 {
 
 /// The side of `b` nearest `p`, measured as a share of its width or height, when it's within
 /// `SIDE` of it; none in the middle.
-fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
+pub(super) fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
     let (x, y) = (f(p.x - b.origin.x), f(p.y - b.origin.y));
     let (w, h) = (f(b.size.width), f(b.size.height));
     [
@@ -159,7 +159,7 @@ fn edge(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
     }
 }
 
-fn half(b: Bounds<Pixels>, side: Side) -> Bounds<Pixels> {
+pub(super) fn half(b: Bounds<Pixels>, side: Side) -> Bounds<Pixels> {
     let mut b = b;
     match side {
         Side::Left => b.size.width /= 2.,

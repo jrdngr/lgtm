@@ -10,6 +10,7 @@ use gpui::{
 
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
+use super::tab_drag::{self, DragsTab, TAB_STRIP};
 use super::{MovesWindow, Workspace, badge, expand};
 use crate::ipc::Place;
 use crate::model::{Axis, LayoutId, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree};
@@ -402,6 +403,7 @@ impl Workspace {
             };
             div()
                 .id(("tab", key))
+                .drags_tab(tab, self.term_label(tab))
                 .flex()
                 .items_center()
                 .gap(px(7.))
@@ -476,7 +478,7 @@ impl Workspace {
                     .into_any_element()
             }),
         };
-        div()
+        let card = div()
             .size_full()
             .min_w_0()
             .min_h_0()
@@ -499,7 +501,7 @@ impl Workspace {
             )
             .child(
                 div()
-                    .h(px(36.))
+                    .h(px(TAB_STRIP))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -536,7 +538,7 @@ impl Workspace {
                         }),
                     )),
             )
-            .child(div().flex_1().min_h_0().children(body))
-            .into_any_element()
+            .child(div().flex_1().min_h_0().children(body));
+        tab_drag::track_card(card, split_id, cx).into_any_element()
     }
 }
