@@ -11,6 +11,7 @@ use super::Workspace;
 use super::actions::{self, COMMANDS};
 use super::overlay::Overlay;
 use super::rename::Target;
+use crate::agents::Kind;
 use crate::ipc::Place;
 use crate::model::{COLORS, LayoutId, Model, SpaceId, SplitId};
 use crate::theme;
@@ -33,6 +34,7 @@ pub struct Menu {
 #[derive(Clone, Copy)]
 enum Item {
     NewTerminal,
+    NewAgent(Kind),
     NewSpace,
     Messages,
     Rename,
@@ -83,6 +85,7 @@ impl Workspace {
                 let place = match item {
                     Item::NewSpace => Place::SpaceRight,
                     Item::Messages => return self.apply(window, cx, Model::show_messages),
+                    Item::NewAgent(kind) => return self.open_agent(kind, window, cx),
                     _ => Place::Tab,
                 };
                 let _ = self.open(None, place, None, &[], true, window, cx);
@@ -120,6 +123,8 @@ impl Workspace {
         match target {
             For::Tabs(_) => vec![
                 named(Item::NewTerminal, "New terminal", "New tab"),
+                named(Item::NewAgent(Kind::Claude), "New claude", ""),
+                named(Item::NewAgent(Kind::Codex), "New codex", ""),
                 named(Item::NewSpace, "New space", ""),
                 named(Item::Messages, "Messages", "Messages"),
             ],

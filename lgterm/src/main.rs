@@ -5,6 +5,7 @@ mod dock;
 mod field;
 mod fonts;
 mod guide;
+mod input;
 mod ipc;
 mod model;
 mod procinfo;
@@ -42,6 +43,7 @@ fn main() {
         cx.set_global(FontSize(theme::DEFAULT_FONT_SIZE));
         cx.set_app_identity("dev.lgtm.lgterm", "lgterm");
         actions::bind(cx);
+        input::bind(cx);
         cx.on_action(|_: &Quit, cx| cx.quit());
         fonts::load(cx);
         cx.set_menus([Menu::new("lgterm").items([

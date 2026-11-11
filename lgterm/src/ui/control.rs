@@ -70,10 +70,7 @@ impl Workspace {
                     }
                     let kind = agent.as_deref().map(agent_kind).transpose()?;
                     let argv = match kind {
-                        Some(kind) => {
-                            let shell = std::env::var("SHELL").unwrap_or_default();
-                            launch::argv(self.settings.agent_command(kind), &argv, &shell)
-                        }
+                        Some(kind) => self.agent_argv(kind, &argv),
                         None => argv,
                     };
                     let id = self
@@ -157,6 +154,22 @@ impl Workspace {
             })
         })();
         result.unwrap_or_else(|e| e)
+    }
+
+    /// The program and arguments that start `kind` with `args`, through the user's shell.
+    pub(super) fn agent_argv(&self, kind: Kind, args: &[String]) -> Vec<String> {
+        let shell = std::env::var("SHELL").unwrap_or_default();
+        launch::argv(self.settings.agent_command(kind), args, &shell)
+    }
+
+    /// Opens a tab beside the focused one running `kind`.
+    pub(super) fn open_agent(&mut self, kind: Kind, window: &mut Window, cx: &mut Context<Self>) {
+        let argv = self.agent_argv(kind, &[]);
+        if let Ok(id) = self.open(None, Place::Tab, None, &argv, true, window, cx)
+            && let Some(t) = self.terms.get_mut(&id)
+        {
+            t.hint = Some(kind);
+        }
     }
 
     /// Opens a terminal beside `from`, or the focused tab, and returns its id. A new space from

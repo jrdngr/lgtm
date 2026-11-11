@@ -145,7 +145,7 @@ impl Render for Workspace {
         .children(self.render_toasts(None, cx))
         .children(self.render_space_drop(cx))
         .children(self.render_palette(cx))
-        .children(self.render_settings(cx))
+        .children(self.render_settings(window, cx))
         .children(self.render_menu(cx))
     }
 }

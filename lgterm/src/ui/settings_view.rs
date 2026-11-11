@@ -33,18 +33,16 @@ impl Workspace {
         if matches!(self.overlay, Some(Overlay::Settings { .. })) {
             self.close_overlay(window, cx);
         } else {
+            let commands = self.command_boxes(window, cx);
             self.show_overlay(window, cx, |focus, _blur| Overlay::Settings {
                 focus,
                 _blur,
-                editing: None,
+                commands,
             });
         }
     }
 
     fn settings_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.command_key(ev, cx) {
-            return;
-        }
         if ev.keystroke.key == "escape" {
             self.close_overlay(window, cx);
             cx.stop_propagation();
@@ -59,7 +57,16 @@ impl Workspace {
         cx.notify();
     }
 
-    pub(super) fn render_settings(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn save_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.save_commands(cx);
+        self.close_overlay(window, cx);
+    }
+
+    pub(super) fn render_settings(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         let Some(Overlay::Settings { focus, .. }) = &self.overlay else {
             return None;
         };
@@ -148,7 +155,13 @@ impl Workspace {
             .pb(px(22.))
             .track_focus(focus)
             .on_key_down(cx.listener(Self::settings_key))
-            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_mouse_down(MouseButton::Left, {
+                let focus = focus.clone();
+                move |_, window, cx| {
+                    window.focus(&focus, cx);
+                    cx.stop_propagation();
+                }
+            })
             .child(
                 div()
                     .flex()
@@ -176,7 +189,7 @@ impl Workspace {
             .child(section("SESSIONS"))
             .children(sessions)
             .child(section("AGENTS"))
-            .children(self.command_rows(cx))
+            .children(self.command_rows(window, cx))
             .child(section("APPEARANCE"))
             .child(
                 div()
@@ -228,6 +241,24 @@ impl Workspace {
                             )
                             .child(step("font-bigger", "+", 1., cx)),
                     ),
+            )
+            .child(
+                div().mt(px(18.)).flex().justify_end().child(
+                    div()
+                        .id("save-settings")
+                        .h(px(28.))
+                        .px(px(16.))
+                        .flex()
+                        .items_center()
+                        .rounded(px(6.))
+                        .bg(rgb(theme::FOCUS))
+                        .text_size(px(13.))
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(rgb(theme::BADGE_TEXT))
+                        .cursor_pointer()
+                        .child("Save")
+                        .on_click(cx.listener(|w, _, window, cx| w.save_settings(window, cx))),
+                ),
             );
         Some(backdrop("settings-overlay", dialog.into_any_element(), cx))
     }
