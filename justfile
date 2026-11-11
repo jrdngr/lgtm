@@ -1,23 +1,12 @@
 # Log levels for the app, as RUST_LOG takes them. `lgtm_lib` and `lgtm_core` are the backend and
-# `ui` the frontend: `just log=debug dev`, `just log=lgtm_lib::watch=trace,info run`
+# `ui` the frontend: `just log=debug dev-app`, `just log=lgtm_lib::watch=trace,info run-app`
 log := "lgtm_lib=info,lgtm_core=info,ui=info,warn"
 
 # Hourly log files, the last 24 kept, at most 50 MB each
 export LGTM_LOG_DIR := justfile_directory() / "logs"
 
-# Run the app with hot reload
-dev:
-    pnpm install --frozen-lockfile
-    RUST_LOG={{ log }} pnpm tauri dev
-
-# Fetch, start a new change on main@origin, and run the app
-app: fresh dev
-
-# Fetch, start a new change on main@origin, and install the `lgtm` command
-tui: fresh build-tui install-tui
-
 # Fetch, start a new change on main@origin, and install the `lgtm` command and lgterm
-go: fresh build-tui install-tui lgterm
+go: fresh install-tui install-lgterm
 
 [private]
 fresh:
@@ -32,42 +21,51 @@ test:
     cargo clippy --workspace --all-targets -- -D warnings
     pnpm test
 
-# Build the macOS app and the `lgtm` command in one cargo build, so they share every
-# dependency, then bundle the app. `tauri build` would compile the app on its own: the frontend
+# Build and bundle the macOS app. `tauri build` would compile the app on its own: the frontend
 # goes into the binary, and custom-protocol is the feature it adds for release builds.
-build:
+build-app:
     pnpm install --frozen-lockfile
     pnpm build
-    cargo build --release --locked -p lgtm-app -p lgtm --features lgtm-app/custom-protocol
+    cargo build --release --locked -p lgtm-app --features lgtm-app/custom-protocol
     pnpm tauri bundle --bundles app
 
-[private]
+# Build the `lgtm` command
 build-tui:
     cargo build --release --locked -p lgtm
 
-# Put the `lgtm` command from `just build` in ~/.local/bin
-[private]
-install-tui:
-    mkdir -p ~/.local/bin
-    install -m 755 target/release/lgtm ~/.local/bin/lgtm
+# Build lgterm, the terminal multiplexer, and bundle lgterm.app. Needs Zig 0.17 and Rust 1.99
+# or newer.
+build-lgterm:
+    scripts/lgterm-app.sh
 
-# Build the app and the `lgtm` command, put the app in /Applications, replacing any copy
-# there, and install the command
-install: build install-tui
+# Build the app and put it in /Applications, replacing any copy there
+install-app: build-app
     rm -rf /Applications/lgtm.app
     ditto target/release/bundle/macos/lgtm.app /Applications/lgtm.app
 
-# Build lgterm, the terminal multiplexer, and put lgterm.app in /Applications, replacing any
-# copy there. Needs Zig 0.17 and Rust 1.99 or newer.
-lgterm:
-    scripts/lgterm-app.sh
+# Build the `lgtm` command and put it in ~/.local/bin
+install-tui: build-tui
+    mkdir -p ~/.local/bin
+    install -m 755 target/release/lgtm ~/.local/bin/lgtm
 
-# Run the app bundle from `just build`, optionally on a repo. Launching the
-# binary inside the .app gives it the bundle's Dock icon.
-run *repo:
+# Build lgterm, put lgterm.app in /Applications, replacing any copy there, and link the
+# `lgterm` command into ~/.local/bin
+install-lgterm: build-lgterm
+    rm -rf /Applications/lgterm.app
+    ditto target/release/bundle/lgterm.app /Applications/lgterm.app
+    mkdir -p ~/.local/bin
+    ln -sf /Applications/lgterm.app/Contents/MacOS/lgterm ~/.local/bin/lgterm
+
+# Run the app with hot reload
+dev-app:
+    pnpm install --frozen-lockfile
+    RUST_LOG={{ log }} pnpm tauri dev
+
+# Run the app bundle from `just build-app`, optionally on a repo. Launching the binary inside
+# the .app gives it the bundle's Dock icon.
+run-app *repo:
     RUST_LOG={{ log }} target/release/bundle/macos/lgtm.app/Contents/MacOS/lgtm-app {{ repo }}
 
 # Clean up workspaces left behind (see `lgtm gc`)
 gc *repo:
     RUST_LOG={{ log }} target/release/lgtm-app gc {{ repo }}
-

@@ -50,7 +50,7 @@ fn dev_build(command: &str) -> bool {
 }
 
 fn exe() -> anyhow::Result<String> {
-    cli().context("the lgtm command isn't installed: run `just install`")
+    cli().context("the lgtm command isn't installed: run `just install-tui`")
 }
 
 /// Claude Code's user config, which holds user-scope MCP servers.

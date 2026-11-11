@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build lgterm in release and install it as /Applications/lgterm.app.
+# Build lgterm in release and bundle it as target/release/bundle/lgterm.app.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -37,9 +37,3 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 codesign --force --sign - "$app" >/dev/null 2>&1 || true
-
-rm -rf /Applications/lgterm.app
-ditto "$app" /Applications/lgterm.app
-mkdir -p "$HOME/.local/bin"
-ln -sf /Applications/lgterm.app/Contents/MacOS/lgterm "$HOME/.local/bin/lgterm"
-echo "Installed /Applications/lgterm.app and ~/.local/bin/lgterm"
