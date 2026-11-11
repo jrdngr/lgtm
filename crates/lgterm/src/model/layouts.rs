@@ -231,6 +231,18 @@ impl Model {
         self.active = cycle(self.active, self.layouts.len(), delta);
     }
 
+    /// Puts a layout before the one at `to` in the list, or last, keeping the shown one shown.
+    pub fn move_layout(&mut self, id: LayoutId, to: usize) {
+        let Some(from) = self.layouts.iter().position(|l| l.id == id) else {
+            return;
+        };
+        let shown = self.layout().id;
+        let to = if to > from { to - 1 } else { to };
+        let l = self.layouts.remove(from);
+        self.layouts.insert(to.min(self.layouts.len()), l);
+        self.active = self.layouts.iter().position(|l| l.id == shown).unwrap_or(0);
+    }
+
     pub fn select_layout(&mut self, index: usize) {
         if index < self.layouts.len() {
             self.active = index;

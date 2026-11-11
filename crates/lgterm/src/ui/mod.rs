@@ -6,13 +6,13 @@ mod badge;
 mod control;
 mod dispatch;
 mod expand;
+mod layout_box;
 mod marks;
 mod menu;
 mod messages;
 mod overlay;
 mod palette;
 mod panes;
-mod picker;
 mod rename;
 mod restore;
 mod select;
@@ -61,6 +61,7 @@ pub struct Workspace {
     toasts: Vec<toasts::Toast>,
     toast_id: u64,
     space_drop: space_drag::SpaceDrop,
+    layout_drop: layout_box::LayoutDrop,
     tab_drop: tab_drag::TabDrop,
     /// Spaces picked with ⌘-click on their titles, for commands like distribute.
     selected: Vec<SpaceId>,
@@ -107,6 +108,7 @@ impl Workspace {
             toasts: Vec::new(),
             toast_id: 0,
             space_drop: Default::default(),
+            layout_drop: Default::default(),
             tab_drop: Default::default(),
             selected: Vec::new(),
             home,
@@ -358,7 +360,8 @@ impl Workspace {
         cx.notify();
     }
 
-    /// ⌘1-9 focus a space by its place in the window, and ⌃1-9 a tab in the focused split.
+    /// ⌘1-9 focus a space by its place in the window, ⌃1-9 a tab in the focused split, and
+    /// ⌃⌘1-9 a layout.
     /// Runs before the terminal sees the key.
     fn key_down(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let k = &ev.keystroke;
@@ -372,6 +375,7 @@ impl Workspace {
         match Held::from(k.modifiers) {
             Held::Cmd => self.apply(window, cx, |m| m.select_slot(d - 1)),
             Held::Ctrl => self.apply(window, cx, |m| m.select_tab(d - 1)),
+            Held::CmdCtrl => self.apply(window, cx, |m| m.select_layout(d - 1)),
             Held::None => return,
         }
         cx.stop_propagation();
@@ -419,6 +423,8 @@ enum Held {
     Cmd,
     /// Tabs in the focused split.
     Ctrl,
+    /// Layouts.
+    CmdCtrl,
 }
 
 impl From<gpui::Modifiers> for Held {
@@ -426,6 +432,7 @@ impl From<gpui::Modifiers> for Held {
         match (m.platform, m.control, m.alt || m.shift || m.function) {
             (true, false, false) => Held::Cmd,
             (false, true, false) => Held::Ctrl,
+            (true, true, false) => Held::CmdCtrl,
             _ => Held::None,
         }
     }

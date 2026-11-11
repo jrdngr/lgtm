@@ -1,11 +1,8 @@
-//! Right-click menus: a tab bar's, a space's, an empty slot's, and a layout's; and the layout
-//! picker's list.
+//! Right-click menus: a tab bar's, a space's, an empty slot's, and a layout's.
 
-use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, Context, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
-    ParentElement, Pixels, Point, StatefulInteractiveElement, Styled, Window, anchored, deferred,
-    div, px, rgb,
+    AnyElement, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
+    Point, StatefulInteractiveElement, Styled, Window, anchored, deferred, div, px, rgb,
 };
 
 use super::Workspace;
@@ -26,8 +23,6 @@ pub enum For {
     /// An empty slot.
     Slot(SlotId),
     Layout(LayoutId),
-    /// The layout picker's list.
-    Layouts,
 }
 
 pub struct Menu {
@@ -45,7 +40,6 @@ enum Item {
     RemoveFromWindow,
     RemoveSplit,
     Delete,
-    PickLayout(usize),
 }
 
 /// The first key of the palette command named `command`, as the palette shows it.
@@ -117,7 +111,6 @@ impl Workspace {
                 }
             }
             (For::Layout(id), Item::Delete) => self.apply(window, cx, |m| m.delete_layout(id)),
-            (_, Item::PickLayout(i)) => self.apply(window, cx, |m| m.select_layout(i)),
             _ => cx.notify(),
         }
     }
@@ -182,9 +175,6 @@ impl Workspace {
                 }
                 items
             }
-            For::Layouts => (0..self.model.layouts.len())
-                .map(|i| (Item::PickLayout(i), self.layout_label(i), String::new()))
-                .collect(),
         }
     }
 
@@ -199,7 +189,7 @@ impl Workspace {
             .enumerate()
             .map(|(i, (item, name, key))| {
                 let group = format!("menu-item-{i}");
-                let on = matches!(item, Item::PickLayout(l) if l == self.model.active);
+                let danger = matches!(item, Item::Delete);
                 div()
                     .id(("menu-item", i))
                     .group(group.clone())
@@ -210,9 +200,11 @@ impl Workspace {
                     .h(px(26.))
                     .px(px(10.))
                     .rounded(px(5.))
-                    .text_color(rgb(theme::TEXT))
-                    .when(on, |d| d.bg(rgb(theme::TAB_ACTIVE)))
-                    .hover(|s| s.bg(rgb(theme::FOCUS)).text_color(rgb(theme::BADGE_TEXT)))
+                    .text_color(rgb(if danger { theme::DANGER } else { theme::TEXT }))
+                    .hover(|s| {
+                        s.bg(rgb(if danger { theme::DANGER } else { theme::FOCUS }))
+                            .text_color(rgb(theme::BADGE_TEXT))
+                    })
                     .cursor_pointer()
                     .child(name)
                     .child(
@@ -222,21 +214,6 @@ impl Workspace {
                             .child(key),
                     )
                     .on_click(cx.listener(move |w, _, window, cx| w.run_menu(item, window, cx)))
-                    .when_some(
-                        match item {
-                            Item::PickLayout(l) => self.model.layouts.get(l).map(|l| l.id),
-                            _ => None,
-                        },
-                        |d, id| {
-                            d.on_mouse_down(
-                                MouseButton::Right,
-                                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                                    cx.stop_propagation();
-                                    w.open_menu(For::Layout(id), ev.position, window, cx)
-                                }),
-                            )
-                        },
-                    )
             })
             .collect::<Vec<_>>();
         let swatches = match target {

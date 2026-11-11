@@ -1,5 +1,5 @@
-//! The sidebar: every space and the agents in it, with the layout picker at the bottom; or only
-//! space badges when narrow.
+//! The sidebar: every space and the agents in it, with the layout box at the bottom; or only
+//! space badges and layout maps when narrow.
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
@@ -115,7 +115,7 @@ impl Workspace {
                     .overflow_y_scroll()
                     .children(rows),
             )
-            .child(self.layout_picker(icons, cx))
+            .child(self.layout_box(icons, cx))
             .child(handle);
         space_drag::track_sidebar(side, cx).into_any_element()
     }

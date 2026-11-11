@@ -495,3 +495,24 @@ fn dropping_a_tab_where_it_already_is_does_nothing() {
     );
     assert!(m.is_valid());
 }
+
+#[test]
+fn moving_a_layout_renumbers_the_list_and_keeps_the_shown_one() {
+    let (mut m, _) = Model::new();
+    m.new_layout();
+    m.new_layout();
+    let ids: Vec<_> = m.layouts.iter().map(|l| l.id).collect();
+    m.select_layout(0);
+    m.move_layout(ids[2], 0);
+    assert_eq!(
+        m.layouts.iter().map(|l| l.id).collect::<Vec<_>>(),
+        [ids[2], ids[0], ids[1]]
+    );
+    assert_eq!(m.layout().id, ids[0]);
+    m.move_layout(ids[2], 3);
+    assert_eq!(
+        m.layouts.iter().map(|l| l.id).collect::<Vec<_>>(),
+        [ids[0], ids[1], ids[2]]
+    );
+    assert_eq!(m.active, 0);
+}
