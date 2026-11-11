@@ -25,8 +25,8 @@ use crate::tui::width;
 
 pub enum Outcome {
     None,
-    /// Leave the editor.
-    Back,
+    /// Quit lgtm.
+    Quit,
     /// Go to the home screen, keeping the open files.
     Home,
     /// Go to the review, on this file's line from 1, which holds this text.
@@ -706,7 +706,7 @@ mod tests {
             e.key(KeyEvent::from(KeyCode::Enter))
         };
         let (_dir, mut e) = editor_on("one\n");
-        assert!(matches!(quit(&mut e), Outcome::Back));
+        assert!(matches!(quit(&mut e), Outcome::Quit));
         e.open[0].buf.insert(0, "x");
         assert!(matches!(quit(&mut e), Outcome::None));
         assert!(e.notice.as_deref().is_some_and(|n| n.contains("a.txt")));

@@ -81,7 +81,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             }
                             match outcome {
                                 edit::Outcome::None => {}
-                                edit::Outcome::Back => return Ok(()),
+                                edit::Outcome::Quit => return Ok(()),
                                 edit::Outcome::Home => {
                                     e.notice = Some("no home screen outside jj".into());
                                 }

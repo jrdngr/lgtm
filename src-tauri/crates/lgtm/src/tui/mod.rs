@@ -644,13 +644,7 @@ impl App {
                     self.mention(text);
                     false
                 }
-                edit::Outcome::Back => match self.editor_back {
-                    Some(screen) => {
-                        self.screen = screen;
-                        false
-                    }
-                    None => true,
-                },
+                edit::Outcome::Quit => true,
             };
         }
         if self.screen == Screen::Dash {

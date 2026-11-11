@@ -14,10 +14,10 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("h", "home"),
     ("heat", "heat on the files"),
     ("side", "files on the other side"),
-    ("q", "leave the editor"),
-    ("q!", "leave, dropping unsaved edits"),
-    ("wq", "save and leave"),
-    ("wqa", "save all and leave"),
+    ("q", "quit"),
+    ("q!", "quit, dropping unsaved edits"),
+    ("wq", "save and quit"),
+    ("wqa", "save all and quit"),
     ("close", "close the file in view"),
     ("reload", "read the file again, over edits"),
     ("raw", "edit conflict markers as text"),
@@ -117,19 +117,19 @@ impl Editor {
             }
             "wq" | "x" => {
                 if self.save() {
-                    return self.leave(false);
+                    return self.quit(false);
                 }
             }
             "wqa" | "xa" => {
                 if self.save_all() {
-                    return self.leave(false);
+                    return self.quit(false);
                 }
             }
             "h" | "home" => return Outcome::Home,
             "heat" => self.sidebar.heat_on = !self.sidebar.heat_on,
             "side" => crate::tui::side::toggle(),
-            "q" | "qa" => return self.leave(false),
-            "q!" | "qa!" => return self.leave(true),
+            "q" | "qa" => return self.quit(false),
+            "q!" | "qa!" => return self.quit(true),
             "close" | "c" => return self.close(),
             "raw" => {
                 if let Some(o) = self.open.get_mut(self.cur) {
@@ -336,16 +336,16 @@ impl Editor {
         }
     }
 
-    /// Leaves the editor unless a buffer has unsaved edits. `force` drops them.
-    pub fn leave(&mut self, force: bool) -> Outcome {
+    /// Quits unless a buffer has unsaved edits. `force` drops them.
+    pub fn quit(&mut self, force: bool) -> Outcome {
         if force {
             self.open.retain(|o| !o.dirty());
             self.cur = 0;
-            return Outcome::Back;
+            return Outcome::Quit;
         }
         let unsaved = self.unsaved();
         if unsaved.is_empty() {
-            Outcome::Back
+            Outcome::Quit
         } else {
             self.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
             Outcome::None
