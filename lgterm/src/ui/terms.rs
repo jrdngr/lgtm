@@ -202,8 +202,8 @@ impl Workspace {
                 .to_owned();
         }
         match t.info.process.as_deref() {
-            Some(p) => p.to_owned(),
-            None => folder_name(t.cwd(), self.home.as_deref()),
+            Some(p) if !t.info.shell_foreground => p.to_owned(),
+            _ => folder_name(t.cwd(), self.home.as_deref()),
         }
     }
 
