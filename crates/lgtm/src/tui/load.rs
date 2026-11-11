@@ -78,11 +78,6 @@ pub enum Msg {
     Changed,
     /// Files were written, for the trees' heat.
     Written(Vec<String>),
-    /// What changed from commit `start` to `@`, and the commit `@` was.
-    TurnDiff {
-        start: String,
-        result: anyhow::Result<(Vec<FileDiff>, String)>,
-    },
     /// An agent's request over MCP, and where its answer goes.
     Agent {
         req: crate::agent::Request,
@@ -219,37 +214,12 @@ impl Loader {
         });
     }
 
-    /// The name the store files the workspace at `root`'s turns under.
-    pub fn workspace_key(&self, root: &std::path::Path) -> Option<String> {
-        self.rt
-            .block_on(lgtm_core::turns::workspace_key(&self.jj, root))
-            .ok()
-    }
-
     /// The files with conflicts in the working copy, snapshotted first.
     pub fn conflicted(&self) -> anyhow::Result<Vec<String>> {
         self.rt.block_on(async {
             let _ = self.jj.snapshot().await;
             self.jj.conflicted_files("@").await
         })
-    }
-
-    /// Snapshots the working copy, then diffs it against `start`, the commit last diffed to.
-    pub fn turn_diff(&self, start: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
-        self.rt.spawn(async move {
-            let _ = jj.background_snapshot().await;
-            let result = async {
-                let at = jj.resolve("@").await?;
-                let range = Range {
-                    from: Some(start.clone()),
-                    to: at.to,
-                };
-                Ok((jj.diff(&range).await?, range.to))
-            }
-            .await;
-            let _ = tx.send(Msg::TurnDiff { start, result });
-        });
     }
 
     /// Lists the files under `root`.

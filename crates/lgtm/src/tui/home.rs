@@ -30,8 +30,6 @@ pub enum Outcome {
     Bookmarks(String),
     /// Find what a push of these commits' bookmarks would do, for the jj menu.
     PushPlan(String),
-    /// Show DASH mode.
-    Dash,
     Quit,
 }
 
@@ -100,7 +98,6 @@ pub const KEYS: &[(&str, &str)] = &[
     ("r", "review"),
     ("v", "snapshots"),
     ("a", "every snapshot"),
-    ("d", "agent dashboard"),
     (":", "command"),
 ];
 
@@ -345,9 +342,6 @@ impl Home {
             // The width kept is the revisions side's, which a step widens the other way.
             self.revisions_width = Some(width::moved(self.drawn_width, -step, SIDE_MIN));
             return Outcome::None;
-        }
-        if key.code == KeyCode::Char('d') && self.focus == Focus::Revisions {
-            return Outcome::Dash;
         }
         if key.code == KeyCode::Char(' ') && self.focus == Focus::Revisions {
             self.set_jj_mode(true);

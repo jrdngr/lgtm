@@ -29,14 +29,12 @@ pub fn run_on(input: &str) -> i32 {
 }
 
 async fn record(input: &serde_json::Value) -> anyhow::Result<()> {
-    let todos = turns::todos(input);
-    let point = turns::checkpoint(input);
+    let Some(point) = turns::checkpoint(input) else {
+        return Ok(());
+    };
     let Some(session) = input["session_id"].as_str() else {
         return Ok(());
     };
-    if point.is_none() && todos.is_none() {
-        return Ok(());
-    }
     let dir = input["cwd"]
         .as_str()
         .map(PathBuf::from)
@@ -45,12 +43,6 @@ async fn record(input: &serde_json::Value) -> anyhow::Result<()> {
         return Ok(());
     };
     let Some(store) = crate::tui::store(&root) else {
-        return Ok(());
-    };
-    if let Some(todos) = todos {
-        store.set_todos(session, &todos, turns::now_ms())?;
-    }
-    let Some(point) = point else {
         return Ok(());
     };
     let store = Mutex::new(store);

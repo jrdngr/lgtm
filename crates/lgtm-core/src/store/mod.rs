@@ -1,7 +1,6 @@
 //! Per-repo SQLite store for marks, file checks, comments, review sessions, reports,
 //! designs, drawings and notes. lgtm's global store is one too, holding only global notes.
 
-mod activity;
 mod agent_comments;
 mod arch;
 mod asleep;
@@ -30,7 +29,6 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 
-pub use activity::{AgentActivity, Todo, TodoStatus, TurnEdit};
 pub use agent_comments::AgentComment;
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
@@ -167,7 +165,9 @@ fn migrate(db: &Connection) -> rusqlite::Result<()> {
     migrate_mark_colors(db)?;
     migrate_check_fingerprints(db)?;
     migrate_check_agents(db)?;
-    migrate_verdict_names(db)
+    migrate_verdict_names(db)?;
+    // The agent dashboard's tables.
+    db.execute_batch("DROP TABLE IF EXISTS turn_edits; DROP TABLE IF EXISTS agent_todos;")
 }
 
 /// Takes saved before the verdicts were renamed to agree, change, disagree and decide.
@@ -286,7 +286,6 @@ impl Store {
         setup::create_table(&db)?;
         symbol_info::create_table(&db)?;
         turns::create_table(&db)?;
-        activity::create_table(&db)?;
         fixes::create_table(&db)?;
         agent_comments::create_table(&db)?;
         migrate(&db)?;

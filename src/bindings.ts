@@ -545,20 +545,6 @@ export const commands = {
 	deferPreview: (workspace: string | null, session: string, id: string) => typedError<string[], string>(__TAURI_INVOKE("defer_preview", { workspace, session, id })),
 	/**  The agent turns and checkpoints on the workspace's working-copy change, newest first. */
 	agentTurns: (workspace: string | null) => typedError<TurnDto[], string>(__TAURI_INVOKE("agent_turns", { workspace })),
-	/**  The workspace's newest agent turn, with its edits and the agent's todo list. */
-	agentActivity: (workspace: string | null) => typedError<{
-	prompt: string | null,
-	/**  The terminal panel the agent runs in. */
-	terminal: string | null,
-	running: boolean,
-	/**  When the turn started and ended (Unix ms). */
-	startedAt: number | null,
-	endedAt: number | null,
-	/**  The turn's edits, oldest first. */
-	edits: TurnEdit[],
-	/**  The session's last todo list. */
-	todos: Todo[],
-} | null, string>(__TAURI_INVOKE("agent_activity", { workspace })),
 	/**  Takes a checkpoint of the workspace's working copy. */
 	setCheckpoint: (workspace: string | null) => typedError<null, string>(__TAURI_INVOKE("set_checkpoint", { workspace })),
 	/**  Puts the files an agent turn changed back as they were before it. */
@@ -617,21 +603,6 @@ export type ActorDto = {
 
 /**  File > Add Repository to this window's project. */
 export type AddRepo = Record<string, never>;
-
-/**  What a workspace's newest agent turn has done so far. */
-export type AgentActivity = {
-	prompt: string | null,
-	/**  The terminal panel the agent runs in. */
-	terminal: string | null,
-	running: boolean,
-	/**  When the turn started and ended (Unix ms). */
-	startedAt: number | null,
-	endedAt: number | null,
-	/**  The turn's edits, oldest first. */
-	edits: TurnEdit[],
-	/**  The session's last todo list. */
-	todos: Todo[],
-};
 
 export type AgentCommentDto = {
 	/**  Shown as `C<number>`. */
@@ -3091,14 +3062,6 @@ export type Tint = {
 	to: number,
 };
 
-/**  An item of the agent's todo list. */
-export type Todo = {
-	content: string,
-	status: TodoStatus,
-};
-
-export type TodoStatus = "pending" | "in_progress" | "completed";
-
 /**  A tool that's missing or too old. */
 export type ToolProblem = {
 	tool: string,
@@ -3170,17 +3133,6 @@ export type TurnDto = {
 	removed: number,
 	/**  When it started (Unix ms). */
 	at: number | null,
-};
-
-/**  One tool call's change to the files, within a turn. */
-export type TurnEdit = {
-	/**  When it finished (Unix ms). */
-	at: number | null,
-	added: number,
-	removed: number,
-	/**  Removed lines the same turn had added: work the agent redid. */
-	rewritten: number,
-	paths: string[],
 };
 
 /**  Who made a turn. */

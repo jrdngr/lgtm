@@ -15,19 +15,6 @@ pub(crate) async fn agent_turns(
         .map_err(err)
 }
 
-/// The workspace's newest agent turn, with its edits and the agent's todo list.
-#[tauri::command]
-#[specta::specta]
-pub(crate) async fn agent_activity(
-    window: Frame,
-    workspace: Option<String>,
-) -> CmdResult<Option<crate::store::AgentActivity>> {
-    repo(&window)?
-        .agent_activity(workspace.as_deref())
-        .await
-        .map_err(err)
-}
-
 /// Takes a checkpoint of the workspace's working copy.
 #[tauri::command]
 #[specta::specta]

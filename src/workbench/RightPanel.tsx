@@ -1,4 +1,3 @@
-import { AgentPanel } from "../agent/AgentPanel";
 import { ArchSection } from "../arch/sidebar/ArchSection";
 import { archBadge } from "../arch/sidebar/logic";
 import { useArch } from "../arch/state";
@@ -67,13 +66,6 @@ export function RightPanel({ onOpenReport, ...props }: Props) {
           icon: "comments",
           alert: needsYou(review?.threads ?? []) > 0,
           render: () => <CommentsPanel />,
-        },
-        {
-          id: "agent",
-          group: "code",
-          title: "Agent",
-          icon: "pulse",
-          render: () => <AgentPanel />,
         },
         {
           id: "guided",

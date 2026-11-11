@@ -209,20 +209,6 @@ impl Store {
         stmt.query_map([workspace, change_id], row)?.collect()
     }
 
-    /// The workspace's newest agent turn, running or not.
-    pub fn latest_agent_turn(&self, workspace: &str) -> rusqlite::Result<Option<Turn>> {
-        self.db
-            .query_row(
-                &format!(
-                    "SELECT {COLUMNS} FROM agent_turns WHERE workspace = ? AND session IS NOT NULL
-                     ORDER BY id DESC LIMIT 1"
-                ),
-                [workspace],
-                row,
-            )
-            .optional()
-    }
-
     /// Adds to the files a turn touched, keeping each once.
     pub fn add_turn_paths(&self, id: i64, paths: &[String]) -> rusqlite::Result<()> {
         let Some(mut turn) = self.turn(id)? else {

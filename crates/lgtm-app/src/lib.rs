@@ -1,4 +1,3 @@
-mod activity;
 mod agents;
 mod canvas;
 mod commands;
@@ -248,7 +247,6 @@ fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::qa::add_qa_turn,
             commands::qa::defer_preview,
             commands::turns::agent_turns,
-            commands::turns::agent_activity,
             commands::turns::set_checkpoint,
             commands::turns::undo_turn,
             commands::turns::split_at_turns,

@@ -61,9 +61,6 @@ pub(super) struct HookReport {
     /// The session's transcript file.
     #[serde(default)]
     pub transcript: Option<String>,
-    /// The agent's todo list, when it just wrote it.
-    #[serde(default)]
-    pub todos: Option<Vec<lgtm_core::store::Todo>>,
     /// The name the user gave the session, looked for when a prompt starts or the agent
     /// stops.
     #[serde(default)]
@@ -217,7 +214,6 @@ pub fn main() -> i32 {
         tool_use: input["tool_use_id"].as_str().map(str::to_string),
         transcript: input["transcript_path"].as_str().map(str::to_string),
         title: title(&input),
-        todos: lgtm_core::turns::todos(&input),
     };
     // The app answers once it has the prompt's context, and after any snapshot, which has
     // to land before the tool runs.

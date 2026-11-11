@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::diff::RowKind;
 use crate::jj::{FileDiff, Jj, Range};
-use crate::store::{Store, Todo, Turn, TurnEdit};
+use crate::store::{Store, Turn};
 
 /// Turns older than this are dropped.
 pub const KEEP_MS: i64 = 14 * 24 * 60 * 60 * 1000;
@@ -59,14 +59,6 @@ pub fn checkpoint(input: &serde_json::Value) -> Option<Checkpoint> {
         "Stop" | "StopFailure" => Some(Checkpoint::End),
         _ => None,
     }
-}
-
-/// The agent's todo list, when the event is Claude Code writing it.
-pub fn todos(input: &serde_json::Value) -> Option<Vec<Todo>> {
-    if input["hook_event_name"] != "PostToolUse" || input["tool_name"] != "TodoWrite" {
-        return None;
-    }
-    serde_json::from_value(input["tool_input"]["todos"].clone()).ok()
 }
 
 pub fn now_ms() -> i64 {
@@ -158,7 +150,6 @@ pub async fn record(
             }
             let store = store.lock().unwrap();
             store.prune_turns(now_ms() - KEEP_MS)?;
-            store.prune_activity(now_ms() - KEEP_MS)?;
             store.prune_fixes(now_ms() - KEEP_MS)?;
             let id =
                 store.start_turn(p.key, Some(p.session), p.prompt, change, commit, now_ms())?;
@@ -192,18 +183,7 @@ pub async fn record(
             if paths.is_empty() {
                 return Ok((None, false));
             }
-            let (added, removed) = counts(diffs.iter());
-            let rewritten = rewritten(jj, &turn.start, &diffs).await;
-            let edit = TurnEdit {
-                at: now_ms(),
-                added,
-                removed,
-                rewritten,
-                paths: paths.clone(),
-            };
-            let store = store.lock().unwrap();
-            store.add_turn_paths(turn.id, &paths)?;
-            store.add_turn_edit(turn.id, &edit)?;
+            store.lock().unwrap().add_turn_paths(turn.id, &paths)?;
             Ok((None, true))
         }
         Checkpoint::End => match running {
@@ -214,32 +194,6 @@ pub async fn record(
             None => Ok((None, false)),
         },
     }
-}
-
-/// How many of the lines `diffs` remove weren't in their file at `start`, so the same turn
-/// wrote them. A file that can't be read counts none.
-async fn rewritten(jj: &Jj, start: &str, diffs: &[FileDiff]) -> u32 {
-    let mut n = 0;
-    for d in diffs {
-        let removed: Vec<&str> = d
-            .hunks
-            .iter()
-            .flat_map(|h| &h.rows)
-            .filter(|r| r.kind == RowKind::Removed)
-            .map(|r| r.text.as_str())
-            .collect();
-        if removed.is_empty() {
-            continue;
-        }
-        let path = d.old_path.as_deref().unwrap_or(&d.path);
-        let Ok(at_start) = jj.file_if_any(Some(start), path).await else {
-            continue;
-        };
-        let text = String::from_utf8_lossy(&at_start.unwrap_or_default()).into_owned();
-        let lines: std::collections::HashSet<&str> = text.lines().collect();
-        n += removed.iter().filter(|l| !lines.contains(*l)).count() as u32;
-    }
-    n
 }
 
 /// Ends `turn` on `commit`, or drops it when its tools changed no files.
@@ -385,9 +339,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn each_edit_counts_its_lines_and_the_ones_it_rewrote_from_earlier_in_the_turn() {
+    async fn a_turn_keeps_each_file_its_tools_wrote_once() {
         let (dir, jj) = repo();
-        write(dir.path(), "a.rs", "keep\nold\n");
+        write(dir.path(), "a.rs", "old\n");
         let store = Mutex::new(Store::in_memory());
         let (c, start) = here(&jj).await;
         let p = Point {
@@ -398,30 +352,9 @@ mod tests {
             prompt: Some("go"),
         };
         record(&store, &jj, &p, Checkpoint::Start).await.unwrap();
-        tool(&store, &jj, dir.path(), "t1", "keep\nold\nnew1\nnew2\n").await;
-        tool(&store, &jj, dir.path(), "t2", "keep\nnew3\n").await;
+        tool(&store, &jj, dir.path(), "t1", "new1\n").await;
+        tool(&store, &jj, dir.path(), "t2", "new2\n").await;
         let turn = store.lock().unwrap().running_turn("s").unwrap().unwrap();
-        let edits = store.lock().unwrap().turn_edits(turn.id).unwrap();
-        let lines: Vec<_> = edits
-            .iter()
-            .map(|e| (e.added, e.removed, e.rewritten))
-            .collect();
-        // The second edit removes `old`, there from the start, and `new1` and `new2`, which
-        // the first edit wrote.
-        assert_eq!(lines, [(2, 0, 0), (1, 3, 2)]);
-        assert_eq!(edits[1].paths, ["a.rs"]);
-    }
-
-    #[test]
-    fn only_todo_write_carries_a_todo_list() {
-        let input = |tool: &str| {
-            serde_json::json!({
-                "hook_event_name": "PostToolUse", "tool_name": tool,
-                "tool_input": { "todos": [{ "content": "Test", "status": "in_progress", "activeForm": "Testing" }] },
-            })
-        };
-        let list = todos(&input("TodoWrite")).unwrap();
-        assert_eq!(list[0].status, crate::store::TodoStatus::InProgress);
-        assert_eq!(todos(&input("Write")), None);
+        assert_eq!(turn.paths, ["a.rs"]);
     }
 }

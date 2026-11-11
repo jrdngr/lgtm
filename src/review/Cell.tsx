@@ -63,7 +63,6 @@ export function Cell({ file, fileIdx, row, index, setup, side, flag }: CellProps
       color={mark?.color}
       amber={amber}
       commented={index.commented.has(key)}
-      fresh={!!index.fresh?.has(key)}
       title={amber ? "changed since marked" : markTitle(mark, setup)}
       flag={flag}
     />
@@ -77,7 +76,6 @@ interface RowCellProps {
   color?: MarkColor;
   amber: boolean;
   commented: boolean;
-  fresh: boolean;
   title?: string;
   flag?: ReactNode;
 }
@@ -91,7 +89,7 @@ const RowCell = memo(function RowCell(p: RowCellProps) {
   const onNew = side !== "left" && r.newLine !== null;
   return (
     <div
-      className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${color ? " marked" : ""}${p.amber ? " amber" : ""}${p.commented ? " commented" : ""}${p.fresh ? " fresh" : ""}`}
+      className={`cell${side ? ` ${side}` : ""} kind-${r.kind}${color ? " marked" : ""}${p.amber ? " amber" : ""}${p.commented ? " commented" : ""}`}
       style={color ? ({ "--m": markVar(color) } as React.CSSProperties) : undefined}
       title={p.title}
       data-path={onNew ? p.path : undefined}
