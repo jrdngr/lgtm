@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import cases from "../../../src-tauri/crates/lgtm/src/edit/key_cases.json";
+import cases from "../../../crates/lgtm/src/edit/key_cases.json";
 import { run } from "./spec.test-utils";
 
 /** The TUI editor's key cases, which `cargo test` runs on its keys too. */

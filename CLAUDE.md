@@ -1,6 +1,6 @@
 # lgtm
 
-Desktop code review app on jj: Tauri v2, Rust backend in `src-tauri/`, React UI in `src/`. The spec, stack, and milestone plan are in `docs/`. The README covers features and shortcuts.
+Desktop code review app on jj: Tauri v2, Rust crates in `crates/` (the app is `crates/lgtm-app`, the TUI `crates/lgtm`, the terminal multiplexer `crates/lgterm`), one Cargo workspace at the root, React UI in `src/`. The spec, stack, and milestone plan are in `docs/`. The README covers features and shortcuts.
 
 ## Workflow
 
@@ -14,8 +14,8 @@ Desktop code review app on jj: Tauri v2, Rust backend in `src-tauri/`, React UI 
 
 - Keep files small and code simple and modular. Split a module before it grows past a few hundred lines.
 - Match the surrounding code's comment density and naming.
-- Rust commands are typed into `src/bindings.ts` by tauri-specta on debug builds. After changing a command, run `cd src-tauri && UPDATE_BINDINGS=1 cargo test` and commit the new bindings.
-- All jj calls go through `src-tauri/src/jj/`.
-- New Tauri plugin APIs need a permission in `src-tauri/capabilities/default.json`.
+- Rust commands are typed into `src/bindings.ts` by tauri-specta on debug builds. After changing a command, run `UPDATE_BINDINGS=1 cargo test -p lgtm-app` and commit the new bindings.
+- All jj calls go through `crates/lgtm-core/src/jj/`.
+- New Tauri plugin APIs need a permission in `crates/lgtm-app/capabilities/default.json`.
 - Update the README when a feature or shortcut changes.
 - No explanatory text in the UI: no hints, subtitles or tooltips saying what something does or why. Labels name things; that's all.

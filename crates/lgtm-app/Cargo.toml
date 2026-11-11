@@ -1,6 +1,3 @@
-[workspace]
-members = [".", "crates/lgtm-core", "crates/lgtm-canvas", "crates/lgtm-arch", "crates/lgtm"]
-
 [package]
 name = "lgtm-app"
 version = "0.1.0"
@@ -12,13 +9,17 @@ license = "MIT"
 name = "lgtm_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[features]
+# Serves the built frontend from the binary, for release builds.
+custom-protocol = ["tauri/custom-protocol"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-lgtm-core = { path = "crates/lgtm-core" }
-lgtm-canvas = { path = "crates/lgtm-canvas" }
-lgtm-arch = { path = "crates/lgtm-arch" }
+lgtm-core = { path = "../lgtm-core" }
+lgtm-canvas = { path = "../lgtm-canvas" }
+lgtm-arch = { path = "../lgtm-arch" }
 tauri = { version = "2", features = ["specta"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -78,13 +79,6 @@ objc2 = "0.6"
 drag = "2"
 
 [dev-dependencies]
-lgtm-core = { path = "crates/lgtm-core", features = ["test-support"] }
+lgtm-core = { path = "../lgtm-core", features = ["test-support"] }
 tempfile = "3"
 rustix = { version = "1", features = ["fs", "process"] }
-
-[profile.release]
-codegen-units = 16
-lto = "thin"
-opt-level = 3
-panic = "abort"
-strip = true

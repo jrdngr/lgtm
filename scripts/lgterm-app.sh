@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build lgterm in release and install it as /Applications/lgterm.app.
 set -euo pipefail
-cd "$(dirname "$0")/../lgterm"
+cd "$(dirname "$0")/.."
 
 minor=$(rustc --version | sed -E 's/^rustc 1\.([0-9]+).*/\1/')
 if [ "$minor" -lt 99 ]; then
@@ -10,14 +10,14 @@ if [ "$minor" -lt 99 ]; then
 fi
 command -v zig >/dev/null || { echo "lgterm needs Zig 0.17 to build libghostty-vt" >&2; exit 1; }
 
-cargo build --release --locked
+cargo build --release --locked -p lgterm
 
 app=target/release/bundle/lgterm.app
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp target/release/lgterm "$app/Contents/MacOS/lgterm"
-cp icons/lgterm.icns "$app/Contents/Resources/lgterm.icns"
-version=$(sed -nE 's/^version = "(.*)"/\1/p' Cargo.toml | head -1)
+cp crates/lgterm/icons/lgterm.icns "$app/Contents/Resources/lgterm.icns"
+version=$(sed -nE 's/^version = "(.*)"/\1/p' crates/lgterm/Cargo.toml | head -1)
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

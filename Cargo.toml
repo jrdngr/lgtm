@@ -1,0 +1,8 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[profile.release]
+codegen-units = 16
+lto = "thin"
+opt-level = 3
