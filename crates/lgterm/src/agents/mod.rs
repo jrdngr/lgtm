@@ -20,6 +20,8 @@ pub use status::Status;
 /// Polls in a row with no sign of work before a hooked agent that never said it stopped
 /// counts as idle.
 const QUIET_POLLS: u8 = 3;
+/// Polls in a row an agent must look gone before it leaves the sidebar.
+const GONE_POLLS: u8 = 3;
 
 /// How long after a message goes in before the next queued one can follow.
 const DELIVERY_GAP: Duration = Duration::from_secs(3);
@@ -35,6 +37,8 @@ pub struct Agent {
     hooked: bool,
     pub session: Option<String>,
     quiet: u8,
+    /// Polls in a row it has looked gone.
+    gone: u8,
     busy_until: Option<Instant>,
     last_hook: Option<(Value, Instant)>,
 }
@@ -47,6 +51,7 @@ impl Agent {
             hooked: false,
             session: None,
             quiet: 0,
+            gone: 0,
             busy_until: None,
             last_hook: None,
         }
@@ -147,7 +152,16 @@ impl Agents {
                 .as_ref()
                 .is_some_and(|(e, at)| e == event && now - *at < REPEAT)
         });
-        if repeat {
+        // Claude Code started inside this terminal by its agent, like a background `claude -p`,
+        // shares its terminal id. Its hooks speak for another session, so they're left out.
+        let other = self.agents.get(&term).is_some_and(|a| {
+            a.kind == Kind::Claude
+                && a.session.is_some()
+                && report.session.is_some()
+                && a.session != report.session
+                && !report.next_session
+        });
+        if repeat || other {
             return;
         }
         if report.ended {
@@ -259,8 +273,20 @@ impl Agents {
     pub fn poll(&mut self, term: TermId, seen: Seen, env: &Env) {
         match (self.agents.get(&term), seen.kind, seen.process_known) {
             (Some(a), None, true) if !a.hooked || seen.shell_foreground => {
+                // A process that briefly holds the terminal doesn't make the agent leave.
+                if a.gone + 1 < GONE_POLLS {
+                    if let Some(a) = self.agents.get_mut(&term) {
+                        a.gone += 1;
+                    }
+                    return;
+                }
                 self.left(term);
                 return;
+            }
+            (Some(_), _, _) => {
+                if let Some(a) = self.agents.get_mut(&term) {
+                    a.gone = 0;
+                }
             }
             (None, Some(kind), _) => {
                 self.agents.insert(term, Agent::new(kind));
@@ -528,7 +554,36 @@ mod tests {
         assert_eq!(a.status(T), Some(Status::Working));
         poll(&mut a, Some(Kind::Codex), "› ");
         assert_eq!(a.status(T), Some(Status::Done));
+        // Something else holding the terminal for a moment doesn't end the agent.
         poll(&mut a, None, "$ ");
+        poll(&mut a, None, "$ ");
+        poll(&mut a, Some(Kind::Codex), "› ");
+        poll(&mut a, None, "$ ");
+        poll(&mut a, None, "$ ");
+        assert_eq!(a.status(T), Some(Status::Done));
+        poll(&mut a, None, "$ ");
+        assert_eq!(a.status(T), None);
+    }
+
+    #[test]
+    fn hooks_from_another_claude_in_the_terminal_are_left_out() {
+        let mut a = Agents::default();
+        let ours = |name: &str| json!({"hook_event_name": name, "session_id": "ours"});
+        let child = |name: &str| json!({"hook_event_name": name, "session_id": "child"});
+        hook(&mut a, ours("UserPromptSubmit"));
+        hook(&mut a, child("SessionStart"));
+        hook(&mut a, child("Stop"));
+        hook(&mut a, child("SessionEnd"));
+        assert_eq!(a.status(T), Some(Status::Working));
+        assert_eq!(a.get(T).and_then(|g| g.session.as_deref()), Some("ours"));
+
+        let clear =
+            json!({"hook_event_name": "SessionStart", "session_id": "next", "source": "clear"});
+        hook(&mut a, clear);
+        hook(
+            &mut a,
+            json!({"hook_event_name": "SessionEnd", "session_id": "next"}),
+        );
         assert_eq!(a.status(T), None);
     }
 

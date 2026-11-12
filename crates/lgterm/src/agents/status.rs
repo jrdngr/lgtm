@@ -49,6 +49,8 @@ pub struct Report {
     pub session: Option<String>,
     /// The agent's session ended.
     pub ended: bool,
+    /// The same process moved on to this session: `/clear`, `/resume` or a compaction.
+    pub next_session: bool,
 }
 
 /// Reads a Claude Code hook payload, or a Codex `notify` payload.
@@ -59,6 +61,7 @@ pub fn report(event: &Value) -> Option<Report> {
             status: Some(Status::Done),
             session: event["thread-id"].as_str().map(str::to_owned),
             ended: false,
+            next_session: true,
         });
     }
     let name = event["hook_event_name"].as_str()?;
@@ -81,6 +84,11 @@ pub fn report(event: &Value) -> Option<Report> {
         // `/clear` and `/resume` end one session and start the next in the same process.
         ended: name == "SessionEnd"
             && !matches!(event["reason"].as_str(), Some("clear" | "resume")),
+        next_session: name == "SessionStart"
+            && matches!(
+                event["source"].as_str(),
+                Some("clear" | "resume" | "compact")
+            ),
     })
 }
 
