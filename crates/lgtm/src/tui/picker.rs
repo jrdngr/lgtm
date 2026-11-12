@@ -51,6 +51,8 @@ pub struct Picker {
     area: Rect,
     /// The last click's line and when, to tell a double click.
     clicked: Option<(Item, std::time::Instant)>,
+    /// The next log puts the cursor on the working copy, as after making a new change.
+    pub to_working_copy: bool,
 }
 
 /// Two clicks on a line within this make a double click.
@@ -75,7 +77,15 @@ impl Picker {
                         .iter()
                         .position(|r| r.commit.as_ref().is_some_and(|c| c.change_id == id))
                 };
-                self.sel = find(sel)
+                let working_copy = std::mem::take(&mut self.to_working_copy)
+                    .then(|| {
+                        self.rows
+                            .iter()
+                            .position(|r| r.commit.as_ref().is_some_and(|c| c.working_copy))
+                    })
+                    .flatten();
+                self.sel = working_copy
+                    .or_else(|| find(sel))
                     .or_else(|| self.commits().first().copied())
                     .unwrap_or(0);
                 self.anchor = find(anchor);
@@ -742,6 +752,29 @@ mod tests {
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc::bbb-commit");
         press(&mut p, KeyCode::Esc);
         assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+    }
+
+    #[test]
+    fn a_new_change_takes_the_cursor_once_and_other_reloads_keep_it() {
+        let log = |at: &str| {
+            ["new", "aaa", "bbb"]
+                .iter()
+                .map(|c| {
+                    let mut row = commit(c, false);
+                    row.commit.as_mut().unwrap().working_copy = *c == at;
+                    row
+                })
+                .collect::<Vec<_>>()
+        };
+        let mut p = Picker::default();
+        p.loaded(Ok(log("bbb")));
+        press(&mut p, KeyCode::Char('j'));
+        p.to_working_copy = true;
+        p.loaded(Ok(log("new")));
+        assert_eq!(p.id(p.sel).as_deref(), Some("new"));
+        press(&mut p, KeyCode::Char('j'));
+        p.loaded(Ok(log("new")));
+        assert_eq!(p.id(p.sel).as_deref(), Some("aaa"));
     }
 
     #[test]

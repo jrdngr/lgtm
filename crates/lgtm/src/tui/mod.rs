@@ -142,6 +142,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         refreshed: Instant::now(),
         busy: None,
         after_edit: None,
+        making: false,
         shift: false,
         home: home::Home::default(),
         review: None,
@@ -252,6 +253,8 @@ struct App {
     busy: Option<(&'static str, Instant)>,
     /// The review to open once the running `jj edit` is done.
     after_edit: Option<Target>,
+    /// The running action makes a new change, which the cursor goes to once it's made.
+    making: bool,
     /// Whether Shift is held, where the terminal reports it.
     shift: bool,
     /// The review's toggles, as last left.
@@ -485,8 +488,10 @@ impl App {
             Msg::Acted(result) => {
                 self.busy = None;
                 let then = self.after_edit.take();
+                let made = std::mem::take(&mut self.making);
                 match result {
                     Ok(_) => {
+                        self.home.picker.to_working_copy = made;
                         self.loader.log();
                         if let Some(target) = then {
                             self.open(target);
@@ -793,6 +798,10 @@ impl App {
     /// Runs a jj action, showing it as running until it's done.
     fn act(&mut self, action: lgtm_core::jj::JjAction) {
         self.busy = Some((motions::doing(&action), Instant::now()));
+        self.making = matches!(
+            action,
+            lgtm_core::jj::JjAction::NewAfter { .. } | lgtm_core::jj::JjAction::NewBefore { .. }
+        );
         self.loader.act(action);
     }
 }
