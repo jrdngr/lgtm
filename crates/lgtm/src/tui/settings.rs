@@ -25,6 +25,8 @@ pub struct Settings {
     pub files_left: bool,
     /// Whether the editor wraps long lines.
     pub editor_wrap: bool,
+    /// Whether markdown files open rendered, as the last one was left.
+    pub render_markdown: bool,
 }
 
 impl Default for Settings {
@@ -42,6 +44,7 @@ impl Default for Settings {
             home_revisions_width: None,
             files_left: false,
             editor_wrap: false,
+            render_markdown: false,
         }
     }
 }

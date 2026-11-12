@@ -21,6 +21,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
     e.files = settings.files;
     e.files_width = settings.editor_files_width;
     e.wrap = settings.editor_wrap;
+    e.render_markdown = settings.render_markdown;
     {
         let (root, tx) = (root.clone(), tx.clone());
         std::thread::spawn(move || {
@@ -77,9 +78,11 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             if e.files != settings.files
                                 || e.files_width != settings.editor_files_width
                                 || e.wrap != settings.editor_wrap
+                                || e.render_markdown != settings.render_markdown
                             {
                                 settings.files = e.files;
                                 settings.editor_wrap = e.wrap;
+                                settings.render_markdown = e.render_markdown;
                                 settings.editor_files_width = e.files_width;
                                 settings::save(&settings);
                             }

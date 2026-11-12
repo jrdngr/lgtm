@@ -147,6 +147,8 @@ pub struct Editor {
     pub files_width: Option<u16>,
     /// Whether long lines wrap at the view's edge.
     pub wrap: bool,
+    /// Whether markdown files open rendered: as the last one was left.
+    pub render_markdown: bool,
     /// The sidebar's width as last drawn, 0 when hidden.
     sidebar_width: u16,
     /// The rows of text as last drawn, top down.
@@ -174,6 +176,7 @@ impl Editor {
             saved: false,
             files_width: None,
             wrap: false,
+            render_markdown: false,
             sidebar_width: 0,
             rows: vec![],
             drag_from: None,
@@ -309,6 +312,11 @@ impl Editor {
         self.keys.mode = Mode::Normal;
         if line > 0 || new {
             go_line(&mut self.open[at].buf, line as usize);
+        }
+        let open = &mut self.open[at];
+        if new && self.render_markdown && crate::edit::markdown::is_markdown(&open.buf.name) {
+            let top = open.buf.line_of(open.buf.sel.head);
+            open.preview = Some(Box::new(preview::Preview::new(top)));
         }
         if !Path::new(name).is_absolute() {
             self.sidebar.reveal(name);
@@ -467,6 +475,7 @@ impl Editor {
             let line = p.src_line();
             open.top = line;
             go_line(&mut open.buf, line + 1);
+            self.render_markdown = false;
             return;
         }
         if !crate::edit::markdown::is_markdown(&open.buf.name) {
@@ -475,6 +484,7 @@ impl Editor {
         }
         self.keys.mode = Mode::Normal;
         open.preview = Some(Box::new(preview::Preview::new(open.top)));
+        self.render_markdown = true;
     }
 
     /// Shows the next open file, or the one before, wrapping around.
@@ -785,6 +795,29 @@ mod tests {
         let mut e = Editor::new(dir.path());
         e.open("a.txt", 1).unwrap();
         (dir, e)
+    }
+
+    #[test]
+    fn markdown_files_open_rendered_or_not_as_the_last_one_was_left() {
+        let dir = tempfile::tempdir().unwrap();
+        for f in ["a.md", "b.md", "c.md", "d.txt"] {
+            std::fs::write(dir.path().join(f), "# Title\n").unwrap();
+        }
+        let mut e = Editor::new(dir.path());
+        let rendered = |e: &Editor| e.previewing();
+        e.open("a.md", 1).unwrap();
+        assert!(!rendered(&e));
+        press(&mut e, "<space>m");
+        assert!(rendered(&e) && e.render_markdown);
+        e.open("b.md", 1).unwrap();
+        assert!(rendered(&e));
+        e.open("d.txt", 1).unwrap();
+        assert!(!rendered(&e));
+        e.open("b.md", 1).unwrap();
+        press(&mut e, "<space>m");
+        assert!(!rendered(&e) && !e.render_markdown);
+        e.open("c.md", 1).unwrap();
+        assert!(!rendered(&e));
     }
 
     #[test]
