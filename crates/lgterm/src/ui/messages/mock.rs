@@ -36,7 +36,11 @@ fn name(label: &str, id: TermId, strong: bool) -> impl IntoElement {
                 .text_ellipsis()
                 .whitespace_nowrap()
                 .when(strong, |d| d.font_weight(FontWeight::SEMIBOLD))
-                .text_color(rgb(if strong { theme::TEXT_STRONG } else { theme::TEXT }))
+                .text_color(rgb(if strong {
+                    theme::TEXT_STRONG
+                } else {
+                    theme::TEXT
+                }))
                 .child(SharedString::from(label.to_owned())),
         )
         .child(id_chip(id))
@@ -116,7 +120,11 @@ pub fn cards(messages: &[Message]) -> AnyElement {
 
 /// The text's first line, for a list row.
 fn first_line(text: &str) -> String {
-    text.lines().find(|l| !l.trim().is_empty()).unwrap_or("").trim().to_string()
+    text.lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim()
+        .to_string()
 }
 
 fn reader(m: &Message) -> AnyElement {
@@ -276,7 +284,11 @@ pub fn conversations(messages: &[Message]) -> AnyElement {
     let first_sender = shown.first().and_then(|m| m.from);
     let transcript = shown.into_iter().map(|m| {
         let who = m.from.unwrap_or(m.to);
-        let color = if Some(who) == first_sender { 0x58a6ff } else { 0xd27a45 };
+        let color = if Some(who) == first_sender {
+            0x58a6ff
+        } else {
+            0xd27a45
+        };
         div()
             .flex()
             .gap(px(12.))
@@ -353,7 +365,10 @@ const AGENT_COLORS: [u32; 8] = [
 /// The mockup's colors: by id order among the agents in the seeded state.
 pub fn agent_color(id: TermId) -> u32 {
     let order = [1, 4, 9, 17];
-    let i = order.iter().position(|&n| n == id.0).unwrap_or(id.0 as usize);
+    let i = order
+        .iter()
+        .position(|&n| n == id.0)
+        .unwrap_or(id.0 as usize);
     AGENT_COLORS[i % AGENT_COLORS.len()]
 }
 

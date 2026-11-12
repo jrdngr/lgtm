@@ -22,12 +22,12 @@ pub struct Where {
 
 type Info<'a> = &'a dyn Fn(TermId) -> Where;
 
-fn env(name: &str, default: &str) -> String {
+pub(super) fn env(name: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.to_owned())
 }
 
 /// `t17` in its space's color, on a tint of it.
-fn chip(id: TermId, color: usize) -> gpui::Div {
+pub(super) fn chip(id: TermId, color: usize) -> gpui::Div {
     let c = theme::space_color(color);
     div()
         .flex_none()
@@ -41,7 +41,7 @@ fn chip(id: TermId, color: usize) -> gpui::Div {
         .child(id.to_string())
 }
 
-fn agent_pair(m: &Message) -> (TermId, TermId) {
+pub(super) fn agent_pair(m: &Message) -> (TermId, TermId) {
     let f = m.from.unwrap_or(m.to);
     if f.0 < m.to.0 { (f, m.to) } else { (m.to, f) }
 }
@@ -53,7 +53,7 @@ fn space_pair(m: &Message, info: Info) -> (u64, u64) {
 }
 
 /// How a row shows it has unread messages.
-fn unread_mark(n: usize, style: &str) -> Option<AnyElement> {
+pub(super) fn unread_mark(n: usize, style: &str) -> Option<AnyElement> {
     if n == 0 {
         return None;
     }
@@ -103,19 +103,28 @@ fn space_line(w: &Where, bold: bool) -> impl IntoElement {
                 .overflow_hidden()
                 .text_ellipsis()
                 .whitespace_nowrap()
-                .text_color(rgb(if bold { theme::TEXT_STRONG } else { theme::TEXT }))
+                .text_color(rgb(if bold {
+                    theme::TEXT_STRONG
+                } else {
+                    theme::TEXT
+                }))
                 .when(bold, |d| d.font_weight(FontWeight::SEMIBOLD))
                 .child(SharedString::from(w.name.clone())),
         )
 }
 
-fn agents_label(a: TermId, b: TermId, info: Info) -> gpui::Div {
+pub(super) fn agents_label(a: TermId, b: TermId, info: Info) -> gpui::Div {
     div()
         .flex()
         .items_center()
         .gap(px(6.))
         .child(chip(a, info(a).color))
-        .child(div().text_color(rgb(theme::ICON)).text_size(px(12.)).child("↔"))
+        .child(
+            div()
+                .text_color(rgb(theme::ICON))
+                .text_size(px(12.))
+                .child("↔"),
+        )
         .child(chip(b, info(b).color))
 }
 
@@ -233,7 +242,10 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
         let is_picked = i == picked;
         match side.as_str() {
             "a" => {
-                let open = is_picked;
+                // Rows open only by their arrow, picked or not.
+                let open = env("LGTERM_MSG_OPEN", "")
+                    .split(',')
+                    .any(|n| n.parse() == Ok(i));
                 rows.push(
                     pair_row(
                         i,
@@ -304,8 +316,16 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                 );
             }
             _ => rows.push(
-                pair_row(i, (&wa, &wb), is_picked, unread(i, None), &style, None, None)
-                    .into_any_element(),
+                pair_row(
+                    i,
+                    (&wa, &wb),
+                    is_picked,
+                    unread(i, None),
+                    &style,
+                    None,
+                    None,
+                )
+                .into_any_element(),
             ),
         }
     }
@@ -314,8 +334,24 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
         .iter()
         .filter(|m| space_pair(m, info) == picked_spaces)
         .filter(|m| filter.is_none_or(|j| agent_pair(m) == picked_agents[j]))
+        .filter(|m| super::mock4::keeps(m))
         .collect();
-    let bar = (side == "c").then(|| {
+    let fsel = env("LGTERM_MSG_FSEL", "");
+    let parts = if side == "c" && !fsel.is_empty() {
+        super::mock4::parts(
+            &super::mock4::Ctx {
+                messages,
+                info,
+                spaces: (where_of(picked_spaces.0), where_of(picked_spaces.1)),
+                agents: picked_agents.clone(),
+                filter,
+            },
+            &fsel,
+        )
+    } else {
+        super::mock4::Parts::default()
+    };
+    let bar = (side == "c" && fsel.is_empty()).then(|| {
         let tab = |label: AnyElement, on: bool| {
             div()
                 .flex()
@@ -344,7 +380,10 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
             .border_color(rgb(theme::ROW_RULE))
             .child(tab("All".into_any_element(), filter.is_none()))
             .children(picked_agents.iter().enumerate().map(|(j, &(a, b))| {
-                tab(agents_label(a, b, info).into_any_element(), filter == Some(j))
+                tab(
+                    agents_label(a, b, info).into_any_element(),
+                    filter == Some(j),
+                )
             }))
     });
     let transcript = shown.into_iter().map(|m| {
@@ -390,6 +429,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
             )
     });
     div()
+        .relative()
         .size_full()
         .flex()
         .child(
@@ -403,6 +443,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                 .border_color(rgb(theme::ROW_RULE))
                 .children(rows),
         )
+        .children(parts.column)
         .child(
             div()
                 .flex_1()
@@ -411,6 +452,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                 .flex()
                 .flex_col()
                 .children(bar)
+                .children(parts.bar)
                 .child(
                     div()
                         .id("transcript")
@@ -428,5 +470,6 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                         ),
                 ),
         )
+        .children(parts.popover)
         .into_any_element()
 }

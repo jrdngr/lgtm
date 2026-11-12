@@ -186,9 +186,17 @@ impl Workspace {
             return name.to_owned();
         }
         if super::messages::mock::on()
-            && let Some(m) = self.agents.messages.iter().find(|m| m.to == term || m.from == Some(term))
+            && let Some(m) = self
+                .agents
+                .messages
+                .iter()
+                .find(|m| m.to == term || m.from == Some(term))
         {
-            return if m.to == term { m.to_label.clone() } else { m.from_label.clone() };
+            return if m.to == term {
+                m.to_label.clone()
+            } else {
+                m.from_label.clone()
+            };
         }
         if let Some(agent) = self.agents.get(term) {
             return clean_title(&t.title)

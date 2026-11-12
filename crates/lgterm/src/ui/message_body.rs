@@ -2,8 +2,8 @@
 //! columns, with `code` and URLs set apart.
 
 use gpui::{
-    AnyElement, FontWeight, IntoElement, ParentElement, SharedString, Styled, StyledText,
-    TextRun, div, font, px, rgb,
+    AnyElement, FontWeight, IntoElement, ParentElement, SharedString, Styled, StyledText, TextRun,
+    div, font, px, rgb,
 };
 
 use crate::fonts;
@@ -139,68 +139,70 @@ pub fn render(text: &str) -> AnyElement {
         .min_w_0()
         .text_size(px(13.))
         .line_height(px(20.))
-        .children(blocks.into_iter().map(|b| match b {
-            Block::Para(t) => div().min_w_0().child(inline(&t, theme::TEXT)),
-            Block::Head(t) => div()
-                .pt(px(4.))
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(rgb(theme::TEXT_STRONG))
-                .child(SharedString::from(t)),
-            Block::Bullets(items) => div().flex().flex_col().gap(px(4.)).children(
-                items.into_iter().map(|t| {
+        .children(blocks.into_iter().map(|b| {
+            match b {
+                Block::Para(t) => div().min_w_0().child(inline(&t, theme::TEXT)),
+                Block::Head(t) => div()
+                    .pt(px(4.))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(rgb(theme::TEXT_STRONG))
+                    .child(SharedString::from(t)),
+                Block::Bullets(items) => {
                     div()
                         .flex()
-                        .gap(px(8.))
-                        .child(div().flex_none().text_color(rgb(theme::ICON)).child("•"))
-                        .child(div().min_w_0().child(inline(&t, theme::TEXT)))
-                }),
-            ),
-            Block::Rows(rows) => {
-                // Keys too long for the column take a line of their own.
-                const LONG: usize = 26;
-                let key_w = rows
-                    .iter()
-                    .map(|(k, _)| k.chars().count())
-                    .filter(|&n| n <= LONG)
-                    .max()
-                    .unwrap_or(0) as f32
-                    * 7.3
-                    + 4.;
-                let key = |k: String| {
-                    div()
-                        .font_family(fonts::mono())
-                        .text_size(px(12.))
-                        .text_color(rgb(theme::CODE))
-                        .child(SharedString::from(k))
-                };
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap(px(5.))
-                    .px(px(12.))
-                    .py(px(9.))
-                    .rounded(px(6.))
-                    .bg(rgb(theme::WINDOW))
-                    .children(rows.into_iter().map(move |(k, v)| {
-                        if k.chars().count() > LONG {
-                            return div()
+                        .flex_col()
+                        .gap(px(4.))
+                        .children(items.into_iter().map(|t| {
+                            div()
                                 .flex()
-                                .flex_col()
-                                .child(key(k))
-                                .child(
+                                .gap(px(8.))
+                                .child(div().flex_none().text_color(rgb(theme::ICON)).child("•"))
+                                .child(div().min_w_0().child(inline(&t, theme::TEXT)))
+                        }))
+                }
+                Block::Rows(rows) => {
+                    // Keys too long for the column take a line of their own.
+                    const LONG: usize = 26;
+                    let key_w = rows
+                        .iter()
+                        .map(|(k, _)| k.chars().count())
+                        .filter(|&n| n <= LONG)
+                        .max()
+                        .unwrap_or(0) as f32
+                        * 7.3
+                        + 4.;
+                    let key = |k: String| {
+                        div()
+                            .font_family(fonts::mono())
+                            .text_size(px(12.))
+                            .text_color(rgb(theme::CODE))
+                            .child(SharedString::from(k))
+                    };
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(5.))
+                        .px(px(12.))
+                        .py(px(9.))
+                        .rounded(px(6.))
+                        .bg(rgb(theme::WINDOW))
+                        .children(rows.into_iter().map(move |(k, v)| {
+                            if k.chars().count() > LONG {
+                                return div().flex().flex_col().child(key(k)).child(
                                     div()
                                         .pl(px(key_w + 16.))
                                         .min_w_0()
                                         .child(inline(&v, theme::TEXT)),
                                 );
-                        }
-                        div()
-                            .flex()
-                            .items_start()
-                            .gap(px(16.))
-                            .child(key(k).w(px(key_w)).flex_none())
-                            .child(div().flex_1().min_w_0().child(inline(&v, theme::TEXT)))
-                    }))
+                            }
+                            div()
+                                .flex()
+                                .items_start()
+                                .gap(px(16.))
+                                .child(key(k).w(px(key_w)).flex_none())
+                                .child(div().flex_1().min_w_0().child(inline(&v, theme::TEXT)))
+                        }))
+                }
             }
         }))
         .into_any_element()

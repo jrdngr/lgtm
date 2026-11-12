@@ -16,6 +16,7 @@ use crate::theme;
 
 pub(super) mod mock;
 mod mock3;
+mod mock4;
 
 impl Workspace {
     pub(super) fn send_message(
