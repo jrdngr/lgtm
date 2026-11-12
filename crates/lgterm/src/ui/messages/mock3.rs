@@ -18,6 +18,8 @@ pub struct Where {
     pub space: u64,
     pub name: String,
     pub color: usize,
+    /// The terminal's own color: the space's for its first terminal, then the next ones.
+    pub sub: usize,
 }
 
 type Info<'a> = &'a dyn Fn(TermId) -> Where;
@@ -26,19 +28,30 @@ pub(super) fn env(name: &str, default: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| default.to_owned())
 }
 
-/// `t17` in its space's color, on a tint of it.
-pub(super) fn chip(id: TermId, color: usize) -> gpui::Div {
-    let c = theme::space_color(color);
-    div()
-        .flex_none()
+/// `t17` in its space's color, with a stripe in the terminal's own color when
+/// `LGTERM_MSG_SUB=1`.
+pub(super) fn chip(id: TermId, w: &Where) -> gpui::Div {
+    let label = div()
         .px(px(5.))
-        .rounded(px(4.))
-        .bg(rgb(c))
+        .bg(rgb(theme::space_color(w.color)))
         .font_family(fonts::mono())
         .text_size(px(11.5))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(rgb(theme::BADGE_TEXT))
-        .child(id.to_string())
+        .child(id.to_string());
+    if env("LGTERM_MSG_SUB", "") != "1" {
+        return div().flex_none().flex().child(label.rounded(px(4.)));
+    }
+    div()
+        .flex_none()
+        .flex()
+        .child(
+            div()
+                .w(px(4.))
+                .rounded_l(px(4.))
+                .bg(rgb(theme::space_color(w.sub))),
+        )
+        .child(label.pl(px(4.)).rounded_r(px(4.)))
 }
 
 pub(super) fn agent_pair(m: &Message) -> (TermId, TermId) {
@@ -78,10 +91,18 @@ pub(super) fn unread_mark(n: usize, style: &str) -> Option<AnyElement> {
             .flex_none()
             .px(px(6.))
             .rounded(px(4.))
-            .bg(rgb(theme::CHIP))
+            .bg(rgb(match env("LGTERM_MSG_UCOL", "").as_str() {
+                "a" => 0x2a4a6e,
+                "b" => 0x3a72ad,
+                _ => theme::CHIP,
+            }))
             .text_size(px(11.))
             .font_weight(FontWeight::SEMIBOLD)
-            .text_color(rgb(theme::TEXT))
+            .text_color(rgb(match env("LGTERM_MSG_UCOL", "").as_str() {
+                "a" => 0xd8e9fb,
+                "b" => 0xffffff,
+                _ => theme::TEXT,
+            }))
             .child(n.to_string())
             .into_any_element(),
         // Nothing on the right: the row's bar and bold names say it.
@@ -118,14 +139,14 @@ pub(super) fn agents_label(a: TermId, b: TermId, info: Info) -> gpui::Div {
         .flex()
         .items_center()
         .gap(px(6.))
-        .child(chip(a, info(a).color))
+        .child(chip(a, &info(a)))
         .child(
             div()
                 .text_color(rgb(theme::ICON))
                 .text_size(px(12.))
                 .child("↔"),
         )
-        .child(chip(b, info(b).color))
+        .child(chip(b, &info(b)))
 }
 
 /// A space pair's row: its spaces, an arrow when it nests, and its unread mark.
@@ -386,6 +407,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                 )
             }))
     });
+    let grouped = (env("LGTERM_MSG_R6", "") == "1").then(|| super::mock5::transcript(&shown, info));
     let transcript = shown.into_iter().map(|m| {
         let who = m.from.unwrap_or(m.to);
         let w = info(who);
@@ -408,7 +430,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                             .items_center()
                             .gap(px(8.))
                             .text_size(px(13.))
-                            .child(chip(who, w.color))
+                            .child(chip(who, &w))
                             .child(
                                 div()
                                     .font_weight(FontWeight::SEMIBOLD)
@@ -416,7 +438,7 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                                     .child(SharedString::from(w.name.clone())),
                             )
                             .child(div().text_color(rgb(theme::ICON)).child("→"))
-                            .child(chip(m.to, info(m.to).color))
+                            .child(chip(m.to, &info(m.to)))
                             .child(
                                 div()
                                     .font_family(fonts::mono())
@@ -466,7 +488,8 @@ pub fn conversations(messages: &[Message], info: Info) -> AnyElement {
                                 .gap(px(22.))
                                 .px(px(24.))
                                 .py(px(20.))
-                                .children(transcript),
+                                .when_some(grouped, |d, g| d.gap(px(26.)).children(g))
+                                .when(env("LGTERM_MSG_R6", "") != "1", |d| d.children(transcript)),
                         ),
                 ),
         )

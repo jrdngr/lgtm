@@ -17,6 +17,7 @@ use crate::theme;
 pub(super) mod mock;
 mod mock3;
 mod mock4;
+mod mock5;
 
 impl Workspace {
     pub(super) fn send_message(
@@ -57,6 +58,7 @@ impl Workspace {
                         space: s.map_or(0, |s| s.id.0),
                         name: s.map(|s| self.space_label(s)).unwrap_or_default(),
                         color: s.map_or(0, |s| s.color),
+                        sub: s.map_or(0, |s| s.color + s.terms().position(|x| x == t).unwrap_or(0)),
                     }
                 };
                 return mock3::conversations(&self.agents.messages, &info);

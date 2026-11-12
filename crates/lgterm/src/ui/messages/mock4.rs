@@ -84,7 +84,7 @@ impl Ctx<'_> {
             .items_center()
             .gap(px(8.))
             .min_w_0()
-            .child(chip(t, (self.info)(t).color))
+            .child(chip(t, &(self.info)(t)))
             .child(
                 div()
                     .min_w_0()
@@ -237,12 +237,53 @@ pub fn parts(cx: &Ctx, sel: &str) -> Parts {
                     )
                     .into_any_element()
                 }));
-                menu(rows, LEFT + 16., 40., 340.)
+                if env("LGTERM_MSG_R6", "") == "1" {
+                    menu(rows, 0., 0., 340.)
+                } else {
+                    menu(rows, LEFT + 16., 40., 340.)
+                }
             });
+            if env("LGTERM_MSG_R6", "") != "1" {
+                return Parts {
+                    bar: Some(bar(vec![button(shown, open == "1").into_any_element()])),
+                    column: None,
+                    popover,
+                };
+            }
+            // The two spaces, then the menu, which opens under its button.
+            let space = |w: &Where| {
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(px(8.))
+                    .text_size(px(13.))
+                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                    .text_color(rgb(theme::TEXT_STRONG))
+                    .child(super::super::badge::badge(w.color, &w.name, None, 0))
+                    .child(SharedString::from(w.name.clone()))
+                    .into_any_element()
+            };
+            let picker = div()
+                .relative()
+                .ml(px(10.))
+                .child(button(shown, open == "1"))
+                .children(
+                    popover
+                        .map(|p| gpui::deferred(div().absolute().top(px(34.)).left_0().child(p))),
+                );
             Parts {
-                bar: Some(bar(vec![button(shown, open == "1").into_any_element()])),
+                bar: Some(bar(vec![
+                    space(&cx.spaces.0),
+                    div()
+                        .text_color(rgb(theme::ICON))
+                        .text_size(px(12.))
+                        .child("↔")
+                        .into_any_element(),
+                    space(&cx.spaces.1),
+                    picker.into_any_element(),
+                ])),
                 column: None,
-                popover,
+                popover: None,
             }
         }
         "2" => {
