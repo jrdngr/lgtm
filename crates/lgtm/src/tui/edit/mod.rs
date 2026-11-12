@@ -5,6 +5,7 @@ mod command;
 pub(crate) mod draw;
 mod finder;
 pub mod help;
+mod preview;
 mod split;
 
 pub use split::FLAG as SPLIT_FLAG;
@@ -59,6 +60,8 @@ pub struct Open {
     pub resolve: Option<Box<Resolver>>,
     /// Whether jj was asked about the conflicts' sides.
     resolve_asked: bool,
+    /// The markdown rendered, which then shows in place of its text.
+    preview: Option<Box<preview::Preview>>,
 }
 
 impl Open {
@@ -75,6 +78,7 @@ impl Open {
             conflict: false,
             resolve: None,
             resolve_asked: false,
+            preview: None,
         }
     }
 
@@ -93,6 +97,16 @@ impl Open {
     pub fn dirty(&self) -> bool {
         self.buf.dirty() || self.resolve.as_ref().is_some_and(|r| r.dirty())
     }
+}
+
+/// Opens a link from a preview: a web address in the browser, else a path from the
+/// workspace in whatever opens it.
+fn open_link(url: &str) {
+    let _ = std::process::Command::new("open")
+        .arg(url)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
 }
 
 /// Puts the cursor on `line`, from 1, at its first char that isn't a space.
@@ -330,6 +344,21 @@ impl Editor {
         if self.finder.is_some() {
             return;
         }
+        if !self.sidebar.contains(ev.column, ev.row)
+            && let Some(p) = self.open.get_mut(self.cur).and_then(|o| o.preview.as_mut())
+        {
+            match ev.kind {
+                MouseEventKind::ScrollDown => p.scroll(3),
+                MouseEventKind::ScrollUp => p.scroll(-3),
+                MouseEventKind::Down(MouseButton::Left) => {
+                    if let Some(url) = p.link_at(ev.column, ev.row) {
+                        open_link(url);
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
         if !self.sidebar.contains(ev.column, ev.row) {
             let (code, by) = match ev.kind {
                 MouseEventKind::ScrollDown => (KeyCode::Down, 3),
@@ -419,6 +448,26 @@ impl Editor {
         if let Some(name) = self.current().map(|b| b.name.clone()) {
             self.sidebar.reveal(&name);
         }
+    }
+
+    /// Shows the markdown file in view rendered, or its text again at the line that was at
+    /// the top.
+    fn toggle_preview(&mut self) {
+        let Some(open) = self.open.get_mut(self.cur) else {
+            return;
+        };
+        if let Some(p) = open.preview.take() {
+            let line = p.src_line();
+            open.top = line;
+            go_line(&mut open.buf, line + 1);
+            return;
+        }
+        if !crate::edit::markdown::is_markdown(&open.buf.name) {
+            self.notice = Some("not markdown".into());
+            return;
+        }
+        self.keys.mode = Mode::Normal;
+        open.preview = Some(Box::new(preview::Preview::new(open.top)));
     }
 
     /// Shows the next open file, or the one before, wrapping around.
@@ -514,6 +563,11 @@ impl Editor {
             || self.keys.waiting()
     }
 
+    /// Whether the file in view shows rendered.
+    pub fn previewing(&self) -> bool {
+        self.open.get(self.cur).is_some_and(|o| o.preview.is_some())
+    }
+
     /// The resolver of the file in view, when it's resolving.
     pub fn resolver(&self) -> Option<&Resolver> {
         self.open.get(self.cur)?.resolve.as_deref()
@@ -521,9 +575,12 @@ impl Editor {
 
     /// The keys for `?`, in groups.
     pub fn help_groups(&self) -> Vec<Group> {
-        match self.resolver() {
-            Some(_) => resolve::help_groups(),
-            None => help::groups(),
+        if self.resolver().is_some() {
+            resolve::help_groups()
+        } else if self.previewing() {
+            help::preview_groups()
+        } else {
+            help::groups()
         }
     }
 
@@ -534,7 +591,7 @@ impl Editor {
             p.text.push_str(&text.replace(['\n', '\r'], " "));
             return;
         }
-        if self.finder.is_some() || self.in_sidebar {
+        if self.finder.is_some() || self.in_sidebar || self.previewing() {
             return;
         }
         if let Some(r) = self.open.get_mut(self.cur).and_then(|o| o.resolve.as_mut()) {
@@ -553,6 +610,7 @@ impl Editor {
         if !key.modifiers.contains(KeyModifiers::SUPER)
             || self.prompt.is_some()
             || self.resolver().is_some()
+            || self.previewing()
         {
             return false;
         }
@@ -597,6 +655,14 @@ impl Editor {
                 resolve::Outcome::Command => self.act(Action::Command),
                 resolve::Outcome::Notice(n) => self.notice = Some(n),
                 resolve::Outcome::Copy(text) => self.act(Action::Copy(text)),
+            }
+            return Outcome::None;
+        }
+        if let Some(p) = self.open.get_mut(self.cur).and_then(|o| o.preview.as_mut()) {
+            match p.key(key) {
+                preview::Outcome::None => {}
+                preview::Outcome::Command => self.act(Action::Command),
+                preview::Outcome::Close => self.toggle_preview(),
             }
             return Outcome::None;
         }
@@ -653,6 +719,7 @@ impl Editor {
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
             Action::CycleFile { forward } => self.cycle_file(forward),
+            Action::Preview => self.toggle_preview(),
             Action::Review | Action::SendToAgent => {}
             Action::Sidebar => {
                 self.files = true;
@@ -974,5 +1041,32 @@ mod tests {
         press(&mut e, "gp");
         press(&mut e, "gp");
         assert_eq!(name(&e), "c.txt");
+    }
+
+    #[test]
+    fn space_m_shows_a_markdown_file_rendered_and_back_at_the_line_it_scrolled_to() {
+        let dir = tempfile::tempdir().unwrap();
+        let md: String = (0..40).map(|i| format!("para {i}\n\n")).collect();
+        std::fs::write(dir.path().join("a.md"), md).unwrap();
+        std::fs::write(dir.path().join("b.txt"), "x\n").unwrap();
+        let mut e = Editor::new(dir.path());
+        e.open("b.txt", 1).unwrap();
+        press(&mut e, " m");
+        assert!(!e.previewing());
+        assert_eq!(e.notice.as_deref(), Some("not markdown"));
+        e.open("a.md", 1).unwrap();
+        press(&mut e, " m");
+        assert!(e.previewing());
+        let area = ratatui::layout::Rect::new(0, 0, 60, 10);
+        let mut screen = ratatui::buffer::Buffer::empty(area);
+        e.files = false;
+        e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
+        // Typing doesn't reach the text.
+        press(&mut e, "ixjjjj");
+        assert!(!e.open[1].buf.dirty());
+        press(&mut e, " m");
+        assert!(!e.previewing());
+        let b = e.current().unwrap();
+        assert_eq!(b.line_of(b.sel.head), 4);
     }
 }

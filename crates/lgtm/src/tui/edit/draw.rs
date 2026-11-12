@@ -12,7 +12,9 @@ use crate::edit::keymap::{self, Pick};
 use crate::edit::keys::Mode;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
-use crate::tui::theme::{self, ACCENT, AMBER, BG, FAINT, FG, GREEN, HAIR, MUTED, PANEL, RED, SEL};
+use crate::tui::theme::{
+    self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, HAIR, MUTED, PANEL, RED, SEL,
+};
 use crate::tui::width;
 
 /// Columns a tab takes.
@@ -68,6 +70,9 @@ impl Editor {
         if let Some(r) = self.resolver() {
             return r.badge();
         }
+        if self.previewing() {
+            return ("VIEW", CYAN);
+        }
         match self.keys.mode {
             Mode::Normal => ("NOR", ACCENT),
             Mode::Insert => ("INS", GREEN),
@@ -99,6 +104,14 @@ impl Editor {
         }
         if let Some(r) = self.resolver() {
             return r.hints();
+        }
+        if self.previewing() {
+            return vec![
+                ("j k", "scroll", false),
+                ("space m", "text", false),
+                (":", "command", false),
+                ("?", "keys", false),
+            ];
         }
         let conflict = self.open.get(self.cur).is_some_and(|o| o.conflict);
         let mut hints = match self.keys.mode {
@@ -186,6 +199,10 @@ impl Editor {
         };
         if let Some(r) = open.resolve.as_mut() {
             r.draw(c, body);
+            return;
+        }
+        if let Some(p) = open.preview.as_mut() {
+            p.draw(c, body, &open.buf.text.to_string(), open.buf.version);
             return;
         }
         open.recolor();

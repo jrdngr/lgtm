@@ -69,9 +69,25 @@ const MORE: &[(&str, &str)] = &[
     ("space w", "word wrap"),
     ("space r", "review"),
     ("space a", "send to agent"),
+    ("space m", "markdown preview"),
     ("space x", "toggle checkbox"),
     ("S-tab", "markdown table cell, footnote"),
 ];
+
+/// The keys while a markdown file shows rendered.
+pub fn preview_groups() -> Vec<Group> {
+    vec![Group::new(
+        "Preview",
+        &[
+            ("j k", "scroll"),
+            ("C-d C-u", "half page down, up"),
+            ("g g  g e", "top, bottom"),
+            ("space m  Esc", "back to the text"),
+            ("click", "open a link"),
+            (":", "command"),
+        ],
+    )]
+}
 
 pub fn groups() -> Vec<Group> {
     vec![

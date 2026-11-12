@@ -36,6 +36,8 @@ pub enum Action {
     Fold(Fold),
     /// Open a list to pick from.
     Pick(Pick),
+    /// Show the markdown rendered, or its text again.
+    Preview,
     /// Show the next open file, or the one before.
     CycleFile {
         forward: bool,
@@ -341,6 +343,7 @@ impl Keys {
             }
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
+            Cmd::Preview => return Action::Preview,
             Cmd::CycleFile { forward } => return Action::CycleFile { forward },
             Cmd::Review => return Action::Review,
             Cmd::SendToAgent => return Action::SendToAgent,

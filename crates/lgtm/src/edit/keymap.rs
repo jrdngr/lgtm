@@ -91,6 +91,8 @@ pub enum Cmd {
     Smart,
     /// Checks or unchecks a markdown checkbox.
     ToggleCheck,
+    /// Shows a markdown file rendered, or its text again.
+    Preview,
 }
 
 impl Cmd {
@@ -277,6 +279,7 @@ pub const BINDS: &[Bind] = &[
     b("space r", Review, Both, "review"),
     b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),
+    b("space m", Preview, Both, "markdown preview"),
     b("S-tab", Smart, Both, "markdown table cell, footnote"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),
