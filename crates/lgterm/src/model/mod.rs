@@ -2,6 +2,7 @@
 //! empty or showing one space; the window shows one layout at a time. A space can be in any
 //! number of layouts, but in at most one slot of each.
 
+mod edge;
 mod ids;
 mod layouts;
 pub mod legacy;

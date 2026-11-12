@@ -527,3 +527,29 @@ fn moving_a_layout_renumbers_the_list_and_keeps_the_shown_one() {
     );
     assert_eq!(m.active, 0);
 }
+
+#[test]
+fn a_tab_dropped_on_a_spaces_edge_gets_a_split_the_full_height_of_the_space() {
+    let (mut m, a) = Model::new();
+    m.split_split(Axis::Column);
+    m.split_split(Axis::Column);
+    let d = m.new_tab();
+    let space = space_of(&m, a);
+    let bottom = m.split().unwrap().id;
+    m.move_tab_to_edge(Tab::Term(d), bottom, Side::Right);
+    let Tree::Branch { axis, children } = &m.find_space(space).unwrap().splits else {
+        panic!("one split");
+    };
+    assert_eq!(*axis, Axis::Row);
+    let Tree::Branch {
+        axis,
+        children: stack,
+    } = &children[0].tree
+    else {
+        panic!("the stack stays together");
+    };
+    assert_eq!((*axis, stack.len()), (Axis::Column, 3));
+    assert!(matches!(&children[1].tree, Tree::Leaf(s) if s.tabs == tabs(&[d])));
+    assert_eq!(m.term(), Some(d));
+    assert!(m.is_valid());
+}

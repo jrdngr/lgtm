@@ -143,7 +143,7 @@ pub(super) fn nearest_side(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side>
 }
 
 /// The side of `b` within `EDGE` of `p`.
-fn edge(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
+pub(super) fn edge(b: &Bounds<Pixels>, p: Point<Pixels>) -> Option<Side> {
     let (x, y) = (f(p.x - b.origin.x), f(p.y - b.origin.y));
     let (w, h) = (f(b.size.width), f(b.size.height));
     if x < EDGE {

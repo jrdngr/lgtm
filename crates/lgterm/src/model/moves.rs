@@ -13,14 +13,14 @@ pub enum Side {
 }
 
 impl Side {
-    fn axis(self) -> Axis {
+    pub fn axis(self) -> Axis {
         match self {
             Side::Left | Side::Right => Axis::Row,
             Side::Top | Side::Bottom => Axis::Column,
         }
     }
 
-    fn before(self) -> bool {
+    pub fn before(self) -> bool {
         matches!(self, Side::Left | Side::Top)
     }
 }
@@ -116,6 +116,38 @@ impl Model {
                     .insert_beside(to, split, side.axis(), side.before());
             }
         }
+        self.focus_tab(tab);
+    }
+
+    /// Moves a tab into a new split along `side` of the largest part of its space that split
+    /// `beside` borders on that side, and focuses it.
+    pub fn move_tab_to_edge(&mut self, tab: Tab, beside: SplitId, side: Side) {
+        let Some(from) = self.locate(tab) else { return };
+        let alone = self
+            .find_space(from.space)
+            .and_then(|s| s.splits.find(from.split))
+            .is_some_and(|s| s.tabs.len() == 1);
+        if (from.split == beside && alone)
+            || !self.spaces.iter().any(|s| s.splits.contains(beside))
+            || !self.remove_tab(tab)
+        {
+            return;
+        }
+        let id = SplitId(self.id());
+        let Some(space) = self.spaces.iter_mut().find(|s| s.splits.contains(beside)) else {
+            return;
+        };
+        let (axis, before) = (side.axis(), side.before());
+        let Some(path) = space.splits.edge_of(beside, axis, before) else {
+            return;
+        };
+        space.zoom = None;
+        let split = Split {
+            id,
+            tabs: vec![tab],
+            active: 0,
+        };
+        space.splits.insert_at_edge(&path, split, axis, before);
         self.focus_tab(tab);
     }
 
