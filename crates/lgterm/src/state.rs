@@ -32,18 +32,15 @@ pub struct State {
     messages_tab: Option<TermId>,
 }
 
-/// A model as saved now, or as saved before spaces left layouts.
+/// A model as saved now, or as saved before spaces left layouts. Read through a JSON value,
+/// whose maps take keys like the "5" of a terminal id, rather than an untagged enum, whose
+/// buffered maps don't.
 fn any_model<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Model, D::Error> {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Any {
-        Now(Model),
-        Old(OldModel),
-    }
-    Ok(match Any::deserialize(d)? {
-        Any::Now(m) => m,
-        Any::Old(m) => m.into(),
-    })
+    use serde::de::Error;
+    let value = serde_json::Value::deserialize(d)?;
+    Model::deserialize(&value)
+        .or_else(|_| OldModel::deserialize(&value).map(Model::from))
+        .map_err(D::Error::custom)
 }
 
 /// The newest messages kept across a restart.
@@ -111,7 +108,9 @@ mod tests {
     #[test]
     fn states_survive_a_save_and_load() {
         let (mut model, first) = Model::new();
-        model.split_split(Axis::Row);
+        let second = model.split_split(Axis::Row);
+        model.set_opener(second, first);
+        model.set_name(second, "tests".into());
         model.show_messages();
         let terms = BTreeMap::from([(
             first,
@@ -127,6 +126,8 @@ mod tests {
         assert_eq!(back.model.tab(), Some(Tab::Messages));
         assert_eq!(back.terms[&first].agent, Some((Kind::Claude, "abc".into())));
         assert_eq!(back.collapsed, [3]);
+        assert!(back.model.opened_by(second, first));
+        assert_eq!(back.model.name(second), Some("tests"));
     }
 
     #[test]
