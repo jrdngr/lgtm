@@ -419,6 +419,25 @@ impl Editor {
         }
     }
 
+    /// Shows the next open file, or the one before, wrapping around.
+    fn cycle_file(&mut self, forward: bool) {
+        let n = self.open.len();
+        if n < 2 {
+            return;
+        }
+        self.cur = if forward {
+            (self.cur + 1) % n
+        } else {
+            (self.cur + n - 1) % n
+        };
+        self.keys.mode = Mode::Normal;
+        if let Some(name) = self.current().map(|b| b.name.clone())
+            && !Path::new(&name).is_absolute()
+        {
+            self.sidebar.reveal(&name);
+        }
+    }
+
     /// Opens a list of `kind` to pick from.
     pub fn pick(&mut self, kind: Pick) {
         let paths: Vec<(String, bool)> = match kind {
@@ -637,6 +656,7 @@ impl Editor {
             },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
+            Action::CycleFile { forward } => self.cycle_file(forward),
             Action::Review | Action::SendToAgent => {}
             Action::Sidebar => {
                 self.files = true;
@@ -941,5 +961,22 @@ mod tests {
         press(&mut e, ":");
         e.paste("w\n");
         assert_eq!(e.prompt.as_ref().map(|p| p.text.as_str()), Some("w "));
+    }
+
+    #[test]
+    fn g_n_and_g_p_step_through_the_open_files_and_wrap_around() {
+        let (dir, mut e) = editor_on("a\n");
+        for name in ["b.txt", "c.txt"] {
+            std::fs::write(dir.path().join(name), "x\n").unwrap();
+            e.open(name, 1).unwrap();
+        }
+        let name = |e: &Editor| e.current().map(|b| b.name.clone()).unwrap();
+        press(&mut e, "gn");
+        assert_eq!(name(&e), "a.txt");
+        press(&mut e, "gn");
+        assert_eq!(name(&e), "b.txt");
+        press(&mut e, "gp");
+        press(&mut e, "gp");
+        assert_eq!(name(&e), "c.txt");
     }
 }

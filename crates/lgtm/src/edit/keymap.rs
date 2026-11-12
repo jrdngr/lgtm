@@ -67,6 +67,10 @@ pub enum Cmd {
     ClipboardYank,
     ClipboardPaste,
     Pick(Pick),
+    /// The next open file, or the one before.
+    CycleFile {
+        forward: bool,
+    },
     /// Go to the review, on the cursor's line.
     Review,
     /// Send where the selection is to an agent.
@@ -217,6 +221,13 @@ pub const BINDS: &[Bind] = &[
     b("g l", LineEnd, Both, "line end"),
     b("end", LineEnd, Both, "line end"),
     b("g s", LineText, Both, "first non-blank"),
+    b("g n", CycleFile { forward: true }, Both, "next open file"),
+    b(
+        "g p",
+        CycleFile { forward: false },
+        Both,
+        "previous open file",
+    ),
     b("x", SelectLine, Both, "select line"),
     b("v", ToggleSelect, Both, "select mode"),
     b(";", Collapse, Both, "collapse selection"),

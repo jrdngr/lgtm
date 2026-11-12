@@ -36,6 +36,10 @@ pub enum Action {
     Fold(Fold),
     /// Open a list to pick from.
     Pick(Pick),
+    /// Show the next open file, or the one before.
+    CycleFile {
+        forward: bool,
+    },
     /// Go to the review.
     Review,
     /// Send where the selection is to an agent.
@@ -337,6 +341,7 @@ impl Keys {
             }
             Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
+            Cmd::CycleFile { forward } => return Action::CycleFile { forward },
             Cmd::Review => return Action::Review,
             Cmd::SendToAgent => return Action::SendToAgent,
             Cmd::Sidebar => return Action::Sidebar,
