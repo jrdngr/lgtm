@@ -90,8 +90,17 @@ impl Workspace {
         let Some(t) = self.terms.get(&term) else {
             return;
         };
+        t.view.update(cx, |v, cx| v.paste_text(text, cx));
+        self.press_return(term, cx);
+    }
+
+    /// Presses return in `term` a moment from now, so a program that reads a burst of input
+    /// as a paste takes it as sending what came before.
+    pub(super) fn press_return(&self, term: TermId, cx: &mut Context<Self>) {
+        let Some(t) = self.terms.get(&term) else {
+            return;
+        };
         let view = t.view.clone();
-        view.update(cx, |v, cx| v.paste_text(text, cx));
         cx.spawn(async move |_, cx| {
             cx.background_executor().timer(RETURN_AFTER).await;
             view.update(cx, |v, cx| v.input(b"\r", cx));

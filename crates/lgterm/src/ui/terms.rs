@@ -127,7 +127,9 @@ impl Workspace {
             let view = term.view.read(cx);
             let pid = view.foreground_pid();
             let process = pid.and_then(procinfo::name);
-            let shell_foreground = pid.is_some() && pid == view.shell_pid();
+            // A terminal opened for an agent starts with the agent, not a shell, so its first
+            // process being in front means the agent is.
+            let shell_foreground = pid.is_some() && pid == view.shell_pid() && term.hint.is_none();
             let kind = process
                 .as_deref()
                 .and_then(Kind::from_process)

@@ -95,12 +95,11 @@ impl Workspace {
                 Request::Type { to, text, enter } => {
                     let to = self.term_arg(&to)?;
                     self.unlocked(Tab::Term(to))?;
-                    let mut bytes = text.into_bytes();
-                    if enter {
-                        bytes.push(b'\r');
-                    }
                     if let Some(t) = self.terms.get(&to) {
-                        t.view.update(cx, |v, cx| v.input(&bytes, cx));
+                        t.view.update(cx, |v, cx| v.input(text.as_bytes(), cx));
+                        if enter {
+                            self.press_return(to, cx);
+                        }
                     }
                     Reply::Ok(String::new())
                 }
