@@ -357,6 +357,10 @@ pub fn agent_color(id: TermId) -> u32 {
     AGENT_COLORS[i % AGENT_COLORS.len()]
 }
 
+pub fn chips_in_tabs() -> bool {
+    std::env::var("LGTERM_MSG_MOCK").as_deref() == Ok("4")
+}
+
 pub fn on() -> bool {
     std::env::var("LGTERM_MSG_MOCK").is_ok()
 }

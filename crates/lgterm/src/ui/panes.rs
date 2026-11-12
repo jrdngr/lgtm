@@ -476,7 +476,7 @@ impl Workspace {
                     d.child(badge::chip(i + 1).ml(px(-3.)))
                 })
                 .when_some(
-                    tab.term().filter(|_| super::messages::mock::on()),
+                    tab.term().filter(|_| super::messages::mock::chips_in_tabs()),
                     |d, t| d.child(super::messages::mock::chip(t).ml(px(-3.))),
                 )
                 .child(self.term_label(tab))
