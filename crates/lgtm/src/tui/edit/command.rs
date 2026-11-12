@@ -352,12 +352,10 @@ impl Editor {
             self.cur = 0;
             return Outcome::Quit;
         }
-        let unsaved = self.unsaved();
-        if unsaved.is_empty() {
-            Outcome::Quit
-        } else {
-            self.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
+        if self.blocks_quit() {
             Outcome::None
+        } else {
+            Outcome::Quit
         }
     }
 

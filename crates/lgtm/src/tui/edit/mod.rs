@@ -489,6 +489,30 @@ impl Editor {
         }
     }
 
+    /// Whether unsaved edits keep the editor from quitting. If so, says which files and
+    /// shows one: the file in view when it's one of them, else the first.
+    pub fn blocks_quit(&mut self) -> bool {
+        let unsaved = self.unsaved();
+        if unsaved.is_empty() {
+            return false;
+        }
+        self.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
+        if !self.open.get(self.cur).is_some_and(|o| o.dirty()) {
+            let Some(i) = self.open.iter().position(|o| o.dirty()) else {
+                return true;
+            };
+            self.cur = i;
+            self.keys.mode = Mode::Normal;
+            if let Some(name) = self.current().map(|b| b.name.clone())
+                && !Path::new(&name).is_absolute()
+            {
+                self.sidebar.reveal(&name);
+            }
+        }
+        self.in_sidebar = false;
+        true
+    }
+
     /// Opens a list of `kind` to pick from.
     pub fn pick(&mut self, kind: Pick) {
         let paths: Vec<(String, bool)> = match kind {
@@ -788,11 +812,19 @@ mod tests {
             }
             e.key(KeyEvent::from(KeyCode::Enter))
         };
-        let (_dir, mut e) = editor_on("one\n");
+        let (dir, mut e) = editor_on("one\n");
         assert!(matches!(quit(&mut e), Outcome::Quit));
         e.open[0].buf.insert(0, "x");
         assert!(matches!(quit(&mut e), Outcome::None));
         assert!(e.notice.as_deref().is_some_and(|n| n.contains("a.txt")));
+
+        // The unsaved file comes into view.
+        std::fs::write(dir.path().join("b.txt"), "two\n").unwrap();
+        e.open("b.txt", 1).unwrap();
+        e.in_sidebar = true;
+        assert!(matches!(quit(&mut e), Outcome::None));
+        assert_eq!(e.current().map(|b| b.name.as_str()), Some("a.txt"));
+        assert!(!e.in_sidebar);
     }
 
     #[test]

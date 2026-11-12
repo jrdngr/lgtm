@@ -544,11 +544,9 @@ impl App {
     /// Handles a key. Returns whether to quit.
     fn key(&mut self, key: KeyEvent) -> bool {
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            let unsaved = self.buffers.unsaved();
-            if unsaved.is_empty() {
+            if !self.buffers.blocks_quit() {
                 return true;
             }
-            self.buffers.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
             self.screen = Screen::Editor;
             return false;
         }

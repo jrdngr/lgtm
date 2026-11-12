@@ -58,11 +58,9 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                         if key.code == KeyCode::Char('c')
                             && key.modifiers.contains(KeyModifiers::CONTROL)
                         {
-                            let unsaved = e.unsaved();
-                            if unsaved.is_empty() {
+                            if !e.blocks_quit() {
                                 return Ok(());
                             }
-                            e.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
                         } else if let Some(h) = help.as_mut() {
                             if !h.key(&key) {
                                 help = None;
