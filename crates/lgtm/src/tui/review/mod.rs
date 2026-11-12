@@ -22,6 +22,7 @@ mod tree;
 mod undo;
 mod wrap;
 
+use crate::tui::help::Group;
 use std::collections::{HashMap, HashSet};
 
 use lgtm_core::diff::RowKind;
@@ -142,41 +143,71 @@ pub struct Review {
     drawn_cursor: usize,
 }
 
-pub const KEYS: &[(&str, &str)] = &[
-    ("j k", "line"),
-    ("Ctrl-d Ctrl-u", "half page"),
-    ("Ctrl-o", "back"),
-    ("g G", "top, bottom"),
-    ("n N", "next, previous file"),
-    ("m M", "next, previous syntax item"),
-    ("h l", "scroll left, right"),
-    ("Enter", "fold file, edit comment"),
-    ("Tab", "file list"),
-    ("< >", "file list width"),
-    ("Enter", "open, close folder (file list)"),
-    ("r f", "review, flag file or folder"),
-    ("R F", "review, flag hunk"),
-    ("u U", "undo, redo marks and comments"),
-    ("z", "hide reviewed files"),
-    ("J K", "select lines"),
-    ("e E", "grow, shrink selection: hunk, file, review"),
-    ("v", "select text"),
-    ("/", "search"),
-    ("c", "comment for the agent, on the selected lines"),
-    ("a", "send the selected lines to an lgterm agent"),
-    ("] [", "next, previous comment"),
-    ("C", "resolve, reopen comment"),
-    ("d", "delete comment"),
-    (
-        "space",
-        "files, open files, file list, search, wrap, editor",
-    ),
-    ("t", "side by side"),
-    ("p", "pull PR comments"),
-    ("P", "hide PR comments"),
-    (":", "command (:? lists them)"),
-    (":h", "back to the home screen"),
-];
+/// The keys for `?`, in groups.
+pub fn help_groups() -> Vec<Group> {
+    vec![
+        Group::new(
+            "Move",
+            &[
+                ("j k", "line"),
+                ("C-d C-u", "half page"),
+                ("g G", "top, bottom"),
+                ("n N", "next, previous file"),
+                ("m M", "next, previous syntax item"),
+                ("] [", "next, previous comment"),
+                ("h l", "scroll left, right"),
+                ("C-o", "back"),
+            ],
+        ),
+        Group::new(
+            "Review",
+            &[
+                ("r f", "review, flag file or folder"),
+                ("R F", "review, flag hunk"),
+                ("u U", "undo, redo"),
+                ("z", "hide reviewed files"),
+            ],
+        ),
+        Group::new(
+            "Select",
+            &[
+                ("J K", "lines"),
+                ("e E", "grow, shrink: hunk, file, review"),
+                ("v", "text"),
+                ("/", "search"),
+            ],
+        ),
+        Group::new(
+            "Comments",
+            &[
+                ("c", "comment on the selected lines"),
+                ("a", "send the selected lines to an agent"),
+                ("C", "resolve, reopen"),
+                ("d", "delete"),
+                ("Enter", "edit"),
+                ("p", "pull PR comments"),
+                ("P", "hide PR comments"),
+            ],
+        ),
+        Group::new(
+            "Files",
+            &[
+                ("Tab", "file list"),
+                ("Enter", "fold file, open folder"),
+                ("< >", "file list width"),
+                ("t", "side by side"),
+            ],
+        ),
+        Group::new(
+            "More",
+            &[
+                ("space", "files, search, wrap, editor"),
+                (":", "command"),
+                (":h", "home"),
+            ],
+        ),
+    ]
+}
 
 /// The narrowest the file list gets.
 const LIST_MIN: u16 = 16;

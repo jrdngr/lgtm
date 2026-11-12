@@ -4,6 +4,7 @@
 mod draw;
 mod layout;
 
+use crate::tui::help::Group;
 use std::path::Path;
 
 use lgtm_core::resolve::{Fate, FileChoice, ResolveView, Session};
@@ -14,27 +15,40 @@ use crate::edit::keys::{Action, Keys, Mode, View};
 use layout::{Row, Slot};
 
 /// The keys, for `?`.
-pub const KEYS: &[(&str, &str)] = &[
-    (
-        "1 2 3",
-        "keep a side, in the order pressed; again to drop it",
-    ),
-    ("0", "keep the base"),
-    ("n N", "next, previous conflict"),
-    ("j k", "move a line"),
-    ("J K", "move the side under the cursor down, up"),
-    ("i", "edit the side under the cursor; Esc twice to finish"),
-    ("o", "the edit, or the side before it"),
-    ("u U", "undo, redo"),
-    ("F D", "keep, delete a file a side deleted"),
-    (
-        "c b x",
-        "carry edits, keep both, drop edits for a moved file",
-    ),
-    (":w", "save what's resolved"),
-    (":q!", "leave, dropping it"),
-    (":raw", "edit the markers as text"),
-];
+pub fn help_groups() -> Vec<Group> {
+    vec![
+        Group::new(
+            "Pick",
+            &[
+                ("1 2 3", "keep a side, in order; again drops it"),
+                ("0", "keep the base"),
+                ("J K", "move the side down, up"),
+                ("i", "edit the side; Esc twice to finish"),
+                ("o", "edited, original"),
+                ("u U", "undo, redo"),
+            ],
+        ),
+        Group::new(
+            "Move",
+            &[("j k", "line"), ("n N", "next, previous conflict")],
+        ),
+        Group::new(
+            "Files",
+            &[
+                ("F D", "keep, delete a deleted file"),
+                ("c b x", "moved file: carry, keep both, drop"),
+            ],
+        ),
+        Group::new(
+            "Commands",
+            &[
+                (":w", "save what's resolved"),
+                (":q!", "leave, dropping it"),
+                (":raw", "edit the markers as text"),
+            ],
+        ),
+    ]
+}
 
 /// A side being edited: its conflict, its place, and its text.
 struct Editing {

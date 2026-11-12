@@ -5,6 +5,7 @@ mod edit;
 mod files;
 mod github;
 mod heat;
+mod help;
 mod highlight;
 mod home;
 mod keybar;
@@ -151,7 +152,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         review_back: None,
         pr,
         prs: HashMap::new(),
-        help: false,
+        help: None,
         agent_pick: None,
         loads: 0,
         settings: settings::load(),
@@ -238,7 +239,7 @@ struct App {
     pr: Option<String>,
     /// The PR pulled for each review, by its name.
     prs: HashMap<String, (String, u32)>,
-    help: bool,
+    help: Option<help::Help>,
     loads: u64,
     /// The repo's store, shared with the desktop app. `None` when it couldn't be opened.
     store: Option<Store>,
@@ -354,10 +355,10 @@ impl App {
                             return Ok(());
                         }
                     }
-                    Event::Paste(text) if self.screen == Screen::Editor && !self.help => {
+                    Event::Paste(text) if self.screen == Screen::Editor && self.help.is_none() => {
                         self.buffers.paste(&text);
                     }
-                    Event::Mouse(_) if self.help => {}
+                    Event::Mouse(_) if self.help.is_some() => {}
                     Event::Mouse(ev) => match self.screen {
                         Screen::Editor => self.buffers.mouse(ev),
                         Screen::Review => {
@@ -548,8 +549,10 @@ impl App {
             self.screen = Screen::Editor;
             return false;
         }
-        if self.help {
-            self.help = false;
+        if let Some(h) = self.help.as_mut() {
+            if !h.key(&key) {
+                self.help = None;
+            }
             return false;
         }
         if let Some(pick) = self.agent_pick.take() {
@@ -564,7 +567,7 @@ impl App {
         }
         if self.screen == Screen::Editor {
             if key.code == KeyCode::Char('?') && !self.buffers.typing() {
-                self.help = true;
+                self.help = Some(help::Help::default());
                 return false;
             }
             let outcome = self.buffers.key(key);
@@ -605,7 +608,7 @@ impl App {
             None => self.home.typing(),
         };
         if key.code == KeyCode::Char('?') && !typing {
-            self.help = true;
+            self.help = Some(help::Help::default());
             return false;
         }
         if let Some(r) = self.review.as_mut() {
@@ -690,7 +693,12 @@ impl App {
 
     fn draw(&mut self, c: &mut Canvas) {
         if self.screen == Screen::Editor {
-            draw_editor(c, &mut self.buffers, self.help, self.agent_pick.as_ref());
+            draw_editor(
+                c,
+                &mut self.buffers,
+                self.help.as_mut(),
+                self.agent_pick.as_ref(),
+            );
             return;
         }
         let Some((x, body)) = frame(c) else {
@@ -720,8 +728,8 @@ impl App {
                 if let Some(pick) = &self.agent_pick {
                     keybar::menu(c, body, &pick.menu());
                 }
-                if self.help {
-                    keybar::help(c, body, &r.help_keys());
+                if let Some(h) = self.help.as_mut() {
+                    h.draw(c, body, &r.help_groups());
                 }
                 return;
             }
@@ -741,7 +749,7 @@ impl App {
                     keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
                     return;
                 }
-                (self.home.hints(), home::KEYS)
+                (self.home.hints(), home::help_groups())
             }
         };
         let badge = if self.review.is_none() {
@@ -753,8 +761,8 @@ impl App {
         if self.review.is_none() {
             keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
         }
-        if self.help {
-            keybar::help(c, body, keys);
+        if let Some(h) = self.help.as_mut() {
+            h.draw(c, body, &keys);
         }
     }
 }
@@ -801,7 +809,12 @@ fn frame(c: &mut Canvas) -> Option<(u16, Rect)> {
 }
 
 /// Draws the editor screen, with the keys over it when `help` is up.
-fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool, pick: Option<&mention::Pick>) {
+fn draw_editor(
+    c: &mut Canvas,
+    e: &mut edit::Editor,
+    help: Option<&mut help::Help>,
+    pick: Option<&mention::Pick>,
+) {
     let Some((x, body)) = frame(c) else {
         return;
     };
@@ -821,8 +834,8 @@ fn draw_editor(c: &mut Canvas, e: &mut edit::Editor, help: bool, pick: Option<&m
     if let Some(pick) = pick {
         keybar::menu(c, body, &pick.menu());
     }
-    if help {
-        keybar::help(c, body, &e.help_keys());
+    if let Some(h) = help {
+        h.draw(c, body, &e.help_groups());
     }
 }
 

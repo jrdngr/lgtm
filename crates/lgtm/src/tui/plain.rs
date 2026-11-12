@@ -39,7 +39,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
     }
     let git = root.join(".git").exists();
     let mut term = Term::start();
-    let mut help = false;
+    let mut help: Option<super::help::Help> = None;
     let mut pick: Option<mention::Pick> = None;
     let mut polled = Instant::now();
     let result = (|| -> anyhow::Result<()> {
@@ -47,7 +47,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             term.terminal.draw(|f| {
                 let area = f.area();
                 let c = &mut Canvas::new(f.buffer_mut(), area);
-                super::draw_editor(c, &mut e, help, pick.as_ref());
+                super::draw_editor(c, &mut e, help.as_mut(), pick.as_ref());
             })?;
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {
@@ -62,12 +62,14 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                                 return Ok(());
                             }
                             e.notice = Some(format!("unsaved: {}", unsaved.join(", ")));
-                        } else if help {
-                            help = false;
+                        } else if let Some(h) = help.as_mut() {
+                            if !h.key(&key) {
+                                help = None;
+                            }
                         } else if let Some(p) = pick.take() {
                             e.notice = p.key(key);
                         } else if key.code == KeyCode::Char('?') && !e.typing() {
-                            help = true;
+                            help = Some(super::help::Help::default());
                         } else {
                             let outcome = e.key(key);
                             if e.files != settings.files
@@ -96,8 +98,8 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             }
                         }
                     }
-                    Event::Mouse(ev) if !help => e.mouse(ev),
-                    Event::Paste(text) if !help => e.paste(&text),
+                    Event::Mouse(ev) if help.is_none() => e.mouse(ev),
+                    Event::Paste(text) if help.is_none() => e.paste(&text),
                     _ => {}
                 }
             }

@@ -4,10 +4,12 @@ pub mod clipboard;
 mod command;
 pub(crate) mod draw;
 mod finder;
+pub mod help;
 mod split;
 
 pub use split::FLAG as SPLIT_FLAG;
 
+use crate::tui::help::Group;
 use std::path::{Path, PathBuf};
 
 use lgtm_core::syntax::Segment;
@@ -517,18 +519,12 @@ impl Editor {
         self.open.get(self.cur)?.resolve.as_deref()
     }
 
-    /// The keys for `?`.
-    pub fn help_keys(&self) -> Vec<(&'static str, &'static str)> {
-        let mut keys: Vec<_> = match self.resolver() {
-            Some(_) => resolve::KEYS.to_vec(),
-            None => crate::edit::keymap::BINDS
-                .iter()
-                .filter(|b| !matches!(b.keys, "left" | "right" | "up" | "down" | "home" | "end"))
-                .map(|b| (b.keys, b.label))
-                .collect(),
-        };
-        keys.push(("C-o", "back"));
-        keys
+    /// The keys for `?`, in groups.
+    pub fn help_groups(&self) -> Vec<Group> {
+        match self.resolver() {
+            Some(_) => resolve::help_groups(),
+            None => help::groups(),
+        }
     }
 
     /// Takes text the terminal pasted: into the line being typed, else the text.

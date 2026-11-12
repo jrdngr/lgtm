@@ -3,6 +3,7 @@
 //! review's: code rows hold their text, or a wrapped row each part of it, and every other line
 //! is empty.
 
+use crate::tui::help::Group;
 use std::path::Path;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -13,7 +14,6 @@ use super::draw::{CODE_X, NUM};
 use super::rows::Line;
 use super::wrap::{code_parts, cols};
 use crate::edit::buffer::{Buffer, Sel};
-use crate::edit::keymap::{self, Cmd};
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
 use crate::tui::edit::clipboard;
@@ -24,44 +24,31 @@ pub struct Selecting {
 }
 
 /// The keys while selecting: the review's own, then the editor's that move or select.
-pub fn select_keys() -> Vec<(&'static str, &'static str)> {
-    let own = [
-        ("Home End", "line start, end"),
-        ("click", "move the cursor"),
-        ("y", "copy the selection"),
-        ("v Esc", "stop selecting"),
-    ];
-    let editor = keymap::BINDS.iter().filter(|b| {
-        !b.cmd.edits()
-            && !matches!(b.keys, "left" | "right" | "up" | "down")
-            && !matches!(
-                b.cmd,
-                Cmd::Pick(_)
-                    | Cmd::Review
-                    | Cmd::SendToAgent
-                    | Cmd::Sidebar
-                    | Cmd::ToggleSidebar
-                    | Cmd::ToggleWrap
-                    | Cmd::Split { .. }
-                    | Cmd::Command
-                    | Cmd::Fold(_)
-                    | Cmd::ToggleSelect
-                    | Cmd::Escape
-                    | Cmd::Yank
-            )
-    });
-    own.into_iter()
-        .chain(editor.map(|b| (b.keys, b.label)))
-        .collect()
+pub fn select_groups() -> Vec<Group> {
+    use crate::tui::edit::help;
+    vec![
+        Group::new(
+            "Selecting",
+            &[
+                ("y", "copy"),
+                ("v Esc", "stop"),
+                ("click", "move the cursor"),
+                ("Home End", "line start, end"),
+            ],
+        ),
+        Group::new("Move", help::MOVE),
+        Group::new("Select", &help::SELECT[1..]),
+        Group::new("Search", help::SEARCH),
+    ]
 }
 
 impl Review {
     /// The keys `?` lists: the selecting ones while selecting.
-    pub fn help_keys(&self) -> Vec<(&'static str, &'static str)> {
+    pub fn help_groups(&self) -> Vec<Group> {
         if self.selecting.is_some() {
-            select_keys()
+            select_groups()
         } else {
-            super::KEYS.to_vec()
+            super::help_groups()
         }
     }
 
@@ -361,7 +348,7 @@ mod tests {
         r.mouse(click, None);
         assert_eq!(r.cursor, 2);
         assert_eq!(point(&r), Some(3));
-        assert_eq!(r.help_keys()[0].0, "Home End");
+        assert_eq!(r.help_groups()[0].title, "Selecting");
     }
 
     #[test]

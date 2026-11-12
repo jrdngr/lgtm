@@ -1,6 +1,7 @@
 //! The screen `lgtm` opens on: the jj log on the left to pick a review from, and the repo's
 //! files on the right to open in the editor. Tab moves between them.
 
+use crate::tui::help::Group;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
@@ -87,19 +88,27 @@ impl Default for Home {
 }
 
 /// The keys of the revisions side, for `?`.
-pub const KEYS: &[(&str, &str)] = &[
-    ("Tab", "files"),
-    ("< >", "move divider"),
-    ("j k", "move"),
-    ("J K", "range"),
-    ("Esc", "clear range"),
-    ("Space", "jj mode"),
-    ("Enter", "edit the commit and review it"),
-    ("r", "review"),
-    ("v", "snapshots"),
-    ("a", "every snapshot"),
-    (":", "command"),
-];
+pub fn help_groups() -> Vec<Group> {
+    vec![
+        Group::new(
+            "Revisions",
+            &[
+                ("j k", "move"),
+                ("J K", "range"),
+                ("Esc", "clear range"),
+                ("Enter", "edit the commit and review it"),
+                ("r", "review"),
+                ("v", "snapshots"),
+                ("a", "every snapshot"),
+                ("Space", "jj mode"),
+            ],
+        ),
+        Group::new(
+            "More",
+            &[("Tab", "files"), ("< >", "move divider"), (":", "command")],
+        ),
+    ]
+}
 
 impl Home {
     /// Whether keys are going into the search box.

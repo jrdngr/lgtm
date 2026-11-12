@@ -1,4 +1,4 @@
-//! The key hints along the bottom, and the `?` list of every key.
+//! The key hints along the bottom, and the menus over them.
 
 use ratatui::layout::Rect;
 use ratatui::style::Color;
@@ -44,14 +44,8 @@ pub fn prompt(c: &mut Canvas, y: u16, text: &str, offers: &[String]) {
     }
 }
 
-/// Where a box of `items` goes in `area`: centered, or at its bottom left.
-enum Place {
-    Center,
-    BottomLeft,
-}
-
-/// A box over `area` listing `items`' keys beside what they do.
-fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)], place: Place) {
+/// A box at the bottom left of `area` listing `items`' keys beside what they do.
+fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)]) {
     let kw = items
         .iter()
         .map(|(k, _)| k.chars().count())
@@ -64,13 +58,7 @@ fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)], place: Place) {
         .unwrap_or(0) as u16;
     let w = (kw + lw + 7).min(area.width);
     let h = (items.len() as u16 + 2).min(area.height);
-    let (x0, y0) = match place {
-        Place::Center => (
-            area.x + (area.width - w) / 2,
-            area.y + (area.height - h) / 2,
-        ),
-        Place::BottomLeft => (area.x, area.bottom() - h),
-    };
+    let (x0, y0) = (area.x, area.bottom() - h);
     let border = theme::fg(HAIR).bg(PANEL);
     for y in y0..y0 + h {
         c.fill(x0, y, w, PANEL);
@@ -93,10 +81,5 @@ pub fn menu(c: &mut Canvas, area: Rect, items: &[(String, &str)]) {
         return;
     }
     let items: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
-    boxed(c, area, &items, Place::BottomLeft);
-}
-
-/// A box over the middle of `area` listing `keys` beside what they do.
-pub fn help(c: &mut Canvas, area: Rect, keys: &[(&str, &str)]) {
-    boxed(c, area, keys, Place::Center);
+    boxed(c, area, &items);
 }
