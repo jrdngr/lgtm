@@ -25,6 +25,7 @@ mod space_drag;
 mod tab_drag;
 mod terms;
 mod toasts;
+mod waiting;
 
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};

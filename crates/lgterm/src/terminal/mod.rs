@@ -11,6 +11,7 @@ mod pty;
 
 pub use pty::SpawnEnv;
 
+use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -60,6 +61,8 @@ pub struct TermView {
     focus: FocusHandle,
     vt: Terminal,
     snap: Snapshotter,
+    /// Reads the screen for agents, apart from what's painted.
+    reader: RefCell<Snapshotter>,
     keys: key::Encoder,
     key_event: key::Event,
     mouse: mouse::Encoder,
@@ -115,6 +118,7 @@ impl TermView {
             .set_default_bg_color(Some(rgb(theme::TERM_BG)))?
             .set_default_cursor_color(Some(rgb(theme::TERM_FG)))?;
         let snap = Snapshotter::new()?;
+        let reader = RefCell::new(Snapshotter::new()?);
         let keys = key::Encoder::new()?;
         let key_event = key::Event::new()?;
         let mouse = mouse::Encoder::new()?;
@@ -139,6 +143,7 @@ impl TermView {
                 focus: cx.focus_handle(),
                 vt,
                 snap,
+                reader,
                 keys,
                 key_event,
                 mouse,
@@ -170,9 +175,14 @@ impl TermView {
         self.pty.shell_pid()
     }
 
-    /// Whether the user is in the middle of typing something.
-    pub fn typing(&self) -> bool {
-        self.draft || self.last_key.is_some_and(|t| t.elapsed() < TYPING_PAUSE)
+    /// Whether the user pressed a key here just now.
+    pub fn typed_recently(&self) -> bool {
+        self.last_key.is_some_and(|t| t.elapsed() < TYPING_PAUSE)
+    }
+
+    /// Whether the user typed a prompt and hasn't sent or dropped it.
+    pub fn draft(&self) -> bool {
+        self.draft
     }
 
     /// Forgets a typed prompt, once the program has taken it.
@@ -241,6 +251,27 @@ impl TermView {
         let bottom = self.rows.saturating_sub(1) as u32;
         let at = |x, y| VtPoint::Active(PointCoordinate { x, y });
         self.format(at(0, top), at(self.cols.saturating_sub(1), bottom), false)
+    }
+
+    /// The bottom `rows` rows of the screen, as runs of text saying whether each is in the
+    /// terminal's own color.
+    pub fn bottom_rows(&self, rows: usize) -> Vec<crate::agents::kind::Row> {
+        let Ok(frame) = self.reader.borrow_mut().frame(&self.vt) else {
+            return vec![];
+        };
+        let skip = frame.rows.len().saturating_sub(rows);
+        frame.rows[skip..]
+            .iter()
+            .map(|row| {
+                row.runs
+                    .iter()
+                    .map(|r| {
+                        let own = (r.fg == frame.fg && !r.faint) || r.bg == Some(frame.fg);
+                        (r.text.clone(), own)
+                    })
+                    .collect()
+            })
+            .collect()
     }
 
     /// The last `lines` lines of scrollback and screen, or a screenful, with wrapped lines

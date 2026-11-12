@@ -47,8 +47,8 @@ impl Workspace {
             Ok(match request {
                 Request::Hook { term, event } => {
                     let id = self.term_arg(&term)?;
-                    self.with_agents(window, cx, |a, env| a.hook(id, &event, env));
-                    Reply::Ok(String::new())
+                    let out = self.with_agents(window, cx, |a, env| a.hook(id, &event, env));
+                    Reply::Ok(out.unwrap_or_default())
                 }
                 Request::Ls { json } => Reply::Ok(self.list(json)),
                 Request::Open {

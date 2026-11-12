@@ -27,6 +27,8 @@ pub struct Behavior {
     blocked: &'static [&'static str],
     /// What its screen shows right after the user stopped it.
     interrupted: &'static [&'static str],
+    /// It takes prompts in a box drawn between two rules.
+    prompt_box: bool,
 }
 
 const BEHAVIORS: &[Behavior] = &[
@@ -38,6 +40,7 @@ const BEHAVIORS: &[Behavior] = &[
         hooks_say_everything: true,
         blocked: &["Do you want to proceed?", "Do you want to make this edit"],
         interrupted: &["Interrupted by user", "What should Claude do instead"],
+        prompt_box: true,
     },
     Behavior {
         kind: Kind::Codex,
@@ -51,6 +54,7 @@ const BEHAVIORS: &[Behavior] = &[
             "Allow command?",
         ],
         interrupted: &[],
+        prompt_box: false,
     },
     Behavior {
         kind: Kind::Pi,
@@ -60,11 +64,23 @@ const BEHAVIORS: &[Behavior] = &[
         hooks_say_everything: false,
         blocked: &[],
         interrupted: &[],
+        prompt_box: false,
     },
 ];
 
 /// Lines from the bottom of the screen that count for a stop.
 const INTERRUPT_LINES: usize = 8;
+
+/// A screen row as runs of text, each saying whether it's in the terminal's own color, as
+/// typed text is and hints and placeholders aren't.
+pub type Row = Vec<(String, bool)>;
+
+/// Whether a row is a rule, the line drawn above or below a prompt box.
+fn rule(row: &Row) -> bool {
+    let text: String = row.iter().map(|(t, _)| t.as_str()).collect();
+    let text = text.trim();
+    text.chars().filter(|c| *c == '─').count() >= 8 && text.chars().all(|c| "─╭╮╰╯ ".contains(c))
+}
 
 impl Kind {
     pub fn behavior(self) -> &'static Behavior {
@@ -116,6 +132,25 @@ impl Kind {
         None
     }
 
+    /// Whether the agent's prompt box has text in it, from the bottom rows of its screen. None
+    /// when the screen shows no box to read.
+    pub fn prompt_typed(self, rows: &[Row]) -> Option<bool> {
+        if !self.behavior().prompt_box {
+            return None;
+        }
+        let mut rules = rows.iter().enumerate().rev().filter(|(_, r)| rule(r));
+        let (bottom, _) = rules.next()?;
+        let (top, _) = rules.next()?;
+        let typed: String = rows[top + 1..bottom]
+            .iter()
+            .flatten()
+            .filter(|(_, own)| *own)
+            .map(|(t, _)| t.as_str())
+            .collect();
+        let typed = typed.trim_start().trim_start_matches(['❯', '>', '│']);
+        Some(typed.chars().any(|c| !c.is_whitespace() && c != '│'))
+    }
+
     /// Whether the screen shows the agent was just stopped, as when the user turns down a
     /// permission prompt. Only the bottom lines count, so an older stop further up doesn't.
     pub fn interrupted(self, screen: &str) -> bool {
@@ -133,6 +168,45 @@ impl Kind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn row(runs: &[(&str, bool)]) -> Row {
+        runs.iter().map(|(t, own)| (t.to_string(), *own)).collect()
+    }
+
+    #[test]
+    fn the_prompt_box_has_text_only_when_typed_text_is_in_it() {
+        let rule = row(&[("────────────────────", false)]);
+        let screen = |input: Row| {
+            vec![
+                row(&[("● ok", true)]),
+                row(&[("              ◐ medium · /effort", false)]),
+                rule.clone(),
+                input,
+                rule.clone(),
+                row(&[("  ⏸ manual mode on · ? for shortcuts", false)]),
+            ]
+        };
+        let empty = screen(row(&[("❯\u{a0}", true), (" ", false)]));
+        let hint = screen(row(&[
+            ("❯\u{a0}", true),
+            ("Try \"fix lint errors\"", false),
+        ]));
+        let typed = screen(row(&[("❯\u{a0}hello there", true), (" ", false)]));
+        assert_eq!(Kind::Claude.prompt_typed(&empty), Some(false));
+        assert_eq!(Kind::Claude.prompt_typed(&hint), Some(false));
+        assert_eq!(Kind::Claude.prompt_typed(&typed), Some(true));
+
+        let mut wrapped = screen(row(&[("❯\u{a0}", true)]));
+        wrapped.insert(4, row(&[("  second line", true)]));
+        assert_eq!(Kind::Claude.prompt_typed(&wrapped), Some(true));
+
+        let menu = vec![
+            row(&[("Select model", true)]),
+            row(&[("❯ 1. Default", true)]),
+        ];
+        assert_eq!(Kind::Claude.prompt_typed(&menu), None);
+        assert_eq!(Kind::Codex.prompt_typed(&typed), None);
+    }
 
     #[test]
     fn screens_show_work_and_prompts() {

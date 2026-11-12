@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use lgterm_proto::Reply;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::model::TermId;
 pub use kind::Kind;
@@ -72,7 +72,7 @@ impl Agent {
 pub enum Effect {
     /// Paste this into the terminal and press return.
     Deliver(TermId, String),
-    /// The agent took what the user typed.
+    /// The user sent what they typed.
     ClearDraft(TermId),
     /// Tell the user the agent stopped.
     Alert(TermId, Status),
@@ -82,8 +82,8 @@ pub enum Effect {
 pub struct Env<'a> {
     /// The terminal the user is looking at, if the window is active.
     pub viewed: Option<TermId>,
-    /// Whether the user is typing in a terminal.
-    pub typing: &'a dyn Fn(TermId) -> bool,
+    /// Whether the user is typing a prompt for the agent of this kind in a terminal.
+    pub typing: &'a dyn Fn(TermId, Kind) -> bool,
 }
 
 /// What a poll saw in one terminal.
@@ -142,10 +142,10 @@ impl Agents {
         )
     }
 
-    pub fn hook(&mut self, term: TermId, event: &Value, env: &Env) {
-        let Some(report) = status::report(event) else {
-            return;
-        };
+    /// Takes a hook from the agent in `term`. Says what the hook should print: a queued
+    /// message, when the agent is about to stop.
+    pub fn hook(&mut self, term: TermId, event: &Value, env: &Env) -> Option<String> {
+        let report = status::report(event)?;
         let now = Instant::now();
         let repeat = self.agents.get(&term).is_some_and(|a| {
             a.last_hook
@@ -162,11 +162,11 @@ impl Agents {
                 && !report.next_session
         });
         if repeat || other {
-            return;
+            return None;
         }
         if report.ended {
             self.left(term);
-            return;
+            return None;
         }
         let new = !self.agents.contains_key(&term);
         let agent = self
@@ -183,9 +183,20 @@ impl Agents {
         if new || was != (agent.kind, agent.session.clone()) {
             self.changed = true;
         }
+        match event["hook_event_name"].as_str() {
+            Some("UserPromptSubmit") => self.effects.push(Effect::ClearDraft(term)),
+            // Handed over as the reason it can't stop yet, the message never touches the
+            // prompt the user may be typing.
+            Some("Stop") if let Some(text) = self.next_message(term) => {
+                self.set_status(term, Status::Working, env);
+                return Some(json!({"decision": "block", "reason": text}).to_string());
+            }
+            _ => {}
+        }
         if let Some(s) = report.status {
             self.set_status(term, s, env);
         }
+        None
     }
 
     fn set_status(&mut self, term: TermId, status: Status, env: &Env) {
@@ -201,13 +212,8 @@ impl Agents {
         agent.quiet = 0;
         let old = agent.status;
         agent.status = status;
-        if old != status {
-            if status == Status::Working {
-                self.effects.push(Effect::ClearDraft(term));
-            }
-            if matches!(status, Status::Blocked | Status::Done) {
-                self.effects.push(Effect::Alert(term, status));
-            }
+        if old != status && matches!(status, Status::Blocked | Status::Done) {
+            self.effects.push(Effect::Alert(term, status));
         }
         if status.ready() {
             self.deliver(term, env);
@@ -380,22 +386,32 @@ impl Agents {
     /// Hands `term` its oldest queued message, if it's ready for one and the user isn't
     /// typing there. The agent counts as working until its own status says otherwise.
     fn deliver(&mut self, term: TermId, env: &Env) {
-        let Some(agent) = self.agents.get_mut(&term).filter(|a| a.can_take_message()) else {
+        let Some(agent) = self.agents.get(&term).filter(|a| a.can_take_message()) else {
             return;
         };
-        if (env.typing)(term) {
+        if (env.typing)(term, agent.kind) {
             return;
         }
-        let Some(m) = self.messages.iter_mut().find(|m| m.queued && m.to == term) else {
+        let Some(text) = self.next_message(term) else {
             return;
         };
+        if let Some(agent) = self.agents.get_mut(&term) {
+            agent.busy_until = Some(Instant::now() + DELIVERY_GAP);
+            agent.status = Status::Working;
+            agent.quiet = 0;
+        }
+        self.effects.push(Effect::Deliver(term, text));
+    }
+
+    /// Takes the oldest message queued for `term`, ready to hand over.
+    fn next_message(&mut self, term: TermId) -> Option<String> {
+        let m = self
+            .messages
+            .iter_mut()
+            .find(|m| m.queued && m.to == term)?;
         m.queued = false;
-        agent.busy_until = Some(Instant::now() + DELIVERY_GAP);
-        agent.status = Status::Working;
-        agent.quiet = 0;
-        self.effects
-            .push(Effect::Deliver(term, messages::envelope(m)));
         self.changed = true;
+        Some(messages::envelope(m))
     }
 
     /// The next blocked agent after `from` in `order`, or failing that the next done one.
@@ -422,11 +438,11 @@ mod tests {
 
     const T: TermId = TermId(1);
 
-    fn not_typing(_: TermId) -> bool {
+    fn not_typing(_: TermId, _: Kind) -> bool {
         false
     }
 
-    fn typing(_: TermId) -> bool {
+    fn typing(_: TermId, _: Kind) -> bool {
         true
     }
 
@@ -464,20 +480,46 @@ mod tests {
     }
 
     #[test]
-    fn messages_wait_for_the_agent_to_finish_its_turn() {
+    fn a_message_goes_in_through_the_stop_hook_without_touching_the_prompt() {
         let mut a = Agents::default();
         hook(&mut a, json!({"hook_event_name": "UserPromptSubmit"}));
         assert_eq!(a.take().0, [Effect::ClearDraft(T)]);
         assert_eq!(a.send(message("first"), &AWAY), Ok("queued"));
         assert!(a.take().0.is_empty());
+        let (tx, rx) = async_channel::bounded(1);
+        a.wait(T, tx);
 
-        hook(&mut a, json!({"hook_event_name": "Stop"}));
+        let busy = Env {
+            viewed: None,
+            typing: &typing,
+        };
+        let stop = json!({"hook_event_name": "Stop"});
+        let out = a
+            .hook(T, &stop, &busy)
+            .expect("the hook hands the message over");
+        let out: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(out["decision"], "block");
+        assert!(out["reason"].as_str().unwrap().contains("first"));
         let (effects, changed) = a.take();
-        assert!(changed);
-        let delivered =
-            |e: &Effect| matches!(e, Effect::Deliver(T, text) if text.contains("first"));
-        assert!(effects.iter().any(delivered));
+        assert!(changed && effects.is_empty());
+        assert!(!a.messages[0].queued);
         assert_eq!(a.status(T), Some(Status::Working));
+        assert!(rx.try_recv().is_err());
+
+        hook(&mut a, json!({"hook_event_name": "PostToolUse"}));
+        assert_eq!(a.hook(T, &stop, &busy), None);
+        assert_eq!(a.status(T), Some(Status::Done));
+        assert_eq!(rx.try_recv(), Ok(Reply::Ok("done".into())));
+    }
+
+    #[test]
+    fn only_a_sent_prompt_clears_the_draft() {
+        let mut a = Agents::default();
+        hook(&mut a, json!({"hook_event_name": "SessionStart"}));
+        hook(&mut a, json!({"hook_event_name": "PreToolUse"}));
+        assert!(!a.take().0.contains(&Effect::ClearDraft(T)));
+        hook(&mut a, json!({"hook_event_name": "UserPromptSubmit"}));
+        assert!(a.take().0.contains(&Effect::ClearDraft(T)));
     }
 
     #[test]

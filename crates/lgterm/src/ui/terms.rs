@@ -156,7 +156,7 @@ impl Workspace {
         }
         let terms = &self.terms;
         let app: &App = cx;
-        let typing = |t: TermId| terms.get(&t).is_some_and(|t| t.view.read(app).typing());
+        let typing = super::agents::typing(terms, app);
         let env = Env {
             viewed: self.viewed(window),
             typing: &typing,
@@ -172,6 +172,7 @@ impl Workspace {
             self.agents.poll(*id, seen, &env);
         }
         self.agents.settle(&env);
+        drop(typing);
         self.run_effects(cx);
     }
 

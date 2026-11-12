@@ -1,16 +1,38 @@
 //! Carrying out what the agents decide: messages typed in, alerts, and the Dock badge.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use gpui::{App, Context, SystemNotification, Window};
 
 use super::Workspace;
-use crate::agents::{Agents, Effect, Env, Status};
+use super::terms::Term;
+use crate::agents::{Agents, Effect, Env, Kind, Status};
 use crate::dock;
 use crate::model::{Tab, TermId};
 
 /// How long after pasting a message its return is pressed.
 const RETURN_AFTER: Duration = Duration::from_millis(150);
+
+/// Rows at the bottom of an agent's screen that hold its prompt box.
+const PROMPT_ROWS: usize = 16;
+
+/// Whether the user is typing a prompt for an agent: they pressed a key just now, or its
+/// prompt box has text, or they typed a prompt and haven't sent it when there's no box to read.
+pub(super) fn typing<'a>(
+    terms: &'a HashMap<TermId, Term>,
+    app: &'a App,
+) -> impl Fn(TermId, Kind) -> bool + 'a {
+    move |t, kind| {
+        terms.get(&t).is_some_and(|t| {
+            let view = t.view.read(app);
+            view.typed_recently()
+                || kind
+                    .prompt_typed(&view.bottom_rows(PROMPT_ROWS))
+                    .unwrap_or_else(|| view.draft())
+        })
+    }
+}
 
 impl Workspace {
     /// The terminal the user is looking at.
@@ -31,7 +53,7 @@ impl Workspace {
         let viewed = self.viewed(window);
         let terms = &self.terms;
         let app: &App = cx;
-        let typing = |t: TermId| terms.get(&t).is_some_and(|t| t.view.read(app).typing());
+        let typing = typing(terms, app);
         let out = f(
             &mut self.agents,
             &Env {
@@ -39,6 +61,7 @@ impl Workspace {
                 typing: &typing,
             },
         );
+        drop(typing);
         self.run_effects(cx);
         out
     }

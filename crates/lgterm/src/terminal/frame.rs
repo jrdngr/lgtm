@@ -56,6 +56,7 @@ pub struct Cursor {
 pub struct Frame {
     pub rows: Rc<Vec<Row>>,
     pub cursor: Option<Cursor>,
+    pub fg: u32,
     pub bg: u32,
 }
 
@@ -177,6 +178,7 @@ impl Snapshotter {
         Ok(Frame {
             rows: self.lines.clone(),
             cursor,
+            fg,
             bg,
         })
     }

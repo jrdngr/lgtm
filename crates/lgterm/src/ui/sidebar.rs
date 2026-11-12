@@ -281,6 +281,7 @@ impl Workspace {
                     .whitespace_nowrap()
                     .child(self.term_label(term.into())),
             )
+            .children(self.waiting_mark(term))
             .children(self.agents.status(term).map(|s| self.mark(s)))
             .on_click(cx.listener(move |w, _, window, cx| {
                 w.model.focus_term(term);

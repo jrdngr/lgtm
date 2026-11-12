@@ -53,9 +53,10 @@ pub fn hook() -> i32 {
 }
 
 /// Passes a hook on to lgterm when this runs in one of its terminals, so it can show the
-/// agent's status. Waits briefly for lgterm to take it, so hooks arrive in order.
+/// agent's status, and prints what lgterm has for the hook to say. Waits briefly for lgterm
+/// to take it, so hooks arrive in order.
 fn tell_lgterm(input: &str) {
-    use lgterm_proto::Request;
+    use lgterm_proto::{Reply, Request};
 
     let Some((term, socket)) = lgterm_proto::here() else {
         return;
@@ -67,7 +68,12 @@ fn tell_lgterm(input: &str) {
         term: term.to_string(),
         event,
     };
-    let _ = lgterm_proto::call(&socket, &hook, Some(std::time::Duration::from_millis(500)));
+    let wait = std::time::Duration::from_secs(2);
+    if let Ok(Reply::Ok(out)) = lgterm_proto::call(&socket, &hook, Some(wait))
+        && !out.is_empty()
+    {
+        println!("{out}");
+    }
 }
 
 /// The desktop app's binary: the one that started this terminal, else an installed app.
