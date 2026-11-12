@@ -6,7 +6,6 @@ mod command;
 pub(crate) mod draw;
 mod finder;
 pub mod help;
-mod preview;
 mod split;
 
 pub use split::FLAG as SPLIT_FLAG;
@@ -15,6 +14,7 @@ use crate::tui::help::Group;
 use std::path::{Path, PathBuf};
 
 use lgtm_core::syntax::Segment;
+use lgtm_tui_kit::markdown as preview;
 use ratatui::crossterm::event::KeyEvent;
 
 use crate::edit::buffer::{Buffer, Sel};

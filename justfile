@@ -5,8 +5,9 @@ log := "lgtm_lib=info,lgtm_core=info,ui=info,warn"
 # Hourly log files, the last 24 kept, at most 50 MB each
 export LGTM_LOG_DIR := justfile_directory() / "logs"
 
-# Fetch, start a new change on main@origin, and install the `lgtm` command and lgterm
-go: fresh install-tui install-lgterm
+# Fetch, start a new change on main@origin, and install the `lgtm` command, lgtm-issues and
+# lgterm
+go: fresh install-tui install-issues install-lgterm
 
 [private]
 fresh:
@@ -33,6 +34,10 @@ build-app:
 build-tui:
     cargo build --release --locked -p lgtm
 
+# Build the `lgtm-issues` command
+build-issues:
+    cargo build --release --locked -p lgtm-issues
+
 # Build lgterm, the terminal multiplexer, and bundle lgterm.app. Needs Zig 0.17 and Rust 1.99
 # or newer.
 build-lgterm:
@@ -47,6 +52,11 @@ install-app: build-app
 install-tui: build-tui
     mkdir -p ~/.local/bin
     install -m 755 target/release/lgtm ~/.local/bin/lgtm
+
+# Build the `lgtm-issues` command and put it in ~/.local/bin
+install-issues: build-issues
+    mkdir -p ~/.local/bin
+    install -m 755 target/release/lgtm-issues ~/.local/bin/lgtm-issues
 
 # Build lgterm, put lgterm.app in /Applications, replacing any copy there, and link the
 # `lgterm` command into ~/.local/bin

@@ -4242,6 +4242,7 @@ dependencies = [
  "ignore",
  "lgterm-proto",
  "lgtm-core",
+ "lgtm-tui-kit",
  "notify",
  "pulldown-cmark",
  "ratatui",
@@ -4396,6 +4397,27 @@ dependencies = [
  "tree-sitter-toml-ng",
  "tree-sitter-typescript",
  "tree-sitter-yaml",
+]
+
+[[package]]
+name = "lgtm-issues"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "lgterm-proto",
+ "lgtm-tui-kit",
+ "ratatui",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "lgtm-tui-kit"
+version = "0.1.0"
+dependencies = [
+ "lgtm-core",
+ "pulldown-cmark",
+ "ratatui",
 ]
 
 [[package]]

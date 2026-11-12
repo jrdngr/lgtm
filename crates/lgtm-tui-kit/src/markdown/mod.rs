@@ -1,4 +1,4 @@
-//! A markdown file rendered, read-only, in place of its text: `space m` goes in and out.
+//! Markdown rendered read-only: what the editor shows for `space m`, and lgtm-issues for an issue.
 
 mod render;
 mod table;
@@ -6,8 +6,8 @@ mod table;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 
-use crate::tui::paint::Canvas;
-use crate::tui::theme::BG;
+use crate::paint::Canvas;
+use crate::theme::BG;
 use render::Line;
 
 /// The widest the text gets, for lines that read well.

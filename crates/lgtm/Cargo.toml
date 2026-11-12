@@ -9,6 +9,7 @@ license = "MIT"
 anyhow = "1"
 lgtm-core = { path = "../lgtm-core" }
 lgterm-proto = { path = "../lgterm-proto" }
+lgtm-tui-kit = { path = "../lgtm-tui-kit" }
 ignore = "0.4.33"
 notify = "8.2.0"
 ropey = "1.6"

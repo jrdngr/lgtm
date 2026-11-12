@@ -3,7 +3,7 @@
 use ratatui::style::Modifier;
 
 use super::render::Run;
-use crate::tui::theme::{self, BG, HAIR};
+use crate::theme::{self, BG, HAIR};
 
 #[derive(Clone, Copy)]
 pub enum Align {

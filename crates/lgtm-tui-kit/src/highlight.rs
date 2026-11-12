@@ -3,7 +3,7 @@
 use lgtm_core::syntax::{self, HIGHLIGHT_NAMES, Items, Segment};
 use ratatui::style::Color;
 
-use super::theme::{self, FG};
+use crate::theme::{self, FG};
 
 /// Highlight segments per line of a file's old and new sides, empty where there's no grammar
 /// or no such side.

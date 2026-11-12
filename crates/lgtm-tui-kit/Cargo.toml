@@ -1,0 +1,11 @@
+[package]
+name = "lgtm-tui-kit"
+version = "0.1.0"
+description = "Drawing pieces the lgtm terminal programs share: colors, canvas, key bar, markdown"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+lgtm-core = { path = "../lgtm-core" }
+pulldown-cmark = { version = "0.13", default-features = false }
+ratatui = "0.30"

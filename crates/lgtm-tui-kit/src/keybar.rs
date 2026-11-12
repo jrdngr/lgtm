@@ -3,8 +3,8 @@
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
-use super::paint::Canvas;
-use super::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
+use crate::paint::Canvas;
+use crate::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
 
 /// A hint: its keys, space-separated when a pair goes both ways, its label, and whether what
 /// it toggles is on.

@@ -3,7 +3,7 @@ use ratatui::style::Modifier;
 
 use super::render::render;
 use super::*;
-use crate::tui::theme::PANEL;
+use crate::theme::PANEL;
 
 fn texts(md: &str, width: usize) -> Vec<String> {
     render(md, width)
