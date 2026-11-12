@@ -10,6 +10,7 @@ mod expand;
 mod layout_box;
 mod marks;
 mod menu;
+mod message_body;
 mod messages;
 mod overlay;
 mod palette;

@@ -14,6 +14,8 @@ use crate::ipc::Reply;
 use crate::model::{Tab, TermId};
 use crate::theme;
 
+mod mock;
+
 impl Workspace {
     pub(super) fn send_message(
         &mut self,
@@ -42,6 +44,12 @@ impl Workspace {
     }
 
     pub(super) fn render_messages(&self) -> AnyElement {
+        match std::env::var("LGTERM_MSG_MOCK").as_deref() {
+            Ok("1") => return mock::cards(&self.agents.messages),
+            Ok("2") => return mock::inbox(&self.agents.messages),
+            Ok("3") => return mock::conversations(&self.agents.messages),
+            _ => {}
+        }
         let rows = self.agents.messages.iter().enumerate().map(|(i, m)| {
             let who = |label: &str, id: Option<TermId>| {
                 div()
