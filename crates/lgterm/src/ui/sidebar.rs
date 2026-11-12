@@ -351,8 +351,15 @@ impl SpaceRow for Stateful<gpui::Div> {
 }
 
 impl Workspace {
-    /// The button that shows or hides the sidebar, just right of the traffic lights.
+    /// The button that shows or hides the sidebar: at the sidebar header's right edge, over
+    /// the new space button, or just right of the traffic lights when the sidebar is hidden or
+    /// shows only badges.
     pub(super) fn render_sidebar_toggle(&self) -> AnyElement {
+        let left = if self.sidebar && !self.sidebar_icons() {
+            self.sidebar_width - 37.
+        } else {
+            78.
+        };
         let icon = if self.sidebar {
             "ui/sidebar-open.svg"
         } else {
@@ -362,7 +369,7 @@ impl Workspace {
             .id("sidebar-toggle")
             .absolute()
             .top(px(12.))
-            .left(px(78.))
+            .left(px(left))
             .size(px(22.))
             .flex()
             .items_center()
