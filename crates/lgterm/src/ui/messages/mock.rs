@@ -344,3 +344,184 @@ pub fn conversations(messages: &[Message]) -> AnyElement {
         )
         .into_any_element()
 }
+
+/// Agent colors, one per open agent, kept for the agent's life.
+const AGENT_COLORS: [u32; 8] = [
+    0x58a6ff, 0xf0883e, 0xbc8cff, 0xf778ba, 0x56d364, 0x39c5cf, 0xe3b341, 0xff7b72,
+];
+
+/// The mockup's colors: by id order among the agents in the seeded state.
+pub fn agent_color(id: TermId) -> u32 {
+    let order = [1, 4, 9, 17];
+    let i = order.iter().position(|&n| n == id.0).unwrap_or(id.0 as usize);
+    AGENT_COLORS[i % AGENT_COLORS.len()]
+}
+
+pub fn on() -> bool {
+    std::env::var("LGTERM_MSG_MOCK").is_ok()
+}
+
+/// `t17` in the agent's color, on a tint of it.
+pub fn chip(id: TermId) -> gpui::Div {
+    let color = agent_color(id);
+    div()
+        .flex_none()
+        .px(px(5.))
+        .rounded(px(4.))
+        .bg(gpui::rgba(theme::tint(color, 0x2e)))
+        .font_family(fonts::mono())
+        .text_size(px(11.5))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(rgb(color))
+        .child(id.to_string())
+}
+
+/// One agent in a pair row: its chip and its space.
+fn agent_line(id: TermId, space: String) -> impl IntoElement {
+    div()
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .min_w_0()
+        .child(chip(id))
+        .child(
+            div()
+                .min_w_0()
+                .overflow_hidden()
+                .text_ellipsis()
+                .whitespace_nowrap()
+                .text_color(rgb(theme::TEXT))
+                .child(SharedString::from(space)),
+        )
+}
+
+/// 4: conversations, agents named by id and space, in their colors, with unread counts.
+pub fn conversations_v2(messages: &[Message], space: &dyn Fn(TermId) -> String) -> AnyElement {
+    let mut pairs: Vec<(Option<TermId>, TermId)> = vec![];
+    for m in messages.iter().rev() {
+        let p = pair(m);
+        if !pairs.contains(&p) {
+            pairs.push(p);
+        }
+    }
+    let picked = 0;
+    let rows = pairs.iter().enumerate().map(|(i, &(a, b))| {
+        let unread = if i == picked {
+            0
+        } else {
+            messages
+                .iter()
+                .filter(|m| pair(m) == (a, b) && m.time.as_str() > "12:05")
+                .count()
+        };
+        div()
+            .id(("pair", i))
+            .flex()
+            .items_center()
+            .gap(px(10.))
+            .px(px(14.))
+            .py(px(10.))
+            .border_b_1()
+            .border_color(rgb(theme::ROW_RULE))
+            .when(i == picked, |d| d.bg(rgb(theme::ROW_SELECTED)))
+            .text_size(px(13.))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .gap(px(6.))
+                    .when_some(a, |d, a| d.child(agent_line(a, space(a))))
+                    .child(agent_line(b, space(b))),
+            )
+            .when(unread > 0, |d| {
+                d.child(
+                    div()
+                        .flex_none()
+                        .min_w(px(20.))
+                        .h(px(20.))
+                        .px(px(6.))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .rounded(px(10.))
+                        .bg(rgb(theme::FOCUS))
+                        .text_size(px(11.5))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(rgb(theme::BADGE_TEXT))
+                        .child(unread.to_string()),
+                )
+            })
+    });
+    let shown: Vec<&Message> = pairs
+        .get(picked)
+        .map(|&p| messages.iter().filter(|m| pair(m) == p).collect())
+        .unwrap_or_default();
+    let transcript = shown.into_iter().map(|m| {
+        let who = m.from.unwrap_or(m.to);
+        let color = agent_color(who);
+        div()
+            .flex()
+            .gap(px(12.))
+            .child(div().w(px(3.)).flex_none().rounded(px(2.)).bg(rgb(color)))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .max_w(px(820.))
+                    .flex()
+                    .flex_col()
+                    .gap(px(8.))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(px(8.))
+                            .text_size(px(13.))
+                            .child(chip(who))
+                            .child(
+                                div()
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .text_color(rgb(theme::TEXT_STRONG))
+                                    .child(SharedString::from(space(who))),
+                            )
+                            .child(time(m))
+                            .children(pill(m)),
+                    )
+                    .child(message_body::render(&m.text)),
+            )
+    });
+    div()
+        .size_full()
+        .flex()
+        .child(
+            div()
+                .id("pairs")
+                .w(px(240.))
+                .flex_none()
+                .h_full()
+                .overflow_y_scroll()
+                .border_r_1()
+                .border_color(rgb(theme::ROW_RULE))
+                .children(rows),
+        )
+        .child(
+            div()
+                .id("transcript")
+                .flex_1()
+                .min_w_0()
+                .h_full()
+                .overflow_y_scroll()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap(px(22.))
+                        .px(px(24.))
+                        .py(px(20.))
+                        .children(transcript),
+                ),
+        )
+        .into_any_element()
+}
