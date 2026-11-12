@@ -42,6 +42,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
     let mut help: Option<super::help::Help> = None;
     let mut pick: Option<mention::Pick> = None;
     let mut polled = Instant::now();
+    let mut refreshed = Instant::now();
     let result = (|| -> anyhow::Result<()> {
         loop {
             term.terminal.draw(|f| {
@@ -115,7 +116,8 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                 polled = Instant::now();
                 e.check_disk();
             }
-            if std::mem::take(&mut e.saved) {
+            if std::mem::take(&mut e.saved) || refreshed.elapsed() >= super::REFRESH {
+                refreshed = Instant::now();
                 git_decor(&root, tx.clone());
             }
             // Outside jj the markers' own labels are all there is.

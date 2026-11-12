@@ -261,7 +261,7 @@ struct App {
 /// How often to look for another app's writes to the store.
 const POLL: Duration = Duration::from_millis(250);
 /// How often the home screen snapshots the working copy, so edits by others show up.
-const REFRESH: Duration = Duration::from_secs(5);
+pub(super) const REFRESH: Duration = Duration::from_secs(5);
 
 impl App {
     fn open(&mut self, target: Target) {
@@ -377,7 +377,10 @@ impl App {
             while let Ok(msg) = rx.try_recv() {
                 self.message(msg);
             }
-            if self.screen == Screen::Home && self.refreshed.elapsed() >= REFRESH {
+            // Agents change files while the editor is open too, so both trees keep up.
+            if matches!(self.screen, Screen::Home | Screen::Editor)
+                && self.refreshed.elapsed() >= REFRESH
+            {
                 self.refreshed = Instant::now();
                 // A snapshot that changed something lands as an operation, which reloads.
                 self.loader.decor();
