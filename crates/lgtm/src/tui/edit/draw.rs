@@ -5,6 +5,7 @@ use lgtm_core::syntax::{self, HIGHLIGHT_NAMES, Segment};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 
+use super::click::TextRow;
 use super::{Editor, Open};
 use crate::edit::buffer::Buffer;
 use crate::edit::gutter::{self, Mark};
@@ -18,7 +19,7 @@ use crate::tui::theme::{
 use crate::tui::width;
 
 /// Columns a tab takes.
-const TAB: usize = 4;
+pub(super) const TAB: usize = 4;
 /// Columns the sidebar takes by default, with its border.
 const SIDEBAR: u16 = 30;
 /// The narrowest the sidebar gets.
@@ -193,6 +194,7 @@ impl Editor {
 
     fn draw_text(&mut self, c: &mut Canvas, body: Rect) {
         self.height = body.height as usize;
+        self.rows.clear();
         let mode = self.keys.mode;
         let Some(open) = self.open.get_mut(self.cur) else {
             return;
@@ -252,6 +254,14 @@ impl Editor {
             if wrap {
                 let starts = row_starts(b, line, width);
                 let rows = starts.len().min((body.bottom() - y) as usize);
+                for (r, &col) in starts[..rows].iter().enumerate() {
+                    self.rows.push(TextRow {
+                        y: y + r as u16,
+                        x: code_x,
+                        line,
+                        col,
+                    });
+                }
                 let end = draw_wrapped(c, b, mode, line, segs, code_x, y, width, &starts[..rows]);
                 if let Some(fold_end) = fold {
                     let (row, x) = place(&starts, end);
@@ -261,6 +271,12 @@ impl Editor {
                 }
                 y += rows as u16;
             } else {
+                self.rows.push(TextRow {
+                    y,
+                    x: code_x,
+                    line,
+                    col: left,
+                });
                 let end = draw_line(c, b, mode, line, segs, code_x, y, left, width);
                 if let Some(fold_end) = fold {
                     draw_fold(c, b, fold_end, code_x, y, end.saturating_sub(left));

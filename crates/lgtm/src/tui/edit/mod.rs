@@ -1,5 +1,6 @@
 //! The editor screen: open buffers, the one in view, the `:` command line, and the keys.
 
+mod click;
 pub mod clipboard;
 mod command;
 pub(crate) mod draw;
@@ -148,6 +149,10 @@ pub struct Editor {
     pub wrap: bool,
     /// The sidebar's width as last drawn, 0 when hidden.
     sidebar_width: u16,
+    /// The rows of text as last drawn, top down.
+    rows: Vec<click::TextRow>,
+    /// Where a drag over the text started.
+    drag_from: Option<usize>,
 }
 
 impl Editor {
@@ -170,6 +175,8 @@ impl Editor {
             files_width: None,
             wrap: false,
             sidebar_width: 0,
+            rows: vec![],
+            drag_from: None,
         }
     }
 
@@ -336,7 +343,7 @@ impl Editor {
 
     /// A click in the sidebar opens a file or a folder, and the wheel scrolls it. Over the
     /// text the wheel scrolls the view three lines a notch, and the cursor with it, as the
-    /// review does.
+    /// review does, and a click or a drag moves the cursor or selects.
     pub fn mouse(&mut self, ev: ratatui::crossterm::event::MouseEvent) {
         use ratatui::crossterm::event::{
             KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
@@ -359,11 +366,11 @@ impl Editor {
             }
             return;
         }
-        if !self.sidebar.contains(ev.column, ev.row) {
+        if !self.sidebar.contains(ev.column, ev.row) || self.drag_from.is_some() {
             let (code, by) = match ev.kind {
                 MouseEventKind::ScrollDown => (KeyCode::Down, 3),
                 MouseEventKind::ScrollUp => (KeyCode::Up, -3),
-                _ => return,
+                kind => return self.text_mouse(kind, ev.column, ev.row),
             };
             self.scroll_view(by);
             for _ in 0..3 {
@@ -902,6 +909,51 @@ mod tests {
         // The second long line's last row is the fifth row down, so the view moves a line.
         press(&mut e, "jj$");
         assert_eq!(draw(&mut e), ["end", "abcdefghij", "klmnopqrst", "uvwxyz"]);
+    }
+
+    #[test]
+    fn clicking_moves_the_cursor_and_dragging_selects_in_any_mode() {
+        use ratatui::buffer::Buffer as Screen;
+        use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+        use ratatui::layout::Rect;
+        let (_dir, mut e) = editor_on("one\n\ttwo\nthree\n");
+        e.files = false;
+        let area = Rect::new(0, 0, 30, 6);
+        e.draw(
+            &mut crate::tui::paint::Canvas::new(&mut Screen::empty(area), area),
+            area,
+        );
+        // The text starts at column 6, after the gutter and the numbers.
+        let mouse = |e: &mut Editor, kind, column, row| {
+            e.mouse(MouseEvent {
+                kind,
+                column,
+                row,
+                modifiers: KeyModifiers::NONE,
+            })
+        };
+        let sel = |e: &Editor| e.current().map(|b| (b.sel.anchor, b.sel.head)).unwrap();
+        let down = MouseEventKind::Down(MouseButton::Left);
+        let drag = MouseEventKind::Drag(MouseButton::Left);
+        let up = MouseEventKind::Up(MouseButton::Left);
+
+        press(&mut e, "i");
+        // Past the tab's four columns, on the "w" of "two".
+        mouse(&mut e, down, 11, 1);
+        mouse(&mut e, up, 11, 1);
+        assert_eq!((sel(&e), e.keys.mode), ((6, 6), Mode::Insert));
+
+        // Past the end of "one", the cursor goes on its newline.
+        mouse(&mut e, down, 20, 0);
+        assert_eq!(sel(&e), (3, 3));
+        mouse(&mut e, drag, 8, 2);
+        mouse(&mut e, up, 8, 2);
+        assert_eq!((sel(&e), e.keys.mode), ((3, 11), Mode::Normal));
+
+        press(&mut e, "v");
+        mouse(&mut e, down, 6, 0);
+        mouse(&mut e, drag, 7, 0);
+        assert_eq!((sel(&e), e.keys.mode), ((0, 1), Mode::Select));
     }
 
     #[test]
