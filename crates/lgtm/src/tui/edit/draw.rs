@@ -466,6 +466,12 @@ fn paint_line(
     let colors = char_colors(text, segs);
     let selected = |i: usize| mode != Mode::Insert && i >= b.sel.from() && i <= b.sel.to();
     let cursor = |i: usize| i == b.sel.head;
+    // Insert mode shows the terminal's bar before the char instead of a block on it.
+    let block = match mode {
+        Mode::Normal => Some(theme::fg(BG).bg(FG)),
+        Mode::Select => Some(theme::fg(BG).bg(AMBER)),
+        Mode::Insert => None,
+    };
     let mut col = 0usize;
     let cell = |c: &mut Canvas, col: usize, s: &str, style: Style| {
         if let Some((x, y)) = at(col) {
@@ -476,8 +482,14 @@ fn paint_line(
         let i = start + k;
         let w = if ch == '\t' { TAB } else { 1 };
         let fg = colors.get(k).copied().unwrap_or(FG);
-        let style = if cursor(i) {
-            theme::fg(BG).bg(FG)
+        if cursor(i)
+            && block.is_none()
+            && let Some((x, y)) = at(col)
+        {
+            c.bar_at(x, y);
+        }
+        let style = if let Some(block) = block.filter(|_| cursor(i)) {
+            block
         } else if selected(i) {
             theme::fg(fg).bg(SEL)
         } else {
@@ -495,7 +507,14 @@ fn paint_line(
     // The newline, or the end of the text, when the cursor or selection is on it.
     let eol = start + text.chars().count();
     if cursor(eol) {
-        cell(c, col, " ", theme::fg(BG).bg(FG));
+        match block {
+            Some(block) => cell(c, col, " ", block),
+            None => {
+                if let Some((x, y)) = at(col) {
+                    c.bar_at(x, y);
+                }
+            }
+        }
     } else if selected(eol) && eol < b.len() {
         cell(c, col, " ", theme::fg(FG).bg(SEL));
     }

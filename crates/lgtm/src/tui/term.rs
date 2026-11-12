@@ -5,6 +5,7 @@
 use std::io::stdout;
 
 use ratatui::DefaultTerminal;
+use ratatui::crossterm::cursor::SetCursorStyle;
 use ratatui::crossterm::event::{
     DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture, KeyCode,
     KeyEvent, KeyModifiers, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
@@ -22,6 +23,9 @@ impl Term {
     pub fn start() -> Self {
         let terminal = ratatui::init();
         let _ = execute!(stdout(), EnableMouseCapture, EnableBracketedPaste);
+        // The cursor shows only in insert mode, as a bar in the text's color.
+        let _ = execute!(stdout(), SetCursorStyle::SteadyBar);
+        print!("\x1b]12;#d4d4d4\x07");
         Self {
             terminal,
             enhanced: enhance(),
@@ -30,6 +34,8 @@ impl Term {
 
     fn release(&self) {
         let _ = execute!(stdout(), DisableMouseCapture, DisableBracketedPaste);
+        let _ = execute!(stdout(), SetCursorStyle::DefaultUserShape);
+        print!("\x1b]112\x07");
         if self.enhanced {
             let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
         }

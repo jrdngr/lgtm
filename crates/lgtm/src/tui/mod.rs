@@ -343,7 +343,11 @@ impl App {
         loop {
             term.terminal.draw(|f| {
                 let area = f.area();
-                self.draw(&mut Canvas::new(f.buffer_mut(), area));
+                let c = &mut Canvas::new(f.buffer_mut(), area);
+                self.draw(c);
+                if let Some(at) = c.bar {
+                    f.set_cursor_position(at);
+                }
             })?;
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {

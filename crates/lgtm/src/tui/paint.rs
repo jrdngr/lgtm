@@ -7,11 +7,24 @@ use ratatui::style::{Color, Style};
 pub struct Canvas<'a> {
     pub buf: &'a mut Buffer,
     pub area: Rect,
+    /// Where the terminal's own cursor shows, as a bar: where typing goes in insert mode.
+    pub bar: Option<(u16, u16)>,
 }
 
 impl<'a> Canvas<'a> {
     pub fn new(buf: &'a mut Buffer, area: Rect) -> Self {
-        Self { buf, area }
+        Self {
+            buf,
+            area,
+            bar: None,
+        }
+    }
+
+    /// Puts the terminal's cursor bar at (`x`, `y`), if that's in the area.
+    pub fn bar_at(&mut self, x: u16, y: u16) {
+        if self.inside(x, y) {
+            self.bar = Some((x, y));
+        }
     }
 
     fn right(&self) -> u16 {

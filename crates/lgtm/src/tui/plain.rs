@@ -49,6 +49,9 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                 let area = f.area();
                 let c = &mut Canvas::new(f.buffer_mut(), area);
                 super::draw_editor(c, &mut e, help.as_mut(), pick.as_ref());
+                if let Some(at) = c.bar {
+                    f.set_cursor_position(at);
+                }
             })?;
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {
