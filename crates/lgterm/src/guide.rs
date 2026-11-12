@@ -25,13 +25,14 @@ in panes (splits), panes in spaces, and spaces in the window's layout.
 
 ## Talking
 
-  lgterm send t9 "Status?"         message an agent; it arrives when the agent is idle
+  lgterm send t9 "Status?"         message an agent; it arrives when the agent ends its turn
   lgterm wait t9 [--timeout 600]   block until t9 is done, blocked or gone
   lgterm read t9 [--lines 50]      the text on t9's screen
   lgterm ls [--json]               every terminal: id, status, space, name
 
 Messages arrive as "[lgterm message from t4 · name] ..." with the command to reply. Tell the
-agents you start who you are and to report back with lgterm send.
+agents you start who you are and to report back with lgterm send. Talk to agents with send,
+never type: send waits for its turn and never lands in what the user is typing.
 
 ## Cleaning up
 
