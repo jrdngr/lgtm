@@ -957,6 +957,22 @@ mod tests {
     }
 
     #[test]
+    fn wc_saves_and_closes_and_close_bang_drops_edits() {
+        let (dir, mut e) = editor_on("one\n");
+        let path = dir.path().join("a.txt");
+        e.open[0].buf.insert(0, "zero\n");
+        e.run_command("wc");
+        assert!(e.open.is_empty());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "zero\none\n");
+
+        e.run_command(&format!("e {}", path.display()));
+        e.open[0].buf.insert(0, "dropped\n");
+        e.run_command("c!");
+        assert!(e.open.is_empty());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "zero\none\n");
+    }
+
+    #[test]
     fn with_no_file_open_keys_stay_in_the_sidebar_where_a_makes_a_file_in_its_folder() {
         let (dir, mut e) = editor_on("one\n");
         std::fs::create_dir(dir.path().join("b")).unwrap();

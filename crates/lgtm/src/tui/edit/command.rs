@@ -19,6 +19,8 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("wq", "save and quit"),
     ("wqa", "save all and quit"),
     ("close", "close the file in view"),
+    ("wc", "save and close the file in view"),
+    ("close!", "close, dropping unsaved edits"),
     ("reload", "read the file again, over edits"),
     ("raw", "edit conflict markers as text"),
     ("resolve", "resolve the file's conflicts"),
@@ -109,18 +111,18 @@ impl Editor {
             _ => {}
         }
         match line {
-            "w" => {
+            "w" | "w!" => {
                 self.save();
             }
             "wa" => {
                 self.save_all();
             }
-            "wq" | "x" => {
+            "wq" | "x" | "wq!" | "x!" => {
                 if self.save() {
                     return self.quit(false);
                 }
             }
-            "wqa" | "xa" => {
+            "wqa" | "xa" | "wqa!" | "xa!" => {
                 if self.save_all() {
                     return self.quit(false);
                 }
@@ -130,7 +132,13 @@ impl Editor {
             "side" => crate::tui::side::toggle(),
             "q" | "qa" => return self.quit(false),
             "q!" | "qa!" => return self.quit(true),
-            "close" | "c" => return self.close(),
+            "close" | "c" => return self.close(false),
+            "close!" | "c!" => return self.close(true),
+            "wc" | "wc!" | "wclose" => {
+                if self.save() {
+                    return self.close(false);
+                }
+            }
             "raw" => {
                 if let Some(o) = self.open.get_mut(self.cur) {
                     if o.resolve.as_ref().is_some_and(|r| r.dirty()) {
@@ -285,11 +293,12 @@ impl Editor {
 
     /// Closes the buffer in view unless it has unsaved edits. With the last one closed, keys
     /// go to the sidebar.
-    fn close(&mut self) -> Outcome {
+    /// Closes the file in view; with `force`, over unsaved edits.
+    fn close(&mut self, force: bool) -> Outcome {
         let Some(o) = self.open.get(self.cur) else {
             return Outcome::None;
         };
-        if o.dirty() {
+        if o.dirty() && !force {
             self.notice = Some(format!("unsaved: {}", o.buf.name));
             return Outcome::None;
         }
