@@ -57,6 +57,9 @@ pub const CHIP_BORDER: u32 = 0x4a4a4a;
 pub const MATCH: u32 = 0x79b8ff;
 pub const CODE: u32 = 0x39c5cf;
 pub const ROW_RULE: u32 = 0x2a2a2a;
+pub const UNREAD: u32 = 0x2a4a6e;
+pub const UNREAD_TEXT: u32 = 0xd8e9fb;
+pub const MESSAGE: u32 = 0x252525;
 
 /// The space colors, also the sidebar badges'.
 const SPACE_COLORS: [u32; 8] = [

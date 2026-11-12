@@ -17,6 +17,26 @@ pub struct Message {
     /// The agent it was queued for left before it could go in.
     #[serde(default)]
     pub dropped: bool,
+    /// Seen by the user. Messages saved before this was kept count as seen.
+    #[serde(default = "seen")]
+    pub read: bool,
+    /// The sender's and receiver's spaces when it was sent, for once they've closed.
+    #[serde(default)]
+    pub from_space: Option<SpaceTag>,
+    #[serde(default)]
+    pub to_space: Option<SpaceTag>,
+}
+
+/// A space as it was: its id, name and color.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SpaceTag {
+    pub id: u64,
+    pub name: String,
+    pub color: usize,
+}
+
+fn seen() -> bool {
+    true
 }
 
 /// The oldest messages are dropped past this many.
@@ -70,6 +90,9 @@ mod tests {
             text: "tests pass".into(),
             queued: true,
             dropped: false,
+            read: false,
+            from_space: None,
+            to_space: None,
         }
     }
 

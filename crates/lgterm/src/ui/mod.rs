@@ -10,6 +10,7 @@ mod expand;
 mod layout_box;
 mod marks;
 mod menu;
+mod message_body;
 mod messages;
 mod overlay;
 mod palette;
@@ -71,6 +72,7 @@ pub struct Workspace {
     home_name: String,
     settings: Settings,
     messages_focus: FocusHandle,
+    messages_view: messages::View,
     /// Has the keyboard while an empty slot is focused.
     root_focus: FocusHandle,
     /// The terminal last given focus, told when it loses it.
@@ -116,6 +118,7 @@ impl Workspace {
             home_name,
             settings,
             messages_focus: cx.focus_handle(),
+            messages_view: Default::default(),
             root_focus: cx.focus_handle(),
             focused: None,
             held: Held::None,

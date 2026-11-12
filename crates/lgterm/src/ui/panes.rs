@@ -447,6 +447,21 @@ impl Workspace {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
+        let body = match split.tab() {
+            Tab::Messages => Some(
+                div()
+                    .size_full()
+                    .track_focus(&self.messages_focus)
+                    .child(self.render_messages(cx))
+                    .into_any_element(),
+            ),
+            Tab::Term(t) => self.terms.get(&t).map(|t| {
+                t.view
+                    .clone()
+                    .cached(StyleRefinement::default().size_full())
+                    .into_any_element()
+            }),
+        };
         let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
             let active = i == split.active;
             let key = match tab {
@@ -515,21 +530,6 @@ impl Workspace {
                 w.model.focus_split(split_id);
                 let _ = w.open(None, Place::Tab, None, &[], true, window, cx);
             }));
-        let body = match split.tab() {
-            Tab::Messages => Some(
-                div()
-                    .size_full()
-                    .track_focus(&self.messages_focus)
-                    .child(self.render_messages())
-                    .into_any_element(),
-            ),
-            Tab::Term(t) => self.terms.get(&t).map(|t| {
-                t.view
-                    .clone()
-                    .cached(StyleRefinement::default().size_full())
-                    .into_any_element()
-            }),
-        };
         let card = div()
             .size_full()
             .min_w_0()

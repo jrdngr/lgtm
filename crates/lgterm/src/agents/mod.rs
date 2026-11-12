@@ -423,6 +423,9 @@ mod tests {
             text: text.into(),
             queued: true,
             dropped: false,
+            read: false,
+            from_space: None,
+            to_space: None,
         }
     }
 
