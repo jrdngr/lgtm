@@ -147,6 +147,8 @@ pub struct Editor {
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
     pub files_width: Option<u16>,
+    /// A `C-w` in the file tree waiting for `<` or `>`.
+    divider: bool,
     /// Whether long lines wrap at the view's edge.
     pub wrap: bool,
     /// Whether markdown files open rendered: as the last one was left.
@@ -177,6 +179,7 @@ impl Editor {
             body_width: 0,
             saved: false,
             files_width: None,
+            divider: false,
             wrap: false,
             render_markdown: false,
             sidebar_width: 0,
@@ -407,8 +410,10 @@ impl Editor {
     fn sidebar_key(&mut self, key: KeyEvent) {
         use ratatui::crossterm::event::{KeyCode, KeyModifiers};
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        if let Some(step) = crate::tui::side::files_step(&key) {
-            self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+        if let Some(step) = crate::tui::side::files_step(&mut self.divider, &key) {
+            if let Some(step) = step {
+                self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+            }
             return;
         }
         let code = match key.code {
@@ -791,6 +796,12 @@ impl Editor {
             }
             Action::ToggleWrap => self.wrap = !self.wrap,
             Action::Split { right } => self.split(None, right),
+            Action::Divider { right } if self.sidebar_width > 0 => {
+                let step =
+                    crate::tui::side::toward_files(if right { width::STEP } else { -width::STEP });
+                self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+            }
+            Action::Divider { .. } => {}
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
                     let line = open.buf.line_of(open.buf.sel.head);
@@ -1003,6 +1014,26 @@ mod tests {
         mouse(&mut e, down, 6, 0);
         mouse(&mut e, drag, 7, 0);
         assert_eq!((sel(&e), e.keys.mode), ((0, 1), Mode::Select));
+    }
+
+    #[test]
+    fn ctrl_w_angle_brackets_move_the_divider_and_bare_ones_still_indent() {
+        use ratatui::buffer::Buffer as Screen;
+        use ratatui::layout::Rect;
+        let (dir, mut e) = editor_on("one\n");
+        e.set_files(crate::tui::walk::list(dir.path()));
+        let area = Rect::new(0, 0, 120, 10);
+        let mut screen = Screen::empty(area);
+        e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
+        use ratatui::crossterm::event::{KeyCode, KeyModifiers};
+        let angle = |e: &mut Editor, c| e.key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
+        let before = e.sidebar_width;
+        press(&mut e, "<C-w>");
+        angle(&mut e, '<');
+        assert_eq!(e.files_width.map(|w| w.abs_diff(before)), Some(4));
+        assert_eq!(e.open[e.cur].buf.text.to_string(), "one\n");
+        angle(&mut e, '>');
+        assert_ne!(e.open[e.cur].buf.text.to_string(), "one\n");
     }
 
     #[test]

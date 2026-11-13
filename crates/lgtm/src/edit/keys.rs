@@ -58,6 +58,10 @@ pub enum Action {
     Split {
         right: bool,
     },
+    /// Move the divider beside the file tree a step right, or left.
+    Divider {
+        right: bool,
+    },
 }
 
 /// The screen around the buffer: its size, for keys that move by it, and the closed folds,
@@ -354,6 +358,7 @@ impl Keys {
             Cmd::ToggleSidebar => return Action::ToggleSidebar,
             Cmd::ToggleWrap => return Action::ToggleWrap,
             Cmd::Split { right } => return Action::Split { right },
+            Cmd::Divider { right } => return Action::Divider { right },
             Cmd::Command => return Action::Command,
             Cmd::Escape => self.mode = Mode::Normal,
             Cmd::Smart => {

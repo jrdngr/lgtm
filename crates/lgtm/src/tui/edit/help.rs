@@ -54,6 +54,7 @@ const FILES: &[(&str, &str)] = &[
     ("space e", "file tree"),
     ("space b", "toggle file tree"),
     ("C-w v  C-w s", "split right, below"),
+    ("C-w <  C-w >", "move divider"),
     (":", "command"),
 ];
 

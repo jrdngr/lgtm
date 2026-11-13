@@ -130,6 +130,8 @@ pub struct Review {
     pub notice: Option<String>,
     /// Whether `space` was pressed, for its menu.
     space: bool,
+    /// A `C-w` waiting for `<` or `>`.
+    divider: bool,
     /// Files with edits the editor hasn't saved.
     pub unsaved: HashSet<String>,
     /// Where to put the cursor once the diff loads.
@@ -196,7 +198,7 @@ pub fn help_groups() -> Vec<Group> {
             &[
                 ("Tab", "file list"),
                 ("Enter", "fold file, open folder"),
-                ("< >", "file list width"),
+                ("C-w < >", "file list width"),
                 ("t", "side by side"),
             ],
         ),
@@ -285,6 +287,7 @@ impl Review {
             show_resolved: false,
             notice: None,
             space: false,
+            divider: false,
             unsaved: HashSet::new(),
             goto: None,
             selecting: None,
@@ -595,8 +598,8 @@ impl Review {
                 _ => Outcome::None,
             };
         }
-        if let Some(step) = crate::tui::side::files_step(&key) {
-            if self.list_area.width > 0 {
+        if let Some(step) = crate::tui::side::files_step(&mut self.divider, &key) {
+            if let Some(step) = step.filter(|_| self.list_area.width > 0) {
                 self.list_width = Some(width::moved(self.list_area.width, step, LIST_MIN));
             }
             return Outcome::None;

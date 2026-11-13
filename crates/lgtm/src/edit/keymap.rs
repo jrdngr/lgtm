@@ -87,6 +87,10 @@ pub enum Cmd {
     Split {
         right: bool,
     },
+    /// Move the divider beside the file tree a step right, or left.
+    Divider {
+        right: bool,
+    },
     Command,
     Escape,
     /// Markdown's smart key: tables and footnotes.
@@ -286,6 +290,18 @@ pub const BINDS: &[Bind] = &[
     b("S-tab", Smart, Both, "markdown table cell, footnote"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),
+    b(
+        "C-w >",
+        Divider { right: true },
+        Both,
+        "move the divider right",
+    ),
+    b(
+        "C-w <",
+        Divider { right: false },
+        Both,
+        "move the divider left",
+    ),
     b("space y", ClipboardYank, Both, "yank to clipboard"),
     b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),

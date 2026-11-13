@@ -1,17 +1,26 @@
-//! Pane widths that `<` and `>` move: the divider goes a step left or right.
+//! Pane widths that `C-w <` and `C-w >` move: the divider goes a step left or right.
 
-use ratatui::crossterm::event::{KeyCode, KeyEvent};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Columns a press moves a divider.
-const STEP: i32 = 4;
+pub const STEP: i32 = 4;
 
-/// How far `key` moves a divider: left for `<`, right for `>`.
-pub fn step(key: &KeyEvent) -> Option<i32> {
-    match key.code {
-        KeyCode::Char('<') => Some(-STEP),
-        KeyCode::Char('>') => Some(STEP),
-        _ => None,
+/// Reads `C-w <` and `C-w >`. `pending` holds a `C-w` waiting for its second key, which is
+/// taken whatever it is. None for a key that isn't part of one; else the step, when the key
+/// ends one.
+pub fn read(pending: &mut bool, key: &KeyEvent) -> Option<Option<i32>> {
+    if std::mem::take(pending) {
+        return Some(match key.code {
+            KeyCode::Char('<') => Some(-STEP),
+            KeyCode::Char('>') => Some(STEP),
+            _ => None,
+        });
     }
+    if key.code == KeyCode::Char('w') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        *pending = true;
+        return Some(None);
+    }
+    None
 }
 
 /// The width a pane drawn `drawn` wide takes after a step, never under `min`.
@@ -28,6 +37,20 @@ pub fn fit(chosen: Option<u16>, default: u16, min: u16, max: u16) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_divider_moves_on_ctrl_w_then_an_angle_bracket_and_a_bare_one_is_left_alone() {
+        let key = |c, m| KeyEvent::new(KeyCode::Char(c), m);
+        let (none, ctrl) = (KeyModifiers::NONE, KeyModifiers::CONTROL);
+        let mut pending = false;
+        assert_eq!(read(&mut pending, &key('>', none)), None);
+        assert_eq!(read(&mut pending, &key('w', ctrl)), Some(None));
+        assert_eq!(read(&mut pending, &key('>', none)), Some(Some(STEP)));
+        assert_eq!(read(&mut pending, &key('<', none)), None);
+        read(&mut pending, &key('w', ctrl));
+        assert_eq!(read(&mut pending, &key('j', none)), Some(None));
+        assert!(!pending);
+    }
 
     #[test]
     fn a_step_starts_from_the_drawn_width_so_presses_past_the_edge_come_straight_back() {

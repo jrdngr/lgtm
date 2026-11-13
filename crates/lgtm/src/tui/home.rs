@@ -62,6 +62,8 @@ pub struct Home {
     drawn_width: u16,
     /// Whether Space was pressed, for the space menu.
     space: bool,
+    /// A `C-w` waiting for `<` or `>`.
+    divider: bool,
 }
 
 /// The narrowest either side gets.
@@ -88,6 +90,7 @@ impl Default for Home {
             revisions_width: None,
             drawn_width: 0,
             space: false,
+            divider: false,
         }
     }
 }
@@ -110,7 +113,11 @@ pub fn help_groups() -> Vec<Group> {
         ),
         Group::new(
             "More",
-            &[("Tab", "files"), ("< >", "move divider"), (":", "command")],
+            &[
+                ("Tab", "files"),
+                ("C-w < >", "move divider"),
+                (":", "command"),
+            ],
         ),
     ]
 }
@@ -355,9 +362,11 @@ impl Home {
         if self.cmd.is_some() {
             return self.command_key(key);
         }
-        if let Some(step) = crate::tui::side::files_step(&key) {
+        if let Some(step) = crate::tui::side::files_step(&mut self.divider, &key) {
             // The width kept is the revisions side's, which a step widens the other way.
-            self.revisions_width = Some(width::moved(self.drawn_width, -step, SIDE_MIN));
+            if let Some(step) = step {
+                self.revisions_width = Some(width::moved(self.drawn_width, -step, SIDE_MIN));
+            }
             return Outcome::None;
         }
         if std::mem::take(&mut self.space) {

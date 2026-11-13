@@ -41,11 +41,15 @@ pub fn split(area: Rect, files: u16) -> (Rect, u16, Rect) {
     }
 }
 
-/// How far `<` or `>` widens the files pane: `>` moves the divider right, which widens it
-/// on the left and narrows it on the right.
-pub fn files_step(key: &KeyEvent) -> Option<i32> {
-    let step = super::width::step(key)?;
-    Some(if files_left() { step } else { -step })
+/// Reads `C-w <` and `C-w >` as how far they widen the files pane (see `width::read`).
+pub fn files_step(pending: &mut bool, key: &KeyEvent) -> Option<Option<i32>> {
+    Some(super::width::read(pending, key)?.map(toward_files))
+}
+
+/// How far a divider step widens the files pane: moving the divider right widens it on the
+/// left and narrows it on the right.
+pub fn toward_files(step: i32) -> i32 {
+    if files_left() { step } else { -step }
 }
 
 #[cfg(test)]
