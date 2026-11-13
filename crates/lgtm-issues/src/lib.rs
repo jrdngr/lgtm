@@ -2,6 +2,7 @@
 //! its commands as `lgtm issues <command>` and shows it as a screen.
 
 mod cli;
+mod fields;
 pub mod folder;
 mod guide;
 mod issue;

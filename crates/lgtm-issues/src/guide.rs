@@ -10,11 +10,19 @@ This folder is an issue tracker for agents, read by `lgtm issues`. Each issue is
 Run these in this folder, or pass `-C <this folder>`. `--as <name>` sets who you are; by
 default it's your lgterm tab's name.
 
-- `lgtm issues new "<title>" [--body "<text>"]` files an issue and prints its id.
+- `lgtm issues new "<title>" [--body "<text>"] [--severity <s>] [--blocked-by <ids>]` files an
+  issue and prints its id.
 - `lgtm issues list [--all]` lists open issues; `--all` adds done and dropped ones.
 - `lgtm issues show <id>` prints an issue's file.
 - `lgtm issues claim <id>` makes it yours and marks it working.
 - `lgtm issues log <id> "<text>"` adds a note: progress, findings, what you changed.
+- `lgtm issues set <id> <field> [value]` sets a header field; no value clears it:
+  - `severity`: low, medium, high or critical.
+  - `revision`: the jj change id holding the code you wrote for it. Set it once you've written
+    code, and again if the code moves to another change.
+  - `blocked-by`: the ids of issues that must be done first, like `3 7`. Don't start a blocked
+    issue; `list` shows which blockers are still open.
+  - `duplicate-of`: the issue this one repeats. It drops this one.
 - `lgtm issues ask <id> <Qn> [--after <Qm>] < question.md` asks the user. Write the question
   in the qq shape: the last decision, `Question N of M`, `Qn — <subject>`, `Context:` bullets,
   `Options:` numbered with the recommendation first, each with `Pro:`/`Con:`/`Risk:` bullets,
@@ -32,9 +40,13 @@ default it's your lgterm tab's name.
 ---
 title: Login redirect loops after session expiry
 status: open | working | needs-input | done | dropped
+severity: low | medium | high | critical
 owner: <tab name of the agent working on it>
 term: <its lgterm terminal, like t12>
 filed-by: <who filed it>
+revision: <jj change id with its code>
+blocked-by: 3, 7
+duplicate-of: <issue id>
 created: 2026-11-12T22:40Z
 ---
 

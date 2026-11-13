@@ -15,10 +15,16 @@ pub const USAGE: &str = "usage: lgtm issues [-C <dir>] [--as <name>] [command]
 With no command, opens the issues screen on this folder, or on one picked under it.
 
   init                         start an issues folder here
-  new <title> [--body <text>]  file an issue; prints its id
+  new <title> [--body <text>] [--severity <s>] [--blocked-by <ids>]
+                               file an issue; prints its id
   list [--all]                 open issues; --all adds done and dropped
   show <id>                    print an issue's file
   claim <id>                   make it yours and mark it working
+  set <id> <field> [value]     set a header field, or clear it with no value:
+                               severity (low, medium, high, critical),
+                               revision (the jj revision with its code),
+                               blocked-by (issue ids), duplicate-of (an issue id;
+                               drops this one)
   log <id> <text>              add a note
   ask <id> <Qn> [--after <Qm>] [text]
                                ask the user; text comes from stdin when not given
@@ -113,7 +119,14 @@ pub fn run(args: Args) -> Result<()> {
     match cmd.as_str() {
         "new" => {
             let body = flag(&mut rest, "--body")?.unwrap_or_default();
-            println!("{}", ops::file(&folder, &rest.join(" "), &body, &who())?);
+            let mut with = Vec::new();
+            for name in ["severity", "blocked-by"] {
+                if let Some(v) = flag(&mut rest, &format!("--{name}"))? {
+                    with.push(ops::Field::parse(name, &v)?);
+                }
+            }
+            let id = ops::file(&folder, &rest.join(" "), &body, &who(), with)?;
+            println!("{id}");
         }
         "list" => list(&folder, switch(&mut rest, "--all"))?,
         "show" => print!(
@@ -121,6 +134,12 @@ pub fn run(args: Args) -> Result<()> {
             std::fs::read_to_string(folder.path(id(rest.first())?)?)?
         ),
         "claim" => ops::claim(&folder, id(rest.first())?, &who(), lgterm::term())?,
+        "set" => {
+            let issue = id(rest.first())?;
+            let name = rest.get(1).context("set which field?")?;
+            let field = ops::Field::parse(name, &rest[2..].join(" "))?;
+            ops::set(&folder, issue, &who(), field)?;
+        }
         "log" => ops::note(&folder, id(rest.first())?, &who(), &rest[1..].join(" "))?,
         "ask" => {
             let after = flag(&mut rest, "--after")?;
@@ -168,18 +187,27 @@ pub fn run(args: Args) -> Result<()> {
 fn list(folder: &Folder, all: bool) -> Result<()> {
     let (issues, bad) = folder.load()?;
     let now = time::now();
-    for i in issues {
+    for i in &issues {
         if !all && matches!(i.status, Status::Done | Status::Dropped) {
             continue;
         }
         println!(
-            "{:<4} {:<11} {:<14} {:>4}  {}",
+            "{:<4} {:<11} {:<8} {:<14} {:>4}  {}",
             i.id,
             i.status.name(),
+            i.severity.map_or("-", |s| s.name()),
             i.owner.as_deref().unwrap_or("-"),
             time::age(i.touched(), now),
             i.title
         );
+        let blockers = i.open_blockers(&issues);
+        if !blockers.is_empty() {
+            let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
+            println!("       blocked by {}", ids.join(", "));
+        }
+        if let Some(d) = i.duplicate_of {
+            println!("       duplicate of #{d}");
+        }
         for (q, asked) in i.questions() {
             if asked != Asked::Answered {
                 let state = if asked == Asked::Waiting {

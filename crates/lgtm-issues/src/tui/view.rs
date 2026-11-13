@@ -2,11 +2,12 @@
 
 use lgtm_tui_kit::markdown::{Outcome, Preview};
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, MUTED};
+use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, MUTED, RED, UNIQUE};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::layout::Rect;
 
 use super::qq;
+use crate::fields::Severity;
 use crate::issue::{Issue, Kind, Status};
 use crate::time;
 
@@ -60,6 +61,21 @@ pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
     let x = c.put(x + 1, y, &format!("{} ", issue.id), theme::fg(MUTED));
     c.put(x, y, &issue.title, theme::bold(FG));
     let mut parts = vec![(issue.status.name().replace('-', " "), color)];
+    if let Some(s) = issue.severity {
+        parts.push((s.name().into(), severity_color(s)));
+    }
+    if let Some(d) = issue.duplicate_of {
+        parts.push(("duplicate of".into(), FAINT));
+        parts.push((format!("#{d}"), FG));
+    }
+    if !issue.blocked_by.is_empty() {
+        let ids: Vec<String> = issue.blocked_by.iter().map(|b| format!("#{b}")).collect();
+        parts.push(("blocked by".into(), FAINT));
+        parts.push((ids.join(" "), FG));
+    }
+    if let Some(r) = &issue.revision {
+        parts.push((r.clone(), UNIQUE));
+    }
     if let Some(o) = &issue.owner {
         parts.push((o.clone(), CYAN));
     }
@@ -72,6 +88,15 @@ pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
     let mut px = c.area.right().saturating_sub(width as u16);
     for (t, col) in parts {
         px = c.put(px, y, &t, theme::fg(col)) + 2;
+    }
+}
+
+pub fn severity_color(s: Severity) -> ratatui::style::Color {
+    match s {
+        Severity::Low => MUTED,
+        Severity::Medium => FG,
+        Severity::High => AMBER,
+        Severity::Critical => RED,
     }
 }
 

@@ -267,7 +267,7 @@ impl Issues {
                 }
             }
             KeyCode::Enter => match ask {
-                Ask::New => match ops::file(&self.folder, &input.text, "", &self.who) {
+                Ask::New => match ops::file(&self.folder, &input.text, "", &self.who, vec![]) {
                     Ok(id) => {
                         self.reload();
                         self.select_issue(id);

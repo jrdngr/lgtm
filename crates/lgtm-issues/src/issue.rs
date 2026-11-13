@@ -3,6 +3,7 @@
 //! `## <time> <who> question Q3 [after Q2]`, `## <time> <who> answer Q3` (the option number,
 //! then notes) and `## <time> <who> reply Q3` (words instead of an option).
 
+use crate::fields::{self, Severity};
 use crate::time::{self, Minute};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,6 +107,11 @@ pub struct Issue {
     /// The owner's lgterm terminal, where answers go.
     pub term: Option<String>,
     pub filed_by: Option<String>,
+    pub severity: Option<Severity>,
+    /// The jj revision holding the code written for it.
+    pub revision: Option<String>,
+    pub blocked_by: Vec<u32>,
+    pub duplicate_of: Option<u32>,
     pub created: Minute,
     pub body: String,
     pub log: Vec<Entry>,
@@ -120,6 +126,10 @@ impl Issue {
             owner: None,
             term: None,
             filed_by,
+            severity: None,
+            revision: None,
+            blocked_by: Vec::new(),
+            duplicate_of: None,
             created: at,
             body: body.trim().to_owned(),
             log: Vec::new(),
@@ -222,10 +232,16 @@ impl Issue {
             self.title,
             self.status.name()
         );
+        let blocked_by =
+            (!self.blocked_by.is_empty()).then(|| fields::format_ids(&self.blocked_by));
         for (key, value) in [
+            ("severity", &self.severity.map(|s| s.name().to_owned())),
             ("owner", &self.owner),
             ("term", &self.term),
             ("filed-by", &self.filed_by),
+            ("revision", &self.revision),
+            ("blocked-by", &blocked_by),
+            ("duplicate-of", &self.duplicate_of.map(|d| d.to_string())),
         ] {
             if let Some(v) = value {
                 out += &format!("{key}: {v}\n");
@@ -272,6 +288,22 @@ impl Issue {
                 "owner" => issue.owner = Some(value).filter(|v| !v.is_empty()),
                 "term" => issue.term = Some(value).filter(|v| !v.is_empty()),
                 "filed-by" => issue.filed_by = Some(value).filter(|v| !v.is_empty()),
+                "severity" if !value.is_empty() => {
+                    issue.severity = Some(
+                        Severity::parse(&value)
+                            .ok_or_else(|| format!("unknown severity {value}"))?,
+                    )
+                }
+                "revision" => issue.revision = Some(value).filter(|v| !v.is_empty()),
+                "blocked-by" => issue.blocked_by = fields::parse_ids(&value)?,
+                "duplicate-of" if !value.is_empty() => {
+                    issue.duplicate_of = Some(
+                        value
+                            .trim_start_matches('#')
+                            .parse()
+                            .map_err(|_| format!("{value} isn't an issue id"))?,
+                    )
+                }
                 "created" => issue.created = time::parse(&value).unwrap_or(0),
                 _ => {}
             }
@@ -360,9 +392,13 @@ mod tests {
     const FILE: &str = "---
 title: Login redirect loops
 status: needs-input
+severity: high
 owner: auth fixer
 term: t12
 filed-by: orchestrator
+revision: wytkzuuo
+blocked-by: 3, 7
+duplicate-of: 2
 created: 2026-11-12T22:40Z
 ---
 
@@ -397,7 +433,17 @@ Toast copy
 
     #[test]
     fn a_file_reads_back_as_written() {
-        assert_eq!(issue().render(), FILE);
+        let i = issue();
+        assert_eq!(
+            (
+                i.severity,
+                i.revision.as_deref(),
+                &i.blocked_by,
+                i.duplicate_of
+            ),
+            (Some(Severity::High), Some("wytkzuuo"), &vec![3, 7], Some(2))
+        );
+        assert_eq!(i.render(), FILE);
     }
 
     #[test]
@@ -487,6 +533,8 @@ Toast copy
         assert!(Issue::parse(1, "# Title\n").is_err());
         assert!(Issue::parse(1, "---\nstatus: open\n---\n").is_err());
         assert!(Issue::parse(1, "---\ntitle: x\nstatus: later\n---\n").is_err());
+        assert!(Issue::parse(1, "---\ntitle: x\nseverity: meh\n---\n").is_err());
+        assert!(Issue::parse(1, "---\ntitle: x\nblocked-by: 3, y\n---\n").is_err());
     }
 
     #[test]
