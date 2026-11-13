@@ -447,6 +447,7 @@ impl Workspace {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
+        self.fit_hidden(split, cx);
         let body = match split.tab() {
             Tab::Messages => Some(
                 div()

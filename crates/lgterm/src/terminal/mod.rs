@@ -59,6 +59,17 @@ pub enum TermEvent {
     Exited,
     /// A link was ⌘-clicked.
     Link(links::Link),
+    /// Drawing gave it a new size.
+    Resized,
+}
+
+/// A terminal's size in cells, and the cell size in pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Fit {
+    cols: u16,
+    rows: u16,
+    cell_w: u32,
+    cell_h: u32,
 }
 
 pub struct TermView {
@@ -79,6 +90,8 @@ pub struct TermView {
     pub title: String,
     cols: u16,
     rows: u16,
+    /// The size it was last given, once it has one.
+    fit: Option<Fit>,
     grid: Option<(Point<Pixels>, Size<Pixels>)>,
     /// Scroll distance not yet turned into whole lines.
     scroll_rest: f32,
@@ -165,6 +178,7 @@ impl TermView {
                 title: String::new(),
                 cols,
                 rows,
+                fit: None,
                 grid: None,
                 scroll_rest: 0.,
                 drag_from: None,
@@ -342,30 +356,56 @@ impl TermView {
         (font(fonts::mono()), px(cx.global::<FontSize>().0))
     }
 
+    /// The size it was last given.
+    pub fn fit(&self) -> Option<Fit> {
+        self.fit
+    }
+
+    /// Gives the terminal and its program a new size. Hidden tabs take their shown sibling's
+    /// size this way, so showing them doesn't make the program redraw. Returns whether it changed.
+    pub fn resize(&mut self, fit: Fit) -> bool {
+        if self.fit == Some(fit) {
+            return false;
+        }
+        let Fit {
+            cols,
+            rows,
+            cell_w,
+            cell_h,
+        } = fit;
+        if self.vt.resize(cols, rows, cell_w, cell_h).is_err() {
+            return false;
+        }
+        self.pty.resize(
+            cols,
+            rows,
+            (cols as u32 * cell_w) as u16,
+            (rows as u32 * cell_h) as u16,
+        );
+        (self.cols, self.rows) = (cols, rows);
+        self.fit = Some(fit);
+        true
+    }
+
     /// Fits the terminal to `bounds` and snapshots the screen.
     fn layout(
         &mut self,
         bounds: Bounds<Pixels>,
         window: &mut Window,
-        cx: &mut App,
+        cx: &mut Context<Self>,
     ) -> Option<(Frame, Grid)> {
         let (font, font_size) = self.font(cx);
         let cell = paint::cell_size(&font, font_size, window);
         let inner_w = bounds.size.width - px(2. * theme::TERM_PAD_X);
         let inner_h = bounds.size.height - px(2. * theme::TERM_PAD_Y);
-        let cols = ((inner_w / cell.width).floor() as u16).max(2);
-        let rows = ((inner_h / cell.height).floor() as u16).max(1);
-        if (cols, rows) != (self.cols, self.rows) {
-            let (cw, ch) = (cell.width.as_f32() as u32, cell.height.as_f32() as u32);
-            if self.vt.resize(cols, rows, cw, ch).is_ok() {
-                self.pty.resize(
-                    cols,
-                    rows,
-                    (cols as u32 * cw) as u16,
-                    (rows as u32 * ch) as u16,
-                );
-                (self.cols, self.rows) = (cols, rows);
-            }
+        let fit = Fit {
+            cols: ((inner_w / cell.width).floor() as u16).max(2),
+            rows: ((inner_h / cell.height).floor() as u16).max(1),
+            cell_w: cell.width.as_f32() as u32,
+            cell_h: cell.height.as_f32() as u32,
+        };
+        if self.resize(fit) {
+            cx.emit(TermEvent::Resized);
         }
         let origin = bounds.origin + gpui::point(px(theme::TERM_PAD_X), px(theme::TERM_PAD_Y));
         self.grid = Some((origin, cell));

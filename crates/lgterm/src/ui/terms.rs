@@ -7,7 +7,7 @@ use gpui::{App, Context, Entity, Subscription, Window};
 
 use super::Workspace;
 use crate::agents::{Env, Kind, Seen};
-use crate::model::{Space, Tab, TermId};
+use crate::model::{Space, Split, Tab, TermId};
 use crate::procinfo;
 use crate::terminal::{TermEvent, TermView};
 
@@ -75,6 +75,7 @@ impl Workspace {
             TermEvent::Exited => this.close(Tab::Term(id), window, cx),
             TermEvent::Changed => this.term_changed(id, cx),
             TermEvent::Link(link) => this.open_link(id, link, window, cx),
+            TermEvent::Resized => cx.notify(),
         });
         let space_name = procinfo::space_name(cwd, self.home.as_deref());
         self.terms.insert(
@@ -90,6 +91,29 @@ impl Workspace {
             },
         );
         Ok(())
+    }
+
+    /// Gives a split's hidden terminals the size of the one it shows.
+    pub(super) fn fit_hidden(&self, split: &Split, cx: &mut App) {
+        let Some(fit) = split
+            .tab()
+            .term()
+            .and_then(|t| self.terms.get(&t))
+            .and_then(|t| t.view.read(cx).fit())
+        else {
+            return;
+        };
+        for tab in &split.tabs {
+            if let Some(t) = tab.term().and_then(|t| self.terms.get(&t))
+                && t.view.read(cx).fit() != Some(fit)
+            {
+                t.view.update(cx, |v, cx| {
+                    if v.resize(fit) {
+                        cx.notify();
+                    }
+                });
+            }
+        }
     }
 
     /// Copies a view's title and folder, so drawing the window doesn't read every view.
