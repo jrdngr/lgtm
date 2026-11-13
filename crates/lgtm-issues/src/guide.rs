@@ -3,7 +3,9 @@
 pub const GUIDE: &str = r#"# Issues
 
 This folder is an issue tracker for agents, read by `lgtm issues`. Each issue is one file,
-`<id>-<slug>.md`. Run `lgtm issues` with no arguments here to see them.
+`<id>-<slug>.md`: in `issues/open` while it's open, working or needs input, and in
+`issues/complete` once it's done or dropped. The commands move it when its status changes.
+Run `lgtm issues` with no arguments here to see them.
 
 ## Commands
 

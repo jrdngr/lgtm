@@ -1,4 +1,5 @@
-//! An issues folder: `ISSUES.md` and one `<id>-<slug>.md` file per issue.
+//! An issues folder: `ISSUES.md`, and one `<id>-<slug>.md` file per issue in `issues/open`
+//! or `issues/complete` by its status.
 
 use std::fs;
 use std::io::{ErrorKind, Write};
@@ -8,9 +9,25 @@ use std::time::SystemTime;
 use anyhow::{Context, Result, bail};
 
 use crate::guide::GUIDE;
-use crate::issue::Issue;
+use crate::issue::{Issue, Status};
 
 pub const MARKER: &str = "ISSUES.md";
+
+const SHELVES: [&str; 2] = ["open", "complete"];
+
+/// The folder under `issues` that an issue with `status` goes in.
+fn shelf(status: Status) -> &'static str {
+    match status {
+        Status::Done | Status::Dropped => "complete",
+        _ => "open",
+    }
+}
+
+/// An issue's id from its file name, `12-login-loops.md`.
+fn file_id(path: &Path) -> Option<u32> {
+    let name = path.file_name()?.to_str()?;
+    name.strip_suffix(".md")?.split('-').next()?.parse().ok()
+}
 
 pub struct Folder {
     pub root: PathBuf,
@@ -30,7 +47,41 @@ impl Folder {
                 root.display()
             );
         }
-        Ok(Folder { root })
+        let folder = Folder { root };
+        folder.shelve()?;
+        Ok(folder)
+    }
+
+    fn shelf_dir(&self, name: &str) -> PathBuf {
+        self.root.join("issues").join(name)
+    }
+
+    /// Makes the shelves, and moves each issue file that isn't on its status's shelf there:
+    /// ones from before the shelves, and ones whose status was changed by hand.
+    fn shelve(&self) -> Result<()> {
+        for name in SHELVES {
+            fs::create_dir_all(self.shelf_dir(name))?;
+        }
+        let mut loose: Vec<PathBuf> = md_files(&self.root)?;
+        for name in SHELVES {
+            loose.extend(md_files(&self.shelf_dir(name))?);
+        }
+        for path in loose {
+            let Some(id) = file_id(&path) else { continue };
+            let Ok(issue) = fs::read_to_string(&path)
+                .map_err(|e| e.to_string())
+                .and_then(|t| Issue::parse(id, &t))
+            else {
+                continue;
+            };
+            let to = self
+                .shelf_dir(shelf(issue.status))
+                .join(path.file_name().expect("name"));
+            if to != path && !to.exists() {
+                fs::rename(&path, &to)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn init(dir: &Path) -> Result<Folder> {
@@ -44,18 +95,11 @@ impl Folder {
 
     fn files(&self) -> Result<Vec<(u32, PathBuf)>> {
         let mut out = Vec::new();
-        for entry in fs::read_dir(&self.root)? {
-            let path = entry?.path();
-            let name = path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or_default();
-            let Some(stem) = name.strip_suffix(".md") else {
-                continue;
-            };
-            let digits = stem.split('-').next().unwrap_or_default();
-            if let Ok(id) = digits.parse::<u32>() {
-                out.push((id, path));
+        for name in SHELVES {
+            for path in md_files(&self.shelf_dir(name))? {
+                if let Some(id) = file_id(&path) {
+                    out.push((id, path));
+                }
             }
         }
         out.sort();
@@ -64,6 +108,7 @@ impl Folder {
 
     /// Every issue, and a line for each file that didn't read.
     pub fn load(&self) -> Result<(Vec<Issue>, Vec<String>)> {
+        self.shelve()?;
         let mut issues = Vec::new();
         let mut bad = Vec::new();
         for (id, path) in self.files()? {
@@ -100,7 +145,7 @@ impl Folder {
         let mut id = self.files()?.last().map_or(1, |(i, _)| i + 1);
         loop {
             issue.id = id;
-            let path = self.root.join(issue.file_name());
+            let path = self.shelf_dir(shelf(issue.status)).join(issue.file_name());
             match fs::File::create_new(&path) {
                 Ok(mut f) => {
                     f.write_all(issue.render().as_bytes())?;
@@ -115,36 +160,63 @@ impl Folder {
         }
     }
 
-    /// Reads issue `id`, changes it with `change`, and writes it back in place.
+    /// Reads issue `id`, changes it with `change`, and writes it back under its name, on the
+    /// shelf for its status now.
     pub fn update<T>(&self, id: u32, change: impl FnOnce(&mut Issue) -> Result<T>) -> Result<T> {
         let path = self.path(id)?;
         let mut issue = Issue::parse(id, &fs::read_to_string(&path)?)
             .map_err(|e| anyhow::anyhow!("issue #{id}: {e}"))?;
         let out = change(&mut issue)?;
-        let tmp = path.with_extension("md.tmp");
+        let to = self
+            .shelf_dir(shelf(issue.status))
+            .join(path.file_name().expect("name"));
+        let tmp = to.with_extension("md.tmp");
         fs::write(&tmp, issue.render())?;
-        fs::rename(&tmp, &path)?;
+        fs::rename(&tmp, &to)?;
+        if to != path {
+            fs::remove_file(&path)?;
+        }
         Ok(out)
     }
 
     pub fn stamp(&self) -> Stamp {
-        let Ok(dir) = fs::read_dir(&self.root) else {
-            return Vec::new();
-        };
-        let mut out: Stamp = dir
-            .flatten()
-            .filter_map(|e| {
+        let mut out = Stamp::new();
+        for dir in [self.root.clone()]
+            .into_iter()
+            .chain(SHELVES.map(|s| self.shelf_dir(s)))
+        {
+            let Ok(entries) = fs::read_dir(&dir) else {
+                continue;
+            };
+            out.extend(entries.flatten().filter_map(|e| {
                 let meta = e.metadata().ok()?;
                 Some((
-                    e.file_name().to_string_lossy().into_owned(),
+                    e.path().to_string_lossy().into_owned(),
                     meta.len(),
                     meta.modified().ok(),
                 ))
-            })
-            .collect();
+            }));
+        }
         out.sort();
         out
     }
+}
+
+/// The `.md` files right in `dir`, none when it's missing.
+fn md_files(dir: &Path) -> Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(e) if e.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e.into()),
+    };
+    let mut out = Vec::new();
+    for entry in entries {
+        let path = entry?.path();
+        if path.is_file() && path.extension().is_some_and(|x| x == "md") {
+            out.push(path);
+        }
+    }
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -170,13 +242,13 @@ mod tests {
         let (_dir, folder) = folder();
         let a = folder.create(Issue::new(0, "First", None, "", 0)).unwrap();
         fs::write(
-            folder.root.join("9-by-hand.md"),
-            "---\ntitle: By hand\nstatus: open\n---\n",
+            folder.root.join("issues/complete/9-by-hand.md"),
+            "---\ntitle: By hand\nstatus: done\n---\n",
         )
         .unwrap();
         let b = folder.create(Issue::new(0, "Second", None, "", 0)).unwrap();
         assert_eq!((a, b), (1, 10));
-        assert!(folder.root.join("10-second.md").is_file());
+        assert!(folder.root.join("issues/open/10-second.md").is_file());
     }
 
     #[test]
@@ -193,11 +265,52 @@ mod tests {
             })
             .unwrap();
         assert_eq!(folder.get(id).unwrap().status, Status::Working);
-        assert!(folder.root.join("1-old-title.md").is_file());
-        fs::write(folder.root.join("2-broken.md"), "no header").unwrap();
+        assert!(folder.root.join("issues/open/1-old-title.md").is_file());
+        fs::write(folder.root.join("issues/open/2-broken.md"), "no header").unwrap();
         let (issues, bad) = folder.load().unwrap();
         assert_eq!(issues.len(), 1);
         assert_eq!(bad.len(), 1);
         assert!(bad[0].starts_with("2-broken.md"));
+    }
+
+    #[test]
+    fn issues_move_between_open_and_complete_with_their_status() {
+        let (_dir, folder) = folder();
+        let id = folder.create(Issue::new(0, "Loops", None, "", 0)).unwrap();
+        let set = |status| {
+            folder
+                .update(id, |i| {
+                    i.status = status;
+                    Ok(())
+                })
+                .unwrap()
+        };
+        set(Status::Dropped);
+        assert!(folder.root.join("issues/complete/1-loops.md").is_file());
+        assert!(!folder.root.join("issues/open/1-loops.md").exists());
+        set(Status::NeedsInput);
+        assert!(folder.root.join("issues/open/1-loops.md").is_file());
+        assert!(!folder.root.join("issues/complete/1-loops.md").exists());
+    }
+
+    #[test]
+    fn loose_and_misplaced_files_go_on_their_shelf_when_the_folder_opens() {
+        let (dir, folder) = folder();
+        fs::write(
+            folder.root.join("3-old.md"),
+            "---\ntitle: Old\nstatus: done\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            folder.root.join("issues/complete/4-edited.md"),
+            "---\ntitle: Edited\nstatus: working\n---\n",
+        )
+        .unwrap();
+        fs::write(folder.root.join("notes.md"), "not an issue").unwrap();
+        let folder = Folder::open(dir.path()).unwrap();
+        assert!(folder.root.join("issues/complete/3-old.md").is_file());
+        assert!(folder.root.join("issues/open/4-edited.md").is_file());
+        assert!(folder.root.join("notes.md").is_file());
+        assert_eq!(folder.load().unwrap().0.len(), 2);
     }
 }
