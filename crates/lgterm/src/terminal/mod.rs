@@ -36,6 +36,10 @@ use crate::theme;
 
 actions!(terminal, [Copy, Paste]);
 
+/// How long a typed prompt holds messages back after its last keypress when the agent's
+/// prompt box reads empty.
+const DRAFT_HOLD: Duration = Duration::from_secs(60);
+
 /// How long after the last keypress the user counts as still typing.
 const TYPING_PAUSE: Duration = Duration::from_secs(2);
 
@@ -183,6 +187,12 @@ impl TermView {
     /// Whether the user typed a prompt and hasn't sent or dropped it.
     pub fn draft(&self) -> bool {
         self.draft
+    }
+
+    /// Whether the user typed a prompt and hasn't sent or dropped it, and pressed a key here
+    /// lately.
+    pub fn recent_draft(&self) -> bool {
+        self.draft && self.last_key.is_some_and(|t| t.elapsed() < DRAFT_HOLD)
     }
 
     /// Forgets a typed prompt, once the program has taken it.

@@ -18,7 +18,9 @@ const RETURN_AFTER: Duration = Duration::from_millis(150);
 const PROMPT_ROWS: usize = 16;
 
 /// Whether the user is typing a prompt for an agent: they pressed a key just now, or its
-/// prompt box has text, or they typed a prompt and haven't sent it when there's no box to read.
+/// prompt box has text, or they typed a prompt and haven't sent it. A prompt box that reads
+/// empty lets an unsent prompt go only once its keys have been quiet a while, since the box
+/// can be misread.
 pub(super) fn typing<'a>(
     terms: &'a HashMap<TermId, Term>,
     app: &'a App,
@@ -27,9 +29,11 @@ pub(super) fn typing<'a>(
         terms.get(&t).is_some_and(|t| {
             let view = t.view.read(app);
             view.typed_recently()
-                || kind
-                    .prompt_typed(&view.bottom_rows(PROMPT_ROWS))
-                    .unwrap_or_else(|| view.draft())
+                || match kind.prompt_typed(&view.bottom_rows(PROMPT_ROWS)) {
+                    Some(true) => true,
+                    Some(false) => view.recent_draft(),
+                    None => view.draft(),
+                }
         })
     }
 }

@@ -129,11 +129,12 @@ pub fn text(k: &Keystroke) -> Option<&str> {
 }
 
 /// Whether a keystroke adds to a prompt being typed (true) or sends or drops it (false).
+/// Escape leaves a prompt as it is: agents keep the text when it closes a menu or stops a turn.
 pub fn drafts(k: &Keystroke) -> Option<bool> {
     let m = &k.modifiers;
     match k.key.as_str() {
         "enter" if m.shift || m.alt => Some(true),
-        "enter" | "escape" => Some(false),
+        "enter" => Some(false),
         "c" if m.control => Some(false),
         "backspace" | "delete" => Some(true),
         _ => text(k).is_some().then_some(true),
@@ -195,12 +196,12 @@ mod tests {
     }
 
     #[test]
-    fn typing_starts_a_draft_and_sending_or_cancelling_ends_it() {
+    fn typing_starts_a_draft_and_sending_or_cancelling_ends_it_but_escape_keeps_it() {
         let d = |s| drafts(&Keystroke::parse(s).unwrap());
         assert_eq!(d("backspace"), Some(true));
         assert_eq!(d("shift-enter"), Some(true));
         assert_eq!(d("enter"), Some(false));
-        assert_eq!(d("escape"), Some(false));
+        assert_eq!(d("escape"), None);
         assert_eq!(d("ctrl-c"), Some(false));
         assert_eq!(d("up"), None);
         let mut a = Keystroke::parse("a").unwrap();
