@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 
 /// The main workspace root of the repo containing `path`: the nearest ancestor (inclusive)
 /// holding a `.jj` directory or, when that's a secondary workspace, the main workspace its
-/// `.jj/repo` file points to.
+/// `.jj/repo` file points to. Without jj, the git working tree's root.
 pub fn find_root(path: &Path) -> Option<PathBuf> {
-    let root = path.ancestors().find(|p| p.join(".jj").is_dir())?;
-    Some(main_root(root).unwrap_or_else(|| root.to_path_buf()))
+    let root = crate::repo::root_of(path)?;
+    Some(main_root(&root).unwrap_or(root))
 }
 
 /// The main workspace root a secondary workspace at `root` belongs to, from its `.jj/repo` file.

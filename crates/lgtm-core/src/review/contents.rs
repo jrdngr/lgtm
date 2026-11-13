@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use super::file::Sides;
 use crate::diff::FileStatus;
-use crate::jj::{FileDiff, Jj};
+use crate::jj::FileDiff;
+use crate::repo::Repo;
 
 /// Files larger than this are left unread, as if binary.
 pub const MAX_FILE_BYTES: usize = 4 << 20;
@@ -12,7 +13,7 @@ pub const MAX_FILE_BYTES: usize = 4 << 20;
 /// Old and new contents per file, `None` where a side is absent, binary, or too large.
 /// Each side is one batched read.
 pub async fn read(
-    jj: &Jj,
+    repo: &Repo,
     sides: &Sides,
     diffs: &[&FileDiff],
 ) -> anyhow::Result<Vec<(Option<String>, Option<String>)>> {
@@ -29,7 +30,7 @@ pub async fn read(
         .collect();
     let old = async {
         match sides.old.as_deref() {
-            Some(commit) if !old_paths.is_empty() => jj.files_at(commit, &old_paths).await,
+            Some(commit) if !old_paths.is_empty() => repo.files_at(commit, &old_paths).await,
             // The root commit has no files.
             _ => Ok(HashMap::new()),
         }
@@ -38,7 +39,7 @@ pub async fn read(
         if new_paths.is_empty() {
             return Ok(HashMap::new());
         }
-        jj.files_at(&sides.new, &new_paths).await
+        repo.files_at(&sides.new, &new_paths).await
     };
     let (old, mut new) = tokio::try_join!(old, new)?;
     let text = |bytes: Option<Vec<u8>>| {

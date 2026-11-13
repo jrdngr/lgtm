@@ -80,7 +80,7 @@ pub struct Issue {
     /// Header fields that aren't built in, like severity, and keys lgtm doesn't know, kept as
     /// written.
     pub fields: Pairs,
-    /// The jj revision holding the code written for it.
+    /// The jj change, or git branch or commit, holding the code written for it.
     pub revision: Option<String>,
     pub blocked_by: Vec<u32>,
     pub duplicate_of: Option<u32>,

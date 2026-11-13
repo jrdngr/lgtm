@@ -31,8 +31,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
-use lgtm_core::jj::Jj;
 use lgtm_core::paths;
+use lgtm_core::repo::Repo;
 use lgtm_core::store::Store;
 use lgtm_tui_kit::{highlight, keybar, paint, theme};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -79,8 +79,8 @@ enum Screen {
 
 pub use edit::SPLIT_FLAG;
 
-/// Runs the UI in the jj workspace around the file or folder it opens, else around the
-/// current directory, opening `start`. Outside jj only the editor runs. A `split` is a second
+/// Runs the UI in the jj workspace or git working tree around the file or folder it opens,
+/// else around the current directory, opening `start`. Outside both only the editor runs. A `split` is a second
 /// one beside another, which keeps the MCP socket.
 pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     crate::register::on_start();
@@ -100,7 +100,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     }
     .unwrap_or_else(|| cwd.clone());
     let file = target.as_ref().filter(|(t, _)| !t.is_dir());
-    let Some(root) = crate::agent::workspace(&near) else {
+    let Some(root) = lgtm_core::repo::root_of(&near) else {
         if matches!(start, Start::Issues) {
             return match lgtm_issues::tui::run(&cwd, lgtm_issues::user()) {
                 Ok(()) => 0,
@@ -111,15 +111,10 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
             };
         }
         if matches!(start, Start::Revset(_) | Start::Conflicts) {
-            eprintln!("lgtm: not in a jj repo");
+            eprintln!("lgtm: not in a jj or git repo");
             return 1;
         }
-        let root = near
-            .ancestors()
-            .find(|d| d.join(".git").exists())
-            .map(Path::to_path_buf)
-            .or(folder.cloned())
-            .unwrap_or(cwd);
+        let root = folder.cloned().unwrap_or(cwd);
         let file = file.map(|(f, line)| (workspace_name(&root, f), *line));
         return plain::run(root, file);
     };
@@ -133,7 +128,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         }
         None => None,
     };
-    let loader = match Loader::new(Jj::new(&root), tx) {
+    let loader = match Loader::new(Repo::open(&root), tx) {
         Ok(l) => l,
         Err(e) => {
             eprintln!("lgtm: {e:#}");
@@ -179,6 +174,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.buffers.wrap = app.settings.editor_wrap;
     app.buffers.render_markdown = app.settings.render_markdown;
     app.home.revisions_width = app.settings.home_revisions_width;
+    app.home.picker.git = app.loader.is_git();
     app.home.files.heat_on = app.settings.heat;
     app.buffers.set_heat_on(app.settings.heat);
     app.loader.log();
@@ -811,7 +807,7 @@ impl App {
                     keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
                     return;
                 }
-                (self.home.hints(), home::help_groups())
+                (self.home.hints(), home::help_groups(self.home.picker.git))
             }
         };
         let badge = if self.review.is_none() {

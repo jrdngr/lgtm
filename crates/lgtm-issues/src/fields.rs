@@ -18,7 +18,7 @@ pub struct Choice {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
-    /// The jj revision holding the code written for an issue.
+    /// The jj change, or git branch or commit, holding the code written for an issue.
     Revision,
     /// Issues that must be done first.
     BlockedBy,

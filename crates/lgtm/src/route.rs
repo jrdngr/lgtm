@@ -1,4 +1,4 @@
-//! Claude Code runs `lgtm mcp` and `lgtm hook`. In a jj workspace `mcp` serves the TUI's
+//! Claude Code runs `lgtm mcp` and `lgtm hook`. In a jj or git repo `mcp` serves the TUI's
 //! tools, and `hook` records the agent's turns and, in an lgterm terminal, passes the hook on
 //! to lgterm.
 
@@ -8,12 +8,12 @@ use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
 pub fn mcp() -> i32 {
     let socket = std::env::current_dir()
         .ok()
-        .and_then(|d| crate::agent::workspace(&d))
+        .and_then(|d| lgtm_core::repo::root_of(&d))
         .and_then(|root| crate::agent::socket_path(&root));
     match socket {
         Some(socket) => crate::mcp::serve(socket),
         None => serve_stdio(Stub(
-            "This session isn't in a jj workspace, so lgtm has nothing to offer.",
+            "This session isn't in a jj or git repo, so lgtm has nothing to offer.",
         )),
     }
 }

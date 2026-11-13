@@ -19,6 +19,8 @@ pub struct LogCommit {
     pub change_id: String,
     /// How many of the change id's first characters tell it apart.
     pub unique: u32,
+    /// What a review of it is called, when not its change id.
+    pub name: Option<String>,
     /// The whole description.
     pub description: String,
     /// Local bookmarks, `*` first when out of sync with their remote, then remote ones as
@@ -76,6 +78,7 @@ fn parse_rows(out: &str) -> Vec<LogRow> {
                     commit_id: f[0].into(),
                     change_id: f[1].into(),
                     unique: f[2].parse().unwrap_or(4),
+                    name: None,
                     description: serde_json::from_str(f[3]).unwrap_or_default(),
                     bookmarks: f[4].split_whitespace().map(String::from).collect(),
                     author: f[5].into(),

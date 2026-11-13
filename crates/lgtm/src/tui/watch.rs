@@ -1,5 +1,6 @@
-//! Watches the workspace: a new jj operation reloads what's on screen, and while the review
-//! shows the working copy, edits are snapshotted so they show up.
+//! Watches the workspace: a new jj operation or git ref change reloads what's on screen, and
+//! while the review shows the working copy, edits are snapshotted (in git, reloaded) so they
+//! show up.
 
 use std::path::Path;
 use std::sync::Arc;
@@ -7,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
-use lgtm_core::jj::Jj;
+use lgtm_core::repo::Repo;
 use lgtm_core::watch::{Ignores, Ping, classify, shared_op_heads};
 use notify::{RecursiveMode, Watcher as _};
 use tokio::sync::mpsc;
@@ -27,7 +28,7 @@ const WRITTEN_EVERY: Duration = Duration::from_millis(250);
 /// Must be called inside a tokio runtime.
 pub fn start(
     root: &Path,
-    jj: Arc<Jj>,
+    repo: Arc<Repo>,
     tx: Sender<Msg>,
     snapshots: Arc<AtomicBool>,
 ) -> anyhow::Result<notify::RecommendedWatcher> {
@@ -93,8 +94,12 @@ pub fn start(
                 && (now - last >= DEBOUNCE || now - first >= MAX_WAIT)
             {
                 edits = None;
-                // A snapshot that changed something lands as an operation.
-                let _ = jj.background_snapshot().await;
+                // A jj snapshot that changed something lands as an operation. git's working
+                // copy is read fresh, so its edits reload what's on screen themselves.
+                repo.background_snapshot().await;
+                if repo.is_git() {
+                    op = Some(Instant::now());
+                }
             }
             if op.is_some_and(|at| now - at >= OP_DEBOUNCE) {
                 op = None;

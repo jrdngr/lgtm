@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use super::{GhRepo, gh, remote};
-use crate::jj::Jj;
+use crate::repo::Repo;
 
 static NAMES: Mutex<Option<HashMap<String, GhRepo>>> = Mutex::new(None);
 
@@ -36,8 +36,8 @@ pub async fn current(repo: &GhRepo) -> GhRepo {
 }
 
 /// The repo's remotes, with each GitHub URL naming its repo as GitHub does now.
-pub async fn remotes(jj: &Jj) -> anyhow::Result<Vec<(String, String)>> {
-    let mut out = jj.remotes().await?;
+pub async fn remotes(repo: &Repo) -> anyhow::Result<Vec<(String, String)>> {
+    let mut out = repo.remotes().await?;
     for (_, url) in &mut out {
         let Some(repo) = remote::parse_url(url).or_else(|| remote::any_repo(url)) else {
             continue;

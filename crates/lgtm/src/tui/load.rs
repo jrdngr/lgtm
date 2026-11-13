@@ -1,4 +1,4 @@
-//! Reads from jj off the UI thread. Results come back as messages the event loop drains.
+//! Reads from the repo off the UI thread. Results come back as messages the event loop drains.
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -6,7 +6,8 @@ use std::sync::mpsc::Sender;
 
 use lgtm_core::anchor::MatchConfig;
 use lgtm_core::config::{Config, ConfigTexts};
-use lgtm_core::jj::{Change, FileDiff, Jj, LogRow, Range, Version};
+use lgtm_core::jj::{Change, FileDiff, LogRow, Range, Version};
+use lgtm_core::repo::Repo;
 use lgtm_core::review::contents;
 use lgtm_core::review::file::{ReviewFile, Sides as Commits, Text};
 use tokio::runtime::Runtime;
@@ -74,7 +75,8 @@ pub enum Msg {
         file: usize,
         sides: Sides,
     },
-    /// A jj operation landed: commits may have changed.
+    /// A jj operation landed, or git's refs or working copy changed: commits may have
+    /// changed.
     Changed,
     /// Files were written, for the trees' heat.
     Written(Vec<String>),
@@ -104,21 +106,25 @@ pub enum Msg {
 
 pub struct Loader {
     rt: Runtime,
-    jj: Arc<Jj>,
+    repo: Arc<Repo>,
     tx: Sender<Msg>,
 }
 
 impl Loader {
-    pub fn new(jj: Jj, tx: Sender<Msg>) -> anyhow::Result<Self> {
+    pub fn new(repo: Repo, tx: Sender<Msg>) -> anyhow::Result<Self> {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
             .build()?;
         Ok(Self {
             rt,
-            jj: Arc::new(jj),
+            repo: Arc::new(repo),
             tx,
         })
+    }
+
+    pub fn is_git(&self) -> bool {
+        self.repo.is_git()
     }
 
     /// Watches the workspace at `root` for new operations, and for edits to snapshot while
@@ -129,36 +135,39 @@ impl Loader {
         snapshots: Arc<AtomicBool>,
     ) -> anyhow::Result<notify::RecommendedWatcher> {
         let _entered = self.rt.enter();
-        super::watch::start(root, self.jj.clone(), self.tx.clone(), snapshots)
+        super::watch::start(root, self.repo.clone(), self.tx.clone(), snapshots)
     }
 
     pub fn log(&self) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
-            let _ = tx.send(Msg::Log(jj.log_rows(None).await));
+            let _ = tx.send(Msg::Log(repo.log_rows(None).await));
         });
     }
 
     /// Runs a jj menu motion.
     pub fn act(&self, action: lgtm_core::jj::JjAction) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
+            let Some(jj) = repo.jj() else { return };
             let _ = tx.send(Msg::Acted(jj.act(&action).await));
         });
     }
 
     /// Finds what a push of `revs`' bookmarks would do.
     pub fn push_plan(&self, revs: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
+            let Some(jj) = repo.jj() else { return };
             let _ = tx.send(Msg::PushPlan(jj.push_plan(Some(&revs)).await));
         });
     }
 
     /// Lists the bookmarks nearest `rev`.
     pub fn bookmarks(&self, rev: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
+            let Some(jj) = repo.jj() else { return };
             let found = jj.nearest_bookmarks(&rev).await;
             let _ = tx.send(Msg::Bookmarks(
                 found.map(|spots| spots.into_iter().map(|s| s.name).collect()),
@@ -168,22 +177,25 @@ impl Loader {
 
     /// Reads the file `name` at `@-`.
     pub fn base(&self, name: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
             // Without a readable base the gutter stays empty.
-            if let Ok(bytes) = jj.file_if_any(Some("@-"), &name).await {
+            if let Ok(bytes) = repo.file_if_any(Some("@-"), &name).await {
                 let text = String::from_utf8_lossy(&bytes.unwrap_or_default()).into_owned();
                 let _ = tx.send(Msg::Base { name, text });
             }
         });
     }
 
-    /// Fills in the sides of the conflicts in `text`, the file `name`'s, from jj.
+    /// Fills in the sides of the conflicts in `text`, the file `name`'s, from jj. git's sides
+    /// stay as their markers name them.
     pub fn resolve(&self, name: String, text: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let mut session = lgtm_core::resolve::Session::new(&name, &text);
-            lgtm_core::resolve::fill(&mut session, &jj).await;
+            if let Some(jj) = repo.jj() {
+                lgtm_core::resolve::fill(&mut session, jj).await;
+            }
             let session = Box::new(session);
             let _ = tx.send(Msg::Resolve {
                 name,
@@ -196,15 +208,15 @@ impl Loader {
     /// Snapshots the working copy, then finds how `@` changes files, for the file trees. A
     /// snapshot that changed something lands as an operation, which reloads this again.
     pub fn decor(&self) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
             use super::decor::{Decor, Decorations};
-            let _ = jj.background_snapshot().await;
+            repo.background_snapshot().await;
             // Without a diff the trees keep their colors.
-            let Ok(range) = jj.resolve("@").await else {
+            let Ok(range) = repo.resolve("@").await else {
                 return;
             };
-            let Ok(paths) = jj.diff_paths(&range).await else {
+            let Ok(paths) = repo.diff_paths(&range).await else {
                 return;
             };
             let found = paths
@@ -216,10 +228,7 @@ impl Loader {
 
     /// The files with conflicts in the working copy, snapshotted first.
     pub fn conflicted(&self) -> anyhow::Result<Vec<String>> {
-        self.rt.block_on(async {
-            let _ = self.jj.snapshot().await;
-            self.jj.conflicted_files("@").await
-        })
+        self.rt.block_on(self.repo.conflicted_files())
     }
 
     /// Lists the files under `root`.
@@ -232,33 +241,33 @@ impl Loader {
 
     /// Pulls the threads of the PR `pr`, or else of the open PR from one of `bookmarks`.
     pub fn pull(&self, id: u64, pr: Option<String>, bookmarks: Vec<String>) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
-            let result = super::github::pull(&jj, pr.as_deref(), &bookmarks).await;
+            let result = super::github::pull(&repo, pr.as_deref(), &bookmarks).await;
             let _ = tx.send(Msg::Pulled { id, result });
         });
     }
 
     /// Loads the versions of the change `rev`.
     pub fn versions(&self, rev: String) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
-            let result = jj.versions(&rev).await;
+            let result = repo.versions(&rev).await;
             let _ = tx.send(Msg::Versions { rev, result });
         });
     }
 
     /// Loads `target`'s diff, then each file's highlighting, then every file's review state.
     pub fn review(&self, id: u64, target: Target) {
-        let (jj, tx) = (self.jj.clone(), self.tx.clone());
+        let (repo, tx) = (self.repo.clone(), self.tx.clone());
         self.rt.spawn(async move {
             let cached = ConfigTexts::default();
             let result = async {
                 let (range, revset) = match target {
                     Target::Revset(revset) => {
                         // Files the editor saved since the last snapshot show too.
-                        let _ = jj.background_snapshot().await;
-                        (jj.resolve(&revset).await?, revset)
+                        repo.background_snapshot().await;
+                        (repo.resolve(&revset).await?, revset)
                     }
                     Target::Between { from, to, .. } => (
                         Range {
@@ -269,9 +278,9 @@ impl Loader {
                     ),
                 };
                 let (changes, files, config) = tokio::try_join!(
-                    jj.changes(&revset),
-                    jj.diff(&range),
-                    Config::at_base(&jj, &cached, range.from.as_deref()),
+                    repo.changes(&revset),
+                    repo.diff(&range),
+                    Config::at_base(&repo, &cached, range.from.as_deref()),
                 )?;
                 anyhow::Ok((range, changes, files, config))
             }
@@ -287,7 +296,7 @@ impl Loader {
                 id,
                 result: Ok((changes, files.clone())),
             });
-            if let Ok(found) = jj.containing(&range.to).await {
+            if let Ok(found) = repo.containing(&range.to).await {
                 let _ = tx.send(Msg::Containing { id, found });
             }
             let config = Arc::new(config);
@@ -296,7 +305,7 @@ impl Loader {
                 new: range.to.clone(),
             });
             let diffs: Vec<&FileDiff> = files.iter().collect();
-            let texts = contents::read(&jj, &commits, &diffs)
+            let texts = contents::read(&repo, &commits, &diffs)
                 .await
                 .unwrap_or_else(|_| vec![(None, None); files.len()]);
             let mut tasks = JoinSet::new();

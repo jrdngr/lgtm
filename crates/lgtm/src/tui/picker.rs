@@ -53,6 +53,8 @@ pub struct Picker {
     clicked: Option<(Item, std::time::Instant)>,
     /// The next log puts the cursor on the working copy, as after making a new change.
     pub to_working_copy: bool,
+    /// Whether the log is git's, which keeps no snapshots and whose commits lgtm doesn't edit.
+    pub git: bool,
 }
 
 /// Two clicks on a line within this make a double click.
@@ -129,9 +131,13 @@ impl Picker {
         (a.min(self.sel), a.max(self.sel))
     }
 
-    /// How jj is told the row's commit apart.
+    /// How a review names the row's commit: by its name when it has one, else as jj tells it
+    /// apart.
     fn id(&self, i: usize) -> Option<String> {
         let c = self.rows.get(i)?.commit.as_ref()?;
+        if let Some(name) = &c.name {
+            return Some(name.clone());
+        }
         Some(if c.divergent {
             c.commit_id.clone()
         } else {
@@ -319,8 +325,8 @@ impl Picker {
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         match key.code {
-            KeyCode::Char('v') => return self.toggle_snapshots(),
-            KeyCode::Char('a') => self.toggle_all(),
+            KeyCode::Char('v') if !self.git => return self.toggle_snapshots(),
+            KeyCode::Char('a') if !self.git => self.toggle_all(),
             KeyCode::Char('j') | KeyCode::Down => self.step(true),
             KeyCode::Char('k') | KeyCode::Up => self.step(false),
             KeyCode::Char(c @ ('J' | 'K')) => self.extend(c == 'J'),
@@ -384,12 +390,11 @@ impl Picker {
     }
 
     pub fn hints(&self) -> Vec<Hint<'static>> {
-        let mut hints = vec![
-            ("Enter", "edit", false),
-            ("r", "review", false),
-            ("J K", "range", false),
-            ("Space", "menu", false),
-        ];
+        let mut hints = match self.git {
+            true => vec![("Enter", "review", false)],
+            false => vec![("Enter", "edit", false), ("r", "review", false)],
+        };
+        hints.extend([("J K", "range", false), ("Space", "menu", false)]);
         if self.anchored() {
             hints.push(("Esc", "clear", false));
         }
@@ -401,7 +406,8 @@ impl Picker {
                     hints.push(("Esc", "close", false));
                 }
             }
-            None => hints.push(("v", "snapshots", false)),
+            None if !self.git => hints.push(("v", "snapshots", false)),
+            None => {}
         }
         hints.extend([("?", "keys", false), (":q", "quit", false)]);
         hints
@@ -703,6 +709,7 @@ mod tests {
                 commit_id: format!("{change}-commit"),
                 change_id: change.into(),
                 unique: 2,
+                name: None,
                 description: String::new(),
                 bookmarks: vec![],
                 author: String::new(),

@@ -95,22 +95,29 @@ impl Default for Home {
     }
 }
 
-/// The keys of the revisions side, for `?`.
-pub fn help_groups() -> Vec<Group> {
+/// The keys of the revisions side, for `?`. A git log has fewer.
+pub fn help_groups(git: bool) -> Vec<Group> {
+    let revisions: &[(&str, &str)] = match git {
+        true => &[
+            ("j k", "move"),
+            ("J K", "range"),
+            ("Esc", "clear range"),
+            ("Enter r", "review"),
+            ("Space", "menu"),
+        ],
+        false => &[
+            ("j k", "move"),
+            ("J K", "range"),
+            ("Esc", "clear range"),
+            ("Enter", "edit the commit and review it"),
+            ("r", "review"),
+            ("v", "snapshots"),
+            ("a", "every snapshot"),
+            ("Space", "menu"),
+        ],
+    };
     vec![
-        Group::new(
-            "Revisions",
-            &[
-                ("j k", "move"),
-                ("J K", "range"),
-                ("Esc", "clear range"),
-                ("Enter", "edit the commit and review it"),
-                ("r", "review"),
-                ("v", "snapshots"),
-                ("a", "every snapshot"),
-                ("Space", "menu"),
-            ],
-        ),
+        Group::new("Revisions", revisions),
         Group::new(
             "More",
             &[
@@ -142,6 +149,9 @@ impl Home {
             return menu.items();
         }
         if self.space {
+            if self.picker.git {
+                return vec![("i".into(), "issues")];
+            }
             return vec![("j".into(), "jj mode"), ("i".into(), "issues")];
         }
         let Some(typed) = &self.cmd else {
@@ -371,7 +381,7 @@ impl Home {
         }
         if std::mem::take(&mut self.space) {
             match key.code {
-                KeyCode::Char('j') => self.set_jj_mode(true),
+                KeyCode::Char('j') if !self.picker.git => self.set_jj_mode(true),
                 KeyCode::Char('i') => return Outcome::Issues,
                 _ => {}
             }
@@ -596,6 +606,7 @@ mod tests {
                     commit_id: format!("{change}-commit"),
                     change_id: (*change).into(),
                     unique: 2,
+                    name: None,
                     description: String::new(),
                     bookmarks: vec![],
                     author: String::new(),
@@ -664,6 +675,16 @@ mod tests {
         press(&mut h, "<space>x");
         assert!(!h.jj_mode() && h.command_menu().is_empty());
         assert!(ran(press(&mut h, "na")).is_empty());
+    }
+
+    #[test]
+    fn a_git_repo_has_no_jj_mode() {
+        let mut h = with_log(&["aaa"]);
+        h.picker.git = true;
+        press(&mut h, "<space>");
+        assert_eq!(h.command_menu(), [("i".to_string(), "issues")]);
+        press(&mut h, "j");
+        assert!(!h.jj_mode());
     }
 
     #[test]

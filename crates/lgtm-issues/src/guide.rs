@@ -31,8 +31,8 @@ default it's your lgterm tab's name.
 - `lgtm issues log <id> "<text>"` adds a note: progress, findings, what you changed.
 - `lgtm issues set <id> <field> [value]` sets a header field; no value clears it. The
   workflow lists the fields this tracker uses. These are built in:
-  - `revision`: the jj change id holding the code you wrote for it. Set it once you've written
-    code, and again if the code moves to another change.
+  - `revision`: where the code you wrote for it is: the jj change id, or in a git repo the
+    branch, else the commit. Set it once you've written code, and again if the code moves.
   - `blocked-by`: the ids of issues that must be done first, like `3 7`. `list` shows which
     blockers are still open.
   - `duplicate-of`: the issue this one repeats. It drops this one.
@@ -57,7 +57,7 @@ severity: <a field the workflow lists, like severity>
 owner: <tab name of the agent working on it>
 term: <its lgterm terminal, like t12>
 filed-by: <who filed it>
-revision: <jj change id with its code>
+revision: <jj change id, git branch or commit with its code>
 blocked-by: 3, 7
 duplicate-of: <issue id>
 created: 2026-11-12T22:40Z

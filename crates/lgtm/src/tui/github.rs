@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use lgtm_core::github::pulled::{PulledThread, pulled};
 use lgtm_core::github::{canonical, heads, remote, threads};
-use lgtm_core::jj::Jj;
+use lgtm_core::repo::Repo;
 
 use lgtm_core::anchor::Side;
 
@@ -20,8 +20,8 @@ pub struct Pulled {
 }
 
 /// Finds the PR, `pr` as typed or by `bookmarks` (newest first), and pulls its threads.
-pub async fn pull(jj: &Jj, pr: Option<&str>, bookmarks: &[String]) -> anyhow::Result<Pulled> {
-    let remotes = canonical::remotes(jj).await?;
+pub async fn pull(local: &Repo, pr: Option<&str>, bookmarks: &[String]) -> anyhow::Result<Pulled> {
+    let remotes = canonical::remotes(local).await?;
     let (repo, number) = match pr {
         Some(typed) => {
             let (repo, number) = remote::parse_pr(typed)?;
@@ -45,7 +45,7 @@ pub async fn pull(jj: &Jj, pr: Option<&str>, bookmarks: &[String]) -> anyhow::Re
     let discussion = threads::discussion(&repo, number).await?;
     let name = repo.to_string();
     // GitHub numbers lines on the PR head. Without it here, its new-side lines can't be placed.
-    let fetched = jj
+    let fetched = local
         .commit_ids(&discussion.head)
         .await
         .is_ok_and(|c| !c.is_empty());
@@ -68,7 +68,7 @@ pub async fn pull(jj: &Jj, pr: Option<&str>, bookmarks: &[String]) -> anyhow::Re
     paths.sort();
     paths.dedup();
     let head_texts = match fetched {
-        true => jj
+        true => local
             .files_at(&discussion.head, &paths)
             .await
             .unwrap_or_default()

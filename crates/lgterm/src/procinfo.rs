@@ -3,21 +3,22 @@
 
 use std::path::{Path, PathBuf};
 
-/// The folder a space is named after: the jj workspace holding `cwd`, else `cwd` itself, shown
-/// as `~` at home.
+/// The folder a space is named after: the jj workspace or git working tree holding `cwd`,
+/// else `cwd` itself, shown as `~` at home.
 pub fn space_name(cwd: &Path, home: Option<&Path>) -> String {
     if home == Some(cwd) {
         return "~".into();
     }
-    let root = jj_root(cwd).unwrap_or(cwd);
+    let root = repo_root(cwd).unwrap_or(cwd);
     match root.file_name() {
         Some(name) => name.to_string_lossy().into_owned(),
         None => root.to_string_lossy().into_owned(),
     }
 }
 
-fn jj_root(cwd: &Path) -> Option<&Path> {
-    cwd.ancestors().find(|dir| dir.join(".jj").is_dir())
+fn repo_root(cwd: &Path) -> Option<&Path> {
+    cwd.ancestors()
+        .find(|dir| dir.join(".jj").is_dir() || dir.join(".git").exists())
 }
 
 /// The name of process `pid`, without its folder.
@@ -113,12 +114,16 @@ mod tests {
     }
 
     #[test]
-    fn spaces_are_named_after_the_jj_workspace_holding_the_folder() {
+    fn spaces_are_named_after_the_jj_workspace_or_git_tree_holding_the_folder() {
         let tmp = std::env::temp_dir().join(format!("lgterm-name-{}", std::process::id()));
         let deep = tmp.join("repo/src/ui");
         std::fs::create_dir_all(&deep).unwrap();
         std::fs::create_dir_all(tmp.join("repo/.jj")).unwrap();
         assert_eq!(space_name(&deep, None), "repo");
+        let tree = tmp.join("tree/lib");
+        std::fs::create_dir_all(&tree).unwrap();
+        std::fs::write(tmp.join("tree/.git"), "gitdir: elsewhere\n").unwrap();
+        assert_eq!(space_name(&tree, None), "tree");
         assert_eq!(
             space_name(&tmp, None),
             tmp.file_name().unwrap().to_str().unwrap()

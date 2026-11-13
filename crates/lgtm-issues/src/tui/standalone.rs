@@ -1,5 +1,5 @@
-//! The issues screen on its own, outside a jj repo: `lgtm issues` where lgtm's other screens
-//! can't run.
+//! The issues screen on its own, outside a jj or git repo: `lgtm issues` where lgtm's other
+//! screens can't run.
 
 use std::io::stdout;
 use std::path::Path;

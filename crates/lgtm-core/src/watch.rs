@@ -1,5 +1,5 @@
-//! Telling what a change under a jj workspace means: a new operation, an edit to the working
-//! copy, or nothing (jj's and git's internals, and ignored files).
+//! Telling what a change under a workspace means: a new jj operation or git ref change, an
+//! edit to the working copy, or nothing (jj's and git's other internals, and ignored files).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use ignore::gitignore::Gitignore;
 /// What a change under a workspace means.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Ping {
-    /// A jj operation landed.
+    /// A jj operation landed, or in a git repo, a ref, `HEAD` or the index changed.
     Op,
     /// A file of the working copy changed, with its path from the root, `/` between parts.
     Edit(String),
@@ -19,6 +19,8 @@ pub enum Ping {
 pub struct Ignores {
     root: PathBuf,
     by_dir: HashMap<PathBuf, Option<Gitignore>>,
+    /// Whether the workspace is git's alone, so its `.git` changes are what moves commits.
+    git: bool,
 }
 
 impl Ignores {
@@ -26,6 +28,7 @@ impl Ignores {
         Self {
             root: root.to_path_buf(),
             by_dir: HashMap::new(),
+            git: !root.join(".jj").is_dir(),
         }
     }
 
@@ -56,7 +59,7 @@ impl Ignores {
 
 pub fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping> {
     let rel = path.strip_prefix(root).ok()?;
-    if rel.starts_with(".jj/repo/op_heads/heads") {
+    if rel.starts_with(".jj/repo/op_heads/heads") || ignores.git && git_moved(rel) {
         return Some(Ping::Op);
     }
     // Its own and any nested workspace's or repo's internals.
@@ -72,6 +75,17 @@ pub fn classify(root: &Path, ignores: &mut Ignores, path: &Path) -> Option<Ping>
         return Some(edit());
     }
     (!ignores.ignored(path)).then(edit)
+}
+
+/// Whether a change to `rel` under a git repo's root moves its commits or what's staged.
+fn git_moved(rel: &Path) -> bool {
+    let Ok(inner) = rel.strip_prefix(".git") else {
+        return false;
+    };
+    inner.starts_with("refs")
+        || ["HEAD", "index", "packed-refs"]
+            .iter()
+            .any(|name| inner == Path::new(name))
 }
 
 /// A secondary workspace's `.jj/repo` is a file pointing at the main repo, whose operations
@@ -94,6 +108,7 @@ mod tests {
         std::fs::create_dir_all(root.join("web")).unwrap();
         std::fs::write(root.join("web/.gitignore"), "dist/\n").unwrap();
         std::fs::create_dir_all(root.join("web/dist")).unwrap();
+        std::fs::create_dir_all(root.join(".jj")).unwrap();
         let mut ignores = Ignores::new(&root);
         let mut c = |p: &str| classify(&root, &mut ignores, &root.join(p));
         assert_eq!(c(".jj/repo/op_heads/heads/abc"), Some(Ping::Op));
@@ -110,6 +125,25 @@ mod tests {
             Some(Ping::Edit("web/src/app.ts".into()))
         );
         assert_eq!(c(".gitignore"), Some(Ping::Edit(".gitignore".into())));
+    }
+
+    #[test]
+    fn in_a_git_repo_refs_head_and_the_index_move_commits_and_objects_do_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let mut ignores = Ignores::new(&root);
+        let mut c = |p: &str| classify(&root, &mut ignores, &root.join(p));
+        for moved in [
+            ".git/HEAD",
+            ".git/index",
+            ".git/refs/heads/main",
+            ".git/packed-refs",
+        ] {
+            assert_eq!(c(moved), Some(Ping::Op), "{moved}");
+        }
+        assert_eq!(c(".git/objects/ab/cdef"), None);
+        assert_eq!(c(".git/index.lock"), None);
+        assert_eq!(c("vendor/lib/.git/HEAD"), None);
     }
 
     #[test]

@@ -13,7 +13,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
 
 use crate::anchor::MatchConfig;
-use crate::jj::Jj;
+use crate::repo::Repo;
 
 pub const PATH: &str = ".lgtm/config.toml";
 
@@ -52,13 +52,17 @@ impl Config {
     /// Reads the config at `base`, a review's base commit, so the changes under review can't
     /// set what it skips. A missing file gives the defaults. Each base's file is read once,
     /// since a commit's contents never change.
-    pub async fn at_base(jj: &Jj, cache: &ConfigTexts, base: Option<&str>) -> anyhow::Result<Self> {
+    pub async fn at_base(
+        repo: &Repo,
+        cache: &ConfigTexts,
+        base: Option<&str>,
+    ) -> anyhow::Result<Self> {
         let key = base.unwrap_or_default().to_string();
         let found = cache.0.lock().unwrap().get(&key).cloned();
         let text = match found {
             Some(text) => text,
             None => {
-                let text = match jj.file_if_any(base, PATH).await? {
+                let text = match repo.file_if_any(base, PATH).await? {
                     Some(bytes) => Some(
                         String::from_utf8(bytes).with_context(|| format!("{PATH} is not UTF-8"))?,
                     ),
