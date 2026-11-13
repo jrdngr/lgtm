@@ -124,3 +124,26 @@ fn it_opens_at_the_source_line_given_and_tells_the_line_at_its_top() {
     p.key(KeyEvent::from(KeyCode::Char(' ')));
     assert_eq!(p.key(KeyEvent::from(KeyCode::Char('m'))), Outcome::Close);
 }
+
+#[test]
+fn a_drag_selects_rendered_text_across_lines_and_a_click_clears_it() {
+    use ratatui::buffer::Buffer;
+    use ratatui::crossterm::event::{MouseButton, MouseEventKind};
+    let md = "first line here\n\nsecond **line** too";
+    let area = Rect::new(0, 0, 40, 4);
+    let mut screen = Buffer::empty(area);
+    let mut p = Preview::new(0);
+    p.draw(&mut Canvas::new(&mut screen, area), area, md, 1);
+    // Two columns of margin: column 8 is the "l" of "line"; row 2 is the second paragraph.
+    p.mouse(MouseEventKind::Down(MouseButton::Left), 8, 0);
+    p.mouse(MouseEventKind::Drag(MouseButton::Left), 7, 2);
+    p.mouse(MouseEventKind::Up(MouseButton::Left), 7, 2);
+    assert_eq!(p.selection(), "line here\n\nsecond");
+    p.draw(&mut Canvas::new(&mut screen, area), area, md, 1);
+    assert_eq!(screen[(8, 0)].bg, SEL);
+    assert_eq!(screen[(7, 0)].bg, BG);
+
+    p.mouse(MouseEventKind::Down(MouseButton::Left), 3, 0);
+    p.mouse(MouseEventKind::Up(MouseButton::Left), 3, 0);
+    assert_eq!(p.selection(), "");
+}

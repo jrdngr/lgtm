@@ -242,6 +242,16 @@ impl Issues {
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
         self.outcome = Outcome::None;
+        if key.code == KeyCode::Char('c')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && let Some(text) = self.selection()
+        {
+            self.notice = Some(match lgtm_tui_kit::clipboard::copy(&text) {
+                Ok(()) => "copied".into(),
+                Err(e) => format!("couldn't copy: {e}"),
+            });
+            return Outcome::None;
+        }
         if self.prompt.is_some() {
             self.prompt_key(key);
         } else if let Some(id) = self.status_for.take() {

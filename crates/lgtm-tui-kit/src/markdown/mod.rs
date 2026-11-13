@@ -1,13 +1,14 @@
 //! Markdown rendered read-only: what the editor shows for `space m`, and lgtm-issues for an issue.
 
 mod render;
+mod select;
 mod table;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 
 use crate::paint::Canvas;
-use crate::theme::BG;
+use crate::theme::{BG, SEL};
 use render::Line;
 
 /// The widest the text gets, for lines that read well.
@@ -25,6 +26,11 @@ pub struct Preview {
     pending: Option<char>,
     /// Where each link drawn last is: row, columns, and URL.
     links: Vec<(u16, std::ops::Range<u16>, String)>,
+    /// Where the text was drawn last: its area and first column.
+    drawn: (Rect, u16),
+    /// Text selected with the mouse, from where the drag started to where it is, as rendered
+    /// line and column.
+    sel: Option<(select::Pos, select::Pos)>,
 }
 
 /// What a key asks of the editor.
@@ -47,6 +53,8 @@ impl Preview {
             height: 0,
             pending: None,
             links: vec![],
+            drawn: (Rect::default(), 0),
+            sel: None,
         }
     }
 
@@ -105,6 +113,7 @@ impl Preview {
         self.scroll(0);
         self.links.clear();
         let x0 = area.x + 2;
+        self.drawn = (area, x0);
         for (i, line) in self.lines.iter().skip(self.top).enumerate() {
             let y = area.y + i as u16;
             if y >= area.bottom() {
@@ -126,6 +135,9 @@ impl Preview {
                     self.links.push((y, x..end, url.clone()));
                 }
                 x = end;
+            }
+            if let Some((from, to)) = self.selected(self.top + i) {
+                c.tint(x0 + from as u16, y, (to - from) as u16, SEL);
             }
         }
         let drawn = self.lines.len().saturating_sub(self.top) as u16;

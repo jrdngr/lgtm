@@ -16,7 +16,7 @@ use super::wrap::{code_parts, cols};
 use crate::edit::buffer::{Buffer, Sel};
 use crate::edit::keys::{Action, Keys, Mode, View};
 use crate::edit::motion;
-use crate::tui::edit::clipboard;
+use lgtm_tui_kit::clipboard;
 
 pub struct Selecting {
     pub buf: Buffer,
@@ -80,6 +80,12 @@ impl Review {
             })
             .collect();
         texts.join("\n")
+    }
+
+    /// The text selected in the review, if any.
+    pub fn selected(&self) -> Option<String> {
+        let s = self.selecting.as_ref()?;
+        Some(self.selected_text(&s.buf)).filter(|t| !t.is_empty())
     }
 
     /// The selected text. Lines a wrapped row continues on join without a newline.

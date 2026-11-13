@@ -14,6 +14,9 @@ const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 impl Issues {
     pub fn mouse(&mut self, ev: MouseEvent) {
+        if let Screen::View(v) = &mut self.screen {
+            return v.mouse(ev.kind, ev.column, ev.row);
+        }
         match ev.kind {
             MouseEventKind::ScrollDown => self.scroll(3),
             MouseEventKind::ScrollUp => self.scroll(-3),
@@ -45,6 +48,14 @@ impl Issues {
             Row::Folded(status, ..) => self.toggle(status),
             Row::Issue(id) if double => self.open(id),
             _ => self.click = Some((n, now)),
+        }
+    }
+
+    /// The text selected with the mouse in an opened issue.
+    pub fn selection(&self) -> Option<String> {
+        match &self.screen {
+            Screen::View(v) => v.selection(),
+            _ => None,
         }
     }
 

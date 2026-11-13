@@ -579,6 +579,13 @@ impl App {
     /// Handles a key. Returns whether to quit.
     fn key(&mut self, key: KeyEvent) -> bool {
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            if let Some(text) = self.selection() {
+                match lgtm_tui_kit::clipboard::copy(&text) {
+                    Ok(()) => self.notice("copied".into()),
+                    Err(e) => self.notice(format!("couldn't copy: {e}")),
+                }
+                return false;
+            }
             if !self.buffers.blocks_quit() {
                 return true;
             }
@@ -829,6 +836,19 @@ impl App {
     }
 
     /// Shows `n` on the screen that's up.
+    /// The text selected on the screen in view, for Ctrl-C to copy.
+    fn selection(&self) -> Option<String> {
+        if self.help.is_some() {
+            return None;
+        }
+        match self.screen {
+            Screen::Editor => self.buffers.selection(),
+            Screen::Review => self.review.as_ref()?.selected(),
+            Screen::Issues => self.issues.as_ref()?.selection(),
+            Screen::Home => None,
+        }
+    }
+
     fn notice(&mut self, n: String) {
         match self.review.as_mut() {
             Some(r) if self.screen != Screen::Editor => r.notice = Some(n),

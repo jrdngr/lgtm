@@ -1,7 +1,7 @@
 //! The editor screen: open buffers, the one in view, the `:` command line, and the keys.
 
 mod click;
-pub mod clipboard;
+use lgtm_tui_kit::clipboard;
 mod command;
 pub(crate) mod draw;
 mod finder;
@@ -367,12 +367,12 @@ impl Editor {
             match ev.kind {
                 MouseEventKind::ScrollDown => p.scroll(3),
                 MouseEventKind::ScrollUp => p.scroll(-3),
-                MouseEventKind::Down(MouseButton::Left) => {
-                    if let Some(url) = p.link_at(ev.column, ev.row) {
-                        open_link(url);
-                    }
+                MouseEventKind::Down(MouseButton::Left)
+                    if let Some(url) = p.link_at(ev.column, ev.row) =>
+                {
+                    open_link(url);
                 }
-                _ => {}
+                kind => p.mouse(kind, ev.column, ev.row),
             }
             return;
         }
@@ -506,6 +506,17 @@ impl Editor {
         {
             self.sidebar.reveal(&name);
         }
+    }
+
+    /// The text selected in view: in the markdown preview, or more than one character of the
+    /// file's selection.
+    pub fn selection(&self) -> Option<String> {
+        let open = self.open.get(self.cur)?;
+        if let Some(p) = &open.preview {
+            return Some(p.selection()).filter(|t| !t.is_empty());
+        }
+        let b = &open.buf;
+        (b.sel.to() > b.sel.from()).then(|| b.slice(b.sel.from(), b.sel.to() + 1))
     }
 
     /// Whether unsaved edits keep the editor from quitting. If so, says which files and

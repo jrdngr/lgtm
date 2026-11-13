@@ -55,6 +55,17 @@ impl<'a> Canvas<'a> {
         }
     }
 
+    /// Sets the background of `w` cells from (`x`, `y`), keeping their text.
+    pub fn tint(&mut self, x: u16, y: u16, w: u16, bg: Color) {
+        if !self.inside(x, y) {
+            return;
+        }
+        let end = x.saturating_add(w).min(self.right());
+        for i in x..end {
+            self.buf[(i, y)].set_bg(bg);
+        }
+    }
+
     /// Writes `text` a line per row from (`x`, `y`).
     pub fn put_lines(&mut self, x: u16, y: u16, text: &str, style: Style) {
         for (i, line) in text.lines().enumerate() {

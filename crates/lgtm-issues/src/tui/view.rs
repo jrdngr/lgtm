@@ -3,7 +3,7 @@
 use lgtm_tui_kit::markdown::{Outcome, Preview};
 use lgtm_tui_kit::paint::Canvas;
 use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, MUTED, RED, UNIQUE};
-use ratatui::crossterm::event::KeyEvent;
+use ratatui::crossterm::event::{KeyEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
 use super::qq;
@@ -35,6 +35,14 @@ impl View {
             self.text = text;
             self.version += 1;
         }
+    }
+
+    pub fn mouse(&mut self, kind: MouseEventKind, x: u16, y: u16) {
+        self.preview.mouse(kind, x, y);
+    }
+
+    pub fn selection(&self) -> Option<String> {
+        Some(self.preview.selection()).filter(|t| !t.is_empty())
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
