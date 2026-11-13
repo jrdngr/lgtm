@@ -39,16 +39,16 @@ impl Default for View {
     }
 }
 
-/// A terminal's space, and the terminal's own color in it.
+/// A terminal and its space.
 #[derive(Clone)]
 pub(super) struct Who {
     pub space: u64,
     pub name: String,
     pub color: usize,
-    /// The space's color for its first terminal, the colors after it for the rest.
-    pub sub: usize,
     /// The terminal's tab name.
     pub label: String,
+    /// The name it was given, if any.
+    pub named: Option<String>,
 }
 
 /// Where terminals that left no trace of their space go.
@@ -57,22 +57,25 @@ const UNKNOWN: u64 = u64::MAX;
 impl Workspace {
     /// Where `t`, one end of `m`, is: its space now, or the one `m` saw it in.
     fn who(&self, m: &Message, t: TermId) -> Who {
-        let label = if self.terms.contains_key(&t) {
-            self.term_label(Tab::Term(t))
+        let (label, named) = if self.terms.contains_key(&t) {
+            (
+                self.term_label(Tab::Term(t)),
+                self.model.name(t).map(str::to_owned),
+            )
         } else if m.from == Some(t) {
-            m.from_label.clone()
+            (m.from_label.clone(), m.from_name.clone())
         } else {
-            m.to_label.clone()
+            (m.to_label.clone(), m.to_name.clone())
         };
-        let live = |space: &crate::model::Space, sub: usize| Who {
+        let live = |space: &crate::model::Space| Who {
             space: space.id.0,
             name: self.space_label(space),
             color: space.color,
-            sub: space.color + sub,
             label: label.clone(),
+            named: named.clone(),
         };
         if let Some(s) = self.model.space_of(Tab::Term(t)) {
-            return live(s, s.terms().position(|x| x == t).unwrap_or(0));
+            return live(s);
         }
         let tag = if m.from == Some(t) {
             &m.from_space
@@ -81,21 +84,21 @@ impl Workspace {
         };
         match tag {
             Some(tag) => match self.model.find_space(SpaceId(tag.id)) {
-                Some(s) => live(s, 0),
+                Some(s) => live(s),
                 None => Who {
                     space: tag.id,
                     name: tag.name.clone(),
                     color: tag.color,
-                    sub: tag.color,
                     label,
+                    named,
                 },
             },
             None => Who {
                 space: UNKNOWN,
                 name: "Closed".into(),
                 color: 0,
-                sub: 0,
                 label,
+                named,
             },
         }
     }

@@ -38,6 +38,8 @@ impl Workspace {
             read: from.is_none(),
             from_space: from.and_then(|f| self.space_tag(f)),
             to_space: self.space_tag(to),
+            from_name: from.and_then(|f| self.model.name(f).map(str::to_owned)),
+            to_name: self.model.name(to).map(str::to_owned),
         };
         match self.with_agents(window, cx, |a, env| a.send(message, env)) {
             Ok(outcome) => Reply::Ok(outcome.into()),

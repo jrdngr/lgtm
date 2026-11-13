@@ -25,6 +25,11 @@ pub struct Message {
     pub from_space: Option<SpaceTag>,
     #[serde(default)]
     pub to_space: Option<SpaceTag>,
+    /// The sender's and receiver's names when it was sent, if they'd been named.
+    #[serde(default)]
+    pub from_name: Option<String>,
+    #[serde(default)]
+    pub to_name: Option<String>,
 }
 
 /// A space as it was: its id, name and color.
@@ -93,6 +98,8 @@ mod tests {
             read: false,
             from_space: None,
             to_space: None,
+            from_name: None,
+            to_name: None,
         }
     }
 

@@ -89,6 +89,8 @@ mod tests {
             read,
             from_space: None,
             to_space: None,
+            from_name: None,
+            to_name: None,
         }
     }
 

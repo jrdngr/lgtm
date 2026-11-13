@@ -468,6 +468,8 @@ mod tests {
             read: false,
             from_space: None,
             to_space: None,
+            from_name: None,
+            to_name: None,
         }
     }
 

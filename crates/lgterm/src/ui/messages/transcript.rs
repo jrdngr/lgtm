@@ -17,29 +17,18 @@ use crate::model::TermId;
 use crate::theme;
 use crate::ui::{Workspace, message_body};
 
-/// `t17` on its space's color, with a stripe in the terminal's own.
+/// The terminal's name, or `t17` when it has none, on its space's color.
 fn chip(t: TermId, w: &Who) -> gpui::Div {
     div()
         .flex_none()
-        .flex()
-        .child(
-            div()
-                .w(px(4.))
-                .rounded_l(px(4.))
-                .bg(rgb(theme::space_color(w.sub))),
-        )
-        .child(
-            div()
-                .pl(px(4.))
-                .pr(px(5.))
-                .rounded_r(px(4.))
-                .bg(rgb(theme::space_color(w.color)))
-                .font_family(fonts::mono())
-                .text_size(px(11.5))
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(rgb(theme::BADGE_TEXT))
-                .child(t.to_string()),
-        )
+        .px(px(5.))
+        .rounded(px(4.))
+        .bg(rgb(theme::space_color(w.color)))
+        .font_family(fonts::mono())
+        .text_size(px(11.5))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(rgb(theme::BADGE_TEXT))
+        .child(w.named.clone().unwrap_or_else(|| t.to_string()))
 }
 
 /// The count of unread messages, when there are any.
@@ -84,7 +73,7 @@ fn pair_chips((a, b): Pair, who: &HashMap<TermId, Who>) -> gpui::Div {
         .child(chip(b, &who[&b]))
 }
 
-/// A chip and the terminal's tab name.
+/// A chip and the terminal's tab name, when the chip doesn't show it.
 fn agent_line(t: TermId, w: &Who, strong: bool) -> gpui::Div {
     div()
         .flex()
@@ -92,19 +81,21 @@ fn agent_line(t: TermId, w: &Who, strong: bool) -> gpui::Div {
         .gap(px(8.))
         .min_w_0()
         .child(chip(t, w))
-        .child(
-            div()
-                .min_w_0()
-                .overflow_hidden()
-                .text_ellipsis()
-                .whitespace_nowrap()
-                .text_color(rgb(if strong {
-                    theme::TEXT_STRONG
-                } else {
-                    theme::TEXT
-                }))
-                .child(SharedString::from(w.label.clone())),
-        )
+        .when(w.named.is_none(), |d| {
+            d.child(
+                div()
+                    .min_w_0()
+                    .overflow_hidden()
+                    .text_ellipsis()
+                    .whitespace_nowrap()
+                    .text_color(rgb(if strong {
+                        theme::TEXT_STRONG
+                    } else {
+                        theme::TEXT
+                    }))
+                    .child(SharedString::from(w.label.clone())),
+            )
+        })
 }
 
 impl Workspace {
