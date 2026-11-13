@@ -355,12 +355,16 @@ impl Workspace {
     /// The button that shows or hides the sidebar: at the sidebar header's right edge, over
     /// the new space button, or just right of the traffic lights when the sidebar is hidden or
     /// shows only badges.
-    pub(super) fn render_sidebar_toggle(&self) -> AnyElement {
-        let left = if self.sidebar && !self.sidebar_icons() {
+    pub(super) fn toggle_left(&self) -> f32 {
+        if self.sidebar && !self.sidebar_icons() {
             self.sidebar_width - 37.
         } else {
             78.
-        };
+        }
+    }
+
+    pub(super) fn render_sidebar_toggle(&self) -> AnyElement {
+        let left = self.toggle_left();
         let icon = if self.sidebar {
             "ui/sidebar-open.svg"
         } else {

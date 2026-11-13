@@ -121,6 +121,7 @@ impl Workspace {
 
     /// Checks what each terminal runs and where, and what its agent is doing.
     pub(super) fn poll(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.check_update(cx);
         let mut changed = false;
         let home = self.home.clone();
         for term in self.terms.values_mut() {

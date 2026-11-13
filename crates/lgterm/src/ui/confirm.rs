@@ -1,5 +1,5 @@
-//! Asking before deleting a layout: its name, Cancel, and a red Delete. Return deletes, Escape
-//! cancels.
+//! Asking before deleting a layout or restarting into an update: a question, Cancel, and the
+//! action's button. Return confirms, Escape cancels.
 
 use gpui::{
     AnyElement, Context, FocusHandle, FontWeight, InteractiveElement, IntoElement, KeyDownEvent,
@@ -14,7 +14,12 @@ use crate::theme;
 pub struct Confirm {
     pub focus: FocusHandle,
     pub _blur: gpui::Subscription,
-    pub layout: LayoutId,
+    pub what: Ask,
+}
+
+pub enum Ask {
+    DeleteLayout(LayoutId),
+    Restart,
 }
 
 impl Workspace {
@@ -28,21 +33,34 @@ impl Workspace {
             Overlay::Confirm(Confirm {
                 focus,
                 _blur,
-                layout,
+                what: Ask::DeleteLayout(layout),
             })
         });
     }
 
-    fn delete_confirmed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn confirm_restart(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.show_overlay(window, cx, |focus, _blur| {
+            Overlay::Confirm(Confirm {
+                focus,
+                _blur,
+                what: Ask::Restart,
+            })
+        });
+    }
+
+    fn confirmed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(Overlay::Confirm(c)) = self.overlay.take() else {
             return;
         };
-        self.apply(window, cx, |m| m.delete_layout(c.layout));
+        match c.what {
+            Ask::DeleteLayout(layout) => self.apply(window, cx, |m| m.delete_layout(layout)),
+            Ask::Restart => self.restart(cx),
+        }
     }
 
     fn confirm_key(&mut self, ev: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         match ev.keystroke.key.as_str() {
-            "enter" => self.delete_confirmed(window, cx),
+            "enter" => self.confirmed(window, cx),
             "escape" => self.close_overlay(window, cx),
             _ => return,
         }
@@ -53,7 +71,21 @@ impl Workspace {
         let Some(Overlay::Confirm(c)) = &self.overlay else {
             return None;
         };
-        let i = self.model.layouts.iter().position(|l| l.id == c.layout)?;
+        let (question, action, color) = match c.what {
+            Ask::DeleteLayout(layout) => {
+                let i = self.model.layouts.iter().position(|l| l.id == layout)?;
+                (
+                    format!("Delete “{}”?", self.layout_label(i)),
+                    "Delete",
+                    theme::DANGER,
+                )
+            }
+            Ask::Restart => (
+                "Restart lgterm to update?".to_owned(),
+                "Restart",
+                theme::UPDATE,
+            ),
+        };
         let button = |id: &'static str, label: &'static str, bg: u32| {
             div()
                 .id(id)
@@ -88,7 +120,7 @@ impl Workspace {
                     .text_size(px(15.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(theme::TEXT_STRONG))
-                    .child(format!("Delete “{}”?", self.layout_label(i))),
+                    .child(question),
             )
             .child(
                 div()
@@ -96,13 +128,12 @@ impl Workspace {
                     .justify_end()
                     .gap(px(8.))
                     .child(
-                        button("cancel-delete", "Cancel", theme::TAB_ACTIVE)
+                        button("cancel-confirm", "Cancel", theme::TAB_ACTIVE)
                             .on_click(cx.listener(|w, _, window, cx| w.close_overlay(window, cx))),
                     )
                     .child(
-                        button("confirm-delete", "Delete", theme::DANGER).on_click(
-                            cx.listener(|w, _, window, cx| w.delete_confirmed(window, cx)),
-                        ),
+                        button("confirm", action, color)
+                            .on_click(cx.listener(|w, _, window, cx| w.confirmed(window, cx))),
                     ),
             );
         Some(backdrop("confirm-overlay", dialog.into_any_element(), cx))

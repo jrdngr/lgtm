@@ -25,6 +25,7 @@ mod space_drag;
 mod tab_drag;
 mod terms;
 mod toasts;
+mod update;
 mod waiting;
 
 use std::cell::Cell;
@@ -89,6 +90,7 @@ pub struct Workspace {
     dirty: bool,
     /// The state last written to disk.
     saved: Option<Vec<u8>>,
+    update: update::Update,
     _server: Option<ipc::Server>,
 }
 
@@ -131,6 +133,7 @@ impl Workspace {
             spinning: Cell::new(false),
             dirty: false,
             saved: None,
+            update: update::Update::new(),
             _server: None,
         };
         this.listen(window, cx);
