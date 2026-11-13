@@ -243,7 +243,7 @@ impl Issues {
         self.notice = None;
         self.outcome = Outcome::None;
         if key.code == KeyCode::Char('c')
-            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && key.modifiers.contains(KeyModifiers::SUPER)
             && let Some(text) = self.selection()
         {
             self.notice = Some(match lgtm_tui_kit::clipboard::copy(&text) {

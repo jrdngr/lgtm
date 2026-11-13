@@ -8,8 +8,8 @@ use ghostty_vt::selection::{FormatOptions, SelectLineOptions, SelectWordOptions,
 use ghostty_vt::terminal::{Mode, Point as VtPoint, PointCoordinate, ScrollViewport};
 use ghostty_vt::{Terminal, fmt};
 use gpui::{
-    Context, KeyDownEvent, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    Pixels, Point, ScrollEvent, Window, px,
+    Context, KeyDownEvent, Keystroke, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
+    MouseUpEvent, Pixels, Point, ScrollEvent, Window, px,
 };
 
 use super::links::{self, Link};
@@ -75,24 +75,25 @@ impl TermView {
                 self.unsent = draft;
             }
         }
+        self.send_key(k, ev.is_held, cx);
+        cx.stop_propagation();
+    }
+
+    /// Writes a keystroke to the program, encoded the way it asked for keys.
+    pub(super) fn send_key(&mut self, k: &Keystroke, held: bool, cx: &mut Context<Self>) {
         let e = &mut self.key_event;
-        e.set_action(if ev.is_held {
-            Action::Repeat
-        } else {
-            Action::Press
-        })
-        .set_key(keys::key(&k.key))
-        .set_mods(keys::mods(&k.modifiers))
-        .set_consumed_mods(keys::consumed(k))
-        .set_utf8(keys::text(k).map(str::to_owned))
-        .set_unshifted_codepoint(keys::unshifted(&k.key).unwrap_or('\0'));
+        e.set_action(if held { Action::Repeat } else { Action::Press })
+            .set_key(keys::key(&k.key))
+            .set_mods(keys::mods(&k.modifiers))
+            .set_consumed_mods(keys::consumed(k))
+            .set_utf8(keys::text(k).map(str::to_owned))
+            .set_unshifted_codepoint(keys::unshifted(&k.key).unwrap_or('\0'));
         self.keys.set_options_from_terminal(&self.vt);
         let mut out = Vec::new();
         if self.keys.encode_to_vec(&self.key_event, &mut out).is_ok() && !out.is_empty() {
             self.write(&out);
             self.scroll_to_bottom(cx);
         }
-        cx.stop_propagation();
     }
 
     /// The cell under `pos`, clamped to the screen.

@@ -60,14 +60,17 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                     Event::Key(key) if key.kind != KeyEventKind::Release => {
                         let key = term::plain(key);
                         if key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::SUPER)
+                            && let Some(text) = e.selection()
+                        {
+                            e.notice = Some(match lgtm_tui_kit::clipboard::copy(&text) {
+                                Ok(()) => "copied".into(),
+                                Err(e) => format!("couldn't copy: {e}"),
+                            });
+                        } else if key.code == KeyCode::Char('c')
                             && key.modifiers.contains(KeyModifiers::CONTROL)
                         {
-                            if let Some(text) = e.selection() {
-                                e.notice = Some(match lgtm_tui_kit::clipboard::copy(&text) {
-                                    Ok(()) => "copied".into(),
-                                    Err(e) => format!("couldn't copy: {e}"),
-                                });
-                            } else if !e.blocks_quit() {
+                            if !e.blocks_quit() {
                                 return Ok(());
                             }
                         } else if let Some(h) = help.as_mut() {

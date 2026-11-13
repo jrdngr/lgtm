@@ -374,9 +374,15 @@ impl TermView {
         Some((frame, grid))
     }
 
+    /// Copies the selection. With none, a program that reads every key, like the lgtm TUI,
+    /// gets ⌘C to copy its own.
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = input::selection_text(&self.vt) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
+        } else if self.vt.kitty_keyboard_flags().is_ok_and(|f| !f.is_empty())
+            && let Ok(k) = gpui::Keystroke::parse("cmd-c")
+        {
+            self.send_key(&k, false, cx);
         }
     }
 
