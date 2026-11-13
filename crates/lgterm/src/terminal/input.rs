@@ -97,7 +97,7 @@ impl TermView {
     }
 
     /// The cell under `pos`, clamped to the screen.
-    fn cell_at(&self, pos: Point<Pixels>) -> Option<(u16, u16)> {
+    pub(super) fn cell_at(&self, pos: Point<Pixels>) -> Option<(u16, u16)> {
         let (origin, cell) = self.grid?;
         let x = ((pos.x - origin.x) / cell.width).floor().max(0.) as u16;
         let y = ((pos.y - origin.y) / cell.height).floor().max(0.) as u16;
@@ -160,7 +160,7 @@ impl TermView {
         links::at(&row.text(), row.char_index(x)?)
     }
 
-    fn screen_point(&self, (x, y): (u16, u16)) -> (u16, u32) {
+    pub(super) fn screen_point(&self, (x, y): (u16, u16)) -> (u16, u32) {
         let top = self.vt.scrollbar().map_or(0, |s| s.offset);
         (x, top as u32 + y as u32)
     }
@@ -247,12 +247,18 @@ impl TermView {
             }
             self.press_at = None;
         }
+        self.select_to(to, ev.modifiers.alt);
+        cx.notify();
+    }
+
+    /// Stretches the drag's selection to `to`, a screen point.
+    pub(super) fn select_to(&mut self, to: (u16, u32), rect: bool) {
+        let Some(from) = self.drag_from else { return };
         let vt = &self.vt;
         let point = |(x, y): (u16, u32)| vt.grid_ref(VtPoint::Screen(PointCoordinate { x, y }));
         if let (Ok(a), Ok(b)) = (point(from), point(to)) {
-            let _ = vt.set_selection(Some(&Selection::new(a, b, ev.modifiers.alt)));
+            let _ = vt.set_selection(Some(&Selection::new(a, b, rect)));
         }
-        cx.notify();
     }
 
     pub(super) fn mouse_up(&mut self, ev: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {

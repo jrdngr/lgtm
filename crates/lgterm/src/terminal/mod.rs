@@ -1,5 +1,6 @@
 //! One terminal: a shell on a pty, parsed by Ghostty, painted by GPUI.
 
+mod autoscroll;
 mod boxes;
 mod find;
 mod frame;
@@ -86,6 +87,10 @@ pub struct TermView {
     /// Where the button went down, until the drag has gone far enough to select.
     press_at: Option<gpui::Point<gpui::Pixels>>,
     mouse_down: bool,
+    /// While a selection drag sits past the top or bottom edge: lines to scroll each tick
+    /// (negative is up), and the pointer's x and Option key.
+    autoscroll: Option<autoscroll::Edge>,
+    autoscrolling: bool,
     /// The button held down over the terminal, and whether its press went to the program.
     pressed: Option<(MouseButton, bool)>,
     find: Option<find::Find>,
@@ -165,6 +170,8 @@ impl TermView {
                 drag_from: None,
                 press_at: None,
                 mouse_down: false,
+                autoscroll: None,
+                autoscrolling: false,
                 pressed: None,
                 find: None,
                 draft: false,
@@ -444,6 +451,7 @@ impl Focusable for TermView {
 impl Render for TermView {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let this = cx.entity();
+        let dragging = cx.entity();
         div()
             .id(("term", self.id.0))
             .size_full()
@@ -467,10 +475,11 @@ impl Render for TermView {
             .child(
                 canvas(
                     move |bounds, window, cx| this.update(cx, |t, cx| t.layout(bounds, window, cx)),
-                    |_, prepared, window, cx| {
+                    move |_, prepared, window, cx| {
                         if let Some((frame, grid)) = prepared {
                             grid.paint(&frame, window, cx);
                         }
+                        autoscroll::listen(dragging, window);
                     },
                 )
                 .size_full(),
