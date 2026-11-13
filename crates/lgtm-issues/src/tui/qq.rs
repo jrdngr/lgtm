@@ -1,7 +1,9 @@
 //! A question in the qq shape, styled: decisions, context, numbered options with their
-//! pros, cons and risks, and the recommendation.
+//! pros, cons and risks, and the recommendation, with markdown inside the text: code spans,
+//! emphasis, links, headings and fenced code.
 
-use lgtm_tui_kit::theme::{self, ACCENT, AMBER, FAINT, FG, GREEN, MUTED, RED};
+use lgtm_tui_kit::markdown::{CODE, inline};
+use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BLANK, FAINT, FG, GREEN, MUTED, RED};
 use ratatui::style::{Color, Style};
 
 use super::wrap::{Runs, wrap};
@@ -75,6 +77,11 @@ fn b(text: &str, c: Color) -> (String, Style) {
     (text.to_owned(), theme::bold(c))
 }
 
+/// Text with its inline markdown, over `style`.
+fn md(text: &str, style: Style) -> Runs {
+    inline(text, style)
+}
+
 /// One source line's runs, and the indent its wrapped lines hang at.
 fn style(line: &str, is_option: bool) -> (Runs, usize) {
     let indent = line.len() - line.trim_start().len();
@@ -86,18 +93,19 @@ fn style(line: &str, is_option: bool) -> (Runs, usize) {
         return (Vec::new(), 0);
     } else if let Some(rest) = t.strip_prefix("✅ ") {
         let (id, rest) = rest.split_once(':').unwrap_or((rest, ""));
-        runs.extend([s("✅ ", GREEN), s(&format!("{id}:"), GREEN), s(rest, FG)]);
+        runs.extend([s("✅ ", GREEN), s(&format!("{id}:"), GREEN)]);
+        runs.extend(md(rest, theme::fg(FG)));
     } else if is_option && indent == 0 {
         let (n, rest) = t.split_once(". ").unwrap_or((t, ""));
         runs.push(b(&format!("{n}. "), ACCENT));
         hang = n.len() + 2;
         match rest.split_once("(recommended)") {
-            Some((name, after)) => runs.extend([
-                b(name.trim_end(), FG),
-                s(" (recommended)", GREEN),
-                s(after, FG),
-            ]),
-            None => runs.push(b(rest, FG)),
+            Some((name, after)) => {
+                runs.extend(md(name.trim_end(), theme::bold(FG)));
+                runs.push(s(" (recommended)", GREEN));
+                runs.extend(md(after, theme::fg(FG)));
+            }
+            None => runs.extend(md(rest, theme::bold(FG))),
         }
     } else if let Some(rest) = t.strip_prefix("- ") {
         hang = indent + 2;
@@ -107,25 +115,48 @@ fn style(line: &str, is_option: bool) -> (Runs, usize) {
             .zip([GREEN, AMBER, RED])
             .find(|(l, _)| rest.starts_with(l));
         match label {
-            Some((l, c)) => runs.extend([b(l, c), s(&rest[l.len()..], FG)]),
+            Some((l, c)) => {
+                runs.push(b(l, c));
+                runs.extend(md(&rest[l.len()..], theme::fg(FG)));
+            }
             None if is_effect(rest) => {
                 let (head, tail) = rest.split_once(':').unwrap_or((rest, ""));
-                runs.extend([s(&format!("{head}:"), FAINT), s(tail, MUTED)]);
+                runs.push(s(&format!("{head}:"), FAINT));
+                runs.extend(md(tail, theme::fg(MUTED)));
             }
-            None => runs.push(s(rest, FG)),
+            None => runs.extend(md(rest, theme::fg(FG))),
         }
     } else if let Some(rest) = t.strip_prefix("Recommendation:") {
-        runs.extend([b("Recommendation:", FG), s(rest, FG)]);
+        runs.push(b("Recommendation:", FG));
+        runs.extend(md(rest, theme::fg(FG)));
     } else if t.starts_with("Question ") && t.contains(" of ") && t.len() < 24 {
         runs.push(s(t, FAINT));
     } else if let Some((id, subject)) = t.split_once(" — ").filter(|(id, _)| is_qid(id)) {
-        runs.extend([b(&format!("{id} — "), AMBER), b(subject, FG)]);
+        runs.push(b(&format!("{id} — "), AMBER));
+        runs.extend(md(subject, theme::bold(FG)));
+    } else if let Some(heading) = heading(t) {
+        runs.extend(md(heading, theme::bold(FG)));
     } else if t.ends_with(':') && t.len() < 48 {
-        runs.push(b(t, MUTED));
+        runs.extend(md(t, theme::bold(MUTED)));
     } else {
-        runs.push(s(t, FG));
+        runs.extend(md(t, theme::fg(FG)));
     }
     (runs, hang)
+}
+
+/// A `## Heading` line's text.
+fn heading(t: &str) -> Option<&str> {
+    let hashes = t.chars().take_while(|&c| c == '#').count();
+    (1..=6)
+        .contains(&hashes)
+        .then(|| t[hashes..].strip_prefix(' '))
+        .flatten()
+}
+
+/// Whether a line opens or closes a fenced code block.
+fn is_fence(line: &str) -> bool {
+    let t = line.trim_start();
+    t.starts_with("```") || t.starts_with("~~~")
 }
 
 fn is_qid(s: &str) -> bool {
@@ -149,8 +180,18 @@ pub fn render(text: &str, width: usize) -> Vec<Line> {
     let lines: Vec<&str> = text.lines().collect();
     let owner = owners(&lines);
     let mut out = Vec::new();
+    let mut code = false;
     for (line, option) in lines.iter().zip(owner) {
-        let (runs, hang) = style(line, option.is_some());
+        if is_fence(line) {
+            code = !code;
+            continue;
+        }
+        let (runs, hang) = if code {
+            let style = Style::default().fg(CODE).bg(BLANK);
+            (vec![(line.to_string(), style)], 0)
+        } else {
+            style(line, option.is_some())
+        };
         for runs in wrap(&runs, width, hang) {
             out.push(Line { runs, option });
         }
@@ -220,6 +261,26 @@ Recommendation: option 1.
                 .iter()
                 .any(|l| text(l) == "Recommendation: option 1." && l.option.is_none())
         );
+    }
+
+    #[test]
+    fn markdown_in_the_text_is_rendered() {
+        let q = "Context:\n\n- `_model_updating()` in **two** places\n\n## Notes\n\n```\nlet x = 1;\n```\n";
+        let lines = render(q, 80);
+        let shown: Vec<String> = lines.iter().map(text).collect();
+        assert!(
+            shown.contains(&"- _model_updating() in two places".to_string()),
+            "{shown:?}"
+        );
+        assert!(shown.contains(&"Notes".to_string()), "{shown:?}");
+        assert!(shown.contains(&"let x = 1;".to_string()), "{shown:?}");
+        assert!(!shown.iter().any(|l| l.contains("```")), "{shown:?}");
+        let code = lines
+            .iter()
+            .flat_map(|l| &l.runs)
+            .find(|(t, _)| t == "_model_updating()")
+            .unwrap();
+        assert_eq!(code.1.fg, Some(CODE));
     }
 
     #[test]

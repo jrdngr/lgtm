@@ -3,12 +3,9 @@
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::style::{Color, Modifier, Style};
 
-use super::table;
+use super::{CODE, table};
 use crate::highlight;
 use crate::theme::{self, ACCENT, BG, BLANK, FAINT, FG, GREEN, HAIR, PANEL};
-
-/// Inline code's color: the highlighter's for strings.
-const CODE: Color = theme::rgb(0xce9178);
 
 /// Text in one style, and the link it opens.
 #[derive(Clone, Debug, PartialEq)]

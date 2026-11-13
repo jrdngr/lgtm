@@ -1,8 +1,11 @@
 //! Markdown rendered read-only: what the editor shows for `space m`, and lgtm-issues for an issue.
 
+mod inline;
 mod render;
 mod select;
 mod table;
+
+pub use inline::spans as inline;
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -10,6 +13,9 @@ use ratatui::layout::Rect;
 use crate::paint::Canvas;
 use crate::theme::{BG, SEL};
 use render::Line;
+
+/// Inline code's color: the highlighter's for strings.
+pub const CODE: ratatui::style::Color = crate::theme::rgb(0xce9178);
 
 /// The widest the text gets, for lines that read well.
 const MAX_WIDTH: usize = 100;
