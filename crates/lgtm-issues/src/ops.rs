@@ -340,6 +340,22 @@ impl Response {
     }
 }
 
+/// A reply that's only one of the question's option numbers picks that option.
+fn as_pick(response: &Response, question: &str) -> Response {
+    if let Response::Reply(text) = response
+        && let Ok(option) = text.trim().parse::<usize>()
+        && crate::tui::qq::options(question)
+            .iter()
+            .any(|(n, _)| *n == option)
+    {
+        return Response::Pick {
+            option,
+            notes: String::new(),
+        };
+    }
+    response.clone()
+}
+
 /// Records the answer to `qid` and says what to send to the agent.
 pub fn answer(
     folder: &Folder,
@@ -364,9 +380,14 @@ fn answer_at(
     }
     let root = folder.root.display().to_string();
     folder.update(id, |i| {
-        if !i.questions().iter().any(|(q, _)| q.qid() == Some(qid)) {
+        let Some((q, _)) = i
+            .questions()
+            .into_iter()
+            .find(|(q, _)| q.qid() == Some(qid))
+        else {
             bail!("issue #{id} has no question {qid}");
-        }
+        };
+        let response = &as_pick(response, &q.text);
         let (kind, text) = response.entry(qid);
         i.push(who, kind, &text, at.max(i.touched()));
         let next: Vec<String> = i
@@ -615,6 +636,26 @@ mod tests {
             (issue.status.as_str(), issue.body.as_str()),
             ("working", "Fix it")
         );
+    }
+
+    #[test]
+    fn a_reply_of_just_an_option_number_picks_it() {
+        let (_dir, folder, id) = setup();
+        let q = "Q1 — Where\n\nOptions:\n\n1. /login (recommended)\n2. /home\n";
+        ask(&folder, id, "Q1", None, "auth-fixer", Some("t12".into()), q).unwrap();
+        ask(&folder, id, "Q2", None, "auth-fixer", None, q).unwrap();
+        let sent = answer(&folder, id, "Q1", "jordan", &Response::Reply(" 2 ".into()))
+            .unwrap()
+            .unwrap();
+        assert!(
+            sent.text.contains("answer to Q1: option 2."),
+            "{}",
+            sent.text
+        );
+        let sent = answer(&folder, id, "Q2", "jordan", &Response::Reply("3".into()))
+            .unwrap()
+            .unwrap();
+        assert!(sent.text.contains("reply to Q2"), "{}", sent.text);
     }
 
     #[test]

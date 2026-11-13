@@ -5,7 +5,7 @@ mod list;
 mod marks;
 mod mouse;
 pub mod picker;
-mod qq;
+pub(crate) mod qq;
 mod question;
 mod standalone;
 mod undo;
