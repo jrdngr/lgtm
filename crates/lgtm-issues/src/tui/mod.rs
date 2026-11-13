@@ -2,6 +2,7 @@
 
 mod input;
 mod list;
+mod mouse;
 pub mod picker;
 mod qq;
 mod question;
@@ -91,6 +92,12 @@ pub struct Issues {
     polled: Instant,
     /// Rows the body had at the last draw.
     height: usize,
+    /// Where the list was drawn last, for clicks.
+    list_area: Rect,
+    /// The last click's row and when, to tell a double click.
+    click: Option<(usize, Instant)>,
+    /// Done and dropped, when their issues are listed.
+    expanded: Vec<Status>,
 }
 
 /// ⌥1 to ⌥9: as Alt and a digit, or as the characters a US Mac keyboard types for them.
@@ -125,6 +132,9 @@ impl Issues {
             history: undo::History::default(),
             polled: Instant::now(),
             height: 0,
+            list_area: Rect::default(),
+            click: None,
+            expanded: Vec::new(),
         };
         issues.reload();
         issues
@@ -176,7 +186,7 @@ impl Issues {
     }
 
     fn rows(&self) -> Vec<Row> {
-        list::rows(&self.issues, &self.filter)
+        list::rows(&self.issues, &self.filter, &self.expanded)
     }
 
     fn clamp(&mut self) {
@@ -357,6 +367,7 @@ impl Issues {
                     self.screen = Screen::Question { id, qid, top: 0 }
                 }
                 Some(Row::Issue(id)) => self.open(id),
+                Some(Row::Folded(status, ..)) => self.toggle(status),
                 _ => {}
             },
             KeyCode::Char('s') => self.status_for = row.and_then(|r| r.issue()),
@@ -553,6 +564,7 @@ impl Issues {
                 } else if self.sel >= self.top + self.height {
                     self.top = self.sel + 1 - self.height;
                 }
+                self.list_area = body;
                 list::draw(c, body, &self.issues, &rows, self.sel, self.top);
                 if !self.bad.is_empty() {
                     let y = bottom - 1;

@@ -1,6 +1,6 @@
 //! The main screen: issues grouped by status under a header each. Needs input lists its
 //! waiting questions first, then working and open issues one line each; done and dropped
-//! fold to a count.
+//! fold to a count, and list their issues once expanded.
 
 use lgtm_tui_kit::paint::Canvas;
 use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, HAIR, MUTED, SEL};
@@ -19,14 +19,14 @@ pub enum Row {
     Issue(u32),
     /// A status's header and how many rows it has.
     Header(Status, usize),
-    /// Done or dropped issues, folded to their count.
-    Folded(Status, usize),
+    /// Done or dropped issues: their count, and whether they're listed below it.
+    Folded(Status, usize, bool),
     Gap,
 }
 
 impl Row {
     pub fn pickable(&self) -> bool {
-        matches!(self, Row::Question { .. } | Row::Issue(_))
+        matches!(self, Row::Question { .. } | Row::Issue(_) | Row::Folded(..))
     }
 
     pub fn issue(&self) -> Option<u32> {
@@ -56,7 +56,7 @@ pub fn questions<'a>(issues: &'a [Issue], filter: &str) -> Vec<(&'a Issue, Strin
     out.into_iter().map(|(i, q, _)| (i, q)).collect()
 }
 
-pub fn rows(issues: &[Issue], filter: &str) -> Vec<Row> {
+pub fn rows(issues: &[Issue], filter: &str, expanded: &[Status]) -> Vec<Row> {
     let shown: Vec<&Issue> = issues.iter().filter(|i| matches(i, filter)).collect();
     // Issues with a status and no waiting question, newest first or, when open, by id.
     let quiet = |status: Status| {
@@ -91,15 +91,21 @@ pub fn rows(issues: &[Issue], filter: &str) -> Vec<Row> {
         rows.push(Row::Header(status, group.len()));
         rows.extend(group);
     }
-    let mut folded = [Status::Done, Status::Dropped]
-        .into_iter()
-        .map(|s| (s, shown.iter().filter(|i| i.status == s).count()))
-        .filter(|(_, n)| *n > 0)
-        .peekable();
-    if folded.peek().is_some() && !rows.is_empty() {
-        rows.push(Row::Gap);
+    let mut gap = !rows.is_empty();
+    for status in [Status::Done, Status::Dropped] {
+        let group = quiet(status);
+        if group.is_empty() {
+            continue;
+        }
+        if std::mem::take(&mut gap) {
+            rows.push(Row::Gap);
+        }
+        let open = expanded.contains(&status);
+        rows.push(Row::Folded(status, group.len(), open));
+        if open {
+            rows.extend(group);
+        }
     }
-    rows.extend(folded.map(|(s, n)| Row::Folded(s, n)));
     rows
 }
 
@@ -155,11 +161,7 @@ pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usi
             Row::Issue(id) => {
                 let Some(issue) = find(*id) else { continue };
                 let open = issue.status == Status::Open;
-                let (dot, color) = if open {
-                    ("○", MUTED)
-                } else {
-                    ("●", ACCENT)
-                };
+                let (dot, color) = super::view::status_mark(issue);
                 let mut x = c.put(area.x + 1, y, dot, st(color));
                 x = c.put(x + 1, y, &format!("{id:<3}"), st(FG));
                 x = c.put(x + 1, y, &cut(&issue.title, 36), st(FG));
@@ -187,14 +189,15 @@ pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usi
                 let rule = area.right().saturating_sub(x + 2) as usize;
                 c.put(x + 1, y, &"─".repeat(rule), st(HAIR));
             }
-            Row::Folded(status, n) => {
+            Row::Folded(status, n, open) => {
                 let (glyph, color) = match status {
                     Status::Done => ("✓", GREEN),
                     _ => ("×", FAINT),
                 };
                 let mut x = c.put(area.x + 1, y, glyph, st(color));
                 x = c.put(x + 1, y, status.name(), st(MUTED));
-                c.put(x + 2, y, &n.to_string(), st(FAINT));
+                x = c.put(x + 2, y, &n.to_string(), st(FAINT));
+                c.put(x + 1, y, if *open { "▾" } else { "▸" }, st(FAINT));
             }
             Row::Gap => {}
         }
@@ -242,7 +245,7 @@ mod tests {
             qid: qid.into(),
         };
         assert_eq!(
-            rows(&issues, ""),
+            rows(&issues, "", &[]),
             [
                 Row::Header(Status::NeedsInput, 3),
                 q("Q1"),
@@ -256,12 +259,21 @@ mod tests {
                 Row::Header(Status::Open, 1),
                 Row::Issue(2),
                 Row::Gap,
-                Row::Folded(Status::Done, 2),
-                Row::Folded(Status::Dropped, 1),
+                Row::Folded(Status::Done, 2, false),
+                Row::Folded(Status::Dropped, 1, false),
             ]
         );
         assert_eq!(
-            rows(&issues, "issue 3"),
+            rows(&issues, "issue", &[Status::Done])[12..],
+            [
+                Row::Folded(Status::Done, 2, true),
+                Row::Issue(5),
+                Row::Issue(8),
+                Row::Folded(Status::Dropped, 1, false),
+            ]
+        );
+        assert_eq!(
+            rows(&issues, "issue 3", &[]),
             [Row::Header(Status::Working, 1), Row::Issue(3)]
         );
     }

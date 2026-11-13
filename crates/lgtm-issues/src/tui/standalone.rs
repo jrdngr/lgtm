@@ -11,7 +11,7 @@ use lgtm_tui_kit::paint::Canvas;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{
     self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-    Event, KeyEventKind, MouseEventKind,
+    Event, KeyEventKind,
 };
 use ratatui::crossterm::execute;
 
@@ -84,11 +84,7 @@ pub fn run(dir: &Path, who: String) -> Result<()> {
                             Outcome::None
                         }
                         Event::Mouse(m) => {
-                            match m.kind {
-                                MouseEventKind::ScrollDown => i.scroll(3),
-                                MouseEventKind::ScrollUp => i.scroll(-3),
-                                _ => {}
-                            }
+                            i.mouse(m);
                             Outcome::None
                         }
                         _ => Outcome::None,

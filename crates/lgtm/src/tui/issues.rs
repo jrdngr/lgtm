@@ -7,7 +7,7 @@ use lgtm_issues::folder::Folder;
 use lgtm_issues::tui::picker::{self, Picker};
 use lgtm_issues::tui::{Issues, Outcome};
 use lgtm_tui_kit::paint::Canvas;
-use ratatui::crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
+use ratatui::crossterm::event::{KeyEvent, MouseEvent};
 
 use super::{App, Screen, settings};
 
@@ -91,11 +91,7 @@ impl App {
 
     pub(super) fn issues_mouse(&mut self, ev: MouseEvent) {
         if let Some(i) = self.issues.as_mut().filter(|_| self.folders.is_none()) {
-            match ev.kind {
-                MouseEventKind::ScrollDown => i.scroll(3),
-                MouseEventKind::ScrollUp => i.scroll(-3),
-                _ => {}
-            }
+            i.mouse(ev);
         }
     }
 
