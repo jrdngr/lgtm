@@ -31,13 +31,22 @@ const COMMANDS: &[&str] = &[
     "guide", "hook", "help", "--help", "-h",
 ];
 
-/// Whether these arguments are a command rather than a launch of the app.
-pub fn is_command(args: &[String]) -> bool {
-    args.first().is_some_and(|a| COMMANDS.contains(&a.as_str()))
+/// Whether these arguments launch the app: none, outside an lgterm terminal. Anything else is
+/// a command, so a mistyped one fails instead of opening another app.
+pub fn launches(args: &[String]) -> bool {
+    args.is_empty() && std::env::var_os(lgterm_proto::SOCKET_ENV).is_none()
 }
 
 /// Runs a command and returns the exit code.
 pub fn run(args: &[String]) -> i32 {
+    let Some(first) = args.first() else {
+        eprintln!("lgterm: already running; this is one of its terminals\n{USAGE}");
+        return 2;
+    };
+    if !COMMANDS.contains(&first.as_str()) {
+        eprintln!("lgterm: unknown command {first}\n{USAGE}");
+        return 2;
+    }
     if args[0] == "guide" {
         print!("{}", crate::guide::GUIDE);
         return 0;

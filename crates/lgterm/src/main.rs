@@ -26,7 +26,7 @@ use ui::actions::{self, OpenSettings, Quit};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    if cli::is_command(&args) {
+    if !cli::launches(&args) {
         std::process::exit(cli::run(&args));
     }
     let cwd = std::env::current_dir()
