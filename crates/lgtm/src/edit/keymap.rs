@@ -73,6 +73,8 @@ pub enum Cmd {
     },
     /// Go to the review, on the cursor's line.
     Review,
+    /// Go to the issues screen.
+    Issues,
     /// Send where the selection is to an agent.
     SendToAgent,
     /// Move to the file tree beside the text.
@@ -277,6 +279,7 @@ pub const BINDS: &[Bind] = &[
     b("space b", ToggleSidebar, Both, "toggle file tree"),
     b("space w", ToggleWrap, Both, "toggle word wrap"),
     b("space r", Review, Both, "review"),
+    b("space i", Issues, Both, "issues"),
     b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),
     b("space m", Preview, Both, "markdown preview"),

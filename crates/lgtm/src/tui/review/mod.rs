@@ -55,6 +55,8 @@ pub enum Outcome {
     Pull,
     /// Send where these lines are to an agent.
     Mention(String),
+    /// Go to the issues screen.
+    Issues,
 }
 
 pub struct Review {
@@ -201,7 +203,7 @@ pub fn help_groups() -> Vec<Group> {
         Group::new(
             "More",
             &[
-                ("space", "files, search, wrap, editor"),
+                ("space", "files, search, wrap, editor, issues"),
                 (":", "command"),
                 (":h", "home"),
             ],
@@ -583,6 +585,7 @@ impl Review {
                 }
                 KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
                 KeyCode::Char('r') => Outcome::Editor(self.edit_target()),
+                KeyCode::Char('i') => Outcome::Issues,
                 KeyCode::Char('w') => {
                     self.wrap = !self.wrap;
                     self.left = 0;

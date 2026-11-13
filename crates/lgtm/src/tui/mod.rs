@@ -7,6 +7,7 @@ mod github;
 mod heat;
 mod help;
 mod home;
+mod issues;
 mod load;
 mod mention;
 mod motions;
@@ -63,6 +64,8 @@ pub enum Start {
     File(PathBuf, u32),
     /// Every file with conflicts in the working copy.
     Conflicts,
+    /// The issues screen.
+    Issues,
 }
 
 /// Which screen is up.
@@ -71,6 +74,7 @@ enum Screen {
     Home,
     Review,
     Editor,
+    Issues,
 }
 
 pub use edit::SPLIT_FLAG;
@@ -93,6 +97,15 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     .unwrap_or_else(|| cwd.clone());
     let file = target.as_ref().filter(|(t, _)| !t.is_dir());
     let Some(root) = crate::agent::workspace(&near) else {
+        if matches!(start, Start::Issues) {
+            return match lgtm_issues::tui::run(&cwd, lgtm_issues::user()) {
+                Ok(()) => 0,
+                Err(e) => {
+                    eprintln!("lgtm: {e:#}");
+                    1
+                }
+            };
+        }
         if matches!(start, Start::Revset(_) | Start::Conflicts) {
             eprintln!("lgtm: not in a jj repo");
             return 1;
@@ -154,6 +167,8 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         agent_pick: None,
         loads: 0,
         settings: settings::load(),
+        issues: None,
+        folders: None,
     };
     app.buffers.files = app.settings.files;
     app.buffers.files_width = app.settings.editor_files_width;
@@ -167,6 +182,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     app.loader.decor();
     match start {
         Start::Home => {}
+        Start::Issues => app.show_issues(Some(&cwd)),
         Start::Conflicts => {
             let names = match app.loader.conflicted() {
                 Ok(names) => names,
@@ -257,6 +273,9 @@ struct App {
     shift: bool,
     /// The review's toggles, as last left.
     settings: Settings,
+    /// The issues screen, once it's been opened, or the folder picker before it.
+    issues: Option<Box<lgtm_issues::tui::Issues>>,
+    folders: Option<lgtm_issues::tui::picker::Picker>,
 }
 
 /// How often to look for another app's writes to the store.
@@ -288,7 +307,7 @@ impl App {
     /// Goes back to the screen this one was reached from, for Ctrl-o.
     fn back(&mut self) {
         let to = match self.screen {
-            Screen::Home => None,
+            Screen::Home | Screen::Issues => None,
             Screen::Editor => self.editor_back,
             Screen::Review => self.review_back,
         };
@@ -296,6 +315,7 @@ impl App {
             Some(Screen::Home) => self.go_home(),
             Some(Screen::Review) if self.review.is_some() => self.screen = Screen::Review,
             Some(Screen::Editor) => self.screen = Screen::Editor,
+            Some(Screen::Issues) => self.show_issues(None),
             _ => {}
         }
     }
@@ -363,6 +383,9 @@ impl App {
                     Event::Paste(text) if self.screen == Screen::Editor && self.help.is_none() => {
                         self.buffers.paste(&text);
                     }
+                    Event::Paste(text) if self.screen == Screen::Issues => {
+                        self.issues_paste(&text);
+                    }
                     Event::Mouse(_) if self.help.is_some() => {}
                     Event::Mouse(ev) => match self.screen {
                         Screen::Editor => self.buffers.mouse(ev),
@@ -375,6 +398,7 @@ impl App {
                             let outcome = self.home.mouse(ev);
                             self.home_outcome(outcome);
                         }
+                        Screen::Issues => self.issues_mouse(ev),
                     },
                     _ => {}
                 }
@@ -382,6 +406,7 @@ impl App {
             while let Ok(msg) = rx.try_recv() {
                 self.message(msg);
             }
+            self.issues_tick();
             // Agents change files while the editor is open too, so both trees keep up.
             if matches!(self.screen, Screen::Home | Screen::Editor)
                 && self.refreshed.elapsed() >= REFRESH
@@ -569,6 +594,9 @@ impl App {
             }
             return false;
         }
+        if self.screen == Screen::Issues {
+            return self.issues_key(key);
+        }
         if key.code == KeyCode::Char('o') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.back();
             return false;
@@ -610,6 +638,10 @@ impl App {
                     self.mention(text);
                     false
                 }
+                edit::Outcome::Issues => {
+                    self.show_issues(None);
+                    false
+                }
                 edit::Outcome::Quit => true,
             };
         }
@@ -647,6 +679,7 @@ impl App {
                     self.loader.pull(r.id, pr, r.bookmarks());
                 }
                 review::Outcome::Mention(text) => self.mention(text),
+                review::Outcome::Issues => self.show_issues(None),
                 review::Outcome::None => {}
             }
             return false;
@@ -696,12 +729,17 @@ impl App {
                 self.loader.push_plan(revs);
             }
             home::Outcome::Quit => return true,
+            home::Outcome::Issues => self.show_issues(None),
             home::Outcome::None => {}
         }
         false
     }
 
     fn draw(&mut self, c: &mut Canvas) {
+        if self.screen == Screen::Issues {
+            self.draw_issues(c);
+            return;
+        }
         if self.screen == Screen::Editor {
             draw_editor(
                 c,

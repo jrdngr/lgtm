@@ -37,6 +37,8 @@ pub enum Outcome {
     Review(String, u32, String),
     /// Send where these lines are to an agent.
     Mention(String),
+    /// Go to the issues screen.
+    Issues,
 }
 
 /// A buffer with where it's scrolled to and its colors.
@@ -723,6 +725,9 @@ impl Editor {
             let text = b.slice(b.line_start(line), b.line_end(line));
             return Outcome::Review(b.name.clone(), line as u32 + 1, text);
         }
+        if action == Action::Issues {
+            return Outcome::Issues;
+        }
         if action == Action::SendToAgent {
             let b = &open.buf;
             let (from, to) = (b.line_of(b.sel.from()), b.line_of(b.sel.to()));
@@ -761,7 +766,7 @@ impl Editor {
             Action::Pick(kind) => self.pick(kind),
             Action::CycleFile { forward } => self.cycle_file(forward),
             Action::Preview => self.toggle_preview(),
-            Action::Review | Action::SendToAgent => {}
+            Action::Review | Action::Issues | Action::SendToAgent => {}
             Action::Sidebar => {
                 self.files = true;
                 self.in_sidebar = true;

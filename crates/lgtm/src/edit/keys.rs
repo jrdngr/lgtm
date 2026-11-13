@@ -44,6 +44,8 @@ pub enum Action {
     },
     /// Go to the review.
     Review,
+    /// Go to the issues screen.
+    Issues,
     /// Send where the selection is to an agent.
     SendToAgent,
     /// Move to the file tree.
@@ -346,6 +348,7 @@ impl Keys {
             Cmd::Preview => return Action::Preview,
             Cmd::CycleFile { forward } => return Action::CycleFile { forward },
             Cmd::Review => return Action::Review,
+            Cmd::Issues => return Action::Issues,
             Cmd::SendToAgent => return Action::SendToAgent,
             Cmd::Sidebar => return Action::Sidebar,
             Cmd::ToggleSidebar => return Action::ToggleSidebar,

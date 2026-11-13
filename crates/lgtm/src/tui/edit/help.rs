@@ -68,6 +68,7 @@ const MORE: &[(&str, &str)] = &[
     ("space y  space p", "clipboard yank, paste"),
     ("space w", "word wrap"),
     ("space r", "review"),
+    ("space i", "issues"),
     ("space a", "send to agent"),
     ("space m", "markdown preview"),
     ("space x", "toggle checkbox"),

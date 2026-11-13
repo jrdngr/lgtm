@@ -2,28 +2,22 @@
 
 mod input;
 mod list;
+pub mod picker;
 mod qq;
 mod question;
+mod standalone;
 mod view;
 mod wrap;
 
 use std::collections::HashMap;
-use std::io::stdout;
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
 use lgtm_tui_kit::keybar::{self, Hint};
-use lgtm_tui_kit::markdown::Outcome;
+use lgtm_tui_kit::markdown::Outcome as ViewOutcome;
 use lgtm_tui_kit::paint::Canvas;
 use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, FG, GREEN, MUTED, PANEL, RED};
-use ratatui::DefaultTerminal;
-use ratatui::crossterm::event::{
-    self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
-};
-use ratatui::crossterm::execute;
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 
 use crate::folder::{Folder, Stamp};
@@ -33,6 +27,8 @@ use input::Input;
 use list::Row;
 use question::Draft;
 use view::View;
+
+pub use standalone::run;
 
 /// How often the folder is checked for changes.
 const POLL: Duration = Duration::from_millis(500);
@@ -50,7 +46,19 @@ enum Ask {
     Command,
 }
 
-struct App {
+/// What a key asks of whatever hosts the screen.
+#[derive(Debug, PartialEq)]
+pub enum Outcome {
+    None,
+    /// Open this file in the editor.
+    Edit(PathBuf),
+    /// Pick another issues folder.
+    Folders,
+    Home,
+    Quit,
+}
+
+pub struct Issues {
     folder: Folder,
     who: String,
     issues: Vec<Issue>,
@@ -63,47 +71,13 @@ struct App {
     prompt: Option<(Ask, Input)>,
     notice: Option<String>,
     drafts: HashMap<(u32, String), Draft>,
-    /// A file to open in the editor, once the screen is let go.
-    edit: Option<PathBuf>,
-    quit: bool,
+    /// What the last key asked of the host.
+    outcome: Outcome,
+    /// Whether Space was pressed, for the space menu.
+    space: bool,
+    polled: Instant,
     /// Rows the body had at the last draw.
     height: usize,
-}
-
-pub fn run(folder: Folder, name: Option<String>) -> Result<()> {
-    let mut app = App {
-        who: name.unwrap_or_else(|| std::env::var("USER").unwrap_or_else(|_| "user".into())),
-        folder,
-        issues: Vec::new(),
-        bad: Vec::new(),
-        stamp: Vec::new(),
-        screen: Screen::List,
-        sel: 0,
-        top: 0,
-        filter: String::new(),
-        prompt: None,
-        notice: None,
-        drafts: HashMap::new(),
-        edit: None,
-        quit: false,
-        height: 0,
-    };
-    app.reload();
-    let mut term = start();
-    let result = app.run(&mut term);
-    stop();
-    result
-}
-
-fn start() -> DefaultTerminal {
-    let term = ratatui::init();
-    let _ = execute!(stdout(), EnableMouseCapture, EnableBracketedPaste);
-    term
-}
-
-fn stop() {
-    let _ = execute!(stdout(), DisableMouseCapture, DisableBracketedPaste);
-    ratatui::restore();
 }
 
 /// ⌥1 to ⌥9: as Alt and a digit, or as the characters a US Mac keyboard types for them.
@@ -117,51 +91,55 @@ fn alt_digit(key: &KeyEvent) -> Option<usize> {
     "¡™£¢∞§¶•ª".chars().position(|m| m == c).map(|i| i + 1)
 }
 
-impl App {
-    fn run(&mut self, term: &mut DefaultTerminal) -> Result<()> {
-        let mut polled = Instant::now();
-        while !self.quit {
-            term.draw(|f| {
-                let area = f.area();
-                let c = &mut Canvas::new(f.buffer_mut(), area);
-                self.draw(c);
-                if let Some(at) = c.bar {
-                    f.set_cursor_position(at);
-                }
-            })?;
-            if event::poll(Duration::from_millis(100))? {
-                match event::read()? {
-                    Event::Key(key) if key.kind != KeyEventKind::Release => self.key(key),
-                    Event::Paste(text) => self.paste(&text),
-                    Event::Mouse(m) => match m.kind {
-                        MouseEventKind::ScrollDown => self.scroll(3),
-                        MouseEventKind::ScrollUp => self.scroll(-3),
-                        _ => {}
-                    },
-                    _ => {}
-                }
-            }
-            if let Some(path) = self.edit.take() {
-                stop();
-                let result = edit(&path);
-                *term = start();
-                term.clear()?;
-                if let Err(e) = result {
-                    self.notice = Some(format!("couldn't open an editor: {e:#}"));
-                }
-                self.reload();
-            }
-            if polled.elapsed() >= POLL {
-                polled = Instant::now();
-                if self.folder.stamp() != self.stamp {
-                    self.reload();
-                }
-            }
-        }
-        Ok(())
+impl Issues {
+    pub fn new(folder: Folder, who: String) -> Issues {
+        let mut issues = Issues {
+            who,
+            folder,
+            issues: Vec::new(),
+            bad: Vec::new(),
+            stamp: Vec::new(),
+            screen: Screen::List,
+            sel: 0,
+            top: 0,
+            filter: String::new(),
+            prompt: None,
+            notice: None,
+            drafts: HashMap::new(),
+            outcome: Outcome::None,
+            space: false,
+            polled: Instant::now(),
+            height: 0,
+        };
+        issues.reload();
+        issues
     }
 
-    fn reload(&mut self) {
+    pub fn root(&self) -> &std::path::Path {
+        &self.folder.root
+    }
+
+    /// Picks up changes to the folder, every so often.
+    pub fn tick(&mut self) {
+        if self.polled.elapsed() >= POLL {
+            self.polled = Instant::now();
+            if self.folder.stamp() != self.stamp {
+                self.reload();
+            }
+        }
+    }
+
+    /// Shows `n` over the key bar until the next key.
+    pub fn notice(&mut self, n: String) {
+        self.notice = Some(n);
+    }
+
+    /// Whether keys are going into a line being typed.
+    pub fn typing(&self) -> bool {
+        self.prompt.is_some() || matches!(self.screen, Screen::Question { .. })
+    }
+
+    pub fn reload(&mut self) {
         self.stamp = self.folder.stamp();
         match self.folder.load() {
             Ok((issues, bad)) => {
@@ -210,7 +188,7 @@ impl App {
             .cloned()
     }
 
-    fn scroll(&mut self, by: isize) {
+    pub fn scroll(&mut self, by: isize) {
         match &mut self.screen {
             Screen::Question { top, .. } => *top = top.saturating_add_signed(by),
             Screen::View(v) => {
@@ -227,7 +205,7 @@ impl App {
         }
     }
 
-    fn paste(&mut self, text: &str) {
+    pub fn paste(&mut self, text: &str) {
         if let Some((_, input)) = self.prompt.as_mut() {
             input.insert(text);
         } else if let Screen::Question { id, qid, .. } = &self.screen {
@@ -236,15 +214,45 @@ impl App {
         }
     }
 
-    fn key(&mut self, key: KeyEvent) {
+    pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
+        self.outcome = Outcome::None;
         if self.prompt.is_some() {
-            return self.prompt_key(key);
+            self.prompt_key(key);
+        } else if std::mem::take(&mut self.space) {
+            match key.code {
+                KeyCode::Char('f') => self.outcome = Outcome::Folders,
+                KeyCode::Char('h') => self.outcome = Outcome::Home,
+                _ => {}
+            }
+        } else if key.code == KeyCode::Char(' ') && !matches!(self.screen, Screen::Question { .. })
+        {
+            self.space = true;
+        } else {
+            match &self.screen {
+                Screen::List => self.list_key(key),
+                Screen::Question { .. } => self.question_key(key),
+                Screen::View(_) => self.view_key(key),
+            }
         }
-        match &self.screen {
-            Screen::List => self.list_key(key),
-            Screen::Question { .. } => self.question_key(key),
-            Screen::View(_) => self.view_key(key),
+        std::mem::replace(&mut self.outcome, Outcome::None)
+    }
+
+    /// The space menu, while Space waits for its second key.
+    pub fn space_menu(&self) -> Vec<(String, &'static str)> {
+        if !self.space {
+            return vec![];
+        }
+        vec![("f".into(), "issues folders"), ("h".into(), "home")]
+    }
+
+    /// Runs a `:` command.
+    fn command(&mut self, line: &str) {
+        match line.trim() {
+            "q" | "q!" | "qa" | "qa!" | "quit" => self.outcome = Outcome::Quit,
+            "h" | "home" => self.outcome = Outcome::Home,
+            "" => {}
+            other => self.notice = Some(format!("unknown command :{other}")),
         }
     }
 
@@ -267,11 +275,7 @@ impl App {
                     Err(e) => self.notice = Some(format!("{e:#}")),
                 },
                 Ask::Filter => {}
-                Ask::Command => match input.text.trim() {
-                    "q" | "q!" | "quit" => self.quit = true,
-                    "" => {}
-                    other => self.notice = Some(format!("unknown command :{other}")),
-                },
+                Ask::Command => self.command(&input.text),
             },
             _ => {
                 input.key(key);
@@ -370,7 +374,11 @@ impl App {
         };
         let id = v.id;
         match key.code {
-            KeyCode::Char('e') => self.edit = self.folder.path(id).ok(),
+            KeyCode::Char('e') => {
+                if let Ok(path) = self.folder.path(id) {
+                    self.outcome = Outcome::Edit(path);
+                }
+            }
             KeyCode::Char('c') => self.close(id),
             KeyCode::Enter => {
                 let next = self
@@ -381,9 +389,9 @@ impl App {
                 }
             }
             _ => match v.key(key) {
-                Outcome::Close => self.screen = Screen::List,
-                Outcome::Command => self.prompt = Some((Ask::Command, Input::default())),
-                Outcome::None => {}
+                ViewOutcome::Close => self.screen = Screen::List,
+                ViewOutcome::Command => self.prompt = Some((Ask::Command, Input::default())),
+                ViewOutcome::None => {}
             },
         }
     }
@@ -463,7 +471,7 @@ impl App {
         };
     }
 
-    fn draw(&mut self, c: &mut Canvas) {
+    pub fn draw(&mut self, c: &mut Canvas) {
         let area = c.area;
         for y in area.y..area.bottom() {
             c.fill(area.x, y, area.width, BG);
@@ -505,7 +513,7 @@ impl App {
                     ("n", "new", false),
                     ("c", "close", false),
                     ("/", "filter", !self.filter.is_empty()),
-                    (":q", "quit", false),
+                    ("Space", "menu", false),
                 ]
             }
             Screen::Question { id, qid, top } => {
@@ -558,7 +566,8 @@ impl App {
                 hints
             }
         };
-        keybar::draw_badged(c, bottom, None, &hints);
+        keybar::draw_badged(c, bottom, Some(("ISS", AMBER)), &hints);
+        keybar::menu(c, body, &self.space_menu());
         self.overlay(c, bottom);
     }
 
@@ -584,8 +593,8 @@ impl App {
 
     fn title(&self, c: &mut Canvas) {
         let (x0, y) = (c.area.x, c.area.y);
-        let x = c.put(x0, y, "lgtm-issues", theme::fg(ACCENT));
-        c.put(x + 2, y, &home(&self.folder.root), theme::fg(FG));
+        let x = c.put(x0, y, "issues", theme::fg(ACCENT));
+        c.put(x + 2, y, &picker::home(&self.folder.root), theme::fg(FG));
         let waiting: usize = self.issues.iter().map(|i| i.waiting().len()).sum();
         let count = |s: Status| self.issues.iter().filter(|i| i.status == s).count();
         let working = self
@@ -610,34 +619,6 @@ impl App {
             x = c.put(x, y, &t, theme::fg(color)) + 2;
         }
     }
-}
-
-fn home(path: &std::path::Path) -> String {
-    match std::env::var_os("HOME").map(PathBuf::from) {
-        Some(h) if path.starts_with(&h) => {
-            format!("~/{}", path.strip_prefix(&h).unwrap_or(path).display())
-        }
-        _ => path.display().to_string(),
-    }
-}
-
-/// Opens `path` in lgtm's editor, or `$VISUAL`/`$EDITOR` where lgtm isn't installed.
-fn edit(path: &std::path::Path) -> Result<()> {
-    match Command::new("lgtm").arg(path).status() {
-        Ok(_) => return Ok(()),
-        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e.into()),
-        Err(_) => {}
-    }
-    let editor = std::env::var("VISUAL")
-        .or_else(|_| std::env::var("EDITOR"))
-        .unwrap_or_else(|_| "vi".into());
-    Command::new("sh")
-        .arg("-c")
-        .arg(format!("{editor} \"$1\""))
-        .arg("sh")
-        .arg(path)
-        .status()?;
-    Ok(())
 }
 
 #[cfg(test)]

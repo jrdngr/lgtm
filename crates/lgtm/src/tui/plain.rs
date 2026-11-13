@@ -92,7 +92,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                                 edit::Outcome::Home => {
                                     e.notice = Some("no home screen outside jj".into());
                                 }
-                                edit::Outcome::Review(..) => {
+                                edit::Outcome::Review(..) | edit::Outcome::Issues => {
                                     e.notice = Some("not in a jj repo".into());
                                 }
                                 edit::Outcome::Mention(text) => match mention::send(text) {

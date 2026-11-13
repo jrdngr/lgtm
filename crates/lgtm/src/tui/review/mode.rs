@@ -17,6 +17,7 @@ impl Review {
             ("/", "search"),
             ("w", "wrap"),
             ("r", "editor"),
+            ("i", "issues"),
         ]
         .into_iter()
         .map(|(k, l)| (k.to_string(), l))
@@ -61,7 +62,7 @@ mod tests {
     fn space_r_goes_to_the_editor_on_the_cursors_line_and_space_f_picks_a_file() {
         let mut r = review();
         assert!(matches!(key(&mut r, ' '), Outcome::None));
-        assert_eq!(r.space_menu().len(), 6);
+        assert_eq!(r.space_menu().len(), 7);
         let out = key(&mut r, 'r');
         assert!(matches!(out, Outcome::Editor(Some((p, 1))) if p == "a.rs"));
         assert!(r.space_menu().is_empty());

@@ -388,7 +388,7 @@ impl Picker {
             ("Enter", "edit", false),
             ("r", "review", false),
             ("J K", "range", false),
-            ("Space", "jj mode", false),
+            ("Space", "menu", false),
         ];
         if self.anchored() {
             hints.push(("Esc", "clear", false));

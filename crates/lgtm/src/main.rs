@@ -25,13 +25,15 @@ fn main() {
         Some("hook") => route::hook(),
         Some("gc") => route::gc(&args[1..]),
         Some("snap") => snap::run(&args[1..]),
+        Some("issues") if args.len() > 1 => lgtm_issues::command(args[1..].to_vec()),
+        Some("issues") => tui::run(tui::Start::Issues, None, false),
         Some("resolve") => match args.get(1) {
             Some(path) => tui::run(tui::Start::File(path.into(), 1), None, false),
             None => tui::run(tui::Start::Conflicts, None, false),
         },
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm mcp | hook | gc"
+                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm mcp | hook | gc"
             );
             0
         }

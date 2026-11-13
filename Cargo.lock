@@ -4242,6 +4242,7 @@ dependencies = [
  "ignore",
  "lgterm-proto",
  "lgtm-core",
+ "lgtm-issues",
  "lgtm-tui-kit",
  "notify",
  "pulldown-cmark",
@@ -4404,6 +4405,7 @@ name = "lgtm-issues"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ignore",
  "lgterm-proto",
  "lgtm-tui-kit",
  "ratatui",

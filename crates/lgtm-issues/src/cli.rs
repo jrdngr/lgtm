@@ -1,4 +1,4 @@
-//! `lgtm-issues <command>`: what agents run.
+//! `lgtm issues <command>`: what agents run.
 
 use std::io::Read;
 use std::path::PathBuf;
@@ -10,9 +10,9 @@ use crate::guide::GUIDE;
 use crate::issue::{Asked, Status};
 use crate::{lgterm, ops, time};
 
-pub const USAGE: &str = "usage: lgtm-issues [-C <dir>] [--as <name>] [command]
+pub const USAGE: &str = "usage: lgtm issues [-C <dir>] [--as <name>] [command]
 
-With no command, shows the issues in this folder.
+With no command, opens the issues screen on this folder, or on one picked under it.
 
   init                         start an issues folder here
   new <title> [--body <text>]  file an issue; prints its id
@@ -91,6 +91,9 @@ fn stdin() -> Result<String> {
 
 pub fn run(args: Args) -> Result<()> {
     let mut rest = args.rest;
+    if rest.is_empty() {
+        bail!("{USAGE}");
+    }
     let cmd = rest.remove(0);
     if cmd == "init" {
         let folder = Folder::init(&args.dir)?;

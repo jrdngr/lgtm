@@ -1,5 +1,6 @@
 //! The review's toggles, kept between runs in the data folder.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,8 @@ pub struct Settings {
     pub editor_wrap: bool,
     /// Whether markdown files open rendered, as the last one was left.
     pub render_markdown: bool,
+    /// The issues folder last picked for each repo, by the repo's root.
+    pub issues_folders: BTreeMap<String, PathBuf>,
 }
 
 impl Default for Settings {
@@ -45,6 +48,7 @@ impl Default for Settings {
             files_left: false,
             editor_wrap: false,
             render_markdown: false,
+            issues_folders: BTreeMap::new(),
         }
     }
 }

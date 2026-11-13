@@ -26,7 +26,7 @@ impl Folder {
             .with_context(|| format!("{} doesn't exist", dir.display()))?;
         if !root.join(MARKER).is_file() {
             bail!(
-                "{} has no {MARKER}. Run `lgtm-issues init` there to start an issues folder.",
+                "{} has no {MARKER}. Run `lgtm issues init` there to start an issues folder.",
                 root.display()
             );
         }
@@ -162,7 +162,7 @@ mod tests {
     fn a_folder_without_the_marker_is_refused() {
         let dir = tempfile::tempdir().unwrap();
         let err = Folder::open(dir.path()).err().unwrap().to_string();
-        assert!(err.contains("lgtm-issues init"), "{err}");
+        assert!(err.contains("lgtm issues init"), "{err}");
     }
 
     #[test]

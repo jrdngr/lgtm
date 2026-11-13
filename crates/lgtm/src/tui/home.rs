@@ -27,6 +27,8 @@ pub enum Outcome {
     Edit(String),
     /// Run a jj menu motion.
     Jj(JjAction),
+    /// Go to the issues screen.
+    Issues,
     /// Load the bookmarks nearest this commit, for the jj menu.
     Bookmarks(String),
     /// Find what a push of these commits' bookmarks would do, for the jj menu.
@@ -58,6 +60,8 @@ pub struct Home {
     pub revisions_width: Option<u16>,
     /// The revisions side's width as last drawn.
     drawn_width: u16,
+    /// Whether Space was pressed, for the space menu.
+    space: bool,
 }
 
 /// The narrowest either side gets.
@@ -83,6 +87,7 @@ impl Default for Home {
             menu: None,
             revisions_width: None,
             drawn_width: 0,
+            space: false,
         }
     }
 }
@@ -100,7 +105,7 @@ pub fn help_groups() -> Vec<Group> {
                 ("r", "review"),
                 ("v", "snapshots"),
                 ("a", "every snapshot"),
-                ("Space", "jj mode"),
+                ("Space", "menu"),
             ],
         ),
         Group::new(
@@ -128,6 +133,9 @@ impl Home {
     pub fn command_menu(&self) -> Vec<(String, &'static str)> {
         if let Some(menu) = &self.menu {
             return menu.items();
+        }
+        if self.space {
+            return vec![("j".into(), "jj mode"), ("i".into(), "issues")];
         }
         let Some(typed) = &self.cmd else {
             return vec![];
@@ -352,8 +360,16 @@ impl Home {
             self.revisions_width = Some(width::moved(self.drawn_width, -step, SIDE_MIN));
             return Outcome::None;
         }
+        if std::mem::take(&mut self.space) {
+            match key.code {
+                KeyCode::Char('j') => self.set_jj_mode(true),
+                KeyCode::Char('i') => return Outcome::Issues,
+                _ => {}
+            }
+            return Outcome::None;
+        }
         if key.code == KeyCode::Char(' ') && self.focus == Focus::Revisions {
-            self.set_jj_mode(true);
+            self.space = true;
             return Outcome::None;
         }
         let empty_search = self.focus == Focus::Revisions || self.files.query.is_empty();
@@ -602,7 +618,7 @@ mod tests {
     #[test]
     fn jj_mode_runs_motions_on_each_commit_the_cursor_moves_to_and_stays_on() {
         let mut h = with_log(&["aaa", "bbb"]);
-        press(&mut h, "<space>");
+        press(&mut h, "<space>j");
         assert!(h.jj_mode());
         let actions = ran(press(&mut h, "najna"));
         assert_eq!(
@@ -620,7 +636,7 @@ mod tests {
     #[test]
     fn jj_mode_ignores_motions_and_moves_while_an_action_runs() {
         let mut h = with_log(&["aaa", "bbb"]);
-        press(&mut h, "<space>");
+        press(&mut h, "<space>j");
         h.busy = Some("making a change".into());
         assert!(ran(press(&mut h, "jna")).is_empty());
         h.busy = None;
@@ -631,9 +647,20 @@ mod tests {
     }
 
     #[test]
+    fn the_space_menu_goes_to_jj_mode_or_issues_and_any_other_key_drops_it() {
+        let mut h = with_log(&["aaa"]);
+        press(&mut h, "<space>");
+        assert_eq!(h.command_menu().len(), 2);
+        assert!(matches!(press(&mut h, "i")[..], [Outcome::Issues]));
+        press(&mut h, "<space>x");
+        assert!(!h.jj_mode() && h.command_menu().is_empty());
+        assert!(ran(press(&mut h, "na")).is_empty());
+    }
+
+    #[test]
     fn tab_leaves_jj_mode_so_letters_search_the_files() {
         let mut h = with_log(&["aaa"]);
-        press(&mut h, "<space><tab>");
+        press(&mut h, "<space>j<tab>");
         assert!(!h.jj_mode());
         assert!(ran(press(&mut h, "e")).is_empty());
         assert_eq!(h.files.query, "e");
@@ -642,7 +669,7 @@ mod tests {
     #[test]
     fn esc_in_jj_mode_clears_a_range_before_leaving() {
         let mut h = with_log(&["aaa", "bbb"]);
-        press(&mut h, "<space>J<esc>");
+        press(&mut h, "<space>jJ<esc>");
         assert!(h.jj_mode());
         assert!(!h.picker.anchored());
         press(&mut h, "<esc>");
