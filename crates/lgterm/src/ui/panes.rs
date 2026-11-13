@@ -462,60 +462,64 @@ impl Workspace {
                     .into_any_element()
             }),
         };
-        let tabs = split.tabs.iter().enumerate().map(|(i, &tab)| {
-            let active = i == split.active;
-            let key = match tab {
-                Tab::Term(t) => t.0,
-                Tab::Messages => 0,
-            };
-            div()
-                .id(("tab", key))
-                .drags_tab(tab, self.term_label(tab))
-                .flex()
-                .items_center()
-                .gap(px(7.))
-                .h(px(26.))
-                .px(px(10.))
-                .rounded(px(7.))
-                .text_size(px(12.5))
-                .whitespace_nowrap()
-                .border_1()
-                .border_color(gpui::transparent_black())
-                .text_color(rgb(theme::TEXT_MUTED))
-                .when(active, |d| {
-                    d.bg(rgb(theme::TAB_ACTIVE))
-                        .border_color(rgb(theme::CARD_BORDER))
-                        .text_color(rgb(theme::TEXT_STRONG))
-                })
-                .when(numbered && i < 9, |d| {
-                    d.child(badge::chip(i + 1).ml(px(-3.)))
-                })
-                .child(self.term_label(tab))
-                .children(
-                    tab.term()
-                        .and_then(|t| self.agents.status(t))
-                        .map(|s| self.mark(s)),
-                )
-                .children(tab.term().and_then(|t| self.waiting_mark(t)))
-                .when(active, |d| {
-                    d.child(
-                        div()
-                            .id(("close", key))
-                            .text_size(px(13.))
-                            .text_color(rgb(theme::ICON))
-                            .child("×")
-                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                            .on_click(cx.listener(move |w, _, window, cx| {
-                                cx.stop_propagation();
-                                w.close(tab, window, cx)
-                            })),
+        let tabs = split
+            .tabs
+            .iter()
+            .enumerate()
+            .map(|(i, &tab)| {
+                let active = i == split.active;
+                let key = match tab {
+                    Tab::Term(t) => t.0,
+                    Tab::Messages => 0,
+                };
+                tab_drag::track_pill(div().id(("tab", key)), tab, cx)
+                    .drags_tab(tab, self.term_label(tab))
+                    .flex()
+                    .items_center()
+                    .gap(px(7.))
+                    .h(px(26.))
+                    .px(px(10.))
+                    .rounded(px(7.))
+                    .text_size(px(12.5))
+                    .whitespace_nowrap()
+                    .border_1()
+                    .border_color(gpui::transparent_black())
+                    .text_color(rgb(theme::TEXT_MUTED))
+                    .when(active, |d| {
+                        d.bg(rgb(theme::TAB_ACTIVE))
+                            .border_color(rgb(theme::CARD_BORDER))
+                            .text_color(rgb(theme::TEXT_STRONG))
+                    })
+                    .when(numbered && i < 9, |d| {
+                        d.child(badge::chip(i + 1).ml(px(-3.)))
+                    })
+                    .child(self.term_label(tab))
+                    .children(
+                        tab.term()
+                            .and_then(|t| self.agents.status(t))
+                            .map(|s| self.mark(s)),
                     )
-                })
-                .on_click(cx.listener(move |w, _, window, cx| {
-                    w.model.focus_tab(tab);
-                    w.focus_current(window, cx);
-                }))
-        });
+                    .children(tab.term().and_then(|t| self.waiting_mark(t)))
+                    .when(active, |d| {
+                        d.child(
+                            div()
+                                .id(("close", key))
+                                .text_size(px(13.))
+                                .text_color(rgb(theme::ICON))
+                                .child("×")
+                                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                .on_click(cx.listener(move |w, _, window, cx| {
+                                    cx.stop_propagation();
+                                    w.close(tab, window, cx)
+                                })),
+                        )
+                    })
+                    .on_click(cx.listener(move |w, _, window, cx| {
+                        w.model.focus_tab(tab);
+                        w.focus_current(window, cx);
+                    }))
+            })
+            .collect::<Vec<_>>();
         let plus = div()
             .id(("new-tab", split_id.0))
             .w(px(26.))

@@ -508,6 +508,25 @@ fn dropping_a_tab_where_it_already_is_does_nothing() {
 }
 
 #[test]
+fn a_dragged_tab_goes_between_tabs_in_its_own_split_or_another() {
+    let (mut m, a) = Model::new();
+    let b = m.new_tab();
+    let c = m.new_tab();
+    let left = m.split().unwrap().id;
+    m.move_tab_to(Tab::Term(a), left, 2);
+    assert_eq!(m.split().unwrap().tabs, tabs(&[b, a, c]));
+    assert_eq!(m.term(), Some(a));
+    m.move_tab_to(Tab::Term(c), left, 0);
+    assert_eq!(m.split().unwrap().tabs, tabs(&[c, b, a]));
+    m.split_slot(Axis::Row);
+    let d = m.new_tab();
+    m.move_tab_to(Tab::Term(d), left, 1);
+    assert_eq!(m.split().unwrap().tabs, tabs(&[c, d, b, a]));
+    assert_eq!(m.space().unwrap().id, space_of(&m, a));
+    assert!(m.is_valid());
+}
+
+#[test]
 fn moving_a_layout_renumbers_the_list_and_keeps_the_shown_one() {
     let (mut m, _) = Model::new();
     m.new_layout();

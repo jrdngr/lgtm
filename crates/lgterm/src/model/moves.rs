@@ -84,12 +84,15 @@ impl Model {
     /// Moves a tab into `to`'s tabs, or into a new split on `side` of it, in any space, and
     /// focuses it. What it leaves empty closes, as when it's closed.
     pub fn move_tab(&mut self, tab: Tab, to: SplitId, side: Option<Side>) {
+        let Some(side) = side else {
+            return self.move_tab_to(tab, to, usize::MAX);
+        };
         let Some(from) = self.locate(tab) else { return };
         let alone = self
             .find_space(from.space)
             .and_then(|s| s.splits.find(from.split))
             .is_some_and(|s| s.tabs.len() == 1);
-        if from.split == to && (side.is_none() || alone) {
+        if from.split == to && alone {
             return;
         }
         if !self.spaces.iter().any(|s| s.splits.contains(to)) || !self.remove_tab(tab) {
@@ -100,21 +103,40 @@ impl Model {
             return;
         };
         space.zoom = None;
-        match side {
-            None => {
-                let split = space.splits.find_mut(to).expect("split");
-                split.tabs.push(tab);
+        let split = Split {
+            id,
+            tabs: vec![tab],
+            active: 0,
+        };
+        let _ = space
+            .splits
+            .insert_beside(to, split, side.axis(), side.before());
+        self.focus_tab(tab);
+    }
+
+    /// Moves a tab into `to`'s tabs before the one at `at` (after the last when `at` is past
+    /// it), in any space, and focuses it. What it leaves empty closes, as when it's closed.
+    pub fn move_tab_to(&mut self, tab: Tab, to: SplitId, at: usize) {
+        let Some(from) = self.locate(tab) else { return };
+        if from.split == to {
+            let split = self
+                .find_space_mut(from.space)
+                .and_then(|s| s.splits.find_mut(to))
+                .expect("split");
+            let at = at.min(split.tabs.len());
+            let at = if at > from.tab { at - 1 } else { at };
+            let t = split.tabs.remove(from.tab);
+            split.tabs.insert(at, t);
+        } else {
+            if !self.spaces.iter().any(|s| s.splits.contains(to)) || !self.remove_tab(tab) {
+                return;
             }
-            Some(side) => {
-                let split = Split {
-                    id,
-                    tabs: vec![tab],
-                    active: 0,
-                };
-                let _ = space
-                    .splits
-                    .insert_beside(to, split, side.axis(), side.before());
-            }
+            let Some(space) = self.spaces.iter_mut().find(|s| s.splits.contains(to)) else {
+                return;
+            };
+            space.zoom = None;
+            let split = space.splits.find_mut(to).expect("split");
+            split.tabs.insert(at.min(split.tabs.len()), tab);
         }
         self.focus_tab(tab);
     }
