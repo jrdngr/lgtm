@@ -496,7 +496,7 @@ impl Workspace {
                     .child(self.term_label(tab))
                     .children(
                         tab.term()
-                            .and_then(|t| self.agents.status(t))
+                            .and_then(|t| self.agents.shown(t))
                             .map(|s| self.mark(s)),
                     )
                     .children(tab.term().and_then(|t| self.waiting_mark(t)))

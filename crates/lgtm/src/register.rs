@@ -9,7 +9,7 @@ use anyhow::Context;
 use serde_json::{Value, json};
 
 /// The hook events lgtm listens to.
-const EVENTS: [&str; 9] = [
+const EVENTS: [&str; 11] = [
     "SessionStart",
     "UserPromptSubmit",
     "PreToolUse",
@@ -19,6 +19,8 @@ const EVENTS: [&str; 9] = [
     "Stop",
     "StopFailure",
     "SessionEnd",
+    "SubagentStart",
+    "SubagentStop",
 ];
 
 /// Registers this binary when it isn't yet, in the background so the TUI starts at once.

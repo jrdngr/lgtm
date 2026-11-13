@@ -12,6 +12,10 @@ pub enum Status {
     Working,
     Blocked,
     Done,
+    /// Ready, with subagents still running. Only shown, never an agent's own status.
+    Subagents,
+    /// Ready, with background shells still running. Only shown, never an agent's own status.
+    Shells,
 }
 
 impl Status {
@@ -19,9 +23,11 @@ impl Status {
     pub fn urgency(self) -> u8 {
         match self {
             Status::Idle => 0,
-            Status::Working => 1,
-            Status::Done => 2,
-            Status::Blocked => 3,
+            Status::Shells => 1,
+            Status::Subagents => 2,
+            Status::Working => 3,
+            Status::Done => 4,
+            Status::Blocked => 5,
         }
     }
 
@@ -31,6 +37,8 @@ impl Status {
             Status::Working => "working",
             Status::Blocked => "blocked",
             Status::Done => "done",
+            Status::Subagents => "subagents",
+            Status::Shells => "shells",
         }
     }
 

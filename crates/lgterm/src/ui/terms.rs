@@ -171,6 +171,7 @@ impl Workspace {
                 process_known: t.info.process.is_some(),
                 shell_foreground: t.info.shell_foreground,
                 screen: &|| view.screen_bottom(STATUS_ROWS),
+                shells: &|| view.foreground_pid().map_or(0, procinfo::background_shells),
             };
             self.agents.poll(*id, seen, &env);
         }

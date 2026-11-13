@@ -1,4 +1,5 @@
-//! Status marks: a dot for blocked and done, a ring for idle, a spinner for working.
+//! Status marks: a dot for blocked, done and background shells, a ring for idle, a spinner
+//! for working and a gray one for subagents.
 
 use std::f32::consts::TAU;
 use std::sync::OnceLock;
@@ -20,7 +21,7 @@ fn phase() -> f32 {
 impl Workspace {
     /// A status mark, noting a spinner so the window keeps turning it.
     pub(super) fn mark(&self, status: Status) -> AnyElement {
-        if status == Status::Working {
+        if matches!(status, Status::Working | Status::Subagents) {
             self.spinning.set(true);
         }
         mark(status)
@@ -38,7 +39,9 @@ fn mark(status: Status) -> AnyElement {
             .border(px(1.5))
             .border_color(rgb(theme::IDLE))
             .into_any_element(),
-        Status::Working => spinner(),
+        Status::Working => spinner(theme::WORKING),
+        Status::Subagents => spinner(theme::SUBAGENTS),
+        Status::Shells => dot(theme::SHELLS),
     }
 }
 
@@ -51,7 +54,7 @@ fn dot(color: u32) -> AnyElement {
         .into_any_element()
 }
 
-fn spinner() -> AnyElement {
+fn spinner(color: u32) -> AnyElement {
     let start = phase() * TAU;
     canvas(
         |_, _, _| {},
@@ -64,13 +67,13 @@ fn spinner() -> AnyElement {
             ring.arc_to(point(r, r), px(0.), false, true, at(TAU / 2.));
             ring.arc_to(point(r, r), px(0.), false, true, at(0.));
             if let Ok(path) = ring.build() {
-                window.paint_path(path, rgba((theme::WORKING << 8) | 0x40));
+                window.paint_path(path, rgba((color << 8) | 0x40));
             }
             let mut arc = PathBuilder::stroke(px(2.));
             arc.move_to(at(start));
             arc.arc_to(point(r, r), px(0.), false, true, at(start + TAU / 4.));
             if let Ok(path) = arc.build() {
-                window.paint_path(path, rgb(theme::WORKING));
+                window.paint_path(path, rgb(color));
             }
         },
     )

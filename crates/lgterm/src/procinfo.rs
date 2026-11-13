@@ -85,6 +85,35 @@ fn parse_procargs(buf: &[u8]) -> Option<(String, Vec<String>)> {
     Some((exe, argv))
 }
 
+/// How many shells Claude Code process `pid` started for commands that are still running.
+/// Its Bash tool runs each command in a shell that sources one of its shell snapshots, which
+/// sets them apart from its other children, like MCP servers.
+pub fn background_shells(pid: i32) -> usize {
+    children(pid)
+        .into_iter()
+        .filter(|&child| {
+            command(child).is_some_and(|(_, argv)| argv.iter().any(|a| a.contains(SNAPSHOTS)))
+        })
+        .count()
+}
+
+const SNAPSHOTS: &str = "shell-snapshots/snapshot-";
+
+#[cfg(target_os = "macos")]
+fn children(pid: i32) -> Vec<i32> {
+    let mut pids = vec![0i32; 256];
+    let bytes = (pids.len() * std::mem::size_of::<i32>()) as i32;
+    let got = unsafe { libc::proc_listchildpids(pid, pids.as_mut_ptr().cast(), bytes) };
+    pids.truncate(got.max(0) as usize);
+    pids.retain(|&p| p > 0);
+    pids
+}
+
+#[cfg(not(target_os = "macos"))]
+fn children(_pid: i32) -> Vec<i32> {
+    Vec::new()
+}
+
 #[cfg(not(target_os = "macos"))]
 pub fn command(_pid: i32) -> Option<(String, Vec<String>)> {
     None

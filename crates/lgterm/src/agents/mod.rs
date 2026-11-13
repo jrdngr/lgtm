@@ -1,12 +1,13 @@
 //! Agents in terminals: what each is doing, the messages queued for them, and who's waiting
 //! on them. This decides; the window carries out the effects.
 
+mod background;
 pub mod kind;
 pub mod launch;
 pub mod messages;
 pub mod status;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
 use lgterm_proto::Reply;
@@ -41,6 +42,10 @@ pub struct Agent {
     gone: u8,
     busy_until: Option<Instant>,
     last_hook: Option<(Value, Instant)>,
+    /// Subagents started and not yet stopped, by id. Workflows run theirs as subagents.
+    subagents: HashSet<String>,
+    /// Background shells it started that are still running.
+    shells: usize,
 }
 
 impl Agent {
@@ -54,6 +59,8 @@ impl Agent {
             gone: 0,
             busy_until: None,
             last_hook: None,
+            subagents: HashSet::new(),
+            shells: 0,
         }
     }
 
@@ -96,6 +103,8 @@ pub struct Seen<'a> {
     pub shell_foreground: bool,
     /// The bottom of the screen, read only if needed.
     pub screen: &'a dyn Fn() -> String,
+    /// How many background shells the agent's process runs, counted only if needed.
+    pub shells: &'a dyn Fn() -> usize,
 }
 
 #[derive(Default)]
@@ -122,7 +131,7 @@ impl Agents {
     pub fn worst(&self, terms: impl IntoIterator<Item = TermId>) -> Option<Status> {
         terms
             .into_iter()
-            .filter_map(|t| self.status(t))
+            .filter_map(|t| self.shown(t))
             .max_by_key(|s| s.urgency())
     }
 
@@ -180,8 +189,14 @@ impl Agents {
         if report.session.is_some() {
             agent.session = report.session;
         }
+        if report.next_session {
+            agent.subagents.clear();
+        }
         if new || was != (agent.kind, agent.session.clone()) {
             self.changed = true;
+        }
+        if self.subagent(term, event) {
+            return None;
         }
         match event["hook_event_name"].as_str() {
             Some("UserPromptSubmit") => self.effects.push(Effect::ClearDraft(term)),
@@ -300,6 +315,7 @@ impl Agents {
             }
             _ => {}
         }
+        self.count_shells(term, seen.shells);
         let Some(agent) = self.agents.get_mut(&term) else {
             return;
         };
@@ -591,6 +607,7 @@ mod tests {
                 process_known: true,
                 shell_foreground: false,
                 screen: &move || screen.clone(),
+                shells: &|| 0,
             };
             a.poll(T, seen, &AWAY);
         };

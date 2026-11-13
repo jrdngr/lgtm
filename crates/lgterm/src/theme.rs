@@ -51,6 +51,9 @@ pub const DEFAULT_FONT_SIZE: f32 = 13.;
 pub const BLOCKED: u32 = 0xe3b341;
 pub const DONE: u32 = 0x3fb950;
 pub const WORKING: u32 = 0x58a6ff;
+pub const SUBAGENTS: u32 = 0x9b9b9b;
+/// Claude Code's color for its background shells.
+pub const SHELLS: u32 = 0x00cccc;
 pub const IDLE: u32 = 0x7a7a7a;
 pub const DIALOG: u32 = 0x272727;
 pub const CHIP: u32 = 0x3a3a3a;
