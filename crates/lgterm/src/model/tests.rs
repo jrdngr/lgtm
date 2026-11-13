@@ -73,6 +73,19 @@ fn a_hidden_space_opens_in_the_magnet_slot_not_the_focused_one() {
 }
 
 #[test]
+fn a_new_space_opens_in_the_magnet_slot_not_the_focused_one() {
+    let (mut m, _) = Model::new();
+    let left = m.layout().focus;
+    m.split_slot(Axis::Row);
+    let b = m.add_space();
+    m.toggle_magnet(left);
+    let c = m.open_space();
+    let (s2, s3) = (space_of(&m, b), space_of(&m, c));
+    assert_eq!(shown(&m), [Some(s3), Some(s2)]);
+    assert_eq!(m.term(), Some(c));
+}
+
+#[test]
 fn each_layout_keeps_its_own_magnet_through_a_save() {
     let (mut m, _) = Model::new();
     let slot = m.layout().focus;

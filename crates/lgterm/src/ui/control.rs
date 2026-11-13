@@ -271,7 +271,7 @@ fn open_focused(m: &mut Model, place: Place) -> TermId {
         Place::Down => m.split_split(Axis::Column),
         Place::SpaceRight => m.split_slot_with_space(Axis::Row),
         Place::SpaceDown => m.split_slot_with_space(Axis::Column),
-        Place::Layout => m.add_space(),
+        Place::Layout => m.open_space(),
     }
 }
 

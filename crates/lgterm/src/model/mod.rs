@@ -290,6 +290,13 @@ impl Model {
         term
     }
 
+    /// Makes a space and shows it where a picked space goes: the magnet slot, else the focused one.
+    pub fn open_space(&mut self) -> TermId {
+        let (space, term) = self.make_space();
+        self.show_space(space);
+        term
+    }
+
     /// Makes a space that isn't shown anywhere.
     pub fn add_space_behind(&mut self) -> TermId {
         self.make_space().1
