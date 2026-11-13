@@ -6,7 +6,6 @@ use anyhow::{Context, bail};
 
 use super::Jj;
 use crate::diff::{self, FileMeta, FileStatus, GitFileDiff, Hunk};
-use crate::gitmeta;
 
 /// A review's diff endpoints. `from` is `None` when the review reaches the root commit.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -108,18 +107,6 @@ impl Jj {
             extra,
         ]
         .concat()
-    }
-
-    /// What `from`'s changes do differently from `to`'s: `from` rebased onto `to`'s parents,
-    /// compared with `to`.
-    pub async fn interdiff(&self, from: &str, to: &str) -> anyhow::Result<Vec<FileDiff>> {
-        let git = self
-            .read_lossy(&["interdiff", "--from", from, "--to", to, "--git"])
-            .await?;
-        Ok(diff::parse_git(&git)?
-            .into_iter()
-            .map(|g| file_diff(gitmeta::meta_from_git(&g), g))
-            .collect())
     }
 }
 

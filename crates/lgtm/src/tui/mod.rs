@@ -48,7 +48,7 @@ use theme::{ACCENT, BG, CYAN, FG, PANEL, RED};
 /// The frames of the spinner a running jj action shows.
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-/// The store of the repo the workspace at `root` belongs to, shared with the desktop app.
+/// The store of the repo the workspace at `root` belongs to.
 pub fn store(root: &Path) -> Option<Store> {
     paths::data_dir()
         .zip(paths::find_root(root))
@@ -83,6 +83,7 @@ pub use edit::SPLIT_FLAG;
 /// current directory, opening `start`. Outside jj only the editor runs. A `split` is a second
 /// one beside another, which keeps the MCP socket.
 pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
+    crate::register::on_start();
     if let Some(home) = std::env::var_os("HOME") {
         lgtm_issues::skill::install(Path::new(&home));
     }
@@ -259,7 +260,7 @@ struct App {
     prs: HashMap<String, (String, u32)>,
     help: Option<help::Help>,
     loads: u64,
-    /// The repo's store, shared with the desktop app. `None` when it couldn't be opened.
+    /// The repo's store. `None` when it couldn't be opened.
     store: Option<Store>,
     /// The store's data version when last read, to notice the app's writes.
     version: Option<i64>,

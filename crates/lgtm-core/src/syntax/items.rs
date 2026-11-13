@@ -135,30 +135,7 @@ impl Lines<'_> {
     }
 }
 
-impl Items {
-    /// For each line of `shown` that has a step, the first shown line its item steps to
-    /// forward and back. Steps pass over lines that aren't shown. Lines count from 0.
-    pub fn shown_steps(&self, shown: &[u32]) -> Vec<(u32, Option<u32>, Option<u32>)> {
-        let set: std::collections::HashSet<u32> = shown.iter().copied().collect();
-        let walk = |steps: &[Option<u32>], mut line: u32| {
-            for _ in 0..steps.len() {
-                let to = steps.get(line as usize).copied().flatten()?;
-                if set.contains(&to) {
-                    return Some(to);
-                }
-                line = to;
-            }
-            None
-        };
-        shown
-            .iter()
-            .filter_map(|&l| {
-                let (next, prev) = (walk(&self.next, l), walk(&self.prev, l));
-                (next.is_some() || prev.is_some()).then_some((l, next, prev))
-            })
-            .collect()
-    }
-}
+impl Items {}
 
 #[cfg(test)]
 mod tests {
@@ -223,16 +200,5 @@ struct S;
     #[test]
     fn a_file_without_a_grammar_has_no_steps() {
         assert_eq!(items("a.unknown", "x\ny\n"), Items::default());
-    }
-
-    #[test]
-    fn shown_steps_pass_over_lines_the_diff_hides() {
-        let src = "fn a() {}\nfn b() {}\nfn c() {}\n";
-        let i = items("a.rs", src);
-        assert_eq!(
-            i.shown_steps(&[0, 2]),
-            vec![(0, Some(2), None), (2, None, Some(0))]
-        );
-        assert_eq!(i.shown_steps(&[1]), vec![]);
     }
 }

@@ -2,10 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 use similar::{ChangeTag, TextDiff};
-use specta::Type;
 
 /// Chars `from..to` of `line`, from 0, that the side changed.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tint {
     pub line: u32,
     pub from: u32,

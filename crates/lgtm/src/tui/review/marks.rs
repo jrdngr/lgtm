@@ -1,5 +1,5 @@
-//! Review marks on hunks and files, in the store the desktop app shares: Reviewed marks rows
-//! green, Flagged red, and checking a file (R) is the app's file check.
+//! Review marks on hunks and files, in the repo's store: Reviewed marks rows green, Flagged
+//! red, and R checks a file.
 
 use std::collections::HashMap;
 
@@ -24,7 +24,7 @@ pub enum State {
     AgentFlagged,
 }
 
-/// Whether a mark's color counts the row as done, as the app's default mark settings have it.
+/// Whether a mark's color counts the row as done.
 fn done(color: MarkColor) -> bool {
     matches!(
         color,

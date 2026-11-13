@@ -21,17 +21,6 @@ pub fn has_conflicts(text: &str) -> bool {
     !parse::parse(text).conflicts.is_empty()
 }
 
-/// A session on `path` in `root`, its labels filled in from jj when `jj` is given and knows
-/// the commits. jj failing leaves the markers' own labels.
-pub async fn load(root: &Path, path: &str, jj: Option<&Jj>) -> std::io::Result<Session> {
-    let text = std::fs::read_to_string(root.join(path))?;
-    let mut session = Session::new(path, &text);
-    if let Some(jj) = jj {
-        fill(&mut session, jj).await;
-    }
-    Ok(session)
-}
-
 /// Fills in each label's bookmarks and unique prefix, and what a side did to the file.
 pub async fn fill(session: &mut Session, jj: &Jj) {
     let mut ids: Vec<String> = session

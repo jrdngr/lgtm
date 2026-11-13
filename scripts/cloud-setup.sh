@@ -6,11 +6,8 @@ set -euo pipefail
 JJ_VERSION=0.46.0
 SUDO=$(command -v sudo >/dev/null && echo sudo || true)
 
-# Tauri's Linux build libraries.
 $SUDO apt-get update -q
-$SUDO apt-get install -yq --no-install-recommends \
-  build-essential curl file pkg-config libssl-dev libxdo-dev \
-  libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev
+$SUDO apt-get install -yq --no-install-recommends build-essential curl file pkg-config libssl-dev
 
 command -v cargo >/dev/null || {
   curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
@@ -27,14 +24,6 @@ jj config set --user user.email "noreply@anthropic.com" 2>/dev/null || true
 
 command -v just >/dev/null || $SUDO apt-get install -yq just ||
   curl -sSf https://just.systems/install.sh | $SUDO bash -s -- --to /usr/local/bin
-
-node --version 2>/dev/null | grep -q '^v2[2-9]' || {
-  curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO bash -
-  $SUDO apt-get install -yq nodejs
-}
-command -v pnpm >/dev/null || $SUDO corepack enable
-
-pnpm install --frozen-lockfile
 
 # lgterm's build: GPUI's libraries, Zig, and Ghostty's Zig packages.
 scripts/lgterm-setup.sh

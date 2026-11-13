@@ -1,4 +1,4 @@
-//! What has a jj lock: the processes with its file open, less the app's own jj processes
+//! What has a jj lock: the processes with its file open, less lgtm's own jj processes
 //! known to be waiting on it. `lsof` can't tell a holder from another waiter, so the list
 //! can name several.
 

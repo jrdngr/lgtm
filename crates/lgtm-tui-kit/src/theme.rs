@@ -1,4 +1,4 @@
-//! The desktop app's dark palette, so both look alike.
+//! lgtm's dark palette.
 
 use ratatui::style::{Color, Modifier, Style};
 

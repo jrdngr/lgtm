@@ -5,48 +5,6 @@ use std::collections::HashMap;
 use super::Jj;
 
 impl Jj {
-    /// A content hash of each of `paths` at `commit`, a commit id, in at most one read. Paths
-    /// not there are left out.
-    pub async fn file_hashes(
-        &self,
-        commit: &str,
-        paths: &[String],
-    ) -> anyhow::Result<HashMap<String, String>> {
-        let key = |p: &str| (commit.to_string(), p.to_string());
-        let mut found = HashMap::new();
-        let mut unread = Vec::new();
-        {
-            let hashes = HASHES.lock().unwrap();
-            for p in paths {
-                match hashes.get(&key(p)) {
-                    Some(Some(h)) => {
-                        found.insert(p.clone(), h.clone());
-                    }
-                    Some(None) => {}
-                    None => unread.push(p.clone()),
-                }
-            }
-        }
-        if unread.is_empty() {
-            return Ok(found);
-        }
-        let mut read = self.files_at(commit, &unread).await?;
-        let mut hashes = HASHES.lock().unwrap();
-        if hashes.len() >= MAX_HASHES {
-            hashes.clear();
-        }
-        for p in unread {
-            let hash = read
-                .remove(&p)
-                .map(|bytes| blake3::hash(&bytes).to_hex().to_string());
-            if let Some(h) = &hash {
-                found.insert(p.clone(), h.clone());
-            }
-            hashes.insert(key(&p), hash);
-        }
-        Ok(found)
-    }
-
     /// The contents of each of `paths` at `commit`, a few hundred paths per read. Paths not
     /// there are left out.
     pub async fn files_at(
@@ -122,14 +80,6 @@ impl Jj {
 }
 
 const FILE_MARK: &[u8] = b"\0lgtm-file\0";
-/// File hashes by commit and path, `None` where the file isn't there.
-type Hashes = HashMap<(String, String), Option<String>>;
-/// The hashes looked up so far. Commits never change.
-static HASHES: std::sync::LazyLock<std::sync::Mutex<Hashes>> =
-    std::sync::LazyLock::new(Default::default);
-
-/// Past this many files the hash cache starts over.
-const MAX_HASHES: usize = 10_000;
 
 /// Keeps a batched `jj file show`'s arguments well under the OS limit.
 const FILES_PER_READ: usize = 300;

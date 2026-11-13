@@ -1,13 +1,12 @@
-//! A session as the app and the terminal draw it.
+//! A session as the conflict resolver draws it.
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::parse::{Label, Part};
 use super::session::{Fate, FileChoice, Session};
 use super::tint::{Tint, tints};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SideView {
     /// 0 for the base, else the side's number.
@@ -21,7 +20,7 @@ pub struct SideView {
     pub original: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConflictView {
     pub index: u32,
@@ -34,14 +33,14 @@ pub struct ConflictView {
     pub rest: Vec<SideView>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum PartView {
     Text { line: u32, text: String },
     Conflict(ConflictView),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolveView {
     pub path: String,

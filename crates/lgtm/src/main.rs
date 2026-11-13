@@ -4,6 +4,7 @@
 mod agent;
 mod edit;
 mod mcp;
+mod register;
 mod route;
 mod snap;
 mod tui;
@@ -23,7 +24,6 @@ fn main() {
     let code = match args.first().map(String::as_str) {
         Some("mcp") => route::mcp(),
         Some("hook") => route::hook(),
-        Some("gc") => route::gc(&args[1..]),
         Some("snap") => snap::run(&args[1..]),
         Some("issues") if args.len() > 1 => lgtm_issues::command(args[1..].to_vec()),
         Some("issues") => tui::run(tui::Start::Issues, None, false),
@@ -33,7 +33,7 @@ fn main() {
         },
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm mcp | hook | gc"
+                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm mcp | hook"
             );
             0
         }

@@ -18,14 +18,7 @@ pub struct SpawnEnv {
 
 /// Variables from a terminal lgterm may itself be running in, which would point its
 /// programs at the wrong app.
-const HIDDEN_ENV: &[&str] = &[
-    "LGTM_SOCKET",
-    "LGTM_ROOT",
-    "LGTM_TERMINAL",
-    "LGTM_APP_BIN",
-    "LGTM_WORKSPACE",
-    "HC_TERMINAL_ID",
-];
+const HIDDEN_ENV: &[&str] = &["HC_TERMINAL_ID"];
 
 /// Reads from the shell held in the channel before the reader waits.
 const OUTPUT_CHUNKS: usize = 16;

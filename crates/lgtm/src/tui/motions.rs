@@ -1,4 +1,4 @@
-//! The jj menu on the revisions side, as the app's ⌘J: Space, then a motion's keys. Some ask
+//! The jj menu on the revisions side: Space, then a motion's keys. Some ask
 //! for a name or a description first, Set bookmark picks one of the nearest bookmarks, and a
 //! push that would create bookmarks on the remote asks first.
 
@@ -22,7 +22,7 @@ enum Kind {
     Rebase,
 }
 
-/// The motions, by their keys, in the app's groups.
+/// The motions, by their keys, in groups.
 const MOTIONS: &[&[(&str, &str, Kind)]] = &[
     &[
         ("na", "New after", Kind::NewAfter),
@@ -308,7 +308,7 @@ fn push(plan: &PushPlan) -> JjAction {
     }
 }
 
-/// What the app shows while `action` runs.
+/// What lgtm shows while `action` runs.
 pub fn doing(action: &JjAction) -> &'static str {
     match action {
         JjAction::Edit { .. } => "editing",

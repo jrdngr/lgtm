@@ -1,5 +1,5 @@
 //! The PR's threads from GitHub, read-only: each under the last line it's on, numbered with
-//! the id the desktop app shows (#12), or at the top of its file once outdated. `p` pulls
+//! their id (#12), or at the top of its file once outdated. `p` pulls
 //! them again, and `H` hides them.
 
 use lgtm_core::review::matching::Remaps;

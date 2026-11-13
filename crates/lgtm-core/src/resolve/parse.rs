@@ -1,10 +1,9 @@
 //! Reading a file's conflicts out of its markers: jj's diff and snapshot styles, and git's.
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 /// Where a side's text came from.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Label {
     /// Empty when the marker doesn't name a commit.

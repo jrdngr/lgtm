@@ -4,7 +4,6 @@
 
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::threads::{ThreadState, thread_from_sql, thread_to_sql};
 use super::{Store, json_err};
@@ -49,14 +48,14 @@ impl Pin {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Author {
     User,
     Agent,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
     pub author: Author,
     pub text: String,
@@ -72,7 +71,7 @@ pub struct Conversation {
 }
 
 /// A post in a GitHub review thread.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GhPost {
     pub author: String,
@@ -84,7 +83,7 @@ pub struct GhPost {
 
 /// The GitHub thread a comment is on: a review thread on code, or a comment or review summary
 /// on the PR, whose comment's path is empty. The comment's body is then a reply not yet sent.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GhLink {
     /// `owner/name` of the PR's repo.

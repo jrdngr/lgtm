@@ -4,12 +4,11 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::parse::{Conflict, Label, Parsed, Part, parse};
 
 /// What to do with a file one side deleted or moved.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FileChoice {
     /// Deleted: keep the file and resolve its conflicts.
@@ -35,7 +34,7 @@ impl FileChoice {
 }
 
 /// What a side did to the file as a whole.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Fate {
     /// No side removed it.
@@ -67,7 +66,7 @@ struct State {
 }
 
 /// What saving did.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Saved {
     /// Whether the file was removed.
     pub removed: bool,

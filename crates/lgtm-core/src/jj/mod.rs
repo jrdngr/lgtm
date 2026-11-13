@@ -9,7 +9,6 @@ use anyhow::{Context, bail};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
-mod at;
 mod background;
 mod bookmarks;
 pub mod checkout;
@@ -18,29 +17,19 @@ mod conflicts;
 mod diff;
 mod edit;
 mod files;
-mod follow;
 pub mod git;
 mod holders;
-pub mod init;
 mod listing;
 mod log;
-mod near;
 mod push;
-mod rewrite;
 #[cfg(any(test, feature = "test-support"))]
 pub mod test_support;
 pub mod workspace;
-pub use at::WorkingCopyDto;
-pub use background::Snapshot;
 pub use bookmarks::{BookmarkSpot, Containing};
-pub use child::end_all;
-pub use conflicts::MarkerCommit;
 pub use diff::{DiffPath, FileDiff, Range};
 pub use edit::JjAction;
 pub use log::{LogCommit, LogRow};
-pub use near::{NearBookmark, StackSide};
 pub use push::PushPlan;
-pub use workspace::WorkspaceInfo;
 
 /// True when `err` came from jj refusing to work on a stale working copy.
 fn is_stale(err: &anyhow::Error) -> bool {
@@ -119,9 +108,8 @@ pub type Notify = Arc<dyn Fn(Notice) + Send + Sync>;
 
 pub struct Jj {
     root: PathBuf,
-    /// Held while the app writes. Holds the working copy's change as of the app's last look,
-    /// so a move the app didn't make can be told apart.
-    writer: Mutex<Option<String>>,
+    /// Held while lgtm writes.
+    writer: Mutex<()>,
     notify: OnceLock<Notify>,
     background: std::sync::Mutex<background::Strikes>,
     name: OnceLock<String>,
@@ -159,7 +147,7 @@ impl Jj {
     pub fn new(root: &Path) -> Self {
         Self {
             root: root.to_path_buf(),
-            writer: Mutex::new(None),
+            writer: Mutex::new(()),
             notify: OnceLock::new(),
             background: Default::default(),
             name: OnceLock::new(),
@@ -324,42 +312,6 @@ impl Jj {
         Ok(parse_changes(&out))
     }
 
-    /// The changes in `revset`, oldest first, each with its first parent, in one read.
-    pub async fn changes_with_parents(
-        &self,
-        revset: &str,
-    ) -> anyhow::Result<Vec<(Change, Option<String>)>> {
-        let template =
-            format!(r#"parents.map(|p| p.commit_id()).join(" ") ++ "\t" ++ {CHANGE_TEMPLATE}"#);
-        let out = self
-            .read(&[
-                "log",
-                "--no-graph",
-                "--reversed",
-                "-r",
-                revset,
-                "-T",
-                &template,
-            ])
-            .await?;
-        Ok(out
-            .lines()
-            .filter_map(|l| {
-                let (parents, rest) = l.split_once('\t')?;
-                let first = parents.split(' ').next().filter(|p| !p.is_empty());
-                Some((parse_changes(rest).pop()?, first.map(str::to_string)))
-            })
-            .collect())
-    }
-
-    /// The repo-relative paths of the files in `rev`, as of the last snapshot.
-    pub async fn files(&self, rev: &str) -> anyhow::Result<Vec<String>> {
-        let out = self
-            .read_lossy(&["file", "list", "-r", rev, "-T", r#"path ++ "\n""#])
-            .await?;
-        Ok(out.lines().map(str::to_string).collect())
-    }
-
     /// The commits `rev` evolved from, newest first, starting with `rev` itself, each with
     /// the time it was made.
     pub async fn versions(&self, rev: &str) -> anyhow::Result<Vec<Version>> {
@@ -383,21 +335,6 @@ impl Jj {
                 })
             })
             .collect())
-    }
-
-    /// Commit IDs `commit` evolved from, newest first, starting with `commit` itself.
-    pub async fn evolog(&self, commit: &str) -> anyhow::Result<Vec<String>> {
-        let out = self
-            .read(&[
-                "evolog",
-                "--no-graph",
-                "-r",
-                commit,
-                "-T",
-                r#"commit.commit_id() ++ "\n""#,
-            ])
-            .await?;
-        Ok(out.lines().map(str::to_string).collect())
     }
 }
 

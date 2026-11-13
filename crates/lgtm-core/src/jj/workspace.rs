@@ -1,7 +1,7 @@
 //! Workspace commands. Adding and forgetting workspaces are writes on the repo, so they take
 //! the writer lock of the `Jj` they run through.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::Jj;
 
@@ -44,77 +44,6 @@ impl Jj {
                 .await?,
         ))
     }
-
-    /// Adds workspace `name` at `path` with a new working-copy commit on `rev`.
-    pub async fn workspace_add(&self, name: &str, path: &Path, rev: &str) -> anyhow::Result<()> {
-        let _guard = self.writer.lock().await;
-        let path = path.to_string_lossy();
-        self.exec(
-            &["workspace", "add", "--name", name, "-r", rev, &path],
-            false,
-        )
-        .await
-        .map(drop)
-    }
-
-    /// Stops tracking workspace `name`. Its working-copy commit stays in the repo.
-    pub async fn workspace_forget(&self, name: &str) -> anyhow::Result<()> {
-        let _guard = self.writer.lock().await;
-        self.exec(&["workspace", "forget", name], false)
-            .await
-            .map(drop)
-    }
-}
-
-/// Runs jj on the repo at `root` outside the async runtime (for `lgtm gc`).
-fn exec_blocking(root: &Path, args: &[&str], what: &str) -> anyhow::Result<String> {
-    let out = std::process::Command::new("jj")
-        .arg("-R")
-        .arg(root)
-        .args(["--no-pager", "--color=never", "--ignore-working-copy"])
-        .args(args)
-        .stdin(std::process::Stdio::null())
-        .output()?;
-    anyhow::ensure!(
-        out.status.success(),
-        "jj {what}: {}",
-        String::from_utf8_lossy(&out.stderr).trim()
-    );
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-/// `jj workspace list`, outside the async runtime.
-pub fn workspaces_blocking(root: &Path) -> anyhow::Result<Vec<WorkspaceInfo>> {
-    let out = exec_blocking(
-        root,
-        &["workspace", "list", "-T", LIST_TEMPLATE],
-        "workspace list",
-    )?;
-    Ok(parse_workspaces(&out))
-}
-
-/// `jj workspace forget`, outside the async runtime.
-pub fn forget_blocking(root: &Path, name: &str) -> anyhow::Result<()> {
-    let what = format!("workspace forget {name}");
-    exec_blocking(root, &["workspace", "forget", name], &what).map(drop)
-}
-
-/// Local bookmarks matching `glob`, outside the async runtime.
-pub fn bookmarks_blocking(root: &Path, glob: &str) -> anyhow::Result<Vec<String>> {
-    let pattern = format!("glob:{glob}");
-    let args = ["bookmark", "list", "-T", r#"name ++ "\n""#, &pattern];
-    let mut names: Vec<String> = exec_blocking(root, &args, "bookmark list")?
-        .lines()
-        .map(str::to_string)
-        .collect();
-    names.dedup();
-    Ok(names)
-}
-
-pub fn bookmark_delete_blocking(root: &Path, name: &str) -> anyhow::Result<()> {
-    let pattern = format!("exact:{name}");
-    let what = format!("bookmark delete {name}");
-    exec_blocking(root, &["bookmark", "delete", &pattern], &what).map(drop)
 }
 
 #[cfg(test)]

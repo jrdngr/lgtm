@@ -13,11 +13,10 @@ pub use refs::Ref;
 use std::collections::HashMap;
 
 use serde::Serialize;
-use specta::Type;
 use tree_sitter::{Node, Parser, QueryCursor, StreamingIterator, Tree};
 use tree_sitter_highlight::{HighlightEvent, Highlighter};
 
-use langs::{LANGS, Lang, injected, lang_key, lang_named, lang_of};
+use langs::{LANGS, Lang, injected, lang_named, lang_of};
 
 /// Capture names the UI styles, as `hl-<index>` classes. Order is part of the UI contract.
 pub const HIGHLIGHT_NAMES: &[&str] = &[
@@ -44,7 +43,7 @@ pub const HIGHLIGHT_NAMES: &[&str] = &[
     "diff.plus",
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SymbolKind {
     Function,
@@ -53,7 +52,7 @@ pub enum SymbolKind {
     Section,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeSymbol {
     pub name: String,
@@ -72,13 +71,6 @@ pub type Segment = (Option<u8>, u32);
 pub struct Parsed {
     lang: &'static Lang,
     tree: Tree,
-}
-
-/// Whether `path` is in a language with symbols.
-pub fn has_symbols(path: &str) -> bool {
-    lang_key(path)
-        .and_then(|k| LANGS.get(k))
-        .is_some_and(|l| l.symbols.pattern_count() > 0)
 }
 
 pub fn parse(path: &str, source: &str) -> Option<Parsed> {
@@ -150,12 +142,6 @@ impl Parsed {
             start = prev;
         }
         (start, node)
-    }
-
-    /// Highlight segments for the given 1-based lines.
-    pub fn highlight(&self, source: &str, lines: &[u32]) -> HashMap<u32, Vec<Segment>> {
-        let wanted: std::collections::HashSet<u32> = lines.iter().copied().collect();
-        highlight_lines(self.lang, source, |l| wanted.contains(&l))
     }
 }
 

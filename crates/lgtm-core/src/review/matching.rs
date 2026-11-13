@@ -2,8 +2,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use similar::DiffOp;
-
 use super::RowRef;
 use super::file::{FileSide, Keyed, ReviewFile};
 use crate::anchor::{self, Candidate, MarkRef, MatchConfig, Side};
@@ -253,26 +251,4 @@ fn match_check(file: &ReviewFile, checks: &[FileCheck]) -> Option<MatchedCheck> 
             && check.fingerprint.is_none_or(|f| f == file.fingerprint),
         check: check.clone(),
     })
-}
-
-/// 1-based lines of the file's current side that replaced the line `mark` was made on.
-pub fn replaced_lines(store: &Store, file: &ReviewFile, mark: &Mark) -> Option<Vec<u32>> {
-    let old = store.line_hashes(&mark.commit, &mark.anchor.path).ok()??;
-    let new = &file.side(mark.anchor.side).index.as_ref()?.hashes;
-    let line = mark.line as usize - 1;
-    similar::capture_diff_slices(similar::Algorithm::Myers, &old, new)
-        .into_iter()
-        .find_map(|op| match op {
-            DiffOp::Replace {
-                old_index,
-                old_len,
-                new_index,
-                new_len,
-            } if (old_index..old_index + old_len).contains(&line) => Some(
-                (new_index..new_index + new_len)
-                    .map(|i| i as u32 + 1)
-                    .collect(),
-            ),
-            _ => None,
-        })
 }

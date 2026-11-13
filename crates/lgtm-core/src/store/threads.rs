@@ -4,13 +4,12 @@
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::comments::{COLUMNS, row_to_comment};
 use super::{Comment, GhLink, Store, json_err};
 
 /// Where a thread is in the reply workflow.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Stage {
     /// Not triaged yet, or needs a call only the user can make.
@@ -30,7 +29,7 @@ pub enum Stage {
 }
 
 /// What the agent thinks of a thread's ask.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TakeVerdict {
     Agree,
@@ -43,7 +42,7 @@ pub enum TakeVerdict {
     Answer,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Take {
     pub verdict: TakeVerdict,
@@ -53,7 +52,7 @@ pub struct Take {
 }
 
 /// A thread's place in the workflow, kept across syncs and restarts.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThreadState {
     /// `owner/name` of the PR's repo.
@@ -69,7 +68,7 @@ pub struct ThreadState {
 }
 
 /// The part of a comment on the PR that a thread answers.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Quote {
     /// The id of the comment it's quoted from.

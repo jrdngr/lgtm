@@ -1,4 +1,4 @@
-//! Comments (C1, C2, …) as both apps use them: placing one on a diff's rows, an agent's
+//! Comments (C1, C2, …): placing one on a diff's rows, an agent's
 //! from where it asked, listing them for an agent, and undoing changes to them.
 
 use serde_json::{Value, json};
@@ -208,14 +208,6 @@ fn set_comment(store: &Store, c: AgentComment, there: bool) -> anyhow::Result<Ag
 impl Step {
     pub fn is_empty(&self) -> bool {
         matches!(self, Step::Marks(e) if e.is_empty())
-    }
-
-    /// The marks and checks the step changes, if any.
-    pub fn marks(&self) -> Option<&Edit> {
-        match self {
-            Step::Marks(e) => Some(e),
-            _ => None,
-        }
     }
 
     /// Undoes the step, or redoes it. Returns it as it now stands, to go the other way.

@@ -61,10 +61,6 @@ impl Store {
     pub fn checks_for_paths(&self, paths: &[&str]) -> rusqlite::Result<Vec<FileCheck>> {
         self.select_by_paths("file_checks", COLUMNS, paths, row_to_check)
     }
-
-    pub fn checks_for_review(&self, review: &str) -> rusqlite::Result<Vec<FileCheck>> {
-        self.select_by_review("file_checks", COLUMNS, review, row_to_check)
-    }
 }
 
 #[cfg(test)]
@@ -94,8 +90,11 @@ mod tests {
         let got = store.checks_for_paths(&["a.rs", "b.rs"]).unwrap();
         assert_eq!(got, added.checks_added);
         let undone = store.apply(&added.inverse()).unwrap();
-        assert!(store.checks_for_review("r").unwrap().is_empty());
+        assert!(store.checks_for_paths(&["a.rs"]).unwrap().is_empty());
         store.apply(&undone.inverse()).unwrap();
-        assert_eq!(store.checks_for_review("r").unwrap(), added.checks_added);
+        assert_eq!(
+            store.checks_for_paths(&["a.rs"]).unwrap(),
+            added.checks_added
+        );
     }
 }

@@ -182,23 +182,6 @@ fn symbol_with_parse_error_is_flagged() {
 }
 
 #[test]
-fn highlight_segments_cover_requested_lines_in_utf16_units() {
-    let src = "fn main() {\n    let s = \"é\";\n}\n";
-    let lines = parse("a.rs", src).unwrap().highlight(src, &[2]);
-    assert_eq!(lines.keys().collect::<Vec<_>>(), [&2]);
-    let segs = &lines[&2];
-    assert_eq!(
-        segs.iter().map(|s| s.1).sum::<u32>(),
-        "    let s = \"é\";".encode_utf16().count() as u32
-    );
-    let keyword = HIGHLIGHT_NAMES
-        .iter()
-        .position(|n| *n == "keyword")
-        .unwrap() as u8;
-    assert!(segs.iter().any(|s| s.0 == Some(keyword)));
-}
-
-#[test]
 fn highlight_file_has_a_segment_list_per_line() {
     let lines = highlight_file("a.rs", "fn f() {}\n\nlet x = 1;\n");
     assert_eq!(lines.len(), 4);

@@ -1,6 +1,5 @@
 //! Markdown editing: lists and quotes that go on at Enter, ordered lists that keep their
 //! numbers, checkboxes, and the smart key for tables and footnotes. Offsets are in chars.
-//! `src/editor/markdown/smart.ts` does the same for the app's editor.
 
 /// Whether `name` is a markdown file.
 pub fn is_markdown(name: &str) -> bool {

@@ -204,7 +204,7 @@ impl Drop for Listed {
     }
 }
 
-/// PIDs of the app's own jj processes that are waiting on `lock`, so not holding it.
+/// PIDs of lgtm's own jj processes that are waiting on `lock`, so not holding it.
 pub(super) fn own_waiters(lock: &str) -> Vec<u32> {
     let live: Vec<Arc<Live>> = LIVE.lock().unwrap().values().cloned().collect();
     live.iter()
@@ -214,22 +214,6 @@ pub(super) fn own_waiters(lock: &str) -> Vec<u32> {
         })
         .filter_map(|l| l.child.lock().unwrap().id())
         .collect()
-}
-
-/// Ends every jj the app started, for when the app quits: SIGTERM, then SIGKILL for any still
-/// running a second later.
-pub fn end_all() {
-    let live: Vec<Arc<Live>> = LIVE.lock().unwrap().values().cloned().collect();
-    for l in &live {
-        l.signal(rustix::process::Signal::TERM);
-    }
-    let until = Instant::now() + Duration::from_secs(1);
-    while Instant::now() < until && live.iter().any(|l| l.running()) {
-        std::thread::sleep(Duration::from_millis(20));
-    }
-    for l in &live {
-        l.signal(rustix::process::Signal::KILL);
-    }
 }
 
 async fn read_all(mut r: impl AsyncRead + Unpin) -> std::io::Result<Vec<u8>> {
@@ -352,7 +336,7 @@ mod tests {
         let holders = tokio::time::timeout(REPORT_AFTER * 5, reported)
             .await
             .unwrap();
-        // The test holds the lock. The waiting jj, the app's own, isn't listed.
+        // The test holds the lock. The waiting jj, lgtm's own, isn't listed.
         let lines: Vec<&str> = holders.lines().collect();
         assert_eq!(lines.len(), 1, "{holders}");
         assert!(lines[0].starts_with(&format!("{} ", std::process::id())));

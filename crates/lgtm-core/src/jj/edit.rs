@@ -1,12 +1,11 @@
 //! Commands from the revisions log that change the repo.
 
 use serde::Deserialize;
-use specta::Type;
 
 use super::Jj;
 
 /// A change to the repo, on a revision given by change id.
-#[derive(Clone, Debug, PartialEq, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum JjAction {
     Edit {
@@ -89,7 +88,7 @@ impl JjAction {
                     &format!("heads({revs})"),
                     "--",
                 ]);
-                args.extend(paths.iter().map(|p| super::rewrite::root_file(p)));
+                args.extend(paths.iter().map(|p| root_file(p)));
                 args
             }
             JjAction::Squash { revs } => v(&[
@@ -147,17 +146,20 @@ impl Jj {
         };
         let args = action.args();
         let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        let mut seen = self.writer.lock().await;
-        let done = async {
-            for _ in 0..steps {
-                self.exec(&args, false).await?;
-            }
-            Ok(steps)
+        let _guard = self.writer.lock().await;
+        for _ in 0..steps {
+            self.exec(&args, false).await?;
         }
-        .await;
-        self.note_working_copy(&mut seen).await;
-        done
+        Ok(steps)
     }
+}
+
+/// The fileset naming exactly the file at repo-relative `path`.
+fn root_file(path: &str) -> String {
+    format!(
+        "root-file:\"{}\"",
+        path.replace('\\', "\\\\").replace('"', "\\\"")
+    )
 }
 
 #[cfg(test)]

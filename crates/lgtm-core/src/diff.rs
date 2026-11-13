@@ -2,9 +2,8 @@
 
 use anyhow::{Context, bail};
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FileStatus {
     Modified,
@@ -14,7 +13,7 @@ pub enum FileStatus {
     Renamed,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum RowKind {
     Context,
@@ -22,7 +21,7 @@ pub enum RowKind {
     Removed,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Row {
     pub kind: RowKind,
@@ -33,7 +32,7 @@ pub struct Row {
     pub text: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hunk {
     pub old_start: u32,

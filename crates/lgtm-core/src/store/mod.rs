@@ -1,29 +1,11 @@
-//! Per-repo SQLite store for marks, file checks, comments, review sessions, reports,
-//! designs, drawings and notes. lgtm's global store is one too, holding only global notes.
+//! Per-repo SQLite store for marks, file checks, comments, agent comments and agent turns.
 
 mod agent_comments;
-mod arch;
-mod asleep;
 mod checks;
 mod comments;
-mod designs;
-mod drawings;
-mod fixes;
-mod guided;
-mod log_revsets;
 mod marks;
-mod notes;
-mod projects;
-mod prs;
-mod qa;
-pub mod report;
-mod report_runs;
-mod sessions;
-mod setup;
-mod symbol_info;
 mod threads;
 mod turns;
-mod workspace_roots;
 
 use std::path::Path;
 
@@ -32,16 +14,8 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 pub use agent_comments::AgentComment;
 pub use checks::FileCheck;
 pub use comments::{Author, Comment, Conversation, GhLink, GhPost, Message, Pin};
-pub use fixes::Fix;
-pub use guided::AgentEdit;
 pub use marks::{Mark, MarkColor};
-pub use notes::NoteRow;
-pub use projects::ProjectRow;
-pub use prs::{PrRecord, fallback_bookmark, head_bookmark_revset};
-pub use report::{Part, Persona, ReportRun};
-pub use sessions::Session;
-pub use symbol_info::InfoKey;
-pub use threads::{Quote, Stage, Take, TakeVerdict, ThreadState};
+pub use threads::{Quote, Stage, ThreadState};
 pub use turns::Turn;
 
 pub struct Store {
@@ -103,14 +77,6 @@ CREATE TABLE IF NOT EXISTS file_checks (
     agent INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS file_checks_path ON file_checks (path);
-CREATE TABLE IF NOT EXISTS sessions (
-    id INTEGER PRIMARY KEY,
-    review TEXT NOT NULL,
-    started_at INTEGER NOT NULL,
-    commits TEXT NOT NULL,
-    seen BLOB NOT NULL
-);
-CREATE INDEX IF NOT EXISTS sessions_review ON sessions (review);
 CREATE TABLE IF NOT EXISTS line_hashes (
     commit_id TEXT NOT NULL,
     path TEXT NOT NULL,
@@ -147,20 +113,8 @@ pub(crate) fn from_blob(blob: &[u8]) -> Vec<i64> {
         .collect()
 }
 
-/// Columns added after the first schema. Rows from before default to the main workspace,
-/// with the review label as the revset.
+/// Brings stores from earlier schemas up to date.
 fn migrate(db: &Connection) -> rusqlite::Result<()> {
-    let has_workspace: bool = db.query_row(
-        "SELECT COUNT(*) > 0 FROM pragma_table_info('sessions') WHERE name = 'workspace'",
-        [],
-        |r| r.get(0),
-    )?;
-    if !has_workspace {
-        db.execute_batch(
-            "ALTER TABLE sessions ADD COLUMN workspace TEXT NOT NULL DEFAULT '';
-             ALTER TABLE sessions ADD COLUMN revset TEXT NOT NULL DEFAULT '';",
-        )?;
-    }
     migrate_autoincrement(db)?;
     migrate_mark_colors(db)?;
     migrate_check_fingerprints(db)?;
@@ -271,49 +225,10 @@ impl Store {
         db.execute_batch("PRAGMA journal_mode = WAL;")?;
         db.execute_batch(SCHEMA)?;
         comments::create_table(&db)?;
-        arch::create_table(&db)?;
-        designs::create_table(&db)?;
-        drawings::create_table(&db)?;
-        guided::create_table(&db)?;
-        log_revsets::create_table(&db)?;
-        workspace_roots::create_table(&db)?;
-        asleep::create_table(&db)?;
-        projects::create_table(&db)?;
-        notes::create_table(&db)?;
-        report_runs::create_table(&db)?;
-        prs::create_table(&db)?;
-        qa::create_table(&db)?;
-        setup::create_table(&db)?;
-        symbol_info::create_table(&db)?;
         turns::create_table(&db)?;
-        fixes::create_table(&db)?;
         agent_comments::create_table(&db)?;
         migrate(&db)?;
         Ok(Self { db })
-    }
-
-    /// Deletes workspace `name`'s Reviewer runs, Q&A sessions, review sessions, assessments,
-    /// Look checks, guided reviews and notes, so a new workspace with its name starts empty.
-    pub fn forget_workspace(&mut self, name: &str) -> rusqlite::Result<()> {
-        let tx = self.db.transaction()?;
-        for table in [
-            "bot_runs",
-            "qa_sessions",
-            "sessions",
-            "arch_reviews",
-            "guided_reviews",
-            "guided_verdicts",
-            "log_revsets",
-            "notes",
-            "note_folders",
-            "workspace_roots",
-            "symbol_info",
-            "agent_turns",
-            "asleep",
-        ] {
-            tx.execute(&format!("DELETE FROM {table} WHERE workspace = ?"), [name])?;
-        }
-        tx.commit()
     }
 
     /// Applies `edit` in one transaction. Added rows keep their ids when they have one (redo)
@@ -345,8 +260,8 @@ impl Store {
         })
     }
 
-    /// Changes whenever another connection commits, so polling it notices another app's
-    /// writes.
+    /// Changes whenever another connection commits, so polling it notices another
+    /// process's writes.
     pub fn data_version(&self) -> rusqlite::Result<i64> {
         self.db.query_row("PRAGMA data_version", [], |r| r.get(0))
     }
@@ -377,18 +292,6 @@ impl Store {
     }
 
     /// Rows of `table` created by `review`.
-    fn select_by_review<T>(
-        &self,
-        table: &str,
-        columns: &str,
-        review: &str,
-        row: fn(&rusqlite::Row) -> rusqlite::Result<T>,
-    ) -> rusqlite::Result<Vec<T>> {
-        let sql = format!("SELECT {columns} FROM {table} WHERE review = ?");
-        let mut stmt = self.db.prepare(&sql)?;
-        stmt.query_map([review], row)?.collect()
-    }
-
     pub fn save_line_hashes(
         &self,
         commit: &str,
@@ -451,7 +354,7 @@ mod tests {
         .unwrap();
         let store = Store::init(db).unwrap();
         let colors: Vec<MarkColor> = store
-            .marks_for_review("r")
+            .marks_for_paths(&["a.rs", "b.rs"])
             .unwrap()
             .into_iter()
             .map(|m| m.color)

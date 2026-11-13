@@ -13,10 +13,9 @@ pub mod snippet;
 pub mod view;
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 /// A row by file index and its index among the file's rows, counting across hunks.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RowRef {
     pub file: u32,
     pub row: u32,

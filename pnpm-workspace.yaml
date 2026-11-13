@@ -1,7 +1,0 @@
-# Matches the one-day release-age policy on Jordan's Mac, so cloud installs catch new
-# packages too.
-minimumReleaseAge: 1440
-
-overrides:
-  hast-util-from-html: 2.0.3
-  vfile-location: 5.0.3

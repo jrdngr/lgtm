@@ -1,36 +1,11 @@
-//! Claude Code registers `lgtm mcp` and `lgtm hook` once. Inside a desktop app terminal they
-//! hand over to the app's binary, which talks to the app. Anywhere else in a jj workspace
-//! `mcp` serves the terminal app's tools, and `hook` records the agent's turns and, in an
-//! lgterm terminal, passes the hook on to lgterm.
-
-use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
-use std::process::Command;
+//! Claude Code runs `lgtm mcp` and `lgtm hook`. In a jj workspace `mcp` serves the TUI's
+//! tools, and `hook` records the agent's turns and, in an lgterm terminal, passes the hook on
+//! to lgterm.
 
 use rmcp::ServiceExt;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
 
-fn var(name: &str) -> Option<String> {
-    std::env::var(name).ok().filter(|v| !v.is_empty())
-}
-
-/// The desktop app's binary, when this runs in one of its terminals.
-fn app_terminal() -> Option<String> {
-    var("LGTM_SOCKET")?;
-    var("LGTM_APP_BIN")
-}
-
-/// Replaces this process with `bin args`, keeping stdio. Only returns on failure.
-fn hand_over(bin: &str, args: &[String]) -> i32 {
-    let e = Command::new(bin).args(args).exec();
-    eprintln!("lgtm: couldn't run {bin}: {e}");
-    1
-}
-
 pub fn mcp() -> i32 {
-    if let Some(app) = app_terminal() {
-        return hand_over(&app, &["mcp".into()]);
-    }
     let socket = std::env::current_dir()
         .ok()
         .and_then(|d| crate::agent::workspace(&d))
@@ -44,9 +19,6 @@ pub fn mcp() -> i32 {
 }
 
 pub fn hook() -> i32 {
-    if let Some(app) = app_terminal() {
-        return hand_over(&app, &["hook".into()]);
-    }
     let input = crate::turn_hook::read_input();
     tell_lgterm(&input);
     crate::turn_hook::run_on(&input)
@@ -74,31 +46,6 @@ fn tell_lgterm(input: &str) {
     {
         println!("{out}");
     }
-}
-
-/// The desktop app's binary: the one that started this terminal, else an installed app.
-fn app_bin() -> Option<String> {
-    if let Some(bin) = var("LGTM_APP_BIN") {
-        return Some(bin);
-    }
-    let path = std::env::var_os("PATH").unwrap_or_default();
-    let on_path = std::env::split_paths(&path).map(|d| d.join("lgtm-app"));
-    let installed = PathBuf::from("/Applications/lgtm.app/Contents/MacOS/lgtm-app");
-    on_path
-        .chain([installed])
-        .find(|p| p.is_file())
-        .map(|p| p.to_string_lossy().into_owned())
-}
-
-/// `lgtm gc` cleans up the desktop app's workspaces, so the app does it.
-pub fn gc(args: &[String]) -> i32 {
-    let Some(app) = app_bin() else {
-        eprintln!("lgtm: the desktop app isn't installed");
-        return 1;
-    };
-    let mut all = vec!["gc".to_string()];
-    all.extend_from_slice(args);
-    hand_over(&app, &all)
 }
 
 /// A server with no tools, explaining why.

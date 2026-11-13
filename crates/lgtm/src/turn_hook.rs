@@ -1,6 +1,5 @@
-//! `lgtm hook` outside the desktop app's terminals: records the agent's turns in the store,
-//! as the app does, so both apps list them. It never fails, so it can't get in Claude Code's
-//! way.
+//! `lgtm hook`: records the agent's turns in the store. It never fails, so it can't get in
+//! Claude Code's way.
 
 use std::io::Read;
 use std::path::PathBuf;

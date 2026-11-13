@@ -1,5 +1,5 @@
-//! `lgtm mcp` outside the desktop app: tools for the terminal app open in the agent's
-//! workspace, asked over its socket at each call, so it can start after the agent does.
+//! `lgtm mcp`: tools for the TUI open in the agent's workspace, asked over its socket at each
+//! call, so it can start after the agent does.
 
 use std::path::PathBuf;
 

@@ -4,7 +4,7 @@ use super::Jj;
 
 /// One commit in the log, with the graph drawn beside its two lines, or a line of graph
 /// alone where branches join or are elided.
-#[derive(Clone, Debug, PartialEq, serde::Serialize, specta::Type)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogRow {
     /// The graph left of each of the row's lines: jj's own, without colors.
@@ -12,7 +12,7 @@ pub struct LogRow {
     pub commit: Option<LogCommit>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize, specta::Type)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LogCommit {
     pub commit_id: String,
@@ -105,27 +105,6 @@ fn parse_rows(out: &str) -> Vec<LogRow> {
     rows
 }
 
-/// Names `trunk()` usually resolves to, preferred over other bookmarks on the same commit.
-const TRUNK_NAMES: [&str; 3] = ["main", "master", "trunk"];
-
-/// Picks the trunk bookmark from the newline-separated local bookmarks on `trunk()`, as a
-/// revset symbol: quoted when it has characters a bare symbol can't.
-fn pick_trunk(out: &str) -> Option<String> {
-    let names: Vec<&str> = out.lines().filter(|l| !l.is_empty()).collect();
-    let name = TRUNK_NAMES
-        .into_iter()
-        .find(|t| names.contains(t))
-        .or_else(|| names.first().copied())?;
-    let bare = name
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || "_./-+".contains(c));
-    Some(if bare {
-        name.to_string()
-    } else {
-        format!("\"{}\"", name.replace('\\', "\\\\").replace('"', "\\\""))
-    })
-}
-
 impl Jj {
     /// The commits of `revset`, or `jj log`'s default revset, newest first, with jj's graph.
     /// Fails with jj's own error, without the command line.
@@ -140,22 +119,6 @@ impl Jj {
             anyhow::anyhow!("{}", text.strip_prefix(&command).unwrap_or(&text))
         })?;
         Ok(parse_rows(&String::from_utf8_lossy(&out)))
-    }
-
-    /// The local bookmark `trunk()` resolves to, as a revset symbol, or `None` when it has
-    /// none.
-    pub async fn trunk_bookmark(&self) -> anyhow::Result<Option<String>> {
-        let out = self
-            .read(&[
-                "log",
-                "--no-graph",
-                "-r",
-                "trunk()",
-                "-T",
-                r#"local_bookmarks.map(|b| b.name()).join("\n") ++ "\n""#,
-            ])
-            .await?;
-        Ok(pick_trunk(&out))
     }
 }
 
@@ -187,13 +150,5 @@ mod tests {
             ("│ ~", true)
         );
         assert_eq!(rows[3].graph, ["~"]);
-    }
-
-    #[test]
-    fn trunk_prefers_the_usual_names_and_quotes_odd_ones() {
-        assert_eq!(pick_trunk("release\nmain\n").as_deref(), Some("main"));
-        assert_eq!(pick_trunk("jg/v1.2\n").as_deref(), Some("jg/v1.2"));
-        assert_eq!(pick_trunk("a\"b c\n").as_deref(), Some(r#""a\"b c""#));
-        assert_eq!(pick_trunk("\n"), None);
     }
 }

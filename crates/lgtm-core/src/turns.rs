@@ -1,4 +1,4 @@
-//! Recording agent turns and named steps, shared by the desktop app and the terminal app.
+//! Recording agent turns and named steps.
 //! Claude Code's hooks snapshot a workspace's working copy when a prompt is sent, around each
 //! tool that can write files, and when the agent stops. A turn's diff runs from its first
 //! snapshot to its last over the files its tools changed. Naming a step ends the agent's
@@ -17,7 +17,7 @@ use crate::store::{Store, Turn};
 /// Turns older than this are dropped.
 pub const KEEP_MS: i64 = 14 * 24 * 60 * 60 * 1000;
 
-/// What agents read about naming steps, as the tool's description in both apps.
+/// What agents read about naming steps, as the tool's description.
 pub const START_SNAPSHOT: &str = "Start a new lgtm snapshot named `label`. lgtm records the \
 files you change for each prompt as one snapshot under the working copy in the human's \
 revisions log, which they can review, undo or move to its own commit on its own. Your edits \
@@ -150,7 +150,6 @@ pub async fn record(
             }
             let store = store.lock().unwrap();
             store.prune_turns(now_ms() - KEEP_MS)?;
-            store.prune_fixes(now_ms() - KEEP_MS)?;
             let id =
                 store.start_turn(p.key, Some(p.session), p.prompt, change, commit, now_ms())?;
             Ok((Some(id), true))

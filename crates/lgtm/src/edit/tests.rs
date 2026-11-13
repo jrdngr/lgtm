@@ -2,8 +2,7 @@ use super::fold;
 use super::keys::{Keys, View};
 use super::spec::{buffer_named, check, keys, marked};
 
-/// Key cases the app's modal editor runs too, in `src/editor/modal/keys.test.ts`, by group:
-/// start, keys, expected.
+/// Key cases for the modal editor, by group: start, keys, expected.
 const KEY_CASES: &str = include_str!("key_cases.json");
 
 #[test]

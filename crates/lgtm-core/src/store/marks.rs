@@ -2,15 +2,12 @@
 
 use rusqlite::{Transaction, params};
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::{Store, enum_from, enum_to, from_blob, to_blob};
 use crate::anchor::Anchor;
 
 /// A mark's color. What each one means is the user's: see `settings::marks`.
-#[derive(
-    Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, Type,
-)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MarkColor {
     Green,
@@ -118,10 +115,6 @@ impl Store {
     pub fn marks_for_paths(&self, paths: &[&str]) -> rusqlite::Result<Vec<Mark>> {
         self.select_by_paths("marks", COLUMNS, paths, row_to_mark)
     }
-
-    pub fn marks_for_review(&self, review: &str) -> rusqlite::Result<Vec<Mark>> {
-        self.select_by_review("marks", COLUMNS, review, row_to_mark)
-    }
 }
 
 #[cfg(test)]
@@ -169,6 +162,6 @@ mod tests {
 
         let redone = store.apply(&removed.inverse()).unwrap().marks_added;
         assert_eq!(redone[0].id, inserted[0].id);
-        assert_eq!(store.marks_for_review("r1").unwrap().len(), 2);
+        assert_eq!(store.marks_for_paths(&["a.rs", "b.rs"]).unwrap().len(), 2);
     }
 }

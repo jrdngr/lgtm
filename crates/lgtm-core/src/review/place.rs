@@ -5,7 +5,6 @@ use std::collections::{HashMap, HashSet};
 
 use anyhow::Context;
 use serde::Serialize;
-use specta::Type;
 
 use super::RowRef;
 use super::file::ReviewFile;
@@ -16,7 +15,7 @@ use crate::diff::RowKind;
 use crate::store::{Pin, Store};
 
 /// The first and last rows a comment covers, by index among its file's rows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct RowSpan {
     pub start: u32,
     pub end: u32,

@@ -3,11 +3,10 @@
 //! it.
 
 use serde::Serialize;
-use specta::Type;
 
 use super::Jj;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Type)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PushPlan {
     pub remote: String,

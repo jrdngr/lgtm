@@ -3,7 +3,7 @@
 use super::Jj;
 
 /// A local bookmark and the change it's on.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, specta::Type)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BookmarkSpot {
     pub name: String,

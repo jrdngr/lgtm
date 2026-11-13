@@ -10,15 +10,13 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use crate::store::MarkColor;
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Type)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MarkSlot {
     #[serde(deserialize_with = "color")]
-    #[specta(type = MarkColor)]
     pub color: MarkColor,
     /// Empty for a color with no label.
     pub label: String,

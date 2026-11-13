@@ -72,11 +72,6 @@ pub fn url_like(like: &str, repo: &GhRepo) -> String {
     }
 }
 
-/// The remote a fork's branches are fetched from.
-pub fn fork_remote(owner: &str) -> String {
-    format!("gh-{owner}")
-}
-
 /// The remote for `want`, or with none, the repo PR numbers refer to: `upstream`, then
 /// `origin`, then the first GitHub remote. Returns the remote's name, URL and repo.
 pub fn pick(
