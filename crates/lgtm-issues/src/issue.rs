@@ -173,6 +173,16 @@ impl Issue {
         self.log.last()
     }
 
+    /// The agent that last wrote to it, or filed it. Answers and replies are the user's.
+    pub fn last_agent(&self) -> Option<&str> {
+        self.log
+            .iter()
+            .rev()
+            .find(|e| !matches!(e.kind, Kind::Answer { .. } | Kind::Reply { .. }))
+            .map(|e| e.who.as_str())
+            .or(self.filed_by.as_deref())
+    }
+
     pub fn push(&mut self, who: &str, kind: Kind, text: &str, at: Minute) {
         self.log.push(Entry {
             at,
@@ -450,6 +460,19 @@ Toast copy
         assert_eq!(issue.body, "Expired cookies loop.\n\n## Steps\n1. log in");
         assert_eq!(issue.log[0].who, "auth fixer");
         assert_eq!(issue.log[0].kind, Kind::Note);
+    }
+
+    #[test]
+    fn last_agent_skips_the_users_answers_and_falls_back_to_the_filer() {
+        let mut issue = Issue::new(1, "x", Some("finder".into()), "", 0);
+        assert_eq!(issue.last_agent(), Some("finder"));
+        let q = Kind::Question {
+            id: "Q1".into(),
+            after: None,
+        };
+        issue.push("fixer", q, "Which?", 1);
+        issue.push("jordan", Kind::Answer { id: "Q1".into() }, "1", 2);
+        assert_eq!(issue.last_agent(), Some("fixer"));
     }
 
     #[test]

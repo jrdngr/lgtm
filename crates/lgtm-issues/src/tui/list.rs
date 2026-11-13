@@ -191,13 +191,14 @@ pub fn draw(
                     let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
                     x = c.put(x + 1, y, &ids.join(" "), st(RED));
                 }
+                let working = wf.verb(Verb::Claim).is_ok_and(|s| s.id == issue.status);
+                let who = if working {
+                    issue.owner.as_deref()
+                } else {
+                    issue.last_agent()
+                };
+                x = c.put(x + 1, y, &cut(who.unwrap_or(""), 11), st(CYAN));
                 if !open {
-                    x = c.put(
-                        x + 1,
-                        y,
-                        &cut(issue.owner.as_deref().unwrap_or(""), 11),
-                        st(CYAN),
-                    );
                     let latest = issue.latest().map_or("", |e| first_line(&e.text));
                     let room = (area.right().saturating_sub(x + 7)) as usize;
                     c.put(x, y, cut(latest, room).trim_end(), st(MUTED));
