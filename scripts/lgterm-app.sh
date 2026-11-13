@@ -36,4 +36,12 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --sign - "$app" >/dev/null 2>&1 || true
+# A stable signer keeps macOS from asking for folder access again after every build.
+identity=-
+if command -v security >/dev/null && scripts/lgterm-cert.sh; then
+  identity="lgterm local signing"
+fi
+if ! codesign --force --sign "$identity" "$app" >/dev/null 2>&1; then
+  echo "Couldn't sign lgterm.app as \"$identity\"; using a throwaway signature." >&2
+  codesign --force --sign - "$app" >/dev/null 2>&1 || true
+fi
