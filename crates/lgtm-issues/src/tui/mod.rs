@@ -6,6 +6,7 @@ pub mod picker;
 mod qq;
 mod question;
 mod standalone;
+mod undo;
 mod view;
 mod wrap;
 
@@ -29,6 +30,15 @@ use question::Draft;
 use view::View;
 
 pub use standalone::run;
+
+/// The status menu's keys.
+const STATUS_KEYS: [(char, Status); 5] = [
+    ('o', Status::Open),
+    ('w', Status::Working),
+    ('i', Status::NeedsInput),
+    ('d', Status::Done),
+    ('x', Status::Dropped),
+];
 
 /// How often the folder is checked for changes.
 const POLL: Duration = Duration::from_millis(500);
@@ -75,6 +85,9 @@ pub struct Issues {
     outcome: Outcome,
     /// Whether Space was pressed, for the space menu.
     space: bool,
+    /// The issue whose status `s` is about to set, while its menu waits for a key.
+    status_for: Option<u32>,
+    history: undo::History,
     polled: Instant,
     /// Rows the body had at the last draw.
     height: usize,
@@ -108,6 +121,8 @@ impl Issues {
             drafts: HashMap::new(),
             outcome: Outcome::None,
             space: false,
+            status_for: None,
+            history: undo::History::default(),
             polled: Instant::now(),
             height: 0,
         };
@@ -219,6 +234,13 @@ impl Issues {
         self.outcome = Outcome::None;
         if self.prompt.is_some() {
             self.prompt_key(key);
+        } else if let Some(id) = self.status_for.take() {
+            if let Some(&(_, status)) = STATUS_KEYS
+                .iter()
+                .find(|(c, _)| key.code == KeyCode::Char(*c))
+            {
+                self.set_status(id, status);
+            }
         } else if std::mem::take(&mut self.space) {
             match key.code {
                 KeyCode::Char('f') => self.outcome = Outcome::Folders,
@@ -238,8 +260,14 @@ impl Issues {
         std::mem::replace(&mut self.outcome, Outcome::None)
     }
 
-    /// The space menu, while Space waits for its second key.
+    /// The space menu, while Space waits for its second key, or the status menu.
     pub fn space_menu(&self) -> Vec<(String, &'static str)> {
+        if self.status_for.is_some() {
+            return STATUS_KEYS
+                .iter()
+                .map(|(c, s)| (c.to_string(), s.name()))
+                .collect();
+        }
         if !self.space {
             return vec![];
         }
@@ -267,7 +295,9 @@ impl Issues {
                 }
             }
             KeyCode::Enter => match ask {
-                Ask::New => match ops::file(&self.folder, &input.text, "", &self.who, vec![]) {
+                Ask::New => match self.history.record(&self.folder, None, || {
+                    ops::file(&self.folder, &input.text, "", &self.who, vec![])
+                }) {
                     Ok(id) => {
                         self.reload();
                         self.select_issue(id);
@@ -329,16 +359,9 @@ impl Issues {
                 Some(Row::Issue(id)) => self.open(id),
                 _ => {}
             },
-            KeyCode::Char('o') => {
-                if let Some(id) = row.and_then(|r| r.issue()) {
-                    self.open(id);
-                }
-            }
-            KeyCode::Char('c') => {
-                if let Some(id) = row.and_then(|r| r.issue()) {
-                    self.close(id);
-                }
-            }
+            KeyCode::Char('s') => self.status_for = row.and_then(|r| r.issue()),
+            KeyCode::Char('u') => self.undo(false),
+            KeyCode::Char('U') => self.undo(true),
             KeyCode::Char('n') => self.prompt = Some((Ask::New, Input::default())),
             KeyCode::Char('/') => {
                 let mut input = Input::default();
@@ -360,12 +383,45 @@ impl Issues {
         }
     }
 
-    fn close(&mut self, id: u32) {
-        match ops::set_status(&self.folder, id, Status::Done, &self.who, "") {
-            Ok(()) => self.notice = Some(format!("closed #{id}")),
-            Err(e) => self.notice = Some(format!("{e:#}")),
+    /// Sets an issue's status, which moves its file to the folder for it, without a note in
+    /// its log, so setting it back leaves the file as it was.
+    fn set_status(&mut self, id: u32, status: Status) {
+        let set = self.history.record(&self.folder, Some(id), || {
+            self.folder.update(id, |i| {
+                i.status = status;
+                Ok(id)
+            })
+        });
+        if let Err(e) = set {
+            self.notice = Some(format!("{e:#}"));
         }
         self.reload();
+        self.select_issue(id);
+    }
+
+    fn undo(&mut self, redo: bool) {
+        let done = if redo {
+            self.history.redo(&self.folder)
+        } else {
+            self.history.undo(&self.folder)
+        };
+        match done {
+            Ok(Some(id)) => {
+                self.reload();
+                self.select_issue(id);
+            }
+            Ok(None) => {
+                self.notice = Some(
+                    if redo {
+                        "nothing to redo"
+                    } else {
+                        "nothing to undo"
+                    }
+                    .into(),
+                )
+            }
+            Err(e) => self.notice = Some(format!("{e:#}")),
+        }
     }
 
     fn view_key(&mut self, key: KeyEvent) {
@@ -379,7 +435,9 @@ impl Issues {
                     self.outcome = Outcome::Edit(path);
                 }
             }
-            KeyCode::Char('c') => self.close(id),
+            KeyCode::Char('s') => self.status_for = Some(id),
+            KeyCode::Char('u') => self.undo(false),
+            KeyCode::Char('U') => self.undo(true),
             KeyCode::Enter => {
                 let next = self
                     .issue(id)
@@ -509,9 +567,9 @@ impl Issues {
                 vec![
                     ("j k", "move", false),
                     ("Enter", "open", false),
-                    ("o", "issue", false),
                     ("n", "new", false),
-                    ("c", "close", false),
+                    ("s", "status", false),
+                    ("u U", "undo redo", false),
                     ("/", "filter", !self.filter.is_empty()),
                     ("Space", "menu", false),
                 ]
@@ -560,7 +618,8 @@ impl Issues {
                 }
                 hints.extend([
                     ("e", "edit", false),
-                    ("c", "close", false),
+                    ("s", "status", false),
+                    ("u U", "undo redo", false),
                     ("Esc", "list", false),
                 ]);
                 hints
