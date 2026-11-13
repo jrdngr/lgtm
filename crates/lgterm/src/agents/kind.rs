@@ -29,6 +29,8 @@ pub struct Behavior {
     interrupted: &'static [&'static str],
     /// It takes prompts in a box drawn between two rules.
     prompt_box: bool,
+    /// Its hooks say when it takes a prompt, so Enter alone doesn't mean one was sent.
+    pub prompt_hook: bool,
 }
 
 const BEHAVIORS: &[Behavior] = &[
@@ -41,6 +43,7 @@ const BEHAVIORS: &[Behavior] = &[
         blocked: &["Do you want to proceed?", "Do you want to make this edit"],
         interrupted: &["Interrupted by user", "What should Claude do instead"],
         prompt_box: true,
+        prompt_hook: true,
     },
     Behavior {
         kind: Kind::Codex,
@@ -55,6 +58,7 @@ const BEHAVIORS: &[Behavior] = &[
         ],
         interrupted: &[],
         prompt_box: false,
+        prompt_hook: false,
     },
     Behavior {
         kind: Kind::Pi,
@@ -65,6 +69,7 @@ const BEHAVIORS: &[Behavior] = &[
         blocked: &[],
         interrupted: &[],
         prompt_box: false,
+        prompt_hook: false,
     },
 ];
 

@@ -91,6 +91,9 @@ pub struct TermView {
     find: Option<find::Find>,
     /// The user typed a prompt and hasn't sent or dropped it yet.
     draft: bool,
+    /// A prompt typed and not yet taken or cancelled. Enter doesn't end it, since it can add a
+    /// line or pick from a menu; the agent's own word that it took the prompt does.
+    unsent: bool,
     last_key: Option<Instant>,
     lines: LineCache,
 }
@@ -165,6 +168,7 @@ impl TermView {
                 pressed: None,
                 find: None,
                 draft: false,
+                unsent: false,
                 last_key: None,
                 lines: LineCache::default(),
             }
@@ -189,15 +193,21 @@ impl TermView {
         self.draft
     }
 
-    /// Whether the user typed a prompt and hasn't sent or dropped it, and pressed a key here
-    /// lately.
-    pub fn recent_draft(&self) -> bool {
-        self.draft && self.last_key.is_some_and(|t| t.elapsed() < DRAFT_HOLD)
+    /// Whether the user typed a prompt the agent hasn't taken and hasn't cancelled.
+    pub fn unsent(&self) -> bool {
+        self.unsent
+    }
+
+    /// Whether the user pressed a key here lately enough for an unsent prompt to still hold
+    /// messages back.
+    pub fn typed_lately(&self) -> bool {
+        self.last_key.is_some_and(|t| t.elapsed() < DRAFT_HOLD)
     }
 
     /// Forgets a typed prompt, once the program has taken it.
     pub fn clear_draft(&mut self) {
         self.draft = false;
+        self.unsent = false;
     }
 
     /// Where the shell is, as best we know without asking the OS.
@@ -375,6 +385,7 @@ impl TermView {
             return;
         };
         self.draft = true;
+        self.unsent = true;
         self.last_key = Some(Instant::now());
         self.paste_text(text, cx);
     }

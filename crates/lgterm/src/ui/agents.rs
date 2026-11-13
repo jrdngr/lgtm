@@ -20,7 +20,7 @@ const PROMPT_ROWS: usize = 16;
 /// Whether the user is typing a prompt for an agent: they pressed a key just now, or its
 /// prompt box has text, or they typed a prompt and haven't sent it. A prompt box that reads
 /// empty lets an unsent prompt go only once its keys have been quiet a while, since the box
-/// can be misread.
+/// can be misread. An agent whose hooks say when it takes a prompt has only sent it then.
 pub(super) fn typing<'a>(
     terms: &'a HashMap<TermId, Term>,
     app: &'a App,
@@ -28,11 +28,16 @@ pub(super) fn typing<'a>(
     move |t, kind| {
         terms.get(&t).is_some_and(|t| {
             let view = t.view.read(app);
+            let unsent = if kind.behavior().prompt_hook {
+                view.unsent()
+            } else {
+                view.draft()
+            };
             view.typed_recently()
                 || match kind.prompt_typed(&view.bottom_rows(PROMPT_ROWS)) {
                     Some(true) => true,
-                    Some(false) => view.recent_draft(),
-                    None => view.draft(),
+                    Some(false) => unsent && view.typed_lately(),
+                    None => unsent,
                 }
         })
     }

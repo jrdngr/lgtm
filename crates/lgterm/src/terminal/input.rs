@@ -71,6 +71,9 @@ impl TermView {
         self.last_key = Some(std::time::Instant::now());
         if let Some(draft) = keys::drafts(k) {
             self.draft = draft;
+            if draft || k.key != "enter" {
+                self.unsent = draft;
+            }
         }
         let e = &mut self.key_event;
         e.set_action(if ev.is_held {
