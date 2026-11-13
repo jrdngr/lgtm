@@ -62,8 +62,8 @@ pub struct Home {
     drawn_width: u16,
     /// Whether Space was pressed, for the space menu.
     space: bool,
-    /// A `C-w` waiting for `<` or `>`.
-    divider: bool,
+    /// Where a `C-w <` or `C-w >` divider move stands.
+    divider: crate::tui::width::Divider,
 }
 
 /// The narrowest either side gets.
@@ -90,7 +90,7 @@ impl Default for Home {
             revisions_width: None,
             drawn_width: 0,
             space: false,
-            divider: false,
+            divider: Default::default(),
         }
     }
 }

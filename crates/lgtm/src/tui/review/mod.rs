@@ -130,8 +130,8 @@ pub struct Review {
     pub notice: Option<String>,
     /// Whether `space` was pressed, for its menu.
     space: bool,
-    /// A `C-w` waiting for `<` or `>`.
-    divider: bool,
+    /// Where a `C-w <` or `C-w >` divider move stands.
+    divider: crate::tui::width::Divider,
     /// Files with edits the editor hasn't saved.
     pub unsaved: HashSet<String>,
     /// Where to put the cursor once the diff loads.
@@ -287,7 +287,7 @@ impl Review {
             show_resolved: false,
             notice: None,
             space: false,
-            divider: false,
+            divider: Default::default(),
             unsaved: HashSet::new(),
             goto: None,
             selecting: None,

@@ -147,8 +147,8 @@ pub struct Editor {
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
     pub files_width: Option<u16>,
-    /// A `C-w` in the file tree waiting for `<` or `>`.
-    divider: bool,
+    /// Where a `C-w <` or `C-w >` divider move stands.
+    divider: width::Divider,
     /// Whether long lines wrap at the view's edge.
     pub wrap: bool,
     /// Whether markdown files open rendered: as the last one was left.
@@ -179,7 +179,7 @@ impl Editor {
             body_width: 0,
             saved: false,
             files_width: None,
-            divider: false,
+            divider: width::Divider::Off,
             wrap: false,
             render_markdown: false,
             sidebar_width: 0,
@@ -403,6 +403,15 @@ impl Editor {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Moves the divider beside the file tree by `step`, and lets `<` and `>` move it again.
+    fn move_divider(&mut self, step: i32) {
+        if self.sidebar_width > 0 {
+            let step = crate::tui::side::toward_files(step);
+            self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+            self.divider = width::Divider::Moving;
         }
     }
 
@@ -708,6 +717,12 @@ impl Editor {
             self.sidebar_key(key);
             return Outcome::None;
         }
+        if std::mem::take(&mut self.divider) == width::Divider::Moving
+            && let Some(step) = width::angle(&key)
+        {
+            self.move_divider(step);
+            return Outcome::None;
+        }
         if let Some(r) = self.open.get_mut(self.cur).and_then(|o| o.resolve.as_mut()) {
             match r.key(key) {
                 resolve::Outcome::None => {}
@@ -796,12 +811,9 @@ impl Editor {
             }
             Action::ToggleWrap => self.wrap = !self.wrap,
             Action::Split { right } => self.split(None, right),
-            Action::Divider { right } if self.sidebar_width > 0 => {
-                let step =
-                    crate::tui::side::toward_files(if right { width::STEP } else { -width::STEP });
-                self.files_width = Some(width::moved(self.sidebar_width, step, draw::SIDEBAR_MIN));
+            Action::Divider { right } => {
+                self.move_divider(if right { width::STEP } else { -width::STEP })
             }
-            Action::Divider { .. } => {}
             Action::Fold(fold) => {
                 if let Some(open) = self.open.get_mut(self.cur) {
                     let line = open.buf.line_of(open.buf.sel.head);
@@ -1017,7 +1029,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_w_angle_brackets_move_the_divider_and_bare_ones_still_indent() {
+    fn ctrl_w_angle_brackets_move_the_divider_until_another_key_and_then_they_indent() {
         use ratatui::buffer::Buffer as Screen;
         use ratatui::layout::Rect;
         let (dir, mut e) = editor_on("one\n");
@@ -1030,8 +1042,11 @@ mod tests {
         let before = e.sidebar_width;
         press(&mut e, "<C-w>");
         angle(&mut e, '<');
-        assert_eq!(e.files_width.map(|w| w.abs_diff(before)), Some(4));
+        e.draw(&mut crate::tui::paint::Canvas::new(&mut screen, area), area);
+        angle(&mut e, '<');
+        assert_eq!(e.files_width.map(|w| w.abs_diff(before)), Some(8));
         assert_eq!(e.open[e.cur].buf.text.to_string(), "one\n");
+        press(&mut e, "l");
         angle(&mut e, '>');
         assert_ne!(e.open[e.cur].buf.text.to_string(), "one\n");
     }

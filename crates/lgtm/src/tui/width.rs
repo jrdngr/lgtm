@@ -1,23 +1,50 @@
-//! Pane widths that `C-w <` and `C-w >` move: the divider goes a step left or right.
+//! Pane widths that `C-w <` and `C-w >` move: the divider goes a step left or right, and
+//! more presses of `<` or `>` keep moving it until another key.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 /// Columns a press moves a divider.
 pub const STEP: i32 = 4;
 
-/// Reads `C-w <` and `C-w >`. `pending` holds a `C-w` waiting for its second key, which is
-/// taken whatever it is. None for a key that isn't part of one; else the step, when the key
-/// ends one.
-pub fn read(pending: &mut bool, key: &KeyEvent) -> Option<Option<i32>> {
-    if std::mem::take(pending) {
-        return Some(match key.code {
-            KeyCode::Char('<') => Some(-STEP),
-            KeyCode::Char('>') => Some(STEP),
-            _ => None,
-        });
+/// Where a divider move stands.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Divider {
+    #[default]
+    Off,
+    /// `C-w` was pressed: the next key is taken, whatever it is.
+    Prefix,
+    /// The divider moved: `<` and `>` move it again.
+    Moving,
+}
+
+/// The step `<` or `>` moves a divider.
+pub fn angle(key: &KeyEvent) -> Option<i32> {
+    match key.code {
+        KeyCode::Char('<') => Some(-STEP),
+        KeyCode::Char('>') => Some(STEP),
+        _ => None,
+    }
+}
+
+/// Reads `C-w <` and `C-w >` and the `<` and `>` presses after them. None for a key that
+/// isn't part of a move; else the step, when the key makes one.
+pub fn read(state: &mut Divider, key: &KeyEvent) -> Option<Option<i32>> {
+    match std::mem::take(state) {
+        Divider::Prefix => {
+            let step = angle(key);
+            if step.is_some() {
+                *state = Divider::Moving;
+            }
+            return Some(step);
+        }
+        Divider::Moving if angle(key).is_some() => {
+            *state = Divider::Moving;
+            return Some(angle(key));
+        }
+        _ => {}
     }
     if key.code == KeyCode::Char('w') && key.modifiers.contains(KeyModifiers::CONTROL) {
-        *pending = true;
+        *state = Divider::Prefix;
         return Some(None);
     }
     None
@@ -39,17 +66,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_divider_moves_on_ctrl_w_then_an_angle_bracket_and_a_bare_one_is_left_alone() {
+    fn ctrl_w_then_angle_brackets_move_a_divider_until_another_key() {
         let key = |c, m| KeyEvent::new(KeyCode::Char(c), m);
         let (none, ctrl) = (KeyModifiers::NONE, KeyModifiers::CONTROL);
-        let mut pending = false;
-        assert_eq!(read(&mut pending, &key('>', none)), None);
-        assert_eq!(read(&mut pending, &key('w', ctrl)), Some(None));
-        assert_eq!(read(&mut pending, &key('>', none)), Some(Some(STEP)));
-        assert_eq!(read(&mut pending, &key('<', none)), None);
-        read(&mut pending, &key('w', ctrl));
-        assert_eq!(read(&mut pending, &key('j', none)), Some(None));
-        assert!(!pending);
+        let mut state = Divider::Off;
+        assert_eq!(read(&mut state, &key('>', none)), None);
+        assert_eq!(read(&mut state, &key('w', ctrl)), Some(None));
+        assert_eq!(read(&mut state, &key('>', none)), Some(Some(STEP)));
+        assert_eq!(read(&mut state, &key('>', none)), Some(Some(STEP)));
+        assert_eq!(read(&mut state, &key('<', none)), Some(Some(-STEP)));
+        assert_eq!(read(&mut state, &key('j', none)), None);
+        assert_eq!(read(&mut state, &key('<', none)), None);
+        read(&mut state, &key('w', ctrl));
+        assert_eq!(read(&mut state, &key('j', none)), Some(None));
+        assert_eq!(state, Divider::Off);
     }
 
     #[test]

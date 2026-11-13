@@ -42,8 +42,8 @@ pub fn split(area: Rect, files: u16) -> (Rect, u16, Rect) {
 }
 
 /// Reads `C-w <` and `C-w >` as how far they widen the files pane (see `width::read`).
-pub fn files_step(pending: &mut bool, key: &KeyEvent) -> Option<Option<i32>> {
-    Some(super::width::read(pending, key)?.map(toward_files))
+pub fn files_step(state: &mut super::width::Divider, key: &KeyEvent) -> Option<Option<i32>> {
+    Some(super::width::read(state, key)?.map(toward_files))
 }
 
 /// How far a divider step widens the files pane: moving the divider right widens it on the
