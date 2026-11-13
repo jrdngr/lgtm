@@ -6,7 +6,7 @@ use ratatui::layout::Rect;
 
 use super::input::Input;
 use super::qq;
-use super::view::header;
+use super::view::{HEADER, header};
 use crate::issue::{Entry, Issue};
 
 /// An answer being written: the option picked, if any, and the text.
@@ -23,8 +23,8 @@ pub fn draw(c: &mut Canvas, area: Rect, issue: &Issue, q: &Entry, draft: &Draft,
     let width = area.width.saturating_sub(INDENT * 2) as usize;
     let lines = qq::render(&q.text, width);
     let body = Rect {
-        y: area.y + 2,
-        height: area.height.saturating_sub(4),
+        y: area.y + HEADER,
+        height: area.height.saturating_sub(HEADER + 2),
         ..area
     };
     let most = lines.len().saturating_sub(body.height as usize);

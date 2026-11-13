@@ -43,23 +43,39 @@ impl View {
 
     pub fn draw(&mut self, c: &mut Canvas, area: Rect, issue: &Issue) {
         c.fill(area.x, area.y, area.width, BG);
+        c.fill(area.x, area.y + 1, area.width, BG);
         header(c, area.x, area.y, issue);
         let body = Rect {
-            y: area.y + 2,
-            height: area.height.saturating_sub(2),
+            y: area.y + HEADER,
+            height: area.height.saturating_sub(HEADER),
             ..area
         };
-        c.fill(area.x, area.y + 1, area.width, BG);
+        c.fill(area.x, area.y + 2, area.width, BG);
         self.preview.draw(c, body, &self.text, self.version);
     }
 }
 
-/// `● 12 Title ... status owner filed by x`.
+/// Rows the header takes, with the blank row under it.
+pub const HEADER: u16 = 3;
+
+/// Text cut to `w` columns, ending in `…` when it doesn't fit.
+fn fit(s: &str, w: usize) -> String {
+    if s.chars().count() <= w {
+        return s.to_owned();
+    }
+    let mut t: String = s.chars().take(w.saturating_sub(1)).collect();
+    t.push('…');
+    t
+}
+
+/// `● 12 Title` over `status  severity  … owner  filed by x`, each cut to the width.
 pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
     let (dot, color) = status_mark(issue);
+    let right = c.area.right().saturating_sub(1);
     let x = c.put(x + 1, y, dot, theme::fg(color));
     let x = c.put(x + 1, y, &format!("{} ", issue.id), theme::fg(MUTED));
-    c.put(x, y, &issue.title, theme::bold(FG));
+    let room = right.saturating_sub(x) as usize;
+    c.put(x, y, &fit(&issue.title, room), theme::bold(FG));
     let mut parts = vec![(issue.status.name().replace('-', " "), color)];
     if let Some(s) = issue.severity {
         parts.push((s.name().into(), severity_color(s)));
@@ -83,11 +99,18 @@ pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
         parts.push(("filed by".into(), FAINT));
         parts.push((f.clone(), CYAN));
     }
-    let text: Vec<String> = parts.iter().map(|(t, _)| t.clone()).collect();
-    let width: usize = text.iter().map(|t| t.chars().count() + 2).sum();
-    let mut px = c.area.right().saturating_sub(width as u16);
+    let mut px = x;
     for (t, col) in parts {
-        px = c.put(px, y, &t, theme::fg(col)) + 2;
+        let room = right.saturating_sub(px) as usize;
+        if room == 0 {
+            break;
+        }
+        let shown = fit(&t, room);
+        let cut = shown != t;
+        px = c.put(px, y + 1, &shown, theme::fg(col)) + 2;
+        if cut {
+            break;
+        }
     }
 }
 
