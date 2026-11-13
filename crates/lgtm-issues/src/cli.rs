@@ -112,7 +112,9 @@ pub fn run(args: Args) -> Result<()> {
         }
         return Ok(());
     }
-    if matches!(cmd.as_str(), "help" | "-h" | "--help") {
+    if matches!(cmd.as_str(), "help" | "-h" | "--help")
+        || rest.iter().any(|a| a == "-h" || a == "--help")
+    {
         println!("{USAGE}");
         return Ok(());
     }
@@ -127,6 +129,9 @@ pub fn run(args: Args) -> Result<()> {
                 if let Some(v) = flag(&mut rest, &format!("--{}", f.name))? {
                     with.push((f.name, v));
                 }
+            }
+            if let Some(f) = rest.iter().find(|a| a.starts_with("--")) {
+                bail!("new has no {f} flag");
             }
             let title = rest.join(" ");
             let (id, d) = ops::file(&folder, &title, &body, &who(), status.as_deref(), with)?;
@@ -308,4 +313,28 @@ fn list(folder: &Folder, all: bool, only: Option<&str>) -> Result<()> {
         eprintln!("unreadable: {b}");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run_in(folder: &Folder, argv: &[&str]) -> Result<()> {
+        run(Args {
+            dir: folder.root.clone(),
+            name: Some("test".into()),
+            rest: argv.iter().map(|a| a.to_string()).collect(),
+        })
+    }
+
+    #[test]
+    fn help_after_a_command_and_unknown_flags_file_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = Folder::init(dir.path()).unwrap();
+        run_in(&folder, &["new", "--help"]).unwrap();
+        run_in(&folder, &["claim", "-h"]).unwrap();
+        let err = run_in(&folder, &["new", "Title", "--sevrity", "high"]).unwrap_err();
+        assert_eq!(err.to_string(), "new has no --sevrity flag");
+        assert!(folder.load().unwrap().0.is_empty());
+    }
 }
