@@ -585,3 +585,18 @@ fn a_tab_dropped_on_a_spaces_edge_gets_a_split_the_full_height_of_the_space() {
     assert_eq!(m.term(), Some(d));
     assert!(m.is_valid());
 }
+
+#[test]
+fn terminals_number_one_apart_and_count_on_from_the_highest_left_after_a_load() {
+    let (mut m, a) = Model::new();
+    m.split_split(Axis::Row);
+    let b = m.add_space_behind();
+    let c = m.new_tab();
+    assert_eq!([a.0, b.0, c.0], [1, 3, 4]);
+    assert!(m.remove_tab(c.into()));
+    assert_eq!(m.new_tab().0, 5);
+    let json = serde_json::to_string(&m).unwrap();
+    let mut back: Model = serde_json::from_str(&json).unwrap();
+    assert!(back.remove_tab(TermId(5).into()));
+    assert_eq!(back.new_tab().0, 4);
+}

@@ -162,6 +162,11 @@ pub struct Model {
     /// The shown layout.
     pub active: usize,
     next: u64,
+    /// The next terminal id, counted apart from other ids so terminal numbers stay small.
+    /// Zero until first needed, then one past the highest terminal open, so a launch starts
+    /// counting again from what's left.
+    #[serde(skip)]
+    next_term: u64,
     /// The terminal that asked for each terminal opened from a terminal.
     #[serde(default)]
     openers: BTreeMap<TermId, TermId>,
@@ -178,6 +183,7 @@ impl Model {
             layouts: vec![],
             active: 0,
             next: 1,
+            next_term: 0,
             openers: BTreeMap::new(),
             names: BTreeMap::new(),
         };
@@ -204,8 +210,16 @@ impl Model {
         self.next - 1
     }
 
+    fn term_id(&mut self) -> TermId {
+        if self.next_term == 0 {
+            self.next_term = self.terms().iter().map(|t| t.0).max().unwrap_or(0) + 1;
+        }
+        self.next_term += 1;
+        TermId(self.next_term - 1)
+    }
+
     fn new_split(&mut self) -> (Split, TermId) {
-        let term = TermId(self.id());
+        let term = self.term_id();
         let split = Split {
             id: SplitId(self.id()),
             tabs: vec![Tab::Term(term)],
@@ -307,7 +321,7 @@ impl Model {
         if self.space().is_none() {
             return self.add_space();
         }
-        let term = TermId(self.id());
+        let term = self.term_id();
         self.insert_tab(Tab::Term(term));
         term
     }
@@ -348,7 +362,7 @@ impl Model {
     /// Opens a tab after `at`, leaving focus and zoom as they are.
     pub fn new_tab_at(&mut self, at: Tab) -> Option<TermId> {
         let p = self.locate(at)?;
-        let new = TermId(self.id());
+        let new = self.term_id();
         let split = self.find_space_mut(p.space)?.splits.find_mut(p.split)?;
         split.tabs.insert(p.tab + 1, Tab::Term(new));
         if split.active > p.tab {
@@ -495,7 +509,7 @@ impl Model {
     }
 
     /// Whether a loaded model holds together: every tree is well formed, everything focused
-    /// exists, every id is unique and below the next one handed out, no layout shows a space
+    /// exists, every id is unique and every id but a terminal's is below the next one handed out, no layout shows a space
     /// twice or one that doesn't exist, and there's at most one Messages tab.
     pub fn is_valid(&self) -> bool {
         if self.active >= self.layouts.len() || self.spaces.is_empty() {
@@ -504,7 +518,7 @@ impl Model {
         let mut terms = HashSet::new();
         let mut messages = 0;
         let mut tab_ok = |t: &Tab| match t {
-            Tab::Term(t) => t.0 < self.next && terms.insert(t.0),
+            Tab::Term(t) => terms.insert(t.0),
             Tab::Messages => {
                 messages += 1;
                 messages == 1

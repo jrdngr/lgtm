@@ -59,6 +59,7 @@ impl From<OldModel> for Model {
             layouts,
             active: old.active,
             next,
+            next_term: 0,
             openers: Default::default(),
             names: Default::default(),
         }
