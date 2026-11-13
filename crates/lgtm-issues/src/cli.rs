@@ -6,25 +6,24 @@ use std::path::PathBuf;
 use anyhow::{Context, Result, bail};
 
 use crate::folder::Folder;
-use crate::guide::GUIDE;
-use crate::issue::{Asked, Status};
-use crate::{lgterm, ops, time};
+use crate::issue::Asked;
+use crate::workflow::Verb;
+use crate::{guide, lgterm, ops, time};
 
 pub const USAGE: &str = "usage: lgtm issues [-C <dir>] [--as <name>] [command]
 
 With no command, opens the issues screen on this folder, or on one picked under it.
 
   init                         start an issues folder here
-  new <title> [--body <text>] [--severity <s>] [--blocked-by <ids>]
+  new <title> [--body <text>] [--status <s>] [--<field> <value>]...
                                file an issue; prints its id
-  list [--all]                 open issues; --all adds done and dropped
+  list [--all] [--status <s>]  issues not done; --all adds done ones
   show <id>                    print an issue's file
-  claim <id>                   make it yours and mark it working
-  set <id> <field> [value]     set a header field, or clear it with no value:
-                               severity (low, medium, high, critical),
-                               revision (the jj revision with its code),
-                               blocked-by (issue ids), duplicate-of (an issue id;
-                               drops this one)
+  statuses                     this tracker's statuses, in order
+  claim <id> [--force]         make it yours and move it to the claim status
+  move <id> <status> [--force] [note]
+                               move it to a status
+  set <id> <field> [value]     set a header field, or clear it with no value
   log <id> <text>              add a note
   ask <id> <Qn> [--after <Qm>] [text]
                                ask the user; text comes from stdin when not given
@@ -32,10 +31,10 @@ With no command, opens the issues screen on this folder, or on one picked under 
                                answer a question and send it to the issue's owner:
                                an option and notes, or with no --pick, a reply that
                                closes the question for a new one
-  close <id> [note]            mark it done
-  drop <id> [note]             mark it dropped
-  reopen <id> [note]           mark it open
-  guide                        how agents use an issues folder";
+  close <id> [--force] [note]  move it to the close status
+  drop <id> [--force] [note]   move it to the drop status
+  reopen <id> [--force] [note] move it to the reopen status
+  guide                        how agents use this issues folder";
 
 /// The arguments every command takes.
 pub struct Args {
@@ -107,7 +106,10 @@ pub fn run(args: Args) -> Result<()> {
         return Ok(());
     }
     if cmd == "guide" {
-        print!("{GUIDE}");
+        match Folder::open(&args.dir) {
+            Ok(folder) => print!("{}", guide::full(&folder.workflow()?)),
+            Err(_) => print!("{}", guide::GUIDE),
+        }
         return Ok(());
     }
     if matches!(cmd.as_str(), "help" | "-h" | "--help") {
@@ -119,26 +121,55 @@ pub fn run(args: Args) -> Result<()> {
     match cmd.as_str() {
         "new" => {
             let body = flag(&mut rest, "--body")?.unwrap_or_default();
+            let status = flag(&mut rest, "--status")?;
             let mut with = Vec::new();
-            for name in ["severity", "blocked-by"] {
-                if let Some(v) = flag(&mut rest, &format!("--{name}"))? {
-                    with.push(ops::Field::parse(name, &v)?);
+            for f in folder.workflow()?.fields {
+                if let Some(v) = flag(&mut rest, &format!("--{}", f.name))? {
+                    with.push((f.name, v));
                 }
             }
-            let id = ops::file(&folder, &rest.join(" "), &body, &who(), with)?;
+            let title = rest.join(" ");
+            let (id, d) = ops::file(&folder, &title, &body, &who(), status.as_deref(), with)?;
             println!("{id}");
+            deliver(d);
         }
-        "list" => list(&folder, switch(&mut rest, "--all"))?,
+        "list" => {
+            let all = switch(&mut rest, "--all");
+            list(&folder, all, flag(&mut rest, "--status")?.as_deref())?
+        }
         "show" => print!(
             "{}",
             std::fs::read_to_string(folder.path(id(rest.first())?)?)?
         ),
-        "claim" => ops::claim(&folder, id(rest.first())?, &who(), lgterm::term())?,
+        "statuses" => statuses(&folder)?,
+        "claim" => {
+            let force = switch(&mut rest, "--force");
+            let d = ops::claim(&folder, id(rest.first())?, &who(), lgterm::term(), force)?;
+            deliver(d);
+        }
+        "move" => {
+            let force = switch(&mut rest, "--force");
+            let issue = id(rest.first())?;
+            let status = rest.get(1).context("move it to which status?")?;
+            let wf = folder.workflow()?;
+            let label = wf.find(status)?.label.clone();
+            let note = match rest[2..].join(" ") {
+                n if n.trim().is_empty() => format!("Moved to {label}."),
+                n => n,
+            };
+            let who = who();
+            deliver(ops::move_to(
+                &folder,
+                issue,
+                status,
+                force,
+                Some((&who, &note)),
+            )?);
+        }
         "set" => {
             let issue = id(rest.first())?;
             let name = rest.get(1).context("set which field?")?;
-            let field = ops::Field::parse(name, &rest[2..].join(" "))?;
-            ops::set(&folder, issue, &who(), field)?;
+            ops::set(&folder, issue, &who(), name, &rest[2..].join(" "))?;
         }
         "log" => ops::note(&folder, id(rest.first())?, &who(), &rest[1..].join(" "))?,
         "ask" => {
@@ -171,55 +202,105 @@ pub fn run(args: Args) -> Result<()> {
             }
         }
         "close" | "drop" | "reopen" => {
-            let status = match cmd.as_str() {
-                "close" => Status::Done,
-                "drop" => Status::Dropped,
-                _ => Status::Open,
+            let verb = match cmd.as_str() {
+                "close" => Verb::Close,
+                "drop" => Verb::Drop,
+                _ => Verb::Reopen,
             };
+            let force = switch(&mut rest, "--force");
             let issue = id(rest.first())?;
-            ops::set_status(&folder, issue, status, &who(), &rest[1..].join(" "))?;
+            let note = rest[1..].join(" ");
+            deliver(ops::verb(&folder, issue, verb, &who(), &note, force)?);
         }
         _ => bail!("unknown command {cmd}\n\n{USAGE}"),
     }
     Ok(())
 }
 
-fn list(folder: &Folder, all: bool) -> Result<()> {
-    let (issues, bad) = folder.load()?;
-    let now = time::now();
-    for i in &issues {
-        if !all && matches!(i.status, Status::Done | Status::Dropped) {
-            continue;
+/// Tells a status's terminal that an issue moved there. The move stands either way.
+fn deliver(d: Option<ops::Delivery>) {
+    if let Some(d) = d
+        && let Err(e) = lgterm::send(&d.to, &d.text)
+    {
+        eprintln!("lgtm issues: moved, but couldn't tell {}: {e:#}", d.to);
+    }
+}
+
+fn statuses(folder: &Folder) -> Result<()> {
+    let wf = folder.workflow()?;
+    for s in &wf.statuses {
+        let mut tags = Vec::new();
+        if s.done {
+            tags.push("done".to_owned());
+        }
+        if !s.requires.is_empty() {
+            tags.push(format!("requires {}", s.requires.join(", ")));
+        }
+        if let Some(n) = &s.notify {
+            tags.push(format!("notifies {n}"));
         }
         println!(
-            "{:<4} {:<11} {:<8} {:<14} {:>4}  {}",
-            i.id,
-            i.status.name(),
-            i.severity.map_or("-", |s| s.name()),
-            i.owner.as_deref().unwrap_or("-"),
-            time::age(i.touched(), now),
-            i.title
+            "{}  {:<14} {:<16} {}",
+            s.key,
+            s.id,
+            s.label,
+            tags.join("; ")
         );
-        let blockers = i.open_blockers(&issues);
-        if !blockers.is_empty() {
-            let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
-            println!("       blocked by {}", ids.join(", "));
+        if let Some(line) = s.body.lines().next() {
+            println!("   {line}");
         }
-        if let Some(d) = i.duplicate_of {
-            println!("       duplicate of #{d}");
+    }
+    Ok(())
+}
+
+fn list(folder: &Folder, all: bool, only: Option<&str>) -> Result<()> {
+    let wf = folder.workflow()?;
+    let only = only.map(|s| wf.find(s)).transpose()?;
+    let (issues, bad) = folder.load()?;
+    let now = time::now();
+    for status in &wf.statuses {
+        if only.is_some_and(|o| o.id != status.id) || (only.is_none() && status.done && !all) {
+            continue;
         }
-        for (q, asked) in i.questions() {
-            if asked != Asked::Answered {
-                let state = if asked == Asked::Waiting {
-                    "waiting"
-                } else {
-                    "queued"
-                };
-                println!(
-                    "       {} {state}: {}",
-                    q.qid().unwrap_or_default(),
-                    q.subject()
-                );
+        for i in issues.iter().filter(|i| i.status == status.id) {
+            println!(
+                "{:<4} {:<14} {:<14} {:>4}  {}",
+                i.id,
+                status.id,
+                i.owner.as_deref().unwrap_or("-"),
+                time::age(i.touched(), now),
+                i.title
+            );
+            let set: Vec<String> = wf
+                .fields
+                .iter()
+                .filter(|f| !matches!(f.name.as_str(), "blocked-by" | "duplicate-of"))
+                .filter_map(|f| Some(format!("{} {}", f.name, i.field(&f.name)?)))
+                .collect();
+            if !set.is_empty() {
+                println!("       {}", set.join(" · "));
+            }
+            let blockers = i.open_blockers(&issues, |s| wf.is_done(s));
+            if !blockers.is_empty() {
+                let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
+                println!("       blocked by {}", ids.join(", "));
+            }
+            if let Some(d) = i.duplicate_of {
+                println!("       duplicate of #{d}");
+            }
+            for (q, asked) in i.questions() {
+                if asked != Asked::Answered {
+                    let state = if asked == Asked::Waiting {
+                        "waiting"
+                    } else {
+                        "queued"
+                    };
+                    println!(
+                        "       {} {state}: {}",
+                        q.qid().unwrap_or_default(),
+                        q.subject()
+                    );
+                }
             }
         }
     }

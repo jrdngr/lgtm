@@ -8,6 +8,7 @@ use super::input::Input;
 use super::qq;
 use super::view::{HEADER, header};
 use crate::issue::{Entry, Issue};
+use crate::workflow::Workflow;
 
 /// An answer being written: the option picked, if any, and the text.
 #[derive(Clone, Debug, Default)]
@@ -18,8 +19,15 @@ pub struct Draft {
 
 const INDENT: u16 = 3;
 
-pub fn draw(c: &mut Canvas, area: Rect, issue: &Issue, q: &Entry, draft: &Draft, top: &mut usize) {
-    header(c, area.x, area.y, issue);
+pub fn draw(
+    c: &mut Canvas,
+    area: Rect,
+    (issue, wf, all): (&Issue, &Workflow, &[Issue]),
+    q: &Entry,
+    draft: &Draft,
+    top: &mut usize,
+) {
+    header(c, area.x, area.y, (issue, wf, all));
     let width = area.width.saturating_sub(INDENT * 2) as usize;
     let lines = qq::render(&q.text, width);
     let body = Rect {

@@ -94,11 +94,17 @@ impl History {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::issue::{Issue, Status};
+    use crate::issue::Issue;
 
-    fn set(folder: &Folder, id: u32, status: Status) -> Result<u32> {
+    fn open(title: &str) -> Issue {
+        let mut i = Issue::new(0, title, None, "", 0);
+        i.status = "open".into();
+        i
+    }
+
+    fn set(folder: &Folder, id: u32, status: &str) -> Result<u32> {
         folder.update(id, |i| {
-            i.status = status;
+            i.status = status.into();
             Ok(id)
         })
     }
@@ -109,25 +115,23 @@ mod tests {
         let folder = Folder::init(dir.path()).unwrap();
         let mut h = History::default();
         let id = h
-            .record(&folder, None, || {
-                folder.create(Issue::new(0, "Loops", None, "", 0))
-            })
+            .record(&folder, None, || folder.create(open("Loops")))
             .unwrap();
         let open = read(&folder, id);
-        h.record(&folder, Some(id), || set(&folder, id, Status::Done))
+        h.record(&folder, Some(id), || set(&folder, id, "done"))
             .unwrap();
-        assert!(folder.root.join("issues/complete/1-loops.md").is_file());
+        assert!(folder.root.join("issues/done/1-loops.md").is_file());
 
         assert_eq!(h.undo(&folder).unwrap(), Some(id));
         assert_eq!(read(&folder, id), open);
-        assert!(!folder.root.join("issues/complete/1-loops.md").exists());
+        assert!(!folder.root.join("issues/done/1-loops.md").exists());
         h.undo(&folder).unwrap();
         assert!(folder.path(id).is_err());
         assert_eq!(h.undo(&folder).unwrap(), None);
 
         h.redo(&folder).unwrap();
         h.redo(&folder).unwrap();
-        assert_eq!(folder.get(id).unwrap().status, Status::Done);
+        assert_eq!(folder.get(id).unwrap().status, "done");
         assert_eq!(h.redo(&folder).unwrap(), None);
     }
 
@@ -135,9 +139,9 @@ mod tests {
     fn undo_refuses_when_the_file_changed_since() {
         let dir = tempfile::tempdir().unwrap();
         let folder = Folder::init(dir.path()).unwrap();
-        let id = folder.create(Issue::new(0, "Loops", None, "", 0)).unwrap();
+        let id = folder.create(open("Loops")).unwrap();
         let mut h = History::default();
-        h.record(&folder, Some(id), || set(&folder, id, Status::Working))
+        h.record(&folder, Some(id), || set(&folder, id, "working"))
             .unwrap();
         folder
             .update(id, |i| {

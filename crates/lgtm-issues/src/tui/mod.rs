@@ -2,6 +2,7 @@
 
 mod input;
 mod list;
+mod marks;
 mod mouse;
 pub mod picker;
 mod qq;
@@ -18,12 +19,13 @@ use std::time::{Duration, Instant};
 use lgtm_tui_kit::keybar::{self, Hint};
 use lgtm_tui_kit::markdown::Outcome as ViewOutcome;
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, FG, GREEN, MUTED, PANEL, RED};
+use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, FG, GREEN, PANEL, RED};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
 
 use crate::folder::{Folder, Stamp};
-use crate::issue::{Issue, Status};
+use crate::issue::Issue;
+use crate::workflow::Workflow;
 use crate::{lgterm, ops};
 use input::Input;
 use list::Row;
@@ -31,15 +33,6 @@ use question::Draft;
 use view::View;
 
 pub use standalone::run;
-
-/// The status menu's keys.
-const STATUS_KEYS: [(char, Status); 5] = [
-    ('o', Status::Open),
-    ('w', Status::Working),
-    ('i', Status::NeedsInput),
-    ('d', Status::Done),
-    ('x', Status::Dropped),
-];
 
 /// How often the folder is checked for changes.
 const POLL: Duration = Duration::from_millis(500);
@@ -73,6 +66,7 @@ pub struct Issues {
     folder: Folder,
     who: String,
     issues: Vec<Issue>,
+    wf: Workflow,
     bad: Vec<String>,
     stamp: Stamp,
     screen: Screen,
@@ -96,8 +90,8 @@ pub struct Issues {
     list_area: Rect,
     /// The last click's row and when, to tell a double click.
     click: Option<(usize, Instant)>,
-    /// Done and dropped, when their issues are listed.
-    expanded: Vec<Status>,
+    /// Folding statuses whose issues are listed.
+    expanded: Vec<String>,
 }
 
 /// ⌥1 to ⌥9: as Alt and a digit, or as the characters a US Mac keyboard types for them.
@@ -117,6 +111,7 @@ impl Issues {
             who,
             folder,
             issues: Vec::new(),
+            wf: Workflow::default(),
             bad: Vec::new(),
             stamp: Vec::new(),
             screen: Screen::List,
@@ -173,6 +168,10 @@ impl Issues {
             }
             Err(e) => self.notice = Some(format!("couldn't read the folder: {e:#}")),
         }
+        match self.folder.workflow() {
+            Ok(wf) => self.wf = wf,
+            Err(e) => self.notice = Some(format!("{e:#}")),
+        }
         if let Screen::View(v) = &mut self.screen
             && let Some(i) = self.issues.iter().find(|i| i.id == v.id)
         {
@@ -186,7 +185,7 @@ impl Issues {
     }
 
     fn rows(&self) -> Vec<Row> {
-        list::rows(&self.issues, &self.filter, &self.expanded)
+        list::rows(&self.issues, &self.wf, &self.filter, &self.expanded)
     }
 
     fn clamp(&mut self) {
@@ -255,10 +254,12 @@ impl Issues {
         if self.prompt.is_some() {
             self.prompt_key(key);
         } else if let Some(id) = self.status_for.take() {
-            if let Some(&(_, status)) = STATUS_KEYS
+            let status = self
+                .wf
+                .statuses
                 .iter()
-                .find(|(c, _)| key.code == KeyCode::Char(*c))
-            {
+                .find(|s| key.code == KeyCode::Char(s.key));
+            if let Some(status) = status.map(|s| s.id.clone()) {
                 self.set_status(id, status);
             }
         } else if std::mem::take(&mut self.space) {
@@ -280,18 +281,34 @@ impl Issues {
         std::mem::replace(&mut self.outcome, Outcome::None)
     }
 
-    /// The space menu, while Space waits for its second key, or the status menu.
-    pub fn space_menu(&self) -> Vec<(String, &'static str)> {
-        if self.status_for.is_some() {
-            return STATUS_KEYS
+    /// The space menu, while Space waits for its second key, or the status menu, where a
+    /// status shows what the issue lacks to move there.
+    pub fn space_menu(&self) -> Vec<(String, String)> {
+        if let Some(issue) = self.status_for.and_then(|id| self.issue(id)) {
+            return self
+                .wf
+                .statuses
                 .iter()
-                .map(|(c, s)| (c.to_string(), s.name()))
+                .map(|s| {
+                    let unmet = self.wf.unmet(issue, &self.issues, s);
+                    let label = match unmet.is_empty() {
+                        true => s.label.clone(),
+                        false => {
+                            let needs = ops::needs(issue, &self.issues, &self.wf, &unmet);
+                            format!("{} · {needs}", s.label)
+                        }
+                    };
+                    (s.key.to_string(), label)
+                })
                 .collect();
         }
         if !self.space {
             return vec![];
         }
-        vec![("f".into(), "issues folders"), ("h".into(), "home")]
+        vec![
+            ("f".into(), "issues folders".into()),
+            ("h".into(), "home".into()),
+        ]
     }
 
     /// Runs a `:` command.
@@ -308,6 +325,7 @@ impl Issues {
         let Some((ask, mut input)) = self.prompt.take() else {
             return;
         };
+        let mut sent = None;
         match key.code {
             KeyCode::Esc => {
                 if ask == Ask::Filter {
@@ -316,9 +334,14 @@ impl Issues {
             }
             KeyCode::Enter => match ask {
                 Ask::New => match self.history.record(&self.folder, None, || {
-                    ops::file(&self.folder, &input.text, "", &self.who, vec![])
+                    let (id, d) =
+                        ops::file(&self.folder, &input.text, "", &self.who, None, vec![])?;
+                    sent = d;
+                    Ok(id)
                 }) {
                     Ok(id) => {
+                        let d = sent.take();
+                        self.deliver(d);
                         self.reload();
                         self.select_issue(id);
                     }
@@ -405,19 +428,29 @@ impl Issues {
     }
 
     /// Sets an issue's status, which moves its file to the folder for it, without a note in
-    /// its log, so setting it back leaves the file as it was.
-    fn set_status(&mut self, id: u32, status: Status) {
+    /// its log, so setting it back leaves the file as it was. A status whose requirements
+    /// the issue doesn't meet refuses it.
+    fn set_status(&mut self, id: u32, status: String) {
+        let mut sent = None;
         let set = self.history.record(&self.folder, Some(id), || {
-            self.folder.update(id, |i| {
-                i.status = status;
-                Ok(id)
-            })
+            sent = ops::move_to(&self.folder, id, &status, false, None)?;
+            Ok(id)
         });
         if let Err(e) = set {
             self.notice = Some(format!("{e:#}"));
         }
+        self.deliver(sent);
         self.reload();
         self.select_issue(id);
+    }
+
+    /// Tells a status's terminal that an issue moved there.
+    fn deliver(&mut self, d: Option<ops::Delivery>) {
+        if let Some(d) = d
+            && let Err(e) = lgterm::send(&d.to, &d.text)
+        {
+            self.notice = Some(format!("moved; couldn't tell {}: {e:#}", d.to));
+        }
     }
 
     fn undo(&mut self, redo: bool) {
@@ -575,7 +608,7 @@ impl Issues {
                     self.top = self.sel + 1 - self.height;
                 }
                 self.list_area = body;
-                list::draw(c, body, &self.issues, &rows, self.sel, self.top);
+                list::draw(c, body, (&self.issues, &self.wf), &rows, self.sel, self.top);
                 if !self.bad.is_empty() {
                     let y = bottom - 1;
                     c.fill(area.x, y, area.width, BG);
@@ -612,7 +645,7 @@ impl Issues {
                     .cloned()
                     .unwrap_or_default();
                 self.height = body.height.saturating_sub(2) as usize;
-                question::draw(c, body, issue, q, &draft, top);
+                question::draw(c, body, (issue, &self.wf, &self.issues), q, &draft, top);
                 let picked = draft.pick.is_some();
                 let mut hints = vec![("⌥1-9", "pick", picked), ("Enter", "send", false)];
                 if picked {
@@ -633,7 +666,7 @@ impl Issues {
                     self.screen = Screen::List;
                     return self.draw(c);
                 };
-                v.draw(c, body, issue);
+                v.draw(c, body, (issue, &self.wf, &self.issues));
                 let mut hints = vec![("j k", "scroll", false)];
                 if !issue.waiting().is_empty() {
                     hints.push(("Enter", "answer", false));
@@ -648,7 +681,10 @@ impl Issues {
             }
         };
         keybar::draw_badged(c, bottom, Some(("ISS", AMBER)), &hints);
-        keybar::menu(c, body, &self.space_menu());
+        let items = self.space_menu();
+        let menu: Vec<(String, &str)> =
+            items.iter().map(|(k, l)| (k.clone(), l.as_str())).collect();
+        keybar::menu(c, body, &menu);
         self.overlay(c, bottom);
     }
 
@@ -677,20 +713,27 @@ impl Issues {
         let x = c.put(x0, y, "issues", theme::fg(ACCENT));
         c.put(x + 2, y, &picker::home(&self.folder.root), theme::fg(FG));
         let waiting: usize = self.issues.iter().map(|i| i.waiting().len()).sum();
-        let count = |s: Status| self.issues.iter().filter(|i| i.status == s).count();
-        let working = self
-            .issues
+        let quiet = |id: &str| {
+            self.issues
+                .iter()
+                .filter(|i| i.status == id && i.waiting().is_empty())
+                .count()
+        };
+        let mut parts = vec![(format!("● {waiting}"), AMBER)];
+        for s in self.wf.statuses.iter().filter(|s| !s.fold) {
+            parts.push((
+                format!("{} {}", s.glyph, quiet(&s.id)),
+                marks::color(&s.color),
+            ));
+        }
+        let folded: usize = self
+            .wf
+            .statuses
             .iter()
-            .filter(|i| {
-                i.waiting().is_empty() && matches!(i.status, Status::Working | Status::NeedsInput)
-            })
-            .count();
-        let parts = [
-            (format!("● {waiting}"), AMBER),
-            (format!("● {working}"), ACCENT),
-            (format!("○ {}", count(Status::Open)), MUTED),
-            (format!("✓ {}", count(Status::Done)), GREEN),
-        ];
+            .filter(|s| s.fold)
+            .map(|s| quiet(&s.id))
+            .sum();
+        parts.push((format!("✓ {folded}"), GREEN));
         let width: u16 = parts
             .iter()
             .map(|(t, _)| t.chars().count() as u16 + 2)

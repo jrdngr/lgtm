@@ -2,140 +2,284 @@
 
 use anyhow::{Context, Result, bail};
 
-use crate::fields::{self, Severity};
+use crate::fields::{self, Kind};
 use crate::folder::Folder;
-use crate::issue::{Issue, Kind, Status};
+use crate::header;
+use crate::issue::{Issue, Kind as LogKind};
 use crate::time::{self, Minute};
+use crate::workflow::{self, Verb, Workflow};
 
-/// An answer to hand to the agent that asked: its terminal and the message.
+/// A message to hand to an agent: an answer to the one that asked, or word that an issue
+/// moved to a status that notifies it. Its terminal, and the message.
+#[derive(Debug)]
 pub struct Delivery {
     pub to: String,
     pub text: String,
 }
 
-pub fn file(folder: &Folder, title: &str, body: &str, who: &str, with: Vec<Field>) -> Result<u32> {
+pub fn file(
+    folder: &Folder,
+    title: &str,
+    body: &str,
+    who: &str,
+    status: Option<&str>,
+    with: Vec<(String, String)>,
+) -> Result<(u32, Option<Delivery>)> {
     if title.trim().is_empty() {
         bail!("an issue needs a title");
     }
+    let wf = folder.workflow()?;
+    let status = match status {
+        Some(s) => wf.find(s)?,
+        None => wf.verb(Verb::New)?,
+    };
     let mut issue = Issue::new(0, title, Some(who.into()), body, time::now());
-    for f in with {
-        check(folder, None, &f)?;
-        f.apply(&mut issue);
-    }
-    folder.create(issue)
-}
-
-/// A header field set to a value, or cleared with None or no ids.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Field {
-    Severity(Option<Severity>),
-    Revision(Option<String>),
-    BlockedBy(Vec<u32>),
-    DuplicateOf(Option<u32>),
-}
-
-impl Field {
-    /// Reads `lgtm issues set` arguments: a field's name, then its value, none clearing it.
-    pub fn parse(name: &str, value: &str) -> Result<Field> {
-        let value = value.trim();
-        let ids = || fields::parse_ids(value).map_err(anyhow::Error::msg);
-        Ok(match name {
-            "severity" => Field::Severity(match value {
-                "" => None,
-                v => Some(Severity::parse(v).with_context(|| {
-                    format!("severity is low, medium, high or critical, not {v}")
-                })?),
-            }),
-            "revision" => Field::Revision(Some(value.to_owned()).filter(|v| !v.is_empty())),
-            "blocked-by" => Field::BlockedBy(ids()?),
-            "duplicate-of" => match ids()?.as_slice() {
-                [] => Field::DuplicateOf(None),
-                [id] => Field::DuplicateOf(Some(*id)),
-                _ => bail!("an issue duplicates one other issue"),
-            },
-            _ => bail!("no field {name}: severity, revision, blocked-by or duplicate-of"),
-        })
-    }
-
-    fn ids(&self) -> &[u32] {
-        match self {
-            Field::BlockedBy(ids) => ids,
-            Field::DuplicateOf(Some(id)) => std::slice::from_ref(id),
-            _ => &[],
+    issue.status = status.id.clone();
+    if let Some(template) = &status.template {
+        let (pairs, text) = header::split(template).map_err(anyhow::Error::msg)?;
+        for (k, v) in pairs
+            .iter()
+            .filter(|(k, _)| !matches!(k.as_str(), "title" | "status"))
+        {
+            issue.set_pair(k, v).map_err(anyhow::Error::msg)?;
+        }
+        if issue.body.is_empty() {
+            issue.body = text.trim().to_owned();
         }
     }
+    for (name, value) in with {
+        apply(folder, &wf, &mut issue, &name, &value)?;
+    }
+    let to = wf.status(&issue.status).and_then(|s| s.notify.clone());
+    let id = folder.create(issue)?;
+    Ok((id, to.map(|to| notice(folder, id, title, &wf, to))))
+}
 
-    /// Sets the field, and says what changed. A duplicate is dropped.
-    fn apply(self, i: &mut Issue) -> String {
-        match self {
-            Field::Severity(s) => {
-                i.severity = s;
-                s.map_or("Cleared severity.".into(), |s| {
-                    format!("Severity {}.", s.name())
-                })
-            }
-            Field::Revision(r) => {
-                let note = r
-                    .as_ref()
-                    .map_or("Cleared revision.".into(), |r| format!("Revision {r}."));
-                i.revision = r;
-                note
-            }
-            Field::BlockedBy(ids) => {
-                let note = if ids.is_empty() {
-                    "No longer blocked.".into()
-                } else {
-                    let ids: Vec<String> = ids.iter().map(|b| format!("#{b}")).collect();
-                    format!("Blocked by {}.", ids.join(", "))
-                };
-                i.blocked_by = ids;
-                note
-            }
-            Field::DuplicateOf(d) => {
-                i.duplicate_of = d;
-                match d {
-                    Some(d) => {
-                        i.status = Status::Dropped;
-                        format!("Duplicate of #{d}.")
-                    }
-                    None => "Not a duplicate.".into(),
-                }
-            }
-        }
+/// Tells the terminal a status notifies that issue `id` moved into it.
+fn notice(folder: &Folder, id: u32, title: &str, wf: &Workflow, to: String) -> Delivery {
+    let label = folder
+        .get(id)
+        .ok()
+        .and_then(|i| wf.status(&i.status).map(|s| s.label.clone()))
+        .unwrap_or_default();
+    Delivery {
+        to,
+        text: format!(
+            "Issue #{id} \"{}\" ({}) moved to {label}.",
+            title.trim(),
+            folder.root.display()
+        ),
     }
 }
 
-/// Refuses a field naming issue `id` itself or one that doesn't exist.
-fn check(folder: &Folder, id: Option<u32>, field: &Field) -> Result<()> {
-    for &other in field.ids() {
-        if Some(other) == id {
-            bail!("issue #{other} can't point at itself");
+/// Sets field `name` on `issue`, checked against the workflow; an empty value clears it.
+/// Says what changed. A duplicate moves to where dropped issues go.
+fn apply(
+    folder: &Folder,
+    wf: &Workflow,
+    issue: &mut Issue,
+    name: &str,
+    value: &str,
+) -> Result<String> {
+    let value = value.trim();
+    let field = wf.field(name).with_context(|| {
+        let names: Vec<&str> = wf.fields.iter().map(|f| f.name.as_str()).collect();
+        format!("no field {name}: {}", names.join(", "))
+    })?;
+    let check = |ids: &[u32]| -> Result<()> {
+        for &other in ids {
+            if other == issue.id && issue.id != 0 {
+                bail!("issue #{other} can't point at itself");
+            }
+            folder.path(other)?;
         }
-        folder.path(other)?;
-    }
-    Ok(())
+        Ok(())
+    };
+    let some = || Some(value.to_owned()).filter(|v| !v.is_empty());
+    Ok(match &field.kind {
+        Kind::Revision => {
+            issue.revision = some();
+            some().map_or("Cleared revision.".into(), |r| format!("Revision {r}."))
+        }
+        Kind::BlockedBy => {
+            let ids = fields::parse_ids(value).map_err(anyhow::Error::msg)?;
+            check(&ids)?;
+            issue.blocked_by = ids.clone();
+            if ids.is_empty() {
+                "No longer blocked.".into()
+            } else {
+                let ids: Vec<String> = ids.iter().map(|b| format!("#{b}")).collect();
+                format!("Blocked by {}.", ids.join(", "))
+            }
+        }
+        Kind::DuplicateOf => match fields::parse_ids(value).map_err(anyhow::Error::msg)?[..] {
+            [] => {
+                issue.duplicate_of = None;
+                "Not a duplicate.".into()
+            }
+            [d] => {
+                check(&[d])?;
+                issue.duplicate_of = Some(d);
+                issue.status = wf.verb(Verb::Drop)?.id.clone();
+                format!("Duplicate of #{d}.")
+            }
+            _ => bail!("an issue duplicates one other issue"),
+        },
+        Kind::Choice(choices) => {
+            if !value.is_empty() && field.rank(value).is_none() {
+                let values: Vec<&str> = choices.iter().map(|c| c.value.as_str()).collect();
+                bail!("{name} is {}, not {value}", values.join(", "));
+            }
+            issue.set_field(name, some());
+            some().map_or(format!("Cleared {name}."), |v| {
+                format!("{} {v}.", capital(name))
+            })
+        }
+        Kind::Text => {
+            issue.set_field(name, some());
+            some().map_or(format!("Cleared {name}."), |v| {
+                format!("{} {v}.", capital(name))
+            })
+        }
+    })
+}
+
+fn capital(s: &str) -> String {
+    let mut c = s.chars();
+    c.next()
+        .map(|f| f.to_uppercase().chain(c).collect())
+        .unwrap_or_default()
 }
 
 /// Changes a header field, logging what changed.
-pub fn set(folder: &Folder, id: u32, who: &str, field: Field) -> Result<()> {
-    check(folder, Some(id), &field)?;
+pub fn set(folder: &Folder, id: u32, who: &str, name: &str, value: &str) -> Result<()> {
+    let wf = folder.workflow()?;
     folder.update(id, |i| {
-        let note = field.apply(i);
-        i.push(who, Kind::Note, &note, time::now());
+        let note = apply(folder, &wf, i, name, value)?;
+        i.push(who, LogKind::Note, &note, time::now());
         Ok(())
     })
 }
 
-pub fn claim(folder: &Folder, id: u32, who: &str, term: Option<String>) -> Result<()> {
+/// Moves issue `id` to `status` (an id or a label), refusing when the status's `requires`
+/// aren't met unless `force`. Logs `note` when there is one. Says whom to notify.
+pub fn move_to(
+    folder: &Folder,
+    id: u32,
+    status: &str,
+    force: bool,
+    note: Option<(&str, &str)>,
+) -> Result<Option<Delivery>> {
+    let wf = folder.workflow()?;
+    let to = wf.find(status)?.clone();
+    let (all, _) = folder.load()?;
+    let issue = all
+        .iter()
+        .find(|i| i.id == id)
+        .with_context(|| format!("no issue #{id}"))?;
+    let unmet = wf.unmet(issue, &all, &to);
+    if !force && !unmet.is_empty() {
+        bail!(
+            "#{id} can't move to {}: {}",
+            to.label,
+            needs(issue, &all, &wf, &unmet)
+        );
+    }
+    let moved = issue.status != to.id;
+    let title = issue.title.clone();
+    folder.update(id, |i| {
+        i.status = to.id.clone();
+        if let Some((who, text)) = note {
+            i.push(who, LogKind::Note, text, time::now());
+        }
+        Ok(())
+    })?;
+    Ok(to
+        .notify
+        .clone()
+        .filter(|_| moved)
+        .map(|n| notice(folder, id, &title, &wf, n)))
+}
+
+/// What an issue lacks, in words: `needs revision`, `blocked by #3`.
+pub fn needs(issue: &Issue, all: &[Issue], wf: &Workflow, unmet: &[String]) -> String {
+    unmet
+        .iter()
+        .map(|r| {
+            if r == workflow::UNBLOCKED {
+                let ids: Vec<String> = issue
+                    .open_blockers(all, |s| wf.is_done(s))
+                    .iter()
+                    .map(|b| format!("#{b}"))
+                    .collect();
+                format!("blocked by {}", ids.join(", "))
+            } else {
+                format!("needs {r}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Moves an issue the way a verb does, logging `note` or the verb's own.
+pub fn verb(
+    folder: &Folder,
+    id: u32,
+    verb: Verb,
+    who: &str,
+    note: &str,
+    force: bool,
+) -> Result<Option<Delivery>> {
+    let to = folder.workflow()?.verb(verb)?.id.clone();
+    let text = match note.trim() {
+        "" => match verb {
+            Verb::Close => "Closed.",
+            Verb::Drop => "Dropped.",
+            _ => "Reopened.",
+        },
+        n => n,
+    };
+    move_to(folder, id, &to, force, Some((who, text)))
+}
+
+/// Makes the issue `who`'s, and moves it to the claim status when it's in one before that.
+/// A blocked issue is refused unless `force`.
+pub fn claim(
+    folder: &Folder,
+    id: u32,
+    who: &str,
+    term: Option<String>,
+    force: bool,
+) -> Result<Option<Delivery>> {
+    let wf = folder.workflow()?;
+    let (all, _) = folder.load()?;
+    let issue = all
+        .iter()
+        .find(|i| i.id == id)
+        .with_context(|| format!("no issue #{id}"))?;
+    let blockers = issue.open_blockers(&all, |s| wf.is_done(s));
+    if !force && !blockers.is_empty() {
+        let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
+        bail!(
+            "#{id} is blocked by {}; --force claims it anyway",
+            ids.join(", ")
+        );
+    }
+    let to = wf.verb(Verb::Claim)?;
+    let pos = |s: &str| wf.statuses.iter().position(|x| x.id == s);
+    let before = pos(&issue.status)
+        .zip(pos(&to.id))
+        .is_some_and(|(a, b)| a < b);
     folder.update(id, |i| {
         i.owner = Some(who.into());
         i.term = term.or(i.term.take());
-        if i.status == Status::Open {
-            i.status = Status::Working;
-        }
-        i.push(who, Kind::Note, "Claimed.", time::now());
+        i.push(who, LogKind::Note, "Claimed.", time::now());
         Ok(())
-    })
+    })?;
+    if before {
+        return move_to(folder, id, &to.id, true, None);
+    }
+    Ok(None)
 }
 
 pub fn note(folder: &Folder, id: u32, who: &str, text: &str) -> Result<()> {
@@ -143,7 +287,7 @@ pub fn note(folder: &Folder, id: u32, who: &str, text: &str) -> Result<()> {
         bail!("nothing to log");
     }
     folder.update(id, |i| {
-        i.push(who, Kind::Note, text, time::now());
+        i.push(who, LogKind::Note, text, time::now());
         Ok(())
     })
 }
@@ -162,7 +306,7 @@ pub fn ask(
         bail!("the question is empty");
     }
     folder.update(id, |i| {
-        let kind = Kind::Question {
+        let kind = LogKind::Question {
             id: qid.into(),
             after,
         };
@@ -170,7 +314,6 @@ pub fn ask(
         if i.term.is_none() || i.owner.as_deref() == Some(who) {
             i.term = term.or(i.term.take());
         }
-        i.status = Status::NeedsInput;
         Ok(())
     })
 }
@@ -183,16 +326,16 @@ pub enum Response {
 }
 
 impl Response {
-    fn entry(&self, qid: &str) -> (Kind, String) {
+    fn entry(&self, qid: &str) -> (LogKind, String) {
         match self {
             Response::Pick { option, notes } if notes.is_empty() => {
-                (Kind::Answer { id: qid.into() }, option.to_string())
+                (LogKind::Answer { id: qid.into() }, option.to_string())
             }
             Response::Pick { option, notes } => (
-                Kind::Answer { id: qid.into() },
+                LogKind::Answer { id: qid.into() },
                 format!("{option}\n{notes}"),
             ),
-            Response::Reply(text) => (Kind::Reply { id: qid.into() }, text.clone()),
+            Response::Reply(text) => (LogKind::Reply { id: qid.into() }, text.clone()),
         }
     }
 }
@@ -226,9 +369,6 @@ fn answer_at(
         }
         let (kind, text) = response.entry(qid);
         i.push(who, kind, &text, at.max(i.touched()));
-        if i.status == Status::NeedsInput && i.waiting().is_empty() {
-            i.status = Status::Working;
-        }
         let next: Vec<String> = i
             .waiting()
             .iter()
@@ -261,26 +401,10 @@ fn message(issue: &Issue, qid: &str, response: &Response, next: &[String], root:
     out
 }
 
-pub fn set_status(folder: &Folder, id: u32, status: Status, who: &str, note: &str) -> Result<()> {
-    folder.update(id, |i| {
-        i.status = status;
-        let text = if note.trim().is_empty() {
-            match status {
-                Status::Done => "Closed.",
-                Status::Dropped => "Dropped.",
-                _ => "Reopened.",
-            }
-        } else {
-            note
-        };
-        i.push(who, Kind::Note, text, time::now());
-        Ok(())
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn pick(option: usize) -> Response {
         Response::Pick {
@@ -289,16 +413,32 @@ mod tests {
         }
     }
 
+    fn new(folder: &Folder, title: &str) -> u32 {
+        file(folder, title, "", "orchestrator", None, vec![])
+            .unwrap()
+            .0
+    }
+
     fn setup() -> (tempfile::TempDir, Folder, u32) {
         let dir = tempfile::tempdir().unwrap();
         let folder = Folder::init(dir.path()).unwrap();
-        let id = file(&folder, "Login loops", "", "orchestrator", vec![]).unwrap();
-        claim(&folder, id, "auth-fixer", Some("t12".into())).unwrap();
+        let id = new(&folder, "Login loops");
+        claim(&folder, id, "auth-fixer", Some("t12".into()), false).unwrap();
         (dir, folder, id)
     }
 
+    /// Adds a `review` status between working and done.
+    fn add_review(folder: &Folder, header: &str) {
+        let dir = folder.root.join("issues/review");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("STATUS.md"), format!("---\n{header}\n---\n")).unwrap();
+        let wf = folder.root.join("issues/workflow.md");
+        let text = fs::read_to_string(&wf).unwrap();
+        fs::write(&wf, text.replace("working, done", "working, review, done")).unwrap();
+    }
+
     #[test]
-    fn asking_marks_it_needing_input_and_answering_hands_it_back() {
+    fn asking_and_answering_send_the_answer_without_moving_the_issue() {
         let (_dir, folder, id) = setup();
         ask(
             &folder,
@@ -320,20 +460,15 @@ mod tests {
             "Toast copy",
         )
         .unwrap();
-        assert_eq!(folder.get(id).unwrap().status, Status::NeedsInput);
+        assert_eq!(folder.get(id).unwrap().status, "working");
 
-        let sent = answer(
-            &folder,
-            id,
-            "Q1",
-            "jordan",
-            &Response::Pick {
-                option: 1,
-                notes: "keep it short".into(),
-            },
-        )
-        .unwrap()
-        .unwrap();
+        let notes = Response::Pick {
+            option: 1,
+            notes: "keep it short".into(),
+        };
+        let sent = answer(&folder, id, "Q1", "jordan", &notes)
+            .unwrap()
+            .unwrap();
         assert_eq!(sent.to, "t12");
         assert!(
             sent.text
@@ -342,24 +477,18 @@ mod tests {
             sent.text
         );
         assert!(sent.text.contains("Still waiting: Q2."), "{}", sent.text);
-        assert_eq!(folder.get(id).unwrap().status, Status::NeedsInput);
 
-        let sent = answer(
-            &folder,
-            id,
-            "Q2",
-            "jordan",
-            &Response::Reply("Neither".into()),
-        )
-        .unwrap()
-        .unwrap();
+        let reply = Response::Reply("Neither".into());
+        let sent = answer(&folder, id, "Q2", "jordan", &reply)
+            .unwrap()
+            .unwrap();
         assert!(
             sent.text.contains("reply to Q2 instead of an option"),
             "{}",
             sent.text
         );
         assert!(!sent.text.contains("Still waiting"));
-        assert_eq!(folder.get(id).unwrap().status, Status::Working);
+        assert_eq!(folder.get(id).unwrap().status, "working");
     }
 
     #[test]
@@ -368,42 +497,124 @@ mod tests {
         assert!(answer(&folder, id, "Q9", "jordan", &pick(1)).is_err());
         assert!(answer(&folder, id, "Q1", "jordan", &Response::Reply(" ".into())).is_err());
         assert!(ask(&folder, id, "Q1", None, "a", None, "  ").is_err());
-        assert!(file(&folder, " ", "", "a", vec![]).is_err());
+        assert!(file(&folder, " ", "", "a", None, vec![]).is_err());
     }
 
     #[test]
-    fn fields_point_only_at_other_issues_that_exist_and_a_duplicate_is_dropped() {
+    fn fields_are_checked_against_the_workflow_and_a_duplicate_is_dropped() {
         let (_dir, folder, id) = setup();
-        let blocked = Field::BlockedBy(vec![id]);
-        let other = file(&folder, "Toast copy", "", "a", vec![blocked]).unwrap();
+        let with = vec![("blocked-by".into(), id.to_string())];
+        let (other, _) = file(&folder, "Toast copy", "", "a", None, with).unwrap();
         assert_eq!(folder.get(other).unwrap().blocked_by, [id]);
-        assert!(set(&folder, other, "a", Field::BlockedBy(vec![other])).is_err());
-        assert!(set(&folder, other, "a", Field::DuplicateOf(Some(99))).is_err());
-        assert!(file(&folder, "x", "", "a", vec![Field::BlockedBy(vec![99])]).is_err());
+        assert!(set(&folder, other, "a", "blocked-by", &other.to_string()).is_err());
+        assert!(set(&folder, other, "a", "duplicate-of", "99").is_err());
+        assert!(set(&folder, other, "a", "severity", "meh").is_err());
+        assert!(set(&folder, other, "a", "area", "ui").is_err());
 
-        set(&folder, other, "a", Field::DuplicateOf(Some(id))).unwrap();
+        set(&folder, other, "a", "severity", "high").unwrap();
+        assert_eq!(
+            folder.get(other).unwrap().field("severity").as_deref(),
+            Some("high")
+        );
+        set(&folder, other, "a", "duplicate-of", &format!("#{id}")).unwrap();
         let issue = folder.get(other).unwrap();
         assert_eq!(
-            (issue.duplicate_of, issue.status),
-            (Some(id), Status::Dropped)
+            (issue.duplicate_of, issue.status.as_str()),
+            (Some(id), "dropped")
         );
         assert_eq!(issue.latest().unwrap().text, format!("Duplicate of #{id}."));
     }
 
     #[test]
-    fn set_arguments_name_a_field_and_an_empty_value_clears_it() {
-        let f = |n, v| Field::parse(n, v).unwrap();
-        assert_eq!(f("severity", "high"), Field::Severity(Some(Severity::High)));
-        assert_eq!(f("severity", ""), Field::Severity(None));
-        assert_eq!(f("blocked-by", "#3, 4"), Field::BlockedBy(vec![3, 4]));
-        assert_eq!(f("duplicate-of", "#5"), Field::DuplicateOf(Some(5)));
-        assert_eq!(
-            f("revision", " wytk "),
-            Field::Revision(Some("wytk".into()))
+    fn a_field_the_workflow_lists_takes_its_values_from_there() {
+        let (_dir, folder, id) = setup();
+        let wf = folder.root.join("issues/workflow.md");
+        let text = fs::read_to_string(&wf).unwrap().replace(
+            "fields: severity,",
+            "area: ui, core\nfields: area, notes, severity,",
         );
-        assert!(Field::parse("severity", "meh").is_err());
-        assert!(Field::parse("duplicate-of", "3 4").is_err());
-        assert!(Field::parse("owner", "x").is_err());
+        fs::write(&wf, text).unwrap();
+        assert!(set(&folder, id, "a", "area", "db").is_err());
+        set(&folder, id, "a", "area", "core").unwrap();
+        set(&folder, id, "a", "notes", "flaky on CI").unwrap();
+        let issue = folder.get(id).unwrap();
+        assert_eq!(issue.field("area").as_deref(), Some("core"));
+        assert_eq!(issue.latest().unwrap().text, "Notes flaky on CI.");
+        set(&folder, id, "a", "area", "").unwrap();
+        assert_eq!(folder.get(id).unwrap().field("area"), None);
+    }
+
+    #[test]
+    fn verbs_move_where_the_workflow_says_and_requires_holds_a_move_back() {
+        let (_dir, folder, id) = setup();
+        add_review(&folder, "requires: revision\nnotify: reviewer");
+        let err = move_to(&folder, id, "review", false, None).unwrap_err();
+        assert!(err.to_string().contains("needs revision"), "{err}");
+        set(&folder, id, "a", "revision", "wytk").unwrap();
+        let sent = move_to(&folder, id, "review", false, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(sent.to, "reviewer");
+        assert!(
+            sent.text
+                .starts_with(&format!("Issue #{id} \"Login loops\"")),
+            "{}",
+            sent.text
+        );
+        assert!(
+            move_to(&folder, id, "review", false, None)
+                .unwrap()
+                .is_none()
+        );
+
+        verb(&folder, id, Verb::Close, "a", "", false).unwrap();
+        let issue = folder.get(id).unwrap();
+        assert_eq!(
+            (issue.status.as_str(), issue.latest().unwrap().text.as_str()),
+            ("done", "Closed.")
+        );
+        verb(&folder, id, Verb::Reopen, "a", "Came back.", false).unwrap();
+        assert_eq!(folder.get(id).unwrap().status, "open");
+    }
+
+    #[test]
+    fn claim_moves_only_forward_and_refuses_a_blocked_issue_unless_forced() {
+        let (_dir, folder, id) = setup();
+        add_review(&folder, "");
+        move_to(&folder, id, "review", false, None).unwrap();
+        claim(&folder, id, "reviewer", None, false).unwrap();
+        let issue = folder.get(id).unwrap();
+        assert_eq!(
+            (issue.status.as_str(), issue.owner.as_deref()),
+            ("review", Some("reviewer"))
+        );
+
+        let with = vec![("blocked-by".into(), id.to_string())];
+        let (blocked, _) = file(&folder, "After", "", "a", None, with).unwrap();
+        assert!(claim(&folder, blocked, "b", None, false).is_err());
+        claim(&folder, blocked, "b", None, true).unwrap();
+        assert_eq!(folder.get(blocked).unwrap().status, "working");
+    }
+
+    #[test]
+    fn a_new_issue_starts_from_its_status_template() {
+        let (_dir, folder, _) = setup();
+        fs::write(
+            folder.root.join("issues/open/TEMPLATE.md"),
+            "---\nseverity: medium\n---\n\n## Steps\n\n## Expected\n",
+        )
+        .unwrap();
+        let with = vec![("severity".into(), "high".into())];
+        let (id, _) = file(&folder, "Crash", "", "a", None, with).unwrap();
+        let issue = folder.get(id).unwrap();
+        assert_eq!(issue.field("severity").as_deref(), Some("high"));
+        assert_eq!(issue.body, "## Steps\n\n## Expected");
+        let (id, _) = file(&folder, "Typo", "Fix it", "a", Some("working"), vec![]).unwrap();
+        let issue = folder.get(id).unwrap();
+        assert_eq!(
+            (issue.status.as_str(), issue.body.as_str()),
+            ("working", "Fix it")
+        );
     }
 
     #[test]

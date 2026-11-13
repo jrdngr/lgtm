@@ -3,41 +3,9 @@
 //! `## <time> <who> question Q3 [after Q2]`, `## <time> <who> answer Q3` (the option number,
 //! then notes) and `## <time> <who> reply Q3` (words instead of an option).
 
-use crate::fields::{self, Severity};
+use crate::fields;
+use crate::header::{self, Pairs};
 use crate::time::{self, Minute};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Status {
-    Open,
-    Working,
-    NeedsInput,
-    Done,
-    Dropped,
-}
-
-impl Status {
-    pub const ALL: [Status; 5] = [
-        Status::Open,
-        Status::Working,
-        Status::NeedsInput,
-        Status::Done,
-        Status::Dropped,
-    ];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Status::Open => "open",
-            Status::Working => "working",
-            Status::NeedsInput => "needs-input",
-            Status::Done => "done",
-            Status::Dropped => "dropped",
-        }
-    }
-
-    pub fn parse(s: &str) -> Option<Status> {
-        Status::ALL.into_iter().find(|st| st.name() == s)
-    }
-}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -101,13 +69,17 @@ impl Entry {
 pub struct Issue {
     pub id: u32,
     pub title: String,
-    pub status: Status,
+    /// The status folder it's in. Read from a `status:` header only while upgrading a folder
+    /// from before status folders; never written.
+    pub status: String,
     /// The agent working on it, by its lgterm tab name.
     pub owner: Option<String>,
     /// The owner's lgterm terminal, where answers go.
     pub term: Option<String>,
     pub filed_by: Option<String>,
-    pub severity: Option<Severity>,
+    /// Header fields that aren't built in, like severity, and keys lgtm doesn't know, kept as
+    /// written.
+    pub fields: Pairs,
     /// The jj revision holding the code written for it.
     pub revision: Option<String>,
     pub blocked_by: Vec<u32>,
@@ -122,11 +94,11 @@ impl Issue {
         Issue {
             id,
             title: title.trim().to_owned(),
-            status: Status::Open,
+            status: String::new(),
             owner: None,
             term: None,
             filed_by,
-            severity: None,
+            fields: Pairs::new(),
             revision: None,
             blocked_by: Vec::new(),
             duplicate_of: None,
@@ -226,16 +198,38 @@ impl Issue {
         format!("{}-{}.md", self.id, slug.trim_end_matches('-'))
     }
 
+    /// A header field's value, built in or not.
+    pub fn field(&self, name: &str) -> Option<String> {
+        match name {
+            "revision" => self.revision.clone(),
+            "blocked-by" => {
+                (!self.blocked_by.is_empty()).then(|| fields::format_ids(&self.blocked_by))
+            }
+            "duplicate-of" => self.duplicate_of.map(|d| d.to_string()),
+            _ => header::get(&self.fields, name).map(str::to_owned),
+        }
+    }
+
+    /// Sets a field that isn't built in, keeping its place in the header, or clears it.
+    pub fn set_field(&mut self, name: &str, value: Option<String>) {
+        let at = self.fields.iter().position(|(k, _)| k == name);
+        match (at, value.filter(|v| !v.is_empty())) {
+            (Some(at), Some(v)) => self.fields[at].1 = v,
+            (None, Some(v)) => self.fields.push((name.to_owned(), v)),
+            (Some(at), None) => {
+                self.fields.remove(at);
+            }
+            (None, None) => {}
+        }
+    }
+
     pub fn render(&self) -> String {
-        let mut out = format!(
-            "---\ntitle: {}\nstatus: {}\n",
-            self.title,
-            self.status.name()
-        );
-        let blocked_by =
-            (!self.blocked_by.is_empty()).then(|| fields::format_ids(&self.blocked_by));
+        let mut out = format!("---\ntitle: {}\n", self.title);
+        for (key, value) in &self.fields {
+            out += &format!("{key}: {value}\n");
+        }
+        let blocked_by = self.field("blocked-by");
         for (key, value) in [
-            ("severity", &self.severity.map(|s| s.name().to_owned())),
             ("owner", &self.owner),
             ("term", &self.term),
             ("filed-by", &self.filed_by),
@@ -264,49 +258,43 @@ impl Issue {
         out
     }
 
+    /// Sets a header line read from a file or a template.
+    pub fn set_pair(&mut self, key: &str, value: &str) -> Result<(), String> {
+        let value = value.trim();
+        let some = || Some(value.to_owned()).filter(|v| !v.is_empty());
+        match key {
+            "title" => self.title = value.to_owned(),
+            "status" => self.status = value.to_owned(),
+            "owner" => self.owner = some(),
+            "term" => self.term = some(),
+            "filed-by" => self.filed_by = some(),
+            "revision" => self.revision = some(),
+            "blocked-by" => self.blocked_by = fields::parse_ids(value)?,
+            "duplicate-of" => {
+                self.duplicate_of = match value {
+                    "" => None,
+                    v => Some(
+                        v.trim_start_matches('#')
+                            .parse()
+                            .map_err(|_| format!("{v} isn't an issue id"))?,
+                    ),
+                }
+            }
+            "created" => self.created = time::parse(value).unwrap_or(0),
+            _ => self.set_field(key, some()),
+        }
+        Ok(())
+    }
+
     /// Reads a file's text. `id` comes from the file name.
     pub fn parse(id: u32, text: &str) -> Result<Issue, String> {
-        let rest = text
-            .strip_prefix("---\n")
-            .ok_or("doesn't start with a --- header")?;
-        let (head, rest) = rest
-            .split_once("\n---\n")
-            .or_else(|| rest.strip_suffix("\n---").map(|h| (h, "")))
-            .ok_or("its header has no closing ---")?;
+        if !text.starts_with("---\n") {
+            return Err("doesn't start with a --- header".into());
+        }
+        let (pairs, rest) = header::split(text)?;
         let mut issue = Issue::new(id, "", None, "", 0);
-        for line in head.lines() {
-            let Some((key, value)) = line.split_once(':') else {
-                continue;
-            };
-            let value = value.trim().to_owned();
-            match key.trim() {
-                "title" => issue.title = value,
-                "status" => {
-                    issue.status =
-                        Status::parse(&value).ok_or_else(|| format!("unknown status {value}"))?
-                }
-                "owner" => issue.owner = Some(value).filter(|v| !v.is_empty()),
-                "term" => issue.term = Some(value).filter(|v| !v.is_empty()),
-                "filed-by" => issue.filed_by = Some(value).filter(|v| !v.is_empty()),
-                "severity" if !value.is_empty() => {
-                    issue.severity = Some(
-                        Severity::parse(&value)
-                            .ok_or_else(|| format!("unknown severity {value}"))?,
-                    )
-                }
-                "revision" => issue.revision = Some(value).filter(|v| !v.is_empty()),
-                "blocked-by" => issue.blocked_by = fields::parse_ids(&value)?,
-                "duplicate-of" if !value.is_empty() => {
-                    issue.duplicate_of = Some(
-                        value
-                            .trim_start_matches('#')
-                            .parse()
-                            .map_err(|_| format!("{value} isn't an issue id"))?,
-                    )
-                }
-                "created" => issue.created = time::parse(&value).unwrap_or(0),
-                _ => {}
-            }
+        for (key, value) in &pairs {
+            issue.set_pair(key, value)?;
         }
         if issue.title.is_empty() {
             return Err("no title".into());
@@ -391,8 +379,8 @@ mod tests {
 
     const FILE: &str = "---
 title: Login redirect loops
-status: needs-input
 severity: high
+area: auth
 owner: auth fixer
 term: t12
 filed-by: orchestrator
@@ -436,14 +424,24 @@ Toast copy
         let i = issue();
         assert_eq!(
             (
-                i.severity,
-                i.revision.as_deref(),
-                &i.blocked_by,
+                i.field("severity").as_deref(),
+                i.field("area").as_deref(),
+                i.field("blocked-by").as_deref(),
                 i.duplicate_of
             ),
-            (Some(Severity::High), Some("wytkzuuo"), &vec![3, 7], Some(2))
+            (Some("high"), Some("auth"), Some("3, 7"), Some(2))
         );
         assert_eq!(i.render(), FILE);
+    }
+
+    #[test]
+    fn a_status_header_is_read_but_never_written() {
+        let i = Issue::parse(3, "---\ntitle: x\nstatus: needs-input\n---\n").unwrap();
+        assert_eq!(i.status, "needs-input");
+        assert_eq!(
+            i.render(),
+            "---\ntitle: x\ncreated: 1970-01-01T00:00Z\n---\n"
+        );
     }
 
     #[test]
@@ -532,8 +530,6 @@ Toast copy
     fn files_without_a_header_or_title_are_refused() {
         assert!(Issue::parse(1, "# Title\n").is_err());
         assert!(Issue::parse(1, "---\nstatus: open\n---\n").is_err());
-        assert!(Issue::parse(1, "---\ntitle: x\nstatus: later\n---\n").is_err());
-        assert!(Issue::parse(1, "---\ntitle: x\nseverity: meh\n---\n").is_err());
         assert!(Issue::parse(1, "---\ntitle: x\nblocked-by: 3, y\n---\n").is_err());
     }
 

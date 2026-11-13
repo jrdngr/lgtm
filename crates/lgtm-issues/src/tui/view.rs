@@ -1,15 +1,16 @@
-//! An opened issue: its file rendered as markdown, the header drawn as one line above it.
+//! An opened issue: its file rendered as markdown, under a two-line header.
 
 use lgtm_tui_kit::markdown::{Outcome, Preview};
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, MUTED, RED, UNIQUE};
+use lgtm_tui_kit::theme::{self, BG, CYAN, FAINT, FG, MUTED, RED, UNIQUE};
 use ratatui::crossterm::event::{KeyEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
-use super::qq;
-use crate::fields::Severity;
-use crate::issue::{Issue, Kind, Status};
+use super::{marks, qq};
+use crate::fields::Kind;
+use crate::issue::{Issue, Kind as LogKind};
 use crate::time;
+use crate::workflow::Workflow;
 
 pub struct View {
     pub id: u32,
@@ -49,10 +50,10 @@ impl View {
         self.preview.key(key)
     }
 
-    pub fn draw(&mut self, c: &mut Canvas, area: Rect, issue: &Issue) {
+    pub fn draw(&mut self, c: &mut Canvas, area: Rect, about: (&Issue, &Workflow, &[Issue])) {
         c.fill(area.x, area.y, area.width, BG);
         c.fill(area.x, area.y + 1, area.width, BG);
-        header(c, area.x, area.y, issue);
+        header(c, area.x, area.y, about);
         let body = Rect {
             y: area.y + HEADER,
             height: area.height.saturating_sub(HEADER),
@@ -76,29 +77,46 @@ fn fit(s: &str, w: usize) -> String {
     t
 }
 
-/// `● 12 Title` over `status  severity  … owner  filed by x`, each cut to the width.
-pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
-    let (dot, color) = status_mark(issue);
+/// `● 12 Title` over the status, its open blockers, the workflow's fields, the owner and who
+/// filed it, each cut to the width.
+pub fn header(c: &mut Canvas, x: u16, y: u16, (issue, wf, all): (&Issue, &Workflow, &[Issue])) {
+    let (dot, color) = marks::mark(issue, wf, all);
     let right = c.area.right().saturating_sub(1);
-    let x = c.put(x + 1, y, dot, theme::fg(color));
+    let x = c.put(x + 1, y, &dot, theme::fg(color));
     let x = c.put(x + 1, y, &format!("{} ", issue.id), theme::fg(MUTED));
     let room = right.saturating_sub(x) as usize;
     c.put(x, y, &fit(&issue.title, room), theme::bold(FG));
-    let mut parts = vec![(issue.status.name().replace('-', " "), color)];
-    if let Some(s) = issue.severity {
-        parts.push((s.name().into(), severity_color(s)));
+    let mut parts = Vec::new();
+    match wf.status(&issue.status) {
+        Some(s) => parts.push((s.label.clone(), marks::color(&s.color))),
+        None => parts.push((issue.status.clone(), MUTED)),
     }
-    if let Some(d) = issue.duplicate_of {
-        parts.push(("duplicate of".into(), FAINT));
-        parts.push((format!("#{d}"), FG));
-    }
-    if !issue.blocked_by.is_empty() {
-        let ids: Vec<String> = issue.blocked_by.iter().map(|b| format!("#{b}")).collect();
+    let blockers = issue.open_blockers(all, |s| wf.is_done(s));
+    if !blockers.is_empty() {
+        let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
         parts.push(("blocked by".into(), FAINT));
-        parts.push((ids.join(" "), FG));
+        parts.push((ids.join(" "), RED));
     }
-    if let Some(r) = &issue.revision {
-        parts.push((r.clone(), UNIQUE));
+    for f in &wf.fields {
+        let Some(value) = issue.field(&f.name) else {
+            continue;
+        };
+        match &f.kind {
+            Kind::BlockedBy => {}
+            Kind::Revision => parts.push((value, UNIQUE)),
+            Kind::DuplicateOf => {
+                parts.push(("duplicate of".into(), FAINT));
+                parts.push((format!("#{value}"), FG));
+            }
+            Kind::Choice(_) => {
+                let color = f.color(&value).map_or(FG, marks::color);
+                parts.push((value, color));
+            }
+            Kind::Text => {
+                parts.push((f.name.clone(), FAINT));
+                parts.push((value, FG));
+            }
+        }
     }
     if let Some(o) = &issue.owner {
         parts.push((o.clone(), CYAN));
@@ -122,25 +140,6 @@ pub fn header(c: &mut Canvas, x: u16, y: u16, issue: &Issue) {
     }
 }
 
-pub fn severity_color(s: Severity) -> ratatui::style::Color {
-    match s {
-        Severity::Low => MUTED,
-        Severity::Medium => FG,
-        Severity::High => AMBER,
-        Severity::Critical => RED,
-    }
-}
-
-pub fn status_mark(issue: &Issue) -> (&'static str, ratatui::style::Color) {
-    match issue.status {
-        Status::NeedsInput if !issue.waiting().is_empty() => ("●", AMBER),
-        Status::Open => ("○", MUTED),
-        Status::Done => ("✓", GREEN),
-        Status::Dropped => ("×", FAINT),
-        _ => ("●", ACCENT),
-    }
-}
-
 /// The issue as markdown to read: the description, then each log entry under a heading of
 /// who, what and when, with picks spelled out as the option they chose.
 pub fn markdown(issue: &Issue) -> String {
@@ -152,14 +151,14 @@ pub fn markdown(issue: &Issue) -> String {
     for e in &issue.log {
         let age = time::age(e.at, now);
         let what = match &e.kind {
-            Kind::Note => String::new(),
-            Kind::Question { id, .. } => format!(" · question {id}"),
-            Kind::Answer { id } => format!(" · answer {id}"),
-            Kind::Reply { id } => format!(" · reply {id}"),
+            LogKind::Note => String::new(),
+            LogKind::Question { id, .. } => format!(" · question {id}"),
+            LogKind::Answer { id } => format!(" · answer {id}"),
+            LogKind::Reply { id } => format!(" · reply {id}"),
         };
         out += &format!("#### {}{what} · {age}\n\n", e.who);
         match &e.kind {
-            Kind::Answer { id } => {
+            LogKind::Answer { id } => {
                 let (n, notes) = e.text.split_once('\n').unwrap_or((&e.text, ""));
                 let name = asked(issue, id)
                     .and_then(|q| {
@@ -173,7 +172,7 @@ pub fn markdown(issue: &Issue) -> String {
                     out += &format!("{}\n\n", notes.trim());
                 }
             }
-            Kind::Question { .. } => out += &format!("{}\n\n", hard_breaks(&e.text)),
+            LogKind::Question { .. } => out += &format!("{}\n\n", hard_breaks(&e.text)),
             _ => out += &format!("{}\n\n", e.text),
         }
     }
@@ -211,7 +210,7 @@ mod tests {
     #[test]
     fn picks_read_as_the_option_they_chose() {
         let mut issue = Issue::new(1, "t", None, "Body.", 0);
-        let q = Kind::Question {
+        let q = LogKind::Question {
             id: "Q1".into(),
             after: None,
         };
@@ -223,11 +222,11 @@ mod tests {
         );
         issue.push(
             "jordan",
-            Kind::Answer { id: "Q1".into() },
+            LogKind::Answer { id: "Q1".into() },
             "1\nkeep it short",
             0,
         );
-        issue.push("jordan", Kind::Reply { id: "Q1".into() }, "Neither", 0);
+        issue.push("jordan", LogKind::Reply { id: "Q1".into() }, "Neither", 0);
         let md = markdown(&issue);
         assert!(md.starts_with("Body.\n\n#### a · question Q1"), "{md}");
         assert!(

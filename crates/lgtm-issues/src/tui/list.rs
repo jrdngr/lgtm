@@ -1,14 +1,18 @@
-//! The main screen: issues grouped by status under a header each. Needs input lists its
-//! waiting questions first, then working and open issues one line each; done and dropped
-//! fold to a count, and list their issues once expanded.
+//! The main screen: issues grouped by status under a header each. Needs input lists waiting
+//! questions first, then each status in the workflow's order, one line per issue; statuses
+//! that fold show a count, and list their issues once expanded.
+
+use std::cmp::Reverse;
 
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, CYAN, FAINT, FG, GREEN, HAIR, MUTED, SEL};
+use lgtm_tui_kit::theme::{self, AMBER, BG, CYAN, FAINT, FG, HAIR, MUTED, SEL};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
-use crate::issue::{Issue, Status};
+use super::marks;
+use crate::issue::Issue;
 use crate::time::{self, Minute};
+use crate::workflow::{Sort, Status, Verb, Workflow};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Row {
@@ -17,10 +21,12 @@ pub enum Row {
         qid: String,
     },
     Issue(u32),
-    /// A status's header and how many rows it has.
-    Header(Status, usize),
-    /// Done or dropped issues: their count, and whether they're listed below it.
-    Folded(Status, usize, bool),
+    /// The needs input header and how many questions it has.
+    Needs(usize),
+    /// A status's header, by id, and how many issues it has.
+    Header(String, usize),
+    /// A folding status: its count, and whether its issues are listed below it.
+    Folded(String, usize, bool),
     Gap,
 }
 
@@ -56,54 +62,62 @@ pub fn questions<'a>(issues: &'a [Issue], filter: &str) -> Vec<(&'a Issue, Strin
     out.into_iter().map(|(i, q, _)| (i, q)).collect()
 }
 
-pub fn rows(issues: &[Issue], filter: &str, expanded: &[Status]) -> Vec<Row> {
-    let shown: Vec<&Issue> = issues.iter().filter(|i| matches(i, filter)).collect();
-    // Issues with a status and no waiting question, newest first or, when open, by id.
-    let quiet = |status: Status| {
-        let mut out: Vec<&&Issue> = shown
-            .iter()
-            .filter(|i| i.status == status && i.waiting().is_empty())
-            .collect();
-        if status != Status::Open {
-            out.sort_by_key(|i| std::cmp::Reverse(i.touched()));
+/// The issues in `status` with no waiting question, in the status's order.
+fn in_status<'a>(shown: &[&'a Issue], status: &Status, wf: &Workflow) -> Vec<&'a Issue> {
+    let mut out: Vec<&Issue> = shown
+        .iter()
+        .copied()
+        .filter(|i| i.status == status.id && i.waiting().is_empty())
+        .collect();
+    match &status.sort {
+        Sort::Id => out.sort_by_key(|i| i.id),
+        Sort::Touched => out.sort_by_key(|i| Reverse(i.touched())),
+        Sort::Field(f) => {
+            let rank = |i: &Issue| {
+                let field = wf.field(f)?;
+                field.rank(&i.field(f)?)
+            };
+            out.sort_by_key(|i| (Reverse(rank(i)), Reverse(i.touched())))
         }
-        out.into_iter()
-            .map(|i| Row::Issue(i.id))
-            .collect::<Vec<_>>()
-    };
-    let mut needs: Vec<Row> = questions(issues, filter)
+    }
+    out
+}
+
+pub fn rows(issues: &[Issue], wf: &Workflow, filter: &str, expanded: &[String]) -> Vec<Row> {
+    let shown: Vec<&Issue> = issues.iter().filter(|i| matches(i, filter)).collect();
+    let mut rows = Vec::new();
+    let needs: Vec<Row> = questions(issues, filter)
         .into_iter()
         .map(|(i, qid)| Row::Question { id: i.id, qid })
         .collect();
-    needs.extend(quiet(Status::NeedsInput));
-    let mut rows = Vec::new();
-    for (status, group) in [
-        (Status::NeedsInput, needs),
-        (Status::Working, quiet(Status::Working)),
-        (Status::Open, quiet(Status::Open)),
-    ] {
+    if !needs.is_empty() {
+        rows.push(Row::Needs(needs.len()));
+        rows.extend(needs);
+    }
+    for status in wf.statuses.iter().filter(|s| !s.fold) {
+        let group = in_status(&shown, status, wf);
         if group.is_empty() {
             continue;
         }
         if !rows.is_empty() {
             rows.push(Row::Gap);
         }
-        rows.push(Row::Header(status, group.len()));
-        rows.extend(group);
+        rows.push(Row::Header(status.id.clone(), group.len()));
+        rows.extend(group.iter().map(|i| Row::Issue(i.id)));
     }
     let mut gap = !rows.is_empty();
-    for status in [Status::Done, Status::Dropped] {
-        let group = quiet(status);
+    for status in wf.statuses.iter().filter(|s| s.fold) {
+        let group = in_status(&shown, status, wf);
         if group.is_empty() {
             continue;
         }
         if std::mem::take(&mut gap) {
             rows.push(Row::Gap);
         }
-        let open = expanded.contains(&status);
-        rows.push(Row::Folded(status, group.len(), open));
+        let open = expanded.contains(&status.id);
+        rows.push(Row::Folded(status.id.clone(), group.len(), open));
         if open {
-            rows.extend(group);
+            rows.extend(group.iter().map(|i| Row::Issue(i.id)));
         }
     }
     rows
@@ -123,7 +137,14 @@ fn first_line(s: &str) -> &str {
     s.lines().next().unwrap_or_default()
 }
 
-pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usize, top: usize) {
+pub fn draw(
+    c: &mut Canvas,
+    area: Rect,
+    (issues, wf): (&[Issue], &Workflow),
+    rows: &[Row],
+    sel: usize,
+    top: usize,
+) {
     let now = time::now();
     let find = |id: u32| issues.iter().find(|i| i.id == id);
     for (n, row) in rows.iter().enumerate().skip(top) {
@@ -160,9 +181,9 @@ pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usi
             }
             Row::Issue(id) => {
                 let Some(issue) = find(*id) else { continue };
-                let open = issue.status == Status::Open;
-                let (dot, color) = super::view::status_mark(issue);
-                let mut x = c.put(area.x + 1, y, dot, st(color));
+                let open = wf.verb(Verb::New).is_ok_and(|s| s.id == issue.status);
+                let (dot, color) = marks::mark(issue, wf, issues);
+                let mut x = c.put(area.x + 1, y, &dot, st(color));
                 x = c.put(x + 1, y, &format!("{id:<3}"), st(FG));
                 x = c.put(x + 1, y, &cut(&issue.title, 36), st(FG));
                 if !open {
@@ -178,24 +199,16 @@ pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usi
                     right(c, time::age(issue.touched(), now));
                 }
             }
-            Row::Header(status, n) => {
-                let color = match status {
-                    Status::NeedsInput => AMBER,
-                    Status::Open => MUTED,
-                    _ => ACCENT,
-                };
-                let mut x = c.put(area.x + 1, y, &status.name().replace('-', " "), bold(color));
-                x = c.put(x + 2, y, &n.to_string(), st(FAINT));
-                let rule = area.right().saturating_sub(x + 2) as usize;
-                c.put(x + 1, y, &"─".repeat(rule), st(HAIR));
+            Row::Needs(n) => header(c, area, y, ("needs input", AMBER), *n, bg),
+            Row::Header(id, n) => {
+                if let Some(s) = wf.status(id) {
+                    header(c, area, y, (&s.label, marks::color(&s.color)), *n, bg);
+                }
             }
-            Row::Folded(status, n, open) => {
-                let (glyph, color) = match status {
-                    Status::Done => ("✓", GREEN),
-                    _ => ("×", FAINT),
-                };
-                let mut x = c.put(area.x + 1, y, glyph, st(color));
-                x = c.put(x + 1, y, status.name(), st(MUTED));
+            Row::Folded(id, n, open) => {
+                let Some(s) = wf.status(id) else { continue };
+                let mut x = c.put(area.x + 1, y, &s.glyph, st(marks::color(&s.color)));
+                x = c.put(x + 1, y, &s.label, st(MUTED));
                 x = c.put(x + 2, y, &n.to_string(), st(FAINT));
                 c.put(x + 1, y, if *open { "▾" } else { "▸" }, st(FAINT));
             }
@@ -204,14 +217,34 @@ pub fn draw(c: &mut Canvas, area: Rect, issues: &[Issue], rows: &[Row], sel: usi
     }
 }
 
+/// A group's header: its label in bold, its count, and a rule to the edge.
+fn header(
+    c: &mut Canvas,
+    area: Rect,
+    y: u16,
+    (label, color): (&str, ratatui::style::Color),
+    n: usize,
+    bg: ratatui::style::Color,
+) {
+    let mut x = c.put(area.x + 1, y, label, theme::bold(color).bg(bg));
+    x = c.put(x + 2, y, &n.to_string(), Style::default().fg(FAINT).bg(bg));
+    let rule = area.right().saturating_sub(x + 2) as usize;
+    c.put(
+        x + 1,
+        y,
+        &"─".repeat(rule),
+        Style::default().fg(HAIR).bg(bg),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::issue::Kind;
 
-    fn issue(id: u32, status: Status, touched: Minute) -> Issue {
+    fn issue(id: u32, status: &str, touched: Minute) -> Issue {
         let mut i = Issue::new(id, &format!("Issue {id}"), None, "", 0);
-        i.status = status;
+        i.status = status.into();
         i.push("a", Kind::Note, "x", touched);
         i
     }
@@ -222,59 +255,86 @@ mod tests {
             after: None,
         };
         i.push("a", q, "q", at);
-        i.status = Status::NeedsInput;
+    }
+
+    fn workflow() -> (tempfile::TempDir, Workflow) {
+        let dir = tempfile::tempdir().unwrap();
+        crate::workflow::write_default(dir.path()).unwrap();
+        let w = Workflow::load(dir.path()).unwrap();
+        (dir, w)
     }
 
     #[test]
-    fn issues_group_by_status_with_questions_oldest_first_and_working_newest_first() {
-        let mut asking = issue(1, Status::Working, 5);
+    fn issues_group_by_status_in_order_after_questions_and_done_ones_fold() {
+        let (_dir, wf) = workflow();
+        let mut asking = issue(1, "working", 5);
         ask(&mut asking, "Q2", 9);
         ask(&mut asking, "Q1", 7);
         let issues = vec![
             asking,
-            issue(2, Status::Open, 1),
-            issue(3, Status::Working, 3),
-            issue(4, Status::Working, 8),
-            issue(5, Status::Done, 2),
-            issue(6, Status::Dropped, 2),
-            issue(7, Status::NeedsInput, 4),
-            issue(8, Status::Done, 2),
+            issue(2, "open", 9),
+            issue(3, "working", 3),
+            issue(4, "working", 8),
+            issue(5, "done", 2),
+            issue(6, "dropped", 2),
+            issue(7, "open", 1),
+            issue(8, "done", 2),
         ];
         let q = |qid: &str| Row::Question {
             id: 1,
             qid: qid.into(),
         };
+        let h = |s: &str, n| Row::Header(s.into(), n);
+        let f = |s: &str, n, open| Row::Folded(s.into(), n, open);
         assert_eq!(
-            rows(&issues, "", &[]),
+            rows(&issues, &wf, "", &[]),
             [
-                Row::Header(Status::NeedsInput, 3),
+                Row::Needs(2),
                 q("Q1"),
                 q("Q2"),
+                Row::Gap,
+                h("open", 2),
+                Row::Issue(2),
                 Row::Issue(7),
                 Row::Gap,
-                Row::Header(Status::Working, 2),
+                h("working", 2),
                 Row::Issue(4),
                 Row::Issue(3),
                 Row::Gap,
-                Row::Header(Status::Open, 1),
-                Row::Issue(2),
-                Row::Gap,
-                Row::Folded(Status::Done, 2, false),
-                Row::Folded(Status::Dropped, 1, false),
+                f("done", 2, false),
+                f("dropped", 1, false),
             ]
         );
         assert_eq!(
-            rows(&issues, "issue", &[Status::Done])[12..],
+            rows(&issues, &wf, "issue", &["done".into()])[12..],
             [
-                Row::Folded(Status::Done, 2, true),
+                f("done", 2, true),
                 Row::Issue(5),
                 Row::Issue(8),
-                Row::Folded(Status::Dropped, 1, false),
+                f("dropped", 1, false)
             ]
         );
         assert_eq!(
-            rows(&issues, "issue 3", &[]),
-            [Row::Header(Status::Working, 1), Row::Issue(3)]
+            rows(&issues, &wf, "issue 3", &[]),
+            [h("working", 1), Row::Issue(3)]
+        );
+    }
+
+    #[test]
+    fn a_status_can_sort_by_a_choice_field_highest_first() {
+        let (dir, _) = workflow();
+        std::fs::write(
+            dir.path().join("open/STATUS.md"),
+            "---\nsort: severity\n---\n",
+        )
+        .unwrap();
+        let wf = Workflow::load(dir.path()).unwrap();
+        let mut issues: Vec<Issue> = (1..=3).map(|id| issue(id, "open", id as Minute)).collect();
+        issues[0].set_field("severity", Some("critical".into()));
+        issues[2].set_field("severity", Some("low".into()));
+        assert_eq!(
+            rows(&issues, &wf, "", &[])[1..],
+            [Row::Issue(1), Row::Issue(3), Row::Issue(2)]
         );
     }
 }

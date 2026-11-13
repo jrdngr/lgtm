@@ -7,7 +7,6 @@ use ratatui::crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 
 use super::list::Row;
 use super::{Issues, Screen};
-use crate::issue::Status;
 
 /// Two clicks on a row within this make a double click.
 const DOUBLE_CLICK: Duration = Duration::from_millis(400);
@@ -59,8 +58,8 @@ impl Issues {
         }
     }
 
-    /// Lists done or dropped issues under their count, or folds them back.
-    pub(super) fn toggle(&mut self, status: Status) {
+    /// Lists a folded status's issues under its count, or folds them back.
+    pub(super) fn toggle(&mut self, status: String) {
         if let Some(p) = self.expanded.iter().position(|s| *s == status) {
             self.expanded.remove(p);
         } else {
@@ -80,9 +79,9 @@ mod tests {
     fn screen() -> (tempfile::TempDir, Issues) {
         let dir = tempfile::tempdir().unwrap();
         let folder = Folder::init(dir.path()).unwrap();
-        for (title, status) in [("Open one", Status::Open), ("Done one", Status::Done)] {
+        for (title, status) in [("Open one", "open"), ("Done one", "done")] {
             let mut i = Issue::new(0, title, None, "", 0);
-            i.status = status;
+            i.status = status.into();
             folder.create(i).unwrap();
         }
         let mut issues = Issues::new(folder, "jordan".into());

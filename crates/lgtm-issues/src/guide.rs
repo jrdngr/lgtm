@@ -1,29 +1,40 @@
-//! What agents read about an issues folder. `init` writes it to `ISSUES.md`.
+//! What agents read about an issues folder. `init` writes it to `ISSUES.md`, and `guide`
+//! prints it followed by the folder's own workflow.
+
+use crate::workflow::Workflow;
 
 pub const GUIDE: &str = r#"# Issues
 
 This folder is an issue tracker for agents, read by `lgtm issues`. Each issue is one file,
-`<id>-<slug>.md`: in `issues/open` while it's open, working or needs input, and in
-`issues/complete` once it's done or dropped. The commands move it when its status changes.
-Run `lgtm issues` with no arguments here to see them.
+`<id>-<slug>.md`, in `issues/<status>/`: the folder it's in is its status. Each status folder
+can hold a `STATUS.md` saying what it means and a `TEMPLATE.md` new issues filed there start
+from, and `issues/workflow.md` orders the statuses and lists the header fields. Run
+`lgtm issues guide` to read this tracker's workflow, and `lgtm issues` with no arguments here
+to see the issues.
 
 ## Commands
 
 Run these in this folder, or pass `-C <this folder>`. `--as <name>` sets who you are; by
 default it's your lgterm tab's name.
 
-- `lgtm issues new "<title>" [--body "<text>"] [--severity <s>] [--blocked-by <ids>]` files an
+- `lgtm issues new "<title>" [--body "<text>"] [--status <s>] [--<field> <value>]` files an
   issue and prints its id.
-- `lgtm issues list [--all]` lists open issues; `--all` adds done and dropped ones.
+- `lgtm issues list [--all] [--status <s>]` lists issues not done; `--all` adds done ones and
+  `--status` shows one status.
 - `lgtm issues show <id>` prints an issue's file.
-- `lgtm issues claim <id>` makes it yours and marks it working.
+- `lgtm issues statuses` lists the statuses in order.
+- `lgtm issues claim <id>` makes it yours and moves it to the claim status when it's in one
+  before that. A blocked issue is refused; don't start it.
+- `lgtm issues move <id> <status> ["<note>"]` moves it to a status. A status can require
+  fields, or no open blockers, before an issue moves in; the refusal says what's missing.
+  `--force` moves it anyway, on `claim` and the other verbs too: only when the user says so.
 - `lgtm issues log <id> "<text>"` adds a note: progress, findings, what you changed.
-- `lgtm issues set <id> <field> [value]` sets a header field; no value clears it:
-  - `severity`: low, medium, high or critical.
+- `lgtm issues set <id> <field> [value]` sets a header field; no value clears it. The
+  workflow lists the fields this tracker uses. These are built in:
   - `revision`: the jj change id holding the code you wrote for it. Set it once you've written
     code, and again if the code moves to another change.
-  - `blocked-by`: the ids of issues that must be done first, like `3 7`. Don't start a blocked
-    issue; `list` shows which blockers are still open.
+  - `blocked-by`: the ids of issues that must be done first, like `3 7`. `list` shows which
+    blockers are still open.
   - `duplicate-of`: the issue this one repeats. It drops this one.
 - `lgtm issues ask <id> <Qn> [--after <Qm>] < question.md` asks the user. Write the question
   in the qq shape: the last decision, `Question N of M`, `Qn — <subject>`, `Context:` bullets,
@@ -34,15 +45,15 @@ default it's your lgterm tab's name.
   the question is closed, so rethink it with what the reply says and ask a new one if needed.
 - `lgtm issues answer <id> <Qn> [--pick <n>] ["<text>"]` answers for the user: `--pick` with
   notes, or a reply without it.
-- `lgtm issues close <id> ["<note>"]` marks it done. `drop` marks it dropped.
+- `lgtm issues close <id> ["<note>"]` moves it to the close status, `drop` to the drop status
+  and `reopen` to the reopen status, as the workflow names them.
 
 ## File format
 
 ```
 ---
 title: Login redirect loops after session expiry
-status: open | working | needs-input | done | dropped
-severity: low | medium | high | critical
+severity: <a field the workflow lists, like severity>
 owner: <tab name of the agent working on it>
 term: <its lgterm terminal, like t12>
 filed-by: <who filed it>
@@ -75,3 +86,40 @@ Neither. Return 401 and let the client show the login sheet.
 
 Times are UTC. Prefer the commands to editing files by hand, so the header and log stay valid.
 "#;
+
+/// The guide, then the tracker's workflow and what each status means.
+pub fn full(wf: &Workflow) -> String {
+    let mut out = format!("{GUIDE}\n# This tracker\n\n");
+    if !wf.body.is_empty() {
+        out += &format!("{}\n\n", wf.body);
+    }
+    let fields: Vec<String> = wf
+        .fields
+        .iter()
+        .map(|f| match &f.kind {
+            crate::fields::Kind::Choice(cs) => {
+                let values: Vec<&str> = cs.iter().map(|c| c.value.as_str()).collect();
+                format!("`{}` ({})", f.name, values.join(", "))
+            }
+            _ => format!("`{}`", f.name),
+        })
+        .collect();
+    out += &format!("Fields: {}.\n\n## Statuses\n", fields.join(", "));
+    for s in &wf.statuses {
+        out += &format!("\n### {} (`{}`)\n\n", s.label, s.id);
+        let mut facts = Vec::new();
+        if s.done {
+            facts.push("Counts as done.".to_owned());
+        }
+        if !s.requires.is_empty() {
+            facts.push(format!("Requires {} to move in.", s.requires.join(", ")));
+        }
+        if !facts.is_empty() {
+            out += &format!("{}\n\n", facts.join(" "));
+        }
+        if !s.body.is_empty() {
+            out += &format!("{}\n", s.body);
+        }
+    }
+    out
+}
