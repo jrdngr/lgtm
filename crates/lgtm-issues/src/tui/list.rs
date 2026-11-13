@@ -5,7 +5,7 @@
 use std::cmp::Reverse;
 
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, AMBER, BG, CYAN, FAINT, FG, HAIR, MUTED, SEL};
+use lgtm_tui_kit::theme::{self, AMBER, BG, CYAN, FAINT, FG, HAIR, MUTED, RED, SEL};
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
@@ -186,6 +186,11 @@ pub fn draw(
                 let mut x = c.put(area.x + 1, y, &dot, st(color));
                 x = c.put(x + 1, y, &format!("{id:<3}"), st(FG));
                 x = c.put(x + 1, y, &cut(&issue.title, 36), st(FG));
+                let blockers = issue.open_blockers(issues, |s| wf.is_done(s));
+                if !blockers.is_empty() {
+                    let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
+                    x = c.put(x + 1, y, &ids.join(" "), st(RED));
+                }
                 if !open {
                     x = c.put(
                         x + 1,
