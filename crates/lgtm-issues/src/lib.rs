@@ -7,6 +7,7 @@ mod guide;
 mod issue;
 mod lgterm;
 mod ops;
+pub mod skill;
 mod time;
 pub mod tui;
 

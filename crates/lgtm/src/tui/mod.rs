@@ -83,6 +83,9 @@ pub use edit::SPLIT_FLAG;
 /// current directory, opening `start`. Outside jj only the editor runs. A `split` is a second
 /// one beside another, which keeps the MCP socket.
 pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
+    if let Some(home) = std::env::var_os("HOME") {
+        lgtm_issues::skill::install(Path::new(&home));
+    }
     let cwd = std::env::current_dir().unwrap_or_default();
     let target = match &start {
         Start::File(path, line) => Some((normalize(&cwd.join(path)), *line)),
