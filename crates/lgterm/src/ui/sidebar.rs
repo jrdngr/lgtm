@@ -9,8 +9,8 @@ use gpui::{
 };
 
 use super::actions::ToggleSidebar;
+use super::branch::Nothing;
 use super::menu::For;
-use super::panes::Nothing;
 use super::rename::Target;
 use super::space_drag::{self, DragsSpace};
 use super::{MovesWindow, Workspace, badge};

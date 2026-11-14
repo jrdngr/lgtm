@@ -26,6 +26,12 @@ pub struct Split {
     pub id: SplitId,
     pub tabs: Vec<Tab>,
     pub active: usize,
+    /// Narrowed to a list of its tabs.
+    #[serde(default)]
+    pub stacked: bool,
+    /// How wide the list of its tabs was last made.
+    #[serde(default)]
+    pub stacked_width: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -88,9 +94,17 @@ impl Keyed for Slot {
     }
 }
 
+/// How wide a split listing its tabs starts.
+const STACKED_WIDTH: f32 = 200.;
+
 impl Split {
     pub fn tab(&self) -> Tab {
         self.tabs[self.active]
+    }
+
+    /// How wide it is while it lists its tabs.
+    pub fn stacked_width(&self) -> f32 {
+        self.stacked_width.unwrap_or(STACKED_WIDTH)
     }
 }
 
@@ -224,6 +238,8 @@ impl Model {
             id: SplitId(self.id()),
             tabs: vec![Tab::Term(term)],
             active: 0,
+            stacked: false,
+            stacked_width: None,
         };
         (split, term)
     }
@@ -494,6 +510,8 @@ impl Model {
             id,
             tabs: vec![tab],
             active: 0,
+            stacked: false,
+            stacked_width: None,
         };
         let at = space.focus;
         space
@@ -634,6 +652,23 @@ impl Model {
     }
 
     /// Fills the focused space with its focused split, or puts its splits back.
+    /// Narrows the focused split to a list of its tabs, or puts it back.
+    pub fn toggle_stacked(&mut self) {
+        if let Some(split) = self.split_mut() {
+            split.stacked = !split.stacked;
+        }
+    }
+
+    pub fn set_stacked_width(&mut self, split: SplitId, width: f32) {
+        if let Some(s) = self
+            .spaces
+            .iter_mut()
+            .find_map(|s| s.splits.find_mut(split))
+        {
+            s.stacked_width = Some(width);
+        }
+    }
+
     pub fn toggle_zoom(&mut self) {
         if let Some(space) = self.space_mut() {
             space.zoom = match space.zoom {

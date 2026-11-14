@@ -42,6 +42,17 @@ pub fn lock(
     icon_button(id, parent, icon, locked, on_click)
 }
 
+/// A split's stack button: lists its tabs in a narrow column. Shown while the pointer is over
+/// the element of group `parent`, or always when `on`.
+pub fn stack(
+    id: impl Into<ElementId>,
+    parent: String,
+    on: bool,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    icon_button(id, parent, "ui/stack.svg", on, on_click)
+}
+
 /// A slot's magnet, shown while the pointer is over the element of group `parent`, or always
 /// when `on`.
 pub fn magnet(

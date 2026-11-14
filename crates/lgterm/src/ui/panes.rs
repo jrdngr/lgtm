@@ -3,47 +3,23 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, AppContext, Context, CursorStyle, DragMoveEvent, FontWeight, InteractiveElement,
-    IntoElement, MouseButton, MouseDownEvent, ParentElement, Render, StatefulInteractiveElement,
-    StyleRefinement, Styled, Window, div, px, rgb, rgba,
+    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
+    ParentElement, StatefulInteractiveElement, StyleRefinement, Styled, Window, div, px, rgb, rgba,
 };
 
+use super::branch::{Owner, Size};
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::tab_drag::{self, DragsTab, TAB_STRIP};
 use super::{MovesWindow, Workspace, badge, expand};
 use crate::ipc::Place;
-use crate::model::{Axis, LayoutId, Slot, SlotId, Space, SpaceId, Split, SplitId, Tab, Tree, tree};
+use crate::model::{Axis, Slot, SlotId, Space, Split, SplitId, Tab, Tree};
 use crate::theme;
 
 /// A space's title height.
 pub(super) const SPACE_TITLE: f32 = 26.;
 /// The tinted border around a space's splits.
 const SPACE_PAD: f32 = 5.;
-
-/// Which tree a branch belongs to: a layout's slots or a space's splits.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Owner {
-    Layout(LayoutId),
-    Space(SpaceId),
-}
-
-/// A divider being dragged: the boundary after child `index` of the branch at `path`.
-#[derive(Clone, Debug, PartialEq)]
-struct Divider {
-    owner: Owner,
-    path: Vec<usize>,
-    index: usize,
-}
-
-/// What a divider drag shows under the pointer: nothing.
-pub(super) struct Nothing;
-
-impl Render for Nothing {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
-    }
-}
 
 impl Workspace {
     pub(super) fn render_main(&mut self, _: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -106,7 +82,10 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (c.weight, self.slot_tree(&c.tree, owner, path, cx))
+                        (
+                            Size::Flex(c.weight),
+                            self.slot_tree(&c.tree, owner, path, cx),
+                        )
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -343,8 +322,14 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
+                        let size = match &c.tree {
+                            Tree::Leaf(s) if s.stacked && *axis == Axis::Row => {
+                                Size::Fixed(s.id, s.stacked_width())
+                            }
+                            _ => Size::Flex(c.weight),
+                        };
                         (
-                            c.weight,
+                            size,
                             self.split_tree(&c.tree, color, focused, owner, path, cx),
                         )
                     })
@@ -354,99 +339,12 @@ impl Workspace {
         }
     }
 
-    /// Children side by side or stacked, with draggable dividers between them.
-    fn branch(
-        &self,
-        axis: Axis,
-        children: Vec<(f32, AnyElement)>,
-        owner: Owner,
-        path: Vec<usize>,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let row = axis == Axis::Row;
-        let count = children.len();
-        let mut items = Vec::with_capacity(count * 2);
-        for (i, (weight, child)) in children.into_iter().enumerate() {
-            items.push(
-                div()
-                    .flex_grow(weight)
-                    .flex_basis(px(0.))
-                    .min_w_0()
-                    .min_h_0()
-                    .flex()
-                    .child(child)
-                    .into_any_element(),
-            );
-            if i + 1 < count {
-                let drag = Divider {
-                    owner,
-                    path: path.clone(),
-                    index: i,
-                };
-                items.push(
-                    div()
-                        .id(gpui::ElementId::Name(
-                            format!("divider-{owner:?}-{path:?}-{i}").into(),
-                        ))
-                        .flex_none()
-                        .when(row, |d| d.w(px(theme::GAP)).h_full())
-                        .when(!row, |d| d.h(px(theme::GAP)).w_full())
-                        .cursor(if row {
-                            CursorStyle::ResizeLeftRight
-                        } else {
-                            CursorStyle::ResizeUpDown
-                        })
-                        .on_drag(drag, |_, _, _, cx| cx.new(|_| Nothing))
-                        .into_any_element(),
-                );
-            }
-        }
-        let here = path;
-        div()
-            .size_full()
-            .min_w_0()
-            .min_h_0()
-            .flex()
-            .when(!row, |d| d.flex_col())
-            .on_drag_move(cx.listener(move |w, ev: &DragMoveEvent<Divider>, _, cx| {
-                let d = ev.drag(cx);
-                if d.owner != owner || d.path != here {
-                    return;
-                }
-                let b = ev.bounds;
-                let pos = ev.event.position;
-                let (at, len) = if row {
-                    ((pos.x - b.origin.x) / b.size.width, b.size.width)
-                } else {
-                    ((pos.y - b.origin.y) / b.size.height, b.size.height)
-                };
-                let min = 120. / len.as_f32().max(1.);
-                let index = d.index;
-                let moved = match owner {
-                    Owner::Layout(id) => w
-                        .model
-                        .find_layout_mut(id)
-                        .and_then(|l| l.slots.branch_mut(&here))
-                        .map(|c| tree::move_boundary(c, index, at, min)),
-                    Owner::Space(id) => w
-                        .model
-                        .find_space_mut(id)
-                        .and_then(|s| s.splits.branch_mut(&here))
-                        .map(|c| tree::move_boundary(c, index, at, min)),
-                };
-                if moved.is_some() {
-                    cx.notify();
-                }
-            }))
-            .children(items)
-            .into_any_element()
-    }
-
     /// A split's card; `outline` is the space color when it's the focused split.
     fn card(&self, split: &Split, outline: Option<usize>, cx: &mut Context<Self>) -> AnyElement {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
+        let compact = split.stacked;
         self.fit_hidden(split, cx);
         let body = match split.tab() {
             Tab::Messages => Some(
@@ -483,6 +381,7 @@ impl Workspace {
                     .rounded(px(7.))
                     .text_size(px(12.5))
                     .whitespace_nowrap()
+                    .when(compact, |d| d.flex_none().w_full().overflow_hidden())
                     .border_1()
                     .border_color(gpui::transparent_black())
                     .text_color(rgb(theme::TEXT_MUTED))
@@ -494,7 +393,20 @@ impl Workspace {
                     .when(numbered && i < 9, |d| {
                         d.child(badge::chip(i + 1).ml(px(-3.)))
                     })
-                    .child(self.term_label(tab))
+                    .map(|d| {
+                        if compact {
+                            d.child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .overflow_hidden()
+                                    .text_ellipsis()
+                                    .child(self.term_label(tab)),
+                            )
+                        } else {
+                            d.child(self.term_label(tab))
+                        }
+                    })
                     .children(
                         tab.term()
                             .and_then(|t| self.agents.shown(t))
@@ -537,6 +449,7 @@ impl Workspace {
                 let _ = w.open(None, Place::Tab, None, &[], true, window, cx);
             }));
         let card = div()
+            .relative()
             .size_full()
             .min_w_0()
             .min_h_0()
@@ -557,48 +470,90 @@ impl Workspace {
                     }
                 }),
             )
-            .child(
-                div()
-                    .h(px(TAB_STRIP))
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .gap(px(3.))
-                    .px(px(6.))
-                    .border_b_1()
-                    .border_color(rgb(theme::TAB_STRIP_BORDER))
-                    .group(format!("tab-bar-{}", split_id.0))
-                    .overflow_hidden()
-                    .on_mouse_down(
-                        MouseButton::Right,
-                        cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                            w.open_menu(For::Tabs(split_id), ev.position, window, cx)
-                        }),
-                    )
-                    .child(
+            .map(|d| {
+                if compact {
+                    d.child(
                         div()
-                            .flex_1()
-                            .min_w_0()
+                            .id(("tab-list", split_id.0))
+                            .size_full()
+                            .flex()
+                            .flex_col()
+                            .gap(px(3.))
+                            .p(px(6.))
+                            .overflow_y_scroll()
+                            .on_mouse_down(
+                                MouseButton::Right,
+                                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                                    w.open_menu(For::Tabs(split_id), ev.position, window, cx)
+                                }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .justify_end()
+                                    .child(stack_button(split_id, true, cx)),
+                            )
+                            .children(tabs),
+                    )
+                } else {
+                    d.child(
+                        div()
+                            .h(px(TAB_STRIP))
+                            .flex_none()
                             .flex()
                             .items_center()
                             .gap(px(3.))
+                            .px(px(6.))
+                            .border_b_1()
+                            .border_color(rgb(theme::TAB_STRIP_BORDER))
+                            .group(format!("tab-bar-{}", split_id.0))
                             .overflow_hidden()
-                            .children(tabs)
-                            .child(plus),
+                            .on_mouse_down(
+                                MouseButton::Right,
+                                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                                    w.open_menu(For::Tabs(split_id), ev.position, window, cx)
+                                }),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .flex()
+                                    .items_center()
+                                    .gap(px(3.))
+                                    .overflow_hidden()
+                                    .children(tabs)
+                                    .child(plus),
+                            )
+                            .child(stack_button(split_id, false, cx))
+                            .child(expand::button(
+                                ("zoom-split", split_id.0),
+                                format!("tab-bar-{}", split_id.0),
+                                zoomed,
+                                cx.listener(move |w, _, window, cx| {
+                                    w.model.focus_split(split_id);
+                                    w.apply(window, cx, |m| m.toggle_zoom())
+                                }),
+                            )),
                     )
-                    .child(expand::button(
-                        ("zoom-split", split_id.0),
-                        format!("tab-bar-{}", split_id.0),
-                        zoomed,
-                        cx.listener(move |w, _, window, cx| {
-                            w.model.focus_split(split_id);
-                            w.apply(window, cx, |m| m.toggle_zoom())
-                        }),
-                    )),
-            )
-            .child(div().flex_1().min_h_0().children(body));
+                    .child(div().flex_1().min_h_0().children(body))
+                }
+            });
         tab_drag::track_card(card, split_id, cx).into_any_element()
     }
+}
+
+/// The button that narrows a split to a list of its tabs, or puts it back.
+fn stack_button(split: SplitId, on: bool, cx: &mut Context<Workspace>) -> impl IntoElement {
+    expand::stack(
+        ("stack-split", split.0),
+        format!("tab-bar-{}", split.0),
+        on,
+        cx.listener(move |w, _, window, cx| {
+            w.model.focus_split(split);
+            w.apply(window, cx, |m| m.toggle_stacked())
+        }),
+    )
 }
 
 /// Header buttons in their order, the ones that are on moved after the rest.
