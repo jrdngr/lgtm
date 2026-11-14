@@ -95,7 +95,7 @@ impl Keyed for Slot {
 }
 
 /// How wide a split listing its tabs starts.
-const STACKED_WIDTH: f32 = 200.;
+const STACKED_WIDTH: f32 = 100.;
 
 impl Split {
     pub fn tab(&self) -> Tab {

@@ -12,7 +12,8 @@ use crate::theme;
 
 /// The smallest a split or slot gets when a divider is dragged.
 const MIN: f32 = 120.;
-/// The widest a split listing its tabs gets.
+/// The narrowest and widest a split listing its tabs gets.
+const STACKED_MIN: f32 = 100.;
 const STACKED_MAX: f32 = 600.;
 
 /// Which tree a branch belongs to: a layout's slots or a space's splits.
@@ -159,5 +160,5 @@ impl Workspace {
 }
 
 fn clamp(width: Pixels) -> f32 {
-    width.as_f32().clamp(MIN, STACKED_MAX)
+    width.as_f32().clamp(STACKED_MIN, STACKED_MAX)
 }
