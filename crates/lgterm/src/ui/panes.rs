@@ -3,8 +3,9 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, Context, FontWeight, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
-    ParentElement, StatefulInteractiveElement, StyleRefinement, Styled, Window, div, px, rgb, rgba,
+    AnyElement, ClickEvent, Context, FontWeight, InteractiveElement, IntoElement, MouseButton,
+    MouseDownEvent, ParentElement, StatefulInteractiveElement, StyleRefinement, Styled, Window,
+    div, px, rgb, rgba,
 };
 
 use super::branch::{Owner, Size};
@@ -361,18 +362,28 @@ impl Workspace {
                     .into_any_element()
             }),
         };
+        let dragged = |tab: Tab| {
+            if self.picked.contains(&tab) {
+                self.picked.clone()
+            } else {
+                vec![tab]
+            }
+        };
+        let whole = split.tabs.clone();
+        let whole_label = self.drag_label(&whole);
         let tabs = split
             .tabs
             .iter()
             .enumerate()
             .map(|(i, &tab)| {
                 let active = i == split.active;
+                let picked = self.picked.contains(&tab);
                 let key = match tab {
                     Tab::Term(t) => t.0,
                     Tab::Messages => 0,
                 };
                 tab_drag::track_pill(div().id(("tab", key)), tab, cx)
-                    .drags_tab(tab, self.term_label(tab))
+                    .drags_tabs(dragged(tab), self.drag_label(&dragged(tab)))
                     .flex()
                     .items_center()
                     .gap(px(7.))
@@ -388,6 +399,11 @@ impl Workspace {
                     .when(active, |d| {
                         d.bg(rgb(theme::TAB_ACTIVE))
                             .border_color(rgb(theme::CARD_BORDER))
+                            .text_color(rgb(theme::TEXT_STRONG))
+                    })
+                    .when(picked, |d| {
+                        d.border_color(rgb(theme::FOCUS))
+                            .bg(rgba((theme::FOCUS << 8) | 0x2e))
                             .text_color(rgb(theme::TEXT_STRONG))
                     })
                     .when(numbered && i < 9, |d| {
@@ -413,7 +429,7 @@ impl Workspace {
                             .map(|s| self.mark(s)),
                     )
                     .children(tab.term().and_then(|t| self.waiting_mark(t)))
-                    .when(active, |d| {
+                    .when(active && !compact, |d| {
                         d.child(
                             div()
                                 .id(("close", key))
@@ -427,7 +443,12 @@ impl Workspace {
                                 })),
                         )
                     })
-                    .on_click(cx.listener(move |w, _, window, cx| {
+                    .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {
+                        if ev.modifiers().platform {
+                            w.toggle_pick(tab, cx);
+                            return;
+                        }
+                        w.picked.clear();
                         w.model.focus_tab(tab);
                         w.focus_current(window, cx);
                     }))
@@ -475,6 +496,7 @@ impl Workspace {
                     d.child(
                         div()
                             .id(("tab-list", split_id.0))
+                            .group(format!("tab-bar-{}", split_id.0))
                             .size_full()
                             .flex()
                             .flex_col()
@@ -491,6 +513,7 @@ impl Workspace {
                                 div()
                                     .flex()
                                     .justify_end()
+                                    .child(grip(split_id, whole.clone(), whole_label.clone()))
                                     .child(stack_button(split_id, true, cx)),
                             )
                             .children(tabs),
@@ -525,6 +548,7 @@ impl Workspace {
                                     .children(tabs)
                                     .child(plus),
                             )
+                            .child(grip(split_id, whole, whole_label))
                             .child(stack_button(split_id, false, cx))
                             .child(expand::button(
                                 ("zoom-split", split_id.0),
@@ -541,6 +565,27 @@ impl Workspace {
             });
         tab_drag::track_card(card, split_id, cx).into_any_element()
     }
+}
+
+/// The handle that drags a split's tabs together, shown while the pointer is over its tabs.
+fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
+    div()
+        .id(("pane-grip", split.0))
+        .flex_none()
+        .size(px(22.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded(px(5.))
+        .text_size(px(11.))
+        .text_color(rgb(theme::ICON))
+        .opacity(0.)
+        .group_hover(format!("tab-bar-{}", split.0), |s| s.opacity(1.))
+        .hover(|s| s.bg(rgb(theme::ROW_HOVER)).text_color(rgb(theme::TEXT)))
+        .cursor_grab()
+        .child("⠿")
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .drags_tabs(tabs, label)
 }
 
 /// The button that narrows a split to a list of its tabs, or puts it back.

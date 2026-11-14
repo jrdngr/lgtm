@@ -1,5 +1,6 @@
-//! Dragging a tab by its pill onto any split in the window: between its tabs, beside it in a
-//! new split, or along the side of a larger part of its space.
+//! Dragging tabs onto any split in the window: between its tabs, beside it in a new split, or
+//! along the side of a larger part of its space. A pill drags its tab, or every picked tab when
+//! it's picked; a split's tab strip drags all its tabs.
 
 use std::collections::HashMap;
 
@@ -17,9 +18,9 @@ use crate::theme;
 /// The tab strip's height; a drop on it joins the split's tabs.
 pub(super) const TAB_STRIP: f32 = 36.;
 
-/// A tab being dragged.
+/// Tabs being dragged, in the order they land.
 pub(super) struct TabDrag {
-    pub tab: Tab,
+    pub tabs: Vec<Tab>,
     pub label: String,
 }
 
@@ -60,15 +61,15 @@ pub(super) struct TabDrop {
 }
 
 pub(super) trait DragsTab {
-    /// Drags `tab` out from here.
-    fn drags_tab(self, tab: Tab, label: String) -> Self;
+    /// Drags `tabs` out from here.
+    fn drags_tabs(self, tabs: Vec<Tab>, label: String) -> Self;
 }
 
 impl DragsTab for Stateful<gpui::Div> {
-    fn drags_tab(self, tab: Tab, label: String) -> Self {
-        self.on_drag(TabDrag { tab, label }, |d, _, _, cx| {
+    fn drags_tabs(self, tabs: Vec<Tab>, label: String) -> Self {
+        self.on_drag(TabDrag { tabs, label }, |d, _, _, cx| {
             cx.new(|_| TabDrag {
-                tab: d.tab,
+                tabs: d.tabs.clone(),
                 label: d.label.clone(),
             })
         })
@@ -100,7 +101,8 @@ pub(super) fn track_card<E: InteractiveElement>(
 impl Workspace {
     /// Works out where the dragged tab would land under the pointer.
     pub(super) fn tab_drag_move(&mut self, ev: &DragMoveEvent<TabDrag>, cx: &mut Context<Self>) {
-        let tab = ev.drag(cx).tab;
+        let tabs = ev.drag(cx).tabs.clone();
+        let Some(&tab) = tabs.first() else { return };
         let p = ev.event.position;
         let shown: Vec<SplitId> = self
             .model
@@ -131,21 +133,48 @@ impl Workspace {
                     .iter()
                     .filter(|(_, b)| b.center().x < p.x)
                     .count();
-                let same = from.split == split && (at == from.tab || at == from.tab + 1);
+                let same = tabs.len() == 1
+                    && from.split == split
+                    && (at == from.tab || at == from.tab + 1);
                 return (!same).then_some(Target::Tabs(split, at));
             }
             let side = nearest_side(b, p)?;
-            let alone = self
-                .model
-                .find_space(from.space)
-                .and_then(|s| s.splits.find(from.split))
-                .is_some_and(|s| s.tabs.len() == 1);
-            (from.split != split || !alone).then_some(Target::Split(split, side))
+            let whole = self.split_tabs(split).iter().all(|t| tabs.contains(t));
+            (!whole).then_some(Target::Split(split, side))
         });
         if self.tab_drop.target != target {
             self.tab_drop.target = target;
             cx.notify();
         }
+    }
+
+    /// Picks a tab to drag with the others picked, or unpicks it.
+    pub(super) fn toggle_pick(&mut self, tab: Tab, cx: &mut Context<Self>) {
+        match self.picked.iter().position(|t| *t == tab) {
+            Some(i) => {
+                self.picked.remove(i);
+            }
+            None => self.picked.push(tab),
+        }
+        cx.notify();
+    }
+
+    /// What a drag of `tabs` shows: their names.
+    pub(super) fn drag_label(&self, tabs: &[Tab]) -> String {
+        tabs.iter()
+            .map(|t| self.term_label(*t))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    }
+
+    /// A split's tabs in order.
+    fn split_tabs(&self, split: SplitId) -> Vec<Tab> {
+        self.model
+            .spaces
+            .iter()
+            .find_map(|s| s.splits.find(split))
+            .map(|s| s.tabs.clone())
+            .unwrap_or_default()
     }
 
     /// A split's tabs in order, with their pills' bounds.
@@ -189,13 +218,45 @@ impl Workspace {
 
     pub(super) fn tab_drop(&mut self, drag: &TabDrag, window: &mut Window, cx: &mut Context<Self>) {
         let d = std::mem::take(&mut self.tab_drop);
-        match d.target {
-            Some(Target::Tabs(split, at)) => self.model.move_tab_to(drag.tab, split, at),
-            Some(Target::Split(split, side)) => self.model.move_tab(drag.tab, split, Some(side)),
-            Some(Target::Edge(split, side)) => self.model.move_tab_to_edge(drag.tab, split, side),
-            None => {}
+        if let Some(target) = d.target {
+            self.move_tabs(&drag.tabs, target);
+            self.picked.clear();
         }
         self.focus_current(window, cx);
+    }
+
+    /// Moves `tabs` to `target`, keeping their order; ones that start a new split take the rest
+    /// along.
+    fn move_tabs(&mut self, tabs: &[Tab], target: Target) {
+        let Some((&first, rest)) = tabs.split_first() else {
+            return;
+        };
+        match target {
+            Target::Tabs(split, at) => {
+                let anchor = self
+                    .split_tabs(split)
+                    .into_iter()
+                    .skip(at)
+                    .find(|t| !tabs.contains(t));
+                for &tab in tabs {
+                    let at = anchor
+                        .and_then(|a| self.split_tabs(split).iter().position(|t| *t == a))
+                        .unwrap_or(usize::MAX);
+                    self.model.move_tab_to(tab, split, at);
+                }
+                self.model.focus_tab(first);
+                return;
+            }
+            Target::Split(split, side) => self.model.move_tab(first, split, Some(side)),
+            Target::Edge(split, side) => self.model.move_tab_to_edge(first, split, side),
+        }
+        let Some(to) = self.model.locate(first).map(|p| p.split) else {
+            return;
+        };
+        for &tab in rest {
+            self.model.move_tab_to(tab, to, usize::MAX);
+        }
+        self.model.focus_tab(first);
     }
 
     /// Where the dragged tab would land, drawn over the window.

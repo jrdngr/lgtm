@@ -70,6 +70,8 @@ pub struct Workspace {
     tab_drop: tab_drag::TabDrop,
     /// Spaces picked with ⌘-click on their titles, for commands like distribute.
     selected: Vec<SpaceId>,
+    /// Tabs picked with ⌘-click, which drag together.
+    picked: Vec<Tab>,
     home: Option<PathBuf>,
     /// What an unnamed space with no terminal is called.
     home_name: String,
@@ -118,6 +120,7 @@ impl Workspace {
             layout_drop: Default::default(),
             tab_drop: Default::default(),
             selected: Vec::new(),
+            picked: Vec::new(),
             home,
             home_name,
             settings,
@@ -290,6 +293,7 @@ impl Workspace {
             self.agents.closed(term);
             self.run_effects(cx);
         }
+        self.picked.retain(|t| *t != tab);
         let was_focused = self.model.tab() == Some(tab);
         if !self.model.remove_tab(tab) {
             cx.quit();
