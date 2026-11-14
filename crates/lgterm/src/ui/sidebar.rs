@@ -397,7 +397,7 @@ impl Workspace {
 }
 
 /// The agent's mark, in its own color.
-fn agent_icon(kind: Kind) -> AnyElement {
+pub(super) fn agent_icon(kind: Kind) -> AnyElement {
     let (path, color) = match kind {
         Kind::Claude => ("agents/claude.svg", theme::CLAUDE),
         Kind::Codex => ("agents/codex.svg", theme::TEXT),

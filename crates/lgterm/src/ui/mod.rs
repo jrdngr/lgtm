@@ -4,6 +4,7 @@ pub mod actions;
 mod agents;
 mod badge;
 mod branch;
+mod collapsed;
 mod confirm;
 mod control;
 mod dispatch;
@@ -72,6 +73,12 @@ pub struct Workspace {
     selected: Vec<SpaceId>,
     /// Tabs picked with ⌘-click, which drag together.
     picked: Vec<Tab>,
+    /// The space whose collapsed splits are listed.
+    collapsed_open: Option<SpaceId>,
+    /// Whether the press under way shut that list.
+    collapsed_shut: bool,
+    /// The window's height, for the list's columns.
+    view_height: f32,
     home: Option<PathBuf>,
     /// What an unnamed space with no terminal is called.
     home_name: String,
@@ -121,6 +128,9 @@ impl Workspace {
             tab_drop: Default::default(),
             selected: Vec::new(),
             picked: Vec::new(),
+            collapsed_open: None,
+            collapsed_shut: false,
+            view_height: 0.,
             home,
             home_name,
             settings,

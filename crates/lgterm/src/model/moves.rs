@@ -107,8 +107,7 @@ impl Model {
             id,
             tabs: vec![tab],
             active: 0,
-            stacked: false,
-            stacked_width: None,
+            collapsed: false,
         };
         let _ = space
             .splits
@@ -170,8 +169,7 @@ impl Model {
             id,
             tabs: vec![tab],
             active: 0,
-            stacked: false,
-            stacked_width: None,
+            collapsed: false,
         };
         space.splits.insert_at_edge(&path, split, axis, before);
         self.focus_tab(tab);

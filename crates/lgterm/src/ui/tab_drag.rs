@@ -119,8 +119,7 @@ impl Workspace {
             .iter()
             .find(|(s, b)| shown.contains(s) && b.contains(&p));
         let target = over.and_then(|(&split, b)| {
-            let stacked = self.is_stacked(split);
-            let in_strip = stacked || (p.y - b.origin.y).as_f32() < TAB_STRIP;
+            let in_strip = (p.y - b.origin.y).as_f32() < TAB_STRIP;
             if !in_strip
                 && let Some(side) = edge(b, p)
                 && self.edge_bounds(split, side).is_some()
@@ -132,13 +131,7 @@ impl Workspace {
                 let at = self
                     .pills_of(split)
                     .iter()
-                    .filter(|(_, b)| {
-                        if stacked {
-                            b.center().y < p.y
-                        } else {
-                            b.center().x < p.x
-                        }
-                    })
+                    .filter(|(_, b)| b.center().x < p.x)
                     .count();
                 let same = tabs.len() == 1
                     && from.split == split
@@ -172,15 +165,6 @@ impl Workspace {
             .map(|t| self.term_label(*t))
             .collect::<Vec<_>>()
             .join(" · ")
-    }
-
-    /// Whether a split lists its tabs, so drops on it only join them.
-    fn is_stacked(&self, split: SplitId) -> bool {
-        self.model
-            .spaces
-            .iter()
-            .find_map(|s| s.splits.find(split))
-            .is_some_and(|s| s.stacked)
     }
 
     /// A split's tabs in order.
@@ -306,26 +290,6 @@ impl Workspace {
     /// A bar where the dragged tab would go among a split's tabs.
     fn render_tab_slot(&self, split: SplitId, at: usize) -> Option<AnyElement> {
         let pills = self.pills_of(split);
-        if self.is_stacked(split) {
-            let (y, b) = match pills.get(at) {
-                Some((_, b)) => (b.origin.y - px(2.5), *b),
-                None => {
-                    let (_, b) = pills.last()?;
-                    (b.origin.y + b.size.height + px(0.5), *b)
-                }
-            };
-            return Some(
-                div()
-                    .absolute()
-                    .left(b.origin.x)
-                    .top(y)
-                    .w(b.size.width)
-                    .h(px(2.))
-                    .rounded(px(1.))
-                    .bg(rgb(theme::FOCUS))
-                    .into_any_element(),
-            );
-        }
         let (x, b) = match pills.get(at) {
             Some((_, b)) => (b.origin.x - px(2.5), *b),
             None => {

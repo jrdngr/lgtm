@@ -600,3 +600,52 @@ fn terminals_number_one_apart_and_count_on_from_the_highest_left_after_a_load() 
     assert!(back.remove_tab(TermId(5).into()));
     assert_eq!(back.new_tab().0, 4);
 }
+
+fn split_of(m: &Model, t: TermId) -> SplitId {
+    m.locate(t.into()).unwrap().split
+}
+
+fn is_collapsed(m: &Model, t: TermId) -> bool {
+    m.space_of(t.into())
+        .unwrap()
+        .collapsed()
+        .iter()
+        .any(|s| s.tabs.contains(&t.into()))
+}
+
+#[test]
+fn moving_focus_skips_collapsed_splits_until_their_terminal_is_focused() {
+    let (mut m, a) = Model::new();
+    let b = m.split_split(Axis::Row);
+    let c = m.split_split(Axis::Row);
+    m.collapse(split_of(&m, b));
+    m.focus_term(a);
+    m.cycle_split(1);
+    assert_eq!(m.term(), Some(c));
+    m.focus_dir(Dir::Left);
+    assert_eq!(m.term(), Some(a));
+    m.focus_term(b);
+    assert_eq!(m.term(), Some(b));
+    assert!(!is_collapsed(&m, b));
+}
+
+#[test]
+fn collapsing_the_focused_split_moves_focus_and_the_last_shown_one_stays() {
+    let (mut m, a) = Model::new();
+    let b = m.split_split(Axis::Row);
+    m.collapse(split_of(&m, b));
+    assert_eq!(m.term(), Some(a));
+    m.collapse(split_of(&m, a));
+    assert!(!is_collapsed(&m, a));
+    assert_eq!(m.term(), Some(a));
+}
+
+#[test]
+fn closing_the_last_shown_split_brings_back_a_collapsed_one() {
+    let (mut m, a) = Model::new();
+    let b = m.split_split(Axis::Column);
+    m.collapse(split_of(&m, b));
+    assert!(m.remove_tab(a.into()));
+    assert_eq!(m.term(), Some(b));
+    assert!(!is_collapsed(&m, b));
+}

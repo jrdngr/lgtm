@@ -26,12 +26,9 @@ pub struct Split {
     pub id: SplitId,
     pub tabs: Vec<Tab>,
     pub active: usize,
-    /// Narrowed to a list of its tabs.
+    /// Out of the space, listed in its title.
     #[serde(default)]
-    pub stacked: bool,
-    /// How wide the list of its tabs was last made.
-    #[serde(default)]
-    pub stacked_width: Option<f32>,
+    pub collapsed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -94,21 +91,32 @@ impl Keyed for Slot {
     }
 }
 
-/// How wide a split listing its tabs starts.
-const STACKED_WIDTH: f32 = 100.;
-
 impl Split {
     pub fn tab(&self) -> Tab {
         self.tabs[self.active]
     }
-
-    /// How wide it is while it lists its tabs.
-    pub fn stacked_width(&self) -> f32 {
-        self.stacked_width.unwrap_or(STACKED_WIDTH)
-    }
 }
 
 impl Space {
+    /// Its collapsed splits, in reading order.
+    pub fn collapsed(&self) -> Vec<&Split> {
+        self.splits
+            .leaves()
+            .into_iter()
+            .filter(|s| s.collapsed)
+            .collect()
+    }
+
+    /// Focuses its first split shown, first showing its first split when all are collapsed.
+    fn refocus(&mut self) {
+        let shown = self.splits.leaves().into_iter().find(|s| !s.collapsed);
+        self.focus = match shown {
+            Some(s) => s.id,
+            None => self.splits.first().id,
+        };
+        self.split_mut().collapsed = false;
+    }
+
     pub fn split(&self) -> &Split {
         self.splits.find(self.focus).expect("focused split")
     }
@@ -238,8 +246,7 @@ impl Model {
             id: SplitId(self.id()),
             tabs: vec![Tab::Term(term)],
             active: 0,
-            stacked: false,
-            stacked_width: None,
+            collapsed: false,
         };
         (split, term)
     }
@@ -418,7 +425,9 @@ impl Model {
             space.zoom = None;
         }
         space.focus = p.split;
-        space.split_mut().active = p.tab;
+        let split = space.split_mut();
+        split.active = p.tab;
+        split.collapsed = false;
     }
 
     pub fn focus_term(&mut self, term: TermId) {
@@ -465,7 +474,7 @@ impl Model {
         }
         if space.splits.remove(p.split).is_some() {
             if space.focus == p.split {
-                space.focus = space.splits.first().id;
+                space.refocus();
             }
             if space.zoom == Some(p.split) {
                 space.zoom = None;
@@ -510,8 +519,7 @@ impl Model {
             id,
             tabs: vec![tab],
             active: 0,
-            stacked: false,
-            stacked_width: None,
+            collapsed: false,
         };
         let at = space.focus;
         space
@@ -593,7 +601,7 @@ impl Model {
     }
 
     /// Each split and empty slot the window shows, with its rectangle: only the expanded
-    /// space's, and only a space's zoomed split.
+    /// space's, only a space's zoomed split, and no collapsed split.
     pub fn cells(&self) -> Vec<(Cell, Rect)> {
         let layout = self.layout();
         let slots = match layout.expanded.and_then(|e| layout.slot_of(e)) {
@@ -609,7 +617,7 @@ impl Model {
                         Some(z) => vec![(Cell::Split(z), area)],
                         None => space
                             .splits
-                            .rects(area)
+                            .rects_where(area, &|s: &Split| !s.collapsed)
                             .into_iter()
                             .map(|(id, r)| (Cell::Split(id), r))
                             .collect(),
@@ -651,24 +659,30 @@ impl Model {
         }
     }
 
+    /// Takes a split out of its space, leaving it listed in the space's title. The last split
+    /// shown stays.
+    pub fn collapse(&mut self, split: SplitId) {
+        let Some(space) = self.spaces.iter_mut().find(|s| s.splits.contains(split)) else {
+            return;
+        };
+        let others = space
+            .splits
+            .leaves()
+            .iter()
+            .any(|s| s.id != split && !s.collapsed);
+        if !others {
+            return;
+        }
+        space.splits.find_mut(split).expect("split").collapsed = true;
+        if space.zoom == Some(split) {
+            space.zoom = None;
+        }
+        if space.focus == split {
+            space.refocus();
+        }
+    }
+
     /// Fills the focused space with its focused split, or puts its splits back.
-    /// Narrows the focused split to a list of its tabs, or puts it back.
-    pub fn toggle_stacked(&mut self) {
-        if let Some(split) = self.split_mut() {
-            split.stacked = !split.stacked;
-        }
-    }
-
-    pub fn set_stacked_width(&mut self, split: SplitId, width: f32) {
-        if let Some(s) = self
-            .spaces
-            .iter_mut()
-            .find_map(|s| s.splits.find_mut(split))
-        {
-            s.stacked_width = Some(width);
-        }
-    }
-
     pub fn toggle_zoom(&mut self) {
         if let Some(space) = self.space_mut() {
             space.zoom = match space.zoom {

@@ -202,18 +202,36 @@ impl<T: Keyed> Tree<T> {
 
     /// Each leaf's rectangle when the tree fills `area`.
     pub fn rects(&self, area: Rect) -> Vec<(T::Key, Rect)> {
+        self.rects_where(area, &|_| true)
+    }
+
+    /// Each kept leaf's rectangle when the kept leaves fill `area` between them.
+    pub fn rects_where(&self, area: Rect, keep: &impl Fn(&T) -> bool) -> Vec<(T::Key, Rect)> {
         let mut out = Vec::new();
-        self.place(area, &mut out);
+        self.place(area, keep, &mut out);
         out
     }
 
-    fn place(&self, area: Rect, out: &mut Vec<(T::Key, Rect)>) {
+    /// Whether any leaf is kept.
+    pub fn any(&self, keep: &impl Fn(&T) -> bool) -> bool {
         match self {
-            Tree::Leaf(leaf) => out.push((leaf.key(), area)),
+            Tree::Leaf(leaf) => keep(leaf),
+            Tree::Branch { children, .. } => children.iter().any(|c| c.tree.any(keep)),
+        }
+    }
+
+    fn place(&self, area: Rect, keep: &impl Fn(&T) -> bool, out: &mut Vec<(T::Key, Rect)>) {
+        match self {
+            Tree::Leaf(leaf) => {
+                if keep(leaf) {
+                    out.push((leaf.key(), area))
+                }
+            }
             Tree::Branch { axis, children } => {
-                let total: f32 = children.iter().map(|c| c.weight).sum();
+                let shown: Vec<_> = children.iter().filter(|c| c.tree.any(keep)).collect();
+                let total: f32 = shown.iter().map(|c| c.weight).sum();
                 let mut at = 0.;
-                for child in children {
+                for child in shown {
                     let share = child.weight / total;
                     let rect = match axis {
                         Axis::Row => Rect {
@@ -227,7 +245,7 @@ impl<T: Keyed> Tree<T> {
                             ..area
                         },
                     };
-                    child.tree.place(rect, out);
+                    child.tree.place(rect, keep, out);
                     at += share;
                 }
             }
@@ -246,19 +264,31 @@ impl<T: Keyed> Tree<T> {
     }
 }
 
-/// Moves the boundary after child `index` to `at` (0 to 1 along the branch), trading length
-/// between the two children beside it. Neither ends up smaller than `min`.
-pub fn move_boundary<T>(children: &mut [Node<T>], index: usize, at: f32, min: f32) {
-    if index + 1 >= children.len() {
+/// Moves the boundary after the `index`th of the `shown` children to `at` (0 to 1 along the
+/// shown children), trading length between the two shown children beside it. Neither ends up
+/// smaller than `min`. Children not shown keep their weight.
+pub fn move_boundary<T>(
+    children: &mut [Node<T>],
+    shown: &[usize],
+    index: usize,
+    at: f32,
+    min: f32,
+) {
+    if index + 1 >= shown.len() || shown.iter().any(|&i| i >= children.len()) {
         return;
     }
-    let total: f32 = children.iter().map(|c| c.weight).sum();
-    let before: f32 = children[..index].iter().map(|c| c.weight).sum::<f32>() / total;
-    let pair = (children[index].weight + children[index + 1].weight) / total;
+    let (a, b) = (shown[index], shown[index + 1]);
+    let total: f32 = shown.iter().map(|&i| children[i].weight).sum();
+    let before: f32 = shown[..index]
+        .iter()
+        .map(|&i| children[i].weight)
+        .sum::<f32>()
+        / total;
+    let pair = (children[a].weight + children[b].weight) / total;
     let min = min.min(pair / 2.);
     let first = (at - before).clamp(min, pair - min);
-    children[index].weight = first * total;
-    children[index + 1].weight = (pair - first) * total;
+    children[a].weight = first * total;
+    children[b].weight = (pair - first) * total;
 }
 
 /// The rectangle beside `from` in `dir`: of those touching that edge, the one that shares the
@@ -302,6 +332,32 @@ mod tests {
 
     fn keys(t: &Tree<L>) -> Vec<u64> {
         t.leaves().iter().map(|l| l.0).collect()
+    }
+
+    #[test]
+    fn leaves_left_out_give_their_length_to_the_rest_and_keep_their_weight() {
+        let mut t = Tree::Leaf(L(1));
+        t.insert(1, L(2), Axis::Row).unwrap();
+        t.insert(2, L(3), Axis::Row).unwrap();
+        let keep = |l: &L| l.0 != 2;
+        let widths = |t: &Tree<L>| -> Vec<f32> {
+            t.rects_where(Rect::UNIT, &keep)
+                .iter()
+                .map(|(_, r)| r.w)
+                .collect()
+        };
+        assert_eq!(
+            t.rects_where(Rect::UNIT, &keep)
+                .iter()
+                .map(|(k, _)| *k)
+                .collect::<Vec<_>>(),
+            [1, 3]
+        );
+        assert!((widths(&t)[0] - 2. / 3.).abs() < 1e-6);
+        move_boundary(t.branch_mut(&[]).unwrap(), &[0, 2], 0, 0.5, 0.05);
+        assert!((widths(&t)[0] - 0.5).abs() < 1e-6);
+        assert!((widths(&t)[1] - 0.5).abs() < 1e-6);
+        assert!((t.rects(Rect::UNIT)[1].1.w - 0.25).abs() < 1e-6);
     }
 
     #[test]
@@ -376,12 +432,12 @@ mod tests {
         t.insert(1, L(2), Axis::Row).unwrap();
         t.insert(2, L(3), Axis::Row).unwrap();
         let children = t.branch_mut(&[]).unwrap();
-        move_boundary(children, 1, 0.6, 0.05);
+        move_boundary(children, &[0, 1, 2], 1, 0.6, 0.05);
         let widths: Vec<f32> = t.rects(Rect::UNIT).iter().map(|(_, r)| r.w).collect();
         assert!((widths[0] - 0.5).abs() < 1e-6);
         assert!((widths[1] - 0.1).abs() < 1e-6);
         assert!((widths[2] - 0.4).abs() < 1e-6);
-        move_boundary(t.branch_mut(&[]).unwrap(), 0, 0., 0.05);
+        move_boundary(t.branch_mut(&[]).unwrap(), &[0, 1, 2], 0, 0., 0.05);
         let widths: Vec<f32> = t.rects(Rect::UNIT).iter().map(|(_, r)| r.w).collect();
         assert!((widths[0] - 0.05).abs() < 1e-6);
     }

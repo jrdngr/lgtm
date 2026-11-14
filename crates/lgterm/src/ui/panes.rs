@@ -8,13 +8,13 @@ use gpui::{
     div, px, rgb, rgba,
 };
 
-use super::branch::{Owner, Size};
+use super::branch::Owner;
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::tab_drag::{self, DragsTab, TAB_STRIP};
 use super::{MovesWindow, Workspace, badge, expand};
 use crate::ipc::Place;
-use crate::model::{Axis, Slot, SlotId, Space, Split, SplitId, Tab, Tree};
+use crate::model::{Slot, SlotId, Space, Split, SplitId, Tab, Tree};
 use crate::theme;
 
 /// A space's title height.
@@ -83,10 +83,7 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (
-                            Size::Flex(c.weight),
-                            self.slot_tree(&c.tree, owner, path, cx),
-                        )
+                        (i, c.weight, self.slot_tree(&c.tree, owner, path, cx))
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -211,11 +208,13 @@ impl Workspace {
             })
             .child(
                 div()
-                    .flex_1()
+                    .flex_initial()
                     .min_w_0()
                     .overflow_hidden()
                     .child(label.clone()),
             )
+            .children(self.collapsed_button(space, cx))
+            .child(div().flex_1())
             .children(on_right(vec![
                 (
                     magnet,
@@ -317,24 +316,20 @@ impl Workspace {
                 self.card(split, outline, cx)
             }
             Tree::Branch { axis, children } => {
-                let kids = children
+                let mut kids: Vec<_> = children
                     .iter()
                     .enumerate()
+                    .filter(|(_, c)| c.tree.any(&|s: &Split| !s.collapsed))
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        let size = match &c.tree {
-                            Tree::Leaf(s) if s.stacked && *axis == Axis::Row => {
-                                Size::Fixed(s.id, s.stacked_width())
-                            }
-                            _ => Size::Flex(c.weight),
-                        };
-                        (
-                            size,
-                            self.split_tree(&c.tree, color, focused, owner, path, cx),
-                        )
+                        let el = self.split_tree(&c.tree, color, focused, owner, path, cx);
+                        (i, c.weight, el)
                     })
                     .collect();
+                if kids.len() == 1 {
+                    return kids.pop().expect("one").2;
+                }
                 self.branch(*axis, kids, owner, path, cx)
             }
         }
@@ -345,7 +340,12 @@ impl Workspace {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
-        let compact = split.stacked;
+        let collapsible = self
+            .model
+            .spaces
+            .iter()
+            .find(|s| s.splits.contains(split_id))
+            .is_some_and(|s| s.splits.leaves().iter().filter(|l| !l.collapsed).count() > 1);
         self.fit_hidden(split, cx);
         let body = match split.tab() {
             Tab::Messages => Some(
@@ -392,7 +392,6 @@ impl Workspace {
                     .rounded(px(7.))
                     .text_size(px(12.5))
                     .whitespace_nowrap()
-                    .when(compact, |d| d.flex_none().w_full().overflow_hidden())
                     .border_1()
                     .border_color(gpui::transparent_black())
                     .text_color(rgb(theme::TEXT_MUTED))
@@ -409,27 +408,14 @@ impl Workspace {
                     .when(numbered && i < 9, |d| {
                         d.child(badge::chip(i + 1).ml(px(-3.)))
                     })
-                    .map(|d| {
-                        if compact {
-                            d.child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .overflow_hidden()
-                                    .text_ellipsis()
-                                    .child(self.term_label(tab)),
-                            )
-                        } else {
-                            d.child(self.term_label(tab))
-                        }
-                    })
+                    .child(self.term_label(tab))
                     .children(
                         tab.term()
                             .and_then(|t| self.agents.shown(t))
                             .map(|s| self.mark(s)),
                     )
                     .children(tab.term().and_then(|t| self.waiting_mark(t)))
-                    .when(active && !compact, |d| {
+                    .when(active, |d| {
                         d.child(
                             div()
                                 .id(("close", key))
@@ -491,78 +477,48 @@ impl Workspace {
                     }
                 }),
             )
-            .map(|d| {
-                if compact {
-                    d.child(
-                        div()
-                            .id(("tab-list", split_id.0))
-                            .group(format!("tab-bar-{}", split_id.0))
-                            .size_full()
-                            .flex()
-                            .flex_col()
-                            .gap(px(3.))
-                            .p(px(6.))
-                            .overflow_y_scroll()
-                            .on_mouse_down(
-                                MouseButton::Right,
-                                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                                    w.open_menu(For::Tabs(split_id), ev.position, window, cx)
-                                }),
-                            )
-                            .child(
-                                div()
-                                    .flex()
-                                    .justify_end()
-                                    .child(grip(split_id, whole.clone(), whole_label.clone()))
-                                    .child(stack_button(split_id, true, cx)),
-                            )
-                            .children(tabs),
+            .child(
+                div()
+                    .h(px(TAB_STRIP))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .gap(px(3.))
+                    .px(px(6.))
+                    .border_b_1()
+                    .border_color(rgb(theme::TAB_STRIP_BORDER))
+                    .group(format!("tab-bar-{}", split_id.0))
+                    .overflow_hidden()
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                            w.open_menu(For::Tabs(split_id), ev.position, window, cx)
+                        }),
                     )
-                } else {
-                    d.child(
+                    .child(
                         div()
-                            .h(px(TAB_STRIP))
-                            .flex_none()
+                            .flex_1()
+                            .min_w_0()
                             .flex()
                             .items_center()
                             .gap(px(3.))
-                            .px(px(6.))
-                            .border_b_1()
-                            .border_color(rgb(theme::TAB_STRIP_BORDER))
-                            .group(format!("tab-bar-{}", split_id.0))
                             .overflow_hidden()
-                            .on_mouse_down(
-                                MouseButton::Right,
-                                cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
-                                    w.open_menu(For::Tabs(split_id), ev.position, window, cx)
-                                }),
-                            )
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .flex()
-                                    .items_center()
-                                    .gap(px(3.))
-                                    .overflow_hidden()
-                                    .children(tabs)
-                                    .child(plus),
-                            )
-                            .child(grip(split_id, whole, whole_label))
-                            .child(stack_button(split_id, false, cx))
-                            .child(expand::button(
-                                ("zoom-split", split_id.0),
-                                format!("tab-bar-{}", split_id.0),
-                                zoomed,
-                                cx.listener(move |w, _, window, cx| {
-                                    w.model.focus_split(split_id);
-                                    w.apply(window, cx, |m| m.toggle_zoom())
-                                }),
-                            )),
+                            .children(tabs)
+                            .child(plus),
                     )
-                    .child(div().flex_1().min_h_0().children(body))
-                }
-            });
+                    .child(grip(split_id, whole, whole_label))
+                    .when(collapsible, |d| d.child(collapse_button(split_id, cx)))
+                    .child(expand::button(
+                        ("zoom-split", split_id.0),
+                        format!("tab-bar-{}", split_id.0),
+                        zoomed,
+                        cx.listener(move |w, _, window, cx| {
+                            w.model.focus_split(split_id);
+                            w.apply(window, cx, |m| m.toggle_zoom())
+                        }),
+                    )),
+            )
+            .child(div().flex_1().min_h_0().children(body));
         tab_drag::track_card(card, split_id, cx).into_any_element()
     }
 }
@@ -588,16 +544,12 @@ fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
         .drags_tabs(tabs, label)
 }
 
-/// The button that narrows a split to a list of its tabs, or puts it back.
-fn stack_button(split: SplitId, on: bool, cx: &mut Context<Workspace>) -> impl IntoElement {
-    expand::stack(
-        ("stack-split", split.0),
+/// The button that takes a split out of its space.
+fn collapse_button(split: SplitId, cx: &mut Context<Workspace>) -> impl IntoElement {
+    expand::collapse(
+        ("collapse-split", split.0),
         format!("tab-bar-{}", split.0),
-        on,
-        cx.listener(move |w, _, window, cx| {
-            w.model.focus_split(split);
-            w.apply(window, cx, |m| m.toggle_stacked())
-        }),
+        cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.collapse(split))),
     )
 }
 
