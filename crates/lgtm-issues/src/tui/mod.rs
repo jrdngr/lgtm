@@ -16,6 +16,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use lgtm_tui_kit::flow;
 use lgtm_tui_kit::keybar::{self, Hint};
 use lgtm_tui_kit::markdown::Outcome as ViewOutcome;
 use lgtm_tui_kit::paint::Canvas;
@@ -591,10 +592,10 @@ impl Issues {
         if area.height < 4 {
             return;
         }
-        self.title(c);
+        let head = self.title(c).min(area.height - 3);
         let body = Rect {
-            y: area.y + 2,
-            height: area.height - 3,
+            y: area.y + head + 1,
+            height: area.height - head - 2,
             ..area
         };
         let bottom = area.bottom() - 1;
@@ -708,10 +709,10 @@ impl Issues {
         }
     }
 
-    fn title(&self, c: &mut Canvas) {
+    /// The folder and the counts by status, on one row with the counts on the right, or
+    /// wrapped onto more rows when the screen is too narrow. Returns the rows it takes.
+    fn title(&self, c: &mut Canvas) -> u16 {
         let (x0, y) = (c.area.x, c.area.y);
-        let x = c.put(x0, y, "issues", theme::fg(ACCENT));
-        c.put(x + 2, y, &picker::home(&self.folder.root), theme::fg(FG));
         let waiting: usize = self.issues.iter().map(|i| i.waiting().len()).sum();
         let quiet = |id: &str| {
             self.issues
@@ -719,7 +720,11 @@ impl Issues {
                 .filter(|i| i.status == id && i.waiting().is_empty())
                 .count()
         };
-        let mut parts = vec![(format!("● {waiting}"), AMBER)];
+        let mut parts = vec![
+            ("issues".to_string(), ACCENT),
+            (picker::home(&self.folder.root), FG),
+            (format!("● {waiting}"), AMBER),
+        ];
         for s in self.wf.statuses.iter().filter(|s| !s.fold) {
             parts.push((
                 format!("{} {}", s.glyph, quiet(&s.id)),
@@ -734,20 +739,68 @@ impl Issues {
             .map(|s| quiet(&s.id))
             .sum();
         parts.push((format!("✓ {folded}"), GREEN));
-        let width: u16 = parts
+        let widths: Vec<u16> = parts
             .iter()
-            .map(|(t, _)| t.chars().count() as u16 + 2)
-            .sum();
-        let mut x = c.area.right().saturating_sub(width - 1);
-        for (t, color) in parts {
-            x = c.put(x, y, &t, theme::fg(color)) + 2;
+            .map(|(t, _)| t.chars().count() as u16)
+            .collect();
+        let room = c.area.width.saturating_sub(1);
+        let lines = flow::lines(&widths, 2, room);
+        if let [_] = lines.as_slice() {
+            let x = c.put(x0, y, &parts[0].0, theme::fg(ACCENT));
+            c.put(x + 2, y, &parts[1].0, theme::fg(FG));
+            let counts: u16 = widths[2..].iter().map(|w| w + 2).sum();
+            let mut x = c.area.right().saturating_sub(counts - 1);
+            for (t, color) in &parts[2..] {
+                x = c.put(x, y, t, theme::fg(*color)) + 2;
+            }
+            return 1;
         }
+        for (row, line) in lines.iter().enumerate() {
+            let mut x = x0;
+            for (t, color) in &parts[line.clone()] {
+                x = c.put(x, y + row as u16, t, theme::fg(*color)) + 2;
+            }
+        }
+        lines.len() as u16
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn rows_of(issues: &Issues, width: u16) -> (u16, Vec<String>) {
+        let area = Rect::new(0, 0, width, 6);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        let n = issues.title(&mut Canvas::new(&mut buf, area));
+        let rows = (0..area.height)
+            .map(|y| {
+                let row: String = (0..width).map(|x| buf[(x, y)].symbol()).collect();
+                row.trim_end().to_owned()
+            })
+            .collect();
+        (n, rows)
+    }
+
+    #[test]
+    fn the_title_wraps_its_counts_onto_more_rows_instead_of_overlapping() {
+        let dir = tempfile::tempdir().unwrap();
+        let issues = Issues::new(Folder::init(dir.path()).unwrap(), "jordan".into());
+        let (n, rows) = rows_of(&issues, 200);
+        assert_eq!(n, 1);
+        assert!(rows[0].starts_with("issues  "));
+        assert!(rows[0].ends_with("✓ 0"));
+        let (n, rows) = rows_of(&issues, 14);
+        assert!(n > 3);
+        assert_eq!(rows[0], "issues");
+        let counts: Vec<&str> = rows[2..n as usize]
+            .iter()
+            .flat_map(|r| r.split("  "))
+            .collect();
+        assert_eq!(counts.first(), Some(&"● 0"));
+        assert_eq!(counts.last(), Some(&"✓ 0"));
+        assert!(counts.iter().all(|c| c.chars().count() == 3));
+    }
 
     #[test]
     fn option_digits_come_as_alt_or_as_mac_option_characters() {
