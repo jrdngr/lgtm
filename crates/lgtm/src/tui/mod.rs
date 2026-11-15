@@ -3,6 +3,7 @@
 mod decor;
 mod edit;
 mod files;
+mod frame;
 mod github;
 mod heat;
 mod help;
@@ -34,16 +35,15 @@ use std::time::{Duration, Instant};
 use lgtm_core::paths;
 use lgtm_core::repo::Repo;
 use lgtm_core::store::Store;
-use lgtm_tui_kit::{highlight, keybar, paint, theme};
+use lgtm_tui_kit::{flow, highlight, keybar, paint, theme};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::layout::Rect;
 
 use load::{Loader, Msg, Target};
 use paint::Canvas;
 use review::Review;
 use settings::Settings;
 use term::Term;
-use theme::{ACCENT, BG, CYAN, FG, PANEL, RED};
+use theme::{CYAN, FG, PANEL, RED};
 
 /// The frames of the spinner a running jj action shows.
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -751,7 +751,7 @@ impl App {
             return;
         }
         if self.screen == Screen::Editor {
-            draw_editor(
+            frame::draw_editor(
                 c,
                 &mut self.buffers,
                 self.help.as_mut(),
@@ -759,29 +759,35 @@ impl App {
             );
             return;
         }
-        let Some((x, body)) = frame(c) else {
-            return;
-        };
-        let area = c.area;
-        let top = area.y;
-        let bottom = area.bottom() - 1;
+        let width = c.area.width;
+        let bottom = c.area.bottom().saturating_sub(1);
         let unsaved = self
             .buffers
             .unsaved()
             .into_iter()
             .map(str::to_string)
             .collect();
-        let (hints, keys) = match self.review.as_mut() {
+        let (body, keys) = match self.review.as_mut() {
             Some(r) => {
                 r.unsaved = unsaved;
-                r.title(c, x, top);
+                let (left, right) = r.title();
+                let prompt = r.prompt().map(|(t, o)| (t, o.to_vec()));
+                let hints = r.hints(self.shift);
+                let badge = Some(("REV", CYAN));
+                let foot = match prompt {
+                    Some(_) => 1,
+                    None => keybar::rows(width, badge, &hints),
+                };
+                let Some(body) = frame::frame(c, left, &right, foot) else {
+                    return;
+                };
                 r.draw(c, body);
-                if let Some((text, offers)) = r.prompt() {
-                    keybar::prompt(c, bottom, &text, offers);
+                if let Some((text, offers)) = prompt {
+                    keybar::prompt(c, bottom, &text, &offers);
                     keybar::menu(c, body, &r.command_menu());
                     return;
                 }
-                keybar::draw_badged(c, bottom, Some(("REV", CYAN)), &r.hints(self.shift));
+                keybar::draw_badged(c, bottom, badge, &hints);
                 keybar::menu(c, body, &r.space_menu());
                 if let Some(pick) = &self.agent_pick {
                     keybar::menu(c, body, &pick.menu());
@@ -792,33 +798,42 @@ impl App {
                 return;
             }
             None => {
-                c.put(x, top, &home(&self.root), theme::fg(FG).bg(PANEL));
                 self.home.busy = self.busy.map(|(doing, since)| {
                     let frame =
                         SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
                     format!("{frame} {doing}…")
                 });
-                if let Some(n) = &self.home.notice {
-                    c.put_right(top, 1, n, theme::fg(RED).bg(PANEL));
-                }
+                let left = vec![flow::Piece::new(
+                    2,
+                    home(&self.root),
+                    theme::fg(FG).bg(PANEL),
+                )];
+                let right: Vec<flow::Piece> = self
+                    .home
+                    .notice
+                    .iter()
+                    .map(|n| flow::Piece::new(2, n.clone(), theme::fg(RED).bg(PANEL)))
+                    .collect();
+                let prompt = self.home.prompt();
+                let hints = self.home.hints();
+                let foot = match prompt {
+                    Some(_) => 1,
+                    None => keybar::rows(width, self.home.badge(), &hints),
+                };
+                let Some(body) = frame::frame(c, left, &right, foot) else {
+                    return;
+                };
                 self.home.draw(c, body);
-                if let Some(text) = self.home.prompt() {
+                if let Some(text) = prompt {
                     keybar::prompt(c, bottom, &text, &[]);
                     keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
                     return;
                 }
-                (self.home.hints(), home::help_groups(self.home.picker.git))
+                keybar::draw_badged(c, bottom, self.home.badge(), &hints);
+                keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
+                (body, home::help_groups(self.home.picker.git))
             }
         };
-        let badge = if self.review.is_none() {
-            self.home.badge()
-        } else {
-            None
-        };
-        keybar::draw_badged(c, bottom, badge, &hints);
-        if self.review.is_none() {
-            keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
-        }
         if let Some(h) = self.help.as_mut() {
             h.draw(c, body, &keys);
         }
@@ -864,53 +879,6 @@ impl App {
             lgtm_core::jj::JjAction::NewAfter { .. } | lgtm_core::jj::JjAction::NewBefore { .. }
         );
         self.loader.act(action);
-    }
-}
-
-/// Paints the background and the top bar with `lgtm` on it. Returns where the title goes on
-/// and the body, when there's room.
-fn frame(c: &mut Canvas) -> Option<(u16, Rect)> {
-    let area = c.area;
-    if area.height < 3 {
-        return None;
-    }
-    for y in area.top()..area.bottom() {
-        c.fill(area.x, y, area.width, BG);
-    }
-    let top = area.y;
-    c.fill(area.x, top, area.width, PANEL);
-    let x = c.put(area.x + 1, top, "lgtm", theme::bold(ACCENT).bg(PANEL)) + 2;
-    Some((x, Rect::new(area.x, top + 1, area.width, area.height - 2)))
-}
-
-/// Draws the editor screen, with the keys over it when `help` is up.
-fn draw_editor(
-    c: &mut Canvas,
-    e: &mut edit::Editor,
-    help: Option<&mut help::Help>,
-    pick: Option<&mention::Pick>,
-) {
-    let Some((x, body)) = frame(c) else {
-        return;
-    };
-    let (top, bottom) = (c.area.y, c.area.bottom() - 1);
-    e.title(c, x, top);
-    e.draw(c, body);
-    if let Some(text) = e.prompt() {
-        keybar::prompt(c, bottom, &text, &[]);
-        keybar::menu(c, body, &e.command_menu());
-        return;
-    }
-    keybar::draw_badged(c, bottom, Some(e.badge()), &e.hints());
-    let pending = e.pending_menu();
-    if !pending.is_empty() {
-        keybar::menu(c, body, &pending);
-    }
-    if let Some(pick) = pick {
-        keybar::menu(c, body, &pick.menu());
-    }
-    if let Some(h) = help {
-        h.draw(c, body, &e.help_groups());
     }
 }
 

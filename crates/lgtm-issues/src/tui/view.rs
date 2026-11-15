@@ -1,8 +1,9 @@
 //! An opened issue: its file rendered as markdown, under a two-line header.
 
+use lgtm_tui_kit::flow::{self, Piece};
 use lgtm_tui_kit::markdown::{Outcome, Preview};
 use lgtm_tui_kit::paint::Canvas;
-use lgtm_tui_kit::theme::{self, BG, CYAN, FAINT, FG, MUTED, RED, UNIQUE};
+use lgtm_tui_kit::theme::{self, CYAN, FAINT, FG, MUTED, RED, UNIQUE};
 use ratatui::crossterm::event::{KeyEvent, MouseEventKind};
 use ratatui::layout::Rect;
 
@@ -51,21 +52,15 @@ impl View {
     }
 
     pub fn draw(&mut self, c: &mut Canvas, area: Rect, about: (&Issue, &Workflow, &[Issue])) {
-        c.fill(area.x, area.y, area.width, BG);
-        c.fill(area.x, area.y + 1, area.width, BG);
-        header(c, area.x, area.y, about);
+        let head = header(c, area.x, area.y, about).min(area.height);
         let body = Rect {
-            y: area.y + HEADER,
-            height: area.height.saturating_sub(HEADER),
+            y: area.y + head,
+            height: area.height - head,
             ..area
         };
-        c.fill(area.x, area.y + 2, area.width, BG);
         self.preview.draw(c, body, &self.text, self.version);
     }
 }
-
-/// Rows the header takes, with the blank row under it.
-pub const HEADER: u16 = 3;
 
 /// Text cut to `w` columns, ending in `…` when it doesn't fit.
 fn fit(s: &str, w: usize) -> String {
@@ -77,25 +72,34 @@ fn fit(s: &str, w: usize) -> String {
     t
 }
 
-/// `● 12 Title` over the status, its open blockers, the workflow's fields, the owner and who
-/// filed it, each cut to the width.
-pub fn header(c: &mut Canvas, x: u16, y: u16, (issue, wf, all): (&Issue, &Workflow, &[Issue])) {
+/// `● 12 Title`, the title cut to the width, over the status, its open blockers, the
+/// workflow's fields, the owner and who filed it, wrapping onto more rows when they don't
+/// fit. Returns the rows it takes, with the blank row under it.
+pub fn header(
+    c: &mut Canvas,
+    x: u16,
+    y: u16,
+    (issue, wf, all): (&Issue, &Workflow, &[Issue]),
+) -> u16 {
     let (dot, color) = marks::mark(issue, wf, all);
     let right = c.area.right().saturating_sub(1);
     let x = c.put(x + 1, y, &dot, theme::fg(color));
     let x = c.put(x + 1, y, &format!("{} ", issue.id), theme::fg(MUTED));
     let room = right.saturating_sub(x) as usize;
     c.put(x, y, &fit(&issue.title, room), theme::bold(FG));
+    let one = |t: String, col| Piece::new(2, t, theme::fg(col));
+    let two = |a: &str, t: String, col| {
+        Piece::new(2, a, theme::fg(FAINT)).then(format!("  {t}"), theme::fg(col))
+    };
     let mut parts = Vec::new();
     match wf.status(&issue.status) {
-        Some(s) => parts.push((s.label.clone(), marks::color(&s.color))),
-        None => parts.push((issue.status.clone(), MUTED)),
+        Some(s) => parts.push(one(s.label.clone(), marks::color(&s.color))),
+        None => parts.push(one(issue.status.clone(), MUTED)),
     }
     let blockers = issue.open_blockers(all, |s| wf.is_done(s));
     if !blockers.is_empty() {
         let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
-        parts.push(("blocked by".into(), FAINT));
-        parts.push((ids.join(" "), RED));
+        parts.push(two("blocked by", ids.join(" "), RED));
     }
     for f in &wf.fields {
         let Some(value) = issue.field(&f.name) else {
@@ -103,41 +107,22 @@ pub fn header(c: &mut Canvas, x: u16, y: u16, (issue, wf, all): (&Issue, &Workfl
         };
         match &f.kind {
             Kind::BlockedBy => {}
-            Kind::Revision => parts.push((value, UNIQUE)),
-            Kind::DuplicateOf => {
-                parts.push(("duplicate of".into(), FAINT));
-                parts.push((format!("#{value}"), FG));
-            }
+            Kind::Revision => parts.push(one(value, UNIQUE)),
+            Kind::DuplicateOf => parts.push(two("duplicate of", format!("#{value}"), FG)),
             Kind::Choice(_) => {
                 let color = f.color(&value).map_or(FG, marks::color);
-                parts.push((value, color));
+                parts.push(one(value, color));
             }
-            Kind::Text => {
-                parts.push((f.name.clone(), FAINT));
-                parts.push((value, FG));
-            }
+            Kind::Text => parts.push(two(&f.name, value, FG)),
         }
     }
     if let Some(o) = &issue.owner {
-        parts.push((o.clone(), CYAN));
+        parts.push(one(o.clone(), CYAN));
     }
     if let Some(f) = &issue.filed_by {
-        parts.push(("filed by".into(), FAINT));
-        parts.push((f.clone(), CYAN));
+        parts.push(two("filed by", f.clone(), CYAN));
     }
-    let mut px = x;
-    for (t, col) in parts {
-        let room = right.saturating_sub(px) as usize;
-        if room == 0 {
-            break;
-        }
-        let shown = fit(&t, room);
-        let cut = shown != t;
-        px = c.put(px, y + 1, &shown, theme::fg(col)) + 2;
-        if cut {
-            break;
-        }
-    }
+    flow::draw(c, (x, y + 1), right.saturating_sub(x), &parts, &[]) + 2
 }
 
 /// The issue as markdown to read: the description, then each log entry under a heading of

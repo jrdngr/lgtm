@@ -502,12 +502,15 @@ impl Home {
             self.picker
                 .draw(&mut sub, left, self.focus == Focus::Revisions);
             let style = theme::title(self.focus == Focus::Revisions);
-            sub.put(left.x + 1, left.y, "Revisions", style.bg(BG));
+            let end = sub.put(left.x + 1, left.y, "Revisions", style.bg(BG));
             if self.jj_mode() {
                 self.draw_jj_frame(&mut sub, left);
             }
             if let Some(busy) = &self.busy {
-                sub.put_right(left.y, 1, busy, theme::fg(CYAN).bg(BG));
+                // On the right, or after the title and cut at the edge when there's no room.
+                let w = busy.chars().count() as u16;
+                let x = left.right().saturating_sub(w + 1).max(end + 2);
+                sub.put(x, left.y, busy, theme::fg(CYAN).bg(BG));
             }
         }
         // jj mode's frame stands in for the divider.
@@ -525,11 +528,22 @@ impl Home {
             return;
         }
         let x = sub.put(x0, right.y + 1, "› ", theme::bold(ACCENT).bg(BG));
-        let x = sub.put(x, right.y + 1, &self.files.query, theme::fg(FG).bg(BG));
+        let count = self.files.count();
+        let count_w = count.as_ref().map_or(0, |n| n.chars().count() as u16 + 2);
+        // The query's end, so the cursor and the count stay in view when it's long.
+        let room = right.right().saturating_sub(x + count_w + 3) as usize;
+        let chars = self.files.query.chars().count();
+        let shown: String = self
+            .files
+            .query
+            .chars()
+            .skip(chars.saturating_sub(room))
+            .collect();
+        let x = sub.put(x, right.y + 1, &shown, theme::fg(FG).bg(BG));
         if focused {
             sub.put(x, right.y + 1, " ", theme::fg(FG).bg(ACCENT));
         }
-        if let Some(count) = self.files.count() {
+        if let Some(count) = count {
             sub.put_right(right.y + 1, 2, &count, theme::fg(MUTED).bg(BG));
         }
         let tree = Rect::new(right.x, right.y + 3, right.width, right.height - 3);

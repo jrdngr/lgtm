@@ -11,6 +11,7 @@ use crate::edit::buffer::Buffer;
 use crate::edit::gutter::{self, Mark};
 use crate::edit::keymap::{self, Pick};
 use crate::edit::keys::Mode;
+use crate::tui::flow::Piece;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
@@ -28,42 +29,49 @@ pub const SIDEBAR_MIN: u16 = 16;
 const MIN_SIDEBAR_WIDTH: u16 = 100;
 
 impl Editor {
-    /// Writes the file's name into the top bar from `x`, and on its right the cursor's line
+    /// The top bar's pieces: the file's name on the left, and on the right the cursor's line
     /// and column, or a notice.
-    pub fn title(&self, c: &mut Canvas, x: u16, y: u16) {
+    pub fn title(&self) -> (Vec<Piece>, Vec<Piece>) {
         let Some(b) = self.current() else {
-            return;
+            return (Vec::new(), Vec::new());
         };
-        let x = c.put(x, y, &b.name, theme::bold(FG).bg(PANEL));
+        let mut left = vec![Piece::new(2, b.name.clone(), theme::bold(FG).bg(PANEL))];
+        let notice = |n: &str| vec![Piece::new(2, n, theme::fg(RED).bg(PANEL))];
         if let Some(r) = self.resolver() {
             if r.dirty() {
-                c.put(x + 2, y, "●", theme::fg(FG).bg(PANEL));
+                left.push(Piece::new(2, "●", theme::fg(FG).bg(PANEL)));
             }
-            match &self.notice {
-                Some(n) => c.put_right(y, 1, n, theme::fg(RED).bg(PANEL)),
+            let right = match &self.notice {
+                Some(n) => notice(n),
                 None => {
                     let (status, color) = r.status();
-                    c.put_right(y, 1, &status, theme::bold(color).bg(PANEL));
+                    vec![Piece::new(2, status, theme::bold(color).bg(PANEL))]
                 }
-            }
-            return;
+            };
+            return (left, right);
         }
         if b.dirty() {
-            c.put(x + 2, y, "●", theme::fg(FG).bg(PANEL));
+            left.push(Piece::new(2, "●", theme::fg(FG).bg(PANEL)));
         }
-        match &self.notice {
-            Some(n) => c.put_right(y, 1, n, theme::fg(RED).bg(PANEL)),
+        let right = match &self.notice {
+            Some(n) => notice(n),
             None => {
                 let line = b.line_of(b.sel.head);
                 let col = b.sel.head - b.line_start(line);
-                let at = format!("{}:{}", line + 1, col + 1);
-                c.put_right(y, 1, &at, theme::fg(MUTED).bg(PANEL));
+                let at = Piece::new(
+                    3,
+                    format!("{}:{}", line + 1, col + 1),
+                    theme::fg(MUTED).bg(PANEL),
+                );
                 if self.open[self.cur].conflict {
-                    let pad = at.chars().count() as u16 + 4;
-                    c.put_right(y, pad, "changed on disk", theme::fg(AMBER).bg(PANEL));
+                    let changed = Piece::new(2, "changed on disk", theme::fg(AMBER).bg(PANEL));
+                    vec![changed, at]
+                } else {
+                    vec![Piece { gap: 2, ..at }]
                 }
             }
-        }
+        };
+        (left, right)
     }
 
     /// The mode's badge for the key bar.

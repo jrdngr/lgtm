@@ -155,7 +155,23 @@ impl Picker {
         let x = c.put(area.x, area.y, "issues folders", theme::fg(ACCENT));
         c.put(x + 2, area.y, &home(&self.root), theme::fg(FG));
         let rows = self.rows();
-        let height = (area.height - 3) as usize;
+        let here = rows
+            .get(self.sel)
+            .is_some_and(|d| self.issues.contains_key(d));
+        let mut hints = vec![("j k", "move"), ("h l", "fold")];
+        hints.push(if here {
+            ("Enter", "open")
+        } else {
+            ("i", "new issues folder")
+        });
+        hints.push(("Esc", "back"));
+        let hints: Vec<keybar::Hint> = hints.into_iter().map(|(k, l)| (k, l, false)).collect();
+        let badge = Some(("ISS", AMBER));
+        let foot = match self.notice {
+            Some(_) => 1,
+            None => keybar::rows(area.width, badge, &hints),
+        };
+        let height = area.height.saturating_sub(2 + foot) as usize;
         if self.sel < self.top {
             self.top = self.sel;
         } else if self.sel >= self.top + height {
@@ -194,18 +210,7 @@ impl Picker {
             }
         }
         let bottom = area.bottom() - 1;
-        let here = rows
-            .get(self.sel)
-            .is_some_and(|d| self.issues.contains_key(d));
-        let mut hints = vec![("j k", "move"), ("h l", "fold")];
-        hints.push(if here {
-            ("Enter", "open")
-        } else {
-            ("i", "new issues folder")
-        });
-        hints.push(("Esc", "back"));
-        let hints: Vec<keybar::Hint> = hints.into_iter().map(|(k, l)| (k, l, false)).collect();
-        keybar::draw_badged(c, bottom, Some(("ISS", AMBER)), &hints);
+        keybar::draw_badged(c, bottom, badge, &hints);
         if let Some(n) = &self.notice {
             c.fill(area.x, bottom, area.width, PANEL);
             c.put(area.x + 1, bottom, n, theme::fg(RED).bg(PANEL));

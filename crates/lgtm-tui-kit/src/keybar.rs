@@ -3,6 +3,7 @@
 use ratatui::layout::Rect;
 use ratatui::style::Color;
 
+use crate::flow::{self, Piece};
 use crate::paint::Canvas;
 use crate::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
 
@@ -10,28 +11,55 @@ use crate::theme::{self, ACCENT, BG, FG, GREEN, HAIR, MUTED, PANEL};
 /// it toggles is on.
 pub type Hint<'a> = (&'a str, &'a str, bool);
 
-/// The key bar after a badge naming the mode, like `NOR`, in its color.
-pub fn draw_badged(c: &mut Canvas, y: u16, badge: Option<(&str, Color)>, hints: &[Hint]) {
-    c.fill(c.area.x, y, c.area.width, PANEL);
-    let mut x = c.area.x + 1;
+/// The key bar's badge and hints as pieces of a bar.
+fn pieces(badge: Option<(&str, Color)>, hints: &[Hint]) -> Vec<Piece> {
+    let mut out = Vec::new();
     if let Some((label, color)) = badge {
-        x = c.put(x, y, &format!(" {label} "), theme::bold(BG).bg(color)) + 2;
+        out.push(Piece::new(
+            0,
+            format!(" {label} "),
+            theme::bold(BG).bg(color),
+        ));
     }
-    for (keys, label, on) in hints {
-        for (i, key) in keys.split(' ').enumerate() {
-            if i > 0 {
-                x += 1;
+    for (i, (keys, label, on)) in hints.iter().enumerate() {
+        let gap = if i == 0 && badge.is_some() { 2 } else { 3 };
+        let mut p = Piece {
+            gap,
+            spans: Vec::new(),
+        };
+        for (j, key) in keys.split(' ').enumerate() {
+            if j > 0 {
+                p = p.then(" ", theme::fg(FG).bg(PANEL));
             }
-            x = c.put(x, y, key, theme::bold(ACCENT).bg(PANEL));
+            p = p.then(key, theme::bold(ACCENT).bg(PANEL));
         }
-        x = c.put(
-            x + 1,
-            y,
-            label,
-            theme::fg(if *on { GREEN } else { FG }).bg(PANEL),
-        );
-        x += 3;
+        let color = if *on { GREEN } else { FG };
+        out.push(p.then(format!(" {label}"), theme::fg(color).bg(PANEL)));
     }
+    out
+}
+
+/// The rows the key bar takes on a screen `width` wide.
+pub fn rows(width: u16, badge: Option<(&str, Color)>, hints: &[Hint]) -> u16 {
+    flow::rows(width.saturating_sub(1), &pieces(badge, hints), &[])
+}
+
+/// The key bar after a badge naming the mode, like `NOR`, in its color, ending on row
+/// `bottom` and wrapping upward onto more rows when it doesn't fit. Returns the rows it took.
+pub fn draw_badged(
+    c: &mut Canvas,
+    bottom: u16,
+    badge: Option<(&str, Color)>,
+    hints: &[Hint],
+) -> u16 {
+    let width = c.area.width.saturating_sub(1);
+    let pieces = pieces(badge, hints);
+    let n = flow::rows(width, &pieces, &[]);
+    let top = (bottom + 1).saturating_sub(n).max(c.area.y);
+    for y in top..=bottom {
+        c.fill(c.area.x, y, c.area.width, PANEL);
+    }
+    flow::draw(c, (c.area.x + 1, top), width, &pieces, &[])
 }
 
 /// A line being typed, with what Tab offers after it.

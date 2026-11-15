@@ -6,7 +6,7 @@ use ratatui::layout::Rect;
 
 use super::input::Input;
 use super::qq;
-use super::view::{HEADER, header};
+use super::view::header;
 use crate::issue::{Entry, Issue};
 use crate::workflow::Workflow;
 
@@ -27,12 +27,12 @@ pub fn draw(
     draft: &Draft,
     top: &mut usize,
 ) {
-    header(c, area.x, area.y, (issue, wf, all));
+    let head = header(c, area.x, area.y, (issue, wf, all));
     let width = area.width.saturating_sub(INDENT * 2) as usize;
     let lines = qq::render(&q.text, width);
     let body = Rect {
-        y: area.y + HEADER,
-        height: area.height.saturating_sub(HEADER + 2),
+        y: area.y + head,
+        height: area.height.saturating_sub(head + 2),
         ..area
     };
     let most = lines.len().saturating_sub(body.height as usize);

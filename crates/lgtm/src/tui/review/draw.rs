@@ -11,6 +11,7 @@ use super::marks::State;
 use super::rows::{Line, NoteKey};
 use super::wrap::{self, code_parts};
 use super::{LIST_MIN, Review, list, tree};
+use crate::tui::flow::Piece;
 use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
@@ -48,58 +49,59 @@ fn icon(state: State) -> (&'static str, Color) {
 }
 
 impl Review {
-    /// Writes the review's ids and description into the top bar from `x`, and on its right
+    /// The top bar's pieces: the review's ids and description on the left, and on the right
     /// how much is reviewed, or a failure.
-    pub fn title(&self, c: &mut Canvas, x: u16, y: u16) {
-        if let Some(notice) = &self.notice {
-            c.put_right(y, 1, notice, theme::fg(RED).bg(PANEL));
+    pub fn title(&self) -> (Vec<Piece>, Vec<Piece>) {
+        let right = if let Some(notice) = &self.notice {
+            vec![Piece::new(2, notice.clone(), theme::fg(RED).bg(PANEL))]
         } else {
-            let pct = self.percent().map(|p| format!("{p}%")).unwrap_or_default();
-            c.put_right(y, 1, &pct, theme::fg(GREEN).bg(PANEL));
+            let mut right = Vec::new();
             if let Some((_, n)) = &self.pr {
-                let right = match pct.len() {
-                    0 => 1,
-                    n => n as u16 + 4,
-                };
-                c.put_right(y, right, &format!("#{n}"), theme::fg(CYAN).bg(PANEL));
+                right.push(Piece::new(2, format!("#{n}"), theme::fg(CYAN).bg(PANEL)));
             }
-        }
-        let id = |c: &mut Canvas, x: u16, ch: &lgtm_core::jj::Change| {
+            if let Some(p) = self.percent() {
+                let gap = if right.is_empty() { 2 } else { 3 };
+                right.push(Piece::new(gap, format!("{p}%"), theme::fg(GREEN).bg(PANEL)));
+            }
+            right
+        };
+        let id = |p: Piece, ch: &lgtm_core::jj::Change| {
             let id: String = ch.change_id.chars().take(8).collect();
             let unique = (ch.unique as usize).min(id.len());
-            let x = c.put(x, y, &id[..unique], theme::fg(UNIQUE).bg(PANEL));
-            c.put(x, y, &id[unique..], theme::fg(MUTED).bg(PANEL))
+            p.then(&id[..unique], theme::fg(UNIQUE).bg(PANEL))
+                .then(&id[unique..], theme::fg(MUTED).bg(PANEL))
         };
+        let start = Piece {
+            gap: 2,
+            spans: Vec::new(),
+        };
+        let mut left = Vec::new();
         match self.changes.as_slice() {
-            [] => {
-                c.put(x, y, &self.revset, theme::fg(FG).bg(PANEL));
-            }
+            [] => left.push(Piece::new(2, self.revset.clone(), theme::fg(FG).bg(PANEL))),
             [one] => {
-                let x = id(c, x, one);
-                let x = self.names(c, x, y);
-                match &self.target {
-                    Target::Between { span, .. } => {
-                        let x = c.put(x + 2, y, "◇ ", theme::fg(AMBER).bg(PANEL));
-                        c.put(x, y, span, theme::fg(FG).bg(PANEL));
-                    }
+                left.push(id(start, one));
+                left.extend(self.names());
+                left.push(match &self.target {
+                    Target::Between { span, .. } => Piece::new(2, "◇ ", theme::fg(AMBER).bg(PANEL))
+                        .then(span.clone(), theme::fg(FG).bg(PANEL)),
                     Target::Revset(_) => {
                         let summary = one.description.lines().next().unwrap_or("");
-                        c.put(x + 2, y, summary, theme::fg(FG).bg(PANEL));
+                        Piece::new(2, summary, theme::fg(FG).bg(PANEL))
                     }
-                }
+                });
             }
             [oldest, .., newest] => {
-                let x = id(c, x, oldest);
-                let x = c.put(x, y, "..", theme::fg(MUTED).bg(PANEL));
-                let x = id(c, x, newest);
-                self.names(c, x, y);
+                let p = id(start, oldest).then("..", theme::fg(MUTED).bg(PANEL));
+                left.push(id(p, newest));
+                left.extend(self.names());
             }
         }
+        (left, right)
     }
 
-    /// The bookmarks and `name@` workspaces that include the newest commit, after `x`, as
-    /// the home screen's log colors them.
-    fn names(&self, c: &mut Canvas, mut x: u16, y: u16) -> u16 {
+    /// The bookmarks and `name@` workspaces that include the newest commit, as the home
+    /// screen's log colors them.
+    fn names(&self) -> Vec<Piece> {
         let bookmarks = self
             .containing
             .bookmarks
@@ -110,10 +112,10 @@ impl Review {
             .workspaces
             .iter()
             .map(|n| (format!("{n}@"), Color::Green));
-        for (name, color) in bookmarks.chain(spaces) {
-            x = c.put(x + 1, y, &name, theme::fg(color).bg(PANEL));
-        }
-        x
+        bookmarks
+            .chain(spaces)
+            .map(|(name, color)| Piece::new(1, name, theme::fg(color).bg(PANEL)))
+            .collect()
     }
 
     pub fn draw(&mut self, c: &mut Canvas, body: Rect) {

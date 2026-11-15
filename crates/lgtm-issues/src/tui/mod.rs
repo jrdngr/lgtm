@@ -16,13 +16,14 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use lgtm_tui_kit::flow;
+use lgtm_tui_kit::flow::{self, Piece};
 use lgtm_tui_kit::keybar::{self, Hint};
 use lgtm_tui_kit::markdown::Outcome as ViewOutcome;
 use lgtm_tui_kit::paint::Canvas;
 use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, FG, GREEN, PANEL, RED};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
+use ratatui::style::Color;
 
 use crate::folder::{Folder, Stamp};
 use crate::issue::Issue;
@@ -584,22 +585,84 @@ impl Issues {
         };
     }
 
+    /// The key bar's badge and hints for the screen that's up.
+    fn hints(&self) -> (Option<(&'static str, Color)>, Vec<Hint<'static>>) {
+        match &self.screen {
+            Screen::List => {
+                let hints = vec![
+                    ("j k", "move", false),
+                    ("Enter", "open", false),
+                    ("n", "new", false),
+                    ("s", "status", false),
+                    ("u U", "undo redo", false),
+                    ("/", "filter", !self.filter.is_empty()),
+                    ("Space", "menu", false),
+                ];
+                (Some(("ISS", AMBER)), hints)
+            }
+            Screen::Question { id, qid, .. } => {
+                let picked = self
+                    .drafts
+                    .get(&(*id, qid.clone()))
+                    .is_some_and(|d| d.pick.is_some());
+                let mut hints = vec![("⌥1-9", "pick", picked), ("Enter", "send", false)];
+                if picked {
+                    hints.push(("BS", "unpick", false));
+                }
+                hints.extend([
+                    ("C-d C-u", "scroll", false),
+                    ("Tab", "next question", false),
+                    ("C-o", "issue", false),
+                    ("Esc", "list", false),
+                ]);
+                (Some(("ANS", AMBER)), hints)
+            }
+            Screen::View(v) => {
+                let mut hints = vec![("j k", "scroll", false)];
+                let waiting = self
+                    .issues
+                    .iter()
+                    .find(|i| i.id == v.id)
+                    .is_some_and(|i| !i.waiting().is_empty());
+                if waiting {
+                    hints.push(("Enter", "answer", false));
+                }
+                hints.extend([
+                    ("e", "edit", false),
+                    ("s", "status", false),
+                    ("u U", "undo redo", false),
+                    ("Esc", "list", false),
+                ]);
+                (Some(("ISS", AMBER)), hints)
+            }
+        }
+    }
+
     pub fn draw(&mut self, c: &mut Canvas) {
         let area = c.area;
         for y in area.y..area.bottom() {
             c.fill(area.x, y, area.width, BG);
         }
-        if area.height < 4 {
+        let (left, right) = self.title();
+        let width = area.width.saturating_sub(1);
+        let head = flow::rows(width, &left, &right);
+        let (badge, hints) = self.hints();
+        let foot = if self.prompt.is_some() || self.notice.is_some() {
+            1
+        } else {
+            keybar::rows(area.width, badge, &hints)
+        };
+        if area.height < head + foot + 2 {
             return;
         }
-        let head = self.title(c).min(area.height - 3);
+        flow::draw(c, (area.x, area.y), width, &left, &right);
         let body = Rect {
             y: area.y + head + 1,
-            height: area.height - head - 2,
+            height: area.height - head - 1 - foot,
             ..area
         };
         let bottom = area.bottom() - 1;
-        let hints: Vec<Hint> = match &mut self.screen {
+        match &mut self.screen {
             Screen::List => {
                 let rows = self.rows();
                 self.height = body.height as usize;
@@ -611,7 +674,7 @@ impl Issues {
                 self.list_area = body;
                 list::draw(c, body, (&self.issues, &self.wf), &rows, self.sel, self.top);
                 if !self.bad.is_empty() {
-                    let y = bottom - 1;
+                    let y = body.bottom() - 1;
                     c.fill(area.x, y, area.width, BG);
                     c.put(
                         area.x + 1,
@@ -620,15 +683,6 @@ impl Issues {
                         theme::fg(RED),
                     );
                 }
-                vec![
-                    ("j k", "move", false),
-                    ("Enter", "open", false),
-                    ("n", "new", false),
-                    ("s", "status", false),
-                    ("u U", "undo redo", false),
-                    ("/", "filter", !self.filter.is_empty()),
-                    ("Space", "menu", false),
-                ]
             }
             Screen::Question { id, qid, top } => {
                 let (id, qid) = (*id, qid.clone());
@@ -647,18 +701,7 @@ impl Issues {
                     .unwrap_or_default();
                 self.height = body.height.saturating_sub(2) as usize;
                 question::draw(c, body, (issue, &self.wf, &self.issues), q, &draft, top);
-                let picked = draft.pick.is_some();
-                let mut hints = vec![("⌥1-9", "pick", picked), ("Enter", "send", false)];
-                if picked {
-                    hints.push(("BS", "unpick", false));
-                }
-                hints.extend([
-                    ("C-d C-u", "scroll", false),
-                    ("Tab", "next question", false),
-                    ("C-o", "issue", false),
-                    ("Esc", "list", false),
-                ]);
-                keybar::draw_badged(c, bottom, Some(("ANS", AMBER)), &hints);
+                keybar::draw_badged(c, bottom, badge, &hints);
                 return self.overlay(c, bottom);
             }
             Screen::View(v) => {
@@ -668,20 +711,9 @@ impl Issues {
                     return self.draw(c);
                 };
                 v.draw(c, body, (issue, &self.wf, &self.issues));
-                let mut hints = vec![("j k", "scroll", false)];
-                if !issue.waiting().is_empty() {
-                    hints.push(("Enter", "answer", false));
-                }
-                hints.extend([
-                    ("e", "edit", false),
-                    ("s", "status", false),
-                    ("u U", "undo redo", false),
-                    ("Esc", "list", false),
-                ]);
-                hints
             }
-        };
-        keybar::draw_badged(c, bottom, Some(("ISS", AMBER)), &hints);
+        }
+        keybar::draw_badged(c, bottom, badge, &hints);
         let items = self.space_menu();
         let menu: Vec<(String, &str)> =
             items.iter().map(|(k, l)| (k.clone(), l.as_str())).collect();
@@ -709,10 +741,8 @@ impl Issues {
         }
     }
 
-    /// The folder and the counts by status, on one row with the counts on the right, or
-    /// wrapped onto more rows when the screen is too narrow. Returns the rows it takes.
-    fn title(&self, c: &mut Canvas) -> u16 {
-        let (x0, y) = (c.area.x, c.area.y);
+    /// The title bar's pieces: the folder on the left and the counts by status on the right.
+    fn title(&self) -> (Vec<Piece>, Vec<Piece>) {
         let waiting: usize = self.issues.iter().map(|i| i.waiting().len()).sum();
         let quiet = |id: &str| {
             self.issues
@@ -720,16 +750,14 @@ impl Issues {
                 .filter(|i| i.status == id && i.waiting().is_empty())
                 .count()
         };
-        let mut parts = vec![
-            ("issues".to_string(), ACCENT),
-            (picker::home(&self.folder.root), FG),
-            (format!("● {waiting}"), AMBER),
+        let left = vec![
+            Piece::new(0, "issues", theme::fg(ACCENT)),
+            Piece::new(2, picker::home(&self.folder.root), theme::fg(FG)),
         ];
+        let mut right = vec![Piece::new(2, format!("● {waiting}"), theme::fg(AMBER))];
         for s in self.wf.statuses.iter().filter(|s| !s.fold) {
-            parts.push((
-                format!("{} {}", s.glyph, quiet(&s.id)),
-                marks::color(&s.color),
-            ));
+            let text = format!("{} {}", s.glyph, quiet(&s.id));
+            right.push(Piece::new(2, text, theme::fg(marks::color(&s.color))));
         }
         let folded: usize = self
             .wf
@@ -738,30 +766,8 @@ impl Issues {
             .filter(|s| s.fold)
             .map(|s| quiet(&s.id))
             .sum();
-        parts.push((format!("✓ {folded}"), GREEN));
-        let widths: Vec<u16> = parts
-            .iter()
-            .map(|(t, _)| t.chars().count() as u16)
-            .collect();
-        let room = c.area.width.saturating_sub(1);
-        let lines = flow::lines(&widths, 2, room);
-        if let [_] = lines.as_slice() {
-            let x = c.put(x0, y, &parts[0].0, theme::fg(ACCENT));
-            c.put(x + 2, y, &parts[1].0, theme::fg(FG));
-            let counts: u16 = widths[2..].iter().map(|w| w + 2).sum();
-            let mut x = c.area.right().saturating_sub(counts - 1);
-            for (t, color) in &parts[2..] {
-                x = c.put(x, y, t, theme::fg(*color)) + 2;
-            }
-            return 1;
-        }
-        for (row, line) in lines.iter().enumerate() {
-            let mut x = x0;
-            for (t, color) in &parts[line.clone()] {
-                x = c.put(x, y + row as u16, t, theme::fg(*color)) + 2;
-            }
-        }
-        lines.len() as u16
+        right.push(Piece::new(2, format!("✓ {folded}"), theme::fg(GREEN)));
+        (left, right)
     }
 }
 
@@ -772,7 +778,14 @@ mod tests {
     fn rows_of(issues: &Issues, width: u16) -> (u16, Vec<String>) {
         let area = Rect::new(0, 0, width, 6);
         let mut buf = ratatui::buffer::Buffer::empty(area);
-        let n = issues.title(&mut Canvas::new(&mut buf, area));
+        let (left, right) = issues.title();
+        let n = flow::draw(
+            &mut Canvas::new(&mut buf, area),
+            (0, 0),
+            width - 1,
+            &left,
+            &right,
+        );
         let rows = (0..area.height)
             .map(|y| {
                 let row: String = (0..width).map(|x| buf[(x, y)].symbol()).collect();
