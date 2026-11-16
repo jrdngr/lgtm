@@ -29,13 +29,13 @@ impl Render for TabDrag {
         div()
             .flex()
             .items_center()
-            .h(px(26.))
+            .h(theme::ui(26.))
             .px(px(10.))
             .rounded(px(7.))
             .bg(rgb(theme::TAB_ACTIVE))
             .border_1()
             .border_color(rgb(theme::CARD_BORDER))
-            .text_size(px(12.5))
+            .text_size(theme::ui(12.5))
             .text_color(rgb(theme::TEXT_STRONG))
             .child(self.label.clone())
     }
@@ -119,7 +119,7 @@ impl Workspace {
             .iter()
             .find(|(s, b)| shown.contains(s) && b.contains(&p));
         let target = over.and_then(|(&split, b)| {
-            let in_strip = (p.y - b.origin.y).as_f32() < TAB_STRIP;
+            let in_strip = (p.y - b.origin.y).as_f32() < TAB_STRIP * theme::scale();
             if !in_strip
                 && let Some(side) = edge(b, p)
                 && self.edge_bounds(split, side).is_some()

@@ -107,7 +107,7 @@ impl Workspace {
             .child(
                 div()
                     .id(("empty-slot-title", slot.0))
-                    .h(px(SPACE_TITLE))
+                    .h(theme::ui(SPACE_TITLE))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -168,7 +168,7 @@ impl Workspace {
         let group = format!("space-title-{}", id.0);
         let title = div()
             .id(("space-title", space.id.0))
-            .h(px(SPACE_TITLE))
+            .h(theme::ui(SPACE_TITLE))
             .flex_none()
             .flex()
             .items_center()
@@ -176,7 +176,7 @@ impl Workspace {
             .px(px(10.))
             .rounded_t(px(12.))
             .bg(rgba(theme::tint(color, if focused { 0x66 } else { 0x33 })))
-            .text_size(px(12.))
+            .text_size(theme::ui(12.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(if focused { theme::TEXT_STRONG } else { color }))
             .when(selected, |d| d.border_2().border_color(rgb(color)))
@@ -204,7 +204,7 @@ impl Workspace {
             )
             .map(|d| match self.space_number(id) {
                 Some(n) => d.child(badge::chip(n)),
-                None => d.child(div().text_size(px(11.)).child("⠿")),
+                None => d.child(div().text_size(theme::ui(11.)).child("⠿")),
             })
             .child(
                 div()
@@ -387,10 +387,10 @@ impl Workspace {
                     .flex()
                     .items_center()
                     .gap(px(7.))
-                    .h(px(26.))
+                    .h(theme::ui(26.))
                     .px(px(10.))
                     .rounded(px(7.))
-                    .text_size(px(12.5))
+                    .text_size(theme::ui(12.5))
                     .whitespace_nowrap()
                     .border_1()
                     .border_color(gpui::transparent_black())
@@ -419,7 +419,7 @@ impl Workspace {
                         d.child(
                             div()
                                 .id(("close", key))
-                                .text_size(px(13.))
+                                .text_size(theme::ui(13.))
                                 .text_color(rgb(theme::ICON))
                                 .child("×")
                                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
@@ -443,12 +443,12 @@ impl Workspace {
         let plus = div()
             .id(("new-tab", split_id.0))
             .w(px(26.))
-            .h(px(26.))
+            .h(theme::ui(26.))
             .flex()
             .items_center()
             .justify_center()
             .rounded(px(6.))
-            .text_size(px(16.))
+            .text_size(theme::ui(16.))
             .text_color(rgb(theme::ICON))
             .child("+")
             .on_click(cx.listener(move |w, _, window, cx| {
@@ -479,7 +479,7 @@ impl Workspace {
             )
             .child(
                 div()
-                    .h(px(TAB_STRIP))
+                    .h(theme::ui(TAB_STRIP))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -533,7 +533,7 @@ fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
         .items_center()
         .justify_center()
         .rounded(px(5.))
-        .text_size(px(11.))
+        .text_size(theme::ui(11.))
         .text_color(rgb(theme::ICON))
         .opacity(0.)
         .group_hover(format!("tab-bar-{}", split.0), |s| s.opacity(1.))

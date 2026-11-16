@@ -137,8 +137,8 @@ pub fn render(text: &str) -> AnyElement {
         .flex_col()
         .gap(px(10.))
         .min_w_0()
-        .text_size(px(13.))
-        .line_height(px(20.))
+        .text_size(theme::ui(13.))
+        .line_height(theme::ui(20.))
         .children(blocks.into_iter().map(|b| {
             match b {
                 Block::Para(t) => div().min_w_0().child(inline(&t, theme::TEXT)),
@@ -174,7 +174,7 @@ pub fn render(text: &str) -> AnyElement {
                     let key = |k: String| {
                         div()
                             .font_family(fonts::mono())
-                            .text_size(px(12.))
+                            .text_size(theme::ui(12.))
                             .text_color(rgb(theme::CODE))
                             .child(SharedString::from(k))
                     };

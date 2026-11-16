@@ -28,13 +28,13 @@ impl Render for LayoutDrag {
         div()
             .flex()
             .items_center()
-            .h(px(28.))
+            .h(theme::ui(28.))
             .px(px(10.))
             .rounded(px(6.))
             .bg(rgb(theme::ROW_SELECTED))
             .border_1()
             .border_color(rgb(theme::CARD_BORDER))
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(theme::TEXT))
             .child(self.label.clone())
@@ -54,7 +54,7 @@ impl Workspace {
     pub(super) fn layout_box(&self, icons: bool, cx: &mut Context<Self>) -> AnyElement {
         let plus = div()
             .id("new-layout")
-            .text_size(px(16.))
+            .text_size(theme::ui(16.))
             .cursor_pointer()
             .child("+")
             .on_click(cx.listener(|w, _, window, cx| w.new_layout(window, cx)));
@@ -63,7 +63,7 @@ impl Workspace {
             .items_center()
             .pt(px(8.))
             .pb(px(6.))
-            .text_size(px(11.))
+            .text_size(theme::ui(11.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(theme::TEXT_MUTED))
             .when(icons, |d| d.justify_center())
@@ -127,13 +127,13 @@ impl Workspace {
             .flex()
             .flex_none()
             .items_center()
-            .h(px(28.))
+            .h(theme::ui(28.))
             .rounded(px(6.))
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .text_color(rgb(theme::TEXT))
             .map(|d| {
                 if icons {
-                    d.w(px(36.)).h(px(32.)).justify_center()
+                    d.w(px(36.)).h(theme::ui(32.)).justify_center()
                 } else {
                     d.gap(px(9.)).pl(px(10.)).pr(px(10.))
                 }
@@ -239,7 +239,7 @@ impl Workspace {
                 .flex()
                 .items_center()
                 .gap(px(10.))
-                .h(px(34.))
+                .h(theme::ui(34.))
                 .px(px(10.))
                 .rounded(px(7.))
                 .when(on, |d| {
@@ -262,7 +262,7 @@ impl Workspace {
             .border_color(rgb(theme::CARD_BORDER))
             .rounded(px(10.))
             .shadow_lg()
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .text_color(rgb(theme::TEXT))
             .children(rows);
         Some(

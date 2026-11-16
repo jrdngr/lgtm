@@ -117,7 +117,7 @@ impl Workspace {
                         .gap(px(2.))
                         .child(
                             div()
-                                .text_size(px(13.))
+                                .text_size(theme::ui(13.))
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(rgb(theme::TEXT_STRONG))
                                 .overflow_hidden()
@@ -127,7 +127,7 @@ impl Workspace {
                         )
                         .child(
                             div()
-                                .text_size(px(12.))
+                                .text_size(theme::ui(12.))
                                 .text_color(rgb(theme::TEXT))
                                 .overflow_hidden()
                                 .text_ellipsis()
@@ -138,7 +138,7 @@ impl Workspace {
                 .child(
                     div()
                         .id(("toast-close", id))
-                        .text_size(px(15.))
+                        .text_size(theme::ui(15.))
                         .text_color(rgb(theme::ICON))
                         .child("×")
                         .on_click(cx.listener(move |w, _, _, cx| {

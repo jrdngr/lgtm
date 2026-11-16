@@ -221,7 +221,7 @@ impl Workspace {
                     .py(px(10.))
                     .border_b_1()
                     .border_color(rgb(theme::ROW_RULE))
-                    .text_size(px(13.))
+                    .text_size(theme::ui(13.))
                     .when(on, |d| d.bg(rgb(theme::ROW_SELECTED)))
                     .when(!on, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
                     .child(

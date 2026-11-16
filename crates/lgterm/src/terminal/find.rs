@@ -145,7 +145,7 @@ impl TermView {
                 .top(px(8.))
                 .right(px(12.))
                 .w(px(260.))
-                .h(px(32.))
+                .h(theme::ui(32.))
                 .flex()
                 .items_center()
                 .gap(px(8.))
@@ -156,7 +156,7 @@ impl TermView {
                 .rounded(px(8.))
                 .shadow_md()
                 .font_family(fonts::ui())
-                .text_size(px(13.))
+                .text_size(theme::ui(13.))
                 .text_color(rgb(theme::TEXT_STRONG))
                 .track_focus(&f.focus)
                 .on_key_down(cx.listener(Self::find_key))
@@ -170,12 +170,12 @@ impl TermView {
                         .items_center()
                         .overflow_hidden()
                         .child(f.query.clone())
-                        .child(div().w(px(1.5)).h(px(15.)).bg(rgb(theme::FOCUS))),
+                        .child(div().w(px(1.5)).h(theme::ui(15.)).bg(rgb(theme::FOCUS))),
                 )
                 .child(
                     div()
                         .flex_none()
-                        .text_size(px(11.5))
+                        .text_size(theme::ui(11.5))
                         .text_color(rgb(theme::TEXT_MUTED))
                         .child(count),
                 )

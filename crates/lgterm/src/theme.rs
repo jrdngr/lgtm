@@ -1,5 +1,9 @@
 //! Colors and sizes from the approved mockups.
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
+use gpui::{Pixels, px};
+
 pub const WINDOW: u32 = 0x191919;
 pub const SIDEBAR: u32 = 0x141414;
 pub const SIDEBAR_BORDER: u32 = 0x2a2a2a;
@@ -47,6 +51,23 @@ pub const MONO_FONT: &str = if cfg!(target_os = "macos") {
     "DejaVu Sans Mono"
 };
 pub const DEFAULT_FONT_SIZE: f32 = 13.;
+
+/// How much bigger than the default the font size is, as f32 bits.
+static SCALE: AtomicU32 = AtomicU32::new(0x3f80_0000);
+
+/// Sizes the window's text and the rows that hold it to follow the font size.
+pub fn set_font_size(size: f32) {
+    SCALE.store((size / DEFAULT_FONT_SIZE).to_bits(), Ordering::Relaxed);
+}
+
+pub fn scale() -> f32 {
+    f32::from_bits(SCALE.load(Ordering::Relaxed))
+}
+
+/// `n` pixels at the default font size, scaled to the current one.
+pub fn ui(n: f32) -> Pixels {
+    px(n * scale())
+}
 
 pub const BLOCKED: u32 = 0xe3b341;
 pub const DONE: u32 = 0x3fb950;

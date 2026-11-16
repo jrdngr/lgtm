@@ -108,6 +108,7 @@ impl Workspace {
     pub fn new(cwd: PathBuf, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let settings = Settings::load();
         cx.set_global(FontSize(settings.font_size));
+        theme::set_font_size(settings.font_size);
         fonts::set(settings.fonts);
         let (model, first) = Model::new();
         let home = dirs::home_dir();
@@ -365,6 +366,7 @@ impl Workspace {
     fn set_font_size(&mut self, size: f32, cx: &mut Context<Self>) {
         let size = size.clamp(8., 32.);
         cx.set_global(FontSize(size));
+        theme::set_font_size(size);
         self.settings.font_size = size;
         self.settings.save();
         for t in self.terms.values() {

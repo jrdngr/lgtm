@@ -40,6 +40,7 @@ impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.spinning.set(false);
         self.view_height = window.viewport_size().height.as_f32();
+        window.set_rem_size(theme::ui(16.));
         self.prune_collapsed();
         let mut el = div()
             .id("workspace")

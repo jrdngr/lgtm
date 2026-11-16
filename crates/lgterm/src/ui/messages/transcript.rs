@@ -25,7 +25,7 @@ fn chip(t: TermId, w: &Who) -> gpui::Div {
         .rounded(px(4.))
         .bg(rgb(theme::space_color(w.color)))
         .font_family(fonts::mono())
-        .text_size(px(11.5))
+        .text_size(theme::ui(11.5))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(rgb(theme::BADGE_TEXT))
         .child(w.named.clone().unwrap_or_else(|| t.to_string()))
@@ -39,7 +39,7 @@ pub(super) fn unread(n: usize) -> Option<AnyElement> {
             .px(px(6.))
             .rounded(px(4.))
             .bg(rgb(theme::UNREAD))
-            .text_size(px(11.))
+            .text_size(theme::ui(11.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(theme::UNREAD_TEXT))
             .child(n.to_string())
@@ -49,7 +49,7 @@ pub(super) fn unread(n: usize) -> Option<AnyElement> {
 
 fn arrow(s: &'static str) -> impl IntoElement {
     div()
-        .text_size(px(12.))
+        .text_size(theme::ui(12.))
         .text_color(rgb(theme::ICON))
         .child(s)
 }
@@ -117,7 +117,7 @@ impl Workspace {
             .py(px(8.))
             .border_b_1()
             .border_color(rgb(theme::ROW_RULE))
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .children(space(c.spaces.0).map(|w| space_line(&w, true)))
             .when(c.spaces.0 != c.spaces.1, |d| {
                 d.child(arrow("↔"))
@@ -148,12 +148,12 @@ impl Workspace {
             .flex()
             .items_center()
             .gap(px(8.))
-            .h(px(28.))
+            .h(theme::ui(28.))
             .px(px(10.))
             .rounded(px(7.))
             .border_1()
             .border_color(rgb(theme::CARD_BORDER))
-            .text_size(px(12.5))
+            .text_size(theme::ui(12.5))
             .text_color(rgb(theme::TEXT))
             .when(open, |d| d.bg(rgb(theme::TAB_ACTIVE)))
             .when(!open, |d| d.hover(|s| s.bg(rgb(theme::ROW_HOVER))))
@@ -265,7 +265,7 @@ impl Workspace {
                 .border_color(rgb(theme::CARD_BORDER))
                 .bg(rgb(theme::DIALOG))
                 .shadow_lg()
-                .text_size(px(13.))
+                .text_size(theme::ui(13.))
                 .occlude()
                 .children(rows),
         )
@@ -300,7 +300,7 @@ pub(super) fn run(run: &[&Message], who: &HashMap<TermId, Who>) -> AnyElement {
                         .border_1()
                         .border_color(rgb(theme::BLOCKED))
                         .rounded(px(5.))
-                        .text_size(px(11.))
+                        .text_size(theme::ui(11.))
                         .text_color(rgb(theme::BLOCKED))
                         .child(if m.queued { "Queued" } else { "Undelivered" }),
                 )
@@ -309,7 +309,7 @@ pub(super) fn run(run: &[&Message], who: &HashMap<TermId, Who>) -> AnyElement {
                 div()
                     .flex_none()
                     .font_family(fonts::mono())
-                    .text_size(px(11.5))
+                    .text_size(theme::ui(11.5))
                     .text_color(rgb(theme::TEXT_MUTED))
                     .child(m.time.clone()),
             )
@@ -337,7 +337,7 @@ pub(super) fn run(run: &[&Message], who: &HashMap<TermId, Who>) -> AnyElement {
                         .flex()
                         .items_center()
                         .gap(px(8.))
-                        .text_size(px(13.))
+                        .text_size(theme::ui(13.))
                         .when(run[0].from.is_some(), |d| {
                             d.child(chip(from, &who[&from])).child(arrow("→"))
                         })

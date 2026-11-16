@@ -31,13 +31,13 @@ impl Render for SpaceDrag {
             .flex()
             .items_center()
             .gap(px(8.))
-            .h(px(28.))
+            .h(theme::ui(28.))
             .px(px(10.))
             .rounded(px(6.))
             .bg(rgb(theme::ROW_SELECTED))
             .border_1()
             .border_color(rgb(theme::CARD_BORDER))
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .font_weight(FontWeight::SEMIBOLD)
             .text_color(rgb(theme::TEXT))
             .child(div().text_color(rgb(theme::ICON)).child("⠿"))
@@ -204,7 +204,7 @@ impl Workspace {
             let title = d.slots.iter().find(|(s, b)| {
                 layout.slots.contains(**s)
                     && b.contains(&p)
-                    && f(p.y - b.origin.y) < super::panes::SPACE_TITLE
+                    && f(p.y - b.origin.y) < super::panes::SPACE_TITLE * theme::scale()
             });
             if let Some((&slot, _)) = title {
                 return (from != Some(slot))

@@ -3,11 +3,12 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    StatefulInteractiveElement, Styled, anchored, deferred, div, px, rgb, rgba,
+    StatefulInteractiveElement, Styled, anchored, deferred, div, px, rgb, rgba, svg,
 };
 
 use super::Workspace;
 use super::sidebar::agent_icon;
+use crate::agents::status::Status;
 use crate::model::{Space, SpaceId, Tab};
 use crate::theme;
 
@@ -31,8 +32,13 @@ impl Workspace {
             return None;
         }
         let id = space.id;
-        let mut tabs: Vec<Tab> = collapsed.iter().flat_map(|s| s.tabs.clone()).collect();
-        tabs.sort_by_key(|t| std::cmp::Reverse(self.urgency(*t)));
+        let tabs: Vec<Tab> = collapsed.iter().flat_map(|s| s.tabs.clone()).collect();
+        let mut agents: Vec<Status> = tabs
+            .iter()
+            .filter_map(|t| t.term().and_then(|t| self.agents.shown(t)))
+            .collect();
+        agents.sort_by_key(|s| std::cmp::Reverse(s.urgency()));
+        let terminals = agents.len() < tabs.len();
         let open = self.collapsed_open == Some(id);
         Some(
             div()
@@ -41,7 +47,7 @@ impl Workspace {
                 .flex()
                 .items_center()
                 .gap(px(6.))
-                .h(px(20.))
+                .h(theme::ui(20.))
                 .px(px(7.))
                 .rounded(px(6.))
                 .bg(rgba(0x0000_0040))
@@ -57,7 +63,13 @@ impl Workspace {
                         cx.notify();
                     }),
                 )
-                .children(tabs.iter().take(MARKS).map(|t| self.tab_mark(*t)))
+                .children(
+                    agents
+                        .iter()
+                        .take(MARKS - usize::from(terminals))
+                        .map(|s| self.mark(*s)),
+                )
+                .when(terminals, |d| d.child(terminal_icon()))
                 .when(open, |d| {
                     d.child(
                         div().absolute().top(px(24.)).left(px(0.)).child(deferred(
@@ -75,7 +87,8 @@ impl Workspace {
     /// A space's collapsed tabs, a split's after another's, in as many columns as the window's
     /// height needs.
     fn collapsed_list(&self, space: &Space, cx: &mut Context<Self>) -> AnyElement {
-        let room = (self.view_height - LIST_MARGIN).max(ROW);
+        let (row, rule_h) = (ROW * theme::scale(), RULE * theme::scale());
+        let room = (self.view_height - LIST_MARGIN).max(row);
         // Each row: its tab, and whether a line sets it apart from the split before.
         let mut columns: Vec<Vec<(Tab, bool)>> = vec![vec![]];
         let mut used = 0.;
@@ -83,10 +96,10 @@ impl Workspace {
             for (i, &tab) in split.tabs.iter().enumerate() {
                 let column = columns.last_mut().expect("a column");
                 let rule = i == 0 && !column.is_empty();
-                let need = ROW + if rule { RULE } else { 0. };
+                let need = row + if rule { rule_h } else { 0. };
                 if used + need > room && !column.is_empty() {
                     columns.push(vec![(tab, false)]);
-                    used = ROW;
+                    used = row;
                 } else {
                     column.push((tab, rule));
                     used += need;
@@ -103,7 +116,7 @@ impl Workspace {
             .rounded(px(8.))
             .shadow_lg()
             .font_weight(gpui::FontWeight::NORMAL)
-            .text_size(px(13.))
+            .text_size(theme::ui(13.))
             .text_color(rgb(theme::TEXT))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down_out(cx.listener(|w, _, _, cx| {
@@ -146,7 +159,7 @@ impl Workspace {
                     .flex()
                     .items_center()
                     .gap(px(8.))
-                    .h(px(ROW))
+                    .h(theme::ui(ROW))
                     .px(px(8.))
                     .rounded(px(5.))
                     .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
@@ -157,7 +170,7 @@ impl Workspace {
                             .flex_none()
                             .flex()
                             .justify_center()
-                            .children(kind.map(agent_icon)),
+                            .child(kind.map_or_else(terminal_icon, agent_icon)),
                     )
                     .child(
                         div()
@@ -168,7 +181,11 @@ impl Workspace {
                             .whitespace_nowrap()
                             .child(self.term_label(tab)),
                     )
-                    .child(self.tab_mark(tab))
+                    .children(
+                        tab.term()
+                            .and_then(|t| self.agents.shown(t))
+                            .map(|s| self.mark(s)),
+                    )
                     .on_click(cx.listener(move |w, _, window, cx| {
                         w.collapsed_open = None;
                         w.model.focus_tab(tab);
@@ -176,26 +193,6 @@ impl Workspace {
                     })),
             )
             .into_any_element()
-    }
-
-    /// How much a tab's status wants attention; tabs without one come last.
-    fn urgency(&self, tab: Tab) -> Option<u8> {
-        tab.term()
-            .and_then(|t| self.agents.shown(t))
-            .map(|s| s.urgency())
-    }
-
-    /// A tab's status mark, or an empty dot when it has none.
-    fn tab_mark(&self, tab: Tab) -> AnyElement {
-        match tab.term().and_then(|t| self.agents.shown(t)) {
-            Some(s) => self.mark(s),
-            None => div()
-                .size(px(7.))
-                .flex_none()
-                .rounded_full()
-                .bg(rgb(theme::CARD_BORDER))
-                .into_any_element(),
-        }
     }
 
     /// Shuts the collapsed list of a space that has none left.
@@ -209,4 +206,15 @@ impl Workspace {
             self.collapsed_open = None;
         }
     }
+}
+
+/// The mark of plain terminals, without an agent.
+fn terminal_icon() -> AnyElement {
+    svg()
+        .path("ui/terminal.svg")
+        .w(px(12.))
+        .h(px(10.))
+        .flex_none()
+        .text_color(rgb(theme::TEXT))
+        .into_any_element()
 }

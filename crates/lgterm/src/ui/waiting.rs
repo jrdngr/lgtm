@@ -1,6 +1,6 @@
 //! The mark on an agent that has messages waiting to go in.
 
-use gpui::{AnyElement, IntoElement, ParentElement, Styled, div, px, rgb};
+use gpui::{AnyElement, IntoElement, ParentElement, Styled, div, rgb};
 
 use super::Workspace;
 use crate::model::TermId;
@@ -16,7 +16,7 @@ impl Workspace {
             .then(|| {
                 div()
                     .flex_none()
-                    .text_size(px(12.))
+                    .text_size(theme::ui(12.))
                     .text_color(rgb(theme::WAITING))
                     .child("✉")
                     .into_any_element()

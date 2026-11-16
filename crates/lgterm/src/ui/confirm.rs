@@ -89,13 +89,13 @@ impl Workspace {
         let button = |id: &'static str, label: &'static str, bg: u32| {
             div()
                 .id(id)
-                .h(px(28.))
+                .h(theme::ui(28.))
                 .px(px(16.))
                 .flex()
                 .items_center()
                 .rounded(px(6.))
                 .bg(rgb(bg))
-                .text_size(px(13.))
+                .text_size(theme::ui(13.))
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(rgb(theme::BADGE_TEXT))
                 .cursor_pointer()
@@ -117,7 +117,7 @@ impl Workspace {
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(
                 div()
-                    .text_size(px(15.))
+                    .text_size(theme::ui(15.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(theme::TEXT_STRONG))
                     .child(question),
