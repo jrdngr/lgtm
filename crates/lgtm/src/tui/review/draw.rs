@@ -165,6 +165,8 @@ impl Review {
             "Files",
             theme::title(self.in_list).bg(BG),
         );
+        // The marks' column shows only while some entry has a mark.
+        let marked = entries.iter().any(|e| icon(self.entry_state(e)).0 != " ");
         for (n, entry) in entries.iter().enumerate().skip(self.list_top).take(height) {
             let y = area.y + 1 + (n - self.list_top) as u16;
             let picked = n == at;
@@ -176,10 +178,7 @@ impl Review {
             c.fill(area.x, y, area.width, bg);
             let (state, name, depth, color) = match entry {
                 tree::Entry::Dir {
-                    name,
-                    path,
-                    depth,
-                    files,
+                    name, path, depth, ..
                 } => {
                     let fold = if self.closed_dirs.contains(path) {
                         "▸"
@@ -187,14 +186,14 @@ impl Review {
                         "▾"
                     };
                     (
-                        list::combined(files.iter().map(|&f| self.file_state(f))),
+                        self.entry_state(entry),
                         format!("{fold} {name}/"),
                         *depth,
                         MUTED,
                     )
                 }
-                tree::Entry::File { file, name, depth } => {
-                    (self.file_state(*file), name.clone(), *depth, FG)
+                tree::Entry::File { name, depth, .. } => {
+                    (self.entry_state(entry), name.clone(), *depth, FG)
                 }
                 tree::Entry::Reviewed { agent, count, open } => {
                     let fold = if *open { "▾" } else { "▸" };
@@ -209,7 +208,12 @@ impl Review {
             } else {
                 theme::fg(color)
             };
-            let x = area.x + 3 + 2 * depth as u16;
+            let left = match entry {
+                tree::Entry::Reviewed { .. } => 1,
+                _ if marked => 3,
+                _ => 1,
+            };
+            let x = area.x + left + 2 * depth as u16;
             let x = c.put(x, y, &name, style.bg(bg));
             if let tree::Entry::File { file, .. } = entry {
                 if self.unsaved.contains(&self.files[*file].path) {
@@ -234,6 +238,17 @@ impl Review {
                     x = c.put(x, y, text, theme::fg(*color).bg(bg)) + 1;
                 }
             }
+        }
+    }
+
+    /// The review state an entry's mark shows: a file's own, a folder's files' together.
+    fn entry_state(&self, entry: &tree::Entry) -> State {
+        match entry {
+            tree::Entry::Dir { files, .. } => {
+                list::combined(files.iter().map(|&f| self.file_state(f)))
+            }
+            tree::Entry::File { file, .. } => self.file_state(*file),
+            tree::Entry::Reviewed { .. } => State::None,
         }
     }
 
@@ -642,7 +657,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         r.draw_list(&mut Canvas::new(&mut buf, area), area);
         let row: String = (0..20).map(|x| buf[(x, 1)].symbol()).collect();
-        assert_eq!(row, "   a_long_fil +2 −2 ");
+        assert_eq!(row, " a_long_file_ +2 −2 ");
     }
 
     #[test]
