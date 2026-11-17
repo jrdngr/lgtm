@@ -104,6 +104,8 @@ pub struct Review {
     /// Folders closed in the file list, by path.
     closed_dirs: HashSet<String>,
     list_top: usize,
+    /// The list entry the list last scrolled to, so the wheel can move the list off it.
+    list_followed: Option<usize>,
     /// Screen rows the diff had when last drawn.
     height: usize,
     /// Columns the diff had when last drawn, which notes wrap to.
@@ -271,6 +273,7 @@ impl Review {
             agent_reviewed_open: false,
             closed_dirs: HashSet::new(),
             list_top: 0,
+            list_followed: None,
             height: 0,
             width: 80,
             list_area: Rect::default(),
@@ -711,6 +714,10 @@ impl Review {
             self.selecting = None;
         }
         match ev.kind {
+            MouseEventKind::ScrollDown if self.list_area.contains(at) => self.list_top += 3,
+            MouseEventKind::ScrollUp if self.list_area.contains(at) => {
+                self.list_top = self.list_top.saturating_sub(3)
+            }
             MouseEventKind::ScrollDown => self.scroll(3),
             MouseEventKind::ScrollUp => self.scroll(-3),
             MouseEventKind::Down(MouseButton::Left) if self.list_area.contains(at) => {

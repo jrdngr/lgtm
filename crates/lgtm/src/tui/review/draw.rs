@@ -147,11 +147,17 @@ impl Review {
         let entries = self.entries();
         let at = self.list_at(&entries);
         let height = area.height.saturating_sub(1) as usize;
-        if at < self.list_top {
-            self.list_top = at;
-        } else if height > 0 && at >= self.list_top + height {
-            self.list_top = at + 1 - height;
+        // The list follows the picked entry when it changes, and otherwise stays where the
+        // wheel put it.
+        if self.list_followed != Some(at) {
+            self.list_followed = Some(at);
+            if at < self.list_top {
+                self.list_top = at;
+            } else if height > 0 && at >= self.list_top + height {
+                self.list_top = at + 1 - height;
+            }
         }
+        self.list_top = self.list_top.min(entries.len().saturating_sub(height));
         let mut c = Canvas::new(&mut *c.buf, area);
         c.put(
             area.x + 1,
@@ -623,6 +629,7 @@ fn split_row(
 #[cfg(test)]
 mod tests {
     use ratatui::buffer::Buffer;
+    use ratatui::crossterm::event::{KeyModifiers, MouseEvent, MouseEventKind};
 
     use super::super::tests::file;
     use super::*;
@@ -636,5 +643,33 @@ mod tests {
         r.draw_list(&mut Canvas::new(&mut buf, area), area);
         let row: String = (0..20).map(|x| buf[(x, 1)].symbol()).collect();
         assert_eq!(row, "   a_long_fil +2 −2 ");
+    }
+
+    #[test]
+    fn the_wheel_over_the_list_scrolls_the_list_and_leaves_the_diff() {
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        let files: Vec<_> = (0..20).map(|i| file(&format!("f{i:02}.rs"), 1)).collect();
+        r.loaded(Ok((vec![], files)));
+        let area = Rect::new(0, 0, 20, 6);
+        let mut buf = Buffer::empty(area);
+        let list_row = |r: &mut Review, buf: &mut Buffer| {
+            r.draw_list(&mut Canvas::new(buf, area), area);
+            (0..20).map(|x| buf[(x, 1)].symbol()).collect::<String>()
+        };
+        let first = list_row(&mut r, &mut buf);
+        let top = r.top;
+        let wheel = |kind| MouseEvent {
+            kind,
+            column: 2,
+            row: 2,
+            modifiers: KeyModifiers::NONE,
+        };
+        r.mouse(wheel(MouseEventKind::ScrollDown), None);
+        let scrolled = list_row(&mut r, &mut buf);
+        assert_ne!(scrolled, first);
+        assert!(scrolled.contains("f03.rs"));
+        assert_eq!(r.top, top);
+        r.mouse(wheel(MouseEventKind::ScrollUp), None);
+        assert_eq!(list_row(&mut r, &mut buf), first);
     }
 }
