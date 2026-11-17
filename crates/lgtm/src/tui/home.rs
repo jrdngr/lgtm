@@ -64,6 +64,8 @@ pub struct Home {
     space: bool,
     /// Where a `C-w <` or `C-w >` divider move stands.
     divider: crate::tui::width::Divider,
+    /// Outside source control: the files alone, with no revisions side.
+    files_only: bool,
 }
 
 /// The narrowest either side gets.
@@ -91,6 +93,7 @@ impl Default for Home {
             drawn_width: 0,
             space: false,
             divider: Default::default(),
+            files_only: false,
         }
     }
 }
@@ -130,6 +133,15 @@ pub fn help_groups(git: bool) -> Vec<Group> {
 }
 
 impl Home {
+    /// The home screen outside source control: the file tree alone.
+    pub fn files_only() -> Self {
+        Self {
+            focus: Focus::Files,
+            files_only: true,
+            ..Self::default()
+        }
+    }
+
     /// Whether keys are going into the search box.
     pub fn typing(&self) -> bool {
         self.focus == Focus::Files || self.cmd.is_some() || self.menu.is_some()
@@ -372,6 +384,16 @@ impl Home {
         if self.cmd.is_some() {
             return self.command_key(key);
         }
+        if self.files_only {
+            if key.code == KeyCode::Char(':') && self.files.query.is_empty() {
+                self.cmd = Some(String::new());
+                return Outcome::None;
+            }
+            return match self.files.key(key) {
+                files::Outcome::Open(path) => Outcome::Edit(path),
+                files::Outcome::None => Outcome::None,
+            };
+        }
         if let Some(step) = crate::tui::side::files_step(&mut self.divider, &key) {
             // The width kept is the revisions side's, which a step widens the other way.
             if let Some(step) = step {
@@ -471,11 +493,11 @@ impl Home {
                 hints
             }
             Focus::Files => {
-                let mut hints = vec![
-                    ("Tab", "revisions", false),
-                    ("Enter", "open", false),
-                    ("↑ ↓", "move", false),
-                ];
+                let mut hints = vec![("Tab", "revisions", false)];
+                if self.files_only {
+                    hints.clear();
+                }
+                hints.extend([("Enter", "open", false), ("↑ ↓", "move", false)]);
                 if self.files.query.is_empty() {
                     hints.push(("← →", "close, open", false));
                 } else {
@@ -488,6 +510,9 @@ impl Home {
     }
 
     pub fn draw(&mut self, c: &mut Canvas, body: Rect) {
+        if self.files_only {
+            return self.draw_files(c, body);
+        }
         let left_w = width::fit(
             self.revisions_width,
             body.width / 2,
@@ -519,6 +544,11 @@ impl Home {
                 c.put(divider, y, "│", theme::fg(HAIR).bg(BG));
             }
         }
+        self.draw_files(c, right);
+    }
+
+    /// The file tree side: its title, the search box and the tree.
+    fn draw_files(&mut self, c: &mut Canvas, right: Rect) {
         let mut sub = Canvas::new(&mut *c.buf, right);
         let x0 = right.x + 1;
         let focused = self.focus == Focus::Files;
@@ -718,5 +748,25 @@ mod tests {
         assert!(!h.picker.anchored());
         press(&mut h, "<esc>");
         assert!(!h.jj_mode());
+    }
+
+    #[test]
+    fn outside_source_control_the_files_fill_the_screen_and_take_every_key() {
+        use ratatui::buffer::Buffer;
+        let mut h = Home::files_only();
+        h.files.set_listing(crate::tui::walk::Listing {
+            files: vec!["a.rs".into(), "b.rs".into()],
+            ..Default::default()
+        });
+        let area = Rect::new(0, 0, 30, 8);
+        let mut buf = Buffer::empty(area);
+        h.draw(&mut Canvas::new(&mut buf, area), area);
+        let row = |y: u16| (0..30).map(|x| buf[(x, y)].symbol()).collect::<String>();
+        assert!(row(0).starts_with(" Files"));
+        assert!(!(0..8).any(|y| row(y).contains("Revisions")));
+        press(&mut h, "<tab>");
+        assert!(h.typing());
+        assert!(matches!(press(&mut h, "b<ret>")[..], [_, Outcome::Edit(ref p)] if p == "b.rs"));
+        assert!(matches!(press(&mut h, "<esc>:q<ret>")[3], Outcome::Quit));
     }
 }

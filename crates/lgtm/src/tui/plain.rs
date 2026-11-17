@@ -1,5 +1,5 @@
-//! The editor alone, for files outside jj: no home, review or agents. The gutter diffs
-//! against git's `HEAD` when the root is a git repo. Leaving the editor quits.
+//! The editor outside source control, with a home screen of the file tree alone: no
+//! revisions, review or agents. Leaving the editor quits.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -8,10 +8,13 @@ use std::time::{Duration, Instant};
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
+use super::flow::Piece;
+use super::home::{self, Home};
 use super::load::Msg;
 use super::paint::Canvas;
 use super::term::{self, Term};
-use super::{POLL, edit, mention, settings, walk};
+use super::theme::{self, FG, PANEL, RED};
+use super::{POLL, edit, keybar, mention, settings, walk};
 
 /// Opens `file`, a name in `root` and a line from 1, else the list of files.
 pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
@@ -29,6 +32,9 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
         });
     }
     git_decor(&root, tx.clone());
+    // The home screen while it's up, and the files for it.
+    let mut home = None;
+    let mut listing: Option<walk::Listing> = None;
     match file {
         Some((name, line)) => {
             if let Err(err) = e.open(&name, line) {
@@ -36,7 +42,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                 return 1;
             }
         }
-        None => e.browse(),
+        None => home = Some(Home::files_only()),
     }
     let git = root.join(".git").exists();
     let mut term = Term::start();
@@ -49,7 +55,10 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             term.terminal.draw(|f| {
                 let area = f.area();
                 let c = &mut Canvas::new(f.buffer_mut(), area);
-                super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref());
+                match home.as_mut() {
+                    Some(h) => draw_home(c, h, &root),
+                    None => super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref()),
+                }
                 if let Some(at) = c.bar {
                     f.set_cursor_position(at);
                 }
@@ -57,6 +66,23 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {
                     Event::Key(key) if term::is_shift(&key) => {}
+                    Event::Key(key) if key.kind != KeyEventKind::Release && home.is_some() => {
+                        let key = term::plain(key);
+                        if key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)
+                        {
+                            return Ok(());
+                        }
+                        let h = home.as_mut().expect("home");
+                        match h.key(key) {
+                            home::Outcome::Quit => return Ok(()),
+                            home::Outcome::Edit(path) => match e.open(&path, 0) {
+                                Ok(()) => home = None,
+                                Err(err) => h.notice = Some(format!("couldn't open {path}: {err}")),
+                            },
+                            _ => {}
+                        }
+                    }
                     Event::Key(key) if key.kind != KeyEventKind::Release => {
                         let key = term::plain(key);
                         if key.code == KeyCode::Char('c')
@@ -98,16 +124,29 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                                 edit::Outcome::None => {}
                                 edit::Outcome::Quit => return Ok(()),
                                 edit::Outcome::Home => {
-                                    e.notice = Some("no home screen outside jj".into());
+                                    let mut h = Home::files_only();
+                                    if let Some(l) = &listing {
+                                        h.files.set_listing(l.clone());
+                                    }
+                                    home = Some(h);
                                 }
                                 edit::Outcome::Review(..) | edit::Outcome::Issues => {
-                                    e.notice = Some("not in a jj repo".into());
+                                    e.notice = Some("not in a jj or git repo".into());
                                 }
                                 edit::Outcome::Mention(text) => match mention::send(text) {
                                     mention::Sent::Done => {}
                                     mention::Sent::Pick(p) => pick = Some(p),
                                     mention::Sent::Notice(n) => e.notice = Some(n),
                                 },
+                            }
+                        }
+                    }
+                    Event::Mouse(ev) if home.is_some() => {
+                        let h = home.as_mut().expect("home");
+                        if let home::Outcome::Edit(path) = h.mouse(ev) {
+                            match e.open(&path, 0) {
+                                Ok(()) => home = None,
+                                Err(err) => h.notice = Some(format!("couldn't open {path}: {err}")),
                             }
                         }
                     }
@@ -118,7 +157,13 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             }
             while let Ok(msg) = rx.try_recv() {
                 match msg {
-                    Msg::Files(listing) => e.set_files(listing),
+                    Msg::Files(l) => {
+                        if let Some(h) = home.as_mut() {
+                            h.files.set_listing(l.clone());
+                        }
+                        e.set_files(l.clone());
+                        listing = Some(l);
+                    }
                     Msg::Base { name, text } => e.set_base(&name, text),
                     Msg::Decor(decor) => e.set_decor(decor),
                     _ => {}
@@ -149,6 +194,34 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             1
         }
     }
+}
+
+/// The home screen: the folder in the top bar, the file tree, and its keys or `:` line.
+fn draw_home(c: &mut Canvas, h: &mut Home, root: &Path) {
+    let left = vec![Piece::new(2, super::home(root), theme::fg(FG).bg(PANEL))];
+    let right: Vec<Piece> = h
+        .notice
+        .iter()
+        .map(|n| Piece::new(2, n.clone(), theme::fg(RED).bg(PANEL)))
+        .collect();
+    let prompt = h.prompt();
+    let hints = h.hints();
+    let foot = match prompt {
+        Some(_) => 1,
+        None => keybar::rows(c.area.width, None, &hints),
+    };
+    let bottom = c.area.bottom().saturating_sub(1);
+    let Some(body) = super::frame::frame(c, left, &right, foot) else {
+        return;
+    };
+    h.draw(c, body);
+    match prompt {
+        Some(text) => keybar::prompt(c, bottom, &text, &[]),
+        None => {
+            keybar::draw_badged(c, bottom, None, &hints);
+        }
+    }
+    keybar::menu(c, body, &h.command_menu());
 }
 
 /// Finds what git says changed, for the sidebar.

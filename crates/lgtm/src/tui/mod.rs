@@ -905,7 +905,7 @@ fn normalize(path: &Path) -> PathBuf {
 }
 
 /// `path` with the home directory as `~`.
-fn home(path: &Path) -> String {
+pub(super) fn home(path: &Path) -> String {
     let text = path.to_string_lossy().into_owned();
     match std::env::var("HOME") {
         Ok(h) if !h.is_empty() && text.starts_with(&h) => format!("~{}", &text[h.len()..]),
