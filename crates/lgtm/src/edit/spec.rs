@@ -127,6 +127,7 @@ pub fn run_in(mut b: Buffer, spec: &str) -> String {
             View {
                 height: 10,
                 hidden: &[],
+                wrap: None,
             },
         );
     }

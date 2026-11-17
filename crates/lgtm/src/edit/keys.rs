@@ -70,6 +70,8 @@ pub enum Action {
 pub struct View<'a> {
     pub height: usize,
     pub hidden: &'a [(usize, usize)],
+    /// The columns lines wrap at, when they wrap; `j` and `k` then move by screen rows.
+    pub wrap: Option<usize>,
 }
 
 /// A command waiting for the char typed after it.
@@ -204,8 +206,13 @@ impl Keys {
         self.take(b, (to, to));
     }
 
-    fn vertical(&self, b: &mut Buffer, by: isize, hidden: &[(usize, usize)]) {
-        let (to, column) = motion::vertical_folded(b, b.sel.head, by, b.column, hidden);
+    fn vertical(&self, b: &mut Buffer, by: isize, view: &View) {
+        let (to, column) = match view.wrap {
+            Some(width) => {
+                motion::vertical_wrapped(b, b.sel.head, by, b.column, view.hidden, width)
+            }
+            None => motion::vertical_folded(b, b.sel.head, by, b.column, view.hidden),
+        };
         b.column = Some(column);
         self.go(b, to);
     }
@@ -227,10 +234,10 @@ impl Keys {
         match cmd {
             Cmd::Left => self.go(b, motion::left(b, head)),
             Cmd::Right => self.go(b, motion::right(b, head)),
-            Cmd::Down => self.vertical(b, 1, view.hidden),
-            Cmd::Up => self.vertical(b, -1, view.hidden),
-            Cmd::HalfDown => self.vertical(b, half, view.hidden),
-            Cmd::HalfUp => self.vertical(b, -half, view.hidden),
+            Cmd::Down => self.vertical(b, 1, &view),
+            Cmd::Up => self.vertical(b, -1, &view),
+            Cmd::HalfDown => self.vertical(b, half, &view),
+            Cmd::HalfUp => self.vertical(b, -half, &view),
             Cmd::NextWord(big) => self.take(b, motion::next_word_start(b, head, big)),
             Cmd::WordEnd(big) => self.take(b, motion::next_word_end(b, head, big)),
             Cmd::PrevWord(big) => self.take(b, motion::prev_word_start(b, head, big)),

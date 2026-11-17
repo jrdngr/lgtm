@@ -3,9 +3,9 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind};
 
 use super::Editor;
-use super::draw::TAB;
-use crate::edit::buffer::{Buffer, Sel};
+use crate::edit::buffer::Sel;
 use crate::edit::keys::Mode;
+use crate::edit::wrap::char_at;
 
 /// A screen row of text as last drawn: its line, and the column shown at `x`.
 pub(super) struct TextRow {
@@ -13,21 +13,6 @@ pub(super) struct TextRow {
     pub x: u16,
     pub line: usize,
     pub col: usize,
-}
-
-/// The char at column `col` of `line`, tabs expanded, or the line's end past it.
-fn char_at(b: &Buffer, line: usize, col: usize) -> usize {
-    let start = b.line_start(line);
-    let text = b.slice(start, b.line_end(line));
-    let text = text.trim_end_matches('\r');
-    let mut at = 0;
-    for (k, ch) in text.chars().enumerate() {
-        at += if ch == '\t' { TAB } else { 1 };
-        if at > col {
-            return start + k;
-        }
-    }
-    start + text.chars().count()
 }
 
 impl Editor {

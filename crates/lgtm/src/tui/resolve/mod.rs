@@ -342,6 +342,7 @@ impl Resolver {
         let view = View {
             height: self.height,
             hidden: &[],
+            wrap: None,
         };
         match self.keys.press(&mut e.buf, key, view) {
             Action::Command => {

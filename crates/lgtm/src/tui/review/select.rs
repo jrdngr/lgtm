@@ -227,6 +227,7 @@ impl Review {
         let view = View {
             height: self.height,
             hidden: &[],
+            wrap: None,
         };
         let copy = (key.code == KeyCode::Char('y') && plain)
             || (key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::SUPER));

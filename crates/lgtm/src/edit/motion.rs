@@ -1,6 +1,7 @@
 //! Where motions go: functions from the text and a position to a new position.
 
 use super::buffer::Buffer;
+use super::wrap;
 
 /// The last char a normal-mode cursor can be on in `line`: before its newline, or the
 /// newline itself on an empty line.
@@ -40,25 +41,69 @@ pub fn vertical_folded(
     let mut line = b.line_of(at);
     let column = column.unwrap_or(at - b.line_start(line));
     for _ in 0..by.unsigned_abs() {
-        let next = if by > 0 {
-            let past = hidden
-                .iter()
-                .find(|&&(s, _)| s == line)
-                .map_or(line, |&(_, e)| e);
-            (past + 1).min(b.last_line())
-        } else {
-            let up = line.saturating_sub(1);
-            hidden
-                .iter()
-                .find(|&&(s, e)| s < up && up <= e)
-                .map_or(up, |&(s, _)| s)
-        };
+        let next = step_line(b, line, by > 0, hidden);
         if next == line {
             break;
         }
         line = next;
     }
     let to = (b.line_start(line) + column).min(line_max(b, line));
+    (to, column)
+}
+
+/// The line shown after `line`, or before it, past what closed folds hide.
+fn step_line(b: &Buffer, line: usize, down: bool, hidden: &[(usize, usize)]) -> usize {
+    if down {
+        let past = hidden
+            .iter()
+            .find(|&&(s, _)| s == line)
+            .map_or(line, |&(_, e)| e);
+        (past + 1).min(b.last_line())
+    } else {
+        let up = line.saturating_sub(1);
+        hidden
+            .iter()
+            .find(|&&(s, e)| s < up && up <= e)
+            .map_or(up, |&(s, _)| s)
+    }
+}
+
+/// `vertical_folded` by screen rows of lines wrapped at `width` columns: within a line's rows,
+/// then onto the next line's first row or the last row of the one before. `column` is the
+/// column within a row to keep.
+pub fn vertical_wrapped(
+    b: &Buffer,
+    at: usize,
+    by: isize,
+    column: Option<usize>,
+    hidden: &[(usize, usize)],
+    width: usize,
+) -> (usize, usize) {
+    let mut line = b.line_of(at);
+    let mut starts = wrap::row_starts(b, line, width);
+    let (mut row, here) = wrap::place(&starts, wrap::column(b, at));
+    let column = column.unwrap_or(here);
+    for _ in 0..by.unsigned_abs() {
+        if by > 0 && row + 1 < starts.len() {
+            row += 1;
+        } else if by < 0 && row > 0 {
+            row -= 1;
+        } else {
+            let next = step_line(b, line, by > 0, hidden);
+            if next == line {
+                break;
+            }
+            line = next;
+            starts = wrap::row_starts(b, line, width);
+            row = if by > 0 { 0 } else { starts.len() - 1 };
+        }
+    }
+    // The row's last column, short of where the next row starts.
+    let end = starts
+        .get(row + 1)
+        .map_or(usize::MAX, |&s| s.saturating_sub(1));
+    let col = (starts[row] + column).min(end.max(starts[row]));
+    let to = wrap::char_at(b, line, col).min(line_max(b, line));
     (to, column)
 }
 

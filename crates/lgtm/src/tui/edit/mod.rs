@@ -143,6 +143,8 @@ pub struct Editor {
     files_asked: Option<u16>,
     /// The text area's width as last drawn, with the sidebar.
     body_width: u16,
+    /// Columns the text had when last drawn, which wrapped lines wrap at.
+    text_width: usize,
     /// Whether a file was saved since this was last cleared.
     pub saved: bool,
     /// The sidebar's width with its border, once `<` or `>` set it.
@@ -177,6 +179,7 @@ impl Editor {
             files: true,
             files_asked: None,
             body_width: 0,
+            text_width: 0,
             saved: false,
             files_width: None,
             divider: width::Divider::Off,
@@ -748,6 +751,7 @@ impl Editor {
         let view = View {
             height: self.height,
             hidden: &hidden,
+            wrap: self.wrap.then_some(self.text_width),
         };
         let action = self.keys.press(&mut open.buf, key, view);
         if action == Action::Review {
@@ -978,8 +982,9 @@ mod tests {
         assert_eq!(draw(&mut e), ["abcdefghij", "end", "abcdefghij", "end"]);
         press(&mut e, "<space>w");
         assert_eq!(draw(&mut e), ["abcdefghij", "klmnopqrst", "uvwxyz", "end"]);
-        // The second long line's last row is the fifth row down, so the view moves a line.
-        press(&mut e, "jj$");
+        // Four rows down is the second long line; its last row is the fifth row, so the view
+        // moves a line.
+        press(&mut e, "jjjj$");
         assert_eq!(draw(&mut e), ["end", "abcdefghij", "klmnopqrst", "uvwxyz"]);
     }
 

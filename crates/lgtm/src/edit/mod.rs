@@ -11,6 +11,7 @@ pub mod markdown;
 pub mod motion;
 pub mod objects;
 pub mod ops;
+pub mod wrap;
 
 #[cfg(test)]
 pub mod spec;

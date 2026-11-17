@@ -91,10 +91,33 @@ fn j_steps_over_a_closed_fold() {
             View {
                 height: 10,
                 hidden: &[(0, 2)],
+                wrap: None,
             },
         );
     }
     assert_eq!(marked(&b, k.mode), "a\n  b\n  c\n[d]");
+}
+
+#[test]
+fn j_and_k_move_by_screen_rows_when_lines_wrap() {
+    // At 8 columns, "the cat sat on" wraps after "the cat " into "sat on".
+    let mut b = buffer_named("the [c]at sat on\nx", "t.txt");
+    let mut k = Keys::default();
+    let view = View {
+        height: 10,
+        hidden: &[],
+        wrap: Some(8),
+    };
+    let mut press = |b: &mut super::buffer::Buffer, spec: &str| {
+        for key in keys(spec) {
+            k.press(b, key, view);
+        }
+        marked(b, k.mode)
+    };
+    assert_eq!(press(&mut b, "j"), "the cat sat [o]n\nx");
+    assert_eq!(press(&mut b, "j"), "the cat sat on\n[x]");
+    assert_eq!(press(&mut b, "k"), "the cat sat [o]n\nx");
+    assert_eq!(press(&mut b, "k"), "the [c]at sat on\nx");
 }
 
 /// Presses `spec` on a buffer named `name` holding `text` with the cursor at `at`, and gives
@@ -108,6 +131,7 @@ fn md(name: &str, text: &str, at: usize, spec: &str) -> (String, usize) {
     let view = View {
         height: 10,
         hidden: &[],
+        wrap: None,
     };
     for key in keys(spec) {
         k.press(&mut b, key, view);

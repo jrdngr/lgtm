@@ -11,6 +11,7 @@ use crate::edit::buffer::Buffer;
 use crate::edit::gutter::{self, Mark};
 use crate::edit::keymap::{self, Pick};
 use crate::edit::keys::Mode;
+use crate::edit::wrap::{column, place, row_starts};
 use crate::tui::flow::Piece;
 use crate::tui::keybar::Hint;
 use crate::tui::paint::Canvas;
@@ -20,7 +21,7 @@ use crate::tui::theme::{
 use crate::tui::width;
 
 /// Columns a tab takes.
-pub(super) const TAB: usize = 4;
+pub(super) use crate::edit::wrap::TAB;
 /// Columns the sidebar takes by default, with its border.
 const SIDEBAR: u16 = 30;
 /// The narrowest the sidebar gets.
@@ -225,6 +226,7 @@ impl Editor {
         let code_x = body.x + 1 + num_w + 2;
         let width = body.right().saturating_sub(code_x) as usize;
         let wrap = self.wrap;
+        self.text_width = width;
         open.scroll(&visible, body.height as usize, width, wrap);
         let first = visible.partition_point(|&l| l < open.top);
         let left = open.left;
@@ -369,16 +371,6 @@ impl Open {
     }
 }
 
-/// The screen column of char `at` in its line, tabs expanded.
-fn column(b: &Buffer, at: usize) -> usize {
-    let start = b.line_start(b.line_of(at));
-    b.text
-        .slice(start..at.min(b.len()))
-        .chars()
-        .map(|c| if c == '\t' { TAB } else { 1 })
-        .sum()
-}
-
 /// Each char's color in a line, from its highlight segments, which count UTF-16 units.
 pub(crate) fn char_colors(text: &str, segs: &[Segment]) -> Vec<Color> {
     let mut out = Vec::with_capacity(text.len());
@@ -449,12 +441,6 @@ fn draw_wrapped(
         let (row, x) = place(starts, col);
         (row < starts.len() && x < width).then(|| (x0 + x as u16, y + row as u16))
     })
-}
-
-/// The row of a wrapped line that column `col` is on, and its column there.
-fn place(starts: &[usize], col: usize) -> (usize, usize) {
-    let row = starts.partition_point(|&s| s <= col).saturating_sub(1);
-    (row, col - starts.get(row).copied().unwrap_or(0))
 }
 
 /// Paints a line's chars where `at` puts each column, if anywhere. Returns the column after
@@ -529,56 +515,9 @@ fn paint_line(
     col
 }
 
-/// The columns line `line`'s rows start at, wrapped at `width` columns.
-fn row_starts(b: &Buffer, line: usize, width: usize) -> Vec<usize> {
-    let text = b.slice(b.line_start(line), b.line_end(line));
-    wrap_starts(text.trim_end_matches('\r'), width)
-}
-
-/// The columns the rows of `text` start at, wrapped at `width` columns: after the last space
-/// that fits, or mid-word when a word is wider than the row. A full last row gets one after
-/// it, for the cursor at the line's end.
-fn wrap_starts(text: &str, width: usize) -> Vec<usize> {
-    let width = width.max(1);
-    let mut starts = vec![0];
-    // Where the row would break: the column after the last space on it.
-    let mut after_space = None;
-    let mut col = 0;
-    for ch in text.chars() {
-        let w = if ch == '\t' { TAB } else { 1 };
-        let start = *starts.last().unwrap_or(&0);
-        // A space may hang past the edge; anything else starts a new row.
-        if col + w > start + width && !ch.is_whitespace() {
-            let at = after_space.filter(|&a| a > start).unwrap_or(col);
-            starts.push(at);
-            after_space = None;
-        }
-        col += w;
-        if ch.is_whitespace() {
-            after_space = Some(col);
-        }
-    }
-    let last = *starts.last().unwrap_or(&0);
-    if col - last >= width {
-        starts.push(col);
-    }
-    starts
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn wrapping_breaks_after_spaces_and_inside_only_words_wider_than_the_row() {
-        assert_eq!(wrap_starts("the cat sat", 8), [0, 8]);
-        assert_eq!(wrap_starts("ab cdefghij", 5), [0, 3, 8]);
-        // Spaces hang past the edge rather than start a row.
-        assert_eq!(wrap_starts("abcd  efg", 4), [0, 6]);
-        // A full last row leaves a row for the cursor at the end.
-        assert_eq!(wrap_starts("abcd", 4), [0, 4]);
-        assert_eq!(wrap_starts("", 4), [0]);
-    }
 
     #[test]
     fn char_colors_follow_utf16_segments() {
