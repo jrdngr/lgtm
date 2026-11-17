@@ -52,6 +52,13 @@ impl Workspace {
         let row = axis == Axis::Row;
         let count = children.len();
         let shown: Vec<usize> = children.iter().map(|(i, ..)| *i).collect();
+        // Flex leaves room unfilled when the grow factors sum under 1, as they do when
+        // collapsed siblings keep their weights, so the shown children split it all.
+        let total: f32 = children
+            .iter()
+            .map(|(_, w, _)| w)
+            .sum::<f32>()
+            .max(f32::EPSILON);
         let mut items = Vec::with_capacity(count * 2);
         for (i, (_, weight, child)) in children.into_iter().enumerate() {
             items.push(
@@ -59,7 +66,7 @@ impl Workspace {
                     .min_w_0()
                     .min_h_0()
                     .flex()
-                    .flex_grow(weight)
+                    .flex_grow(weight / total)
                     .flex_basis(px(0.))
                     .child(child)
                     .into_any_element(),
