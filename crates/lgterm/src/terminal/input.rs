@@ -155,7 +155,7 @@ impl TermView {
 
     fn link_at(&mut self, pos: Point<Pixels>) -> Option<Link> {
         let (x, y) = self.cell_at(pos)?;
-        let frame = self.snap.frame(&self.vt).ok()?;
+        let frame = self.snap.get_mut().frame(&self.vt).ok()?;
         let row = frame.rows.get(y as usize)?;
         links::at(&row.text(), row.char_index(x)?)
     }

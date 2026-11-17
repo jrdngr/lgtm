@@ -76,9 +76,9 @@ pub struct TermView {
     pub id: TermId,
     focus: FocusHandle,
     vt: Terminal,
-    snap: Snapshotter,
-    /// Reads the screen for agents, apart from what's painted.
-    reader: RefCell<Snapshotter>,
+    /// The one reader of the screen, for painting and for agents: reading takes the
+    /// terminal's record of which rows changed, so a second reader would leave rows unpainted.
+    snap: RefCell<Snapshotter>,
     keys: key::Encoder,
     key_event: key::Event,
     mouse: mouse::Encoder,
@@ -142,8 +142,7 @@ impl TermView {
         vt.set_default_fg_color(Some(rgb(theme::TERM_FG)))?
             .set_default_bg_color(Some(rgb(theme::TERM_BG)))?
             .set_default_cursor_color(Some(rgb(theme::TERM_FG)))?;
-        let snap = Snapshotter::new()?;
-        let reader = RefCell::new(Snapshotter::new()?);
+        let snap = RefCell::new(Snapshotter::new()?);
         let keys = key::Encoder::new()?;
         let key_event = key::Event::new()?;
         let mouse = mouse::Encoder::new()?;
@@ -168,7 +167,6 @@ impl TermView {
                 focus: cx.focus_handle(),
                 vt,
                 snap,
-                reader,
                 keys,
                 key_event,
                 mouse,
@@ -297,7 +295,7 @@ impl TermView {
     /// The bottom `rows` rows of the screen, as runs of text saying whether each is in the
     /// terminal's own color.
     pub fn bottom_rows(&self, rows: usize) -> Vec<crate::agents::kind::Row> {
-        let Ok(frame) = self.reader.borrow_mut().frame(&self.vt) else {
+        let Ok(frame) = self.snap.borrow_mut().frame(&self.vt) else {
             return vec![];
         };
         let skip = frame.rows.len().saturating_sub(rows);
@@ -409,7 +407,7 @@ impl TermView {
         }
         let origin = bounds.origin + gpui::point(px(theme::TERM_PAD_X), px(theme::TERM_PAD_Y));
         self.grid = Some((origin, cell));
-        let frame = self.snap.frame(&self.vt).ok()?;
+        let frame = self.snap.get_mut().frame(&self.vt).ok()?;
         let grid = Grid {
             origin,
             cell,
