@@ -19,6 +19,8 @@ pub struct Listing {
     pub ignored: Vec<String>,
     /// Ignored folders in folders that aren't ignored, not read.
     pub ignored_dirs: Vec<String>,
+    /// Folders that aren't ignored and hold no files, however deep.
+    pub empty_dirs: Vec<String>,
 }
 
 /// Folders never listed.
@@ -65,6 +67,15 @@ pub fn list(root: &Path) -> Listing {
     }
     let kept: HashSet<&Path> = dirs.iter().map(PathBuf::as_path).collect();
     let known: HashSet<&str> = files.iter().map(String::as_str).collect();
+    let full: HashSet<&str> = files
+        .iter()
+        .flat_map(|f| f.match_indices('/').map(|(i, _)| &f[..i]))
+        .collect();
+    let empty_dirs = dirs
+        .iter()
+        .filter_map(|d| rel(root, d))
+        .filter(|d| !full.contains(d.as_str()))
+        .collect();
     let (mut ignored, mut ignored_dirs) = (Vec::new(), Vec::new());
     for dir in &dirs {
         let Ok(entries) = std::fs::read_dir(dir) else {
@@ -90,6 +101,7 @@ pub fn list(root: &Path) -> Listing {
         files,
         ignored,
         ignored_dirs,
+        empty_dirs,
     }
 }
 
@@ -125,6 +137,21 @@ pub fn everything(root: &Path) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn folders_with_no_files_are_listed() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::create_dir_all(root.join("src/empty")).unwrap();
+        std::fs::create_dir_all(root.join("docs/drafts/old")).unwrap();
+        std::fs::write(root.join("src/a.rs"), "").unwrap();
+        let mut l = list(root);
+        l.empty_dirs.sort();
+        assert_eq!(
+            l.empty_dirs,
+            ["docs", "docs/drafts", "docs/drafts/old", "src/empty"]
+        );
+    }
 
     #[test]
     fn ignored_files_are_apart_and_ignored_folders_unread() {

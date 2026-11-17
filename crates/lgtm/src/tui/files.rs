@@ -106,7 +106,9 @@ impl FileTree {
         let mut paths = listing.files;
         paths.extend(listing.ignored.iter().cloned());
         paths.sort();
-        let dirs: BTreeSet<String> = listing.ignored_dirs.iter().cloned().collect();
+        let unread: BTreeSet<String> = listing.ignored_dirs.iter().cloned().collect();
+        let mut dirs = unread.clone();
+        dirs.extend(listing.empty_dirs);
         if paths == self.paths && dirs == self.dirs {
             return;
         }
@@ -114,8 +116,8 @@ impl FileTree {
         self.root = Some(listing.root);
         self.paths = paths;
         self.ignored = listing.ignored.into_iter().collect();
-        self.ignored.extend(dirs.iter().cloned());
-        self.unread = dirs.clone();
+        self.ignored.extend(unread.iter().cloned());
+        self.unread = unread;
         self.dirs = dirs;
         let open: Vec<String> = self.open.iter().cloned().collect();
         for dir in open {
@@ -846,6 +848,7 @@ mod tests {
             files: vec!["a.rs".into()],
             ignored: vec!["a.log".into()],
             ignored_dirs: vec!["target".into()],
+            ..Listing::default()
         });
         let dimmed = |t: &FileTree| -> Vec<(String, bool)> {
             t.rows
@@ -876,7 +879,20 @@ mod tests {
             files: vec!["a.rs".into(), "b.rs".into()],
             ignored: vec![],
             ignored_dirs: vec!["target".into()],
+            ..Listing::default()
         });
         assert_eq!(shown(&t)[..3], ["-target/", "  +debug/", "  out"]);
+    }
+
+    #[test]
+    fn empty_folders_show_in_the_tree() {
+        let mut t = FileTree::default();
+        t.set_listing(Listing {
+            files: vec!["src/a.rs".into()],
+            empty_dirs: vec!["docs".into()],
+            ..Listing::default()
+        });
+        assert_eq!(shown(&t), ["+docs/", "+src/"]);
+        assert!(!t.is_ignored("docs"));
     }
 }
