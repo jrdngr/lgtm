@@ -174,8 +174,8 @@ impl<T: Keyed> Tree<T> {
         *self = Tree::Branch { axis, children };
     }
 
-    /// Take the leaf `key` out, giving its share to a neighbor and folding branches left with
-    /// one child. The root leaf can't be removed: its owner drops the whole tree instead.
+    /// Take the leaf `key` out, giving its share to the neighbor before it (the one it was most
+    /// likely split from), or after it when it's first, and folding branches left with one child. The root leaf can't be removed: its owner drops the whole tree instead.
     pub fn remove(&mut self, key: T::Key) -> Option<T> {
         let Tree::Branch { children, .. } = self else {
             return None;
@@ -184,7 +184,7 @@ impl<T: Keyed> Tree<T> {
         let removed = match &children[i].tree {
             Tree::Leaf(_) => {
                 let node = children.remove(i);
-                let heir = i.min(children.len() - 1);
+                let heir = i.saturating_sub(1);
                 children[heir].weight += node.weight;
                 match node.tree {
                     Tree::Leaf(leaf) => leaf,
@@ -417,13 +417,17 @@ mod tests {
     }
 
     #[test]
-    fn removed_weight_goes_to_the_next_sibling() {
+    fn removed_weight_goes_back_to_the_leaf_it_split_from() {
         let mut t = Tree::Leaf(L(1));
         t.insert(1, L(2), Axis::Row).unwrap();
-        t.insert(2, L(3), Axis::Row).unwrap();
-        t.remove(2);
-        let rects = t.rects(Rect::UNIT);
-        assert_eq!(rects[1].1.w, 0.5);
+        t.insert(1, L(3), Axis::Row).unwrap();
+        t.remove(3);
+        let widths: Vec<f32> = t.rects(Rect::UNIT).iter().map(|(_, r)| r.w).collect();
+        assert_eq!(widths, [0.5, 0.5]);
+        t.insert(2, L(4), Axis::Row).unwrap();
+        t.remove(1);
+        let widths: Vec<f32> = t.rects(Rect::UNIT).iter().map(|(_, r)| r.w).collect();
+        assert_eq!(widths, [0.75, 0.25]);
     }
 
     #[test]
