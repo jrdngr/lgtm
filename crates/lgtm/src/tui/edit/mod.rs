@@ -989,6 +989,41 @@ mod tests {
     }
 
     #[test]
+    fn dragging_onto_the_bottom_row_selects_past_it_and_the_view_scrolls() {
+        use ratatui::buffer::Buffer as Screen;
+        use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+        use ratatui::layout::Rect;
+        let (_dir, mut e) = editor_on("l0\nl1\nl2\nl3\nl4\nl5\n");
+        e.files = false;
+        let area = Rect::new(0, 0, 30, 3);
+        let draw = |e: &mut Editor| {
+            e.draw(
+                &mut crate::tui::paint::Canvas::new(&mut Screen::empty(area), area),
+                area,
+            )
+        };
+        let mouse = |e: &mut Editor, kind, row| {
+            e.mouse(MouseEvent {
+                kind,
+                column: 7,
+                row,
+                modifiers: KeyModifiers::NONE,
+            })
+        };
+        let head_line = |e: &Editor| e.current().map(|b| b.line_of(b.sel.head)).unwrap();
+        draw(&mut e);
+        mouse(&mut e, MouseEventKind::Down(MouseButton::Left), 0);
+        for _ in 0..2 {
+            mouse(&mut e, MouseEventKind::Drag(MouseButton::Left), 2);
+            draw(&mut e);
+        }
+        assert_eq!((head_line(&e), e.open[0].top), (4, 2));
+        assert_eq!(e.current().unwrap().sel.anchor, 1);
+        mouse(&mut e, MouseEventKind::Drag(MouseButton::Left), 0);
+        assert_eq!(head_line(&e), 1);
+    }
+
+    #[test]
     fn clicking_moves_the_cursor_and_dragging_selects_in_any_mode() {
         use ratatui::buffer::Buffer as Screen;
         use ratatui::crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};

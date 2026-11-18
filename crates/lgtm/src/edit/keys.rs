@@ -243,6 +243,7 @@ impl Keys {
             Cmd::PrevWord(big) => self.take(b, motion::prev_word_start(b, head, big)),
             Cmd::Find { forward, till } => self.awaiting = Some(Await::Find { forward, till }),
             Cmd::FileStart => self.go(b, 0),
+            Cmd::FileEnd if self.select() => self.go(b, motion::line_max(b, b.last_line())),
             Cmd::FileEnd => self.go(b, b.line_start(b.last_line())),
             Cmd::LineStart => self.go(b, b.line_start(b.line_of(head))),
             Cmd::LineEnd => self.go(b, motion::line_max(b, b.line_of(head))),

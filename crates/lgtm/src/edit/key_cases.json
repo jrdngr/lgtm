@@ -50,6 +50,7 @@
   "goto keys go to file and line ends": [
     ["ab\n  c[d]", "gg", "[a]b\n  cd"],
     ["a[b]\ncd", "ge", "ab\n[c]d"],
+    ["a[b]\ncd\n", "vge", "a[b\ncd]\n"],
     ["  a[b]c", "gh", "[ ] abc"],
     ["[a]bc\nd", "gl", "ab[c]\nd"],
     ["  ab[c]", "gs", "  [a]bc"],
