@@ -352,11 +352,14 @@ impl Workspace {
                 if !path.is_file() {
                     return;
                 }
-                let argv = [
-                    "lgtm".to_owned(),
+                // Through the interactive shell, which puts ~/.local/bin on the PATH when
+                // only the user's .zshrc does.
+                let shell = std::env::var("SHELL").unwrap_or_default();
+                let args = [
                     "--split".to_owned(),
                     format!("{}:{}", path.display(), line.unwrap_or(1)),
                 ];
+                let argv = crate::agents::launch::argv("lgtm", &args, &shell);
                 let from = Some(Tab::Term(term));
                 let _ = self.open(from, Place::Right, Some(cwd), &argv, true, window, cx);
             }
