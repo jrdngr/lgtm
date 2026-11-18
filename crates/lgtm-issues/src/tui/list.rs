@@ -123,6 +123,18 @@ pub fn rows(issues: &[Issue], wf: &Workflow, filter: &str, expanded: &[String]) 
     rows
 }
 
+/// Columns the age takes on the right, with the margin after it.
+const AGE: u16 = 4 + 1;
+
+/// Who an issue's row names: its owner while it's being worked on, else the last agent on it.
+fn who<'a>(issue: &'a Issue, wf: &Workflow) -> Option<&'a str> {
+    if wf.verb(Verb::Claim).is_ok_and(|s| s.id == issue.status) {
+        issue.owner.as_deref()
+    } else {
+        issue.last_agent()
+    }
+}
+
 fn cut(s: &str, w: usize) -> String {
     if s.chars().count() <= w {
         format!("{s:<w$}")
@@ -166,6 +178,12 @@ pub fn draw(
                     continue;
                 };
                 let q = qs[at].0;
+                right(c, time::age(q.at, now));
+                let end = area.right().saturating_sub(AGE + 1);
+                let c = &mut Canvas::new(
+                    &mut *c.buf,
+                    Rect::new(area.x, y, end.saturating_sub(area.x), 1),
+                );
                 let mut x = c.put(area.x + 1, y, "●", st(AMBER));
                 x = c.put(x + 1, y, &format!("{id:<3}"), st(FG));
                 x = c.put(x + 1, y, &format!("{qid:<4}"), bold(AMBER));
@@ -177,32 +195,35 @@ pub fn draw(
                     st(FAINT),
                 );
                 c.put(x, y, &cut(&q.who, 11), st(CYAN));
-                right(c, time::age(q.at, now));
             }
             Row::Issue(id) => {
                 let Some(issue) = find(*id) else { continue };
                 let open = wf.verb(Verb::New).is_ok_and(|s| s.id == issue.status);
                 let (dot, color) = marks::mark(issue, wf, issues);
                 let mut x = c.put(area.x + 1, y, &dot, st(color));
-                x = c.put(x + 1, y, &format!("{id:<3}"), st(FG));
-                x = c.put(x + 1, y, &cut(&issue.title, 36), st(FG));
-                let blockers = issue.open_blockers(issues, |s| wf.is_done(s));
-                if !blockers.is_empty() {
-                    let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
-                    x = c.put(x + 1, y, &ids.join(" "), st(RED));
-                }
-                let working = wf.verb(Verb::Claim).is_ok_and(|s| s.id == issue.status);
-                let who = if working {
-                    issue.owner.as_deref()
-                } else {
-                    issue.last_agent()
-                };
-                x = c.put(x + 1, y, &cut(who.unwrap_or(""), 11), st(CYAN));
+                x = c.put(x + 1, y, &format!("{id:<3}"), st(FG)) + 1;
+                // The right edge: the age unless the issue is new, and left of it the first
+                // blocker once there's no room for it after the title.
+                let mut end = area.right().saturating_sub(1);
                 if !open {
-                    let latest = issue.latest().map_or("", |e| first_line(&e.text));
-                    let room = (area.right().saturating_sub(x + 7)) as usize;
-                    c.put(x, y, cut(latest, room).trim_end(), st(MUTED));
                     right(c, time::age(issue.touched(), now));
+                    end = area.right().saturating_sub(AGE + 1);
+                }
+                let blockers = issue.open_blockers(issues, |s| wf.is_done(s));
+                let first = blockers.first().map(|b| format!("#{b}"));
+                let title_w = issue.title.chars().count().min(36) as u16;
+                let docked = first
+                    .as_ref()
+                    .filter(|b| x + title_w + 1 + b.len() as u16 > end);
+                if let Some(b) = docked {
+                    let bx = end.saturating_sub(b.len() as u16).max(x);
+                    c.put(bx, y, b, st(RED));
+                    end = bx.saturating_sub(1);
+                }
+                let room = end.saturating_sub(x).min(36) as usize;
+                x = c.put(x, y, &cut(&issue.title, room), st(FG));
+                if docked.is_none() {
+                    details(c, (x + 1, end, y), (issue, wf, issues), bg, open);
                 }
             }
             Row::Needs(n) => header(c, area, y, ("needs input", AMBER), *n, bg),
@@ -220,6 +241,34 @@ pub fn draw(
             }
             Row::Gap => {}
         }
+    }
+}
+
+/// What follows an issue's title, from `x` to before `end` on row `y`: its open blockers, who
+/// has it, and unless it's new, the first line of its latest entry.
+fn details(
+    c: &mut Canvas,
+    (x, end, y): (u16, u16, u16),
+    (issue, wf, issues): (&Issue, &Workflow, &[Issue]),
+    bg: ratatui::style::Color,
+    open: bool,
+) {
+    if end <= x {
+        return;
+    }
+    let st = |color| Style::default().fg(color).bg(bg);
+    let mut c = Canvas::new(&mut *c.buf, Rect::new(x, y, end - x, 1));
+    let mut x = x;
+    let blockers = issue.open_blockers(issues, |s| wf.is_done(s));
+    if !blockers.is_empty() {
+        let ids: Vec<String> = blockers.iter().map(|b| format!("#{b}")).collect();
+        x = c.put(x, y, &ids.join(" "), st(RED)) + 1;
+    }
+    x = c.put(x, y, &cut(who(issue, wf).unwrap_or(""), 11), st(CYAN));
+    if !open {
+        let latest = issue.latest().map_or("", |e| first_line(&e.text));
+        let room = end.saturating_sub(x) as usize;
+        c.put(x, y, cut(latest, room).trim_end(), st(MUTED));
     }
 }
 
@@ -324,6 +373,38 @@ mod tests {
             rows(&issues, &wf, "issue 3", &[]),
             [h("working", 1), Row::Issue(3)]
         );
+    }
+
+    fn line(issues: &[Issue], wf: &Workflow, width: u16) -> String {
+        let area = Rect::new(0, 0, width, 1);
+        let mut buf = ratatui::buffer::Buffer::empty(area);
+        draw(
+            &mut Canvas::new(&mut buf, area),
+            area,
+            (issues, wf),
+            &[Row::Issue(1)],
+            1,
+            0,
+        );
+        (0..width).map(|x| buf[(x, 0)].symbol()).collect()
+    }
+
+    #[test]
+    fn the_first_blocker_docks_beside_the_age_when_the_row_runs_out_of_room() {
+        let (_dir, wf) = workflow();
+        let now = time::now();
+        let mut blocked = issue(1, "working", now - 90);
+        blocked.title = "A title long enough to fill a narrow list".into();
+        blocked.blocked_by = vec![2, 3];
+        let issues = vec![blocked, issue(2, "open", 1), issue(3, "open", 1)];
+
+        let wide = line(&issues, &wf, 120);
+        assert!(wide.contains("#2 #3"), "{wide}");
+
+        let narrow = line(&issues, &wf, 40);
+        assert!(narrow.trim_end().ends_with("#2   1h"), "{narrow}");
+        assert!(!narrow.contains("#3"), "{narrow}");
+        assert!(narrow.contains("A title long"), "{narrow}");
     }
 
     #[test]
