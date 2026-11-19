@@ -1,10 +1,11 @@
-//! `lgtm`: terminal code review for jj, and the command Claude Code runs for lgtm's MCP server
-//! and hooks.
+//! `lgtm`: terminal code review for jj, the commands agents run to review with it, and the
+//! command Claude Code runs for lgtm's hooks.
 
 mod agent;
 mod edit;
-mod mcp;
+mod open_review;
 mod register;
+mod review_cmd;
 mod route;
 mod snap;
 mod tui;
@@ -14,26 +15,21 @@ fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let pr = take_flag(&mut args, "--pr", "a PR number or URL");
     let revset = take_flag(&mut args, "-r", "a revset");
-    let split = match args.iter().position(|a| a == tui::SPLIT_FLAG) {
-        Some(i) => {
-            args.remove(i);
-            true
-        }
-        None => false,
-    };
+    // lgterm marks a copy it opens beside another, which runs like any other.
+    args.retain(|a| a != tui::SPLIT_FLAG);
     let code = match args.first().map(String::as_str) {
-        Some("mcp") => route::mcp(),
+        Some("review") => review_cmd::run(args[1..].to_vec(), revset.clone()),
         Some("hook") => route::hook(),
         Some("snap") => snap::run(&args[1..]),
         Some("issues") if args.len() > 1 => lgtm_issues::command(args[1..].to_vec()),
-        Some("issues") => tui::run(tui::Start::Issues, None, false),
+        Some("issues") => tui::run(tui::Start::Issues, None),
         Some("resolve") => match args.get(1) {
-            Some(path) => tui::run(tui::Start::File(path.into(), 1), None, false),
-            None => tui::run(tui::Start::Conflicts, None, false),
+            Some(path) => tui::run(tui::Start::File(path.into(), 1), None),
+            None => tui::run(tui::Start::Conflicts, None),
         },
         Some("-h" | "--help") => {
             println!(
-                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm mcp | hook"
+                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm review [<command>]\n       lgtm hook"
             );
             0
         }
@@ -41,10 +37,10 @@ fn main() {
             eprintln!("lgtm: -r opens a review, not a file");
             2
         }
-        Some(arg) => tui::run(file(arg), pr, split),
+        Some(arg) => tui::run(file(arg), pr),
         None => match revset {
-            Some(r) => tui::run(tui::Start::Revset(r), pr, split),
-            None => tui::run(tui::Start::Home, pr, split),
+            Some(r) => tui::run(tui::Start::Revset(r), pr),
+            None => tui::run(tui::Start::Home, pr),
         },
     };
     std::process::exit(code);

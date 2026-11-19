@@ -1,22 +1,5 @@
-//! Claude Code runs `lgtm mcp` and `lgtm hook`. In a jj or git repo `mcp` serves the TUI's
-//! tools, and `hook` records the agent's turns and, in an lgterm terminal, passes the hook on
-//! to lgterm.
-
-use rmcp::ServiceExt;
-use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
-
-pub fn mcp() -> i32 {
-    let socket = std::env::current_dir()
-        .ok()
-        .and_then(|d| lgtm_core::repo::root_of(&d))
-        .and_then(|root| crate::agent::socket_path(&root));
-    match socket {
-        Some(socket) => crate::mcp::serve(socket),
-        None => serve_stdio(Stub(
-            "This session isn't in a jj or git repo, so lgtm has nothing to offer.",
-        )),
-    }
-}
+//! Claude Code runs `lgtm hook`, which records the agent's turns and, in an lgterm terminal,
+//! passes the hook on to lgterm.
 
 pub fn hook() -> i32 {
     let input = crate::turn_hook::read_input();
@@ -45,41 +28,5 @@ fn tell_lgterm(input: &str) {
         && !out.is_empty()
     {
         println!("{out}");
-    }
-}
-
-/// A server with no tools, explaining why.
-struct Stub(&'static str);
-
-impl rmcp::ServerHandler for Stub {
-    fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(ServerCapabilities::default())
-            .with_server_info(Implementation::new("lgtm", env!("CARGO_PKG_VERSION")))
-            .with_instructions(self.0)
-    }
-}
-
-/// Serves `server` on stdin and stdout until the client goes.
-pub fn serve_stdio(server: impl rmcp::ServerHandler) -> i32 {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("tokio runtime");
-    let served = rt.block_on(async {
-        server
-            .serve((tokio::io::stdin(), tokio::io::stdout()))
-            .await?
-            .waiting()
-            .await?;
-        anyhow::Ok(())
-    });
-    // Tokio's stdin read can't be cancelled, so waiting on it would keep this running.
-    rt.shutdown_background();
-    match served {
-        Ok(()) => 0,
-        Err(e) => {
-            eprintln!("lgtm mcp: {e:#}");
-            1
-        }
     }
 }

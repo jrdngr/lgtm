@@ -1,5 +1,5 @@
-//! Registers this binary with Claude Code on start: `lgtm mcp` as a user-scope MCP server and
-//! `lgtm hook` in its user settings. A cargo build never registers, so trying one out leaves
+//! Registers this binary's `lgtm hook` in Claude Code's user settings on start, and removes the
+//! MCP server lgtm used to register. A cargo build never registers, so trying one out leaves
 //! the installed command in place.
 
 use std::path::{Path, PathBuf};
@@ -28,9 +28,9 @@ pub fn on_start() {
     let Some(exe) = exe() else {
         return;
     };
-    let mcp = !claude_json()
+    let mcp = claude_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
-        .is_some_and(|c| mcp_in(&c, &exe));
+        .is_some_and(|c| old_mcp_in(&c));
     let hooks = !settings_json()
         .and_then(|p| std::fs::read_to_string(p).ok())
         .is_some_and(|c| hooks_in(&c, &exe));
@@ -39,7 +39,7 @@ pub fn on_start() {
     }
     std::thread::spawn(move || {
         if mcp {
-            let _ = register_mcp(&exe);
+            let _ = unregister_mcp();
         }
         if hooks {
             let _ = register_hooks(&exe);
@@ -78,31 +78,26 @@ fn settings_json() -> Option<PathBuf> {
     }
 }
 
-/// Whether a `.claude.json` registers `exe mcp` as the `lgtm` server.
-fn mcp_in(config: &str, exe: &str) -> bool {
+/// Whether a `.claude.json` registers some lgtm binary's `mcp` as the `lgtm` server.
+fn old_mcp_in(config: &str) -> bool {
     let Ok(v) = serde_json::from_str::<Value>(config) else {
         return false;
     };
     let server = &v["mcpServers"]["lgtm"];
-    server["command"] == exe && server["args"] == json!(["mcp"])
+    let lgtm = server["command"]
+        .as_str()
+        .is_some_and(|c| c.ends_with("/lgtm") || c.ends_with("/lgtm-app"));
+    lgtm && server["args"] == json!(["mcp"])
 }
 
-/// Registers `exe mcp` through the `claude` command, replacing any earlier registration.
-fn register_mcp(exe: &str) -> anyhow::Result<()> {
-    let claude = || {
-        let mut c = Command::new("claude");
-        c.stdin(std::process::Stdio::null());
-        c
-    };
-    // Fails when there's nothing to remove, which is fine.
-    claude()
+/// Removes the `lgtm` MCP server through the `claude` command.
+fn unregister_mcp() -> anyhow::Result<()> {
+    let out = Command::new("claude")
         .args(["mcp", "remove", "-s", "user", "lgtm"])
+        .stdin(std::process::Stdio::null())
         .output()
         .context("couldn't run Claude Code")?;
-    let out = claude()
-        .args(["mcp", "add", "-s", "user", "lgtm", "--", exe, "mcp"])
-        .output()?;
-    anyhow::ensure!(out.status.success(), "`claude mcp add` failed");
+    anyhow::ensure!(out.status.success(), "`claude mcp remove` failed");
     Ok(())
 }
 
@@ -189,17 +184,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn reads_the_registration_from_claude_json() {
+    fn finds_the_old_mcp_registration_of_any_lgtm_build() {
         let config = |cmd: &str, args: &str| {
             format!(
                 r#"{{"mcpServers":{{"lgtm":{{"type":"stdio","command":"{cmd}","args":{args}}}}}}}"#
             )
         };
-        assert!(mcp_in(&config("/a/lgtm", r#"["mcp"]"#), "/a/lgtm"));
-        assert!(!mcp_in(&config("/old/lgtm-app", r#"["mcp"]"#), "/a/lgtm"));
-        assert!(!mcp_in(&config("/a/lgtm", r#"["hook"]"#), "/a/lgtm"));
-        assert!(!mcp_in("{}", "/a/lgtm"));
-        assert!(!mcp_in("", "/a/lgtm"));
+        assert!(old_mcp_in(&config("/a/lgtm", r#"["mcp"]"#)));
+        assert!(old_mcp_in(&config("/old/lgtm-app", r#"["mcp"]"#)));
+        assert!(!old_mcp_in(&config("/a/other", r#"["mcp"]"#)));
+        assert!(!old_mcp_in(&config("/a/lgtm", r#"["hook"]"#)));
+        assert!(!old_mcp_in("{}"));
+        assert!(!old_mcp_in(""));
     }
 
     #[test]

@@ -9,14 +9,13 @@ mod heat;
 mod help;
 mod home;
 mod issues;
-mod load;
+pub mod load;
 mod mention;
 mod motions;
 mod picker;
 mod plain;
 mod resolve;
-mod review;
-mod serve;
+pub mod review;
 mod settings;
 mod side;
 mod term;
@@ -38,6 +37,7 @@ use lgtm_core::store::Store;
 use lgtm_tui_kit::{flow, highlight, keybar, paint, theme};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 
+use crate::open_review;
 use load::{Loader, Msg, Target};
 use paint::Canvas;
 use review::Review;
@@ -80,12 +80,12 @@ enum Screen {
 pub use edit::SPLIT_FLAG;
 
 /// Runs the UI in the jj workspace or git working tree around the file or folder it opens,
-/// else around the current directory, opening `start`. Outside both only the editor runs. A `split` is a second
-/// one beside another, which keeps the MCP socket.
-pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
+/// else around the current directory, opening `start`. Outside both only the editor runs.
+pub fn run(start: Start, pr: Option<String>) -> i32 {
     crate::register::on_start();
     if let Some(home) = std::env::var_os("HOME") {
         lgtm_issues::skill::install(Path::new(&home));
+        crate::review_cmd::skill::install(Path::new(&home));
     }
     let cwd = std::env::current_dir().unwrap_or_default();
     let target = match &start {
@@ -119,15 +119,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         return plain::run(root, file);
     };
     let (tx, rx) = mpsc::channel();
-    let socket = crate::agent::socket_path(&root).filter(|_| !split);
-    let server = match socket.map(|p| serve::start(&p, tx.clone())) {
-        Some(Ok(s)) => s,
-        Some(Err(e)) => {
-            eprintln!("lgtm: {e:#}");
-            return 1;
-        }
-        None => None,
-    };
+    let shown = open_review::folder(&root).and_then(|f| open_review::Mine::start(&f).ok());
     let loader = match Loader::new(Repo::open(&root), tx) {
         Ok(l) => l,
         Err(e) => {
@@ -143,7 +135,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
         root,
         loader,
         _watcher: watcher,
-        _server: server,
+        shown,
         snapshots,
         version: store.as_ref().and_then(|s| s.data_version().ok()),
         store,
@@ -234,8 +226,8 @@ struct App {
     root: PathBuf,
     loader: Loader,
     _watcher: Option<notify::RecommendedWatcher>,
-    /// Where agents ask this app about the review, over MCP.
-    _server: Option<serve::Server>,
+    /// Where `lgtm review` learns which review this app shows.
+    shown: Option<open_review::Mine>,
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
     /// Agents to pick from for a selection sent with `a`.
@@ -418,6 +410,7 @@ impl App {
             if self.polled.elapsed() >= POLL {
                 self.polled = Instant::now();
                 self.poll_store();
+                self.record_shown();
                 self.buffers.check_disk();
             }
             for name in self.buffers.take_base_requests() {
@@ -448,6 +441,21 @@ impl App {
         if let Some(r) = self.review.as_mut() {
             r.rematch(store);
         }
+    }
+
+    /// Records which review this app shows, for `lgtm review`.
+    fn record_shown(&mut self) {
+        let Some(mine) = self.shown.as_mut() else {
+            return;
+        };
+        mine.show(self.review.as_ref().map(|r| open_review::Shown {
+            revset: r.revset.clone(),
+            between: match &r.target {
+                Target::Revset(_) => None,
+                Target::Between { from, to, .. } => Some((from.clone(), to.clone())),
+            },
+            pr: r.pr().cloned(),
+        }));
     }
 
     fn message(&mut self, msg: Msg) {
@@ -541,13 +549,6 @@ impl App {
             Msg::Changed => {
                 self.buffers.bases_stale();
                 self.reload();
-            }
-            Msg::Agent { req, reply } => {
-                let answer = match self.review.as_mut() {
-                    Some(r) => r.answer(req, self.store.as_mut()),
-                    None => Err("lgtm has no review open".into()),
-                };
-                let _ = reply.send(answer);
             }
             Msg::Highlight { id, file, sides } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {

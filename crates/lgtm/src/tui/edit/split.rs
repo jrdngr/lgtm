@@ -1,5 +1,5 @@
 //! Splits: a pane beside or below this one, in lgterm or herdr, running another `lgtm` on a
-//! file and line. That one is editor only and leaves the MCP socket to this one.
+//! file and line. That one is editor only.
 
 use std::path::Path;
 use std::process::{Command, Stdio};

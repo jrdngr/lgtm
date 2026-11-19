@@ -82,7 +82,7 @@ pub fn from_agent<'a>(
     let row = match (add.line, add.removed_line) {
         (Some(n), None) => rows.find(|r| r.kind != RowKind::Removed && r.new_line == Some(n)),
         (None, Some(n)) => rows.find(|r| r.kind == RowKind::Removed && r.old_line == Some(n)),
-        _ => return Err("give either line or removedLine".into()),
+        _ => return Err("give either a line or a removed line".into()),
     };
     let row = row.ok_or_else(|| {
         format!(
@@ -91,7 +91,7 @@ pub fn from_agent<'a>(
         )
     })?;
     Ok(AgentComment {
-        author: Some(add.author.clone().unwrap_or_else(|| "Agent".into())),
+        author: Some(add.author.clone()),
         ..new_comment(path, old_path, None, row, body, review)
     })
 }
@@ -287,12 +287,11 @@ mod tests {
             row(RowKind::Added, None, Some(21), "a >= b"),
         ];
         let add = |line, removed_line| AddComment {
-            revset: "@".into(),
             path: "a.rs".into(),
             line,
             removed_line,
             body: " Off by one? ".into(),
-            author: Some("Claude".into()),
+            author: "Claude".into(),
         };
         let on = |a: &AddComment| from_agent(rows.iter().copied(), "a.rs", None, a, "@");
         let new = on(&add(Some(21), None)).unwrap();

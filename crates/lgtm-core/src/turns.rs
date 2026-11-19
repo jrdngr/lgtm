@@ -17,20 +17,6 @@ use crate::store::{Store, Turn};
 /// Turns older than this are dropped.
 pub const KEEP_MS: i64 = 14 * 24 * 60 * 60 * 1000;
 
-/// What agents read about naming steps, as the tool's description.
-pub const START_SNAPSHOT: &str = "Start a new lgtm snapshot named `label`. lgtm records the \
-files you change for each prompt as one snapshot under the working copy in the human's \
-revisions log, which they can review, undo or move to its own commit on its own. Your edits \
-after this call go into the new snapshot, until you call it again or your turn ends. When the \
-human asks for work in separate snapshots, call it before each part, naming the part.";
-
-/// `start_snapshot`'s argument.
-#[derive(Debug, Deserialize, schemars::JsonSchema)]
-pub struct StartSnapshot {
-    /// What the snapshot holds, in a few words, like `Fix the off-by-one in paging`.
-    pub label: String,
-}
-
 /// Where in an agent's turn a hook snapshots the working copy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

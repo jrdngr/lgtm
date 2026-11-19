@@ -65,7 +65,7 @@ mod tests {
 
     use super::super::tests::{press, review};
     use super::*;
-    use crate::agent::{Request, ResolveComment};
+    use crate::agent::Request;
 
     #[test]
     fn c_resolves_a_comment_which_stays_until_the_cursor_leaves_and_u_undoes_it() {
@@ -101,29 +101,19 @@ mod tests {
     }
 
     #[test]
-    fn agents_see_resolved_comments_last_and_can_reopen_them() {
-        let mut store = Store::in_memory();
+    fn agents_see_resolved_comments_last() {
+        let store = Store::in_memory();
         let mut r = review();
         for body in ["one", "two"] {
             store.add_agent_comment(&comment(body)).unwrap();
         }
+        store.set_agent_comment_done(1, true).unwrap();
         r.load_comments(&store);
-        r.answer(
-            Request::ResolveComment(ResolveComment { number: 1 }),
-            Some(&mut store),
-        )
-        .unwrap();
         let listed: serde_json::Value =
             serde_json::from_str(&r.answer(Request::GetComments, None).unwrap()).unwrap();
         assert_eq!(listed[0]["number"], "C2");
         assert_eq!(listed[1]["number"], "C1");
         assert_eq!(listed[1]["resolved"], true);
-        r.answer(
-            Request::UnresolveComment(ResolveComment { number: 1 }),
-            Some(&mut store),
-        )
-        .unwrap();
-        assert!(!r.comment(1).unwrap().done);
     }
 
     fn comment(body: &str) -> AgentComment {

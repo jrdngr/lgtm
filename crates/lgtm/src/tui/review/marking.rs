@@ -23,7 +23,7 @@ impl Review {
             .collect();
         self.marks = Some(Marks::new(files, cfg, self.revset.clone(), hunk_rows));
         if let Some(store) = store {
-            self.rematch(store);
+            self.match_store(store);
         }
         let reviewed = self.reviewed_paths();
         if !std::mem::replace(&mut self.built_once, true) {
@@ -48,8 +48,20 @@ impl Review {
             .collect()
     }
 
-    /// Matches marks and comments again, after the store changed.
+    /// Matches marks and comments again, after the store changed. Folds files an agent's
+    /// writes just left all reviewed with nothing flagged.
     pub fn rematch(&mut self, store: &Store) {
+        let before = self.agent_reviewed();
+        self.match_store(store);
+        let newly: Vec<usize> = (0..self.files.len())
+            .filter(|&f| self.file_state(f) == State::Agent && !before.contains(&f))
+            .collect();
+        for f in newly {
+            self.set_folded(f, true);
+        }
+    }
+
+    pub(super) fn match_store(&mut self, store: &Store) {
         if let Some(m) = self.marks.as_mut()
             && let Err(e) = m.rematch(store)
         {
@@ -57,6 +69,13 @@ impl Review {
         }
         self.load_comments(store);
         self.load_threads(store);
+    }
+
+    /// The files only an agent reviewed.
+    fn agent_reviewed(&self) -> HashSet<usize> {
+        (0..self.files.len())
+            .filter(|&f| self.file_state(f) == State::Agent)
+            .collect()
     }
 
     pub fn hunk_state(&self, file: usize, hunk: usize) -> State {

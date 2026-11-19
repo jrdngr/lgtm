@@ -80,11 +80,6 @@ pub enum Msg {
     Changed,
     /// Files were written, for the trees' heat.
     Written(Vec<String>),
-    /// An agent's request over MCP, and where its answer goes.
-    Agent {
-        req: crate::agent::Request,
-        reply: std::sync::mpsc::Sender<crate::agent::Response>,
-    },
     /// The review's PR threads, pulled from GitHub.
     Pulled {
         id: u64,

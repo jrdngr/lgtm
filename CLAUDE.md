@@ -1,6 +1,6 @@
 # lgtm
 
-Code review on jj, in the terminal. Rust crates in `crates/`, one Cargo workspace at the root: `crates/lgtm` is the `lgtm` TUI and CLI (`lgtm mcp`, `lgtm hook`, `lgtm issues`), `crates/lgterm` the terminal multiplexer, and `lgtm-core`, `lgtm-tui-kit`, `lgtm-issues` and `lgterm-proto` what they share. The README covers features and shortcuts.
+Code review on jj, in the terminal. Rust crates in `crates/`, one Cargo workspace at the root: `crates/lgtm` is the `lgtm` TUI and CLI (`lgtm review`, `lgtm hook`, `lgtm issues`), `crates/lgterm` the terminal multiplexer, and `lgtm-core`, `lgtm-tui-kit`, `lgtm-issues` and `lgterm-proto` what they share. The README covers features and shortcuts.
 
 ## Workflow
 

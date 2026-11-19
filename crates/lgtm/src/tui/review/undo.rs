@@ -58,7 +58,7 @@ impl Review {
             Ok(step) => self.history.undo.push(step),
             Err(e) => self.notice = Some(format!("{e:#}")),
         }
-        self.rematch(store);
+        self.match_store(store);
         let after = self.reviewed_paths();
         for path in before.difference(&after) {
             self.folded.remove(path);

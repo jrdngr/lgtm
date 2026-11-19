@@ -272,7 +272,7 @@ impl ReviewView<'_> {
     }
 }
 
-/// A line range as get_review writes them: `12` or `12-20`.
+/// A line range as `lgtm review` writes them: `12` or `12-20`.
 pub fn parse_range(range: &str) -> anyhow::Result<(u32, u32)> {
     let bad = || format!("`{range}` isn't a line or a range like `12-20`");
     let (a, b) = range.split_once('-').unwrap_or((range, range));

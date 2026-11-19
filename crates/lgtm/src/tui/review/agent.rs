@@ -1,4 +1,4 @@
-//! Answers agents' requests over MCP about the open review.
+//! Answers `lgtm review`'s requests about a review it loaded.
 
 use lgtm_core::anchor::Side;
 use lgtm_core::store::{AgentComment, Store};
@@ -21,27 +21,10 @@ impl Review {
         match req {
             Request::GetReview => self.get_review(),
             Request::GetComments => self.get_comments(),
-            Request::ResolveComment(r) => self.set_done(r.number, true, store),
-            Request::UnresolveComment(r) => self.set_done(r.number, false, store),
             Request::CheckFiles(c) => self.check_files(c, store),
             Request::MarkLines(m) => self.mark_lines(m, store),
             Request::AddComment(a) => self.add_comment(a, store),
         }
-    }
-
-    fn set_done(&mut self, number: i64, done: bool, store: Option<&mut Store>) -> Response {
-        let store = store.ok_or("lgtm couldn't open its store")?;
-        let found = store
-            .set_agent_comment_done(number, done)
-            .map_err(|e| e.to_string())?;
-        if !found {
-            return Err(format!("there's no comment C{number}"));
-        }
-        self.load_comments(store);
-        Ok(format!(
-            "C{number} is {}.",
-            if done { "done" } else { "open again" }
-        ))
     }
 
     fn get_review(&self) -> Response {
@@ -125,28 +108,7 @@ impl Review {
         comment_core::range_code(&rows)
     }
 
-    /// Folds those of `files` an agent's writes left all reviewed with nothing flagged.
-    fn fold_agent_reviewed(&mut self, files: impl IntoIterator<Item = usize>) {
-        for f in files {
-            if self.file_state(f) == super::marks::State::Agent {
-                self.set_folded(f, true);
-            }
-        }
-    }
-
-    fn same_review(&self, revset: &str) -> Result<(), String> {
-        if revset == self.revset {
-            Ok(())
-        } else {
-            Err(format!(
-                "lgtm now shows `{}`, not `{revset}`: call get_review again",
-                self.revset
-            ))
-        }
-    }
-
     fn check_files(&mut self, c: CheckFiles, store: Option<&mut Store>) -> Response {
-        self.same_review(&c.revset)?;
         let store = store.ok_or("lgtm couldn't open its store")?;
         let marks = self.marks.as_mut().ok_or("the review is still loading")?;
         let files = c
@@ -163,13 +125,11 @@ impl Review {
         marks
             .agent_check(store, &files, c.checked)
             .map_err(|e| format!("{e:#}"))?;
-        self.fold_agent_reviewed(files.iter().map(|&f| f as usize));
         let verb = if c.checked { "Checked" } else { "Unchecked" };
         Ok(format!("{verb} {} files.", files.len()))
     }
 
     fn add_comment(&mut self, a: AddComment, store: Option<&mut Store>) -> Response {
-        self.same_review(&a.revset)?;
         let store = store.ok_or("lgtm couldn't open its store")?;
         let file = self
             .files
@@ -185,7 +145,6 @@ impl Review {
     }
 
     fn mark_lines(&mut self, m: MarkLines, store: Option<&mut Store>) -> Response {
-        self.same_review(&m.revset)?;
         let store = store.ok_or("lgtm couldn't open its store")?;
         let marks = self.marks.as_mut().ok_or("the review is still loading")?;
         let file = marks
@@ -204,7 +163,6 @@ impl Review {
         let n = marks
             .agent_mark(store, file, &lines, &removed, color)
             .map_err(|e| format!("{e:#}"))?;
-        self.fold_agent_reviewed([file]);
         if n == 0 {
             return Err("none of those lines changed in the review".into());
         }
@@ -237,7 +195,6 @@ mod tests {
         };
         assert_eq!(left(&mut r), json!(["2", "10"]));
         let mark = MarkLines {
-            revset: "@".into(),
             path: "a.rs".into(),
             lines: vec!["9-10".into()],
             removed_lines: vec![],
