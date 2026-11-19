@@ -121,7 +121,7 @@ pub fn run(start: Start, pr: Option<String>, split: bool) -> i32 {
     let (tx, rx) = mpsc::channel();
     let socket = crate::agent::socket_path(&root).filter(|_| !split);
     let server = match socket.map(|p| serve::start(&p, tx.clone())) {
-        Some(Ok(s)) => Some(s),
+        Some(Ok(s)) => s,
         Some(Err(e)) => {
             eprintln!("lgtm: {e:#}");
             return 1;

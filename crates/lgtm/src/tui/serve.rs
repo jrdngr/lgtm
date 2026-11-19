@@ -1,4 +1,5 @@
-//! The workspace's socket, where `lgtm mcp` asks this app for agents. One app per workspace.
+//! The workspace's socket, where `lgtm mcp` asks this app for agents. The first app open in
+//! a workspace answers; later ones run without it.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -20,10 +21,11 @@ impl Drop for Server {
     }
 }
 
-/// Starts listening at `path`. Fails when another app already listens there.
-pub fn start(path: &Path, tx: Sender<Msg>) -> anyhow::Result<Server> {
+/// Starts listening at `path`, unless another app already listens there: that one keeps
+/// answering agents.
+pub fn start(path: &Path, tx: Sender<Msg>) -> anyhow::Result<Option<Server>> {
     if UnixStream::connect(path).is_ok() {
-        anyhow::bail!("lgtm is already open in this workspace");
+        return Ok(None);
     }
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
@@ -36,9 +38,9 @@ pub fn start(path: &Path, tx: Sender<Msg>) -> anyhow::Result<Server> {
             std::thread::spawn(move || answer(stream, &tx));
         }
     });
-    Ok(Server {
+    Ok(Some(Server {
         path: path.to_path_buf(),
-    })
+    }))
 }
 
 /// Reads one request, has the UI answer it, and writes the answer back.
