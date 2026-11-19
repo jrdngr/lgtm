@@ -400,12 +400,21 @@ impl Agents {
     }
 
     /// Hands `term` its oldest queued message, if it's ready for one and the user isn't
-    /// typing there. The agent counts as working until its own status says otherwise.
+    /// typing there.
     fn deliver(&mut self, term: TermId, env: &Env) {
         let Some(agent) = self.agents.get(&term).filter(|a| a.can_take_message()) else {
             return;
         };
         if (env.typing)(term, agent.kind) {
+            return;
+        }
+        self.deliver_now(term);
+    }
+
+    /// Hands `term` its oldest queued message now, ready or not. The agent counts as
+    /// working until its own status says otherwise.
+    pub fn deliver_now(&mut self, term: TermId) {
+        if !self.agents.contains_key(&term) {
             return;
         }
         let Some(text) = self.next_message(term) else {
@@ -551,6 +560,19 @@ mod tests {
         assert_eq!(a.send(message("hi"), &busy), Ok("queued"));
         a.settle(&AWAY);
         assert!(matches!(&a.take().0[..], [Effect::Deliver(T, _)]));
+    }
+
+    #[test]
+    fn a_busy_agent_takes_a_message_on_demand() {
+        let mut a = Agents::default();
+        hook(&mut a, json!({"hook_event_name": "UserPromptSubmit"}));
+        a.send(message("first"), &AWAY).unwrap();
+        a.send(message("second"), &AWAY).unwrap();
+        a.take();
+        a.deliver_now(T);
+        let (effects, _) = a.take();
+        assert!(matches!(&effects[..], [Effect::Deliver(T, t)] if t.contains("first")));
+        assert!(!a.messages[0].queued && a.messages[1].queued);
     }
 
     #[test]
