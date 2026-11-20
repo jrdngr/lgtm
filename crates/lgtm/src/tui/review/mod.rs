@@ -583,7 +583,6 @@ impl Review {
         if std::mem::take(&mut self.space) {
             return match key.code {
                 KeyCode::Char('f') => Outcome::Pick(Pick::Files),
-                KeyCode::Char('o') => Outcome::Pick(Pick::OpenFiles),
                 KeyCode::Char('b') => {
                     self.show_list = !self.show_list;
                     self.set_in_list(false);
@@ -940,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn space_b_hides_and_shows_the_file_list_and_space_o_lists_open_files() {
+    fn space_b_hides_and_shows_the_file_list() {
         let mut r = review();
         let space = |r: &mut Review, c| {
             press(r, KeyCode::Char(' '));
@@ -950,7 +949,6 @@ mod tests {
         assert!(!r.settings(&Settings::default()).files);
         space(&mut r, 'b');
         assert!(r.settings(&Settings::default()).files);
-        assert!(matches!(space(&mut r, 'o'), Outcome::Pick(Pick::OpenFiles)));
     }
 
     #[test]
