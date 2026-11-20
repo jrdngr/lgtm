@@ -77,7 +77,7 @@ impl Pane {
                 path.strip_prefix(&self.root)
                     .map_or_else(|_| path.display().to_string(), |p| p.display().to_string()),
             ),
-            Outcome::Mode(_) | Outcome::Home | Outcome::None => Asked::None,
+            Outcome::Mode(_) | Outcome::None => Asked::None,
         }
     }
 

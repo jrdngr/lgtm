@@ -1,5 +1,5 @@
-//! The jj menu on the revisions side: Space, then a motion's keys. Some ask
-//! for a name or a description first, Set bookmark picks one of the nearest bookmarks, and a
+//! The jj menu in the revisions drawer: a motion's keys. Some ask for a name or a
+//! description first, Set bookmark picks one of the nearest bookmarks, and a
 //! push that would create bookmarks on the remote asks first.
 
 use lgtm_core::jj::{JjAction, PushPlan};

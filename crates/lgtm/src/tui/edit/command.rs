@@ -11,7 +11,6 @@ pub const COMMANDS: &[(&str, &str)] = &[
     ("e", "open a file"),
     ("w", "save, or save as a path"),
     ("wa", "save all"),
-    ("h", "home"),
     ("heat", "heat on the files"),
     ("side", "files on the other side"),
     ("q", "quit"),
@@ -127,7 +126,6 @@ impl Editor {
                     return self.quit(false);
                 }
             }
-            "h" | "home" => return Outcome::Home,
             "heat" => self.sidebar.heat_on = !self.sidebar.heat_on,
             "side" => crate::tui::side::toggle(),
             "q" | "qa" => return self.quit(false),

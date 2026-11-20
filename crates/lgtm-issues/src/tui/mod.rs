@@ -60,7 +60,6 @@ pub enum Outcome {
     Folders,
     /// Switch to another screen.
     Mode(Mode),
-    Home,
     Quit,
 }
 
@@ -130,7 +129,7 @@ impl Issues {
             outcome: Outcome::None,
             space: false,
             mode_menu: false,
-            modes: vec![Mode::Editor, Mode::Review, Mode::Home],
+            modes: vec![Mode::Editor, Mode::Review],
             status_for: None,
             history: undo::History::default(),
             polled: Instant::now(),
@@ -340,7 +339,6 @@ impl Issues {
     fn command(&mut self, line: &str) {
         match line.trim() {
             "q" | "q!" | "qa" | "qa!" | "quit" => self.outcome = Outcome::Quit,
-            "h" | "home" => self.outcome = Outcome::Home,
             "" => {}
             other => self.notice = Some(format!("unknown command :{other}")),
         }

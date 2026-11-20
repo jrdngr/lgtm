@@ -44,11 +44,10 @@ use draw::{CODE_X, NUM};
 use rows::Line;
 
 /// The screens `space m` switches to from the review.
-const MODES: &[Mode] = &[Mode::Editor, Mode::Issues, Mode::Home];
+const MODES: &[Mode] = &[Mode::Editor, Mode::Issues];
 
 pub enum Outcome {
     None,
-    Back,
     Quit,
     /// Go to the editor, on this file, a path in the workspace, at this line, else on the
     /// file it last had.
@@ -61,7 +60,8 @@ pub enum Outcome {
     Mention(String),
     /// Go to the issues screen.
     Issues,
-    Home,
+    /// Open the revisions drawer.
+    Revisions,
 }
 
 pub struct Review {
@@ -214,9 +214,8 @@ pub fn help_groups() -> Vec<Group> {
         Group::new(
             "More",
             &[
-                ("space", "files, search, wrap, mode"),
+                ("space", "files, search, wrap, revisions, mode"),
                 (":", "command"),
-                (":h", "home"),
             ],
         ),
     ]
@@ -595,7 +594,6 @@ impl Review {
             return match Mode::pick(c, MODES) {
                 Some(Mode::Editor) => Outcome::Editor(self.edit_target()),
                 Some(Mode::Issues) => Outcome::Issues,
-                Some(Mode::Home) => Outcome::Home,
                 Some(Mode::Review) | None => Outcome::None,
             };
         }
@@ -608,6 +606,7 @@ impl Review {
                     Outcome::None
                 }
                 KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
+                KeyCode::Char('j') => Outcome::Revisions,
                 KeyCode::Char('m') => {
                     self.mode_menu = true;
                     Outcome::None

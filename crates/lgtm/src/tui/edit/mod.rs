@@ -32,8 +32,6 @@ pub enum Outcome {
     None,
     /// Quit lgtm.
     Quit,
-    /// Go to the home screen, keeping the open files.
-    Home,
     /// Go to the review, on this file's line from 1, which holds this text.
     Review(String, u32, String),
     /// Send where these lines are to an agent.
@@ -191,7 +189,7 @@ impl Editor {
             sidebar_width: 0,
             rows: vec![],
             drag_from: None,
-            modes: vec![mode::Mode::Review, mode::Mode::Issues, mode::Mode::Home],
+            modes: vec![mode::Mode::Review, mode::Mode::Issues],
         }
     }
 
@@ -770,7 +768,6 @@ impl Editor {
                     Outcome::Review(b.name.clone(), line as u32 + 1, text)
                 }
                 mode::Mode::Issues => Outcome::Issues,
-                mode::Mode::Home => Outcome::Home,
                 mode::Mode::Editor => Outcome::None,
             };
         }
@@ -911,21 +908,6 @@ mod tests {
         assert!(matches!(quit(&mut e), Outcome::None));
         assert_eq!(e.current().map(|b| b.name.as_str()), Some("a.txt"));
         assert!(!e.in_sidebar);
-    }
-
-    #[test]
-    fn colon_h_goes_home_even_with_unsaved_edits_which_stay_open() {
-        use ratatui::crossterm::event::{KeyCode, KeyEvent};
-        let (_dir, mut e) = editor_on("one\n");
-        e.open[0].buf.insert(0, "x");
-        for c in [':', 'h'] {
-            e.key(KeyEvent::from(KeyCode::Char(c)));
-        }
-        assert!(matches!(
-            e.key(KeyEvent::from(KeyCode::Enter)),
-            Outcome::Home
-        ));
-        assert_eq!(e.unsaved(), ["a.txt"]);
     }
 
     #[test]

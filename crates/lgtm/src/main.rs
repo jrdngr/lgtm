@@ -40,7 +40,7 @@ fn main() {
         Some(arg) => tui::run(file(arg), pr),
         None => match revset {
             Some(r) => tui::run(tui::Start::Revset(r), pr),
-            None => tui::run(tui::Start::Home, pr),
+            None => tui::run(tui::Start::Editor, pr),
         },
     };
     std::process::exit(code);

@@ -73,7 +73,14 @@ pub fn prompt(c: &mut Canvas, y: u16, text: &str, offers: &[String]) {
 }
 
 /// A box at the bottom left of `area` listing `items`' keys beside what they do.
-fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)]) {
+/// The width of the box `menu` draws for `items`.
+pub fn menu_width(items: &[(String, &str)]) -> u16 {
+    let items: Vec<(&str, &str)> = items.iter().map(|(k, l)| (k.as_str(), *l)).collect();
+    widths(&items).2
+}
+
+/// The widest key, the widest label, and the box's width around them.
+fn widths(items: &[(&str, &str)]) -> (u16, u16, u16) {
     let kw = items
         .iter()
         .map(|(k, _)| k.chars().count())
@@ -84,7 +91,12 @@ fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)]) {
         .map(|(_, l)| l.chars().count())
         .max()
         .unwrap_or(0) as u16;
-    let w = (kw + lw + 7).min(area.width);
+    (kw, lw, kw + lw + 7)
+}
+
+fn boxed(c: &mut Canvas, area: Rect, items: &[(&str, &str)]) {
+    let (kw, _, w) = widths(items);
+    let w = w.min(area.width);
     let h = (items.len() as u16 + 2).min(area.height);
     let (x0, y0) = (area.x, area.bottom() - h);
     let border = theme::fg(HAIR).bg(PANEL);

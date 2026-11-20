@@ -99,8 +99,8 @@ impl Review {
         (left, right)
     }
 
-    /// The bookmarks and `name@` workspaces that include the newest commit, as the home
-    /// screen's log colors them.
+    /// The bookmarks and `name@` workspaces that include the newest commit, as the revisions
+    /// log colors them.
     fn names(&self) -> Vec<Piece> {
         let bookmarks = self
             .containing
@@ -140,6 +140,21 @@ impl Review {
             diff = rest;
         }
         self.draw_diff(&mut Canvas::new(&mut *c.buf, diff));
+    }
+
+    /// Draws the diff alone in `body`, with something else in the file list's place.
+    pub fn draw_diff_only(&mut self, c: &mut Canvas, body: Rect) {
+        self.list_area = Rect::default();
+        if let Some(e) = &self.error {
+            c.put_lines(body.x + 1, body.y + 1, e, theme::fg(RED));
+            return;
+        }
+        self.draw_diff(&mut Canvas::new(&mut *c.buf, body));
+    }
+
+    /// The commit id of the review's newest commit, once it's loaded.
+    pub fn newest(&self) -> Option<&str> {
+        self.changes.last().map(|c| c.commit_id.as_str())
     }
 
     fn draw_list(&mut self, c: &mut Canvas, area: Rect) {

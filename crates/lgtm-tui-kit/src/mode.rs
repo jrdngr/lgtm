@@ -5,7 +5,6 @@ pub enum Mode {
     Editor,
     Review,
     Issues,
-    Home,
 }
 
 impl Mode {
@@ -14,7 +13,6 @@ impl Mode {
             Mode::Editor => 'e',
             Mode::Review => 'r',
             Mode::Issues => 'i',
-            Mode::Home => 'h',
         }
     }
 
@@ -23,7 +21,6 @@ impl Mode {
             Mode::Editor => "editor",
             Mode::Review => "review",
             Mode::Issues => "issues",
-            Mode::Home => "home",
         }
     }
 

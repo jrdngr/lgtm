@@ -27,7 +27,6 @@ const COMMANDS: &[(&str, bool, &str)] = &[
     ("split", false, "side by side"),
     ("side", false, "files on the other side"),
     ("edit", false, "open the editor"),
-    ("h", false, "back to the home screen"),
     ("q", false, "quit"),
 ];
 
@@ -272,7 +271,6 @@ impl Review {
                     return Outcome::Editor(Some((path, line)));
                 }
             }
-            "h" => return Outcome::Back,
             _ => return Outcome::Quit,
         }
         Outcome::None

@@ -66,7 +66,7 @@ const FOLDS: &[(&str, &str)] = &[
 ];
 
 const MORE: &[(&str, &str)] = &[
-    ("space m r  space m i  space m h", "review, issues, home"),
+    ("space m r  space m i", "review, issues"),
     ("space w", "word wrap"),
     ("space a", "send to agent"),
     ("space p", "markdown preview"),

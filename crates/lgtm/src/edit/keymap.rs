@@ -280,7 +280,6 @@ pub const BINDS: &[Bind] = &[
     b("space w", ToggleWrap, Both, "toggle word wrap"),
     b("space m r", Cmd::Mode(Mode::Review), Both, "review"),
     b("space m i", Cmd::Mode(Mode::Issues), Both, "issues"),
-    b("space m h", Cmd::Mode(Mode::Home), Both, "home"),
     b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),
     b("space p", Preview, Both, "markdown preview"),

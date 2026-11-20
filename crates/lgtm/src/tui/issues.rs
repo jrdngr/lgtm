@@ -49,7 +49,7 @@ impl App {
                 picker::Outcome::Cancel => {
                     self.folders = None;
                     if self.issues.is_none() {
-                        self.go_home();
+                        self.screen = Screen::Editor;
                     }
                 }
                 picker::Outcome::None => {}
@@ -57,13 +57,12 @@ impl App {
             return false;
         }
         let Some(issues) = self.issues.as_mut() else {
-            self.go_home();
+            self.screen = Screen::Editor;
             return false;
         };
         match issues.key(key) {
             Outcome::None => {}
             Outcome::Quit => return !self.buffers.blocks_quit(),
-            Outcome::Home => self.go_home(),
             Outcome::Mode(mode) => self.switch(mode),
             Outcome::Folders => self.folders = Some(Picker::new(&self.root)),
             Outcome::Edit(path) => {

@@ -1,5 +1,5 @@
-//! The editor outside source control, with a home screen of the file tree alone and the
-//! issues screen: no revisions, review or agents. Leaving the editor quits.
+//! The editor outside source control, and the issues screen: no revisions, review or
+//! agents. Leaving the editor quits.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -8,14 +8,11 @@ use std::time::{Duration, Instant};
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 
-use super::flow::Piece;
-use super::home::{self, Home};
 use super::load::Msg;
 use super::paint::Canvas;
 use super::plain_issues::{Asked, Pane};
 use super::term::{self, Term};
-use super::theme::{self, FG, PANEL, RED};
-use super::{POLL, edit, keybar, mention, settings, walk};
+use super::{POLL, edit, mention, settings, walk};
 use lgtm_tui_kit::mode::Mode;
 
 /// Opens `file`, a name in `root` and a line from 1, else the list of files, with the
@@ -38,9 +35,6 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
         });
     }
     git_decor(&root, tx.clone());
-    // The home screen while it's up, and the files for it.
-    let mut home = None;
-    let mut listing: Option<walk::Listing> = None;
     match file {
         Some((name, line)) => {
             if let Err(err) = e.open(&name, line) {
@@ -48,7 +42,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
                 return 1;
             }
         }
-        None => home = Some(Home::files_only()),
+        None => e.browse(),
     }
     let git = root.join(".git").exists();
     let mut term = Term::start();
@@ -61,12 +55,9 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
             term.terminal.draw(|f| {
                 let area = f.area();
                 let c = &mut Canvas::new(f.buffer_mut(), area);
-                match (pane.as_mut().filter(|_| on_issues), home.as_mut()) {
-                    (Some(p), _) => p.draw(c),
-                    (None, Some(h)) => draw_home(c, h, &root),
-                    (None, None) => {
-                        super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref())
-                    }
+                match pane.as_mut().filter(|_| on_issues) {
+                    Some(p) => p.draw(c),
+                    None => super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref()),
                 }
                 if let Some(at) = c.bar {
                     f.set_cursor_position(at);
@@ -92,29 +83,9 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
                             Asked::Quit if !e.blocks_quit() => return Ok(()),
                             Asked::Quit | Asked::Editor => on_issues = false,
                             Asked::Edit(name) => match e.open(&name, 1) {
-                                Ok(()) => {
-                                    home = None;
-                                    on_issues = false;
-                                }
+                                Ok(()) => on_issues = false,
                                 Err(err) => e.notice = Some(format!("couldn't open {name}: {err}")),
                             },
-                        }
-                    }
-                    Event::Key(key) if key.kind != KeyEventKind::Release && home.is_some() => {
-                        let key = term::plain(key);
-                        if key.code == KeyCode::Char('c')
-                            && key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
-                            return Ok(());
-                        }
-                        let h = home.as_mut().expect("home");
-                        match h.key(key) {
-                            home::Outcome::Quit => return Ok(()),
-                            home::Outcome::Edit(path) => match e.open(&path, 0) {
-                                Ok(()) => home = None,
-                                Err(err) => h.notice = Some(format!("couldn't open {path}: {err}")),
-                            },
-                            _ => {}
                         }
                     }
                     Event::Key(key) if key.kind != KeyEventKind::Release => {
@@ -157,13 +128,6 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
                             match outcome {
                                 edit::Outcome::None => {}
                                 edit::Outcome::Quit => return Ok(()),
-                                edit::Outcome::Home => {
-                                    let mut h = Home::files_only();
-                                    if let Some(l) = &listing {
-                                        h.files.set_listing(l.clone());
-                                    }
-                                    home = Some(h);
-                                }
                                 edit::Outcome::Issues => {
                                     pane.get_or_insert_with(|| Pane::new(&root));
                                     on_issues = true;
@@ -181,15 +145,6 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
                     }
                     Event::Mouse(ev) if on_issues => pane.as_mut().expect("issues").mouse(ev),
                     Event::Paste(text) if on_issues => pane.as_mut().expect("issues").paste(&text),
-                    Event::Mouse(ev) if home.is_some() => {
-                        let h = home.as_mut().expect("home");
-                        if let home::Outcome::Edit(path) = h.mouse(ev) {
-                            match e.open(&path, 0) {
-                                Ok(()) => home = None,
-                                Err(err) => h.notice = Some(format!("couldn't open {path}: {err}")),
-                            }
-                        }
-                    }
                     Event::Mouse(ev) if help.is_none() => e.mouse(ev),
                     Event::Paste(text) if help.is_none() => e.paste(&text),
                     _ => {}
@@ -197,13 +152,7 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
             }
             while let Ok(msg) = rx.try_recv() {
                 match msg {
-                    Msg::Files(l) => {
-                        if let Some(h) = home.as_mut() {
-                            h.files.set_listing(l.clone());
-                        }
-                        e.set_files(l.clone());
-                        listing = Some(l);
-                    }
+                    Msg::Files(l) => e.set_files(l),
                     Msg::Base { name, text } => e.set_base(&name, text),
                     Msg::Decor(decor) => e.set_decor(decor),
                     _ => {}
@@ -234,34 +183,6 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
             1
         }
     }
-}
-
-/// The home screen: the folder in the top bar, the file tree, and its keys or `:` line.
-fn draw_home(c: &mut Canvas, h: &mut Home, root: &Path) {
-    let left = vec![Piece::new(2, super::home(root), theme::fg(FG).bg(PANEL))];
-    let right: Vec<Piece> = h
-        .notice
-        .iter()
-        .map(|n| Piece::new(2, n.clone(), theme::fg(RED).bg(PANEL)))
-        .collect();
-    let prompt = h.prompt();
-    let hints = h.hints();
-    let foot = match prompt {
-        Some(_) => 1,
-        None => keybar::rows(c.area.width, None, &hints),
-    };
-    let bottom = c.area.bottom().saturating_sub(1);
-    let Some(body) = super::frame::frame(c, left, &right, foot) else {
-        return;
-    };
-    h.draw(c, body);
-    match prompt {
-        Some(text) => keybar::prompt(c, bottom, &text, &[]),
-        None => {
-            keybar::draw_badged(c, bottom, None, &hints);
-        }
-    }
-    keybar::menu(c, body, &h.command_menu());
 }
 
 /// Finds what git says changed, for the sidebar.

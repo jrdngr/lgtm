@@ -7,7 +7,7 @@ use super::{App, Screen};
 
 impl App {
     /// Goes to `mode`'s screen: the editor on the files it has open, the open review or else
-    /// the working copy's, the issues, or home.
+    /// the working copy's, or the issues.
     pub(super) fn switch(&mut self, mode: Mode) {
         let from = self.screen;
         match mode {
@@ -23,7 +23,6 @@ impl App {
                 self.review_back = Some(from);
             }
             Mode::Issues => self.show_issues(None),
-            Mode::Home => self.go_home(),
         }
     }
 }

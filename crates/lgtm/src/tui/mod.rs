@@ -1,13 +1,13 @@
-//! The terminal UI: a picker over the jj log, the review of what was picked, and the editor.
+//! The terminal UI: the editor, the review with its revisions drawer, and the issues.
 
 mod decor;
+mod drawer;
 mod edit;
 mod files;
 mod frame;
 mod github;
 mod heat;
 mod help;
-mod home;
 mod issues;
 pub mod load;
 mod mention;
@@ -45,7 +45,7 @@ use paint::Canvas;
 use review::Review;
 use settings::Settings;
 use term::Term;
-use theme::{CYAN, FG, PANEL, RED};
+use theme::{CYAN, PANEL, RED};
 
 /// The frames of the spinner a running jj action shows.
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -59,7 +59,7 @@ pub fn store(root: &Path) -> Option<Store> {
 
 /// What the UI opens on.
 pub enum Start {
-    Home,
+    Editor,
     Revset(String),
     /// A file, as given relative to the current directory, at a line from 1. A folder opens
     /// the list of files.
@@ -73,7 +73,6 @@ pub enum Start {
 /// Which screen is up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Screen {
-    Home,
     Review,
     Editor,
     Issues,
@@ -135,14 +134,12 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         polled: Instant::now(),
         refreshed: Instant::now(),
         busy: None,
-        after_edit: None,
         making: false,
         shift: false,
-        home: home::Home::default(),
+        drawer: drawer::Drawer::default(),
         review: None,
-        direct: matches!(start, Start::Revset(_)),
         buffers,
-        screen: Screen::Home,
+        screen: Screen::Editor,
         editor_back: None,
         review_back: None,
         pr,
@@ -158,15 +155,13 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
     app.buffers.files_width = app.settings.editor_files_width;
     app.buffers.wrap = app.settings.editor_wrap;
     app.buffers.render_markdown = app.settings.render_markdown;
-    app.home.revisions_width = app.settings.home_revisions_width;
-    app.home.picker.git = app.loader.is_git();
-    app.home.files.heat_on = app.settings.heat;
+    app.drawer.picker.git = app.loader.is_git();
     app.buffers.set_heat_on(app.settings.heat);
     app.loader.log();
     app.loader.files(&app.root);
     app.loader.decor();
     match start {
-        Start::Home => {}
+        Start::Editor => app.buffers.browse(),
         Start::Issues => app.show_issues(Some(&cwd)),
         Start::Conflicts => {
             let names = match app.loader.conflicted() {
@@ -225,10 +220,8 @@ struct App {
     snapshots: Arc<AtomicBool>,
     /// Agents to pick from for a selection sent with `a`.
     agent_pick: Option<mention::Pick>,
-    home: home::Home,
+    drawer: drawer::Drawer,
     review: Option<Review>,
-    /// Whether the review was opened from the command line, so leaving it quits.
-    direct: bool,
     buffers: edit::Editor,
     screen: Screen,
     /// The screen leaving the editor goes back to. `None` quits.
@@ -246,12 +239,10 @@ struct App {
     /// The store's data version when last read, to notice the app's writes.
     version: Option<i64>,
     polled: Instant,
-    /// When the home screen last snapshotted the working copy.
+    /// When the editor last snapshotted the working copy.
     refreshed: Instant,
     /// The jj action running, and since when.
     busy: Option<(&'static str, Instant)>,
-    /// The review to open once the running `jj edit` is done.
-    after_edit: Option<Target>,
     /// The running action makes a new change, which the cursor goes to once it's made.
     making: bool,
     /// Whether Shift is held, where the terminal reports it.
@@ -265,7 +256,7 @@ struct App {
 
 /// How often to look for another app's writes to the store.
 const POLL: Duration = Duration::from_millis(250);
-/// How often the home screen snapshots the working copy, so edits by others show up.
+/// How often the editor snapshots the working copy, so edits by others show up.
 pub(super) const REFRESH: Duration = Duration::from_secs(5);
 
 impl App {
@@ -278,26 +269,17 @@ impl App {
             review.set_pr(pr.clone());
         }
         self.review = Some(review);
-        self.review_back = (!self.direct).then_some(Screen::Home);
         self.screen = Screen::Review;
-    }
-
-    /// Goes to the home screen from any other, closing the review.
-    fn go_home(&mut self) {
-        self.review = None;
-        self.screen = Screen::Home;
-        self.snapshots.store(false, Ordering::Relaxed);
     }
 
     /// Goes back to the screen this one was reached from, for Ctrl-o.
     fn back(&mut self) {
         let to = match self.screen {
-            Screen::Home | Screen::Issues => None,
+            Screen::Issues => None,
             Screen::Editor => self.editor_back,
             Screen::Review => self.review_back,
         };
         match to {
-            Some(Screen::Home) => self.go_home(),
             Some(Screen::Review) if self.review.is_some() => self.screen = Screen::Review,
             Some(Screen::Editor) => self.screen = Screen::Editor,
             Some(Screen::Issues) => self.show_issues(None),
@@ -374,14 +356,15 @@ impl App {
                     Event::Mouse(_) if self.help.is_some() => {}
                     Event::Mouse(ev) => match self.screen {
                         Screen::Editor => self.buffers.mouse(ev),
+                        Screen::Review if self.drawer.contains(ev.column, ev.row) => {
+                            let outcome = self.drawer.mouse(ev);
+                            self.drawer_outcome(outcome);
+                        }
+                        Screen::Review if self.drawer.is_open() => {}
                         Screen::Review => {
                             if let Some(r) = self.review.as_mut() {
                                 r.mouse(ev, self.store.as_mut());
                             }
-                        }
-                        Screen::Home => {
-                            let outcome = self.home.mouse(ev);
-                            self.home_outcome(outcome);
                         }
                         Screen::Issues => self.issues_mouse(ev),
                     },
@@ -393,9 +376,7 @@ impl App {
             }
             self.issues_tick();
             // Agents change files while the editor is open too, so both trees keep up.
-            if matches!(self.screen, Screen::Home | Screen::Editor)
-                && self.refreshed.elapsed() >= REFRESH
-            {
+            if self.screen == Screen::Editor && self.refreshed.elapsed() >= REFRESH {
                 self.refreshed = Instant::now();
                 // A snapshot that changed something lands as an operation, which reloads.
                 self.loader.decor();
@@ -454,8 +435,8 @@ impl App {
     fn message(&mut self, msg: Msg) {
         match msg {
             Msg::Log(result) => {
-                self.home.picker.loaded(result);
-                for rev in self.home.picker.versions_revs() {
+                self.drawer.picker.loaded(result);
+                for rev in self.drawer.picker.versions_revs() {
                     self.loader.versions(rev);
                 }
             }
@@ -479,7 +460,7 @@ impl App {
                         })
                         .collect())
                 });
-                self.home.picker.versions_loaded(&rev, labeled);
+                self.drawer.picker.versions_loaded(&rev, labeled);
             }
             Msg::Diff { id, result } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
@@ -495,50 +476,35 @@ impl App {
                     r.containing = found;
                 }
             }
-            Msg::Files(listing) => {
-                self.home.files.set_listing(listing.clone());
-                self.buffers.set_files(listing);
-            }
+            Msg::Files(listing) => self.buffers.set_files(listing),
             Msg::Base { name, text } => self.buffers.set_base(&name, text),
             Msg::Resolve {
                 name,
                 text,
                 session,
             } => self.buffers.set_resolve(&name, &text, &session),
-            Msg::Decor(decor) => {
-                self.home.files.decor = decor.clone();
-                self.buffers.set_decor(decor);
-            }
+            Msg::Decor(decor) => self.buffers.set_decor(decor),
             Msg::Acted(result) => {
                 self.busy = None;
-                let then = self.after_edit.take();
                 let made = std::mem::take(&mut self.making);
                 match result {
                     Ok(_) => {
-                        self.home.picker.to_working_copy = made;
+                        self.drawer.picker.to_working_copy = made;
                         self.loader.log();
-                        if let Some(target) = then {
-                            self.open(target);
-                        }
                     }
-                    Err(e) => self.home.notice = Some(format!("{e:#}")),
+                    Err(e) => self.drawer.notice = Some(format!("{e:#}")),
                 }
             }
             Msg::Bookmarks(found) => {
-                if let home::Outcome::Jj(action) = self.home.bookmarks(found) {
-                    self.act(action);
-                }
+                let outcome = self.drawer.bookmarks(found);
+                self.drawer_outcome(outcome);
             }
             Msg::PushPlan(plan) => {
                 self.busy = None;
-                if let home::Outcome::Jj(action) = self.home.push_plan(plan) {
-                    self.act(action);
-                }
+                let outcome = self.drawer.push_plan(plan);
+                self.drawer_outcome(outcome);
             }
-            Msg::Written(paths) => {
-                self.home.files.heat.written(&paths);
-                self.buffers.written(&paths);
-            }
+            Msg::Written(paths) => self.buffers.written(&paths),
             Msg::Changed => {
                 self.buffers.bases_stale();
                 self.reload();
@@ -622,7 +588,6 @@ impl App {
                 self.settings.render_markdown = self.buffers.render_markdown;
                 self.settings.editor_files_width = self.buffers.files_width;
                 self.settings.heat = self.buffers.heat_on();
-                self.home.files.heat_on = self.settings.heat;
                 settings::save(&self.settings);
                 if let Some(r) = self.review.as_mut() {
                     r.apply(&self.settings);
@@ -632,10 +597,6 @@ impl App {
                 edit::Outcome::None => false,
                 edit::Outcome::Review(path, line, text) => {
                     self.show_review(&path, line, &text);
-                    false
-                }
-                edit::Outcome::Home => {
-                    self.go_home();
                     false
                 }
                 edit::Outcome::Mention(text) => {
@@ -650,11 +611,17 @@ impl App {
             };
         }
         let typing = match self.review.as_ref() {
+            _ if self.drawer.is_open() => self.drawer.typing(),
             Some(r) => r.typing(),
-            None => self.home.typing(),
+            None => false,
         };
         if key.code == KeyCode::Char('?') && !typing {
             self.help = Some(help::Help::default());
+            return false;
+        }
+        if self.drawer.is_open() {
+            let outcome = self.drawer.key(key);
+            self.drawer_outcome(outcome);
             return false;
         }
         if let Some(r) = self.review.as_mut() {
@@ -666,12 +633,6 @@ impl App {
                 self.settings = settings;
             }
             match outcome {
-                review::Outcome::Back => {
-                    self.review = None;
-                    self.screen = Screen::Home;
-                    self.snapshots.store(false, Ordering::Relaxed);
-                    return self.direct;
-                }
                 review::Outcome::Quit => return true,
                 review::Outcome::Editor(at) => self.show_editor(at),
                 review::Outcome::Pick(kind) => {
@@ -684,60 +645,33 @@ impl App {
                 }
                 review::Outcome::Mention(text) => self.mention(text),
                 review::Outcome::Issues => self.show_issues(None),
-                review::Outcome::Home => self.go_home(),
+                review::Outcome::Revisions => {
+                    let newest = r.newest().map(str::to_string);
+                    self.drawer.show(newest.as_deref());
+                }
                 review::Outcome::None => {}
             }
-            return false;
         }
-        let outcome = self.home.key(key);
-        if self.home.revisions_width != self.settings.home_revisions_width {
-            self.settings.home_revisions_width = self.home.revisions_width;
-            settings::save(&self.settings);
-        }
-        self.save_heat();
-        self.home_outcome(outcome)
+        false
     }
 
-    /// Keeps the file trees' heat toggle, after a key on a screen that changes it.
-    fn save_heat(&mut self) {
-        if self.home.files.heat_on != self.settings.heat {
-            self.settings.heat = self.home.files.heat_on;
-            self.buffers.set_heat_on(self.settings.heat);
-            settings::save(&self.settings);
-        }
-    }
-
-    /// Acts on what a key or click on the home screen asked for. Returns whether to quit.
-    fn home_outcome(&mut self, outcome: home::Outcome) -> bool {
+    /// Acts on what a key or click in the revisions drawer asked for.
+    fn drawer_outcome(&mut self, outcome: drawer::Outcome) {
         match outcome {
-            home::Outcome::Open(target) => self.open(target),
-            home::Outcome::EditOpen { rev, target } => {
-                self.after_edit = Some(target);
-                self.act(lgtm_core::jj::JjAction::Edit { rev });
-            }
-            home::Outcome::Versions(revs) => {
+            drawer::Outcome::Open(target) => self.open(target),
+            drawer::Outcome::Versions(revs) => {
                 for rev in revs {
                     self.loader.versions(rev);
                 }
             }
-            home::Outcome::Edit(path) => match self.buffers.open(&path, 0) {
-                Ok(()) => {
-                    self.screen = Screen::Editor;
-                    self.editor_back = Some(Screen::Home);
-                }
-                Err(e) => self.buffers.notice = Some(format!("couldn't open {path}: {e}")),
-            },
-            home::Outcome::Jj(action) => self.act(action),
-            home::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
-            home::Outcome::PushPlan(revs) => {
+            drawer::Outcome::Jj(action) => self.act(action),
+            drawer::Outcome::Bookmarks(rev) => self.loader.bookmarks(rev),
+            drawer::Outcome::PushPlan(revs) => {
                 self.busy = Some(("checking the push", Instant::now()));
                 self.loader.push_plan(revs);
             }
-            home::Outcome::Quit => return true,
-            home::Outcome::Mode(mode) => self.switch(mode),
-            home::Outcome::None => {}
+            drawer::Outcome::None => {}
         }
-        false
     }
 
     fn draw(&mut self, c: &mut Canvas) {
@@ -754,84 +688,86 @@ impl App {
             );
             return;
         }
-        let width = c.area.width;
-        let bottom = c.area.bottom().saturating_sub(1);
         let unsaved = self
             .buffers
             .unsaved()
             .into_iter()
             .map(str::to_string)
             .collect();
-        let (body, keys) = match self.review.as_mut() {
-            Some(r) => {
-                r.unsaved = unsaved;
-                let (left, right) = r.title();
-                let prompt = r.prompt().map(|(t, o)| (t, o.to_vec()));
-                let hints = r.hints(self.shift);
-                let badge = Some(("REV", CYAN));
-                let foot = match prompt {
-                    Some(_) => 1,
-                    None => keybar::rows(width, badge, &hints),
-                };
-                let Some(body) = frame::frame(c, left, &right, foot) else {
-                    return;
-                };
-                r.draw(c, body);
-                if let Some((text, offers)) = prompt {
-                    keybar::prompt(c, bottom, &text, &offers);
-                    keybar::menu(c, body, &r.command_menu());
-                    return;
-                }
-                keybar::draw_badged(c, bottom, badge, &hints);
-                keybar::menu(c, body, &r.space_menu());
-                if let Some(pick) = &self.agent_pick {
-                    keybar::menu(c, body, &pick.menu());
-                }
-                if let Some(h) = self.help.as_mut() {
-                    h.draw(c, body, &r.help_groups());
-                }
-                return;
-            }
-            None => {
-                self.home.busy = self.busy.map(|(doing, since)| {
-                    let frame =
-                        SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
-                    format!("{frame} {doing}…")
-                });
-                let left = vec![flow::Piece::new(
-                    2,
-                    home(&self.root),
-                    theme::fg(FG).bg(PANEL),
-                )];
-                let right: Vec<flow::Piece> = self
-                    .home
-                    .notice
-                    .iter()
-                    .map(|n| flow::Piece::new(2, n.clone(), theme::fg(RED).bg(PANEL)))
-                    .collect();
-                let prompt = self.home.prompt();
-                let hints = self.home.hints();
-                let foot = match prompt {
-                    Some(_) => 1,
-                    None => keybar::rows(width, self.home.badge(), &hints),
-                };
-                let Some(body) = frame::frame(c, left, &right, foot) else {
-                    return;
-                };
-                self.home.draw(c, body);
-                if let Some(text) = prompt {
-                    keybar::prompt(c, bottom, &text, &[]);
-                    keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
-                    return;
-                }
-                keybar::draw_badged(c, bottom, self.home.badge(), &hints);
-                keybar::menu(c, self.home.menu_area(body), &self.home.command_menu());
-                (body, home::help_groups(self.home.picker.git))
-            }
+        let Some(r) = self.review.as_mut() else {
+            return;
         };
-        if let Some(h) = self.help.as_mut() {
-            h.draw(c, body, &keys);
+        r.unsaved = unsaved;
+        if self.drawer.is_open() {
+            self.drawer.busy = self.busy.map(|(doing, since)| {
+                let frame = SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
+                format!("{frame} {doing}…")
+            });
+            draw_with_drawer(c, r, &mut self.drawer, self.help.as_mut());
+            return;
         }
+        let width = c.area.width;
+        let bottom = c.area.bottom().saturating_sub(1);
+        let (left, right) = r.title();
+        let prompt = r.prompt().map(|(t, o)| (t, o.to_vec()));
+        let hints = r.hints(self.shift);
+        let badge = Some(("REV", CYAN));
+        let foot = match prompt {
+            Some(_) => 1,
+            None => keybar::rows(width, badge, &hints),
+        };
+        let Some(body) = frame::frame(c, left, &right, foot) else {
+            return;
+        };
+        r.draw(c, body);
+        if let Some((text, offers)) = prompt {
+            keybar::prompt(c, bottom, &text, &offers);
+            keybar::menu(c, body, &r.command_menu());
+            return;
+        }
+        keybar::draw_badged(c, bottom, badge, &hints);
+        keybar::menu(c, body, &r.space_menu());
+        if let Some(pick) = &self.agent_pick {
+            keybar::menu(c, body, &pick.menu());
+        }
+        if let Some(h) = self.help.as_mut() {
+            h.draw(c, body, &r.help_groups());
+        }
+    }
+}
+
+/// The review with the revisions drawer open in its file list's place, and the drawer's keys.
+fn draw_with_drawer(
+    c: &mut Canvas,
+    r: &mut Review,
+    d: &mut drawer::Drawer,
+    help: Option<&mut help::Help>,
+) {
+    let bottom = c.area.bottom().saturating_sub(1);
+    let (left, mut right) = r.title();
+    if let Some(n) = &d.notice {
+        right = vec![flow::Piece::new(2, n.clone(), theme::fg(RED).bg(PANEL))];
+    }
+    let prompt = d.prompt();
+    let hints = d.hints();
+    let badge = Some(("REV", CYAN));
+    let foot = match prompt {
+        Some(_) => 1,
+        None => keybar::rows(c.area.width, badge, &hints),
+    };
+    let Some(body) = frame::frame(c, left, &right, foot) else {
+        return;
+    };
+    r.draw_diff_only(c, drawer::Drawer::beside(body));
+    d.draw(c, body);
+    match prompt {
+        Some(text) => keybar::prompt(c, bottom, &text, &[]),
+        None => {
+            keybar::draw_badged(c, bottom, badge, &hints);
+        }
+    }
+    if let Some(h) = help {
+        h.draw(c, body, &drawer::help_groups(d.picker.git));
     }
 }
 
@@ -855,7 +791,6 @@ impl App {
             Screen::Editor => self.buffers.selection(),
             Screen::Review => self.review.as_ref()?.selected(),
             Screen::Issues => self.issues.as_ref()?.selection(),
-            Screen::Home => None,
         }
     }
 
@@ -896,14 +831,5 @@ fn normalize(path: &Path) -> PathBuf {
     match (path.parent(), path.file_name()) {
         (Some(dir), Some(name)) => normalize(dir).join(name),
         _ => path.to_path_buf(),
-    }
-}
-
-/// `path` with the home directory as `~`.
-pub(super) fn home(path: &Path) -> String {
-    let text = path.to_string_lossy().into_owned();
-    match std::env::var("HOME") {
-        Ok(h) if !h.is_empty() && text.starts_with(&h) => format!("~{}", &text[h.len()..]),
-        _ => text,
     }
 }

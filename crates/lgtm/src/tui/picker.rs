@@ -1,12 +1,11 @@
-//! Picking what to review from the jj log: one commit, a range picked with Space, or
-//! snapshots, which `s` shows under every change.
+//! Picking what to review from the jj log: one commit, a range picked with `J` and `K`, or
+//! snapshots, which `v` shows under every change.
 
 use lgtm_core::jj::{LogCommit, LogRow};
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 
-use super::keybar::Hint;
 use super::load::Target;
 use super::motions;
 use super::paint::Canvas;
@@ -18,11 +17,6 @@ pub enum Outcome {
     Open(Target),
     /// Load the versions of these changes.
     Versions(Vec<String>),
-    /// `jj edit` the commit, then open its review.
-    EditOpen {
-        rev: String,
-        target: Target,
-    },
 }
 
 /// A line of the picker: a row of the log, or the `j`th snapshot shown under the `k`th
@@ -187,17 +181,16 @@ impl Picker {
         })
     }
 
-    /// The commit Enter moves the working copy to before reviewing it: the cursor's, when it's
-    /// one commit, not a range or a snapshot, and jj may edit it and isn't already on it.
-    fn to_edit(&self) -> Option<String> {
-        if self.on.is_some() || self.anchored() {
-            return None;
+    /// Clears the range and puts the cursor on the commit `id`, when the log has it.
+    pub fn focus(&mut self, id: &str) {
+        self.clear_ranges();
+        let at = self
+            .rows
+            .iter()
+            .position(|r| r.commit.as_ref().is_some_and(|c| c.commit_id == id));
+        if let Some(i) = at {
+            self.go(Item::Row(i));
         }
-        let c = self.rows.get(self.sel)?.commit.as_ref()?;
-        if c.working_copy || c.immutable {
-            return None;
-        }
-        self.id(self.sel)
     }
 
     /// The versions of the change the cursor's on a snapshot of.
@@ -336,18 +329,13 @@ impl Picker {
                     return self.toggle_snapshots();
                 }
             }
-            KeyCode::Enter | KeyCode::Char('r') => {
-                let edit = (key.code == KeyCode::Enter)
-                    .then(|| self.to_edit())
-                    .flatten();
+            KeyCode::Enter => {
                 let target = match self.on_versions() {
                     Some((v, _)) => v.open(),
                     None => self.revset().map(Target::Revset),
                 };
-                match (target, edit) {
-                    (Some(target), Some(rev)) => return Outcome::EditOpen { rev, target },
-                    (Some(t), None) => return Outcome::Open(t),
-                    _ => {}
+                if let Some(t) = target {
+                    return Outcome::Open(t);
                 }
             }
             _ => {}
@@ -387,30 +375,6 @@ impl Picker {
     /// The wheel moves the cursor.
     pub fn scroll(&mut self, down: bool) {
         self.step(down);
-    }
-
-    pub fn hints(&self) -> Vec<Hint<'static>> {
-        let mut hints = match self.git {
-            true => vec![("Enter", "review", false)],
-            false => vec![("Enter", "edit", false), ("r", "review", false)],
-        };
-        hints.extend([("J K", "range", false), ("Space", "menu", false)]);
-        if self.anchored() {
-            hints.push(("Esc", "clear", false));
-        }
-        match &self.snapshots {
-            Some(list) => {
-                let all = list.first().is_some_and(|v| v.all);
-                hints.push(("a", "evolog", all));
-                if !self.anchored() {
-                    hints.push(("Esc", "close", false));
-                }
-            }
-            None if !self.git => hints.push(("v", "snapshots", false)),
-            None => {}
-        }
-        hints.extend([("?", "keys", false), (":q", "quit", false)]);
-        hints
     }
 
     /// The picker's lines, and which one the cursor is on.
@@ -730,11 +694,7 @@ mod tests {
 
     fn opened(o: Outcome) -> String {
         match o {
-            Outcome::Open(Target::Revset(r))
-            | Outcome::EditOpen {
-                target: Target::Revset(r),
-                ..
-            } => r,
+            Outcome::Open(Target::Revset(r)) => r,
             _ => panic!("nothing opened"),
         }
     }
@@ -785,29 +745,21 @@ mod tests {
     }
 
     #[test]
-    fn enter_edits_one_mutable_commit_off_the_working_copy_and_r_only_reviews() {
-        let mut at = commit("www", false);
-        let mut root = commit("zzz", false);
-        if let (Some(a), Some(z)) = (at.commit.as_mut(), root.commit.as_mut()) {
-            a.working_copy = true;
-            z.immutable = true;
-        }
+    fn focus_clears_the_range_and_puts_the_cursor_on_a_commit() {
         let mut p = Picker::default();
-        p.loaded(Ok(vec![at, commit("aaa", false), root]));
-        let edits = |o: Outcome| match o {
-            Outcome::EditOpen { rev, .. } => Some(rev),
-            Outcome::Open(_) => None,
-            _ => panic!("nothing opened"),
-        };
-        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
-        press(&mut p, KeyCode::Char('j'));
-        assert_eq!(edits(press(&mut p, KeyCode::Enter)), Some("aaa".into()));
-        assert_eq!(edits(press(&mut p, KeyCode::Char('r'))), None);
+        p.loaded(Ok(vec![
+            commit("aaa", false),
+            commit("bbb", false),
+            commit("ccc", false),
+        ]));
         press(&mut p, KeyCode::Char('J'));
-        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
-        press(&mut p, KeyCode::Esc);
-        press(&mut p, KeyCode::Char('j'));
-        assert_eq!(edits(press(&mut p, KeyCode::Enter)), None);
+        p.focus("ccc-commit");
+        assert!(!p.anchored());
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "ccc");
+        press(&mut p, KeyCode::Char('K'));
+        p.focus("zzz-commit");
+        assert!(!p.anchored());
+        assert_eq!(opened(press(&mut p, KeyCode::Enter)), "bbb");
     }
 
     #[test]

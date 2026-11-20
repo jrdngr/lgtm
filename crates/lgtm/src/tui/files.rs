@@ -1,9 +1,8 @@
 //! The repo's files as a tree with folders that open and close, narrowed by a fuzzy search.
-//! Home shows it beside the jj log, and the editor beside the text. Files git ignores show
-//! dimmed, and an ignored folder is read when it's opened.
+//! The editor shows it beside the text. Files git ignores show dimmed, and an ignored folder
+//! is read when it's opened.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::time::{Duration, Instant};
 
 use lgtm_core::fuzzy;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -86,12 +85,7 @@ pub struct FileTree {
     drawn_sel: Option<usize>,
     /// Where the rows were last drawn, for clicks.
     area: Rect,
-    /// The last file `pick` selected and when, to tell a double click.
-    picked: Option<(String, Instant)>,
 }
-
-/// Two clicks on a file within this make a double click.
-const DOUBLE_CLICK: Duration = Duration::from_millis(400);
 
 #[derive(Default)]
 struct Node {
@@ -388,28 +382,6 @@ impl FileTree {
         }
     }
 
-    /// A click on the screen row `y` that selects a file and opens it on a double click.
-    /// Folders open or close as with `click`.
-    pub fn pick(&mut self, y: u16) -> Outcome {
-        self.pick_at(y, Instant::now())
-    }
-
-    fn pick_at(&mut self, y: u16, now: Instant) -> Outcome {
-        let Outcome::Open(path) = self.click(y) else {
-            self.picked = None;
-            return Outcome::None;
-        };
-        let double = self
-            .picked
-            .take()
-            .is_some_and(|(was, when)| was == path && now - when < DOUBLE_CLICK);
-        if double {
-            return Outcome::Open(path);
-        }
-        self.picked = Some((path, now));
-        Outcome::None
-    }
-
     /// Moves the cursor to the folder that holds `row`.
     fn go_to_parent(&mut self, row: &Row) {
         let depth = match row {
@@ -438,11 +410,6 @@ impl FileTree {
         {
             self.reveal(&path);
         }
-    }
-
-    /// How many files match, and how many there are, while searching.
-    pub fn count(&self) -> Option<String> {
-        (!self.query.trim().is_empty()).then(|| format!("{} / {}", self.matched, self.paths.len()))
     }
 
     /// Draws the rows into `area`. `focused` paints the cursor's row, and `marked` puts ●
@@ -759,10 +726,10 @@ mod tests {
                 "  main.rs"
             ]
         );
-        assert_eq!(t.count().as_deref(), Some("2 / 7"));
+        assert_eq!(t.matched, 2);
         let picked = t.selected().map(str::to_string);
         t.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
-        assert_eq!(t.count(), None);
+        assert!(t.query.is_empty());
         assert_eq!(t.selected().map(str::to_string), picked);
     }
 
@@ -785,14 +752,14 @@ mod tests {
             "services/billing/docs/services/c.md",
         ]);
         t.set_query("auth/docs/services".into());
-        assert_eq!(t.count().as_deref(), Some("2 / 4"));
+        assert_eq!(t.matched, 2);
         assert_eq!(t.selected(), Some("services/auth/docs/services/a.md"));
         t.set_query("auth/docs/oth".into());
-        assert_eq!(t.count().as_deref(), Some("1 / 4"));
+        assert_eq!(t.matched, 1);
         t.set_query("/auth".into());
-        assert_eq!(t.count().as_deref(), Some("0 / 4"));
+        assert_eq!(t.matched, 0);
         t.set_query("docs/".into());
-        assert_eq!(t.count().as_deref(), Some("4 / 4"));
+        assert_eq!(t.matched, 4);
     }
 
     #[test]
@@ -803,21 +770,6 @@ mod tests {
         assert_eq!(shown(&t)[..2], ["-src/", "  main.tsx"]);
         assert!(matches!(t.click(6), Outcome::Open(p) if p == "src/main.tsx"));
         assert!(matches!(t.click(40), Outcome::None));
-    }
-
-    #[test]
-    fn a_pick_selects_a_file_and_a_quick_second_pick_opens_it() {
-        let mut t = tree(PATHS);
-        t.area = Rect::new(0, 5, 30, 10);
-        let start = Instant::now();
-        let soon = start + Duration::from_millis(100);
-        t.pick_at(5, start);
-        assert!(matches!(t.pick_at(6, start), Outcome::None));
-        assert_eq!(t.selected(), Some("src/main.tsx"));
-        assert!(matches!(t.pick_at(6, soon), Outcome::Open(p) if p == "src/main.tsx"));
-        let late = soon + DOUBLE_CLICK;
-        assert!(matches!(t.pick_at(6, late), Outcome::None));
-        assert!(matches!(t.pick_at(6, late + DOUBLE_CLICK), Outcome::None));
     }
 
     #[test]
