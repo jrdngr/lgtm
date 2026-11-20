@@ -11,9 +11,11 @@ mod home;
 mod issues;
 pub mod load;
 mod mention;
+mod modes;
 mod motions;
 mod picker;
 mod plain;
+mod plain_issues;
 mod resolve;
 pub mod review;
 mod settings;
@@ -101,22 +103,13 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
     .unwrap_or_else(|| cwd.clone());
     let file = target.as_ref().filter(|(t, _)| !t.is_dir());
     let Some(root) = lgtm_core::repo::root_of(&near) else {
-        if matches!(start, Start::Issues) {
-            return match lgtm_issues::tui::run(&cwd, lgtm_issues::user()) {
-                Ok(()) => 0,
-                Err(e) => {
-                    eprintln!("lgtm: {e:#}");
-                    1
-                }
-            };
-        }
         if matches!(start, Start::Revset(_) | Start::Conflicts) {
             eprintln!("lgtm: not in a jj or git repo");
             return 1;
         }
         let root = folder.cloned().unwrap_or(cwd);
         let file = file.map(|(f, line)| (workspace_name(&root, f), *line));
-        return plain::run(root, file);
+        return plain::run(root, file, matches!(start, Start::Issues));
     };
     let (tx, rx) = mpsc::channel();
     let shown = open_review::folder(&root).and_then(|f| open_review::Mine::start(&f).ok());
@@ -691,6 +684,7 @@ impl App {
                 }
                 review::Outcome::Mention(text) => self.mention(text),
                 review::Outcome::Issues => self.show_issues(None),
+                review::Outcome::Home => self.go_home(),
                 review::Outcome::None => {}
             }
             return false;
@@ -740,7 +734,7 @@ impl App {
                 self.loader.push_plan(revs);
             }
             home::Outcome::Quit => return true,
-            home::Outcome::Issues => self.show_issues(None),
+            home::Outcome::Mode(mode) => self.switch(mode),
             home::Outcome::None => {}
         }
         false

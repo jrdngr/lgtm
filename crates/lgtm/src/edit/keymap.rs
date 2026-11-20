@@ -1,6 +1,7 @@
 //! The one key table: which keys run which command in which modes. Keys are names joined by
 //! spaces, like `g g`, `space f` or `C-d`.
 
+use lgtm_tui_kit::mode::Mode;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::fold::Fold;
@@ -64,17 +65,13 @@ pub enum Cmd {
     SearchNext,
     SearchPrev,
     SearchSelection,
-    ClipboardYank,
-    ClipboardPaste,
     Pick(Pick),
     /// The next open file, or the one before.
     CycleFile {
         forward: bool,
     },
-    /// Go to the review, on the cursor's line.
-    Review,
-    /// Go to the issues screen.
-    Issues,
+    /// Switch to another screen: the review goes to the cursor's line.
+    Mode(Mode),
     /// Send where the selection is to an agent.
     SendToAgent,
     /// Move to the file tree beside the text.
@@ -126,7 +123,6 @@ impl Cmd {
                 | SurroundReplace
                 | Undo
                 | Redo
-                | ClipboardPaste
                 | Smart
                 | ToggleCheck
         )
@@ -282,11 +278,12 @@ pub const BINDS: &[Bind] = &[
     b("space e", Sidebar, Both, "file tree"),
     b("space b", ToggleSidebar, Both, "toggle file tree"),
     b("space w", ToggleWrap, Both, "toggle word wrap"),
-    b("space r", Review, Both, "review"),
-    b("space i", Issues, Both, "issues"),
+    b("space m r", Cmd::Mode(Mode::Review), Both, "review"),
+    b("space m i", Cmd::Mode(Mode::Issues), Both, "issues"),
+    b("space m h", Cmd::Mode(Mode::Home), Both, "home"),
     b("space a", SendToAgent, Both, "send to agent"),
     b("space x", ToggleCheck, Both, "toggle checkbox"),
-    b("space m", Preview, Both, "markdown preview"),
+    b("space p", Preview, Both, "markdown preview"),
     b("S-tab", Smart, Both, "markdown table cell, footnote"),
     b("C-w v", Split { right: true }, Both, "split to the right"),
     b("C-w s", Split { right: false }, Both, "split below"),
@@ -302,8 +299,6 @@ pub const BINDS: &[Bind] = &[
         Both,
         "move the divider left",
     ),
-    b("space y", ClipboardYank, Both, "yank to clipboard"),
-    b("space p", ClipboardPaste, Both, "paste from clipboard"),
     b(":", Command, Both, "command"),
     b("esc", Escape, Select, "normal mode"),
 ];
@@ -369,19 +364,51 @@ pub fn find(seq: &str, select: bool) -> Found {
     if partial { Found::Partial } else { Found::None }
 }
 
-/// The bindings after `prefix`, each with its next key and label, for a prefix's menu.
+/// Prefixes inside a prefix's menu, with their labels there.
+const GROUPS: &[(&str, &str)] = &[("space m", "mode")];
+
+/// The bindings after `prefix`, each with its next key and label, for a prefix's menu. A
+/// prefix inside it shows once, under its group label.
 pub fn after(prefix: &str, select: bool) -> Vec<(&'static str, &'static str)> {
     let start = format!("{prefix} ");
-    BINDS
-        .iter()
-        .filter(|b| fits(b, select))
-        .filter_map(|b| Some((b.keys.strip_prefix(start.as_str())?, b.label)))
-        .collect()
+    let mut out: Vec<(&'static str, &'static str)> = Vec::new();
+    for b in BINDS.iter().filter(|b| fits(b, select)) {
+        let Some(rest) = b.keys.strip_prefix(start.as_str()) else {
+            continue;
+        };
+        let item = match rest.split_once(' ') {
+            None => (rest, b.label),
+            Some((next, _)) => {
+                let keys = &b.keys[..start.len() + next.len()];
+                let label = GROUPS.iter().find(|(g, _)| *g == keys).map_or("", |g| g.1);
+                (next, label)
+            }
+        };
+        if !out.iter().any(|(k, _)| *k == item.0) {
+            out.push(item);
+        }
+    }
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_prefix_inside_a_menu_shows_once_under_its_label() {
+        let space = after("space", false);
+        assert_eq!(space.iter().filter(|(k, _)| *k == "m").count(), 1);
+        assert!(space.contains(&("m", "mode")));
+        assert!(after("space m", false).contains(&("r", "review")));
+    }
+
+    #[test]
+    fn every_group_names_a_prefix_in_use() {
+        for (g, _) in GROUPS {
+            assert!(matches!(find(g, false), Found::Partial), "{g}");
+        }
+    }
 
     #[test]
     fn every_binding_is_unique_in_its_modes_and_no_binding_hides_another() {

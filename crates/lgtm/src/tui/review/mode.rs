@@ -7,6 +7,9 @@ use super::reload::Spot;
 impl Review {
     /// What `space` goes on to, while it waits for the next key.
     pub fn space_menu(&self) -> Vec<(String, &'static str)> {
+        if self.mode_menu {
+            return lgtm_tui_kit::mode::menu(super::MODES);
+        }
         if !self.space {
             return vec![];
         }
@@ -15,8 +18,7 @@ impl Review {
             ("b", "file list"),
             ("/", "search"),
             ("w", "wrap"),
-            ("r", "editor"),
-            ("i", "issues"),
+            ("m", "mode"),
         ]
         .into_iter()
         .map(|(k, l)| (k.to_string(), l))
@@ -58,13 +60,20 @@ mod tests {
     }
 
     #[test]
-    fn space_r_goes_to_the_editor_on_the_cursors_line_and_space_f_picks_a_file() {
+    fn space_m_e_goes_to_the_editor_on_the_cursors_line_and_space_f_picks_a_file() {
         let mut r = review();
-        assert!(matches!(key(&mut r, ' '), Outcome::None));
-        assert_eq!(r.space_menu().len(), 6);
-        let out = key(&mut r, 'r');
+        key(&mut r, ' ');
+        key(&mut r, 'm');
+        assert!(r.space_menu().iter().any(|(k, _)| k == "e"));
+        let out = key(&mut r, 'e');
         assert!(matches!(out, Outcome::Editor(Some((p, 1))) if p == "a.rs"));
         assert!(r.space_menu().is_empty());
+        key(&mut r, ' ');
+        key(&mut r, 'm');
+        assert!(matches!(key(&mut r, 'h'), Outcome::Home));
+        key(&mut r, ' ');
+        key(&mut r, 'm');
+        assert!(matches!(key(&mut r, 'r'), Outcome::None));
         key(&mut r, ' ');
         assert!(matches!(key(&mut r, 'f'), Outcome::Pick(Pick::Files)));
     }

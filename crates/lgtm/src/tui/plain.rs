@@ -1,5 +1,5 @@
-//! The editor outside source control, with a home screen of the file tree alone: no
-//! revisions, review or agents. Leaving the editor quits.
+//! The editor outside source control, with a home screen of the file tree alone and the
+//! issues screen: no revisions, review or agents. Leaving the editor quits.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -12,14 +12,20 @@ use super::flow::Piece;
 use super::home::{self, Home};
 use super::load::Msg;
 use super::paint::Canvas;
+use super::plain_issues::{Asked, Pane};
 use super::term::{self, Term};
 use super::theme::{self, FG, PANEL, RED};
 use super::{POLL, edit, keybar, mention, settings, walk};
+use lgtm_tui_kit::mode::Mode;
 
-/// Opens `file`, a name in `root` and a line from 1, else the list of files.
-pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
+/// Opens `file`, a name in `root` and a line from 1, else the list of files, with the
+/// issues screen over it when `issues`.
+pub fn run(root: PathBuf, file: Option<(String, u32)>, issues: bool) -> i32 {
     let (tx, rx) = mpsc::channel();
     let mut e = edit::Editor::new(&root);
+    e.modes = vec![Mode::Issues];
+    let mut pane = issues.then(|| Pane::new(&root));
+    let mut on_issues = issues;
     let mut settings = settings::load();
     e.files = settings.files;
     e.files_width = settings.editor_files_width;
@@ -55,17 +61,45 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
             term.terminal.draw(|f| {
                 let area = f.area();
                 let c = &mut Canvas::new(f.buffer_mut(), area);
-                match home.as_mut() {
-                    Some(h) => draw_home(c, h, &root),
-                    None => super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref()),
+                match (pane.as_mut().filter(|_| on_issues), home.as_mut()) {
+                    (Some(p), _) => p.draw(c),
+                    (None, Some(h)) => draw_home(c, h, &root),
+                    (None, None) => {
+                        super::frame::draw_editor(c, &mut e, help.as_mut(), pick.as_ref())
+                    }
                 }
                 if let Some(at) = c.bar {
                     f.set_cursor_position(at);
                 }
             })?;
+            if let Some(p) = pane.as_mut().filter(|_| on_issues) {
+                p.tick();
+            }
             if event::poll(Duration::from_millis(50))? {
                 match event::read()? {
                     Event::Key(key) if term::is_shift(&key) => {}
+                    Event::Key(key) if key.kind != KeyEventKind::Release && on_issues => {
+                        let key = term::plain(key);
+                        let p = pane.as_mut().expect("issues");
+                        let asked = match key.code == KeyCode::Char('c')
+                            && key.modifiers.contains(KeyModifiers::CONTROL)
+                        {
+                            true => Asked::Quit,
+                            false => p.key(key),
+                        };
+                        match asked {
+                            Asked::None => {}
+                            Asked::Quit if !e.blocks_quit() => return Ok(()),
+                            Asked::Quit | Asked::Editor => on_issues = false,
+                            Asked::Edit(name) => match e.open(&name, 1) {
+                                Ok(()) => {
+                                    home = None;
+                                    on_issues = false;
+                                }
+                                Err(err) => e.notice = Some(format!("couldn't open {name}: {err}")),
+                            },
+                        }
+                    }
                     Event::Key(key) if key.kind != KeyEventKind::Release && home.is_some() => {
                         let key = term::plain(key);
                         if key.code == KeyCode::Char('c')
@@ -130,7 +164,11 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                                     }
                                     home = Some(h);
                                 }
-                                edit::Outcome::Review(..) | edit::Outcome::Issues => {
+                                edit::Outcome::Issues => {
+                                    pane.get_or_insert_with(|| Pane::new(&root));
+                                    on_issues = true;
+                                }
+                                edit::Outcome::Review(..) => {
                                     e.notice = Some("not in a jj or git repo".into());
                                 }
                                 edit::Outcome::Mention(text) => match mention::send(text) {
@@ -141,6 +179,8 @@ pub fn run(root: PathBuf, file: Option<(String, u32)>) -> i32 {
                             }
                         }
                     }
+                    Event::Mouse(ev) if on_issues => pane.as_mut().expect("issues").mouse(ev),
+                    Event::Paste(text) if on_issues => pane.as_mut().expect("issues").paste(&text),
                     Event::Mouse(ev) if home.is_some() => {
                         let h = home.as_mut().expect("home");
                         if let home::Outcome::Edit(path) = h.mouse(ev) {

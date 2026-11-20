@@ -66,12 +66,10 @@ const FOLDS: &[(&str, &str)] = &[
 ];
 
 const MORE: &[(&str, &str)] = &[
-    ("space y  space p", "clipboard yank, paste"),
+    ("space m r  space m i  space m h", "review, issues, home"),
     ("space w", "word wrap"),
-    ("space r", "review"),
-    ("space i", "issues"),
     ("space a", "send to agent"),
-    ("space m", "markdown preview"),
+    ("space p", "markdown preview"),
     ("space x", "toggle checkbox"),
     ("S-tab", "markdown table cell, footnote"),
 ];
@@ -84,7 +82,7 @@ pub fn preview_groups() -> Vec<Group> {
             ("j k", "scroll"),
             ("C-d C-u", "half page down, up"),
             ("g g  g e", "top, bottom"),
-            ("space m  Esc", "back to the text"),
+            ("space p  Esc", "back to the text"),
             ("click", "open a link"),
             (":", "command"),
         ],

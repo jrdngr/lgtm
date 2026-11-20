@@ -122,7 +122,7 @@ fn it_opens_at_the_source_line_given_and_tells_the_line_at_its_top() {
     p.key(KeyEvent::from(KeyCode::Char('e')));
     assert_eq!(p.top, p.lines.len() - 5);
     p.key(KeyEvent::from(KeyCode::Char(' ')));
-    assert_eq!(p.key(KeyEvent::from(KeyCode::Char('m'))), Outcome::Close);
+    assert_eq!(p.key(KeyEvent::from(KeyCode::Char('p'))), Outcome::Close);
 }
 
 #[test]

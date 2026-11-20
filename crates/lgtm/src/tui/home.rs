@@ -14,6 +14,7 @@ use super::picker::{self, Picker};
 use super::theme::{self, ACCENT, AMBER, BG, CYAN, FG, HAIR, MUTED};
 use super::width;
 use lgtm_core::jj::{JjAction, PushPlan};
+use lgtm_tui_kit::mode::{self as modes, Mode};
 
 pub enum Outcome {
     None,
@@ -27,8 +28,8 @@ pub enum Outcome {
     Edit(String),
     /// Run a jj menu motion.
     Jj(JjAction),
-    /// Go to the issues screen.
-    Issues,
+    /// Switch to another screen.
+    Mode(Mode),
     /// Load the bookmarks nearest this commit, for the jj menu.
     Bookmarks(String),
     /// Find what a push of these commits' bookmarks would do, for the jj menu.
@@ -62,6 +63,8 @@ pub struct Home {
     drawn_width: u16,
     /// Whether Space was pressed, for the space menu.
     space: bool,
+    /// Whether `space m` waits for a mode's key.
+    mode_menu: bool,
     /// Where a `C-w <` or `C-w >` divider move stands.
     divider: crate::tui::width::Divider,
     /// Outside source control: the files alone, with no revisions side.
@@ -70,6 +73,9 @@ pub struct Home {
 
 /// The narrowest either side gets.
 const SIDE_MIN: u16 = 20;
+
+/// The screens `space m` switches to from home.
+const MODES: &[Mode] = &[Mode::Review, Mode::Editor, Mode::Issues];
 
 /// The `:` commands, for the menu over the command line.
 const COMMANDS: &[(&str, &str)] = &[
@@ -92,6 +98,7 @@ impl Default for Home {
             revisions_width: None,
             drawn_width: 0,
             space: false,
+            mode_menu: false,
             divider: Default::default(),
             files_only: false,
         }
@@ -160,11 +167,14 @@ impl Home {
         if let Some(menu) = &self.menu {
             return menu.items();
         }
+        if self.mode_menu {
+            return modes::menu(MODES);
+        }
         if self.space {
             if self.picker.git {
-                return vec![("i".into(), "issues")];
+                return vec![("m".into(), "mode")];
             }
-            return vec![("j".into(), "jj mode"), ("i".into(), "issues")];
+            return vec![("j".into(), "jj mode"), ("m".into(), "mode")];
         }
         let Some(typed) = &self.cmd else {
             return vec![];
@@ -401,10 +411,16 @@ impl Home {
             }
             return Outcome::None;
         }
+        if std::mem::take(&mut self.mode_menu) {
+            return match key.code {
+                KeyCode::Char(c) => Mode::pick(c, MODES).map_or(Outcome::None, Outcome::Mode),
+                _ => Outcome::None,
+            };
+        }
         if std::mem::take(&mut self.space) {
             match key.code {
                 KeyCode::Char('j') if !self.picker.git => self.set_jj_mode(true),
-                KeyCode::Char('i') => return Outcome::Issues,
+                KeyCode::Char('m') => self.mode_menu = true,
                 _ => {}
             }
             return Outcome::None;
@@ -711,11 +727,14 @@ mod tests {
     }
 
     #[test]
-    fn the_space_menu_goes_to_jj_mode_or_issues_and_any_other_key_drops_it() {
+    fn the_space_menu_goes_to_jj_mode_or_a_mode_and_any_other_key_drops_it() {
         let mut h = with_log(&["aaa"]);
-        press(&mut h, "<space>");
-        assert_eq!(h.command_menu().len(), 2);
-        assert!(matches!(press(&mut h, "i")[..], [Outcome::Issues]));
+        press(&mut h, "<space>m");
+        assert!(!h.command_menu().iter().any(|(k, _)| k == "h"));
+        assert!(matches!(
+            press(&mut h, "i")[..],
+            [Outcome::Mode(Mode::Issues)]
+        ));
         press(&mut h, "<space>x");
         assert!(!h.jj_mode() && h.command_menu().is_empty());
         assert!(ran(press(&mut h, "na")).is_empty());
@@ -726,7 +745,7 @@ mod tests {
         let mut h = with_log(&["aaa"]);
         h.picker.git = true;
         press(&mut h, "<space>");
-        assert_eq!(h.command_menu(), [("i".to_string(), "issues")]);
+        assert_eq!(h.command_menu(), [("m".to_string(), "mode")]);
         press(&mut h, "j");
         assert!(!h.jj_mode());
     }

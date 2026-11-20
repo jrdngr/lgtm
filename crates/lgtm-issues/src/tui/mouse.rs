@@ -28,6 +28,7 @@ impl Issues {
 
     fn click_at(&mut self, y: u16, now: Instant) {
         self.space = false;
+        self.mode_menu = false;
         self.status_for = None;
         let area = self.list_area;
         if !matches!(self.screen, Screen::List) || y < area.y || y >= area.bottom() {

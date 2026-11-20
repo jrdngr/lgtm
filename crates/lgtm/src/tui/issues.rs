@@ -1,4 +1,4 @@
-//! The issues screen inside lgtm: opened with `space i` or `lgtm issues`, on the folder lgtm
+//! The issues screen inside lgtm: opened with `space m i` or `lgtm issues`, on the folder lgtm
 //! started in when it's an issues folder, else the one last picked for the repo, else a pick.
 
 use std::path::Path;
@@ -64,6 +64,7 @@ impl App {
             Outcome::None => {}
             Outcome::Quit => return !self.buffers.blocks_quit(),
             Outcome::Home => self.go_home(),
+            Outcome::Mode(mode) => self.switch(mode),
             Outcome::Folders => self.folders = Some(Picker::new(&self.root)),
             Outcome::Edit(path) => {
                 let name = path

@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 
 use lgtm_core::syntax::Segment;
 use lgtm_tui_kit::markdown as preview;
+use lgtm_tui_kit::mode;
 use ratatui::crossterm::event::KeyEvent;
 
 use crate::edit::buffer::{Buffer, Sel};
@@ -161,6 +162,8 @@ pub struct Editor {
     rows: Vec<click::TextRow>,
     /// Where a drag over the text started.
     drag_from: Option<usize>,
+    /// The screens `space m` can switch to.
+    pub modes: Vec<mode::Mode>,
 }
 
 impl Editor {
@@ -188,6 +191,7 @@ impl Editor {
             sidebar_width: 0,
             rows: vec![],
             drag_from: None,
+            modes: vec![mode::Mode::Review, mode::Mode::Issues, mode::Mode::Home],
         }
     }
 
@@ -754,14 +758,21 @@ impl Editor {
             wrap: self.wrap.then_some(self.text_width),
         };
         let action = self.keys.press(&mut open.buf, key, view);
-        if action == Action::Review {
-            let b = &open.buf;
-            let line = b.line_of(b.sel.head);
-            let text = b.slice(b.line_start(line), b.line_end(line));
-            return Outcome::Review(b.name.clone(), line as u32 + 1, text);
-        }
-        if action == Action::Issues {
-            return Outcome::Issues;
+        if let Action::Mode(to) = action {
+            if !self.modes.contains(&to) {
+                return Outcome::None;
+            }
+            return match to {
+                mode::Mode::Review => {
+                    let b = &open.buf;
+                    let line = b.line_of(b.sel.head);
+                    let text = b.slice(b.line_start(line), b.line_end(line));
+                    Outcome::Review(b.name.clone(), line as u32 + 1, text)
+                }
+                mode::Mode::Issues => Outcome::Issues,
+                mode::Mode::Home => Outcome::Home,
+                mode::Mode::Editor => Outcome::None,
+            };
         }
         if action == Action::SendToAgent {
             let b = &open.buf;
@@ -789,19 +800,11 @@ impl Editor {
                     self.notice = Some(format!("couldn't copy: {e}"));
                 }
             }
-            Action::Paste => match clipboard::paste() {
-                Ok(text) => {
-                    if let Some(open) = self.open.get_mut(self.cur) {
-                        self.keys.paste_text(&mut open.buf, &text);
-                    }
-                }
-                Err(e) => self.notice = Some(format!("couldn't paste: {e}")),
-            },
             Action::Notice(n) => self.notice = Some(n),
             Action::Pick(kind) => self.pick(kind),
             Action::CycleFile { forward } => self.cycle_file(forward),
             Action::Preview => self.toggle_preview(),
-            Action::Review | Action::Issues | Action::SendToAgent => {}
+            Action::Mode(_) | Action::SendToAgent => {}
             Action::Sidebar => {
                 self.files = true;
                 self.in_sidebar = true;
@@ -850,14 +853,14 @@ mod tests {
         let rendered = |e: &Editor| e.previewing();
         e.open("a.md", 1).unwrap();
         assert!(!rendered(&e));
-        press(&mut e, "<space>m");
+        press(&mut e, "<space>p");
         assert!(rendered(&e) && e.render_markdown);
         e.open("b.md", 1).unwrap();
         assert!(rendered(&e));
         e.open("d.txt", 1).unwrap();
         assert!(!rendered(&e));
         e.open("b.md", 1).unwrap();
-        press(&mut e, "<space>m");
+        press(&mut e, "<space>p");
         assert!(!rendered(&e) && !e.render_markdown);
         e.open("c.md", 1).unwrap();
         assert!(!rendered(&e));
@@ -1126,6 +1129,19 @@ mod tests {
         assert!(matches!(out, Outcome::Mention(t) if t == "a.txt:2-3"));
     }
 
+    #[test]
+    fn space_m_switches_only_to_the_modes_offered_and_the_review_lands_on_the_cursors_line() {
+        let (_dir, mut e) = editor_on("one\ntwo\n");
+        let out = press_last(&mut e, "j<space>mr");
+        assert!(matches!(out, Outcome::Review(p, 2, t) if p == "a.txt" && t == "two"));
+        e.modes = vec![mode::Mode::Issues];
+        assert!(matches!(press_last(&mut e, "<space>mr"), Outcome::None));
+        assert_eq!(e.pending_menu(), []);
+        press(&mut e, "<space>m");
+        assert_eq!(e.pending_menu(), [("i".to_string(), "issues")]);
+        assert!(matches!(press_last(&mut e, "i"), Outcome::Issues));
+    }
+
     fn press_last(e: &mut Editor, keys: &str) -> Outcome {
         let mut out = Outcome::None;
         for key in crate::edit::spec::keys(keys) {
@@ -1279,18 +1295,18 @@ mod tests {
     }
 
     #[test]
-    fn space_m_shows_a_markdown_file_rendered_and_back_at_the_line_it_scrolled_to() {
+    fn space_p_shows_a_markdown_file_rendered_and_back_at_the_line_it_scrolled_to() {
         let dir = tempfile::tempdir().unwrap();
         let md: String = (0..40).map(|i| format!("para {i}\n\n")).collect();
         std::fs::write(dir.path().join("a.md"), md).unwrap();
         std::fs::write(dir.path().join("b.txt"), "x\n").unwrap();
         let mut e = Editor::new(dir.path());
         e.open("b.txt", 1).unwrap();
-        press(&mut e, " m");
+        press(&mut e, " p");
         assert!(!e.previewing());
         assert_eq!(e.notice.as_deref(), Some("not markdown"));
         e.open("a.md", 1).unwrap();
-        press(&mut e, " m");
+        press(&mut e, " p");
         assert!(e.previewing());
         let area = ratatui::layout::Rect::new(0, 0, 60, 10);
         let mut screen = ratatui::buffer::Buffer::empty(area);
@@ -1299,7 +1315,7 @@ mod tests {
         // Typing doesn't reach the text.
         press(&mut e, "ixjjjj");
         assert!(!e.open[1].buf.dirty());
-        press(&mut e, " m");
+        press(&mut e, " p");
         assert!(!e.previewing());
         let b = e.current().unwrap();
         assert_eq!(b.line_of(b.sel.head), 4);

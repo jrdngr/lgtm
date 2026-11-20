@@ -118,7 +118,7 @@ impl Editor {
         if self.previewing() {
             return vec![
                 ("j k", "scroll", false),
-                ("space m", "text", false),
+                ("space p", "text", false),
                 (":", "command", false),
                 ("?", "keys", false),
             ];
@@ -147,6 +147,9 @@ impl Editor {
         let pending = self.keys.pending();
         if pending.is_empty() {
             return vec![];
+        }
+        if pending == "space m" {
+            return lgtm_tui_kit::mode::menu(&self.modes);
         }
         keymap::after(&pending, self.keys.mode == Mode::Select)
             .into_iter()

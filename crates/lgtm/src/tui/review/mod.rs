@@ -28,6 +28,7 @@ use std::collections::{HashMap, HashSet};
 use lgtm_core::diff::RowKind;
 use lgtm_core::jj::{Change, FileDiff};
 use lgtm_core::store::Store;
+use lgtm_tui_kit::mode::Mode;
 use ratatui::crossterm::event::{
     KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -41,6 +42,9 @@ use super::width;
 use crate::edit::keymap::Pick;
 use draw::{CODE_X, NUM};
 use rows::Line;
+
+/// The screens `space m` switches to from the review.
+const MODES: &[Mode] = &[Mode::Editor, Mode::Issues, Mode::Home];
 
 pub enum Outcome {
     None,
@@ -57,6 +61,7 @@ pub enum Outcome {
     Mention(String),
     /// Go to the issues screen.
     Issues,
+    Home,
 }
 
 pub struct Review {
@@ -132,6 +137,8 @@ pub struct Review {
     pub notice: Option<String>,
     /// Whether `space` was pressed, for its menu.
     space: bool,
+    /// Whether `space m` waits for a mode's key.
+    mode_menu: bool,
     /// Where a `C-w <` or `C-w >` divider move stands.
     divider: crate::tui::width::Divider,
     /// Files with edits the editor hasn't saved.
@@ -207,7 +214,7 @@ pub fn help_groups() -> Vec<Group> {
         Group::new(
             "More",
             &[
-                ("space", "files, search, wrap, editor, issues"),
+                ("space", "files, search, wrap, mode"),
                 (":", "command"),
                 (":h", "home"),
             ],
@@ -290,6 +297,7 @@ impl Review {
             show_resolved: false,
             notice: None,
             space: false,
+            mode_menu: false,
             divider: Default::default(),
             unsaved: HashSet::new(),
             goto: None,
@@ -580,6 +588,17 @@ impl Review {
             self.select_key(key);
             return Outcome::None;
         }
+        if std::mem::take(&mut self.mode_menu) {
+            let KeyCode::Char(c) = key.code else {
+                return Outcome::None;
+            };
+            return match Mode::pick(c, MODES) {
+                Some(Mode::Editor) => Outcome::Editor(self.edit_target()),
+                Some(Mode::Issues) => Outcome::Issues,
+                Some(Mode::Home) => Outcome::Home,
+                Some(Mode::Review) | None => Outcome::None,
+            };
+        }
         if std::mem::take(&mut self.space) {
             return match key.code {
                 KeyCode::Char('f') => Outcome::Pick(Pick::Files),
@@ -589,8 +608,10 @@ impl Review {
                     Outcome::None
                 }
                 KeyCode::Char('/') => Outcome::Pick(Pick::Grep),
-                KeyCode::Char('r') => Outcome::Editor(self.edit_target()),
-                KeyCode::Char('i') => Outcome::Issues,
+                KeyCode::Char('m') => {
+                    self.mode_menu = true;
+                    Outcome::None
+                }
                 KeyCode::Char('w') => {
                     self.wrap = !self.wrap;
                     self.left = 0;

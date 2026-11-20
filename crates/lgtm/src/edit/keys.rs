@@ -28,8 +28,6 @@ pub enum Action {
     Search,
     /// Put this on the system clipboard.
     Copy(String),
-    /// Paste the system clipboard after the selection, through `paste_text`.
-    Paste,
     /// Something the buffer couldn't do, to show.
     Notice(String),
     /// Open or close folds at the cursor's line.
@@ -42,10 +40,8 @@ pub enum Action {
     CycleFile {
         forward: bool,
     },
-    /// Go to the review.
-    Review,
-    /// Go to the issues screen.
-    Issues,
+    /// Switch to another screen.
+    Mode(lgtm_tui_kit::mode::Mode),
     /// Send where the selection is to an agent.
     SendToAgent,
     /// Move to the file tree.
@@ -352,15 +348,10 @@ impl Keys {
             Cmd::SearchSelection if b.len() > 0 => {
                 self.search = Some(b.slice(b.sel.from(), b.sel.to() + 1));
             }
-            Cmd::ClipboardYank if b.len() > 0 => {
-                return Action::Copy(b.slice(b.sel.from(), b.sel.to() + 1));
-            }
-            Cmd::ClipboardPaste => return Action::Paste,
             Cmd::Pick(pick) => return Action::Pick(pick),
             Cmd::Preview => return Action::Preview,
             Cmd::CycleFile { forward } => return Action::CycleFile { forward },
-            Cmd::Review => return Action::Review,
-            Cmd::Issues => return Action::Issues,
+            Cmd::Mode(mode) => return Action::Mode(mode),
             Cmd::SendToAgent => return Action::SendToAgent,
             Cmd::Sidebar => return Action::Sidebar,
             Cmd::ToggleSidebar => return Action::ToggleSidebar,
@@ -376,7 +367,6 @@ impl Keys {
                 self.markdown(b, markdown::toggle_check);
             }
             Cmd::Delete | Cmd::Yank | Cmd::ToggleCase | Cmd::SearchSelection => {}
-            Cmd::ClipboardYank => {}
         }
         Action::None
     }

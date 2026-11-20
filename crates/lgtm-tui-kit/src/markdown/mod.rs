@@ -1,4 +1,4 @@
-//! Markdown rendered read-only: what the editor shows for `space m`, and lgtm-issues for an issue.
+//! Markdown rendered read-only: what the editor shows for `space p`, and lgtm-issues for an issue.
 
 mod inline;
 mod render;
@@ -80,7 +80,7 @@ impl Preview {
         match (self.pending.take(), key.code) {
             (Some('g'), KeyCode::Char('g')) => self.top = 0,
             (Some('g'), KeyCode::Char('e')) => self.scroll(isize::MAX),
-            (Some(' '), KeyCode::Char('m')) => return Outcome::Close,
+            (Some(' '), KeyCode::Char('p')) => return Outcome::Close,
             (Some(_), _) => {}
             (None, KeyCode::Char(c @ ('g' | ' '))) => self.pending = Some(c),
             (None, KeyCode::Char('j') | KeyCode::Down) => self.scroll(1),

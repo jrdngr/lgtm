@@ -350,13 +350,6 @@ impl Resolver {
                 Outcome::Command
             }
             Action::Copy(text) => Outcome::Copy(text),
-            Action::Paste => match lgtm_tui_kit::clipboard::paste() {
-                Ok(text) => {
-                    self.keys.paste_text(&mut e.buf, &text);
-                    Outcome::None
-                }
-                Err(err) => Outcome::Notice(format!("couldn't paste: {err}")),
-            },
             Action::Notice(n) => Outcome::Notice(n),
             _ => Outcome::None,
         }

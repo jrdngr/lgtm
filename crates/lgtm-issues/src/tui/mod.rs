@@ -7,7 +7,6 @@ mod mouse;
 pub mod picker;
 pub(crate) mod qq;
 mod question;
-mod standalone;
 mod undo;
 mod view;
 mod wrap;
@@ -19,6 +18,7 @@ use std::time::{Duration, Instant};
 use lgtm_tui_kit::flow::{self, Piece};
 use lgtm_tui_kit::keybar::{self, Hint};
 use lgtm_tui_kit::markdown::Outcome as ViewOutcome;
+use lgtm_tui_kit::mode::{self, Mode};
 use lgtm_tui_kit::paint::Canvas;
 use lgtm_tui_kit::theme::{self, ACCENT, AMBER, BG, FG, GREEN, PANEL, RED};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -33,8 +33,6 @@ use input::Input;
 use list::Row;
 use question::Draft;
 use view::View;
-
-pub use standalone::run;
 
 /// How often the folder is checked for changes.
 const POLL: Duration = Duration::from_millis(500);
@@ -60,6 +58,8 @@ pub enum Outcome {
     Edit(PathBuf),
     /// Pick another issues folder.
     Folders,
+    /// Switch to another screen.
+    Mode(Mode),
     Home,
     Quit,
 }
@@ -82,6 +82,10 @@ pub struct Issues {
     outcome: Outcome,
     /// Whether Space was pressed, for the space menu.
     space: bool,
+    /// Whether `space m` waits for a mode's key.
+    mode_menu: bool,
+    /// The screens `space m` can switch to.
+    modes: Vec<Mode>,
     /// The issue whose status `s` is about to set, while its menu waits for a key.
     status_for: Option<u32>,
     history: undo::History,
@@ -125,6 +129,8 @@ impl Issues {
             drafts: HashMap::new(),
             outcome: Outcome::None,
             space: false,
+            mode_menu: false,
+            modes: vec![Mode::Editor, Mode::Review, Mode::Home],
             status_for: None,
             history: undo::History::default(),
             polled: Instant::now(),
@@ -240,6 +246,11 @@ impl Issues {
         }
     }
 
+    /// Sets the screens `space m` can switch to.
+    pub fn set_modes(&mut self, modes: Vec<Mode>) {
+        self.modes = modes;
+    }
+
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
         self.outcome = Outcome::None;
@@ -264,10 +275,16 @@ impl Issues {
             if let Some(status) = status.map(|s| s.id.clone()) {
                 self.set_status(id, status);
             }
+        } else if std::mem::take(&mut self.mode_menu) {
+            if let KeyCode::Char(c) = key.code
+                && let Some(m) = Mode::pick(c, &self.modes)
+            {
+                self.outcome = Outcome::Mode(m);
+            }
         } else if std::mem::take(&mut self.space) {
             match key.code {
                 KeyCode::Char('f') => self.outcome = Outcome::Folders,
-                KeyCode::Char('h') => self.outcome = Outcome::Home,
+                KeyCode::Char('m') => self.mode_menu = true,
                 _ => {}
             }
         } else if key.code == KeyCode::Char(' ') && !matches!(self.screen, Screen::Question { .. })
@@ -304,12 +321,18 @@ impl Issues {
                 })
                 .collect();
         }
+        if self.mode_menu {
+            return mode::menu(&self.modes)
+                .into_iter()
+                .map(|(k, l)| (k, l.to_string()))
+                .collect();
+        }
         if !self.space {
             return vec![];
         }
         vec![
             ("f".into(), "issues folders".into()),
-            ("h".into(), "home".into()),
+            ("m".into(), "mode".into()),
         ]
     }
 
@@ -813,6 +836,24 @@ mod tests {
         assert_eq!(counts.first(), Some(&"● 0"));
         assert_eq!(counts.last(), Some(&"✓ 0"));
         assert!(counts.iter().all(|c| c.chars().count() == 3));
+    }
+
+    #[test]
+    fn space_m_switches_only_to_the_modes_the_host_offers() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut issues = Issues::new(Folder::init(dir.path()).unwrap(), "jordan".into());
+        issues.set_modes(vec![Mode::Editor]);
+        let press = |i: &mut Issues, c| i.key(KeyEvent::from(KeyCode::Char(c)));
+        press(&mut issues, ' ');
+        press(&mut issues, 'm');
+        assert_eq!(
+            issues.space_menu(),
+            [("e".to_string(), "editor".to_string())]
+        );
+        assert_eq!(press(&mut issues, 'r'), Outcome::None);
+        press(&mut issues, ' ');
+        press(&mut issues, 'm');
+        assert_eq!(press(&mut issues, 'e'), Outcome::Mode(Mode::Editor));
     }
 
     #[test]
