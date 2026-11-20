@@ -576,17 +576,6 @@ impl Review {
             self.input_key(key, store.as_deref());
             return Outcome::None;
         }
-        if self.selecting.is_some() {
-            if key.code == KeyCode::Char('a')
-                && !ctrl
-                && let Some(text) = self.selecting_lines().and_then(|r| self.mention(r))
-            {
-                self.selecting = None;
-                return Outcome::Mention(text);
-            }
-            self.select_key(key);
-            return Outcome::None;
-        }
         if std::mem::take(&mut self.mode_menu) {
             let KeyCode::Char(c) = key.code else {
                 return Outcome::None;
@@ -620,14 +609,25 @@ impl Review {
                 _ => Outcome::None,
             };
         }
+        if key.code == KeyCode::Char(' ') && !ctrl && !self.select_waiting() {
+            self.space = true;
+            return Outcome::None;
+        }
+        if self.selecting.is_some() {
+            if key.code == KeyCode::Char('a')
+                && !ctrl
+                && let Some(text) = self.selecting_lines().and_then(|r| self.mention(r))
+            {
+                self.selecting = None;
+                return Outcome::Mention(text);
+            }
+            self.select_key(key);
+            return Outcome::None;
+        }
         if let Some(step) = crate::tui::side::files_step(&mut self.divider, &key) {
             if let Some(step) = step.filter(|_| self.list_area.width > 0) {
                 self.list_width = Some(width::moved(self.list_area.width, step, LIST_MIN));
             }
-            return Outcome::None;
-        }
-        if key.code == KeyCode::Char(' ') && !self.in_list {
-            self.space = true;
             return Outcome::None;
         }
         if !matches!(key.code, KeyCode::Char('J' | 'K' | 'c' | 'a' | 'e' | 'E')) {
@@ -838,6 +838,7 @@ impl Review {
                 ("y", "copy", false),
                 ("/", "search", false),
                 ("n N", "match", false),
+                ("space", "menu", false),
                 ("Esc", "cancel", false),
             ];
         }
@@ -969,6 +970,27 @@ mod tests {
         assert!(!r.settings(&Settings::default()).files);
         space(&mut r, 'b');
         assert!(r.settings(&Settings::default()).files);
+    }
+
+    #[test]
+    fn space_m_switches_from_the_file_list_and_while_selecting() {
+        let mut r = review();
+        let keys = |r: &mut Review, k: &str| {
+            let mut out = Outcome::None;
+            for key in crate::edit::spec::keys(k) {
+                out = r.key(key, None);
+            }
+            out
+        };
+        r.set_in_list(true);
+        assert!(matches!(keys(&mut r, "<space>mi"), Outcome::Issues));
+        r.set_in_list(false);
+        keys(&mut r, "v");
+        assert!(r.selecting.is_some());
+        assert!(matches!(keys(&mut r, "<space>me"), Outcome::Editor(_)));
+        // A space after `f` is the character to find.
+        keys(&mut r, "f<space>");
+        assert!(!r.space);
     }
 
     #[test]

@@ -45,6 +45,7 @@ pub fn help_groups() -> Vec<Group> {
                 (":w", "save what's resolved"),
                 (":q!", "leave, dropping it"),
                 (":raw", "edit the markers as text"),
+                ("space m", "mode"),
             ],
         ),
     ]
@@ -109,6 +110,11 @@ impl Resolver {
     /// Whether keys are going into a side's text.
     pub fn typing(&self) -> bool {
         self.editing.is_some() && (self.keys.mode == Mode::Insert || self.keys.waiting())
+    }
+
+    /// Whether a side's text is open for editing.
+    pub fn editing(&self) -> bool {
+        self.editing.is_some()
     }
 
     pub fn mode(&self) -> Option<Mode> {

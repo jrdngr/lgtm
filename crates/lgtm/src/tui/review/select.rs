@@ -207,6 +207,11 @@ impl Review {
 
     /// Handles a key while selecting: motions move the selection, Home and End go to the
     /// line's ends, `y` copies it, `/` searches from it, and `v` or Esc stop.
+    /// Whether the selection's keys wait for more, as after `f` or `m`.
+    pub(super) fn select_waiting(&self) -> bool {
+        self.selecting.as_ref().is_some_and(|s| s.keys.waiting())
+    }
+
     pub(super) fn select_key(&mut self, key: KeyEvent) {
         let plain = !key.modifiers.contains(KeyModifiers::CONTROL);
         let waiting = self.selecting.as_ref().is_some_and(|s| s.keys.waiting());

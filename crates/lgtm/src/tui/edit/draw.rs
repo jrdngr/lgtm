@@ -105,6 +105,7 @@ impl Editor {
                 ("← →", "close, open", false),
                 ("Enter", "open", false),
                 ("a", "new file", false),
+                ("space", "menu", false),
                 (":", "command", false),
             ];
             if !self.open.is_empty() {
@@ -118,7 +119,7 @@ impl Editor {
         if self.previewing() {
             return vec![
                 ("j k", "scroll", false),
-                ("space p", "text", false),
+                ("space", "menu", false),
                 (":", "command", false),
                 ("?", "keys", false),
             ];
@@ -144,6 +145,16 @@ impl Editor {
 
     /// What the keys typed so far could go on to, for the menu over the key bar.
     pub fn pending_menu(&self) -> Vec<(String, &'static str)> {
+        if self.leader.active() {
+            let mut extra = vec![];
+            if self.in_sidebar && !self.open.is_empty() {
+                extra.push(('e', "file tree"));
+            }
+            if self.previewing() {
+                extra.push(('p', "text"));
+            }
+            return self.leader.menu(&self.modes, &extra);
+        }
         let pending = self.keys.pending();
         if pending.is_empty() {
             return vec![];

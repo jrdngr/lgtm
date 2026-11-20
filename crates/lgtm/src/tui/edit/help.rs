@@ -83,6 +83,7 @@ pub fn preview_groups() -> Vec<Group> {
             ("C-d C-u", "half page down, up"),
             ("g g  g e", "top, bottom"),
             ("space p  Esc", "back to the text"),
+            ("space m", "mode"),
             ("click", "open a link"),
             (":", "command"),
         ],

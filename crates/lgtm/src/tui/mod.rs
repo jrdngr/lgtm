@@ -320,7 +320,7 @@ impl App {
             true => self.reload(),
             false => self.open(Target::Revset("@".into())),
         }
-        if let Some(r) = self.review.as_mut() {
+        if let Some(r) = self.review.as_mut().filter(|_| !path.is_empty()) {
             r.go_to_line(path, line, text);
         }
         self.screen = Screen::Review;
@@ -670,6 +670,7 @@ impl App {
                 self.busy = Some(("checking the push", Instant::now()));
                 self.loader.push_plan(revs);
             }
+            drawer::Outcome::Mode(to) => self.switch(to),
             drawer::Outcome::None => {}
         }
     }
@@ -766,6 +767,7 @@ fn draw_with_drawer(
             keybar::draw_badged(c, bottom, badge, &hints);
         }
     }
+    keybar::menu(c, body, &d.leader_menu());
     if let Some(h) = help {
         h.draw(c, body, &drawer::help_groups(d.picker.git));
     }

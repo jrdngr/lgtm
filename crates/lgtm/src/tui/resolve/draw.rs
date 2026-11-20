@@ -77,6 +77,7 @@ impl Resolver {
             ("i", "edit", false),
             ("o", "original", false),
             ("u U", "undo", false),
+            ("space", "menu", false),
             (":w", "save", false),
             (":q!", "discard", false),
         ]);

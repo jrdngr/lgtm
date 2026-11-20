@@ -12,6 +12,10 @@ use super::paint::Canvas;
 use super::picker::{self, Picker};
 use super::theme::{self, AMBER, BG, CYAN, FG, MUTED};
 use lgtm_core::jj::{JjAction, PushPlan};
+use lgtm_tui_kit::mode::{Leader, Mode, Press};
+
+/// The screens `space m` switches to from the drawer, which is in the review.
+const MODES: &[Mode] = &[Mode::Editor, Mode::Issues];
 
 pub enum Outcome {
     None,
@@ -24,6 +28,8 @@ pub enum Outcome {
     Bookmarks(String),
     /// Find what a push of these commits' bookmarks would do, for the jj menu.
     PushPlan(String),
+    /// Switch to this screen, the drawer closed.
+    Mode(Mode),
 }
 
 #[derive(Default)]
@@ -36,6 +42,7 @@ pub struct Drawer {
     pub busy: Option<String>,
     /// A failure to show until the next key.
     pub notice: Option<String>,
+    leader: Leader,
 }
 
 /// The drawer's keys, for `?`. A git log has fewer.
@@ -83,6 +90,11 @@ impl Drawer {
         self.menu = (self.open && !self.picker.git)
             .then(|| self.picker.motion_target().map(Menu::new))
             .flatten();
+    }
+
+    /// What `space` goes on to, while it waits.
+    pub fn leader_menu(&self) -> Vec<(String, &'static str)> {
+        self.leader.menu(MODES, &[])
     }
 
     /// What the jj menu asks for on the bottom line.
@@ -161,11 +173,21 @@ impl Drawer {
 
     /// Whether keys are going into a line being typed.
     pub fn typing(&self) -> bool {
-        self.prompt().is_some()
+        self.prompt().is_some() || self.leader.active()
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Outcome {
         self.notice = None;
+        if !self.in_motion() && self.prompt().is_none() {
+            match self.leader.key(&key, MODES) {
+                Press::Pass => {}
+                Press::Switch(to) => {
+                    self.close();
+                    return Outcome::Mode(to);
+                }
+                Press::Held | Press::Other(_) => return Outcome::None,
+            }
+        }
         if self.in_motion() {
             let step = self.menu.as_mut().map(|m| m.key(key));
             return step.map_or(Outcome::None, |s| self.menu_step(s));
@@ -384,6 +406,23 @@ mod tests {
         assert!(d.is_open());
         assert_eq!(reviewed(press(&mut d, "jJ<ret>")), ["ddd::ccc"]);
         assert!(!d.is_open());
+    }
+
+    #[test]
+    fn space_m_switches_mode_and_closes_without_running_a_motion() {
+        let mut d = with_log(&["aaa", "bbb"]);
+        d.show(None);
+        press(&mut d, " ");
+        assert_eq!(d.leader_menu(), [("m".to_string(), "mode")]);
+        let out = press(&mut d, "me");
+        assert!(matches!(
+            out[..],
+            [Outcome::None, Outcome::Mode(Mode::Editor)]
+        ));
+        assert!(!d.is_open());
+        d.show(None);
+        // `d` after an unfinished leader isn't Describe.
+        assert!(ran(press(&mut d, " d")).is_empty());
     }
 
     #[test]

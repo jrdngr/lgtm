@@ -162,6 +162,8 @@ pub struct Editor {
     drag_from: Option<usize>,
     /// The screens `space m` can switch to.
     pub modes: Vec<mode::Mode>,
+    /// `space m` where the text's own keys don't run: the tree, a preview, a resolver.
+    leader: mode::Leader,
 }
 
 impl Editor {
@@ -190,6 +192,7 @@ impl Editor {
             rows: vec![],
             drag_from: None,
             modes: vec![mode::Mode::Review, mode::Mode::Issues],
+            leader: mode::Leader::default(),
         }
     }
 
@@ -439,7 +442,7 @@ impl Editor {
             KeyCode::Char('u') if ctrl => KeyCode::PageUp,
             KeyCode::Char('g') => KeyCode::Home,
             KeyCode::Char('G') => KeyCode::End,
-            KeyCode::Esc | KeyCode::Tab | KeyCode::Char(' ') => {
+            KeyCode::Esc | KeyCode::Tab => {
                 if !self.open.is_empty() {
                     self.leave_sidebar();
                 }
@@ -470,6 +473,31 @@ impl Editor {
                 Ok(()) => self.in_sidebar = false,
                 Err(e) => self.notice = Some(format!("couldn't open {path}: {e}")),
             }
+        }
+    }
+
+    /// Whether keys go to the tree, a preview or a resolver, which have no space menu of
+    /// their own.
+    fn bare(&self) -> bool {
+        self.in_sidebar
+            || self.open.is_empty()
+            || self.previewing()
+            || self.resolver().is_some_and(|r| !r.editing())
+    }
+
+    /// The screen for `to`: the review lands on the cursor's line in the file in view.
+    fn switch(&self, to: mode::Mode) -> Outcome {
+        match to {
+            mode::Mode::Review => match self.current() {
+                Some(b) => {
+                    let line = b.line_of(b.sel.head);
+                    let text = b.slice(b.line_start(line), b.line_end(line));
+                    Outcome::Review(b.name.clone(), line as u32 + 1, text)
+                }
+                None => Outcome::Review(String::new(), 0, String::new()),
+            },
+            mode::Mode::Issues => Outcome::Issues,
+            mode::Mode::Editor => Outcome::None,
         }
     }
 
@@ -627,6 +655,9 @@ impl Editor {
 
     /// Whether keys are going into text, so screen-wide keys like `?` aren't theirs.
     pub fn typing(&self) -> bool {
+        if self.leader.active() {
+            return true;
+        }
         if let Some(r) = self.resolver() {
             return self.prompt.is_some() || self.finder.is_some() || r.typing();
         }
@@ -717,6 +748,21 @@ impl Editor {
         if self.finder.is_some() {
             return self.finder_key(key);
         }
+        if self.bare() {
+            match self.leader.key(&key, &self.modes) {
+                mode::Press::Pass => {}
+                mode::Press::Held => return Outcome::None,
+                mode::Press::Switch(to) => return self.switch(to),
+                mode::Press::Other(c) => {
+                    match c {
+                        'e' if self.in_sidebar && !self.open.is_empty() => self.leave_sidebar(),
+                        'p' if self.previewing() => self.toggle_preview(),
+                        _ => {}
+                    }
+                    return Outcome::None;
+                }
+            }
+        }
         if self.in_sidebar || self.open.is_empty() {
             self.in_sidebar = true;
             self.sidebar_key(key);
@@ -760,16 +806,7 @@ impl Editor {
             if !self.modes.contains(&to) {
                 return Outcome::None;
             }
-            return match to {
-                mode::Mode::Review => {
-                    let b = &open.buf;
-                    let line = b.line_of(b.sel.head);
-                    let text = b.slice(b.line_start(line), b.line_end(line));
-                    Outcome::Review(b.name.clone(), line as u32 + 1, text)
-                }
-                mode::Mode::Issues => Outcome::Issues,
-                mode::Mode::Editor => Outcome::None,
-            };
+            return self.switch(to);
         }
         if action == Action::SendToAgent {
             let b = &open.buf;
@@ -1124,6 +1161,28 @@ mod tests {
         assert!(matches!(press_last(&mut e, "i"), Outcome::Issues));
     }
 
+    #[test]
+    fn space_m_switches_from_the_tree_and_a_preview_but_space_types_while_inserting() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.md"), "# Title\n").unwrap();
+        std::fs::write(dir.path().join("b.txt"), "x\n").unwrap();
+        let mut e = Editor::new(dir.path());
+        e.browse();
+        press(&mut e, "<space>");
+        assert_eq!(e.pending_menu(), [("m".to_string(), "mode")]);
+        let out = press_last(&mut e, "mr");
+        assert!(matches!(out, Outcome::Review(p, 0, _) if p.is_empty()));
+        e.open("a.md", 1).unwrap();
+        e.in_sidebar = false;
+        press(&mut e, "<space>p");
+        assert!(e.previewing());
+        assert!(matches!(press_last(&mut e, "<space>mi"), Outcome::Issues));
+        assert!(e.previewing());
+        e.open("b.txt", 1).unwrap();
+        press(&mut e, "i<space>m<esc>");
+        assert_eq!(e.current().unwrap().text.to_string(), " mx\n");
+    }
+
     fn press_last(e: &mut Editor, keys: &str) -> Outcome {
         let mut out = Outcome::None;
         for key in crate::edit::spec::keys(keys) {
@@ -1196,7 +1255,7 @@ mod tests {
         std::fs::write(dir.path().join("b/c.txt"), "see\n").unwrap();
         e.set_files(crate::tui::walk::list(dir.path()));
         e.run_command("close");
-        press(&mut e, "<esc><space>");
+        press(&mut e, "<esc>");
         assert!(e.in_sidebar);
         e.sidebar.reveal("b/c.txt");
         press(&mut e, "anew/d.txt<ret>");
