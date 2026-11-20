@@ -37,6 +37,11 @@ pub const NOTE: Color = tint((79, 140, 201), 12);
 /// Behind an agent's comment for the human.
 pub const AGENT_NOTE: Color = tint((214, 112, 214), 12);
 pub const BLANK: Color = tint((60, 60, 60), 35);
+/// Rows in a file list tinted by their review state.
+pub const GREEN_ROW: Color = tint((63, 185, 80), 22);
+pub const CYAN_ROW: Color = tint((57, 197, 207), 22);
+pub const RED_ROW: Color = tint((248, 81, 73), 22);
+pub const FUCHSIA_ROW: Color = tint((214, 112, 214), 22);
 
 pub fn fg(c: Color) -> Style {
     Style::default().fg(c)

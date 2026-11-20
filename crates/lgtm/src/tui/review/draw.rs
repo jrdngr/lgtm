@@ -16,8 +16,8 @@ use crate::tui::highlight::{self, Sides};
 use crate::tui::load::Target;
 use crate::tui::paint::Canvas;
 use crate::tui::theme::{
-    self, ACCENT, ADD, AGENT_NOTE, AMBER, BG, BLANK, CYAN, DEL, FAINT, FG, FUCHSIA, GREEN, HAIR,
-    MUTED, NOTE, PANEL, RED, SEL, THREAD, UNIQUE,
+    self, ACCENT, ADD, AGENT_NOTE, AMBER, BG, BLANK, CYAN, CYAN_ROW, DEL, FAINT, FG, FUCHSIA,
+    FUCHSIA_ROW, GREEN, GREEN_ROW, HAIR, MUTED, NOTE, PANEL, RED, RED_ROW, SEL, THREAD, UNIQUE,
 };
 use crate::tui::width;
 
@@ -37,14 +37,14 @@ fn bar(state: State) -> Option<Color> {
     }
 }
 
-/// A file's icon in the file list.
-fn icon(state: State) -> (&'static str, Color) {
+/// The background of a file list row in `state`.
+fn row_tint(state: State) -> Option<Color> {
     match state {
-        State::Reviewed => ("✓", GREEN),
-        State::Agent => ("✓", CYAN),
-        State::Flagged => ("!", RED),
-        State::AgentFlagged => ("!", FUCHSIA),
-        State::Partial | State::None => (" ", FAINT),
+        State::Reviewed => Some(GREEN_ROW),
+        State::Agent => Some(CYAN_ROW),
+        State::Flagged => Some(RED_ROW),
+        State::AgentFlagged => Some(FUCHSIA_ROW),
+        State::None | State::Partial => None,
     }
 }
 
@@ -180,18 +180,25 @@ impl Review {
             "Files",
             theme::title(self.in_list).bg(BG),
         );
-        // The marks' column shows only while some entry has a mark.
-        let marked = entries.iter().any(|e| icon(self.entry_state(e)).0 != " ");
         for (n, entry) in entries.iter().enumerate().skip(self.list_top).take(height) {
             let y = area.y + 1 + (n - self.list_top) as u16;
             let picked = n == at;
+            // An open folder's files show their own states, so only a closed one is tinted.
+            let state = match entry {
+                tree::Entry::Dir { path, .. } if !self.closed_dirs.contains(path) => State::None,
+                _ => self.entry_state(entry),
+            };
             let bg = match (picked, self.in_list) {
                 (true, true) => SEL,
                 (true, false) => HAIR,
-                _ => BG,
+                _ => row_tint(state).unwrap_or(BG),
             };
             c.fill(area.x, y, area.width, bg);
-            let (state, name, depth, color) = match entry {
+            // A picked row keeps its state in its first cell.
+            if let (true, Some(color)) = (picked, bar(state)) {
+                c.put(area.x, y, " ", theme::fg(FG).bg(color));
+            }
+            let (name, depth, color) = match entry {
                 tree::Entry::Dir {
                     name, path, depth, ..
                 } => {
@@ -200,35 +207,21 @@ impl Review {
                     } else {
                         "▾"
                     };
-                    (
-                        self.entry_state(entry),
-                        format!("{fold} {name}/"),
-                        *depth,
-                        MUTED,
-                    )
+                    (format!("{fold} {name}/"), *depth, MUTED)
                 }
-                tree::Entry::File { name, depth, .. } => {
-                    (self.entry_state(entry), name.clone(), *depth, FG)
-                }
+                tree::Entry::File { name, depth, .. } => (name.clone(), *depth, FG),
                 tree::Entry::Reviewed { agent, count, open } => {
                     let fold = if *open { "▾" } else { "▸" };
                     let name = if *agent { "Agent reviewed" } else { "Reviewed" };
-                    (State::None, format!("{fold} {name} {count}"), 0, MUTED)
+                    (format!("{fold} {name} {count}"), 0, MUTED)
                 }
             };
-            let (mark, mark_color) = icon(state);
-            c.put(area.x + 1, y, mark, theme::fg(mark_color).bg(bg));
             let style = if self.in_list && picked {
                 theme::bold(FG)
             } else {
                 theme::fg(color)
             };
-            let left = match entry {
-                tree::Entry::Reviewed { .. } => 1,
-                _ if marked => 3,
-                _ => 1,
-            };
-            let x = area.x + left + 2 * depth as u16;
+            let x = area.x + 1 + 2 * depth as u16;
             let x = c.put(x, y, &name, style.bg(bg));
             if let tree::Entry::File { file, .. } = entry {
                 if self.unsaved.contains(&self.files[*file].path) {
@@ -673,6 +666,32 @@ mod tests {
         r.draw_list(&mut Canvas::new(&mut buf, area), area);
         let row: String = (0..20).map(|x| buf[(x, 1)].symbol()).collect();
         assert_eq!(row, " a_long_file_ +2 −2 ");
+    }
+
+    #[test]
+    fn flagged_rows_are_tinted_the_picked_one_keeps_a_cell_and_only_a_closed_folder_is_tinted() {
+        use lgtm_core::store::{MarkColor, Store};
+        let mut store = Store::in_memory();
+        let mut r = Review::new(1, Target::Revset("@".into()));
+        let paths = ["src/a.rs", "src/b.rs", "z.rs"];
+        r.loaded(Ok((vec![], paths.map(|p| file(p, 2)).to_vec())));
+        let mut marks = super::super::marks::tests::marks_for(&paths);
+        marks
+            .toggle_files(&mut store, &[0, 1], MarkColor::Red)
+            .unwrap();
+        r.marks = Some(marks);
+        let area = Rect::new(0, 0, 20, 5);
+        let bgs = |r: &mut Review, y: u16, xs: [u16; 2]| {
+            let mut buf = Buffer::empty(area);
+            r.draw_list(&mut Canvas::new(&mut buf, area), area);
+            xs.map(|x| buf[(x, y)].bg)
+        };
+        assert_eq!(bgs(&mut r, 1, [0, 5]), [BG, BG]);
+        assert_eq!(bgs(&mut r, 2, [0, 5]), [RED, HAIR]);
+        assert_eq!(bgs(&mut r, 3, [0, 5]), [RED_ROW, RED_ROW]);
+        r.cursor = super::super::rows::find(&r.lines, (2, None, None));
+        r.closed_dirs.insert("src".into());
+        assert_eq!(bgs(&mut r, 1, [0, 5]), [RED_ROW, RED_ROW]);
     }
 
     #[test]
