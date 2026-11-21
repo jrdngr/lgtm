@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use gpui::{App, Context, Entity, Subscription, Window};
 
 use super::Workspace;
+use super::menu::For;
 use crate::agents::{Env, Kind, Seen};
 use crate::model::{Space, Split, Tab, TermId};
 use crate::procinfo;
@@ -76,6 +77,10 @@ impl Workspace {
             TermEvent::Changed => this.term_changed(id, cx),
             TermEvent::Link(link) => this.open_link(id, link, window, cx),
             TermEvent::Resized => cx.notify(),
+            TermEvent::Menu(at) => {
+                this.model.focus_term(id);
+                this.open_menu(For::Term(id), *at, window, cx);
+            }
         });
         let space_name = procinfo::space_name(cwd, self.home.as_deref());
         self.terms.insert(

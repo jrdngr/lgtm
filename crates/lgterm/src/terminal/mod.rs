@@ -61,6 +61,8 @@ pub enum TermEvent {
     Link(links::Link),
     /// Drawing gave it a new size.
     Resized,
+    /// Right-clicked here, in window coordinates.
+    Menu(gpui::Point<gpui::Pixels>),
 }
 
 /// A terminal's size in cells, and the cell size in pixels.
@@ -417,6 +419,11 @@ impl TermView {
             lines: self.lines.clone(),
         };
         Some((frame, grid))
+    }
+
+    /// Whether text is selected.
+    pub fn has_selection(&self) -> bool {
+        input::selection_text(&self.vt).is_some()
     }
 
     /// Copies the selection. With none, a program that reads every key, like the lgtm TUI,

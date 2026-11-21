@@ -172,6 +172,10 @@ impl TermView {
         cx: &mut Context<Self>,
     ) {
         window.focus(&self.focus, cx);
+        if ev.button == MouseButton::Right {
+            cx.emit(TermEvent::Menu(ev.position));
+            return;
+        }
         if ev.modifiers.platform
             && ev.button == MouseButton::Left
             && let Some(link) = self.link_at(ev.position)

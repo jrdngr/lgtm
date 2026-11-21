@@ -1,7 +1,7 @@
-//! Right-click menus: a tab bar's, a space's, an empty slot's, and a layout's.
+//! Right-click menus: a terminal's, a tab bar's, a space's, an empty slot's, and a layout's.
 
 use gpui::{
-    AnyElement, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
+    AnyElement, App, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
     Point, StatefulInteractiveElement, Styled, Window, anchored, deferred, div, px, rgb,
 };
 
@@ -11,12 +11,14 @@ use super::overlay::Overlay;
 use super::rename::Target;
 use crate::agents::Kind;
 use crate::ipc::Place;
-use crate::model::{COLORS, LayoutId, Model, SlotId, SpaceId, SplitId};
+use crate::model::{COLORS, LayoutId, Model, SlotId, SpaceId, SplitId, TermId};
+use crate::terminal::{Copy, Paste};
 use crate::theme;
 
 /// What a menu is for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum For {
+    Term(TermId),
     Tabs(SplitId),
     /// A space, and the slot whose title it was opened on.
     Space(SpaceId, Option<SlotId>),
@@ -32,6 +34,12 @@ pub struct Menu {
 
 #[derive(Clone, Copy)]
 enum Item {
+    Copy,
+    Paste,
+    SplitRight,
+    SplitDown,
+    Find,
+    CloseTab,
     NewTerminal,
     NewAgent(Kind),
     NewSpace,
@@ -79,6 +87,18 @@ impl Workspace {
             return;
         };
         match (menu.target, item) {
+            (For::Term(_), _) => {
+                let action: Box<dyn gpui::Action> = match item {
+                    Item::Copy => Box::new(Copy),
+                    Item::Paste => Box::new(Paste),
+                    Item::SplitRight => Box::new(actions::SplitRight),
+                    Item::SplitDown => Box::new(actions::SplitDown),
+                    Item::Find => Box::new(actions::Find),
+                    _ => Box::new(actions::CloseTab),
+                };
+                self.focus_current(window, cx);
+                window.dispatch_action(action, cx);
+            }
             (For::Tabs(split), _) => {
                 self.model.focus_split(split);
                 let place = match item {
@@ -144,9 +164,35 @@ impl Workspace {
         cx.notify();
     }
 
-    fn items(&self, target: For) -> Vec<(Item, String, String)> {
+    fn items(&self, target: For, cx: &App) -> Vec<(Item, String, String)> {
         let named = |item, name: &str, command: &str| (item, name.to_owned(), key(command));
         match target {
+            For::Term(id) => {
+                let selected = self
+                    .terms
+                    .get(&id)
+                    .is_some_and(|t| t.view.read(cx).has_selection());
+                let mut items = Vec::new();
+                if selected {
+                    items.push((
+                        Item::Copy,
+                        "Copy".into(),
+                        actions::display("cmd-c").concat(),
+                    ));
+                }
+                items.extend([
+                    (
+                        Item::Paste,
+                        "Paste".into(),
+                        actions::display("cmd-v").concat(),
+                    ),
+                    named(Item::SplitRight, "Split right", "Split right"),
+                    named(Item::SplitDown, "Split down", "Split down"),
+                    named(Item::Find, "Find", "Find"),
+                    named(Item::CloseTab, "Close tab", "Close tab"),
+                ]);
+                items
+            }
             For::Tabs(_) => vec![
                 named(Item::NewTerminal, "New terminal", "New tab"),
                 named(Item::NewAgent(Kind::Claude), "New claude", ""),
@@ -184,7 +230,7 @@ impl Workspace {
         };
         let target = menu.target;
         let rows = self
-            .items(target)
+            .items(target, cx)
             .into_iter()
             .enumerate()
             .map(|(i, (item, name, key))| {
