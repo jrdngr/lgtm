@@ -4,6 +4,7 @@ mod inline;
 mod render;
 mod select;
 mod table;
+mod wrap;
 
 pub use inline::spans as inline;
 

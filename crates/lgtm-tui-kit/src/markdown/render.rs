@@ -3,6 +3,7 @@
 use pulldown_cmark::{Alignment, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use ratatui::style::{Color, Modifier, Style};
 
+use super::wrap::wrap;
 use super::{CODE, table};
 use crate::highlight;
 use crate::theme::{self, ACCENT, BG, BLANK, FAINT, FG, GREEN, HAIR, PANEL};
@@ -384,40 +385,8 @@ impl Renderer {
         }
         let runs = std::mem::take(&mut self.runs);
         let src = runs[0].1;
-        let words = words(runs.into_iter().map(|(r, _)| r));
-        let mut line: Vec<Run> = vec![];
-        let mut used = 0;
         let avail = self.width.saturating_sub(self.prefix_width()).max(4);
-        for word in words {
-            let w: usize = word.iter().map(Run::width).sum();
-            let space = word.first().is_some_and(|r| r.text.starts_with(' '));
-            if used + w > avail && used > 0 {
-                self.emit(std::mem::take(&mut line), src, None);
-                used = 0;
-            }
-            for mut run in word {
-                if used == 0 && space {
-                    run.text = run.text.trim_start().to_string();
-                }
-                // A word wider than the line is cut across lines.
-                while used + run.width() > avail {
-                    let take = avail - used;
-                    let head: String = run.text.chars().take(take).collect();
-                    run.text = run.text.chars().skip(take).collect();
-                    line.push(Run {
-                        text: head,
-                        ..run.clone()
-                    });
-                    self.emit(std::mem::take(&mut line), src, None);
-                    used = 0;
-                }
-                used += run.width();
-                if !run.text.is_empty() {
-                    line.push(run);
-                }
-            }
-        }
-        if !line.is_empty() {
+        for line in wrap(runs.into_iter().map(|(r, _)| r), avail) {
             self.emit(line, src, None);
         }
     }
@@ -500,29 +469,6 @@ fn heading_style(level: HeadingLevel) -> Style {
         _ => FG,
     };
     theme::bold(color).bg(BG)
-}
-
-/// Runs split into words, each a list of runs with the space before it.
-fn words(runs: impl Iterator<Item = Run>) -> Vec<Vec<Run>> {
-    let mut out: Vec<Vec<Run>> = vec![vec![]];
-    for run in runs {
-        let mut piece = String::new();
-        for ch in run.text.chars() {
-            if ch == ' ' && !piece.trim().is_empty() {
-                out.last_mut().unwrap().push(Run {
-                    text: std::mem::take(&mut piece),
-                    ..run.clone()
-                });
-                out.push(vec![]);
-            }
-            piece.push(ch);
-        }
-        if !piece.is_empty() {
-            out.last_mut().unwrap().push(Run { text: piece, ..run });
-        }
-    }
-    out.retain(|w| !w.is_empty());
-    out
 }
 
 /// Highlights `text` as code in `lang`, by the file extension it goes by.

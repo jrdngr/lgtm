@@ -76,7 +76,7 @@ fn quotes_keep_their_bar_on_every_line_between_paragraphs() {
 }
 
 #[test]
-fn tables_line_up_their_columns_and_cut_cells_that_cannot_fit() {
+fn tables_line_up_their_columns_and_wrap_cells_that_cannot_fit() {
     let md = "| name | n |\n|---|--:|\n| alpha | 1 |\n| b | 22 |\n";
     assert_eq!(
         texts(md, 40),
@@ -88,7 +88,19 @@ fn tables_line_up_their_columns_and_cut_cells_that_cannot_fit() {
         ]
     );
     // The bar and spaces take five of eleven columns, which leaves three for each.
-    assert_eq!(texts(md, 11)[2], " al… │   1");
+    assert_eq!(
+        texts(md, 11),
+        [
+            " nam │   n",
+            " e   │",
+            "─────┼─────",
+            " alp │   1",
+            " ha  │",
+            " b   │  22",
+        ]
+    );
+    let md = "| who | does |\n|---|---|\n| ci | runs the tests |\n";
+    assert_eq!(&texts(md, 16)[2..], [" ci  │ runs the", "     │ tests"]);
 }
 
 #[test]
