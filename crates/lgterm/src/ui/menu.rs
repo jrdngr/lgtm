@@ -171,7 +171,7 @@ impl Workspace {
                 let selected = self
                     .terms
                     .get(&id)
-                    .is_some_and(|t| t.view.read(cx).has_selection());
+                    .is_some_and(|t| t.view.read(cx).can_copy());
                 let mut items = Vec::new();
                 if selected {
                     items.push((

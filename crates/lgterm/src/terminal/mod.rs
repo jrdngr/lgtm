@@ -421,9 +421,15 @@ impl TermView {
         Some((frame, grid))
     }
 
-    /// Whether text is selected.
-    pub fn has_selection(&self) -> bool {
-        input::selection_text(&self.vt).is_some()
+    /// Whether ⌘C copies something: text selected here, or a program that keeps its own
+    /// selection and takes ⌘C for it.
+    pub fn can_copy(&self) -> bool {
+        input::selection_text(&self.vt).is_some() || self.takes_copy_key()
+    }
+
+    /// Whether the program reads ⌘C itself: it asked for kitty keys.
+    fn takes_copy_key(&self) -> bool {
+        self.vt.kitty_keyboard_flags().is_ok_and(|f| !f.is_empty())
     }
 
     /// Copies the selection. With none, a program that reads every key, like the lgtm TUI,
@@ -431,7 +437,7 @@ impl TermView {
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = input::selection_text(&self.vt) {
             cx.write_to_clipboard(ClipboardItem::new_string(text));
-        } else if self.vt.kitty_keyboard_flags().is_ok_and(|f| !f.is_empty())
+        } else if self.takes_copy_key()
             && let Ok(k) = gpui::Keystroke::parse("cmd-c")
         {
             self.send_key(&k, false, cx);
