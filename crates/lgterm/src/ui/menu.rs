@@ -1,4 +1,4 @@
-//! Right-click menus: a terminal's, a tab bar's, a space's, an empty slot's, and a layout's.
+//! Right-click menus: a terminal's, a tab's, a tab bar's, a space's, an empty slot's, and a layout's.
 
 use gpui::{
     AnyElement, App, Context, InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels,
@@ -11,7 +11,7 @@ use super::overlay::Overlay;
 use super::rename::Target;
 use crate::agents::Kind;
 use crate::ipc::Place;
-use crate::model::{COLORS, LayoutId, Model, SlotId, SpaceId, SplitId, TermId};
+use crate::model::{COLORS, LayoutId, Model, SlotId, SpaceId, SplitId, Tab, TermId};
 use crate::terminal::{Copy, Paste};
 use crate::theme;
 
@@ -19,6 +19,7 @@ use crate::theme;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum For {
     Term(TermId),
+    Tab(TermId),
     Tabs(SplitId),
     /// A space, and the slot whose title it was opened on.
     Space(SpaceId, Option<SlotId>),
@@ -99,6 +100,11 @@ impl Workspace {
                 self.focus_current(window, cx);
                 window.dispatch_action(action, cx);
             }
+            (For::Tab(id), Item::Rename) => {
+                let text = self.term_label(Tab::Term(id));
+                self.start_rename(Target::Term(id), text, window, cx);
+            }
+            (For::Tab(id), Item::CloseTab) => self.close(Tab::Term(id), window, cx),
             (For::Tabs(split), _) => {
                 self.model.focus_split(split);
                 let place = match item {
@@ -193,6 +199,10 @@ impl Workspace {
                 ]);
                 items
             }
+            For::Tab(_) => vec![
+                named(Item::Rename, "Rename", ""),
+                named(Item::CloseTab, "Close tab", ""),
+            ],
             For::Tabs(_) => vec![
                 named(Item::NewTerminal, "New terminal", "New tab"),
                 named(Item::NewAgent(Kind::Claude), "New claude", ""),

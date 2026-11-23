@@ -33,6 +33,10 @@ impl Model {
         self.names.insert(term, name);
     }
 
+    pub fn clear_name(&mut self, term: TermId) {
+        self.names.remove(&term);
+    }
+
     /// Drops a closed terminal's name and place among the openers. What it opened passes to
     /// its own opener, so that one can still close them.
     pub fn forget(&mut self, term: TermId) {

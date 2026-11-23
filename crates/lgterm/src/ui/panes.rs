@@ -408,7 +408,10 @@ impl Workspace {
                     .when(numbered && i < 9, |d| {
                         d.child(badge::chip(i + 1).ml(px(-3.)))
                     })
-                    .child(self.term_label(tab))
+                    .child(match tab {
+                        Tab::Term(t) => self.tab_name(t, self.term_label(tab), cx),
+                        Tab::Messages => self.term_label(tab).into_any_element(),
+                    })
                     .children(
                         tab.term()
                             .and_then(|t| self.agents.shown(t))
@@ -427,6 +430,15 @@ impl Workspace {
                                     cx.stop_propagation();
                                     w.close(tab, window, cx)
                                 })),
+                        )
+                    })
+                    .when_some(tab.term(), |d, t| {
+                        d.on_mouse_down(
+                            MouseButton::Right,
+                            cx.listener(move |w, ev: &MouseDownEvent, window, cx| {
+                                cx.stop_propagation();
+                                w.open_menu(For::Tab(t), ev.position, window, cx)
+                            }),
                         )
                     })
                     .on_click(cx.listener(move |w, ev: &ClickEvent, window, cx| {

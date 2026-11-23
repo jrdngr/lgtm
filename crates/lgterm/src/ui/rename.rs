@@ -1,16 +1,21 @@
-//! Renaming a layout or space in place in the sidebar.
+//! Renaming a layout or space in place in the sidebar, or a tab in its tab bar.
 
-use gpui::{Context, FocusHandle, KeyDownEvent, Subscription, Window};
+use gpui::{
+    AnyElement, Context, FocusHandle, InteractiveElement, IntoElement, KeyDownEvent, ParentElement,
+    SharedString, Styled, Subscription, Window, div, px, rgb,
+};
 
 use super::Workspace;
 use super::overlay::Overlay;
 use crate::field::{self, Key};
-use crate::model::{LayoutId, SpaceId};
+use crate::model::{LayoutId, SpaceId, TermId};
+use crate::theme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
     Layout(LayoutId),
     Space(SpaceId),
+    Term(TermId),
 }
 
 pub struct Rename {
@@ -47,8 +52,8 @@ impl Workspace {
         cx.notify();
     }
 
-    /// Saves the name being typed. An empty space name goes back to following the folder; an
-    /// empty layout name keeps the old one.
+    /// Saves the name being typed. An empty space or tab name goes back to the one it follows;
+    /// an empty layout name keeps the old one.
     pub(super) fn finish_rename(&mut self, save: bool) {
         if !matches!(self.overlay, Some(Overlay::Rename(_))) {
             return;
@@ -73,6 +78,10 @@ impl Workspace {
                     s.name = name;
                 }
             }
+            Target::Term(id) => match name {
+                Some(name) => self.model.set_name(id, name),
+                None => self.model.clear_name(id),
+            },
         }
     }
 
@@ -83,6 +92,26 @@ impl Workspace {
         if !self.sidebar_icons() {
             let id = self.model.layout().id;
             self.start_rename(Target::Layout(id), String::new(), window, cx);
+        }
+    }
+
+    /// A tab's name, or the field renaming it.
+    pub(super) fn tab_name(
+        &self,
+        term: TermId,
+        label: String,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        match self.renaming().filter(|r| r.target == Target::Term(term)) {
+            Some(r) => div()
+                .flex()
+                .items_center()
+                .track_focus(&r.focus)
+                .on_key_down(cx.listener(Self::rename_key))
+                .child(SharedString::from(r.text.clone()))
+                .child(div().w(px(1.5)).h(theme::ui(15.)).bg(rgb(theme::FOCUS)))
+                .into_any_element(),
+            None => label.into_any_element(),
         }
     }
 
