@@ -843,9 +843,9 @@ impl Review {
             ];
         }
         let (review, flag) = if shift {
-            (("R", "review hunk", false), ("F", "flag hunk", false))
+            (("R", "hunk reviewed", false), ("F", "hunk flagged", false))
         } else {
-            (("r", "review file", false), ("f", "flag file", false))
+            (("r", "file reviewed", false), ("f", "file flagged", false))
         };
         if let Some(c) = self.comment_at_cursor().and_then(|n| self.comment(n)) {
             let resolve = if c.done { "reopen" } else { "resolve" };
@@ -862,15 +862,10 @@ impl Review {
         }
         let mut hints = vec![
             ("space", "menu", false),
-            ("n N", "file", false),
-            ("m M", "item", false),
             review,
             flag,
             ("c", "comment", false),
-            ("t", "split", self.split),
-            ("u U", "undo", false),
             ("v", "select", false),
-            ("z", "hide reviewed", self.group_reviewed),
         ];
         if self.pr.is_some() {
             hints.push(("P", "hide PR", self.hide_pr));
