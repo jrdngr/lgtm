@@ -135,6 +135,8 @@ pub struct Review {
     show_resolved: bool,
     /// A failure to show until the next key.
     pub notice: Option<String>,
+    /// When the pull of PR threads still running started.
+    pub pulling: Option<std::time::Instant>,
     /// Whether `space` was pressed, for its menu.
     space: bool,
     /// Whether `space m` waits for a mode's key.
@@ -295,6 +297,7 @@ impl Review {
             hide_pr: false,
             show_resolved: false,
             notice: None,
+            pulling: None,
             space: false,
             mode_menu: false,
             divider: Default::default(),

@@ -50,6 +50,11 @@ use theme::{CYAN, PANEL, RED};
 /// The frames of the spinner a running jj action shows.
 const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
+/// The spinner's frame for work that started at `since`.
+pub fn spinner(since: Instant) -> &'static str {
+    SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()]
+}
+
 /// The store of the repo the workspace at `root` belongs to.
 pub fn store(root: &Path) -> Option<Store> {
     paths::data_dir()
@@ -142,6 +147,7 @@ pub fn run(start: Start, pr: Option<String>) -> i32 {
         screen: Screen::Editor,
         editor_back: None,
         review_back: None,
+        pull_pr: pr.is_some(),
         pr,
         prs: HashMap::new(),
         help: None,
@@ -230,6 +236,8 @@ struct App {
     review_back: Option<Screen>,
     /// The PR given on the command line, whose threads `p` pulls.
     pr: Option<String>,
+    /// Whether to pull that PR's threads once the first review loads.
+    pull_pr: bool,
     /// The PR pulled for each review, by its name.
     prs: HashMap<String, (String, u32)>,
     help: Option<help::Help>,
@@ -465,6 +473,10 @@ impl App {
             Msg::Diff { id, result } => {
                 if let Some(r) = self.review.as_mut().filter(|r| r.id == id) {
                     r.loaded(result);
+                    if std::mem::take(&mut self.pull_pr) {
+                        r.pulling = Some(Instant::now());
+                        self.loader.pull(r.id, self.pr.clone(), r.bookmarks());
+                    }
                     if let Some(store) = self.store.as_ref() {
                         r.load_comments(store);
                     }
@@ -515,10 +527,11 @@ impl App {
                 }
             }
             Msg::Pulled { id, result } => {
-                if let (Some(r), Some(store)) = (
-                    self.review.as_mut().filter(|r| r.id == id),
-                    self.store.as_ref(),
-                ) {
+                let Some(r) = self.review.as_mut().filter(|r| r.id == id) else {
+                    return;
+                };
+                r.pulling = None;
+                if let Some(store) = self.store.as_ref() {
                     r.pulled(store, result);
                     if let Some(pr) = r.pr() {
                         self.prs.insert(r.revset.clone(), pr.clone());
@@ -641,6 +654,7 @@ impl App {
                 }
                 review::Outcome::Pull => {
                     let pr = r.pr().map(|(_, n)| n.to_string()).or(self.pr.clone());
+                    r.pulling = Some(Instant::now());
                     self.loader.pull(r.id, pr, r.bookmarks());
                 }
                 review::Outcome::Mention(text) => self.mention(text),
@@ -700,10 +714,9 @@ impl App {
         };
         r.unsaved = unsaved;
         if self.drawer.is_open() {
-            self.drawer.busy = self.busy.map(|(doing, since)| {
-                let frame = SPINNER[(since.elapsed().as_millis() / 100) as usize % SPINNER.len()];
-                format!("{frame} {doing}…")
-            });
+            self.drawer.busy = self
+                .busy
+                .map(|(doing, since)| format!("{} {doing}…", spinner(since)));
             draw_with_drawer(c, r, &mut self.drawer, self.help.as_mut());
             return;
         }

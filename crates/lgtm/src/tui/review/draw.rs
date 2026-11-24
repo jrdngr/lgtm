@@ -56,8 +56,17 @@ impl Review {
             vec![Piece::new(2, notice.clone(), theme::fg(RED).bg(PANEL))]
         } else {
             let mut right = Vec::new();
+            if let Some(since) = self.pulling {
+                let spin = crate::tui::spinner(since);
+                right.push(Piece::new(
+                    2,
+                    format!("{spin} pulling PR"),
+                    theme::fg(CYAN).bg(PANEL),
+                ));
+            }
             if let Some((_, n)) = &self.pr {
-                right.push(Piece::new(2, format!("#{n}"), theme::fg(CYAN).bg(PANEL)));
+                let gap = if right.is_empty() { 2 } else { 3 };
+                right.push(Piece::new(gap, format!("#{n}"), theme::fg(CYAN).bg(PANEL)));
             }
             if let Some(p) = self.percent() {
                 let gap = if right.is_empty() { 2 } else { 3 };
