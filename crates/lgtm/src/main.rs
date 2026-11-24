@@ -19,9 +19,6 @@ fn main() {
     args.retain(|a| a != tui::SPLIT_FLAG);
     let code = match args.first().map(String::as_str) {
         Some("agent") => agent_cmd::run(args[1..].to_vec()),
-        // Claude Code settings from before `lgtm agent hook` run this until lgtm next starts
-        // and rewrites them. A file named `hook` would open in its place, without a terminal.
-        Some("hook") if args.len() == 1 => route::hook(),
         Some("review") => review(args[1..].to_vec()),
         Some("issues") => issues(args[1..].to_vec()),
         Some("resolve") => match args.get(1) {
