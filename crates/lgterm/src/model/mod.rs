@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 pub use ids::{LayoutId, SlotId, SpaceId, SplitId, Tab, TermId};
 pub use moves::{Side, WindowDrop};
-pub use tree::{Axis, Dir, Keyed, Rect, Tree};
+pub use tree::{Axis, Dir, End, Keyed, Rect, Tree};
 
 /// How many space colors there are.
 pub const COLORS: usize = 8;

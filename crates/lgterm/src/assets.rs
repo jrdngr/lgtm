@@ -37,6 +37,14 @@ const FILES: &[(&str, &[u8])] = &[
     ("ui/fold.svg", include_bytes!("../icons/ui/fold.svg")),
     ("ui/unfold.svg", include_bytes!("../icons/ui/unfold.svg")),
     (
+        "ui/fold-middle.svg",
+        include_bytes!("../icons/ui/fold-middle.svg"),
+    ),
+    (
+        "ui/unfold-middle.svg",
+        include_bytes!("../icons/ui/unfold-middle.svg"),
+    ),
+    (
         "ui/terminal.svg",
         include_bytes!("../icons/ui/terminal.svg"),
     ),

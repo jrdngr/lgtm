@@ -12,9 +12,9 @@ use super::branch::{Kid, Owner};
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::tab_drag::{self, DragsTab, TAB_STRIP};
-use super::{MovesWindow, Workspace, badge, expand};
+use super::{MovesWindow, Workspace, badge, expand, folded};
 use crate::ipc::Place;
-use crate::model::{Slot, SlotId, Space, Split, SplitId, Tab, Tree};
+use crate::model::{Axis, End, Slot, SlotId, Space, Split, SplitId, Tab, Tree};
 use crate::theme;
 
 /// A space's title height.
@@ -331,7 +331,8 @@ impl Workspace {
                             let el = self.split_tree(&c.tree, color, focused, owner, path, cx);
                             (None, el)
                         } else {
-                            let (len, el) = self.folded(&c.tree.leaves(), *axis, cx);
+                            let at = (*axis, End::of(i, children.len()));
+                            let (len, el) = self.folded(&c.tree.leaves(), at, cx);
                             (Some(len), el)
                         };
                         Kid {
@@ -355,12 +356,16 @@ impl Workspace {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
-        let foldable = self
+        // Where it folds to; none when it's the last split shown in its space.
+        let fold_to = self
             .model
             .spaces
             .iter()
             .find(|s| s.splits.contains(split_id))
-            .is_some_and(|s| s.splits.leaves().iter().filter(|l| !l.collapsed).count() > 1);
+            .and_then(|s| {
+                s.splits
+                    .fold_place(split_id, &|l: &Split| !l.collapsed && l.id != split_id)
+            });
         self.fit_hidden(split, cx);
         let body = match split.tab() {
             Tab::Messages => Some(
@@ -534,7 +539,7 @@ impl Workspace {
                             .child(plus),
                     )
                     .child(grip(split_id, whole, whole_label))
-                    .when(foldable, |d| d.child(fold_button(split_id, cx)))
+                    .when_some(fold_to, |d, to| d.child(fold_button(split_id, to, cx)))
                     .child(expand::button(
                         ("zoom-split", split_id.0),
                         format!("tab-bar-{}", split_id.0),
@@ -572,9 +577,10 @@ fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
 }
 
 /// The button that takes a split out of its space.
-fn fold_button(split: SplitId, cx: &mut Context<Workspace>) -> impl IntoElement {
+fn fold_button(split: SplitId, to: (Axis, End), cx: &mut Context<Workspace>) -> impl IntoElement {
     expand::fold(
         ("fold-split", split.0),
+        folded::icon(to, false),
         format!("tab-bar-{}", split.0),
         cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.fold(split))),
     )

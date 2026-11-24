@@ -5,7 +5,7 @@
 use gpui::prelude::FluentBuilder;
 use gpui::{
     App, ClickEvent, ElementId, InteractiveElement, IntoElement, MouseButton, ParentElement,
-    StatefulInteractiveElement, Styled, Window, div, px, rgb, svg,
+    StatefulInteractiveElement, Styled, Transformation, Window, div, px, radians, rgb, svg,
 };
 
 use crate::theme;
@@ -45,10 +45,11 @@ pub fn lock(
 /// A split's fold button, shown while the pointer is over the element of group `parent`.
 pub fn fold(
     id: impl Into<ElementId>,
+    (icon, turn): (&'static str, f32),
     parent: String,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    icon_button(id, parent, "ui/fold.svg", false, on_click)
+    turned_button(id, parent, icon, turn, on_click)
 }
 
 /// A slot's magnet, shown while the pointer is over the element of group `parent`, or always
@@ -70,6 +71,18 @@ pub fn add(
     icon_button(id, String::new(), "ui/plus.svg", true, on_click)
 }
 
+/// `icon` turned by `turn` radians, as a button that shows while the pointer is over
+/// `parent`.
+fn turned_button(
+    id: impl Into<ElementId>,
+    parent: String,
+    icon: &'static str,
+    turn: f32,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    button_with(id, parent, icon, false, turn, on_click)
+}
+
 /// `icon` as a button: bright and always shown when `on`, else dim and shown while the pointer is
 /// over `parent`.
 fn icon_button(
@@ -77,6 +90,17 @@ fn icon_button(
     parent: String,
     icon: &'static str,
     on: bool,
+    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+) -> impl IntoElement {
+    button_with(id, parent, icon, on, 0., on_click)
+}
+
+fn button_with(
+    id: impl Into<ElementId>,
+    parent: String,
+    icon: &'static str,
+    on: bool,
+    turn: f32,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
     let id = id.into();
@@ -97,6 +121,7 @@ fn icon_button(
         .cursor_pointer()
         .group(group.clone())
         .child(svg().path(icon).size(px(14.)).map(|s| {
+            let s = s.with_transformation(Transformation::rotate(radians(turn)));
             if on {
                 s.text_color(rgb(theme::ICON_ON))
             } else {

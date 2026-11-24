@@ -13,7 +13,7 @@ use super::Workspace;
 use super::menu::For;
 use super::sidebar::agent_icon;
 use super::tab_drag::TAB_STRIP;
-use crate::model::{Axis, Split, Tab};
+use crate::model::{Axis, End, Split, Tab};
 use crate::theme;
 
 /// How wide a strip of folded splits is.
@@ -25,9 +25,10 @@ impl Workspace {
     pub(super) fn folded(
         &self,
         splits: &[&Split],
-        axis: Axis,
+        (axis, end): (Axis, End),
         cx: &mut Context<Self>,
     ) -> (Pixels, AnyElement) {
+        let (icon, turn) = icon((axis, end), true);
         let ids: Vec<_> = splits.iter().map(|s| s.id).collect();
         let key = ids.first().map_or(0, |s| s.0);
         let row = axis == Axis::Row;
@@ -43,14 +44,10 @@ impl Workspace {
             .hover(|s| s.bg(rgb(theme::ROW_HOVER)))
             .child(
                 svg()
-                    .path("ui/unfold.svg")
+                    .path(icon)
                     .size(px(14.))
                     .text_color(rgb(theme::ICON))
-                    .when(row, |s| {
-                        s.with_transformation(Transformation::rotate(radians(
-                            -std::f32::consts::FRAC_PI_2,
-                        )))
-                    }),
+                    .with_transformation(Transformation::rotate(radians(turn))),
             )
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(cx.listener(move |w, _, window, cx| {
@@ -182,6 +179,26 @@ impl Workspace {
                 w.focus_current(window, cx);
             }))
     }
+}
+
+/// The icon for folding toward `to`, or for opening back from it, and the turn that points it
+/// that way: its arrow points where the split goes.
+pub(super) fn icon((axis, end): (Axis, End), open: bool) -> (&'static str, f32) {
+    use std::f32::consts::{FRAC_PI_2, PI};
+    let path = match (end, open) {
+        (End::Middle, false) => "ui/fold-middle.svg",
+        (End::Middle, true) => "ui/unfold-middle.svg",
+        (_, false) => "ui/fold.svg",
+        (_, true) => "ui/unfold.svg",
+    };
+    // Unturned, the bar is on top: a top split folds up and opens down.
+    let turn = match (axis, end) {
+        (Axis::Column, End::Start | End::Middle) => 0.,
+        (Axis::Column, End::End) => PI,
+        (Axis::Row, End::Start) => -FRAC_PI_2,
+        (Axis::Row, End::Middle | End::End) => FRAC_PI_2,
+    };
+    (path, turn)
 }
 
 /// The line before each folded split's tabs, across the bar or strip.

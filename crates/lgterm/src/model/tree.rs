@@ -19,6 +19,26 @@ pub enum Dir {
     Down,
 }
 
+/// Where a child sits among its branch's children: first, last, or between.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum End {
+    Start,
+    Middle,
+    End,
+}
+
+impl End {
+    pub fn of(index: usize, count: usize) -> End {
+        if index == 0 {
+            End::Start
+        } else if index + 1 >= count {
+            End::End
+        } else {
+            End::Middle
+        }
+    }
+}
+
 /// A leaf with a stable id.
 pub trait Keyed {
     type Key: Copy + Eq;
@@ -72,6 +92,33 @@ impl<T: Keyed> Tree<T> {
         match self {
             Tree::Leaf(leaf) => (leaf.key() == key).then_some(leaf),
             Tree::Branch { children, .. } => children.iter_mut().find_map(|c| c.tree.find_mut(key)),
+        }
+    }
+
+    /// Where the leaf `key` folds to, given which leaves stay `open`: the axis of the nearest
+    /// branch that keeps an open child beside the one holding `key`, and where that child sits.
+    pub fn fold_place(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<(Axis, End)> {
+        self.fold_walk(key, open).flatten()
+    }
+
+    /// `None` when `key` isn't here; `Some(None)` when nothing else here stays open.
+    fn fold_walk(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<Option<(Axis, End)>> {
+        match self {
+            Tree::Leaf(leaf) => (leaf.key() == key).then_some(None),
+            Tree::Branch { axis, children } => {
+                let (i, found) = children
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, c)| Some((i, c.tree.fold_walk(key, open)?)))?;
+                if found.is_some() {
+                    return Some(found);
+                }
+                let others = children
+                    .iter()
+                    .enumerate()
+                    .any(|(j, c)| j != i && c.tree.any(open));
+                Some(others.then(|| (*axis, End::of(i, children.len()))))
+            }
         }
     }
 
@@ -332,6 +379,23 @@ mod tests {
 
     fn keys(t: &Tree<L>) -> Vec<u64> {
         t.leaves().iter().map(|l| l.0).collect()
+    }
+
+    #[test]
+    fn a_leaf_folds_toward_its_end_of_the_nearest_branch_left_with_an_open_child() {
+        let mut t = Tree::Leaf(L(1));
+        t.insert(1, L(2), Axis::Row).unwrap();
+        t.insert(2, L(4), Axis::Row).unwrap();
+        t.insert(2, L(3), Axis::Column).unwrap();
+        assert_eq!(keys(&t), [1, 2, 3, 4]);
+        let all = |k: u64| move |l: &L| l.0 != k;
+        assert_eq!(t.fold_place(1, &all(1)), Some((Axis::Row, End::Start)));
+        assert_eq!(t.fold_place(4, &all(4)), Some((Axis::Row, End::End)));
+        assert_eq!(t.fold_place(2, &all(2)), Some((Axis::Column, End::Start)));
+        assert_eq!(t.fold_place(3, &all(3)), Some((Axis::Column, End::End)));
+        let two_folded = |l: &L| l.0 != 2 && l.0 != 3;
+        assert_eq!(t.fold_place(3, &two_folded), Some((Axis::Row, End::Middle)));
+        assert_eq!(Tree::Leaf(L(1)).fold_place(1, &all(1)), None);
     }
 
     #[test]
