@@ -39,13 +39,14 @@ fn main() {
     std::process::exit(code);
 }
 
-/// `lgtm review [-r <revset>] [--pr <pr>]`: the working copy, a revset, or a PR's revisions.
+/// `lgtm review [-r <revset>] [-p, --pr <pr>]`: the working copy, a revset, or a PR's revisions.
 fn review(mut args: Vec<String>) -> i32 {
-    let pr = take_flag(&mut args, "--pr", "a PR number or URL");
+    let pr = take_flag(&mut args, "--pr", "a PR number or URL")
+        .or_else(|| take_flag(&mut args, "-p", "a PR number or URL"));
     let revset = take_flag(&mut args, "-r", "a revset");
     if let Some(extra) = args.first() {
         eprintln!(
-            "lgtm: review takes -r and --pr, not `{extra}`\n\n{}",
+            "lgtm: review takes -r and -p/--pr, not `{extra}`\n\n{}",
             help::HELP
         );
         return 2;
