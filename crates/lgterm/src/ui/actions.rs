@@ -17,6 +17,7 @@ actions!(
         SplitSpaceDown,
         CloseSplit,
         ZoomSplit,
+        FoldSplit,
         ExpandSpace,
         DistributeSpaces,
         DistributeAllSpaces,
@@ -72,6 +73,7 @@ commands! {
     "Split window down", ["cmd-shift-n"], SplitSpaceDown;
     "Close split", ["cmd-shift-w"], CloseSplit;
     "Zoom split", ["cmd-shift-enter"], ZoomSplit;
+    "Fold split", ["cmd-."], FoldSplit;
     "Expand space", [], ExpandSpace;
     "Distribute selected spaces", [], DistributeSpaces;
     "Distribute all spaces", [], DistributeAllSpaces;

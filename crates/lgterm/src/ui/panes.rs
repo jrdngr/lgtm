@@ -8,7 +8,7 @@ use gpui::{
     div, px, rgb, rgba,
 };
 
-use super::branch::Owner;
+use super::branch::{Kid, Owner};
 use super::menu::For;
 use super::space_drag::{self, DragsSpace};
 use super::tab_drag::{self, DragsTab, TAB_STRIP};
@@ -83,7 +83,12 @@ impl Workspace {
                     .map(|(i, c)| {
                         let mut path = path.clone();
                         path.push(i);
-                        (i, c.weight, self.slot_tree(&c.tree, owner, path, cx))
+                        Kid {
+                            index: i,
+                            weight: c.weight,
+                            fixed: None,
+                            el: self.slot_tree(&c.tree, owner, path, cx),
+                        }
                     })
                     .collect();
                 self.branch(*axis, kids, owner, path, cx)
@@ -213,7 +218,6 @@ impl Workspace {
                     .overflow_hidden()
                     .child(label.clone()),
             )
-            .children(self.collapsed_button(space, cx))
             .child(div().flex_1())
             .children(on_right(vec![
                 (
@@ -316,19 +320,30 @@ impl Workspace {
                 self.card(split, outline, cx)
             }
             Tree::Branch { axis, children } => {
-                let mut kids: Vec<_> = children
+                let mut kids: Vec<Kid> = children
                     .iter()
                     .enumerate()
-                    .filter(|(_, c)| c.tree.any(&|s: &Split| !s.collapsed))
                     .map(|(i, c)| {
-                        let mut path = path.clone();
-                        path.push(i);
-                        let el = self.split_tree(&c.tree, color, focused, owner, path, cx);
-                        (i, c.weight, el)
+                        let open = c.tree.any(&|s: &Split| !s.collapsed);
+                        let (fixed, el) = if open {
+                            let mut path = path.clone();
+                            path.push(i);
+                            let el = self.split_tree(&c.tree, color, focused, owner, path, cx);
+                            (None, el)
+                        } else {
+                            let (len, el) = self.folded(&c.tree.leaves(), *axis, cx);
+                            (Some(len), el)
+                        };
+                        Kid {
+                            index: i,
+                            weight: c.weight,
+                            fixed,
+                            el,
+                        }
                     })
                     .collect();
                 if kids.len() == 1 {
-                    return kids.pop().expect("one").2;
+                    return kids.pop().expect("one").el;
                 }
                 self.branch(*axis, kids, owner, path, cx)
             }
@@ -340,7 +355,7 @@ impl Workspace {
         let split_id = split.id;
         let zoomed = self.model.spaces.iter().any(|s| s.zoom == Some(split_id));
         let numbered = outline.is_some() && self.held == super::Held::Ctrl;
-        let collapsible = self
+        let foldable = self
             .model
             .spaces
             .iter()
@@ -519,7 +534,7 @@ impl Workspace {
                             .child(plus),
                     )
                     .child(grip(split_id, whole, whole_label))
-                    .when(collapsible, |d| d.child(collapse_button(split_id, cx)))
+                    .when(foldable, |d| d.child(fold_button(split_id, cx)))
                     .child(expand::button(
                         ("zoom-split", split_id.0),
                         format!("tab-bar-{}", split_id.0),
@@ -557,11 +572,11 @@ fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
 }
 
 /// The button that takes a split out of its space.
-fn collapse_button(split: SplitId, cx: &mut Context<Workspace>) -> impl IntoElement {
-    expand::collapse(
-        ("collapse-split", split.0),
+fn fold_button(split: SplitId, cx: &mut Context<Workspace>) -> impl IntoElement {
+    expand::fold(
+        ("fold-split", split.0),
         format!("tab-bar-{}", split.0),
-        cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.collapse(split))),
+        cx.listener(move |w, _, window, cx| w.apply(window, cx, |m| m.fold(split))),
     )
 }
 

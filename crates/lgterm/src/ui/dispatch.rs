@@ -39,9 +39,7 @@ macro_rules! on_open {
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.spinning.set(false);
-        self.view_height = window.viewport_size().height.as_f32();
         window.set_rem_size(theme::ui(16.));
-        self.prune_collapsed();
         let mut el = div()
             .id("workspace")
             .key_context("Workspace")
@@ -55,7 +53,6 @@ impl Render for Workspace {
             .capture_key_down(cx.listener(Self::key_down))
             // A ⌘-click on a space's title picks it; any other click drops the picks.
             .capture_any_mouse_down(cx.listener(|w, ev: &gpui::MouseDownEvent, _, cx| {
-                w.collapsed_shut = false;
                 if !ev.modifiers.platform {
                     w.deselect(cx);
                 }
@@ -88,6 +85,7 @@ impl Render for Workspace {
         el = on_model!(el, cx, NextTab, |m| m.cycle_tab(1));
         el = on_model!(el, cx, PrevTab, |m| m.cycle_tab(-1));
         el = on_model!(el, cx, ZoomSplit, |m| m.toggle_zoom());
+        el = on_model!(el, cx, FoldSplit, |m| m.fold_focused());
         el = el.on_action(
             cx.listener(|w, _: &DistributeSpaces, win, cx| w.distribute(false, win, cx)),
         );

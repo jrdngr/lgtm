@@ -98,7 +98,8 @@ impl Split {
 }
 
 impl Space {
-    /// Its collapsed splits, in reading order.
+    /// Its folded splits, in reading order.
+    #[cfg(test)]
     pub fn collapsed(&self) -> Vec<&Split> {
         self.splits
             .leaves()
@@ -659,9 +660,8 @@ impl Model {
         }
     }
 
-    /// Takes a split out of its space, leaving it listed in the space's title. The last split
-    /// shown stays.
-    pub fn collapse(&mut self, split: SplitId) {
+    /// Folds a split down to its tabs. The last split shown in its space stays open.
+    pub fn fold(&mut self, split: SplitId) {
         let Some(space) = self.spaces.iter_mut().find(|s| s.splits.contains(split)) else {
             return;
         };
@@ -679,6 +679,29 @@ impl Model {
         }
         if space.focus == split {
             space.refocus();
+        }
+    }
+
+    /// Folds the focused split.
+    pub fn fold_focused(&mut self) {
+        if let Some(split) = self.split().map(|s| s.id) {
+            self.fold(split);
+        }
+    }
+
+    /// Opens folded splits again, focusing the first.
+    pub fn unfold(&mut self, splits: &[SplitId]) {
+        for &split in splits {
+            if let Some(s) = self
+                .spaces
+                .iter_mut()
+                .find_map(|s| s.splits.find_mut(split))
+            {
+                s.collapsed = false;
+            }
+        }
+        if let Some(&first) = splits.first() {
+            self.focus_split(first);
         }
     }
 

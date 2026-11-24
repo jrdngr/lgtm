@@ -42,13 +42,13 @@ pub fn lock(
     icon_button(id, parent, icon, locked, on_click)
 }
 
-/// A split's collapse button, shown while the pointer is over the element of group `parent`.
-pub fn collapse(
+/// A split's fold button, shown while the pointer is over the element of group `parent`.
+pub fn fold(
     id: impl Into<ElementId>,
     parent: String,
     on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
 ) -> impl IntoElement {
-    icon_button(id, parent, "ui/stack.svg", false, on_click)
+    icon_button(id, parent, "ui/fold.svg", false, on_click)
 }
 
 /// A slot's magnet, shown while the pointer is over the element of group `parent`, or always

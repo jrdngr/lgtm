@@ -618,7 +618,7 @@ fn moving_focus_skips_collapsed_splits_until_their_terminal_is_focused() {
     let (mut m, a) = Model::new();
     let b = m.split_split(Axis::Row);
     let c = m.split_split(Axis::Row);
-    m.collapse(split_of(&m, b));
+    m.fold(split_of(&m, b));
     m.focus_term(a);
     m.cycle_split(1);
     assert_eq!(m.term(), Some(c));
@@ -633,9 +633,9 @@ fn moving_focus_skips_collapsed_splits_until_their_terminal_is_focused() {
 fn collapsing_the_focused_split_moves_focus_and_the_last_shown_one_stays() {
     let (mut m, a) = Model::new();
     let b = m.split_split(Axis::Row);
-    m.collapse(split_of(&m, b));
+    m.fold(split_of(&m, b));
     assert_eq!(m.term(), Some(a));
-    m.collapse(split_of(&m, a));
+    m.fold(split_of(&m, a));
     assert!(!is_collapsed(&m, a));
     assert_eq!(m.term(), Some(a));
 }
@@ -644,8 +644,22 @@ fn collapsing_the_focused_split_moves_focus_and_the_last_shown_one_stays() {
 fn closing_the_last_shown_split_brings_back_a_collapsed_one() {
     let (mut m, a) = Model::new();
     let b = m.split_split(Axis::Column);
-    m.collapse(split_of(&m, b));
+    m.fold(split_of(&m, b));
     assert!(m.remove_tab(a.into()));
     assert_eq!(m.term(), Some(b));
     assert!(!is_collapsed(&m, b));
+}
+
+#[test]
+fn opening_folded_splits_shows_them_and_focuses_the_first() {
+    let (mut m, a) = Model::new();
+    let b = m.split_split(Axis::Column);
+    let c = m.split_split(Axis::Column);
+    m.focus_term(b);
+    m.fold_focused();
+    m.fold(split_of(&m, c));
+    assert_eq!(m.term(), Some(a));
+    m.unfold(&[split_of(&m, b), split_of(&m, c)]);
+    assert!(!is_collapsed(&m, b) && !is_collapsed(&m, c));
+    assert_eq!(m.term(), Some(b));
 }
