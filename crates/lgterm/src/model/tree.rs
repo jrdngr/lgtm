@@ -21,20 +21,20 @@ pub enum Dir {
 
 /// Where a child sits among its branch's children: first, last, or between.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum End {
+pub enum Spot {
     Start,
     Middle,
     End,
 }
 
-impl End {
-    pub fn of(index: usize, count: usize) -> End {
+impl Spot {
+    pub fn of(index: usize, count: usize) -> Spot {
         if index == 0 {
-            End::Start
+            Spot::Start
         } else if index + 1 >= count {
-            End::End
+            Spot::End
         } else {
-            End::Middle
+            Spot::Middle
         }
     }
 }
@@ -97,12 +97,12 @@ impl<T: Keyed> Tree<T> {
 
     /// Where the leaf `key` folds to, given which leaves stay `open`: the axis of the nearest
     /// branch that keeps an open child beside the one holding `key`, and where that child sits.
-    pub fn fold_place(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<(Axis, End)> {
+    pub fn fold_place(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<(Axis, Spot)> {
         self.fold_walk(key, open).flatten()
     }
 
     /// `None` when `key` isn't here; `Some(None)` when nothing else here stays open.
-    fn fold_walk(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<Option<(Axis, End)>> {
+    fn fold_walk(&self, key: T::Key, open: &impl Fn(&T) -> bool) -> Option<Option<(Axis, Spot)>> {
         match self {
             Tree::Leaf(leaf) => (leaf.key() == key).then_some(None),
             Tree::Branch { axis, children } => {
@@ -117,7 +117,7 @@ impl<T: Keyed> Tree<T> {
                     .iter()
                     .enumerate()
                     .any(|(j, c)| j != i && c.tree.any(open));
-                Some(others.then(|| (*axis, End::of(i, children.len()))))
+                Some(others.then(|| (*axis, Spot::of(i, children.len()))))
             }
         }
     }
@@ -389,12 +389,15 @@ mod tests {
         t.insert(2, L(3), Axis::Column).unwrap();
         assert_eq!(keys(&t), [1, 2, 3, 4]);
         let all = |k: u64| move |l: &L| l.0 != k;
-        assert_eq!(t.fold_place(1, &all(1)), Some((Axis::Row, End::Start)));
-        assert_eq!(t.fold_place(4, &all(4)), Some((Axis::Row, End::End)));
-        assert_eq!(t.fold_place(2, &all(2)), Some((Axis::Column, End::Start)));
-        assert_eq!(t.fold_place(3, &all(3)), Some((Axis::Column, End::End)));
+        assert_eq!(t.fold_place(1, &all(1)), Some((Axis::Row, Spot::Start)));
+        assert_eq!(t.fold_place(4, &all(4)), Some((Axis::Row, Spot::End)));
+        assert_eq!(t.fold_place(2, &all(2)), Some((Axis::Column, Spot::Start)));
+        assert_eq!(t.fold_place(3, &all(3)), Some((Axis::Column, Spot::End)));
         let two_folded = |l: &L| l.0 != 2 && l.0 != 3;
-        assert_eq!(t.fold_place(3, &two_folded), Some((Axis::Row, End::Middle)));
+        assert_eq!(
+            t.fold_place(3, &two_folded),
+            Some((Axis::Row, Spot::Middle))
+        );
         assert_eq!(Tree::Leaf(L(1)).fold_place(1, &all(1)), None);
     }
 

@@ -13,7 +13,7 @@ use super::Workspace;
 use super::menu::For;
 use super::sidebar::agent_icon;
 use super::tab_drag::TAB_STRIP;
-use crate::model::{Axis, End, Split, Tab};
+use crate::model::{Axis, Split, Spot, Tab};
 use crate::theme;
 
 /// How wide a strip of folded splits is.
@@ -25,7 +25,7 @@ impl Workspace {
     pub(super) fn folded(
         &self,
         splits: &[&Split],
-        (axis, end): (Axis, End),
+        (axis, end): (Axis, Spot),
         cx: &mut Context<Self>,
     ) -> (Pixels, AnyElement) {
         let (icon, turn) = icon((axis, end), true);
@@ -183,20 +183,20 @@ impl Workspace {
 
 /// The icon for folding toward `to`, or for opening back from it, and the turn that points it
 /// that way: its arrow points where the split goes.
-pub(super) fn icon((axis, end): (Axis, End), open: bool) -> (&'static str, f32) {
+pub(super) fn icon((axis, end): (Axis, Spot), open: bool) -> (&'static str, f32) {
     use std::f32::consts::{FRAC_PI_2, PI};
     let path = match (end, open) {
-        (End::Middle, false) => "ui/fold-middle.svg",
-        (End::Middle, true) => "ui/unfold-middle.svg",
+        (Spot::Middle, false) => "ui/fold-middle.svg",
+        (Spot::Middle, true) => "ui/unfold-middle.svg",
         (_, false) => "ui/fold.svg",
         (_, true) => "ui/unfold.svg",
     };
     // Unturned, the bar is on top: a top split folds up and opens down.
     let turn = match (axis, end) {
-        (Axis::Column, End::Start | End::Middle) => 0.,
-        (Axis::Column, End::End) => PI,
-        (Axis::Row, End::Start) => -FRAC_PI_2,
-        (Axis::Row, End::Middle | End::End) => FRAC_PI_2,
+        (Axis::Column, Spot::Start | Spot::Middle) => 0.,
+        (Axis::Column, Spot::End) => PI,
+        (Axis::Row, Spot::Start) => -FRAC_PI_2,
+        (Axis::Row, Spot::Middle | Spot::End) => FRAC_PI_2,
     };
     (path, turn)
 }

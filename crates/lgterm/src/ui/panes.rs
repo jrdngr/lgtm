@@ -14,7 +14,7 @@ use super::space_drag::{self, DragsSpace};
 use super::tab_drag::{self, DragsTab, TAB_STRIP};
 use super::{MovesWindow, Workspace, badge, expand, folded};
 use crate::ipc::Place;
-use crate::model::{Axis, End, Slot, SlotId, Space, Split, SplitId, Tab, Tree};
+use crate::model::{Axis, Slot, SlotId, Space, Split, SplitId, Spot, Tab, Tree};
 use crate::theme;
 
 /// A space's title height.
@@ -331,7 +331,7 @@ impl Workspace {
                             let el = self.split_tree(&c.tree, color, focused, owner, path, cx);
                             (None, el)
                         } else {
-                            let at = (*axis, End::of(i, children.len()));
+                            let at = (*axis, Spot::of(i, children.len()));
                             let (len, el) = self.folded(&c.tree.leaves(), at, cx);
                             (Some(len), el)
                         };
@@ -577,7 +577,7 @@ fn grip(split: SplitId, tabs: Vec<Tab>, label: String) -> impl IntoElement {
 }
 
 /// The button that takes a split out of its space.
-fn fold_button(split: SplitId, to: (Axis, End), cx: &mut Context<Workspace>) -> impl IntoElement {
+fn fold_button(split: SplitId, to: (Axis, Spot), cx: &mut Context<Workspace>) -> impl IntoElement {
     expand::fold(
         ("fold-split", split.0),
         folded::icon(to, false),
