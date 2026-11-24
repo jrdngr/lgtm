@@ -1,4 +1,4 @@
-//! What `lgtm review` passes to change a review.
+//! What `lgtm agent review` passes to change a review.
 
 use crate::store::MarkColor;
 

@@ -214,7 +214,7 @@ struct App {
     root: PathBuf,
     loader: Loader,
     _watcher: Option<notify::RecommendedWatcher>,
-    /// Where `lgtm review` learns which review this app shows.
+    /// Where `lgtm agent review` learns which review this app shows.
     shown: Option<open_review::Mine>,
     /// Whether the watcher snapshots edits, while the review shows the working copy.
     snapshots: Arc<AtomicBool>,
@@ -417,7 +417,7 @@ impl App {
         }
     }
 
-    /// Records which review this app shows, for `lgtm review`.
+    /// Records which review this app shows, for `lgtm agent review`.
     fn record_shown(&mut self) {
         let Some(mine) = self.shown.as_mut() else {
             return;

@@ -1,4 +1,4 @@
-//! Claude Code runs `lgtm hook`, which records the agent's turns and, in an lgterm terminal,
+//! Claude Code runs `lgtm agent hook`, which records the agent's turns and, in an lgterm terminal,
 //! passes the hook on to lgterm.
 
 pub fn hook() -> i32 {

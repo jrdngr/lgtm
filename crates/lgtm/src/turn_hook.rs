@@ -1,4 +1,4 @@
-//! `lgtm hook`: records the agent's turns in the store. It never fails, so it can't get in
+//! `lgtm agent hook`: records the agent's turns in the store. It never fails, so it can't get in
 //! Claude Code's way.
 
 use std::io::Read;

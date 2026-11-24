@@ -1,4 +1,4 @@
-//! The skill that points Claude Code and Codex at `lgtm review guide`.
+//! The skill that points Claude Code and Codex at `lgtm agent review guide`.
 
 use std::path::Path;
 
@@ -7,7 +7,7 @@ name: lgtm-review
 description: Use when the user mentions lgtm or its review, refers to review comments like C3 or P2, asks you to review a change in lgtm or says `lgtm flag review`, or asks for work in separate lgtm snapshots.
 ---
 
-Run `lgtm review guide` and follow it. It covers reading the review open in lgtm, the user's
+Run `lgtm agent review guide` and follow it. It covers reading the review open in lgtm, the user's
 comments and resolving them, checking files, marking lines, leaving comments, and snapshots.
 "#;
 

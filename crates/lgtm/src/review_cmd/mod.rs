@@ -1,4 +1,4 @@
-//! `lgtm review`: agents read and mark a review, and read and leave comments, in the store
+//! `lgtm agent review`: agents read and mark a review, and read and leave comments, in the store
 //! the app shows.
 
 mod args;
@@ -11,15 +11,15 @@ use lgtm_core::review::agent::{AddComment, AgentMark, CheckFiles, MarkLines, aut
 use crate::agent::Request;
 use args::Args;
 
-const USAGE: &str = "usage: lgtm review [-r <revset>]
-       lgtm review check [-r <revset>] [--uncheck] <path>...
-       lgtm review mark [-r <revset>] <path> [<lines>] [--removed <lines>] --reviewed|--flagged|--clear
-       lgtm review comments [-r <revset>]
-       lgtm review comment [-r <revset>] <path>:<line> [--removed] [--as <name>] [<text>]
-       lgtm review resolve|reopen <C3>...
-       lgtm review guide";
+const USAGE: &str = "usage: lgtm agent review [-r <revset>]
+       lgtm agent review check [-r <revset>] [--uncheck] <path>...
+       lgtm agent review mark [-r <revset>] <path> [<lines>] [--removed <lines>] --reviewed|--flagged|--clear
+       lgtm agent review comments [-r <revset>]
+       lgtm agent review comment [-r <revset>] <path>:<line> [--removed] [--as <name>] [<text>]
+       lgtm agent review resolve|reopen <C3>...
+       lgtm agent review guide";
 
-/// Runs `lgtm review` with the arguments after it. `revset` is `-r`'s.
+/// Runs `lgtm agent review` with the arguments after it. `revset` is `-r`'s.
 pub fn run(args: Vec<String>, revset: Option<String>) -> i32 {
     match run_args(args, revset) {
         Ok(out) => {

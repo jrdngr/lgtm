@@ -1,10 +1,11 @@
-//! `lgtm`: terminal code review for jj, the commands agents run to review with it, and the
-//! command Claude Code runs for lgtm's hooks.
+//! `lgtm`: terminal code review for jj, and under `lgtm agent`, the commands agents run.
 
 mod agent;
+mod agent_cmd;
 mod edit;
 mod help;
 mod open_review;
+mod pr_start;
 mod register;
 mod review_cmd;
 mod route;
@@ -14,16 +15,15 @@ mod turn_hook;
 
 fn main() {
     let mut args: Vec<String> = std::env::args().skip(1).collect();
-    let pr = take_flag(&mut args, "--pr", "a PR number or URL");
-    let revset = take_flag(&mut args, "-r", "a revset");
     // lgterm marks a copy it opens beside another, which runs like any other.
     args.retain(|a| a != tui::SPLIT_FLAG);
     let code = match args.first().map(String::as_str) {
-        Some("review") => review_cmd::run(args[1..].to_vec(), revset.clone()),
-        Some("hook") => route::hook(),
-        Some("snap") => snap::run(&args[1..]),
-        Some("issues") if args.len() > 1 => lgtm_issues::command(args[1..].to_vec()),
-        Some("issues") => tui::run(tui::Start::Issues, None),
+        Some("agent") => agent_cmd::run(args[1..].to_vec()),
+        // Claude Code settings from before `lgtm agent hook` run this until lgtm next starts
+        // and rewrites them. A file named `hook` would open in its place, without a terminal.
+        Some("hook") if args.len() == 1 => route::hook(),
+        Some("review") => review(args[1..].to_vec()),
+        Some("issues") => issues(args[1..].to_vec()),
         Some("resolve") => match args.get(1) {
             Some(path) => tui::run(tui::Start::File(path.into(), 1), None),
             None => tui::run(tui::Start::Conflicts, None),
@@ -32,17 +32,65 @@ fn main() {
             println!("{}", help::HELP);
             0
         }
-        _ if revset.is_some() && !args.is_empty() => {
-            eprintln!("lgtm: -r opens a review, not a file");
+        Some(arg) if args.len() == 1 && !arg.starts_with('-') => tui::run(file(arg), None),
+        Some(_) => {
+            eprintln!("{}", help::HELP);
             2
         }
-        Some(arg) => tui::run(file(arg), pr),
-        None => match revset {
-            Some(r) => tui::run(tui::Start::Revset(r), pr),
-            None => tui::run(tui::Start::Editor, pr),
-        },
+        None => tui::run(tui::Start::Editor, None),
     };
     std::process::exit(code);
+}
+
+/// `lgtm review [-r <revset>] [--pr <pr>]`: the working copy, a revset, or a PR's revisions.
+fn review(mut args: Vec<String>) -> i32 {
+    let pr = take_flag(&mut args, "--pr", "a PR number or URL");
+    let revset = take_flag(&mut args, "-r", "a revset");
+    if let Some(extra) = args.first() {
+        eprintln!(
+            "lgtm: review takes -r and --pr, not `{extra}`\n\n{}",
+            help::HELP
+        );
+        return 2;
+    }
+    let revset = match (revset, &pr) {
+        (Some(r), _) => r,
+        (None, Some(pr)) => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let Some(root) = lgtm_core::repo::root_of(&cwd) else {
+                eprintln!("lgtm: not in a jj or git repo");
+                return 1;
+            };
+            match pr_start::revset(&root, pr) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("lgtm: {e:#}");
+                    return 1;
+                }
+            }
+        }
+        (None, None) => "@".into(),
+    };
+    tui::run(tui::Start::Revset(revset), pr)
+}
+
+/// `lgtm issues [-C <dir>] [init | answer ...]`: the issues screen, or the user's commands.
+fn issues(args: Vec<String>) -> i32 {
+    let screen = match args.as_slice() {
+        [] => true,
+        [c, dir] if c == "-C" => {
+            if let Err(e) = std::env::set_current_dir(dir) {
+                eprintln!("lgtm: {dir}: {e}");
+                return 1;
+            }
+            true
+        }
+        _ => false,
+    };
+    if screen {
+        return tui::run(tui::Start::Issues, None);
+    }
+    lgtm_issues::command(args, lgtm_issues::Side::User)
 }
 
 /// Takes `flag` and the value after it out of `args`, exiting when the value is missing.

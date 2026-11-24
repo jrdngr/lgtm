@@ -1,4 +1,4 @@
-//! Registers this binary's `lgtm hook` in Claude Code's user settings on start, and removes the
+//! Registers this binary's `lgtm agent hook` in Claude Code's user settings on start, and removes the
 //! MCP server lgtm used to register. A cargo build never registers, so trying one out leaves
 //! the installed command in place.
 
@@ -103,12 +103,14 @@ fn unregister_mcp() -> anyhow::Result<()> {
 
 /// The hook command for this binary.
 fn hook_command(exe: &str) -> String {
-    format!("'{}' hook", exe.replace('\'', "'\\''"))
+    format!("'{}' agent hook", exe.replace('\'', "'\\''"))
 }
 
-/// Whether a hook command runs some lgtm binary's `hook`.
+/// Whether a hook command runs some lgtm binary's hook, by its name now or before.
 fn is_lgtm_hook(command: &str) -> bool {
-    command.ends_with("/lgtm' hook") || command.ends_with("/lgtm-app' hook")
+    ["/lgtm' agent hook", "/lgtm' hook", "/lgtm-app' hook"]
+        .iter()
+        .any(|end| command.ends_with(end))
 }
 
 /// Whether settings JSON has this binary's hook on every event lgtm listens to.
@@ -203,7 +205,8 @@ mod tests {
         let mine = r#"{"type":"command","command":"say hi"}"#;
         let config = format!(
             r#"{{"model":"opus","hooks":{{"Stop":[{{"hooks":[{mine},{{"type":"command","command":"'/old/lgtm-app' hook"}}]}}],
-            "Notification":[{{"hooks":[{{"type":"command","command":"'/old/lgtm' hook"}}]}}]}}}}"#
+            "Notification":[{{"hooks":[{{"type":"command","command":"'/old/lgtm' hook"}}]}}],
+            "SessionEnd":[{{"hooks":[{{"type":"command","command":"'/old/lgtm' agent hook"}}]}}]}}}}"#
         );
         assert!(!hooks_in(&config, "/a/lgtm"));
         let out = with_hooks(&config, "/a/lgtm").unwrap();
@@ -213,6 +216,7 @@ mod tests {
         assert_eq!(v["model"], "opus");
         assert_eq!(v["hooks"]["Stop"][0]["hooks"][0]["command"], "say hi");
         assert_eq!(v["hooks"]["Notification"].as_array().unwrap().len(), 1);
+        assert_eq!(v["hooks"]["SessionEnd"].as_array().unwrap().len(), 1);
         assert_eq!(with_hooks(&out, "/a/lgtm").unwrap(), out);
         assert!(with_hooks("[1]", "/a/lgtm").is_err());
     }

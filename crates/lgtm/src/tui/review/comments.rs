@@ -1,5 +1,5 @@
 //! Comments for the agent: `c` writes one under the cursor's row, numbered C1, C2, …; the
-//! agent reads them with `lgtm review comments` and marks them done, which hides them. `d` deletes one.
+//! agent reads them with `lgtm agent review comments` and marks them done, which hides them. `d` deletes one.
 
 use lgtm_core::diff::RowKind;
 use lgtm_core::jj::FileDiff;

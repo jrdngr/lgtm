@@ -1,4 +1,4 @@
-//! What `lgtm review` asks of a review it loaded.
+//! What `lgtm agent review` asks of a review it loaded.
 
 use std::path::{Path, PathBuf};
 

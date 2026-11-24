@@ -19,3 +19,15 @@ pub struct HeadRepo {
     pub name: String,
     pub owner: Login,
 }
+
+/// A PR's base and head commits, as GitHub has them now.
+pub async fn ends(repo: &super::GhRepo, number: u32) -> anyhow::Result<(String, String)> {
+    let mut v = super::gh::rest(&format!(
+        "repos/{}/{}/pulls/{number}",
+        repo.owner, repo.name
+    ))
+    .await?;
+    let base: String = super::gh::at(&mut v, "/base/sha")?;
+    let head: String = super::gh::at(&mut v, "/head/sha")?;
+    Ok((base, head))
+}

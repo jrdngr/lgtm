@@ -1,4 +1,4 @@
-//! The arguments after `lgtm review <command>`.
+//! The arguments after `lgtm agent review <command>`.
 
 pub struct Args(Vec<String>);
 

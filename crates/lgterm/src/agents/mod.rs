@@ -28,7 +28,7 @@ const GONE_POLLS: u8 = 3;
 const DELIVERY_GAP: Duration = Duration::from_secs(3);
 
 /// The same hook twice within this is one report that reached lgterm twice, as when both
-/// `lgtm hook` and `lgterm hook` are set up.
+/// `lgtm agent hook` and `lgterm hook` are set up.
 const REPEAT: Duration = Duration::from_secs(1);
 
 pub struct Agent {

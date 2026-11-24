@@ -37,6 +37,22 @@ fn write(issue: &Issue, from: Option<&Path>, to: &Path) -> Result<()> {
     Ok(())
 }
 
+/// `text` with each `lgtm issues <verb>` an agent runs as `lgtm agent issues <verb>`.
+fn renamed_commands(text: &str) -> String {
+    const VERBS: [&str; 13] = [
+        "new", "list", "show", "statuses", "claim", "move", "set", "log", "ask", "close", "drop",
+        "reopen", "guide",
+    ];
+    let mut out = text.to_string();
+    for verb in VERBS {
+        out = out.replace(
+            &format!("`lgtm issues {verb}"),
+            &format!("`lgtm agent issues {verb}"),
+        );
+    }
+    out
+}
+
 pub struct Folder {
     pub root: PathBuf,
 }
@@ -57,6 +73,7 @@ impl Folder {
         }
         let folder = Folder { root };
         folder.upgrade()?;
+        folder.rename_commands()?;
         folder.place_loose()?;
         Ok(folder)
     }
@@ -68,6 +85,18 @@ impl Folder {
             fs::write(&marker, GUIDE)?;
         }
         Folder::open(dir)
+    }
+
+    /// Points an `ISSUES.md` from before `lgtm agent issues` at the agents' commands' new names,
+    /// keeping the rest of it as it is.
+    fn rename_commands(&self) -> Result<()> {
+        let marker = self.root.join(MARKER);
+        let text = fs::read_to_string(&marker)?;
+        let renamed = renamed_commands(&text);
+        if renamed != text {
+            fs::write(&marker, renamed)?;
+        }
+        Ok(())
     }
 
     pub fn issues_dir(&self) -> PathBuf {
@@ -359,6 +388,20 @@ mod tests {
         let (issues, bad) = folder.load().unwrap();
         assert_eq!(issues.len(), 1);
         assert!(bad[0].starts_with("2-broken.md"));
+    }
+
+    #[test]
+    fn an_old_guide_names_the_agent_commands_and_keeps_the_users_own_lines() {
+        let (_dir, folder) = folder();
+        let old = "Run `lgtm issues claim <id>`, then `lgtm issues log`.\n\
+                   Answer with `lgtm issues answer`, or open `lgtm issues`.\nMy note.\n";
+        fs::write(folder.root.join(MARKER), old).unwrap();
+        let folder = Folder::open(&folder.root).unwrap();
+        assert_eq!(
+            fs::read_to_string(folder.root.join(MARKER)).unwrap(),
+            "Run `lgtm agent issues claim <id>`, then `lgtm agent issues log`.\n\
+             Answer with `lgtm issues answer`, or open `lgtm issues`.\nMy note.\n"
+        );
     }
 
     #[test]

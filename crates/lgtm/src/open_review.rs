@@ -1,4 +1,4 @@
-//! Which review each open lgtm shows, so `lgtm review` can default to it. Each app keeps a
+//! Which review each open lgtm shows, so `lgtm agent review` can default to it. Each app keeps a
 //! file named for its pid in its workspace's folder, locked while it runs.
 
 use std::fs::{File, TryLockError};

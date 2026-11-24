@@ -1,4 +1,5 @@
-//! `lgtm issues <command>`: what agents run.
+//! `lgtm agent issues <command>`, what agents run, and `lgtm issues <command>`, what the user
+//! runs.
 
 use std::io::Read;
 use std::path::PathBuf;
@@ -10,11 +11,20 @@ use crate::issue::Asked;
 use crate::workflow::Verb;
 use crate::{guide, lgterm, ops, time};
 
-pub const USAGE: &str = "usage: lgtm issues [-C <dir>] [--as <name>] [command]
+pub const USAGE: &str = "usage: lgtm issues [-C <dir>]
+       lgtm issues [-C <dir>] init
+       lgtm issues [-C <dir>] answer <id> <Qn> [--pick <n>] [text]
 
 With no command, opens the issues screen on this folder, or on one picked under it.
 
   init                         start an issues folder here
+  answer <id> <Qn> [--pick <n>] [text]
+                               answer a question and send it to the issue's owner:
+                               an option and notes, or with no --pick, a reply that
+                               closes the question for a new one";
+
+pub const AGENT_USAGE: &str = "usage: lgtm agent issues [-C <dir>] [--as <name>] <command>
+
   new <title> [--body <text>] [--status <s>] [--<field> <value>]...
                                file an issue; prints its id
   list [--all] [--status <s>]  issues not done; --all adds done ones
@@ -27,14 +37,32 @@ With no command, opens the issues screen on this folder, or on one picked under 
   log <id> <text>              add a note
   ask <id> <Qn> [--after <Qm>] [text]
                                ask the user; text comes from stdin when not given
-  answer <id> <Qn> [--pick <n>] [text]
-                               answer a question and send it to the issue's owner:
-                               an option and notes, or with no --pick, a reply that
-                               closes the question for a new one
   close <id> [--force] [note]  move it to the close status
   drop <id> [--force] [note]   move it to the drop status
   reopen <id> [--force] [note] move it to the reopen status
   guide                        how agents use this issues folder";
+
+/// Who runs a command: the user, as `lgtm issues`, or an agent, as `lgtm agent issues`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    User,
+    Agent,
+}
+
+impl Side {
+    fn usage(self) -> &'static str {
+        match self {
+            Side::User => USAGE,
+            Side::Agent => AGENT_USAGE,
+        }
+    }
+
+    /// Whether this side runs `cmd`.
+    fn runs(self, cmd: &str) -> bool {
+        let user = matches!(cmd, "init" | "answer");
+        user == (self == Side::User)
+    }
+}
 
 /// The arguments every command takes.
 pub struct Args {
@@ -94,12 +122,21 @@ fn stdin() -> Result<String> {
     Ok(text)
 }
 
-pub fn run(args: Args) -> Result<()> {
+pub fn run(args: Args, side: Side) -> Result<()> {
     let mut rest = args.rest;
     if rest.is_empty() {
-        bail!("{USAGE}");
+        bail!("{}", side.usage());
     }
     let cmd = rest.remove(0);
+    if matches!(cmd.as_str(), "help" | "-h" | "--help")
+        || rest.iter().any(|a| a == "-h" || a == "--help")
+    {
+        println!("{}", side.usage());
+        return Ok(());
+    }
+    if !side.runs(&cmd) {
+        bail!("unknown command `{cmd}`\n{}", side.usage());
+    }
     if cmd == "init" {
         let folder = Folder::init(&args.dir)?;
         println!("{}", folder.root.display());
@@ -110,12 +147,6 @@ pub fn run(args: Args) -> Result<()> {
             Ok(folder) => print!("{}", guide::full(&folder.workflow()?)),
             Err(_) => print!("{}", guide::GUIDE),
         }
-        return Ok(());
-    }
-    if matches!(cmd.as_str(), "help" | "-h" | "--help")
-        || rest.iter().any(|a| a == "-h" || a == "--help")
-    {
-        println!("{USAGE}");
         return Ok(());
     }
     let folder = Folder::open(&args.dir)?;
@@ -319,12 +350,17 @@ fn list(folder: &Folder, all: bool, only: Option<&str>) -> Result<()> {
 mod tests {
     use super::*;
 
-    fn run_in(folder: &Folder, argv: &[&str]) -> Result<()> {
-        run(Args {
+    fn run_as(side: Side, folder: &Folder, argv: &[&str]) -> Result<()> {
+        let args = Args {
             dir: folder.root.clone(),
             name: Some("test".into()),
             rest: argv.iter().map(|a| a.to_string()).collect(),
-        })
+        };
+        run(args, side)
+    }
+
+    fn run_in(folder: &Folder, argv: &[&str]) -> Result<()> {
+        run_as(Side::Agent, folder, argv)
     }
 
     #[test]
@@ -336,5 +372,16 @@ mod tests {
         let err = run_in(&folder, &["new", "Title", "--sevrity", "high"]).unwrap_err();
         assert_eq!(err.to_string(), "new has no --sevrity flag");
         assert!(folder.load().unwrap().0.is_empty());
+    }
+
+    #[test]
+    fn the_user_and_agents_each_run_only_their_own_commands() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = Folder::init(dir.path()).unwrap();
+        assert!(run_as(Side::User, &folder, &["new", "Title"]).is_err());
+        assert!(run_as(Side::Agent, &folder, &["init"]).is_err());
+        assert!(run_as(Side::Agent, &folder, &["answer", "1", "Q1", "yes"]).is_err());
+        assert!(folder.load().unwrap().0.is_empty());
+        run_as(Side::User, &folder, &["init"]).unwrap();
     }
 }

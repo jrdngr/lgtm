@@ -1,4 +1,4 @@
-//! `lgtm snap <label>` starts a step named `label`. It ends the agent's running turn in the
+//! `lgtm agent snap <label>` starts a step named `label`. It ends the agent's running turn in the
 //! workspace and starts one named for the step, or takes a checkpoint named `label` when no
 //! agent is working. Both apps list it with the workspace's turns.
 
@@ -12,7 +12,7 @@ pub fn run(label: &[String]) -> i32 {
     let label = label.join(" ");
     let label = label.trim();
     if label.is_empty() {
-        eprintln!("usage: lgtm snap <label>");
+        eprintln!("usage: lgtm agent snap <label>");
         return 2;
     }
     let Some(root) = std::env::current_dir()

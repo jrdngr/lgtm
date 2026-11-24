@@ -1,5 +1,6 @@
 //! lgtm issues: an issue tracker for agents, kept as markdown files in one folder. lgtm runs
-//! its commands as `lgtm issues <command>` and shows it as a screen.
+//! its commands as `lgtm issues <command>` and `lgtm agent issues <command>`, and shows it as a
+//! screen.
 
 mod cli;
 mod fields;
@@ -14,11 +15,12 @@ mod time;
 pub mod tui;
 mod workflow;
 
-pub use cli::USAGE;
+pub use cli::{AGENT_USAGE, Side, USAGE};
 
-/// Runs `lgtm issues <args>`, a command other than opening the screen. Returns the exit code.
-pub fn command(args: Vec<String>) -> i32 {
-    let result = cli::Args::parse(args).and_then(cli::run);
+/// Runs `lgtm issues <args>` or `lgtm agent issues <args>`, a command other than opening the
+/// screen. Returns the exit code.
+pub fn command(args: Vec<String>, side: Side) -> i32 {
+    let result = cli::Args::parse(args).and_then(|a| cli::run(a, side));
     match result {
         Ok(()) => 0,
         Err(e) => {

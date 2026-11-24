@@ -1,4 +1,4 @@
-//! The Claude Code skill that points agents at `lgtm issues guide`.
+//! The Claude Code skill that points agents at `lgtm agent issues guide`.
 
 use std::path::Path;
 
@@ -7,11 +7,11 @@ name: lgtm-issues
 description: Use when asked to file, claim, work on, fix, close or orchestrate issues in an lgtm issues folder (one with ISSUES.md), to ask the user a question through issues, or to coordinate agents through an issue tracker.
 ---
 
-Run `lgtm issues guide` and follow it. It covers filing, claiming and closing issues, logging
+Run `lgtm agent issues guide` and follow it. It covers filing, claiming and closing issues, logging
 progress, and asking the user questions they answer in `lgtm issues`.
 
 When orchestrating other agents, also run `lgterm guide` to start and message them. Tell each
-agent its issue id and to follow `lgtm issues guide`.
+agent its issue id and to follow `lgtm agent issues guide`.
 "#;
 
 /// Writes the skill into `~/.claude/skills/lgtm-issues` when Claude Code is set up and the

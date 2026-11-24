@@ -1,4 +1,4 @@
-//! Answers `lgtm review`'s requests about a review it loaded.
+//! Answers `lgtm agent review`'s requests about a review it loaded.
 
 use lgtm_core::anchor::Side;
 use lgtm_core::store::{AgentComment, Store};
