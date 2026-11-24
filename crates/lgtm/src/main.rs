@@ -3,6 +3,7 @@
 
 mod agent;
 mod edit;
+mod help;
 mod open_review;
 mod register;
 mod review_cmd;
@@ -28,9 +29,7 @@ fn main() {
             None => tui::run(tui::Start::Conflicts, None),
         },
         Some("-h" | "--help") => {
-            println!(
-                "usage: lgtm [--pr <number>] [-r <revset>]\n       lgtm <file>[:line] | <folder>\n       lgtm snap <label>\n       lgtm resolve [<file>]\n       lgtm issues [<command>]\n       lgtm review [<command>]\n       lgtm hook"
-            );
+            println!("{}", help::HELP);
             0
         }
         _ if revset.is_some() && !args.is_empty() => {
